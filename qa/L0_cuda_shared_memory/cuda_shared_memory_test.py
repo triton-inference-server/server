@@ -25,23 +25,23 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import tensorrtserver.shared_memory as shm
+import tensorrtserver.shared_memory as cshm
 from tensorrtserver.api import *
 import numpy as np
 import threading
 
-# Raises error since invalid shm region
+# Raises error since invalid cuda shm region
 try:
-    shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", -1)
+    shm_op0_handle = cshm.create_shared_memory_region("dummy_data", -1, 0)
 except Exception as ex:
     assert str(ex) == "unable to initialize the size"
 
 shared_memory_ctx = SharedMemoryControlContext("localhost:8000",  ProtocolType.HTTP, verbose=False)
 
-# Create a valid shared memory region
-shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", 8)
-# Fill data in shared memory region
-shm.set_shared_memory_region(shm_op0_handle, [np.array([1,2])])
+# Create a valid cuda shared memory region
+shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
+# Fill data in cuda shared memory region
+cshm.set_shared_memory_region(shm_op0_handle, [np.array([1,2])])
 # Unregister before register does not fail - does nothing
 shared_memory_ctx.unregister(shm_op0_handle)
 # Test if register is working
@@ -55,16 +55,16 @@ except Exception as ex:
 
 # unregister after register
 shared_memory_ctx.unregister(shm_op0_handle)
-shm.destroy_shared_memory_region(shm_op0_handle)
+cshm.destroy_shared_memory_region(shm_op0_handle)
 
-shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0", 64)
-shm_op1_handle = shm.create_shared_memory_region("output1_data", "/output1", 64)
-shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0", 64)
-shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", 64)
+shm_op0_handle = cshm.create_shared_memory_region("output0_data", 64, 0)
+shm_op1_handle = cshm.create_shared_memory_region("output1_data", 64, 0)
+shm_ip0_handle = cshm.create_shared_memory_region("input0_data", 64, 0)
+shm_ip1_handle = cshm.create_shared_memory_region("input1_data", 64, 0)
 input0_data = np.arange(start=0, stop=16, dtype=np.int32)
 input1_data = np.ones(shape=16, dtype=np.int32)
-shm.set_shared_memory_region(shm_ip0_handle, [input0_data])
-shm.set_shared_memory_region(shm_ip1_handle, [input1_data])
+cshm.set_shared_memory_region(shm_ip0_handle, [input0_data])
+cshm.set_shared_memory_region(shm_ip1_handle, [input1_data])
 shared_memory_ctx.register(shm_ip0_handle)
 shared_memory_ctx.register(shm_ip1_handle)
 shared_memory_ctx.register(shm_op0_handle)
@@ -97,7 +97,7 @@ shared_memory_ctx.register(shm_op0_handle)
 # Destory during inference (Does not destroy_shared_memory_region)
 threads[0] = threading.Thread(target=basic_inference,
     args=(shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle, error_msg))
-threads[1] = threading.Thread(target=shm.destroy_shared_memory_region, args=(shm_op0_handle,))
+threads[1] = threading.Thread(target=cshm.destroy_shared_memory_region, args=(shm_op0_handle,))
 for t in threads:
     t.start()
 for t in threads:
@@ -106,7 +106,7 @@ if len(error_msg) > 1:
     raise Exception(error_msg[-1])
 
 # Register during inference - Should work fine
-shm_ip2_handle = shm.create_shared_memory_region("input2_data", "/input2", 128)
+shm_ip2_handle = cshm.create_shared_memory_region("input2_data", 128, 0)
 threads[0] = threading.Thread(target=basic_inference,
     args=(shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle, error_msg))
 threads[1] = threading.Thread(target=shared_memory_ctx.register, args=(shm_ip2_handle,))
@@ -137,12 +137,12 @@ status_after = shared_memory_ctx.get_shared_memory_status()
 assert len(status_after.shared_memory_region) == 0
 
 # cleanup (error with shm_op0_handle destroy since open on server)
-shm.destroy_shared_memory_region(shm_ip0_handle)
-shm.destroy_shared_memory_region(shm_ip1_handle)
-shm.destroy_shared_memory_region(shm_ip2_handle)
-shm.destroy_shared_memory_region(shm_op1_handle)
+cshm.destroy_shared_memory_region(shm_ip0_handle)
+cshm.destroy_shared_memory_region(shm_ip1_handle)
+cshm.destroy_shared_memory_region(shm_ip2_handle)
+cshm.destroy_shared_memory_region(shm_op1_handle)
 try:
-    shm.destroy_shared_memory_region(shm_op0_handle)
+    cshm.destroy_shared_memory_region(shm_op0_handle)
 except:
     pass
 
