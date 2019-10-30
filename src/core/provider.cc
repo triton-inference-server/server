@@ -756,8 +756,8 @@ InferResponseProvider::AllocateOutputBuffer(
 
   void* buffer = nullptr;
   void* buffer_userp = nullptr;
-  TRTSERVER_Memory_Type raw_actual_memory_type = preferred_memory_type;
-  int64_t raw_actual_memory_type_id = preferred_memory_type_id;
+  TRTSERVER_Memory_Type raw_actual_memory_type;
+  int64_t raw_actual_memory_type_id;
 #ifdef TRTIS_ENABLE_GPU
   int current_device;
   auto cuerr = cudaGetDevice(&current_device);

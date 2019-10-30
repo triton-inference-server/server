@@ -637,7 +637,7 @@ TRTSERVER_Error*
 InferResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
-    TRTSERVER_Memory_Type preferred_memory_type, int64_t memory_type_id,
+    TRTSERVER_Memory_Type preferred_memory_type, int64_t preferred_memory_type_id,
     void* userp, TRTSERVER_Memory_Type* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
@@ -647,6 +647,8 @@ InferResponseAlloc(
 
   *buffer = nullptr;
   *buffer_userp = nullptr;
+  *actual_memory_type = preferred_memory_type;
+  *actual_memory_type_id = preferred_memory_type_id;
 
   // Called once for each result tensor in the inference request. Must
   // always add a raw output into the response's list of outputs so

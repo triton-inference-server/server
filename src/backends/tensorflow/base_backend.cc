@@ -488,6 +488,13 @@ ReadStringOutputTensor(
   if (cuda_copy) {
     cudaStreamSynchronize(stream);
   }
+  if (stream != nullptr) {
+    cudaError_t err = cudaStreamDestroy(stream);
+    if (err != cudaSuccess) {
+      LOG_ERROR << "Failed to destroy cuda stream: " << cudaGetErrorString(err);
+    }
+    stream = nullptr;
+  }
 #endif  // TRTIS_ENABLE_GPU
 }
 
