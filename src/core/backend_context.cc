@@ -57,15 +57,28 @@ Status
 BackendContext::CreateCudaStream(const int cuda_stream_priority)
 {
 #ifdef TRTIS_ENABLE_GPU
-  int device_cnt;
-  auto cuerr = cudaGetDeviceCount(&device_cnt);
-  // Do nothing if there is no CUDA device since all data transfer will be done
-  // within CPU memory
-  if ((cuerr != cudaErrorNoDevice) && (cuerr != cudaErrorInsufficientDriver)) {
+  if (gpu_device_ != NO_GPU_DEVICE) {
+    // Make sure that correct device is set before creating stream and
+    // then restore the device to what was set by the caller.
+    int current_device;
+    auto cuerr = cudaGetDevice(&current_device);
+    bool overridden = false;
+    if (cuerr == cudaSuccess) {
+      overridden = (current_device != gpu_device_);
+      if (overridden) {
+        cuerr = cudaSetDevice(gpu_device_);
+      }
+    }
+
     if (cuerr == cudaSuccess) {
       cuerr = cudaStreamCreateWithPriority(
           &stream_, cudaStreamDefault, cuda_stream_priority);
     }
+
+    if (overridden) {
+      cudaSetDevice(current_device);
+    }
+
     if (cuerr != cudaSuccess) {
       return Status(
           RequestStatusCode::INTERNAL, "unable to create stream for " + name_ +
@@ -73,6 +86,7 @@ BackendContext::CreateCudaStream(const int cuda_stream_priority)
     }
   }
 #endif  // TRTIS_ENABLE_GPU
+
   return Status::Success;
 }
 
