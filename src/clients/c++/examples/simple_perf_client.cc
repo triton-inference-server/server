@@ -168,31 +168,47 @@ class InferContextFactory {
 
 void
 RunSyncSerial(
-    nic::InferContext* ctx, const uint32_t iters,
+    nic::InferContext* ctx, const uint32_t iters, const uint32_t start_window,
+    const uint32_t end_window, uint64_t* t_total_duration_ns,
     std::vector<uint64_t>* request_duration_ns)
 {
+  struct timespec start, end;
+
   for (uint32_t iter = 0; iter < iters; iter++) {
     std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
 
-    struct timespec start;
-    clock_gettime(CLOCK_MONOTONIC, &start);
+    if (iter == start_window) {
+      clock_gettime(CLOCK_MONOTONIC, &start);
+    }
+
+    struct timespec request_start;
+    clock_gettime(CLOCK_MONOTONIC, &request_start);
 
     FAIL_IF_ERR(ctx->Run(&results), "unable to run");
 
-    struct timespec end;
-    clock_gettime(CLOCK_MONOTONIC, &end);
+    struct timespec request_end;
+    clock_gettime(CLOCK_MONOTONIC, &request_end);
+
+    if (iter == end_window) {
+      clock_gettime(CLOCK_MONOTONIC, &end);
+    }
 
     // We expect there to be 1 result.
     FAIL_IF(
         results.size() != 1,
         "expected 1 result, got " + std::to_string(results.size()));
 
-    if (request_duration_ns != nullptr) {
-      uint64_t start_ns = TIMESPEC_TO_NANOS(start);
-      uint64_t end_ns = TIMESPEC_TO_NANOS(end);
+    if (request_duration_ns != nullptr && iter >= start_window &&
+        iter <= end_window) {
+      uint64_t start_ns = TIMESPEC_TO_NANOS(request_start);
+      uint64_t end_ns = TIMESPEC_TO_NANOS(request_end);
       request_duration_ns->push_back(end_ns - start_ns);
     }
   }
+
+  uint64_t start_ns = TIMESPEC_TO_NANOS(start);
+  uint64_t end_ns = TIMESPEC_TO_NANOS(end);
+  *t_total_duration_ns = end_ns - start_ns;
 }
 
 void
@@ -211,6 +227,11 @@ RunSyncConcurrent(
       concurrency);
   std::vector<uint64_t> threads_total_duration_ns(concurrency);
 
+  // We will be selecting 'iters/concurrency' readings from the center of
+  // each thread to finally report the stable results.
+  uint64_t start_window = (iters * (concurrency - 1)) / (2 * concurrency);
+  uint64_t end_window = start_window + (iters / concurrency) - 1;
+
   for (uint32_t t = 0; t < concurrency; ++t) {
     std::vector<uint64_t>* t_duration_ns = new std::vector<uint64_t>();
     threads_duration_ns[t].reset(t_duration_ns);
@@ -218,24 +239,17 @@ RunSyncConcurrent(
     uint64_t* t_total_duration_ns = &threads_total_duration_ns[t];
     *t_total_duration_ns = 0;
 
-    threads.emplace_back(new std::thread(
-        [barrier, factory, iters, t_total_duration_ns, t_duration_ns] {
+    threads.emplace_back(
+        new std::thread([barrier, factory, iters, start_window, end_window,
+                         t_total_duration_ns, t_duration_ns] {
           std::unique_ptr<nic::InferContext> ctx;
           factory.Create(&ctx);
 
           barrier->Wait();
 
-          struct timespec start;
-          clock_gettime(CLOCK_MONOTONIC, &start);
-
-          RunSyncSerial(ctx.get(), iters, t_duration_ns);
-
-          struct timespec end;
-          clock_gettime(CLOCK_MONOTONIC, &end);
-
-          uint64_t start_ns = TIMESPEC_TO_NANOS(start);
-          uint64_t end_ns = TIMESPEC_TO_NANOS(end);
-          *t_total_duration_ns = end_ns - start_ns;
+          RunSyncSerial(
+              ctx.get(), iters, start_window, end_window, t_total_duration_ns,
+              t_duration_ns);
         }));
   }
 
@@ -295,12 +309,25 @@ RunAsyncConcurrent(
   sem_t* sem = &lsem;
   sem_init(sem, 0, concurrency);
 
-  struct timespec total_start;
-  clock_gettime(CLOCK_MONOTONIC, &total_start);
-  request_duration_ns->resize(iters * concurrency);
+  struct timespec total_start, total_end;
+  std::vector<uint64_t> request_duration_buffer_ns(iters * concurrency);
 
-  for (std::vector<uint64_t>::iterator iter = request_duration_ns->begin();
-       iter != request_duration_ns->end(); ++iter) {
+  // We will be selecting 'iters' readings from the center to finally report the
+  // stable results with the given concurrency.
+  uint64_t start_window = (iters * (concurrency - 1)) / 2;
+  uint64_t end_window = start_window + iters - 1;
+  bool signal_end;
+
+  uint64_t index = 0;
+  for (std::vector<uint64_t>::iterator iter =
+           request_duration_buffer_ns.begin();
+       iter != request_duration_buffer_ns.end(); ++iter) {
+    if (index == start_window) {
+      clock_gettime(CLOCK_MONOTONIC, &total_start);
+    }
+
+    signal_end = (index == end_window);
+
     // Wait so that only 'concurrency' requests are in flight at any
     // given time.
     sem_wait(sem);
@@ -311,12 +338,17 @@ RunAsyncConcurrent(
 
     FAIL_IF_ERR(
         ctx->AsyncRun(
-            [sem, iter](
+            [sem, iter, signal_end, &total_end](
                 nic::InferContext* ctx,
                 const std::shared_ptr<nic::InferContext::Request>& request) {
               RunAsyncComplete(ctx, request, sem, iter);
+              if (signal_end) {
+                clock_gettime(CLOCK_MONOTONIC, &total_end);
+              }
             }),
         "unable to async run");
+
+    index += 1;
   }
 
   // Wait for all the in-flight requests to complete.
@@ -326,11 +358,13 @@ RunAsyncConcurrent(
     if (sem_value == (int)concurrency) {
       break;
     }
-    // FIXME quick sleep here
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 
-  struct timespec total_end;
-  clock_gettime(CLOCK_MONOTONIC, &total_end);
+  // extract the readings from the target window
+  request_duration_ns->assign(
+      request_duration_buffer_ns.begin() + start_window,
+      request_duration_buffer_ns.begin() + end_window);
 
   if (total_duration_ns != nullptr) {
     uint64_t total_start_ns = TIMESPEC_TO_NANOS(total_start);
@@ -384,7 +418,7 @@ ShowResults(
 
   double total_infer_per_us = 0.0;
   for (const auto ns : total_duration_ns) {
-    total_infer_per_us += iters / (ns / 1000.0);
+    total_infer_per_us += (iters / total_duration_ns.size()) / (ns / 1000.0);
   }
 
   std::cout << "{\"s_benchmark_kind\":\"simple_perf\",";
