@@ -669,7 +669,7 @@ EnsembleContext::CheckAndSetEnsembleOutput()
         output_pair.first, &buffer, expected_byte_size, shape, dst_memory_type,
         memory_type_id);
     if (dst_memory_type == TRTSERVER_MEMORY_CPU) {
-      return status;
+      RETURN_IF_ERROR(status);
     }
 
     // Done with this output if 'expected_byte_size' is 0
