@@ -358,7 +358,7 @@ RunAsyncConcurrent(
     if (sem_value == (int)concurrency) {
       break;
     }
-    // FIXME quick sleep here
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 
   // extract the readings from the target window
