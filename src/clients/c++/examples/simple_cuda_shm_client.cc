@@ -257,7 +257,7 @@ main(int argc, char** argv)
 
   // Register Output shared memory with TRTIS
   err = shared_memory_ctx->RegisterCudaSharedMemory(
-      "output_data", output_cuda_handle, output_byte_size * 2);
+      "output_data", output_cuda_handle, output_byte_size * 2, 0);
   if (!err.IsOk()) {
     std::cerr << "error: unable to register shared memory output region: "
               << err << std::endl;
@@ -300,7 +300,7 @@ main(int argc, char** argv)
 
   // Register Input shared memory with TRTIS
   err = shared_memory_ctx->RegisterCudaSharedMemory(
-      "input_data", input_cuda_handle, input_byte_size * 2);
+      "input_data", input_cuda_handle, input_byte_size * 2, 0);
   if (!err.IsOk()) {
     std::cerr << "error: unable to register shared memory input region: " << err
               << std::endl;
