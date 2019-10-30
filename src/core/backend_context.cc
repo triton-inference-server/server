@@ -211,8 +211,6 @@ BackendContext::CopyBuffer(
     memcpy(dst, src, byte_size);
   } else {
 #ifdef TRTIS_ENABLE_GPU
-    // [TODO] Add check for Peer Access between two GPUs and use
-    // when possible
     // [TODO] use cudaMemcpyDefault if UVM is supported for the device
     auto copy_kind = cudaMemcpyDeviceToDevice;
     if (src_memory_type == TRTSERVER_MEMORY_CPU) {
