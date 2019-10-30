@@ -59,7 +59,9 @@ RET=0
 
 set +e
 
-# Add onnx_nobatch_zero_1_object once Onnx backend is fixed
+# Ignore ONNX backend because even though ONNX supports string data type,
+# strings that contain null character in the middle is not allowed.
+# https://github.com/microsoft/onnxruntime/issues/2284
 for MODEL in graphdef_nobatch_zero_1_object savedmodel_nobatch_zero_1_object; do
   python $NULLCHAR_CLIENT_PY -m $MODEL -v >>$CLIENT_LOG 2>&1
   if [ $? -ne 0 ]; then
