@@ -777,7 +777,7 @@ EnsembleContext::ScheduleSteps(
         step->request_provider_->RequestHeader().batch_size());
     infer_stats->SetFailed(true);
 
-    context->is_->Infer(
+    context->is_->InferAsync(
         step->backend_, step->request_provider_, step->response_provider_,
         infer_stats,
         [context, step, infer_stats](const Status& status) mutable {
@@ -794,7 +794,7 @@ EnsembleContext::ScheduleSteps(
           context->stats_->IncrementQueueDuration(*infer_stats);
           context->stats_->IncrementComputeDuration(*infer_stats);
 
-          infer_stats.reset();
+          infer_stats->Report();
 
           step->infer_status_ = status;
           Proceed(context, step);

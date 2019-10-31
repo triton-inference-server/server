@@ -108,7 +108,7 @@ class ModelInferStats {
   }
 
   // Report collected statistics.
-  ~ModelInferStats();
+  void Report();
 
   // Mark inferencing request as failed / not-failed.
   void SetFailed(bool failed) { failed_ = failed; }
