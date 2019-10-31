@@ -284,14 +284,29 @@ additional requirements for enabling a backend.
 
 These additional options may be specified:
 
+* **TRTIS_ENABLE_GRPC**: By default the inference server accepts
+  inference, status, health and other requests via the GRPC
+  protocol. Use -DTRTIS_ENABLE_GRPC=OFF to disable.
+
+* **TRTIS_ENABLE_HTTP**: By default the inference server accepts
+  inference, status, health and other requests via the HTTP
+  protocol. Use -DTRTIS_ENABLE_HTTP=OFF to disable.
+
 * **TRTIS_ENABLE_METRICS**: By default the inference server reports
   :ref:`Prometheus metrics<section-metrics>` on an HTTP endpoint. Use
   -DTRTIS_ENABLE_METRICS=OFF to disable.
 
+* **TRTIS_ENABLE_GCS**: Use -DTRTIS_ENABLE_GCS=ON to enable the
+  inference server to read model repositories from Google Cloud
+  Storage.
+
+* **TRTIS_ENABLE_S3**: Use -DTRTIS_ENABLE_S3=ON to enable the
+  inference server to read model repositories from Amazon S3.
+
 * **TRTIS_ENABLE_GPU**: By default the inference server supports
   NVIDIA GPUs. Use -DTRTIS_ENABLE_GPU=OFF to disable GPU support. When
   GPUs are disable the inference server will :ref:`run models on CPU
-  when possible<section-running-the-inference-server-without-gpu>`.
+  when possible <section-running-the-inference-server-without-gpu>`.
 
 * **TRTIS_MIN_COMPUTE_CAPABILITY**: By default, the inference server
   supports NVIDIA GPUs with CUDA compute capability 6.0 or higher. If
@@ -299,6 +314,11 @@ These additional options may be specified:
   support a lower compute capability, then TRTIS can be built to support
   that lower compute capability by setting -DTRTIS_MIN_COMPUTE_CAPABILITY
   appropriately. The setting is ignored if -DTRTIS_ENABLE_GPU=OFF.
+
+* **TRTIS_EXTRA_LIB_PATHS**: Extra paths that are searched for
+  framework libraries as described above. Multiple paths can be
+  specified by separating them with a semicolon, for example,
+  -DTRTIS_EXTRA_LIB_PATHS="/path/a;/path/b".
 
 Build Inference Server
 ^^^^^^^^^^^^^^^^^^^^^^
