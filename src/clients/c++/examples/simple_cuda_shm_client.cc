@@ -382,11 +382,17 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  // Cleanup cuda IPC handle and free GPU memory
-  cudaIpcCloseMemHandle(input0_d_ptr);
-  cudaFree(input0_d_ptr);
-  cudaIpcCloseMemHandle(output0_d_ptr);
-  cudaFree(output0_d_ptr);
+  // Free GPU memory
+  cudaError_t cuerr = cudaFree(input0_d_ptr);
+  if (cuerr != cudaSuccess) {
+    std::cerr << "CUDA free (input0_d_ptr) error: " << cudaGetErrorName(cuerr)
+              << "\n";
+  }
+  cuerr = cudaFree(output0_d_ptr);
+  if (cuerr != cudaSuccess) {
+    std::cerr << "CUDA free (output0_d_ptr) error: " << cudaGetErrorName(cuerr)
+              << "\n";
+  }
 
   return 0;
 }
