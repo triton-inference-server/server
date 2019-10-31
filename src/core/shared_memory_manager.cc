@@ -244,7 +244,7 @@ SharedMemoryManager::UnregisterSharedMemoryHelper(const std::string& name)
 #endif  // TRTIS_ENABLE_GPU
     }
 
-    // remove region info from shared_memory_map_
+    // Remove region information from shared_memory_map_
     shared_memory_map_.erase(it);
   }
 

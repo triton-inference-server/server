@@ -820,7 +820,8 @@ InferGRPCToInput(
     }
 
     RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-        request_provider, io.name().c_str(), base, byte_size, memory_type, 0 /* memory_type_id */));
+        request_provider, io.name().c_str(), base, byte_size, memory_type,
+        0 /* memory_type_id */));
   }
 
   return nullptr;  // success

@@ -162,11 +162,10 @@ class CudaSharedMemoryException(Exception):
 
     """
     def __init__(self, err):
-        self.err_code_map = { -2: "unable to set device successfully",
-                            -2: "unable to create cuda shared memory",
+        self.err_code_map = { -1: "unable to set device successfully",
+                            -2: "unable to create cuda shared memory handle",
                             -3: "unable to set values in cuda shared memory",
-                            -4: "unable to close the cuda shared memory region",
-                            -5: "unable to free GPU device memory"}
+                            -4: "unable to free GPU device memory"}
         self._msg = None
         if err.value != 0 and err.value in self.err_code_map:
             self._msg = self.err_code_map[err.value]

@@ -1,5 +1,5 @@
 #!/usr/bin/python
-
+#
 # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -137,7 +137,7 @@ if __name__ == '__main__':
 
     del results
     print(shared_memory_ctx.get_shared_memory_status())
-    # shared_memory_ctx.unregister_all()
+    shared_memory_ctx.unregister_all()
     cudashm.destroy_shared_memory_region(shm_ip0_handle)
     cudashm.destroy_shared_memory_region(shm_ip1_handle)
     cudashm.destroy_shared_memory_region(shm_op0_handle)

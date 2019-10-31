@@ -922,7 +922,8 @@ HTTPAPIServer::EVBufferToInput(
             io.shared_memory().byte_size(), &base));
         TRTSERVER_SharedMemoryBlockDevice(smb, &memory_type);
         RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-            request_provider, io.name().c_str(), base, byte_size, memory_type, 0 /* memory_type_id */));
+            request_provider, io.name().c_str(), base, byte_size, memory_type,
+            0 /* memory_type_id */));
       } else {
         while ((byte_size > 0) && (v_idx < n)) {
           char* base = static_cast<char*>(v[v_idx].iov_base);

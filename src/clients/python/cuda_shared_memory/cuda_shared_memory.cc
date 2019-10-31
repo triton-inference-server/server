@@ -68,12 +68,12 @@ CudaSharedMemoryRegionCreate(
     return -1;
   }
 
-  void* data_ptr;
+  void* base_addr;
   cudaIpcMemHandle_t cuda_handle;
 
   // Allocate data and create cuda IPC handle for data on the gpu
-  cudaMalloc((void**)&data_ptr, byte_size);
-  err = cudaIpcGetMemHandle(&cuda_handle, data_ptr);
+  err = cudaMalloc(&base_addr, byte_size);
+  err = cudaIpcGetMemHandle(&cuda_handle, base_addr);
   if (err != cudaSuccess) {
     cudaSetDevice(previous_device);
     return -2;
@@ -81,7 +81,9 @@ CudaSharedMemoryRegionCreate(
 
   // create a handle for the shared memory region
   *cuda_shm_handle = CudaSharedMemoryHandleCreate(
-      std::string(trtis_shm_name), cuda_handle, data_ptr, byte_size, device_id);
+      std::string(trtis_shm_name), cuda_handle, base_addr, byte_size,
+      device_id);
+  std::cerr << "Base address (Create): " << base_addr << "\n";
 
   // Set device to previous GPU
   cudaSetDevice(previous_device);
@@ -106,9 +108,9 @@ CudaSharedMemoryRegionSet(
   // Copy data into cuda shared memory
   void* base_addr =
       reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle)->base_addr_;
-  uint8_t* base_addr_offset = reinterpret_cast<uint8_t*>(base_addr);
   err = cudaMemcpy(
-      base_addr_offset + offset, data, byte_size, cudaMemcpyHostToDevice);
+      reinterpret_cast<uint8_t*>(base_addr) + offset, data, byte_size,
+      cudaMemcpyHostToDevice);
   if (err != cudaSuccess) {
     cudaSetDevice(previous_device);
     return -3;
@@ -133,21 +135,14 @@ CudaSharedMemoryRegionDestroy(void* cuda_shm_handle)
     return -1;
   }
 
-  // Close cuda IPC handle
-  void* base_addr =
-      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle)->base_addr_;
-  // TODO fix failure here
-  err = cudaIpcCloseMemHandle(base_addr);
+  SharedMemoryHandle* shm_hand =
+      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle);
+
+  // Free GPU device memory
+  err = cudaFree(shm_hand->base_addr_);
   if (err != cudaSuccess) {
     cudaSetDevice(previous_device);
     return -4;
-  }
-
-  // Free GPU device memory
-  err = cudaFree(base_addr);
-  if (err != cudaSuccess) {
-    cudaSetDevice(previous_device);
-    return -5;
   }
 
   // Set device to previous GPU
