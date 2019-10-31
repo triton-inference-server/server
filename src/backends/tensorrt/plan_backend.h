@@ -52,13 +52,6 @@ class PlanBackend : public InferenceBackend {
       const std::string profile_index);
 
  private:
-  // Run model on the context associated with 'runner_idx' to
-  // execute for one or more requests.
-  void Run(
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(Status)> OnCompleteQueuedPayloads);
-
- private:
   DISALLOW_COPY_AND_ASSIGN(PlanBackend);
   friend std::ostream& operator<<(std::ostream&, const PlanBackend&);
 
@@ -93,13 +86,10 @@ class PlanBackend : public InferenceBackend {
 
     void InitProfile();
 
-    // Run model to execute for one or more requests. This function
-    // assumes that it is only called by the single runner thread that
-    // is assigned to this context. A non-OK return status indicates
-    // an internal error that prevents any of the of requests from
-    // completing. If an error is isolate to a single request payload
-    // it will be reported in that payload.
-    Status Run(std::vector<Scheduler::Payload>* payloads);
+    // See BackendContext::Run()
+    Status Run(
+        const InferenceBackend* base,
+        std::vector<Scheduler::Payload>* payloads) override;
 
     // TensorRT components for the model
     nvinfer1::IRuntime* runtime_;
@@ -140,8 +130,6 @@ class PlanBackend : public InferenceBackend {
     std::unordered_map<int, cudaGraph_t> cuda_graphs_;
     std::unordered_map<int, cudaGraphExec_t> cuda_graph_execs_;
   };
-
-  std::vector<std::unique_ptr<Context>> contexts_;
 };
 
 std::ostream& operator<<(std::ostream& out, const PlanBackend& pb);

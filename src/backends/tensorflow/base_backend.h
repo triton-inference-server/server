@@ -123,8 +123,10 @@ class BaseBackend : public InferenceBackend {
     // an internal error that prevents any of the of requests from
     // completing. If an error is isolate to a single request payload
     // it will be reported in that payload.
+    // See BackendContext::Run()
     Status Run(
-        const BaseBackend* base, std::vector<Scheduler::Payload>* payloads);
+        const InferenceBackend* base,
+        std::vector<Scheduler::Payload>* payloads) override;
 
     // Map from configuration name for an input to tensor name for
     // that input in the model.
@@ -142,18 +144,8 @@ class BaseBackend : public InferenceBackend {
   };
 
  private:
-  // Run model on the context associated with 'runner_idx' to
-  // execute for one or more requests.
-  void Run(
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(Status)> OnCompleteQueuedPayloads);
-
- private:
   DISALLOW_COPY_AND_ASSIGN(BaseBackend);
   friend std::ostream& operator<<(std::ostream&, const BaseBackend&);
-
-  // The contexts for this backend.
-  std::vector<std::unique_ptr<Context>> contexts_;
 };
 
 std::ostream& operator<<(std::ostream& out, const BaseBackend& pb);

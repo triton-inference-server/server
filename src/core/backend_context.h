@@ -36,8 +36,10 @@
 namespace nvidia { namespace inferenceserver {
 
 class AllocatedSystemMemory;
+class InferenceBackend;
 
 struct BackendContext {
+ public:
   // GPU device number that indicates that no gpu is available for a
   // context (which is an invalid state since TensorRT requires a
   // GPU).
@@ -54,6 +56,16 @@ struct BackendContext {
   // Create the CUDA stream for data transfer operations. Have no effect
   // if GPU support is disabled.
   Status CreateCudaStream(const int cuda_stream_priority = 0);
+
+  // Run model to execute for one or more requests. This function
+  // assumes that it is only called by the single runner thread that
+  // is assigned to this context. A non-OK return status indicates
+  // an internal error that prevents any of the of requests from
+  // completing. If an error is isolate to a single request payload
+  // it will be reported in that payload.
+  virtual Status Run(
+      const InferenceBackend* base,
+      std::vector<Scheduler::Payload>* payloads) = 0;
 
   // Helper function to batch input data from payloads into 'input_buffer'.
   // 'input_buffer' must be a continuous block that can hold the sum of

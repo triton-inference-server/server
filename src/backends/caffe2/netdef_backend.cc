@@ -215,7 +215,7 @@ NetDefBackend::CreateExecutionContext(
                                                    : Config().max_batch_size();
 
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
-  const std::unique_ptr<Context>& context = contexts_.back();
+  Context* context = static_cast<Context*>(contexts_.back().get());
 
   RETURN_IF_ERROR(context->CreateCudaStream());
 
@@ -322,43 +322,6 @@ NetDefBackend::Context::ValidateOutputs(
   }
 
   return Status::Success;
-}
-
-void
-NetDefBackend::Run(
-    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-    std::function<void(Status)> OnCompleteQueuedPayloads)
-{
-  // Each runner executes using the corresponding context...
-  if (runner_idx >= contexts_.size()) {
-    OnCompleteQueuedPayloads(Status(
-        RequestStatusCode::INTERNAL,
-        "unexpected runner index" + std::to_string(runner_idx) +
-            ", max allowed " + std::to_string(contexts_.size())));
-    return;
-  }
-
-  // Stop queue timer and start compute timer when the payload is
-  // scheduled to run
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeStart);
-      payload.stats_->SetGPUDevice(contexts_[runner_idx]->gpu_device_);
-    }
-  }
-
-  Status status = contexts_[runner_idx]->Run(this, payloads);
-
-  // Stop compute timers.
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeEnd);
-    }
-  }
-
-  OnCompleteQueuedPayloads(status);
 }
 
 Status
@@ -489,7 +452,7 @@ NetDefBackend::Context::SetInput(
 
 Status
 NetDefBackend::Context::Run(
-    const NetDefBackend* base, std::vector<Scheduler::Payload>* payloads)
+    const InferenceBackend* base, std::vector<Scheduler::Payload>* payloads)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";

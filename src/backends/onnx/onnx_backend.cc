@@ -198,7 +198,7 @@ OnnxBackend::CreateExecutionContext(
                                                    : Config().max_batch_size();
 
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
-  Context* context = contexts_.back().get();
+  Context* context = static_cast<Context*>(contexts_.back().get());
 
   RETURN_IF_ERROR(context->CreateCudaStream());
 
@@ -477,7 +477,7 @@ OnnxBackend::Run(
   Status status = contexts_[runner_idx]->Run(this, payloads);
 
   // Release all run related resources regardless of the run status
-  contexts_[runner_idx]->ReleaseOrtRunResources();
+  static_cast<Context*>(contexts_[runner_idx].get())->ReleaseOrtRunResources();
 
   // Stop compute timers.
   for (auto& payload : *payloads) {
@@ -492,7 +492,7 @@ OnnxBackend::Run(
 
 Status
 OnnxBackend::Context::Run(
-    const OnnxBackend* base, std::vector<Scheduler::Payload>* payloads)
+    const InferenceBackend* base, std::vector<Scheduler::Payload>* payloads)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
@@ -763,7 +763,7 @@ OnnxBackend::Context::FillStringData(
 
 Status
 OnnxBackend::Context::ReadOutputTensors(
-    const OnnxBackend* base, size_t total_batch_size,
+    const InferenceBackend* base, size_t total_batch_size,
     const std::vector<const char*>& output_names,
     std::vector<Scheduler::Payload>* payloads)
 {
