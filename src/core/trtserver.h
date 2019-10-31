@@ -223,9 +223,9 @@ TRTSERVER_Error* TRTSERVER_SharedMemoryBlockMemoryTypeId(
 /// is not possible for the result buffer and will abort the inference
 /// request.
 typedef TRTSERVER_Error* (*TRTSERVER_ResponseAllocatorAllocFn_t)(
-    TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
-    const char* tensor_name, size_t byte_size,
-    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp,
+    TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id,
+    void* userp, void** buffer, void** buffer_userp,
     TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_memory_type_id);
 
 /// Type for function that is called when the server no longer holds

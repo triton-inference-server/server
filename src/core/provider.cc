@@ -771,8 +771,8 @@ InferResponseProvider::AllocateOutputBuffer(
   }
 #endif  // TRTIS_ENABLE_GPU
   TRTSERVER_Error* err = alloc_fn_(
-      allocator_, &buffer, &buffer_userp, name.c_str(), alloc_byte_size,
-      preferred_memory_type, preferred_memory_type_id, alloc_userp_,
+      allocator_, name.c_str(), alloc_byte_size, preferred_memory_type,
+      preferred_memory_type_id, alloc_userp_, &buffer, &buffer_userp,
       &raw_actual_memory_type, &raw_actual_memory_type_id);
   if (!is_class) {
     *content = buffer;

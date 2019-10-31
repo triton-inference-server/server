@@ -267,10 +267,10 @@ class HTTPAPIServer : public HTTPServerImpl {
 
  private:
   static TRTSERVER_Error* ResponseAlloc(
-      TRTSERVER_ResponseAllocator* allocator, void** buffer,
-      void** buffer_userp, const char* tensor_name, size_t byte_size,
-      TRTSERVER_Memory_Type preferred_memory_type, int64_t memory_type_id,
-      void* userp, TRTSERVER_Memory_Type* actual_memory_type,
+      TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
+      size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
+      int64_t preferred_memory_type_id, void* userp, void** buffer,
+      void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
       int64_t* actual_memory_type_id);
   static TRTSERVER_Error* ResponseRelease(
       TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
@@ -323,11 +323,11 @@ class HTTPAPIServer : public HTTPServerImpl {
 
 TRTSERVER_Error*
 HTTPAPIServer::ResponseAlloc(
-    TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
-    const char* tensor_name, size_t byte_size,
-    TRTSERVER_Memory_Type preferred_memory_type,
-    int64_t preferred_memory_type_id, void* userp,
-    TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_memory_type_id)
+    TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
+    int64_t preferred_memory_type_id, void* userp, void** buffer,
+    void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
+    int64_t* actual_memory_type_id)
 {
   auto userp_pair = reinterpret_cast<EVBufferPair*>(userp);
   evbuffer* evhttp_buffer = reinterpret_cast<evbuffer*>(userp_pair->first);

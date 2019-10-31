@@ -122,8 +122,8 @@ BackendContext::SetInputBuffer(
       if (content_byte_size > 0) {
         bool cuda_used = false;
         payload.status_ = CopyBuffer(
-            name, src_memory_type, (int)src_memory_type_id, dst_memory_type,
-            (int)dst_memory_type_id, content_byte_size, content,
+            name, src_memory_type, src_memory_type_id, dst_memory_type,
+            dst_memory_type_id, content_byte_size, content,
             input_buffer + buffer_copy_offset + copied_byte_size, &cuda_used);
         cuda_copy |= cuda_used;
       }
@@ -181,9 +181,9 @@ BackendContext::SetFixedSizeOutputBuffer(
         } else {
           bool cuda_used = false;
           status = CopyBuffer(
-              name, src_memory_type, (int)src_memory_type_id, dst_memory_type,
-              (int)dst_memory_type_id, expected_byte_size,
-              content + content_offset, buffer, &cuda_used);
+              name, src_memory_type, src_memory_type_id, dst_memory_type,
+              dst_memory_type_id, expected_byte_size, content + content_offset,
+              buffer, &cuda_used);
           cuda_copy |= cuda_used;
         }
       }
@@ -200,8 +200,9 @@ BackendContext::SetFixedSizeOutputBuffer(
 Status
 BackendContext::CopyBuffer(
     const std::string& name, const TRTSERVER_Memory_Type src_memory_type,
-    const int src_memory_type_id, const TRTSERVER_Memory_Type dst_memory_type,
-    const int dst_memory_type_id, const size_t byte_size, const void* src,
+    const int64_t src_memory_type_id,
+    const TRTSERVER_Memory_Type dst_memory_type,
+    const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
     void* dst, bool* cuda_used)
 {
   *cuda_used = false;

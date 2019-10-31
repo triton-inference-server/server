@@ -79,10 +79,10 @@ class EnsembleContext {
 
  private:
   static TRTSERVER_Error* ResponseAlloc(
-      TRTSERVER_ResponseAllocator* allocator, void** buffer,
-      void** buffer_userp, const char* tensor_name, size_t byte_size,
-      TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp,
-      TRTSERVER_Memory_Type* allocated_memory_type,
+      TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
+      size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
+      int64_t preferred_memory_type_id, void* userp, void** buffer,
+      void** buffer_userp, TRTSERVER_Memory_Type* allocated_memory_type,
       int64_t* allocated_memory_type_id);
   static TRTSERVER_Error* ResponseRelease(
       TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
@@ -316,10 +316,10 @@ EnsembleContext::EnsembleContext(
 
 TRTSERVER_Error*
 EnsembleContext::ResponseAlloc(
-    TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
-    const char* tensor_name, size_t byte_size,
-    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp,
-    TRTSERVER_Memory_Type* allocated_memory_type,
+    TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
+    int64_t preferred_memory_type_id, void* userp, void** buffer,
+    void** buffer_userp, TRTSERVER_Memory_Type* allocated_memory_type,
     int64_t* allocated_memory_type_id)
 {
   auto tensor_data_map = reinterpret_cast<
@@ -330,7 +330,7 @@ EnsembleContext::ResponseAlloc(
   *buffer_userp = nullptr;
 
   auto allocated_buffer = std::make_shared<AllocatedSystemMemory>(
-      byte_size, memory_type, memory_type_id);
+      byte_size, preferred_memory_type, preferred_memory_type_id);
 
   auto mutable_buffer = allocated_buffer->MutableBuffer(
       allocated_memory_type, allocated_memory_type_id);

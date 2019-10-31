@@ -76,8 +76,9 @@ struct BackendContext {
 
   Status CopyBuffer(
       const std::string& name, const TRTSERVER_Memory_Type src_memory_type,
-      const int src_memory_type_id, const TRTSERVER_Memory_Type dst_memory_type,
-      const int dst_memory_type_id, const size_t byte_size, const void* src,
+      const int64_t src_memory_type_id,
+      const TRTSERVER_Memory_Type dst_memory_type,
+      const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
       void* dst, bool* cuda_used);
 
   // Name of the model instance

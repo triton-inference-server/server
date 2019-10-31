@@ -635,11 +635,11 @@ StatusHandler::Process(Handler::State* state, bool rpc_ok)
 //
 TRTSERVER_Error*
 InferResponseAlloc(
-    TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
-    const char* tensor_name, size_t byte_size,
-    TRTSERVER_Memory_Type preferred_memory_type,
-    int64_t preferred_memory_type_id, void* userp,
-    TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_memory_type_id)
+    TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
+    int64_t preferred_memory_type_id, void* userp, void** buffer,
+    void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
+    int64_t* actual_memory_type_id)
 {
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
   InferResponse* response = payload->response_;
