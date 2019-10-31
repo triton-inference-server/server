@@ -139,10 +139,10 @@ for model_trial in v 0 1 2 4; do
     cp -r $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/nop_* `pwd`/$MODEL_DIR/.
     create_nop_modelfile `pwd`/libidentity.so `pwd`/$MODEL_DIR
 
-    # Need to launch the server for each test so that the model status is
-    # reset (which is used to make sure the correctly batch size was used
-    # for execution). Test everything with fixed-tensor-size models and
-    # variable-tensor-size models.
+    # Need to launch the server for each test so that the model status
+    # is reset (which is used to make sure the correct batch size was
+    # used for execution). Test everything with fixed-tensor-size
+    # models and variable-tensor-size models.
     export BATCHER_TYPE="VARIABLE" &&
         [[ "$model_trial" != "v" ]] && export BATCHER_TYPE="FIXED"
 
@@ -163,12 +163,13 @@ for model_trial in v 0 1 2 4; do
             exit 1
         fi
 
-        echo "Test: $i" >>$CLIENT_LOG
+        echo "Test: $i, repository $MODEL_DIR" >>$CLIENT_LOG
 
         set +e
         python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Test Failed\n***"
+            echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+            echo -e "\n***\n*** Test $i Failed\n***"
             RET=1
         fi
         set -e
@@ -208,12 +209,13 @@ for model_trial in v 0 1 2 4; do
             exit 1
         fi
 
-        echo "Test: $i" >>$CLIENT_LOG
+        echo "Test: $i, repository $MODEL_DIR" >>$CLIENT_LOG
 
         set +e
         python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Test Failed\n***"
+            echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+            echo -e "\n***\n*** Test $i Failed\n***"
             RET=1
         fi
         set -e

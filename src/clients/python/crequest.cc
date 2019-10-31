@@ -456,6 +456,7 @@ struct InferContextCtx {
   std::unordered_map<size_t, nic::InferContext::ResultMap> async_results;
   std::unordered_map<size_t, std::shared_ptr<nic::InferContext::Request>>
       requests;
+  std::mutex mu;
 };
 
 nic::Error*
@@ -534,15 +535,22 @@ InferContextAsyncRun(
       [ctx, callback](
           nic::InferContext*,
           std::shared_ptr<nic::InferContext::Request> request) {
-        ctx->requests.emplace(request->Id(), request);
+        {
+          std::lock_guard<std::mutex> lock(ctx->mu);
+          ctx->requests.emplace(request->Id(), request);
+        }
+
         (*callback)(ctx, request->Id());
       });
+
   return new nic::Error(err);
 }
 
 nic::Error*
 InferContextGetAsyncRunResults(InferContextCtx* ctx, uint64_t request_id)
 {
+  std::lock_guard<std::mutex> lock(ctx->mu);
+
   auto itr = ctx->requests.find(request_id);
   if (itr != ctx->requests.end()) {
     nic::InferContext::ResultMap results;
@@ -552,9 +560,10 @@ InferContextGetAsyncRunResults(InferContextCtx* ctx, uint64_t request_id)
 
     return new nic::Error(err);
   }
+
   return new nic::Error(
       ni::RequestStatusCode::INVALID_ARG,
-      "The request ID doesn't match any existing asynchrnous requests");
+      "The request ID doesn't match any existing asynchronous requests");
 }
 
 //==============================================================================
@@ -722,7 +731,7 @@ InferContextAsyncResultNew(
     InferContextResultCtx** ctx, InferContextCtx* infer_ctx,
     const uint64_t request_id, const char* result_name)
 {
-  InferContextResultCtx* lctx = new InferContextResultCtx;
+  std::lock_guard<std::mutex> lock(infer_ctx->mu);
 
   auto res_itr = infer_ctx->async_results.find(request_id);
   if (res_itr == infer_ctx->async_results.end()) {
@@ -739,6 +748,7 @@ InferContextAsyncResultNew(
         "unable to find result for output '" + std::string(result_name) + "'");
   }
 
+  InferContextResultCtx* lctx = new InferContextResultCtx;
   lctx->result.swap(itr->second);
   *ctx = lctx;
 
