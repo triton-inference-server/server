@@ -705,8 +705,9 @@ Status
 InferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
     const std::vector<int64_t>& content_shape,
-    TRTSERVER_Memory_Type preferred_memory_type,
-    int64_t preferred_memory_type_id)
+    const TRTSERVER_Memory_Type preferred_memory_type,
+    const int64_t preferred_memory_type_id,
+    TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_memory_type_id)
 {
   *content = nullptr;
 
@@ -716,44 +717,37 @@ InferResponseProvider::AllocateOutputBuffer(
         RequestStatusCode::INTERNAL, "unexpected output '" + name + "'");
   }
 
-  // Ensure idempotent for multiple function call with the same name but
-  // with different memory_type
-  if (outputs_.empty() || (outputs_.back().name_ != name)) {
-    outputs_.emplace_back();
-  }
+  outputs_.emplace_back();
   Output* loutput = &(outputs_.back());
   loutput->name_ = name;
   loutput->shape_ = content_shape;
   loutput->cls_count_ = 0;
   loutput->ptr_ = nullptr;
   loutput->byte_size_ = content_byte_size;
-  loutput->memory_type_ = preferred_memory_type;
-  loutput->memory_type_id_ = preferred_memory_type_id;
 
-  // For cls result, the provider will be responsible for allocating
+  // For class result, the provider will be responsible for allocating
   // the requested memory. The user-provided allocator should only be invoked
   // once with byte size 0 when the provider allocation is succeed.
-  // For cls result, the preferred memory type must be CPU. Otherwise,
+  // For class result, the actual memory type must be CPU. If preferred memory
+  // type is GPU then set actual_memory_type to CPU and proceed. Otherwise,
   // return success and nullptr to align with the behavior of
   // 'TRTSERVER_ResponseAllocatorAllocFn_t'
-  if (pr->second.has_cls()) {
+  const bool is_class = pr->second.has_cls();
+  if (is_class) {
+    // For class result no additional buffer is needed.
     if (content_byte_size == 0) {
       Status(
           RequestStatusCode::INVALID_ARG,
           "Classification result is requested for output '" + name + "'" +
               " while its output buffer size is 0");
     }
-    if (preferred_memory_type == TRTSERVER_MEMORY_CPU) {
-      loutput->cls_count_ = pr->second.cls().count();
-      char* buffer = new char[content_byte_size];
-      *content = static_cast<void*>(buffer);
-      loutput->ptr_ = static_cast<void*>(buffer);
-      loutput->buffer_.reset(buffer);
-    } else {
-      return Status::Success;
-    }
-  }
 
+    loutput->cls_count_ = pr->second.cls().count();
+    char* buffer = new char[content_byte_size];
+    *content = static_cast<void*>(buffer);
+    loutput->ptr_ = static_cast<void*>(buffer);
+    loutput->buffer_.reset(buffer);
+  }
 
   // If a buffer has been allocated for cls result, then no
   // additional buffer is needed from alloc_fn, but still need to call the
@@ -762,6 +756,8 @@ InferResponseProvider::AllocateOutputBuffer(
 
   void* buffer = nullptr;
   void* buffer_userp = nullptr;
+  TRTSERVER_Memory_Type raw_actual_memory_type;
+  int64_t raw_actual_memory_type_id;
 #ifdef TRTIS_ENABLE_GPU
   int current_device;
   auto cuerr = cudaGetDevice(&current_device);
@@ -775,8 +771,20 @@ InferResponseProvider::AllocateOutputBuffer(
   }
 #endif  // TRTIS_ENABLE_GPU
   TRTSERVER_Error* err = alloc_fn_(
-      allocator_, &buffer, &buffer_userp, name.c_str(), alloc_byte_size,
-      preferred_memory_type, preferred_memory_type_id, alloc_userp_);
+      allocator_, name.c_str(), alloc_byte_size, preferred_memory_type,
+      preferred_memory_type_id, alloc_userp_, &buffer, &buffer_userp,
+      &raw_actual_memory_type, &raw_actual_memory_type_id);
+  if (!is_class) {
+    *content = buffer;
+    loutput->ptr_ = buffer;
+    loutput->memory_type_ = raw_actual_memory_type;
+    loutput->memory_type_id_ = raw_actual_memory_type_id;
+  } else {
+    // If class result, then force the memory type to be CPU
+    loutput->memory_type_ = TRTSERVER_MEMORY_CPU;
+    loutput->memory_type_id_ = 0;
+  }
+
   Status status;
 #ifdef TRTIS_ENABLE_GPU
   cuerr = cudaSetDevice(current_device);
@@ -798,13 +806,10 @@ InferResponseProvider::AllocateOutputBuffer(
     return status;
   }
 
-  if (*content == nullptr) {
-    *content = buffer;
-    loutput->ptr_ = buffer;
-  }
-
   loutput->release_buffer_ = buffer;
   loutput->release_userp_ = buffer_userp;
+  *actual_memory_type = loutput->memory_type_;
+  *actual_memory_type_id = loutput->memory_type_id_;
 
   return Status::Success;
 }

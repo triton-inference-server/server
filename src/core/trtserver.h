@@ -169,6 +169,21 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockGpuNew(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockDelete(
     TRTSERVER_SharedMemoryBlock* shared_memory_block);
 
+/// Get the memory type of a shared memory block object.
+/// \param shared_memory_block The object whose memory type is required.
+/// \param memory_type Returns the memory type of the shared memory block.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_Error* TRTSERVER_SharedMemoryBlockMemoryType(
+    TRTSERVER_SharedMemoryBlock* shared_memory_block,
+    TRTSERVER_Memory_Type* memory_type);
+
+/// Get the memory type id of a shared memory block object.
+/// \param shared_memory_block The object whose memory type is required.
+/// \param memory_type_id The device ID if the region is in GPU shared memory.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_Error* TRTSERVER_SharedMemoryBlockMemoryTypeId(
+    TRTSERVER_SharedMemoryBlock* shared_memory_block, int64_t* memory_type_id);
+
 /// TRTSERVER_ResponseAllocator
 ///
 /// Object representing a memory allocator for inference response
@@ -195,23 +210,23 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockDelete(
 /// case the function should return success and set 'buffer' ==
 /// nullptr.
 ///
-/// If the function is called with 'byte_size' non-zero but an
-/// allocation is not possible for the requested 'memory_type', the
-/// function should return success and set 'buffer' == nullptr to
-/// indicate that an allocation in the requested 'memory_type' is not
-/// possible. In this case the function may be called again for the
-/// same 'tensor_name' but with a different 'memory_type'.
+/// If the function is called with 'byte_size' non-zero the function should
+/// allocate a contiguous buffer of the requested size. If possible the function
+/// should allocate the buffer in the requested 'memory_type' and
+/// 'memory_type_id', but the function is free to allocate the buffer in any
+/// memory. The function must return in 'actual_memory_type' and
+/// 'actual_memory_type_id' the memory where the buffer is allocated.
 ///
 /// The function should return a TRTSERVER_Error object if a failure
 /// occurs while attempting an allocation. If an error object is
-/// returned, or if 'buffer' == nullptr is returned on all attempts
-/// for a result tensor, the inference server will assume allocation
+/// returned for a result tensor, the inference server will assume allocation
 /// is not possible for the result buffer and will abort the inference
 /// request.
 typedef TRTSERVER_Error* (*TRTSERVER_ResponseAllocatorAllocFn_t)(
-    TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
-    const char* tensor_name, size_t byte_size,
-    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp);
+    TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id,
+    void* userp, void** buffer, void** buffer_userp,
+    TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_memory_type_id);
 
 /// Type for function that is called when the server no longer holds
 /// any reference to a buffer allocated by

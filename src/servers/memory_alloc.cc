@@ -99,9 +99,11 @@ MemoryTypeString(TRTSERVER_Memory_Type memory_type)
 
 TRTSERVER_Error*
 ResponseAlloc(
-    TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
-    const char* tensor_name, size_t byte_size,
-    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp)
+    TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
+    int64_t preferred_memory_type_id, void* userp, void** buffer,
+    void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
+    int64_t* actual_memory_type_id)
 {
   // Pass the tensor name with buffer_userp so we can show it when
   // releasing the buffer.
@@ -115,10 +117,10 @@ ResponseAlloc(
              << tensor_name;
   } else {
     void* allocated_ptr = nullptr;
-    if (memory_type == TRTSERVER_MEMORY_CPU) {
+    if (preferred_memory_type == TRTSERVER_MEMORY_CPU) {
       allocated_ptr = malloc(byte_size);
     } else if (io_spec.output_type_ == TRTSERVER_MEMORY_GPU) {
-      auto err = cudaSetDevice(memory_type_id);
+      auto err = cudaSetDevice(preferred_memory_type_id);
       if (err == cudaSuccess) {
         err = cudaMalloc(&allocated_ptr, byte_size);
       }
@@ -136,7 +138,7 @@ ResponseAlloc(
           TRTSERVER_ERROR_INTERNAL,
           std::string(
               "failed to allocate " + std::to_string(byte_size) + " bytes in " +
-              MemoryTypeString(memory_type) + " for result tensor " +
+              MemoryTypeString(preferred_memory_type) + " for result tensor " +
               tensor_name)
               .c_str());
     }
@@ -144,10 +146,12 @@ ResponseAlloc(
     *buffer = allocated_ptr;
     *buffer_userp = new std::string(tensor_name);
     LOG_INFO << "allocated " << byte_size << " bytes in "
-             << MemoryTypeString(memory_type) << " for result tensor "
+             << MemoryTypeString(preferred_memory_type) << " for result tensor "
              << tensor_name;
   }
 
+  *actual_memory_type = preferred_memory_type;
+  *actual_memory_type_id = preferred_memory_type_id;
   return nullptr;  // Success
 }
 
