@@ -121,8 +121,10 @@ class OnnxBackend : public InferenceBackend {
         const std::vector<const char*>& output_names,
         std::vector<Scheduler::Payload>* payloads);
 
-    // Helper function to set output buffer of string data type to payloads
-    void SetStringOutputBuffer(
+    // Helper function to set output buffer of string data type to payloads.
+    // Return true if cudaMemcpyAsync is called, and the caller should call
+    // cudaStreamSynchronize before using the data. Otherwise, return false.
+    bool SetStringOutputBuffer(
         const std::string& name, const size_t batch1_element_cnt,
         const char* content, const std::vector<int64_t>& content_shape,
         const size_t* offsets, std::vector<Scheduler::Payload>* payloads);
