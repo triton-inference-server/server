@@ -30,9 +30,10 @@
 Model Repository
 ================
 
-The TensorRT Inference Server accesses models from a locally
-accessible file path or from Google Cloud Storage. This path is
-specified when the server is started using the -\\-model-repository option.
+The TensorRT Inference Server accesses models from one or more locally
+accessible file paths, from Google Cloud Storage, and from Amazon
+S3. These paths are specified when the server is started using the
+-\\-model-repository option.
 
 For a locally accessible file-system the absolute path must be
 specified, for example,
@@ -40,8 +41,8 @@ specified, for example,
 residing in Google Cloud Storage, the path must be prefixed with
 gs://, for example,
 -\\-model-repository=gs://bucket/path/to/model/repository.  For a
-model repository residing in Amazon S3, the path must be
-prefixed with s3://, for example,
+model repository residing in Amazon S3, the path must be prefixed with
+s3://, for example,
 -\\-model-repository=s3://bucket/path/to/model/repository.
 
 :ref:`section-example-model-repository` describes how to create an
@@ -66,10 +67,10 @@ An example of a typical model repository layout is shown below::
       7/
         model.graphdef
 
-Any number of models may be specified and the inference server will
-attempt to load all models into the CPU and GPU when the server
-starts. The :ref:`Status API <section-api-status>` can be used to
-determine if any models failed to load successfully. The server's
+See :ref:`section-model-management` for discussion of how the
+inference server manages the models specified in the model
+repositories. The :ref:`Status API <section-api-status>` can be used
+to determine if any models failed to load successfully. The server's
 console log will also show the reason for any failures during startup.
 
 The name of the model directory (model_0 and model_1 in the above
@@ -104,11 +105,7 @@ Modifying the Model Repository
 
 The inference server has multiple execution modes that control how the
 models within the model repository are managed. These modes are
-described in :ref:`section-model-management`. In the default mode
-changes to the model repository will be detected and the server will
-attempt to load and unload models as necessary based on those
-changes. In the other modes changes to the model repository will be
-ignored
+described in :ref:`section-model-management`.
 
 .. _section-model-versions:
 
