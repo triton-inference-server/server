@@ -292,11 +292,11 @@ InferenceServer::IsReady(bool* ready)
 }
 
 void
-InferenceServer::Infer(
+InferenceServer::InferAsync(
     const std::shared_ptr<InferenceBackend>& backend,
-    std::shared_ptr<InferRequestProvider> request_provider,
-    std::shared_ptr<InferResponseProvider> response_provider,
-    std::shared_ptr<ModelInferStats> infer_stats,
+    const std::shared_ptr<InferRequestProvider>& request_provider,
+    const std::shared_ptr<InferResponseProvider>& response_provider,
+    const std::shared_ptr<ModelInferStats>& infer_stats,
     std::function<void(const Status&)> OnCompleteInfer)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {

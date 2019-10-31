@@ -75,9 +75,9 @@ class InferenceBackend {
   // response. The inference will run asynchronously and "OnCompleteHandleInfer"
   // callback will be called once the inference is completed
   void Run(
-      std::shared_ptr<ModelInferStats> stats,
-      std::shared_ptr<InferRequestProvider> request_provider,
-      std::shared_ptr<InferResponseProvider> response_provider,
+      const std::shared_ptr<ModelInferStats>& stats,
+      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const std::shared_ptr<InferResponseProvider>& response_provider,
       std::function<void(const Status&)> OnCompleteHandleInfer);
 
  protected:
