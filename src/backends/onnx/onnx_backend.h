@@ -57,16 +57,6 @@ class OnnxBackend : public InferenceBackend {
       OrtSessionOptions* session_options,
       const std::unordered_map<std::string, std::string>& paths);
 
-  // [TODO] need to override Run() because it needs to clean up run-wise
-  // variables, but should just move the clean up inside Context::Run(),
-  // and make this non-virtual.
-  //
-  // Run model on the context associated with 'runner_idx' to
-  // execute for one or more requests.
-  void Run(
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(Status)> OnCompleteQueuedPayloads) override;
-
  private:
   DISALLOW_COPY_AND_ASSIGN(OnnxBackend);
   friend std::ostream& operator<<(std::ostream&, const OnnxBackend&);
@@ -94,7 +84,8 @@ class OnnxBackend : public InferenceBackend {
 
     // See BackendContext::Run()
     Status Run(
-        const InferenceBackend* base, std::vector<Scheduler::Payload>* payloads);
+        const InferenceBackend* base,
+        std::vector<Scheduler::Payload>* payloads);
 
     // Set an input tensor from one or more payloads.
     Status SetInputTensor(

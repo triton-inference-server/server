@@ -450,46 +450,6 @@ OnnxBackend::Context::ValidateOutputs(
   return Status::Success;
 }
 
-void
-OnnxBackend::Run(
-    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-    std::function<void(Status)> OnCompleteQueuedPayloads)
-{
-  // Each runner executes using the corresponding context...
-  if (runner_idx >= contexts_.size()) {
-    OnCompleteQueuedPayloads(Status(
-        RequestStatusCode::INTERNAL,
-        "unexpected runner index" + std::to_string(runner_idx) +
-            ", max allowed " + std::to_string(contexts_.size())));
-    return;
-  }
-
-  // Stop queue timer and start compute timer when the payload is
-  // scheduled to run
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeStart);
-      payload.stats_->SetGPUDevice(contexts_[runner_idx]->gpu_device_);
-    }
-  }
-
-  Status status = contexts_[runner_idx]->Run(this, payloads);
-
-  // Release all run related resources regardless of the run status
-  static_cast<Context*>(contexts_[runner_idx].get())->ReleaseOrtRunResources();
-
-  // Stop compute timers.
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeEnd);
-    }
-  }
-
-  OnCompleteQueuedPayloads(status);
-}
-
 Status
 OnnxBackend::Context::Run(
     const InferenceBackend* base, std::vector<Scheduler::Payload>* payloads)
@@ -534,6 +494,14 @@ OnnxBackend::Context::Run(
         "dynamic batch size " + std::to_string(total_batch_size) + " for '" +
             name_ + "', max allowed is " + std::to_string(max_batch_size_));
   }
+
+  // use Scoped wrapper to clean up Ort tensors when Run() returns
+  static auto io_tensor_deleter = [](Context* ctx) {
+    if (ctx != nullptr) {
+      ctx->ReleaseOrtRunResources();
+    }
+  };
+  OrtResourceWrapper<Context*> io_tensor_wrapper(this, io_tensor_deleter);
 
   // Hold reference to each buffer of input data so that it stays
   // until the inference has completed.
