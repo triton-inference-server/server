@@ -47,7 +47,9 @@ _trials = ("savedmodel", "graphdef", "plan", "netdef", "custom", "libtorch", "on
 TEST_SHARED_MEMORY = int(os.environ.get('TEST_SHARED_MEMORY', 0))
 
 _max_queue_delay_ms = 10000
-_check_exception = None
+
+_deferred_exceptions_lock = threading.Lock()
+_deferred_exceptions = []
 
 def _create_advance(shm_regions = None):
     if TEST_SHARED_MEMORY:
@@ -70,17 +72,23 @@ def _cleanup_after(shm_handles):
 
 class BatcherTest(unittest.TestCase):
     def setUp(self):
-        global _check_exception
-        _check_exception = None
+        global _deferred_exceptions
+        _deferred_exceptions = []
+
+    def add_deferred_exception(self, ex):
+        global _deferred_exceptions
+        with _deferred_exceptions_lock:
+            _deferred_exceptions.append(ex)
 
     def check_deferred_exception(self):
-        if _check_exception is not None:
-            raise _check_exception
+        # Just raise one of the exceptions...
+        with _deferred_exceptions_lock:
+            if len(_deferred_exceptions) > 0:
+                raise _deferred_exceptions[0]
 
     def check_response(self, trial, bs, thresholds,
                        requested_outputs=("OUTPUT0", "OUTPUT1"), input_size=16,
                        shm_region_names=None, precreated_shm_regions=None):
-        global _check_exception
         try:
             start_ms = int(round(time.time() * 1000))
 
@@ -110,7 +118,7 @@ class BatcherTest(unittest.TestCase):
                                 "expected greater than " + str(gt_ms) +
                                 "ms response time, got " + str(end_ms - start_ms) + " ms")
         except Exception as ex:
-            _check_exception = ex
+            self.add_deferred_exception(ex)
 
     def check_setup(self, url, protocol, model_name):
         # Make sure test.sh set up the correct batcher settings
@@ -632,8 +640,8 @@ class BatcherTest(unittest.TestCase):
     def test_multi_different_outputs(self):
         # Send two requests where one request asks for one output and
         # the other request asks for the other output. They should be
-        # batched and get the correct response even though they don't
-        # request both outputs.
+        # batched and each should get the correct response even though
+        # they don't request both outputs.
         if TEST_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00']
             shm1_region_names = ['ip10', 'ip11', 'op11']

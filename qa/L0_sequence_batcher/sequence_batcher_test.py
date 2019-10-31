@@ -73,7 +73,9 @@ _trials = tuple(res)
 
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
-_check_exception = None
+
+_deferred_exceptions_lock = threading.Lock()
+_deferred_exceptions = None
 
 class UserData:
     def __init__(self):
@@ -86,12 +88,23 @@ def completion_callback(user_data, infer_ctx, request_id):
 
 class SequenceBatcherTest(unittest.TestCase):
     def setUp(self):
-        global _check_exception
-        _check_exception = None
+        self.clear_deferred_exceptions()
+
+    def clear_deferred_exceptions(self):
+        global _deferred_exceptions
+        with _deferred_exceptions_lock:
+          _deferred_exceptions = []
+
+    def add_deferred_exception(self, ex):
+        global _deferred_exceptions
+        with _deferred_exceptions_lock:
+            _deferred_exceptions.append(ex)
 
     def check_deferred_exception(self):
-        if _check_exception is not None:
-            raise _check_exception
+        # Just raise one of the exceptions...
+        with _deferred_exceptions_lock:
+            if len(_deferred_exceptions) > 0:
+                raise _deferred_exceptions[0]
 
     def check_sequence(self, trial, model_name, input_dtype, correlation_id,
                        sequence_thresholds, values, expected_result,
@@ -102,8 +115,6 @@ class SequenceBatcherTest(unittest.TestCase):
         (flag_str, value, (ls_ms, gt_ms), (pre_delay_ms, post_delay_ms)
 
         """
-        global _check_exception
-
         if (("savedmodel" in trial) or ("graphdef" in trial) or
             ("netdef" in trial) or ("custom" in trial) or
             ("onnx" in trial) or ("libtorch" in trial) or
@@ -238,7 +249,7 @@ class SequenceBatcherTest(unittest.TestCase):
                                         "sequence expected greater than " + str(gt_ms) +
                                         "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
             except Exception as ex:
-                _check_exception = ex
+                self.add_deferred_exception(ex)
 
     def check_sequence_async(self, trial, model_name, input_dtype, correlation_id,
                              sequence_thresholds, values, expected_result,
@@ -249,8 +260,6 @@ class SequenceBatcherTest(unittest.TestCase):
         (flag_str, value, pre_delay_ms)
 
         """
-        global _check_exception
-
         if (("savedmodel" in trial) or ("graphdef" in trial) or
             ("netdef" in trial) or ("custom" in trial) or
             ("onnx" in trial) or ("libtorch" in trial) or
@@ -392,7 +401,7 @@ class SequenceBatcherTest(unittest.TestCase):
                                         "sequence expected greater than " + str(gt_ms) +
                                         "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
             except Exception as ex:
-                _check_exception = ex
+                self.add_deferred_exception(ex)
 
     def check_setup(self, model_name):
         # Make sure test.sh set up the correct batcher settings
@@ -460,6 +469,7 @@ class SequenceBatcherTest(unittest.TestCase):
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
                 try:
                     dtype = self.get_datatype(trial)
                     model_name = tu.get_sequence_model_name(trial, dtype)
@@ -495,6 +505,7 @@ class SequenceBatcherTest(unittest.TestCase):
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
                 try:
                     dtype = self.get_datatype(trial)
                     model_name = tu.get_sequence_model_name(trial, dtype)
@@ -528,6 +539,7 @@ class SequenceBatcherTest(unittest.TestCase):
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
                 try:
                     dtype = self.get_datatype(trial)
                     model_name = tu.get_sequence_model_name(trial, dtype)
@@ -571,6 +583,7 @@ class SequenceBatcherTest(unittest.TestCase):
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
                 try:
                     dtype = self.get_datatype(trial)
                     model_name = tu.get_sequence_model_name(trial, dtype)
@@ -612,6 +625,7 @@ class SequenceBatcherTest(unittest.TestCase):
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
                 try:
                     dtype = self.get_datatype(trial)
                     model_name = tu.get_sequence_model_name(trial, dtype)
@@ -658,6 +672,7 @@ class SequenceBatcherTest(unittest.TestCase):
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
                 try:
                     dtype = self.get_datatype(trial)
                     model_name = tu.get_sequence_model_name(trial, dtype)
@@ -705,6 +720,7 @@ class SequenceBatcherTest(unittest.TestCase):
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
                 try:
                     dtype = self.get_datatype(trial)
                     model_name = tu.get_sequence_model_name(trial, dtype)
@@ -735,6 +751,7 @@ class SequenceBatcherTest(unittest.TestCase):
         # parallel and make sure they get completely batched into
         # batch-size 2 inferences.
         for trial in _trials:
+            self.clear_deferred_exceptions()
             try:
                 dtype = self.get_datatype(trial)
                 model_name = tu.get_sequence_model_name(trial, dtype)
@@ -792,6 +809,7 @@ class SequenceBatcherTest(unittest.TestCase):
         # two sequences have shorter length so that padding must be
         # applied correctly for the longer sequences.
         for trial in _trials:
+            self.clear_deferred_exceptions()
             try:
                 dtype = self.get_datatype(trial)
                 model_name = tu.get_sequence_model_name(trial, dtype)
@@ -879,6 +897,7 @@ class SequenceBatcherTest(unittest.TestCase):
         # parallel and make sure they get completely batched into
         # batch-size 4 inferences.
         for trial in _trials:
+            self.clear_deferred_exceptions()
             try:
                 dtype = self.get_datatype(trial)
                 model_name = tu.get_sequence_model_name(trial, dtype)
@@ -959,6 +978,7 @@ class SequenceBatcherTest(unittest.TestCase):
         # batch-size 4 inferences plus the 5th should go in the
         # backlog and then get handled once there is a free slot.
         for trial in _trials:
+            self.clear_deferred_exceptions()
             try:
                 protocol = "streaming"
                 dtype = self.get_datatype(trial)
@@ -1058,6 +1078,7 @@ class SequenceBatcherTest(unittest.TestCase):
             return
 
         for trial in _trials:
+            self.clear_deferred_exceptions()
             try:
                 protocol = "streaming"
                 dtype = self.get_datatype(trial)
@@ -1169,6 +1190,7 @@ class SequenceBatcherTest(unittest.TestCase):
             return
 
         for trial in _trials:
+            self.clear_deferred_exceptions()
             try:
                 protocol = "streaming"
                 dtype = self.get_datatype(trial)
@@ -1274,6 +1296,7 @@ class SequenceBatcherTest(unittest.TestCase):
         # batch-size 4 inferences. Send a 5th with the same
         # correlation ID as one of the first four.
         for trial in _trials:
+            self.clear_deferred_exceptions()
             try:
                 protocol = "streaming"
                 dtype = self.get_datatype(trial)
@@ -1379,6 +1402,7 @@ class SequenceBatcherTest(unittest.TestCase):
             return
 
         for trial in _trials:
+            self.clear_deferred_exceptions()
             try:
                 protocol = "streaming"
                 dtype = self.get_datatype(trial)
@@ -1484,6 +1508,7 @@ class SequenceBatcherTest(unittest.TestCase):
             return
 
         for trial in _trials:
+            self.clear_deferred_exceptions()
             try:
                 protocol = "streaming"
                 dtype = self.get_datatype(trial)
