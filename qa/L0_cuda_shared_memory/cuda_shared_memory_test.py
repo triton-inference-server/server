@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import tensorrtserver.shared_memory as cshm
+import tensorrtserver.cuda_shared_memory as cshm
 from tensorrtserver.api import *
 import numpy as np
 import threading
@@ -34,22 +34,22 @@ import threading
 try:
     shm_op0_handle = cshm.create_shared_memory_region("dummy_data", -1, 0)
 except Exception as ex:
-    assert str(ex) == "unable to initialize the size"
+    assert str(ex) == "unable to create cuda shared memory handle"
 
 shared_memory_ctx = SharedMemoryControlContext("localhost:8000",  ProtocolType.HTTP, verbose=False)
 
 # Create a valid cuda shared memory region
 shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
 # Fill data in cuda shared memory region
-cshm.set_shared_memory_region(shm_op0_handle, [np.array([1,2])])
+cshm.set_shared_memory_region(shm_op0_handle, [np.array([1,2], dtype=np.float32)])
 # Unregister before register does not fail - does nothing
 shared_memory_ctx.unregister(shm_op0_handle)
 # Test if register is working
-shared_memory_ctx.register(shm_op0_handle)
+shared_memory_ctx.cuda_register(shm_op0_handle)
 
 # Raises error if registering already registered region
 try:
-    shared_memory_ctx.register(shm_op0_handle)
+    shared_memory_ctx.cuda_register(shm_op0_handle)
 except Exception as ex:
     assert "shared memory block 'dummy_data' already in manager" in str(ex)
 
@@ -65,10 +65,10 @@ input0_data = np.arange(start=0, stop=16, dtype=np.int32)
 input1_data = np.ones(shape=16, dtype=np.int32)
 cshm.set_shared_memory_region(shm_ip0_handle, [input0_data])
 cshm.set_shared_memory_region(shm_ip1_handle, [input1_data])
-shared_memory_ctx.register(shm_ip0_handle)
-shared_memory_ctx.register(shm_ip1_handle)
-shared_memory_ctx.register(shm_op0_handle)
-shared_memory_ctx.register(shm_op1_handle)
+shared_memory_ctx.cuda_register(shm_ip0_handle)
+shared_memory_ctx.cuda_register(shm_ip1_handle)
+shared_memory_ctx.cuda_register(shm_op0_handle)
+shared_memory_ctx.cuda_register(shm_op1_handle)
 
 infer_ctx = InferContext("localhost:8000", ProtocolType.HTTP, "simple", -1, verbose=False)
 def basic_inference(shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle, error_msg):
@@ -80,7 +80,7 @@ def basic_inference(shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_hand
     except Exception as ex:
         error_msg.append(str(ex.message()))
 
-# Unregister during inference
+# Unregister during inference - inference fails and unregisters
 error_msg = []
 threads = []
 threads.append(threading.Thread(target=basic_inference,
@@ -92,24 +92,13 @@ for t in threads:
     t.join()
 
 assert error_msg[0] == "shared memory block 'output0_data' not found in manager"
-shared_memory_ctx.register(shm_op0_handle)
+shared_memory_ctx.cuda_register(shm_op0_handle)
 
-# Destory during inference (Does not destroy_shared_memory_region)
-threads[0] = threading.Thread(target=basic_inference,
-    args=(shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle, error_msg))
-threads[1] = threading.Thread(target=cshm.destroy_shared_memory_region, args=(shm_op0_handle,))
-for t in threads:
-    t.start()
-for t in threads:
-    t.join()
-if len(error_msg) > 1:
-    raise Exception(error_msg[-1])
-
-# Register during inference - Should work fine
+# Register during inference - Registered successfully
 shm_ip2_handle = cshm.create_shared_memory_region("input2_data", 128, 0)
 threads[0] = threading.Thread(target=basic_inference,
     args=(shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle, error_msg))
-threads[1] = threading.Thread(target=shared_memory_ctx.register, args=(shm_ip2_handle,))
+threads[1] = threading.Thread(target=shared_memory_ctx.cuda_register, args=(shm_ip2_handle,))
 for t in threads:
     t.start()
 for t in threads:
@@ -118,6 +107,8 @@ if len(error_msg) > 1:
     raise Exception(error_msg[-1])
 
 # Shared memory input region larger than needed - Throws error
+shared_memory_ctx.unregister(shm_ip2_handle)
+shared_memory_ctx.cuda_register(shm_ip2_handle)
 basic_inference(shm_ip0_handle, shm_ip2_handle, shm_op0_handle, shm_op1_handle, error_msg)
 if len(error_msg) > 1:
     if error_msg[-1] != "The input 'INPUT1' has shared memory of size 128 bytes"\
@@ -140,6 +131,7 @@ assert len(status_after.shared_memory_region) == 0
 cshm.destroy_shared_memory_region(shm_ip0_handle)
 cshm.destroy_shared_memory_region(shm_ip1_handle)
 cshm.destroy_shared_memory_region(shm_ip2_handle)
+cshm.destroy_shared_memory_region(shm_op0_handle)
 cshm.destroy_shared_memory_region(shm_op1_handle)
 try:
     cshm.destroy_shared_memory_region(shm_op0_handle)
