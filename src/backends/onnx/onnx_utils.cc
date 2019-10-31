@@ -28,7 +28,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-const OrtApi* ort_api = OrtGetApi(ORT_API_VERSION);
+const OrtApi* ort_api = OrtGetApiBase()->GetApi(ORT_API_VERSION);
 
 namespace {
 

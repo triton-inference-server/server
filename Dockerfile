@@ -99,7 +99,7 @@ FROM ${BASE_IMAGE} AS trtserver_onnx
 # needs to be built from source
 
 # Onnx Runtime release version
-ARG ONNX_RUNTIME_VERSION=0.5.0
+ARG ONNX_RUNTIME_VERSION=1.0.0
 
 # Get release version of Onnx Runtime
 WORKDIR /workspace
@@ -107,10 +107,8 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends git && \
     rm -rf /var/lib/apt/lists/*
 
-# Use a fixed commit after rel-0.5.0
-RUN git clone --recursive https://github.com/Microsoft/onnxruntime && \
+RUN git clone -b rel-${ONNX_RUNTIME_VERSION} --recursive https://github.com/Microsoft/onnxruntime && \
     (cd onnxruntime && \
-            git checkout c24d7a8a0a95002cfde70db8ffdac1a1d95b3ca7 && \
             git submodule update --init --recursive)
 
 ENV PATH="/opt/cmake/bin:${PATH}"
@@ -178,7 +176,6 @@ ARG COMMON_BUILD_ARGS="--skip_submodule_sync --parallel --build_shared_lib --use
 RUN mkdir -p /workspace/build
 RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspace/build \
             --config Release $COMMON_BUILD_ARGS \
-            --cmake_extra_defines CMAKE_CXX_FLAGS="-Wno-deprecated-declarations" \
             --use_cuda \
             --cuda_home /usr/local/cuda \
             --cudnn_home /usr/local/cudnn-$(echo $CUDNN_VERSION | cut -d. -f1-2)/cuda \
@@ -265,7 +262,7 @@ COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/li
 # Onnx Runtime headers and library
 # Put include files to same directory as ONNX Runtime changed the include path
 # https://github.com/microsoft/onnxruntime/pull/1461
-ARG ONNX_RUNTIME_VERSION=0.5.0
+ARG ONNX_RUNTIME_VERSION=1.0.0
 COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/session/onnxruntime_c_api.h \
      /opt/tensorrtserver/include/onnxruntime/
 COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cpu/cpu_provider_factory.h \
