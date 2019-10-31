@@ -117,10 +117,10 @@ ResponseAlloc(
              << tensor_name;
   } else {
     void* allocated_ptr = nullptr;
-    if (preferred_memory_type == TRTSERVER_MEMORY_CPU) {
+    if (io_spec.output_type_ == TRTSERVER_MEMORY_CPU) {
       allocated_ptr = malloc(byte_size);
-    } else if (io_spec.output_type_ == TRTSERVER_MEMORY_GPU) {
-      auto err = cudaSetDevice(preferred_memory_type_id);
+    } else {
+      auto err = cudaSetDevice(io_spec.output_type_id_);
       if (err == cudaSuccess) {
         err = cudaMalloc(&allocated_ptr, byte_size);
       }
@@ -138,7 +138,7 @@ ResponseAlloc(
           TRTSERVER_ERROR_INTERNAL,
           std::string(
               "failed to allocate " + std::to_string(byte_size) + " bytes in " +
-              MemoryTypeString(preferred_memory_type) + " for result tensor " +
+              MemoryTypeString(io_spec.output_type_) + " for result tensor " +
               tensor_name)
               .c_str());
     }
@@ -146,12 +146,12 @@ ResponseAlloc(
     *buffer = allocated_ptr;
     *buffer_userp = new std::string(tensor_name);
     LOG_INFO << "allocated " << byte_size << " bytes in "
-             << MemoryTypeString(preferred_memory_type) << " for result tensor "
+             << MemoryTypeString(io_spec.output_type_) << " for result tensor "
              << tensor_name;
   }
 
-  *actual_memory_type = preferred_memory_type;
-  *actual_memory_type_id = preferred_memory_type_id;
+  *actual_memory_type = io_spec.output_type_;
+  *actual_memory_type_id = io_spec.output_type_id_;
   return nullptr;  // Success
 }
 
@@ -307,8 +307,6 @@ main(int argc, char** argv)
         break;
       }
       case 'o': {
-        LOG_WARNING
-            << "This option can't guarantee acutal output type yet. [DLIS-823]";
         int64_t raw_id = std::stoll(optarg);
         if (raw_id < 0) {
           io_spec.output_type_ = TRTSERVER_MEMORY_CPU;
