@@ -84,7 +84,7 @@ class InferenceBackend {
  protected:
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
-  void Run(
+  virtual void Run(
       uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
       std::function<void(Status)> OnCompleteQueuedPayloads);
 
