@@ -1359,7 +1359,7 @@ TRTSERVER_ServerInferAsync(
     infer_response_provider = del_response_provider;
   }
 
-  lserver->Infer(
+  lserver->InferAsync(
       lprovider->Backend(), infer_request_provider, infer_response_provider,
       infer_stats,
       [infer_stats, trace, infer_response_provider, server, complete_fn,
@@ -1378,6 +1378,13 @@ TRTSERVER_ServerInferAsync(
           ltrace->Report(infer_stats);
         }
 #endif  // TRTIS_ENABLE_TRACING
+
+        // We must explicitly update the inference stats before
+        // sending the response... otherwise it is possible that the
+        // client will be able to query the stats after the response
+        // is received but before they've been updated for the request
+        // (this is especially important for testing).
+        infer_stats->Report();
 
         TrtServerResponse* response =
             new TrtServerResponse(status, infer_response_provider);

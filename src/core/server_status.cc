@@ -323,7 +323,8 @@ ServerStatTimerScoped::~ServerStatTimerScoped()
   }
 }
 
-ModelInferStats::~ModelInferStats()
+void
+ModelInferStats::Report()
 {
   // If the inference request failed before a backend could be
   // determined, there will be no metrics reporter.. so just use the

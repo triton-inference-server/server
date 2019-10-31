@@ -115,7 +115,7 @@ for model_type in FIXED VARIABLE; do
             exit 1
         fi
 
-        echo "Test: $i" >>$CLIENT_LOG
+        echo "Test: $i, $model_type" >>$CLIENT_LOG
 
         set +e
         python $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
