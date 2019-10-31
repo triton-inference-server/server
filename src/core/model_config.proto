@@ -492,7 +492,7 @@ message ModelOptimizationPolicy
     //@@
     //@@       For TensorFlow backend, possible values are "tensorrt", "gpu_io".
     //@@       For "tensorrt", the following parameters can be specified:
-    //@@         "precision_mode" The precission used for optimization.
+    //@@         "precision_mode" The precision used for optimization.
     //@@         The value can be one of "FP32" and "FP16".
     //@@         Default value is "FP32".
     //@@
