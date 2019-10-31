@@ -30,6 +30,14 @@
 Building
 ========
 
+The TensorRT Inference Server, the client libraries and examples, and
+custom backends can each be built using either Docker or CMake. The
+procedure for each is different and is detailed in the corresponding
+sections below.
+
+Building the Server
+-------------------
+
 The TensorRT Inference Server can be built in two ways:
 
 * Build using Docker and the TensorFlow and PyTorch containers from
@@ -44,7 +52,7 @@ The TensorRT Inference Server can be built in two ways:
 .. _section-building-the-server-with-docker:
 
 Building the Server with Docker
--------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To build a release version of the TensorRT Inference Server container,
 change directory to the root of the repo and checkout the release
@@ -58,7 +66,7 @@ Then use docker to build::
   $ docker build --pull -t tensorrtserver .
 
 Incremental Builds with Docker
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..............................
 
 For typical development you will want to run the *build* container
 with your local repo’s source files mounted so that your local changes
@@ -91,7 +99,7 @@ You can reconfigure the build by running *cmake* as described in
 .. _section-building-the-server-with-cmake:
 
 Building the Server with CMake
-------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To build a release version of the TensorRT Inference Server with
 CMake, change directory to the root of the repo and checkout the
@@ -107,7 +115,7 @@ enable the desired features, and finally build the server.
 .. _section-cmake-dependencies:
 
 Dependencies
-^^^^^^^^^^^^
+............
 
 To include GPU support in the inference server you must install the
 necessary CUDA libraries. Similarly, to include support for a
@@ -117,7 +125,7 @@ build. In general, the Dockerfile build steps guide how each of these
 frameworks can be built for use in the interence server.
 
 CUDA, cuBLAS, cuDNN
-...................
+~~~~~~~~~~~~~~~~~~~
 
 For the inference server to support NVIDIA GPUs you must install CUDA,
 cuBLAS and cuDNN. These libraries must be installed on system include
@@ -134,7 +142,7 @@ Once you have CUDA, cuBLAS and cuDNN installed you can enable GPUs
 with the CMake option -DTRTIS_ENABLE_GPU=ON as described below.
 
 TensorRT
-........
+~~~~~~~~
 
 The TensorRT includes and libraries must be installed on system
 include and library paths so that they are available for the CMake
@@ -152,7 +160,7 @@ in the inference server with the CMake option
 -DTRTIS_ENABLE_GPU=ON because TensorRT requires GPU support.
 
 TensorFlow
-..........
+~~~~~~~~~~
 
 The version of TensorFlow used in the Dockerfile build can be found in
 the `Framework Containers Support Matrix
@@ -182,7 +190,7 @@ them with a semicolon, for example,
 -DTRTIS_EXTRA_LIB_PATHS="/path/a;/path/b".
 
 ONNX Runtime
-............
+~~~~~~~~~~~~
 
 The version of the ONNX Runtime used in the Dockerfile build can be
 found in the trtserver_onnx section of the Dockerfile. That section
@@ -207,7 +215,7 @@ You must also provide the path to the ONNX Runtime headers using the
 specified by separating them with a semicolon.
 
 PyTorch and Caffe2
-..................
+~~~~~~~~~~~~~~~~~~
 
 The version of PyTorch and Caffe2 used in the Dockerfile build can be
 found in the `Framework Containers Support Matrix
@@ -237,7 +245,7 @@ headers using the -DTRTIS_PYTORCH_INCLUDE_PATHS option. Multiple paths
 can be specified by separating them with a semicolon.
 
 Configure Inference Server
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+..........................
 
 Use cmake to configure the TensorRT Inference Server::
 
@@ -321,7 +329,7 @@ These additional options may be specified:
   -DTRTIS_EXTRA_LIB_PATHS="/path/a;/path/b".
 
 Build Inference Server
-^^^^^^^^^^^^^^^^^^^^^^
+......................
 
 After configuring, build the inference server with make::
 
