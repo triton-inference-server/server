@@ -424,8 +424,7 @@ InferResponseProvider::InferResponseProvider(
     const std::shared_ptr<LabelProvider>& label_provider,
     TRTSERVER_ResponseAllocator* allocator,
     TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
-    TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
-    const std::unordered_map<std::string, TRTSERVER_Memory_Type>& output_buffer)
+    TRTSERVER_ResponseAllocatorReleaseFn_t release_fn)
     : request_header_(request_header), label_provider_(label_provider),
       allocator_(allocator), alloc_fn_(alloc_fn), alloc_userp_(alloc_userp),
       release_fn_(release_fn)
@@ -433,14 +432,7 @@ InferResponseProvider::InferResponseProvider(
   // Create a map from output name to the InferRequestHeader::Output
   // object for that output.
   for (const InferRequestHeader::Output& output : request_header.output()) {
-    auto it = output_buffer.find(output.name());
-    if (it == output_buffer.end()) {
-      output_map_.emplace(std::make_pair(
-          output.name(), std::make_pair(output, TRTSERVER_MEMORY_CPU)));
-    } else {
-      output_map_.emplace(
-          std::make_pair(output.name(), std::make_pair(output, it->second)));
-    }
+    output_map_.emplace(std::make_pair(output.name(), output));
   }
 }
 
@@ -448,13 +440,6 @@ bool
 InferResponseProvider::RequiresOutput(const std::string& name)
 {
   return output_map_.find(name) != output_map_.end();
-}
-
-TRTSERVER_Memory_Type
-InferResponseProvider::OutputMemoryType(const std::string& name)
-{
-  auto pr = output_map_.find(name);
-  return pr->second.second;
 }
 
 Status
@@ -660,12 +645,11 @@ InferResponseProvider::Create(
     TRTSERVER_ResponseAllocator* allocator,
     TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
     TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
-    const std::unordered_map<std::string, TRTSERVER_Memory_Type>& output_buffer,
     std::shared_ptr<InferResponseProvider>* infer_provider)
 {
   InferResponseProvider* provider = new InferResponseProvider(
       request_header, label_provider, allocator, alloc_fn, alloc_userp,
-      release_fn, output_buffer);
+      release_fn);
   infer_provider->reset(provider);
 
   return Status::Success;

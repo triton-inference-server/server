@@ -277,8 +277,6 @@ class InferResponseProvider {
       TRTSERVER_ResponseAllocator* allocator,
       TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
       TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
-      const std::unordered_map<std::string, TRTSERVER_Memory_Type>&
-          output_buffer,
       std::shared_ptr<InferResponseProvider>* infer_provider);
 
   ~InferResponseProvider();
@@ -291,9 +289,6 @@ class InferResponseProvider {
 
   // Return true if this provider requires a named output.
   bool RequiresOutput(const std::string& name);
-
-  // Return memorytype of this output.
-  TRTSERVER_Memory_Type OutputMemoryType(const std::string& name);
 
   // Get a buffer to store results for a named output. Must be called
   // exactly once for each output that is being returned for the
@@ -336,18 +331,13 @@ class InferResponseProvider {
       const std::shared_ptr<LabelProvider>& label_provider,
       TRTSERVER_ResponseAllocator* allocator,
       TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
-      TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
-      const std::unordered_map<std::string, TRTSERVER_Memory_Type>&
-          output_buffer);
+      TRTSERVER_ResponseAllocatorReleaseFn_t release_fn);
 
   InferRequestHeader request_header_;
 
   // Map from output name to the InferRequestHeader output information
-  // for that output and it's memory type.
-  std::unordered_map<
-      std::string,
-      std::pair<const InferRequestHeader::Output, TRTSERVER_Memory_Type>>
-      output_map_;
+  // for that output.	  // for that output and it's memory type.
+  std::unordered_map<std::string, const InferRequestHeader::Output> output_map_;
 
   // Information about each output.
   struct Output {

@@ -515,7 +515,6 @@ Status
 EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
 {
   std::unordered_map<std::string, std::shared_ptr<Memory>> input_map;
-  std::unordered_map<std::string, TRTSERVER_Memory_Type> output_map;
   InferRequestHeader request_header;
   auto& version_map = handles_[info_->steps_[step_idx].model_name_];
   auto& backend = version_map[info_->steps_[step_idx].model_version_];
@@ -561,7 +560,7 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   RETURN_IF_ERROR(InferResponseProvider::Create(
       (*step)->request_provider_->RequestHeader(),
       (*step)->backend_->GetLabelProvider(), allocator_.get(), ResponseAlloc,
-      &((*step)->output_map_), ResponseRelease, output_map,
+      &((*step)->output_map_), ResponseRelease,
       &((*step)->response_provider_)));
 
   return Status::Success;
