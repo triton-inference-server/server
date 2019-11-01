@@ -1,4 +1,4 @@
-name: "control_kind_ready_multiple"
+name: "control_kind_end_multiple"
 platform: "custom"
 max_batch_size: 8
 sequence_batching {
@@ -13,7 +13,7 @@ sequence_batching {
       ]
     },
     {
-      name: "READY0"
+      name: "READY"
       control [
         {
           kind: CONTROL_SEQUENCE_READY
@@ -22,10 +22,19 @@ sequence_batching {
       ]
     },
     {
-      name: "READY1"
+      name: "END0"
       control [
         {
-          kind: CONTROL_SEQUENCE_READY
+          kind: CONTROL_SEQUENCE_END
+          int32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "END1"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_END
           int32_false_true: [ 0, 1 ]
         }
       ]

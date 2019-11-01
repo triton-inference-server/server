@@ -593,7 +593,7 @@ message ModelSequenceBatching
   //@@     be idle before it is aborted. The inference server considers a
   //@@     sequence idle when it does not have any inference request queued
   //@@     for the sequence. If this limit is exceeded, the inference server
-  //@@     will free the batch slot allocated by the sequence and make it
+  //@@     will free the sequence slot allocated by the sequence and make it
   //@@     available for another sequence. If not specified (or specified as
   //@@     zero) a default value of 1000000 (1 second) is used.
   //@@
@@ -614,16 +614,25 @@ message ModelSequenceBatching
       //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_START = 0
       //@@
       //@@         A new sequence is/is-not starting. If true a sequence is
-      //@@         starting, if false a sequence is continuing.
+      //@@         starting, if false a sequence is continuing. This control
+      //@@         must be specified.
       //@@
       CONTROL_SEQUENCE_START = 0;
+
+      //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_END = 2
+      //@@
+      //@@         A sequence is/is-not ending. If true a sequence is
+      //@@         ending, if false a sequence is continuing. This control
+      //@@         is optional.
+      //@@
+      CONTROL_SEQUENCE_END = 2;
 
       //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_READY = 1
       //@@
       //@@         A sequence is/is-not ready for inference. If true the
       //@@         input tensor data is valid and should be used. If false
       //@@         the input tensor data is invalid and inferencing should
-      //@@         be "skipped".
+      //@@         be "skipped". This control must be specified.
       //@@
       CONTROL_SEQUENCE_READY = 1;
     }
