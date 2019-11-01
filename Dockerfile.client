@@ -25,8 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Default setting is building on nvidia/cuda:10.1-devel-ubuntu18.04
-ARG UBUNTU_VERSION=18.04
-ARG BASE_IMAGE=nvidia/cuda:10.1-devel-ubuntu${UBUNTU_VERSION}
+ARG BASE_IMAGE=nvidia/cuda:10.1-devel-ubuntu18.04
 
 FROM ${BASE_IMAGE}
 

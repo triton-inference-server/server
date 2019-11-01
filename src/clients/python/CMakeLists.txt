@@ -31,7 +31,7 @@ cmake_minimum_required (VERSION 3.5)
 #
 add_library(crequest SHARED crequest.cc)
 if(${TRTIS_ENABLE_GPU})
-target_include_directories(crequest PUBLIC ${CUDA_INCLUDE_DIRS})
+  target_include_directories(crequest PUBLIC ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
   crequest
   PRIVATE ${CUDA_LIBRARIES}
@@ -78,7 +78,7 @@ if(NOT WIN32)
 configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
 endif()
 if(${TRTIS_ENABLE_GPU})
-configure_file(cuda_shared_memory/__init__.py cuda_shared_memory/__init__.py COPYONLY)
+  configure_file(cuda_shared_memory/__init__.py cuda_shared_memory/__init__.py COPYONLY)
 endif() # TRTIS_ENABLE_GPU
 configure_file(setup.py setup.py COPYONLY)
 

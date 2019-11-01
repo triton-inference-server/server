@@ -81,10 +81,11 @@ a Python wheel file for the Python client library::
 
   $ docker build -t tensorrtserver_client -f Dockerfile.client .
 
-You can optionally add *-\\-build-arg "UBUNTU_VERSION=<ver>"* to set
-the Ubuntu version that you want the client library built
-for. Supported values for *<ver>* are 16.04 and 18.04, with 16.04
-being the default.
+You can optionally add *-\\-build-arg "BASE_IMAGE=<base_image>"* to set
+the base image that you want the client library built for. Must be a
+Ubuntu CUDA devel image to be able to build CUDA shared memory support.
+If CUDA shared memory support is not required, you can build with Ubuntu
+16.04 or 18.04.
 
 The generated Python wheel file works with both Python2 and Python3,
 but you can control which version of Python (and pip) are used to

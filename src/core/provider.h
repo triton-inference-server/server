@@ -336,7 +336,7 @@ class InferResponseProvider {
   InferRequestHeader request_header_;
 
   // Map from output name to the InferRequestHeader output information
-  // for that output.	  // for that output and it's memory type.
+  // for that output.
   std::unordered_map<std::string, const InferRequestHeader::Output> output_map_;
 
   // Information about each output.
