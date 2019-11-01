@@ -39,12 +39,14 @@ import infer_util as iu
 import test_util as tu
 from tensorrtserver.api import *
 import tensorrtserver.shared_memory as shm
+import tensorrtserver.cuda_shared_memory as cudashm
 import tensorrtserver.api.server_status_pb2 as server_status
 from ctypes import *
 
 _trials = ("savedmodel", "graphdef", "plan", "netdef", "custom", "libtorch", "onnx")
 
-TEST_SHARED_MEMORY = int(os.environ.get('TEST_SHARED_MEMORY', 0))
+TEST_SHARED_MEMORY = bool(os.environ.get('TEST_SHARED_MEMORY', 0))
+TEST_CUDA_SHARED_MEMORY = bool(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0))
 
 _max_queue_delay_ms = 10000
 
@@ -52,19 +54,23 @@ _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
 def _create_advance(shm_regions = None):
-    if TEST_SHARED_MEMORY:
+    if TEST_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
         precreated_shm_regions = []
         shared_memory_ctx = SharedMemoryControlContext("localhost:8000", ProtocolType.HTTP, verbose=True)
         if shm_regions is None:
             shm_regions = ['output0','output1']
         for shm_region in shm_regions:
-            shm_tmp_handle = shm.create_shared_memory_region(shm_region +'_data', '/'+ shm_region, 512)
+            if TEST_SHARED_MEMORY:
+                shm_tmp_handle = shm.create_shared_memory_region(shm_region +'_data', '/'+ shm_region, 512)
+                shared_memory_ctx.register(shm_tmp_handle)
+            else:
+                shm_tmp_handle = cudashm.create_shared_memory_region(shm_region +'_data', 512, 0)
+                shared_memory_ctx.cuda_register(shm_tmp_handle)
             precreated_shm_regions.append(shm_tmp_handle)
-            shared_memory_ctx.register(shm_tmp_handle)
         return precreated_shm_regions
 
 def _cleanup_after(shm_handles):
-    if TEST_SHARED_MEMORY:
+    if TEST_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
         shared_memory_ctx = SharedMemoryControlContext("localhost:8000", ProtocolType.HTTP, verbose=True)
         for shm_tmp_handle in shm_handles:
             shared_memory_ctx.unregister(shm_tmp_handle)
