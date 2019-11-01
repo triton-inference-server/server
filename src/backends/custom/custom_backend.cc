@@ -485,6 +485,21 @@ CustomBackend::Context::Run(
       break;
   }
 
+#ifdef TRTIS_ENABLE_GPU
+  // Transfer data to actual buffer if internal buffer is created.
+  // This happens in the case where V1 interface is used and actual buffer is
+  // on GPU.
+  for (auto& work_io_context : work_io_contexts) {
+    for (auto& output_buffer : work_io_context.output_buffers_) {
+      auto dst = std::get<0>(output_buffer);
+      auto src = std::get<1>(output_buffer).get();
+      auto byte_size = std::get<2>(output_buffer);
+      cudaMemcpyAsync(dst, src, byte_size, cudaMemcpyHostToDevice, stream_);
+    }
+  }
+  cudaStreamSynchronize(stream_);
+#endif  // TRTIS_ENABLE_GPU
+
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
@@ -562,6 +577,32 @@ CustomBackend::Context::GetNextInput(
       false);
   *memory_type = ToCustomMemoryType(src_memory_type);
   return status.IsOk();
+}
+
+bool
+CustomBackend::Context::GetOutput(
+    GetInputOutputContext* output_context, const char* cname,
+    size_t shape_dim_cnt, int64_t* shape_dims, uint64_t content_byte_size,
+    void** content)
+{
+  auto dst_memory_type = CUSTOM_MEMORY_CPU;
+  int64_t dst_memory_type_id = 0;
+  bool ok = GetOutput(
+      output_context, cname, shape_dim_cnt, shape_dims, content_byte_size,
+      content, &dst_memory_type, &dst_memory_type_id);
+
+#ifdef TRTIS_ENABLE_GPU
+  // If the actual memory type is GPU, returns a CPU memory buffer and
+  // implicitly copying the content to actual memory buffer after run.
+  if (ok && (dst_memory_type == CUSTOM_MEMORY_GPU)) {
+    std::unique_ptr<char[]> internal_buffer(new char[content_byte_size]);
+    void* internal_ptr = internal_buffer.get();
+    output_context->output_buffers_.emplace_back(
+        *content, std::move(internal_buffer), content_byte_size);
+    *content = internal_ptr;
+  }
+#endif  // TRTIS_ENABLE_GPU
+  return ok;
 }
 
 bool
@@ -654,18 +695,11 @@ CustomGetOutput(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content)
 {
-  // [TODO] below assumption no longer hold after
-  // https://github.com/NVIDIA/tensorrt-inference-server/pull/780,
-  // either to perform internal buffering like for CustomGetNextInput(),
-  // or to return error if actual type is not CPU.
-  // The former requires work on CustomBackend::Context::Run().
-  // internally call V2 as CPU memory request is default option and will
-  // always be permitted
-  auto memory_type = CUSTOM_MEMORY_CPU;
-  int64_t memory_type_id = 0;
-  return CustomGetOutputV2(
-      output_context, name, shape_dim_cnt, shape_dims, content_byte_size,
-      content, &memory_type, &memory_type_id);
+  CustomBackend::Context::GetInputOutputContext* ocontext =
+      static_cast<CustomBackend::Context::GetInputOutputContext*>(
+          output_context);
+  return ocontext->context_->GetOutput(
+      ocontext, name, shape_dim_cnt, shape_dims, content_byte_size, content);
 }
 
 bool
