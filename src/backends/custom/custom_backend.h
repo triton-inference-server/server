@@ -104,7 +104,10 @@ class CustomBackend : public InferenceBackend {
       }
       CustomBackend::Context* context_;
       Scheduler::Payload* payload_;
+      // Variable for being compatible with V1 interface in the case of GPU I/O
       std::vector<std::unique_ptr<char[]>> input_buffers_;
+      std::vector<std::tuple<void*, std::unique_ptr<char[]>, uint64_t>>
+          output_buffers_;
     };
 
     // Callback used by custom backends to get the next block of input
@@ -120,6 +123,14 @@ class CustomBackend : public InferenceBackend {
         GetInputOutputContext* input_context, const char* name,
         const void** content, uint64_t* content_byte_size,
         CustomMemoryType* memory_type, int64_t* memory_type_id);
+
+    // Callback used by custom backends to get the output buffer for a
+    // 'name'd output tensor. This function will enforce that
+    // the 'content' will be in CPU memory.
+    bool GetOutput(
+        GetInputOutputContext* output_context, const char* name,
+        size_t shape_dim_cnt, int64_t* shape_dims, uint64_t content_byte_size,
+        void** content);
 
     // Callback used by custom backends to get the output buffer for a
     // 'name'd output tensor.
