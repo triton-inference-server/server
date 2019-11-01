@@ -617,13 +617,14 @@ main(int argc, char** argv)
         std::to_string(input0_size) + ", got " +
         std::to_string(output0_byte_size));
   } else if (
-      (io_spec.output_type_ == TRTSERVER_MEMORY_CPU) &&
-      (output0_memory_type == TRTSERVER_MEMORY_GPU)) {
+      (io_spec.output_type_ != output0_memory_type) ||
+      (io_spec.output_type_id_ != output0_memory_type_id)) {
     FAIL(
-        "unexpected output0 memory type, expected to be allocated "
+        "unexpected output0 memory type (id), expected to be allocated "
         "in " +
-        MemoryTypeString(TRTSERVER_MEMORY_CPU) + ", got " +
-        MemoryTypeString(output0_memory_type) + ", id " +
+        MemoryTypeString(io_spec.output_type_) + " with id " +
+        std::to_string(io_spec.output_type_id_) + ", got " +
+        MemoryTypeString(output0_memory_type) + " with id " +
         std::to_string(output0_memory_type_id));
   }
 
@@ -642,13 +643,14 @@ main(int argc, char** argv)
         std::to_string(input1_size) + ", got " +
         std::to_string(output1_byte_size));
   } else if (
-      (io_spec.output_type_ == TRTSERVER_MEMORY_CPU) &&
-      (output1_memory_type == TRTSERVER_MEMORY_GPU)) {
+      (io_spec.output_type_ != output1_memory_type) ||
+      (io_spec.output_type_id_ != output1_memory_type_id)) {
     FAIL(
-        "unexpected output1 memory type, expected to be allocated "
+        "unexpected output1 memory type (id), expected to be allocated "
         "in " +
-        MemoryTypeString(TRTSERVER_MEMORY_CPU) + ", got " +
-        MemoryTypeString(output1_memory_type) + ", id " +
+        MemoryTypeString(io_spec.output_type_) + " with id " +
+        std::to_string(io_spec.output_type_id_) + ", got " +
+        MemoryTypeString(output1_memory_type) + " with id " +
         std::to_string(output1_memory_type_id));
   }
 
