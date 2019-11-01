@@ -592,8 +592,8 @@ CustomBackend::Context::GetOutput(
       content, &dst_memory_type, &dst_memory_type_id);
 
 #ifdef TRTIS_ENABLE_GPU
-  // If the memory type is on GPU, implicitly copying it to CPU memory
-  // to ensure backward capability
+  // If the actual memory type is GPU, returns a CPU memory buffer and
+  // implicitly copying the content to actual memory buffer after run.
   if (ok && (dst_memory_type == CUSTOM_MEMORY_GPU)) {
     std::unique_ptr<char[]> internal_buffer(new char[content_byte_size]);
     void* internal_ptr = internal_buffer.get();
