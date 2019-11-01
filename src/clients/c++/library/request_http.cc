@@ -1296,26 +1296,27 @@ InferHttpContextImpl::AsyncRun(InferContext::OnCompleteFn callback)
     inputs.emplace_back(std::make_shared<InputImpl>(*input));
   }
 
-  HttpRequestImpl* current_context =
+  HttpRequestImpl* http_request_ptr =
       new HttpRequestImpl(0 /* temp id */, inputs, std::move(callback));
-  async_request.reset(static_cast<Request*>(current_context));
+  async_request.reset(static_cast<Request*>(http_request_ptr));
 
-  if (!current_context->easy_handle_) {
+  if (!http_request_ptr->easy_handle_) {
     return Error(
         RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
   }
 
-  current_context->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
+  http_request_ptr->Timer().CaptureTimestamp(
+      RequestTimers::Kind::REQUEST_START);
 
   Error err = PreRunProcessing(async_request);
 
-  current_context->SetId(async_request_id_++);
+  http_request_ptr->SetId(async_request_id_++);
 
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
     auto insert_result = ongoing_async_requests_.emplace(std::make_pair(
-        reinterpret_cast<uintptr_t>(current_context->easy_handle_),
+        reinterpret_cast<uintptr_t>(http_request_ptr->easy_handle_),
         async_request));
 
     if (!insert_result.second) {
@@ -1323,16 +1324,16 @@ InferHttpContextImpl::AsyncRun(InferContext::OnCompleteFn callback)
           RequestStatusCode::INTERNAL,
           "Failed to insert new asynchronous request context.");
     }
-    curl_multi_add_handle(multi_handle_, current_context->easy_handle_);
+    http_request_ptr->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
+    if (http_request_ptr->total_input_byte_size_ == 0) {
+      // Set SEND_END here because CURLOPT_READFUNCTION will not be called if
+      // content length is 0. In that case, we can't measure SEND_END properly
+      // (send ends after sending request header).
+      http_request_ptr->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
+    }
+    curl_multi_add_handle(multi_handle_, http_request_ptr->easy_handle_);
   }
 
-  current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
-  if (current_context->total_input_byte_size_ == 0) {
-    // Set SEND_END here because CURLOPT_READFUNCTION will not be called if
-    // content length is 0. In that case, we can't measure SEND_END properly
-    // (send ends after sending request header).
-    current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
-  }
 
   cv_.notify_all();
   return Error(RequestStatusCode::SUCCESS);
