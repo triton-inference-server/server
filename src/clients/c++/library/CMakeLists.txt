@@ -127,7 +127,7 @@ set_target_properties(
     LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/librequest.ldscript
     LINK_FLAGS "-Wl,--version-script=librequest.ldscript"
 )
-endif()
+endif() # NOT WIN32
 
 if(${TRTIS_ENABLE_GPU})
   target_include_directories(request PUBLIC ${CUDA_INCLUDE_DIRS})

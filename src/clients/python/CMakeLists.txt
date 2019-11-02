@@ -50,23 +50,17 @@ add_library(cshm SHARED shared_memory/shared_memory.cc)
 if(${TRTIS_ENABLE_GPU})
   target_include_directories(cshm PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRTIS_ENABLE_GPU
-target_link_libraries(
-  cshm
-  rt
-)
-endif() # TRTIS_ENABLE_GPU
+target_link_libraries(cshm rt)
 
 #
 # libccudashm.so
 #
 if(${TRTIS_ENABLE_GPU})
-add_library(ccudashm SHARED cuda_shared_memory/cuda_shared_memory.cc)
-target_include_directories(ccudashm PUBLIC ${CUDA_INCLUDE_DIRS})
-target_link_libraries(
-  ccudashm
-  PRIVATE ${CUDA_LIBRARIES}
-)
+  add_library(ccudashm SHARED cuda_shared_memory/cuda_shared_memory.cc)
+  target_include_directories(ccudashm PUBLIC ${CUDA_INCLUDE_DIRS})
+  target_link_libraries(ccudashm PRIVATE ${CUDA_LIBRARIES})
 endif() # TRTIS_ENABLE_GPU
+endif() # NOT WIN32
 
 #
 # Wheel file
@@ -75,11 +69,11 @@ set(wheel_stamp_file "stamp.whl")
 configure_file(../../../VERSION VERSION COPYONLY)
 configure_file(__init__.py __init__.py COPYONLY)
 if(NOT WIN32)
-configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
+  configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
+  if(${TRTIS_ENABLE_GPU})
+    configure_file(cuda_shared_memory/__init__.py cuda_shared_memory/__init__.py COPYONLY)
+  endif() # TRTIS_ENABLE_GPU
 endif()
-if(${TRTIS_ENABLE_GPU})
-  configure_file(cuda_shared_memory/__init__.py cuda_shared_memory/__init__.py COPYONLY)
-endif() # TRTIS_ENABLE_GPU
 configure_file(setup.py setup.py COPYONLY)
 
 add_custom_command(
