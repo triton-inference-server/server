@@ -36,10 +36,6 @@
 #include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/model_config.pb.h"
 
-#if TRTIS_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
-
 namespace nvidia { namespace inferenceserver { namespace client {
 
 class InferGrpcContextImpl;
@@ -380,10 +376,10 @@ SharedMemoryControlGrpcContextImpl::RegisterCudaSharedMemory(
   // serialize cuda shm handle
   std::string* ipc_handle = cuda_shm_id->mutable_raw_handle();
   ipc_handle->append(
-      reinterpret_cast<const char*>(cuda_shm_handle),
+      reinterpret_cast<const char*>(&cuda_shm_handle),
       sizeof(cudaIpcMemHandle_t));
-  cuda_shm_id->set_device_id(device_id);
 
+  cuda_shm_id->set_device_id(device_id);
   rshm_region->set_byte_size(byte_size);
 
   grpc::Status status =

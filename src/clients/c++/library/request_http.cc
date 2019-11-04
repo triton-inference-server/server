@@ -37,10 +37,6 @@
 #define strncasecmp _strnicmp
 #endif
 
-#if TRTIS_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
-
 namespace nvidia { namespace inferenceserver { namespace client {
 
 class HttpRequestImpl;
@@ -611,11 +607,13 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
   Error GetSharedMemoryStatus(SharedMemoryStatus* status) override;
 
  private:
+#if TRTIS_ENABLE_GPU
+  static size_t RequestProvider(void*, size_t, size_t, void*);
+#endif  // TRTIS_ENABLE_GPU
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
   Error SendRequest(
       const std::string& action_str, const std::string& name,
-      const std::string& shm_key, const size_t offset, const size_t byte_size,
-      const int device_id);
+      const std::string& shm_key, const size_t offset, const size_t byte_size);
   static size_t ResponseHandler(void*, size_t, size_t, void*);
 
   // URL for control endpoint on inference server.
@@ -659,7 +657,7 @@ SharedMemoryControlHttpContextImpl::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
     const size_t byte_size)
 {
-  return SendRequest("register", name, shm_key, offset, byte_size, 0);
+  return SendRequest("register", name, shm_key, offset, byte_size);
 }
 
 #if TRTIS_ENABLE_GPU
@@ -668,8 +666,82 @@ SharedMemoryControlHttpContextImpl::RegisterCudaSharedMemory(
     const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
     size_t byte_size, int device_id)
 {
-  return SendRequest(
-      "cudaregister", name, cuda_shm_handle, 0, byte_size, device_id);
+  response_.clear();
+  request_status_.Clear();
+
+  if (!curl_global.Status().IsOk()) {
+    return curl_global.Status();
+  }
+
+  CURL* curl = curl_easy_init();
+  if (!curl) {
+    return Error(
+        RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
+  }
+
+  std::string full_url = url_ + "/cudaregister/" + name + "/" +
+                         std::to_string(byte_size) + "/" +
+                         std::to_string(device_id);
+  full_url += "?format=binary";
+
+  curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+  curl_easy_setopt(curl, CURLOPT_POST, 1L);
+  curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1L);
+  if (verbose_) {
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  }
+
+  // Serialize cuda ipc handle to HTTP body
+  size_t handle_byte_size = sizeof(cudaIpcMemHandle_t);
+  std::string reserved_handle_memory((char*)&cuda_shm_handle, handle_byte_size);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)handle_byte_size);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, reserved_handle_memory.c_str());
+
+  // response headers handled by ResponseHeaderHandler()
+  curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, ResponseHeaderHandler);
+  curl_easy_setopt(curl, CURLOPT_HEADERDATA, this);
+
+  // Response data handled by ResponseHandler()
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ResponseHandler);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, this);
+
+  // Add custom headers...
+  struct curl_slist* header_list = nullptr;
+  for (const auto& pr : headers_) {
+    std::string hdr = pr.first + ": " + pr.second;
+    header_list = curl_slist_append(header_list, hdr.c_str());
+  }
+
+  if (header_list != nullptr) {
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_list);
+  }
+
+  CURLcode res = curl_easy_perform(curl);
+  if (res != CURLE_OK) {
+    curl_slist_free_all(header_list);
+    curl_easy_cleanup(curl);
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "HTTP client failed: " + std::string(curl_easy_strerror(res)));
+  }
+
+  // Must use long with curl_easy_getinfo
+  long http_code;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+  curl_slist_free_all(header_list);
+  curl_easy_cleanup(curl);
+
+  // Should have a request status, if not then create an error status.
+  if (request_status_.code() == RequestStatusCode::INVALID) {
+    request_status_.Clear();
+    request_status_.set_code(RequestStatusCode::INTERNAL);
+    request_status_.set_msg(
+        "sharedmemorycontrol request did not return status");
+  }
+
+  return Error(request_status_);
 }
 #endif  // TRTIS_ENABLE_GPU
 
@@ -677,13 +749,13 @@ Error
 SharedMemoryControlHttpContextImpl::UnregisterSharedMemory(
     const std::string& name)
 {
-  return SendRequest("unregister", name, "", 0, 0, 0);
+  return SendRequest("unregister", name, "", 0, 0);
 }
 
 Error
 SharedMemoryControlHttpContextImpl::UnregisterAllSharedMemory()
 {
-  return SendRequest("unregisterall", "", "", 0, 0, 0);
+  return SendRequest("unregisterall", "", "", 0, 0);
 }
 
 Error
@@ -692,7 +764,7 @@ SharedMemoryControlHttpContextImpl::GetSharedMemoryStatus(
 {
   shm_status->Clear();
 
-  Error err = SendRequest("status", "", "", 0, 0, 0);
+  Error err = SendRequest("status", "", "", 0, 0);
   if (err.IsOk()) {
     if (!shm_status->ParseFromString(response_)) {
       return Error(
@@ -710,8 +782,7 @@ SharedMemoryControlHttpContextImpl::GetSharedMemoryStatus(
 Error
 SharedMemoryControlHttpContextImpl::SendRequest(
     const std::string& action_str, const std::string& name,
-    const std::string& shm_key, const size_t offset, const size_t byte_size,
-    const int device_id)
+    const std::string& shm_key, const size_t offset, const size_t byte_size)
 {
   response_.clear();
   request_status_.Clear();
@@ -731,13 +802,6 @@ SharedMemoryControlHttpContextImpl::SendRequest(
   if (action_str == "register") {
     full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
                 "/" + std::to_string(byte_size);
-  } else if (action_str == "cudaregister") {
-#if TRTIS_ENABLE_GPU
-    // TODO set cuda-shm_handle as raw bytes in body
-    full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
-                "/" + std::to_string(byte_size) + "/" +
-                std::to_string(device_id);
-#endif  // TRTIS_ENABLE_GPU
   } else if (action_str == "unregister") {
     full_url += +"/" + name;
   }

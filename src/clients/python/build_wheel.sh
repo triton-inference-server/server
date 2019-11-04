@@ -74,6 +74,14 @@ function main() {
       "${WHLDIR}/tensorrtserver/shared_memory/."
     cp shared_memory/__init__.py \
       "${WHLDIR}/tensorrtserver/shared_memory/."
+
+    if [ "$(expr $CUDA_VERSION)" != "" ]; then
+      mkdir -p ${WHLDIR}/tensorrtserver/cuda_shared_memory
+      cp libccudashm.so \
+        "${WHLDIR}/tensorrtserver/cuda_shared_memory/."
+      cp cuda_shared_memory/__init__.py \
+        "${WHLDIR}/tensorrtserver/cuda_shared_memory/."
+    fi
   fi
 
   cp setup.py "${WHLDIR}"

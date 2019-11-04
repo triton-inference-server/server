@@ -52,6 +52,10 @@
 #include "src/core/server_status.pb.h"
 #endif
 
+#if TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 namespace nvidia { namespace inferenceserver {
 
 // From model_config.h, repeat here to avoid introducing dependence on
@@ -531,7 +535,7 @@ class InferContext {
 
     /// Set the correlation id to use for subsequent inferences.
     /// \param correlation_id The value of correlation id to be set.
-    /// If non-zero this correlation ID overrides the context's 
+    /// If non-zero this correlation ID overrides the context's
     /// correlation ID for all subsequent inference requests, else
     /// the context retains its current correlation ID.
     virtual void SetCorrelationId(CorrelationID correlation_id) = 0;
@@ -804,11 +808,10 @@ class SharedMemoryControlContext {
   /// in shared memory being registered.
   /// \param byte_size The size, in bytes of the shared memory region.
   /// \param device id The GPU device ID the shared memory region is in.
-  /// Defaults to 0.
   /// \return Error object indicating success or failure.
   virtual Error RegisterCudaSharedMemory(
       const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
-      size_t byte_size, int device_id = 0) = 0;
+      size_t byte_size, int device_id) = 0;
 #endif  // TRTIS_ENABLE_GPU
 
   /// Unregister a registered shared memory region on the inference server. If

@@ -38,9 +38,9 @@ class InferenceBackend;
 class LabelProvider;
 
 //
-// SystemMemory used to access data in providers
+// Memory used to access data in providers
 //
-class SystemMemory {
+class Memory {
  public:
   // Get the 'idx'-th data block in the buffer. Using index to avoid
   // maintaining internal state such that one buffer can be shared
@@ -59,16 +59,16 @@ class SystemMemory {
   size_t TotalByteSize() const { return total_byte_size_; }
 
  protected:
-  SystemMemory() : total_byte_size_(0) {}
+  Memory() : total_byte_size_(0) {}
   size_t total_byte_size_;
 };
 
-class SystemMemoryReference : public SystemMemory {
+class MemoryReference : public Memory {
  public:
   // Create a read-only data buffer as a reference to other data buffer
-  SystemMemoryReference();
+  MemoryReference();
 
-  //\see SystemMemory::BufferAt()
+  //\see Memory::BufferAt()
   const char* BufferAt(
       size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
       int64_t* memory_type_id) const override;
@@ -96,7 +96,7 @@ class SystemMemoryReference : public SystemMemory {
   std::vector<Block> buffer_;
 };
 
-class AllocatedSystemMemory : public SystemMemory {
+class AllocatedSystemMemory : public Memory {
  public:
   // Create a continuous data buffer with 'byte_size', 'memory_type' and
   // 'memory_id.
@@ -106,7 +106,7 @@ class AllocatedSystemMemory : public SystemMemory {
 
   ~AllocatedSystemMemory();
 
-  //\see SystemMemory::BufferAt()
+  //\see Memory::BufferAt()
   const char* BufferAt(
       size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
       int64_t* memory_type_id) const override;
@@ -133,7 +133,7 @@ class InferRequestProvider {
   static Status Create(
       const std::string& model_name, const int64_t model_version,
       const InferRequestHeader& request_header,
-      const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>&
+      const std::unordered_map<std::string, std::shared_ptr<Memory>>&
           input_buffer,
       std::shared_ptr<InferRequestProvider>* provider);
 
@@ -178,8 +178,8 @@ class InferRequestProvider {
       bool force_contiguous);
 
   // Retrieve the data buffer of input 'name'.
-  Status GetSystemMemory(
-      const std::string& name, std::shared_ptr<SystemMemory>* input_buffer);
+  Status GetMemory(
+      const std::string& name, std::shared_ptr<Memory>* input_buffer);
 
   // Set content for named inputs. If the input already has content,
   // this content will be in-place of existing content.
@@ -229,8 +229,7 @@ class InferRequestProvider {
 
   // Map from input name to the content of the input. The content contains
   // the buffer and index to the next data block for the named input.
-  std::unordered_map<
-      std::string, std::pair<std::shared_ptr<SystemMemory>, size_t>>
+  std::unordered_map<std::string, std::pair<std::shared_ptr<Memory>, size_t>>
       input_buffer_;
 };
 

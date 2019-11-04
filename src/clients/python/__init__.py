@@ -119,6 +119,9 @@ _crequest_shm_control_ctx_del.argtypes = [c_void_p]
 _crequest_shm_control_ctx_register = _crequest.SharedMemoryControlContextRegister
 _crequest_shm_control_ctx_register.restype = c_void_p
 _crequest_shm_control_ctx_register.argtypes = [c_void_p, c_void_p]
+_crequest_shm_control_ctx_cuda_register = _crequest.SharedMemoryControlContextCudaRegister
+_crequest_shm_control_ctx_cuda_register.restype = c_void_p
+_crequest_shm_control_ctx_cuda_register.argtypes = [c_void_p, c_void_p]
 _crequest_shm_control_ctx_unregister = _crequest.SharedMemoryControlContextUnregister
 _crequest_shm_control_ctx_unregister.restype = c_void_p
 _crequest_shm_control_ctx_unregister.argtypes = [c_void_p, c_void_p]
@@ -164,6 +167,9 @@ _crequest_infer_ctx_options_add_class.argtypes = [c_void_p, c_void_p, _utf8, c_u
 _crequest_infer_ctx_options_add_shared_memory = _crequest.InferContextOptionsAddSharedMemory
 _crequest_infer_ctx_options_add_shared_memory.restype = c_void_p
 _crequest_infer_ctx_options_add_shared_memory.argtypes = [c_void_p, c_void_p, _utf8, c_void_p]
+_crequest_infer_ctx_options_add_cuda_shared_memory = _crequest.InferContextOptionsAddCudaSharedMemory
+_crequest_infer_ctx_options_add_cuda_shared_memory.restype = c_void_p
+_crequest_infer_ctx_options_add_cuda_shared_memory.argtypes = [c_void_p, c_void_p, _utf8, c_void_p]
 _crequest_correlation_id = _crequest.CorrelationId
 _crequest_correlation_id.restype = c_uint64
 _crequest_correlation_id.argtypes = [c_void_p]
@@ -185,6 +191,9 @@ _crequest_infer_ctx_input_set_raw.argtypes = [c_void_p, c_void_p, c_uint64]
 _crequest_infer_ctx_input_set_shared_memory = _crequest.InferContextInputSetSharedMemory
 _crequest_infer_ctx_input_set_shared_memory.restype = c_void_p
 _crequest_infer_ctx_input_set_shared_memory.argtypes = [c_void_p, c_void_p]
+_crequest_infer_ctx_input_set_cuda_shared_memory = _crequest.InferContextInputSetCudaSharedMemory
+_crequest_infer_ctx_input_set_cuda_shared_memory.restype = c_void_p
+_crequest_infer_ctx_input_set_cuda_shared_memory.argtypes = [c_void_p, c_void_p]
 
 _crequest_infer_ctx_result_new = _crequest.InferContextResultNew
 _crequest_infer_ctx_result_new.restype = c_void_p
@@ -754,6 +763,28 @@ class SharedMemoryControlContext:
             c_void_p(_crequest_shm_control_ctx_register(self._ctx, shm_handle)))
         return
 
+    def cuda_register(self, cuda_shm_handle):
+        """Request the inference server to register specified shared memory region.
+
+        Parameters
+        ----------
+        cuda_shm_handle : c_void_p
+            The handle for the CUDA shared memory region.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to register the shared memory region.
+
+        """
+        self._last_request_id = None
+        if self._ctx is None:
+            _raise_error("SharedMemoryControlContext is closed")
+
+        self._last_request_id = _raise_if_error(
+            c_void_p(_crequest_shm_control_ctx_cuda_register(self._ctx, cuda_shm_handle)))
+        return
+
     def unregister(self, shm_handle):
         """Request the inference server to unregister specified shared memory region.
 
@@ -902,7 +933,7 @@ class InferContext:
         self._callback_resources_dict = dict()
         self._callback_resources_dict_id = 0
         self._ctx = c_void_p()
-        # Lock for the thread-safety across asynchronous requests 
+        # Lock for the thread-safety across asynchronous requests
         self._lock = threading.Lock()
 
         if http_headers is None:
