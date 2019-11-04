@@ -63,7 +63,7 @@ class ConcurrencyManager : public LoadManager {
   /// \param manger Returns a new ConcurrencyManager object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
-      const int32_t batch_size, const size_t max_threads,
+      const bool async, const int32_t batch_size, const size_t max_threads,
       const size_t sequence_length, const size_t string_length,
       const std::string& string_data, const bool zero_input,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
@@ -117,16 +117,17 @@ class ConcurrencyManager : public LoadManager {
 
  private:
   ConcurrencyManager(
+      const bool async,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       const int32_t batch_size, const size_t max_threads,
       const size_t sequence_length,
       const std::shared_ptr<ContextFactory>& factory);
 
-  /// Function for worker that sends async inference requests.
+  /// Function for worker that sends inference requests.
   /// \param err Returns the status of the worker
   /// \param stats Returns the statistic of the InferContexts
   /// \param concurrency The concurrency level that the worker should produce.
-  void AsyncInfer(
+  void Infer(
       std::shared_ptr<nic::Error> err,
       std::shared_ptr<std::vector<nic::InferContext::Stat>> stats,
       std::shared_ptr<size_t> concurrency);
@@ -143,6 +144,8 @@ class ConcurrencyManager : public LoadManager {
   /// \param offset_ratio The offset ratio of the generated length
   /// \return random sequence length
   size_t GetRandomLength(double offset_ratio);
+
+  bool async_;
 
   size_t batch_size_;
   size_t max_threads_;

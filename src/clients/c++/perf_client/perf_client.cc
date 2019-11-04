@@ -303,7 +303,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-t <number of concurrent requests>" << std::endl;
   std::cerr << "\t-c <maximum concurrency>" << std::endl;
   std::cerr << "\t-d" << std::endl;
-  std::cerr << "\t-a" << std::endl;
+  std::cerr << "\t--async (-a)" << std::endl;
   std::cerr << std::endl;
   std::cerr << "II. INPUT DATA OPTIONS: " << std::endl;
   std::cerr << "\t-b <batch size>" << std::endl;
@@ -380,7 +380,9 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr
       << FormatMessage(
              " --max-threads: Sets the maximum number of threads that will be "
-             "created for providing desired concurrency. Default is 16.",
+             "created for providing desired concurrency. However, when running "
+             "in synchronous mode with a given max concurrency limit,"
+             "this value will be ignored. Default is 16.",
              18)
       << std::endl;
   std::cerr
@@ -534,6 +536,7 @@ main(int argc, char** argv)
   int32_t concurrent_request_count = 1;
   size_t max_concurrency = 0;
   bool dynamic_concurrency_mode = false;
+  bool async = false;
 
   // Required for detecting the use of conflicting options
   bool using_concurrency_range = false;
@@ -556,6 +559,7 @@ main(int argc, char** argv)
                                          {"input-data", 1, 0, 11},
                                          {"string-length", 1, 0, 12},
                                          {"string-data", 1, 0, 13},
+                                         {"async", 0, 0, 14},
                                          {0, 0, 0, 0}};
 
   // Parse commandline...
@@ -676,6 +680,10 @@ main(int argc, char** argv)
         string_data = optarg;
         break;
       }
+      case 14: {
+        async = true;
+        break;
+      }
       case 'v':
         verbose = true;
         break;
@@ -732,8 +740,7 @@ main(int argc, char** argv)
         filename = optarg;
         break;
       case 'a':
-        std::cerr << "WARNING: -a flag is deprecated. Enable it will not change"
-                  << "perf client behaviors." << std::endl;
+        async = true;
         break;
       case '?':
         Usage(argv);
@@ -803,6 +810,24 @@ main(int argc, char** argv)
     url = "localhost:8001";
   }
 
+  if (!async) {
+    if (concurrency_range[CONCURRENCY_RANGE::kEND] == NO_LIMIT) {
+      std::cerr
+          << "WARNING: The maximum attainable concurrency will be limited by "
+             "max_threads specification."
+          << std::endl;
+      concurrency_range[CONCURRENCY_RANGE::kEND] = max_threads;
+    } else {
+      std::cerr << "WARNING: Overriding max_threads specification to ensure "
+                   "requested "
+                   "concurrency range."
+                << std::endl;
+      max_threads = std::max(
+          concurrency_range[CONCURRENCY_RANGE::kSTART],
+          concurrency_range[CONCURRENCY_RANGE::kEND]);
+    }
+  }
+
   // trap SIGINT to allow threads to exit gracefully
   signal(SIGINT, perfclient::SignalHandler);
 
@@ -818,8 +843,8 @@ main(int argc, char** argv)
     return 1;
   }
   err = perfclient::ConcurrencyManager::Create(
-      batch_size, max_threads, sequence_length, string_length, string_data,
-      zero_input, input_shapes, data_directory, factory, &manager);
+      async, batch_size, max_threads, sequence_length, string_length,
+      string_data, zero_input, input_shapes, data_directory, factory, &manager);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
