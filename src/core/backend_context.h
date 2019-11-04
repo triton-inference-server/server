@@ -35,6 +35,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
+class AllocatedSystemMemory;
+
 struct BackendContext {
   // GPU device number that indicates that no gpu is available for a
   // context (which is an invalid state since TensorRT requires a
@@ -80,6 +82,20 @@ struct BackendContext {
       const TRTSERVER_Memory_Type dst_memory_type,
       const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
       void* dst, bool* cuda_used);
+
+  // Helper function for handling string input. This function will return the
+  // requested input content within a payload in a contiguous chunk. In some
+  // cases this will require copying the data. If it happens,
+  // 'contiguous_buffer' will be set to hold the contiguous chunk and
+  // 'cuda_copy' will be set to indicate whether CUDA copy is conducted.
+  // The data copy can be avoid if the input is already in contiguous chunk and
+  // the input is located in memory type and id specified.
+  Status GetContiguousInputContent(
+      const std::string& name, TRTSERVER_Memory_Type memory_type,
+      int64_t memory_type_id, const Scheduler::Payload& payload,
+      const char** content, size_t* content_byte_size,
+      std::unique_ptr<AllocatedSystemMemory>* contiguous_buffer,
+      bool* cuda_copy);
 
   // Name of the model instance
   std::string name_;
