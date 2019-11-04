@@ -28,13 +28,14 @@ import sys
 import os
 import numpy as np
 from tensorrtserver.api import *
-TEST_SHARED_MEMORY = bool(os.environ.get('TEST_SHARED_MEMORY', 0))
 import tensorrtserver.shared_memory as shm
-TEST_CUDA_SHARED_MEMORY = bool(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0))
 import tensorrtserver.cuda_shared_memory as cudashm
 import test_util as tu
 from sets import Set
 from ctypes import *
+
+TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
 
 # unicode() doesn't exist on python3, for how we use it the
 # corresponding function is bytes()
@@ -91,20 +92,21 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         if TEST_CUDA_SHARED_MEMORY:
             configs.append(("localhost:8000", ProtocolType.HTTP, False, False, True))
         else:
-            configs.append(("localhost:8000", ProtocolType.HTTP, False, TEST_SHARED_MEMORY, False))
+            configs.append(("localhost:8000", ProtocolType.HTTP, False, TEST_SYSTEM_SHARED_MEMORY, False))
     if use_grpc:
         if TEST_CUDA_SHARED_MEMORY:
-            configs.append(("localhost:8000", ProtocolType.GRPC, False, False, True))
+            configs.append(("localhost:8001", ProtocolType.GRPC, False, False, True))
         else:
-            configs.append(("localhost:8000", ProtocolType.GRPC, False, TEST_SHARED_MEMORY, False))
+            configs.append(("localhost:8001", ProtocolType.GRPC, False, TEST_SYSTEM_SHARED_MEMORY, False))
     if use_streaming:
         if TEST_CUDA_SHARED_MEMORY:
-            configs.append(("localhost:8000", ProtocolType.GRPC, True, False, True))
+            configs.append(("localhost:8001", ProtocolType.GRPC, True, False, True))
         else:
-            configs.append(("localhost:8000", ProtocolType.GRPC, True, TEST_SHARED_MEMORY, False))
+            configs.append(("localhost:8001", ProtocolType.GRPC, True, TEST_SYSTEM_SHARED_MEMORY, False))
 
     registered_shm_regions = {}
     for config in configs:
+        print("zz", registered_shm_regions)
         model_name = tu.get_model_name(pf, input_dtype, output0_dtype, output1_dtype)
 
         # outputs are sum and difference of inputs so set max input
@@ -196,7 +198,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 shm_region_names = ['input0', 'input1', 'output0', 'output1']
 
             if not _match_registered(registered_shm_regions, shm_region_names[0], input0_byte_size):
-                if config[3]:
+                if config[4]:
                     shm_ip0_handle = cudashm.create_shared_memory_region(shm_region_names[0]+'_data',
                                                                 input0_byte_size, 0)
                 else:
@@ -207,13 +209,13 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 shm_ip0_handle = registered_shm_regions[shm_region_names[0]][1]
 
             if not _match_registered(registered_shm_regions, shm_region_names[1], input1_byte_size):
-                if config[3]:
+                if config[4]:
                     shm_ip1_handle = cudashm.create_shared_memory_region(shm_region_names[1]+'_data',
                                                                 input1_byte_size, 0)
                 else:
                     shm_ip1_handle = shm.create_shared_memory_region(shm_region_names[1]+'_data',
                                                                 '/'+shm_region_names[1], input1_byte_size)
-                    registered_shm_regions[shm_region_names[1]] = (input1_byte_size, shm_ip1_handle)
+                registered_shm_regions[shm_region_names[1]] = (input1_byte_size, shm_ip1_handle)
             else:
                 shm_ip1_handle = registered_shm_regions[shm_region_names[1]][1]
 
@@ -221,7 +223,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 i = 0
                 if "OUTPUT0" in outputs:
                     if not _match_registered(registered_shm_regions, shm_region_names[2], output0_byte_size):
-                        if config[3]:
+                        if config[4]:
                             shm_op0_handle = cudashm.create_shared_memory_region(shm_region_names[2]+'_data',
                                                                         output0_byte_size, 0)
                         else:
@@ -231,14 +233,14 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                     else:
                         shm_op0_handle = registered_shm_regions[shm_region_names[2]][1]
                     shared_memory_ctx.unregister(shm_op0_handle)
-                    if config[3]:
+                    if config[4]:
                         shared_memory_ctx.cuda_register(shm_op0_handle)
                     else:
                         shared_memory_ctx.register(shm_op0_handle)
                     i+=1
                 if "OUTPUT1" in outputs:
                     if not _match_registered(registered_shm_regions, shm_region_names[2+i], output1_byte_size):
-                        if config[3]:
+                        if config[4]:
                             shm_op1_handle = cudashm.create_shared_memory_region(shm_region_names[2+i]+'_data',
                                                                         output1_byte_size, 0)
                         else:
@@ -248,7 +250,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                     else:
                         shm_op1_handle = registered_shm_regions[shm_region_names[2+i]][1]
                     shared_memory_ctx.unregister(shm_op1_handle)
-                    if config[3]:
+                    if config[4]:
                         shared_memory_ctx.cuda_register(shm_op1_handle)
                     else:
                         shared_memory_ctx.register(shm_op1_handle)
@@ -261,9 +263,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 if "OUTPUT1" in outputs:
                     shm_op1_handle = precreated_shm_regions[i]
 
-            if config[3] or configs[4]:
+            if config[3] or config[4]:
                 # copy data into shared memory region for input values
-                if config[3]:
+                if config[4]:
                     cudashm.set_shared_memory_region(shm_ip0_handle, input0_list)
                     cudashm.set_shared_memory_region(shm_ip1_handle, input1_list)
                 else:
@@ -271,7 +273,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                     shm.set_shared_memory_region(shm_ip1_handle, input1_list)
                 shared_memory_ctx.unregister(shm_ip0_handle)
                 shared_memory_ctx.unregister(shm_ip1_handle)
-                if config[3]:
+                if config[4]:
                     shared_memory_ctx.cuda_register(shm_ip0_handle)
                     shared_memory_ctx.cuda_register(shm_ip1_handle)
                 else:
@@ -311,7 +313,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         ctx = InferContext(config[0], config[1], model_name, model_version,
                            correlation_id=correlation_id, streaming=config[2],
                            verbose=True)
-        if config[3]:
+        if config[3] or config[4]:
             results = ctx.run(
                     { INPUT0 : (shm_ip0_handle, tensor_shape),
                     INPUT1 : (shm_ip1_handle, tensor_shape) },
@@ -374,7 +376,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                         else:
                             tester.assertTrue(False, "unexpected class result {}".format(result_name))
 
-        if config[3]:
+        if config[3] or config[4]:
             shared_memory_ctx.unregister(shm_ip0_handle)
             shared_memory_ctx.unregister(shm_ip1_handle)
             if precreated_shm_regions is None:
@@ -397,17 +399,17 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         if TEST_CUDA_SHARED_MEMORY:
             configs.append(("localhost:8000", ProtocolType.HTTP, False, False, True))
         else:
-            configs.append(("localhost:8000", ProtocolType.HTTP, False, TEST_SHARED_MEMORY, False))
+            configs.append(("localhost:8000", ProtocolType.HTTP, False, TEST_SYSTEM_SHARED_MEMORY, False))
     if use_grpc:
         if TEST_CUDA_SHARED_MEMORY:
             configs.append(("localhost:8000", ProtocolType.GRPC, False, False, True))
         else:
-            configs.append(("localhost:8000", ProtocolType.GRPC, False, TEST_SHARED_MEMORY, False))
+            configs.append(("localhost:8000", ProtocolType.GRPC, False, TEST_SYSTEM_SHARED_MEMORY, False))
     if use_streaming:
         if TEST_CUDA_SHARED_MEMORY:
             configs.append(("localhost:8000", ProtocolType.GRPC, True, False, True))
         else:
-            configs.append(("localhost:8000", ProtocolType.GRPC, True, TEST_SHARED_MEMORY, False))
+            configs.append(("localhost:8000", ProtocolType.GRPC, True, TEST_SYSTEM_SHARED_MEMORY, False))
     tester.assertEqual(len(input_shapes), len(output_shapes))
     io_cnt = len(input_shapes)
 
@@ -474,7 +476,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
             expected_dict[output_name] = expected_list
             if config[3] or config[4]:
                 # copy data into shared memory region for input values
-                if config[3]:
+                if config[4]:
                     cudashm.set_shared_memory_region(shm_ip_handles[io_num], input_list)
                 else:
                     shm.set_shared_memory_region(shm_ip_handles[io_num], input_list)
@@ -507,7 +509,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
             for io_num in range(io_cnt):
                 shared_memory_ctx.unregister(shm_ip_handles[io_num])
                 shared_memory_ctx.unregister(shm_op_handles[io_num])
-                if config[3]:
+                if config[4]:
                     cudashm.destroy_shared_memory_region(shm_ip_handles[io_num])
                     cudashm.destroy_shared_memory_region(shm_op_handles[io_num])
                 else:

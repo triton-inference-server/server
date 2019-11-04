@@ -45,8 +45,8 @@ from ctypes import *
 
 _trials = ("savedmodel", "graphdef", "plan", "netdef", "custom", "libtorch", "onnx")
 
-TEST_SHARED_MEMORY = bool(os.environ.get('TEST_SHARED_MEMORY', 0))
-TEST_CUDA_SHARED_MEMORY = bool(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0))
+TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
 
 _max_queue_delay_ms = 10000
 
@@ -54,13 +54,13 @@ _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
 def _create_advance(shm_regions = None):
-    if TEST_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
         precreated_shm_regions = []
         shared_memory_ctx = SharedMemoryControlContext("localhost:8000", ProtocolType.HTTP, verbose=True)
         if shm_regions is None:
             shm_regions = ['output0','output1']
         for shm_region in shm_regions:
-            if TEST_SHARED_MEMORY:
+            if TEST_SYSTEM_SHARED_MEMORY:
                 shm_tmp_handle = shm.create_shared_memory_region(shm_region +'_data', '/'+ shm_region, 512)
                 shared_memory_ctx.register(shm_tmp_handle)
             else:
@@ -70,7 +70,7 @@ def _create_advance(shm_regions = None):
         return precreated_shm_regions
 
 def _cleanup_after(shm_handles):
-    if TEST_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
         shared_memory_ctx = SharedMemoryControlContext("localhost:8000", ProtocolType.HTTP, verbose=True)
         for shm_tmp_handle in shm_handles:
             shared_memory_ctx.unregister(shm_tmp_handle)
@@ -255,7 +255,7 @@ class BatcherTest(unittest.TestCase):
         # not be batched. The first response will come back
         # immediately and the second delayed by the max batch queue
         # delay
-        if TEST_SHARED_MEMORY:
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00', 'op01']
             shm1_region_names = ['ip10', 'ip11', 'op10', 'op11']
         else:
@@ -302,7 +302,7 @@ class BatcherTest(unittest.TestCase):
         # delayed by the max batch queue delay, and the second by max
         # delay (minus the difference in time that they arrived in the
         # queue)
-        if TEST_SHARED_MEMORY:
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00', 'op01']
             shm1_region_names = ['ip10', 'ip11', 'op10', 'op11']
         else:
@@ -348,7 +348,7 @@ class BatcherTest(unittest.TestCase):
         # and a non-preferred batch size. This should cause the first
         # two requests to be immediately responded to and the third
         # response to be delayed by the max batch queue delay.
-        if TEST_SHARED_MEMORY:
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00', 'op01']
             shm1_region_names = ['ip10', 'ip11', 'op10', 'op11']
             shm2_region_names = ['ip20', 'ip21', 'op20', 'op21']
@@ -405,7 +405,7 @@ class BatcherTest(unittest.TestCase):
         # request with the same shape as the third that causes a
         # preferred size so that third and forth response are sent
         # immediately.
-        if TEST_SHARED_MEMORY:
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00', 'op01']
             shm1_region_names = ['ip10', 'ip11', 'op10', 'op11']
             shm2_region_names = ['ip20', 'ip21', 'op20', 'op21']
@@ -469,7 +469,7 @@ class BatcherTest(unittest.TestCase):
         # second request so that it arrives after the first is already
         # be processed by the dynamic batcher. This should cause both
         # responses to be returned immediately.
-        if TEST_SHARED_MEMORY:
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00', 'op01']
             shm1_region_names = ['ip10', 'ip11', 'op10', 'op11']
         else:
@@ -516,7 +516,7 @@ class BatcherTest(unittest.TestCase):
         # response to be returned immediately but the second response,
         # since it alone is not greater than max preferred size, will
         # be delayed.
-        if TEST_SHARED_MEMORY:
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00', 'op01']
             shm1_region_names = ['ip10', 'ip11', 'op10', 'op11']
         else:
@@ -559,7 +559,7 @@ class BatcherTest(unittest.TestCase):
         # Send two requests where both ask for OUTPUT0. They should be
         # batched and get the correct response even though they don't
         # request both outputs.
-        if TEST_SHARED_MEMORY:
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00']
             shm1_region_names = ['ip10', 'ip11', 'op10']
         else:
@@ -603,7 +603,7 @@ class BatcherTest(unittest.TestCase):
         # Send two requests where both ask for OUTPUT1. They should be
         # batched and get the correct response even though they don't
         # request both outputs.
-        if TEST_SHARED_MEMORY:
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op01']
             shm1_region_names = ['ip10', 'ip11', 'op11']
         else:
@@ -646,9 +646,9 @@ class BatcherTest(unittest.TestCase):
     def test_multi_different_outputs(self):
         # Send two requests where one request asks for one output and
         # the other request asks for the other output. They should be
-        # batched and each should get the correct response even though
-        # they don't request both outputs.
-        if TEST_SHARED_MEMORY:
+        # batched and get the correct response even though they don't
+        # request both outputs.
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00']
             shm1_region_names = ['ip10', 'ip11', 'op11']
         else:
@@ -692,7 +692,7 @@ class BatcherTest(unittest.TestCase):
         # Send two requests that ask for both outputs, but in a
         # different order. They should be batched and get the correct
         # response even though they use different order.
-        if TEST_SHARED_MEMORY:
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00','op01']
             shm1_region_names = ['ip10', 'ip11', 'op11','op10']
         else:
@@ -735,7 +735,7 @@ class BatcherTest(unittest.TestCase):
         # servicing. This should cause first response to be returned
         # immediately but the second response, since it alone is not
         # greater than max preferred size, will be delayed.
-        if TEST_SHARED_MEMORY:
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00', 'op01']
             shm1_region_names = ['ip10', 'ip11', 'op10', 'op11']
         else:
@@ -787,7 +787,7 @@ class BatcherTest(unittest.TestCase):
         # immediately responded to. Send a forth request with the same
         # shape as the third that causes a preferred size so that
         # third and forth response are sent immediately.
-        if TEST_SHARED_MEMORY:
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00', 'op01']
             shm1_region_names = ['ip10', 'ip11', 'op10', 'op11']
             shm2_region_names = ['ip20', 'ip21', 'op20', 'op21']
@@ -854,7 +854,7 @@ class BatcherTest(unittest.TestCase):
         # batch. Use TRTSERVER_DELAY_SCHEDULER in the environment so
         # that requests can be queued up before scheduler starts
         # servicing.
-        if TEST_SHARED_MEMORY:
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00', 'op01']
             shm1_region_names = ['ip10', 'ip11', 'op10', 'op11']
             shm2_region_names = ['ip20', 'ip21', 'op20', 'op21']
@@ -934,7 +934,7 @@ class BatcherTest(unittest.TestCase):
         # timeout. Use TRTSERVER_DELAY_SCHEDULER in the environment so
         # that requests can be queued up before scheduler starts
         # servicing.
-        if TEST_SHARED_MEMORY:
+        if TEST_SYSTEM_SHARED_MEMORY:
             shm0_region_names = ['ip00', 'ip01', 'op00', 'op01']
             shm1_region_names = ['ip10', 'ip11', 'op10', 'op11']
             shm2_region_names = ['ip20', 'ip21', 'op20', 'op21']
