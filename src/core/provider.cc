@@ -42,12 +42,12 @@
 namespace nvidia { namespace inferenceserver {
 
 //
-// SystemMemoryReference
+// MemoryReference
 //
-SystemMemoryReference::SystemMemoryReference() : SystemMemory() {}
+MemoryReference::MemoryReference() : Memory() {}
 
 const char*
-SystemMemoryReference::BufferAt(
+MemoryReference::BufferAt(
     size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
     int64_t* memory_type_id) const
 {
@@ -64,7 +64,7 @@ SystemMemoryReference::BufferAt(
 }
 
 size_t
-SystemMemoryReference::AddBuffer(
+MemoryReference::AddBuffer(
     const char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
     int64_t memory_type_id)
 {
@@ -75,7 +75,7 @@ SystemMemoryReference::AddBuffer(
 
 AllocatedSystemMemory::AllocatedSystemMemory(
     size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
-    : SystemMemory(), memory_type_(memory_type), memory_type_id_(memory_type_id)
+    : Memory(), memory_type_(memory_type), memory_type_id_(memory_type_id)
 {
   buffer_ = nullptr;
   if (byte_size != 0) {
@@ -185,7 +185,7 @@ Status
 InferRequestProvider::Create(
     const std::string& model_name, const int64_t model_version,
     const InferRequestHeader& request_header,
-    const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>&
+    const std::unordered_map<std::string, std::shared_ptr<Memory>>&
         input_buffer,
     std::shared_ptr<InferRequestProvider>* provider)
 {
@@ -321,8 +321,8 @@ InferRequestProvider::GetNextInputContent(
 }
 
 Status
-InferRequestProvider::GetSystemMemory(
-    const std::string& name, std::shared_ptr<SystemMemory>* input_buffer)
+InferRequestProvider::GetMemory(
+    const std::string& name, std::shared_ptr<Memory>* input_buffer)
 {
   auto it = input_buffer_.find(name);
   if (it == input_buffer_.end()) {

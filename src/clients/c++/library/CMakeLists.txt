@@ -69,6 +69,9 @@ add_library(
 target_include_directories(
   request-library PRIVATE
   $<TARGET_PROPERTY:CURL::libcurl,INTERFACE_INCLUDE_DIRECTORIES>)
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(request-library PUBLIC ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 add_dependencies(
   request-library
   model-config-library grpc-library proto-library
@@ -86,10 +89,8 @@ add_library(
   TRTIS::request_static ALIAS request_static
 )
 if(${TRTIS_ENABLE_GPU})
-  target_include_directories(
-    request_static
-    PRIVATE ${CUDA_INCLUDE_DIRS}
-  )
+  target_include_directories(request_static PUBLIC ${CUDA_INCLUDE_DIRS})
+  target_link_libraries(request_static PRIVATE ${CUDA_LIBRARIES})
 endif() # TRTIS_ENABLE_GPU
 target_include_directories(
   request_static
@@ -126,8 +127,11 @@ set_target_properties(
     LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/librequest.ldscript
     LINK_FLAGS "-Wl,--version-script=librequest.ldscript"
 )
-endif()
+endif() # NOT WIN32
 
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(request PUBLIC ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 target_include_directories (request
   PUBLIC
     $<INSTALL_INTERFACE:include>

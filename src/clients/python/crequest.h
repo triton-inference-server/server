@@ -89,6 +89,8 @@ nic::Error* SharedMemoryControlContextNew(
 void SharedMemoryControlContextDelete(SharedMemoryControlContextCtx* ctx);
 nic::Error* SharedMemoryControlContextRegister(
     SharedMemoryControlContextCtx* ctx, void* shm_handle);
+nic::Error* SharedMemoryControlContextCudaRegister(
+    SharedMemoryControlContextCtx* ctx, void* cuda_shm_handle);
 nic::Error* SharedMemoryControlContextUnregister(
     SharedMemoryControlContextCtx* ctx, void* shm_handle);
 nic::Error* SharedMemoryControlContextUnregisterAll(
@@ -98,6 +100,9 @@ nic::Error* SharedMemoryControlContextGetStatus(
 nic::Error* SharedMemoryControlContextGetSharedMemoryHandle(
     void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd,
     size_t* offset, size_t* byte_size);
+nic::Error* SharedMemoryControlContextGetCudaSharedMemoryHandle(
+    void* cuda_shm_handle, void** shm_addr, size_t* byte_size, int* device_id);
+
 //==============================================================================
 // InferContext
 typedef struct InferContextCtx InferContextCtx;
@@ -130,6 +135,9 @@ nic::Error* InferContextOptionsAddClass(
 nic::Error* InferContextOptionsAddSharedMemory(
     InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
     const char* output_name, void* shm_handle);
+nic::Error* InferContextOptionsAddCudaSharedMemory(
+    InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
+    const char* output_name, void* cuda_shm_handle);
 ni::CorrelationID CorrelationId(InferContextCtx* ctx);
 
 //==============================================================================
@@ -145,6 +153,8 @@ nic::Error* InferContextInputSetRaw(
     InferContextInputCtx* ctx, const void* data, uint64_t byte_size);
 nic::Error* InferContextInputSetSharedMemory(
     InferContextInputCtx* ctx, void* shm_handle);
+nic::Error* InferContextInputSetCudaSharedMemory(
+    InferContextInputCtx* ctx, void* cuda_shm_handle);
 
 //==============================================================================
 // InferContext::Result

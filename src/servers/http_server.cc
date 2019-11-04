@@ -701,8 +701,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
   }
 
   re2::RE2 register_regex_(R"(/([^/]+)/(/[^/]+)/([0-9]+)/([0-9]+))");
-  re2::RE2 cudaregister_regex_(
-      R"(/([^/]+)/([^/]+)/([0-9]+)/([0-9]+)/([0-9]+))");
+  re2::RE2 cudaregister_regex_(R"(/([^/]+)/([0-9]+)/([0-9]+))");
   re2::RE2 unregister_regex_(R"(/([^/]+))");
 
   std::string action_type_str, remaining, name, shm_key;
@@ -729,8 +728,8 @@ HTTPAPIServer::HandleSharedMemoryControl(
       } else if (
           action_type_str == "cudaregister" &&
           (!RE2::FullMatch(
-              remaining, cudaregister_regex_, &name, &shm_key, &offset_str,
-              &byte_size_str, &device_id_str))) {
+              remaining, cudaregister_regex_, &name, &byte_size_str,
+              &device_id_str))) {
         evhtp_send_reply(req, EVHTP_RES_BADREQ);
         return;
       } else if (action_type_str == "unregister") {
@@ -915,14 +914,18 @@ HTTPAPIServer::EVBufferToInput(
         }
 
         void* base;
+        TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
+        int64_t memory_type_id;
         TRTSERVER_SharedMemoryBlock* smb = nullptr;
         RETURN_IF_ERR(smb_manager_->Get(&smb, io.shared_memory().name()));
         RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
             server_.get(), smb, io.shared_memory().offset(),
             io.shared_memory().byte_size(), &base));
+        TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
+        TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
         RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-            request_provider, io.name().c_str(), base, byte_size,
-            TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+            request_provider, io.name().c_str(), base, byte_size, memory_type,
+            memory_type_id));
       } else {
         while ((byte_size > 0) && (v_idx < n)) {
           char* base = static_cast<char*>(v[v_idx].iov_base);

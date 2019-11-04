@@ -776,6 +776,8 @@ InferGRPCToInput(
   for (const auto& io : request_header.input()) {
     const void* base;
     size_t byte_size;
+    TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
+    int64_t memory_type_id = 0;
     if (io.has_shared_memory()) {
       TRTSERVER_SharedMemoryBlock* smb = nullptr;
       RETURN_IF_ERR(smb_manager->Get(&smb, io.shared_memory().name()));
@@ -783,6 +785,8 @@ InferGRPCToInput(
           trtserver.get(), smb, io.shared_memory().offset(),
           io.shared_memory().byte_size(), const_cast<void**>(&base)));
       byte_size = io.shared_memory().byte_size();
+      TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
+      TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
     } else if ((int)idx >= request.raw_input_size()) {
       return TRTSERVER_ErrorNew(
           TRTSERVER_ERROR_INVALID_ARG,
@@ -813,8 +817,8 @@ InferGRPCToInput(
     }
 
     RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-        request_provider, io.name().c_str(), base, byte_size,
-        TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+        request_provider, io.name().c_str(), base, byte_size, memory_type,
+        memory_type_id));
   }
 
   return nullptr;  // success

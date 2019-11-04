@@ -151,8 +151,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockCpuNew(
 /// \param name A unique name for the shared memory block. This name
 /// is used in inference requests to refer to this shared memory
 /// block.
-/// \param handle_block_name The name of the system shared memory block
-/// containing the CUDA IPC handle.
+/// \param cuda_shm_handle The CUDA IPC handle.
 /// \param byte_size The size, in bytes of the block.
 /// \param device_id The GPU number the CUDA shared memory region is in.
 /// \return a TRTSERVER_Error indicating success or failure.

@@ -370,8 +370,8 @@ class TrtServerRequestProvider {
   int64_t ModelVersion() const { return model_version_; }
   ni::InferRequestHeader* InferRequestHeader() const;
   const std::shared_ptr<ni::InferenceBackend>& Backend() const;
-  const std::unordered_map<std::string, std::shared_ptr<ni::SystemMemory>>&
-  InputMap() const;
+  const std::unordered_map<std::string, std::shared_ptr<ni::Memory>>& InputMap()
+      const;
 
   void SetInputData(
       const char* input_name, const void* base, size_t byte_size,
@@ -382,7 +382,7 @@ class TrtServerRequestProvider {
   const int64_t model_version_;
   std::shared_ptr<ni::InferRequestHeader> request_header_;
   std::shared_ptr<ni::InferenceBackend> backend_;
-  std::unordered_map<std::string, std::shared_ptr<ni::SystemMemory>> input_map_;
+  std::unordered_map<std::string, std::shared_ptr<ni::Memory>> input_map_;
 };
 
 TrtServerRequestProvider::TrtServerRequestProvider(
@@ -419,7 +419,7 @@ TrtServerRequestProvider::Backend() const
   return backend_;
 }
 
-const std::unordered_map<std::string, std::shared_ptr<ni::SystemMemory>>&
+const std::unordered_map<std::string, std::shared_ptr<ni::Memory>>&
 TrtServerRequestProvider::InputMap() const
 {
   return input_map_;
@@ -431,13 +431,13 @@ TrtServerRequestProvider::SetInputData(
     TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
 {
   auto pr = input_map_.emplace(input_name, nullptr);
-  std::shared_ptr<ni::SystemMemory>& smem = pr.first->second;
+  std::shared_ptr<ni::Memory>& smem = pr.first->second;
   if (pr.second) {
-    smem.reset(new ni::SystemMemoryReference());
+    smem.reset(new ni::MemoryReference());
   }
 
   if (byte_size > 0) {
-    std::static_pointer_cast<ni::SystemMemoryReference>(smem)->AddBuffer(
+    std::static_pointer_cast<ni::MemoryReference>(smem)->AddBuffer(
         static_cast<const char*>(base), byte_size, memory_type, memory_type_id);
   }
 }

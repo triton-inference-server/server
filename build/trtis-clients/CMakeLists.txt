@@ -48,6 +48,18 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
 
+if(NOT WIN32)
+#
+# CUDA
+#
+if(${TRTIS_ENABLE_GPU})
+  add_definitions(-DTRTIS_ENABLE_GPU=1)
+  find_package(CUDA REQUIRED)
+  message(STATUS "Using CUDA ${CUDA_VERSION}")
+  set(CUDA_NVCC_FLAGS -std=c++11)
+endif() # TRTIS_ENABLE_GPU
+endif() # NOT WIN32
+
 #
 # Protobuf
 #
