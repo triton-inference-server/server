@@ -50,9 +50,6 @@ set(
 
 add_executable(perf_client
   ${PERF_CLIENT_SRCS} ${PERF_CLIENT_HDRS})
-if(${TRTIS_ENABLE_GPU})
-  target_include_directories(perf_client PRIVATE ${CUDA_INCLUDE_DIRS})
-endif() # TRTIS_ENABLE_GPU
 target_link_libraries(
   perf_client
   PRIVATE TRTIS::request_static
