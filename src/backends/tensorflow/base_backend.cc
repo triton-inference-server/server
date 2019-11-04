@@ -615,32 +615,14 @@ BaseBackend::Context::SetStringInputTensor(
     // we can read string length and construct the string properly.
     auto src_memory_type = TRTSERVER_MEMORY_CPU;
     int64_t src_memory_type_id = 0;
-    const void* vcontent;
+    const char* content;
     size_t content_byte_size = expected_element_cnt * sizeof(uint32_t);
-    payload.status_ = payload.request_provider_->GetNextInputContent(
-        input_name, &vcontent, &content_byte_size, &src_memory_type,
-        &src_memory_type_id, true);
-
-    const char* content = reinterpret_cast<const char*>(vcontent);
-#ifdef TRTIS_ENABLE_GPU
-    std::unique_ptr<char[]> cpu_buffer;
-    if (src_memory_type != TRTSERVER_MEMORY_CPU) {
-      cpu_buffer.reset(new char[content_byte_size]);
-      cudaError_t err = cudaMemcpyAsync(
-          cpu_buffer.get(), vcontent, content_byte_size, cudaMemcpyDeviceToHost,
-          stream_);
-      if (err != cudaSuccess) {
-        payload.status_ = Status(
-            RequestStatusCode::INTERNAL,
-            "input '" + input_name + "' is in GPU memory and failed to use" +
-                " CUDA copy to CPU memory for setting String input data: " +
-                std::string(cudaGetErrorString(err)));
-      } else {
-        cudaStreamSynchronize(stream_);
-      }
-      content = cpu_buffer.get();
-    }
-#endif  // TRTIS_ENABLE_GPU
+    // If contiguous buffer is created, it needs to live until tensor is filled
+    std::unique_ptr<AllocatedSystemMemory> contiguous_buffer;
+    bool cuda_copy = false;
+    payload.status_ = GetContiguousInputContent(
+        input_name, src_memory_type, src_memory_type_id, payload, &content,
+        &content_byte_size, &contiguous_buffer, &cuda_copy);
 
     if (!payload.status_.IsOk()) {
       FillStringTensor(
