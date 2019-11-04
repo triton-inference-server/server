@@ -258,8 +258,7 @@ InferRequestProvider::GetInputOverrideContent(
 Status
 InferRequestProvider::GetNextInputContent(
     const std::string& name, const void** content, size_t* content_byte_size,
-    TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id,
-    bool force_contiguous)
+    TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id)
 {
   if (*content_byte_size == 0) {
     *content = nullptr;
@@ -277,44 +276,8 @@ InferRequestProvider::GetNextInputContent(
     }
 
     auto& input_content = pr->second;
-
-    bool isLastChunk =
-        (input_content.first->BufferAt(
-             input_content.second + 1, content_byte_size, memory_type,
-             memory_type_id) == nullptr);
-    if (!force_contiguous || isLastChunk) {
-      *content = input_content.first->BufferAt(
-          input_content.second++, content_byte_size, memory_type,
-          memory_type_id);
-    } else {
-      size_t total_size = 0;
-      size_t start_idx = input_content.second;
-      do {
-        *content = input_content.first->BufferAt(
-            input_content.second++, content_byte_size, memory_type,
-            memory_type_id);
-        total_size += *content_byte_size;
-      } while (*content != nullptr);
-
-      contiguous_buffers_.emplace_back();
-      std::vector<char>& buf = contiguous_buffers_.back();
-      buf.reserve(total_size);
-
-      // [DLIS-825] on 'force_contiguous', need to be careful as the data block
-      // may be on GPU
-      for (size_t i = start_idx; i < input_content.second; i++) {
-        const auto& block = input_content.first->BufferAt(
-            i, content_byte_size, memory_type, memory_type_id);
-        buf.insert(buf.end(), block, block + *content_byte_size);
-      }
-
-      if (buf.size() != total_size) {
-        return Status(RequestStatusCode::INTERNAL, "contiguous input failed");
-      }
-
-      *content = &(buf[0]);
-      *content_byte_size = total_size;
-    }
+    *content = input_content.first->BufferAt(
+        input_content.second++, content_byte_size, memory_type, memory_type_id);
   }
 
   return Status::Success;
@@ -343,8 +306,7 @@ std::mutex NULLInferRequestProvider::mu_;
 Status
 NULLInferRequestProvider::GetNextInputContent(
     const std::string& name, const void** content, size_t* content_byte_size,
-    TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id,
-    bool force_contiguous)
+    TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id)
 {
   *memory_type = TRTSERVER_MEMORY_CPU;
   *memory_type_id = 0;
