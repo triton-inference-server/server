@@ -125,6 +125,7 @@ set(
   autofill.cc
   backend.cc
   backend_context.cc
+  cuda_utils.cc
   dynamic_batch_scheduler.cc
   ensemble_scheduler.cc
   ensemble_utils.cc
@@ -153,6 +154,7 @@ set(
   backend.h
   backend_context.h
   constants.h
+  cuda_utils.h
   dynamic_batch_scheduler.h
   ensemble_scheduler.h
   ensemble_utils.h
