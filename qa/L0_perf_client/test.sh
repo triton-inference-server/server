@@ -100,13 +100,25 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
+
+$PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 -a>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 set -e
 
 # Test perf client behavior on different model with different batch size
 for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
     # Valid batch size
     set +e
-    $PERF_CLIENT -v -i grpc -m $MODEL -t 1 -p20000 -b 1 >$CLIENT_LOG 2>&1
+    $PERF_CLIENT -v -i grpc -m $MODEL -t 1 -p2000 -b 1 >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -117,7 +129,7 @@ for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
     # Invalid batch sizes
     for STATIC_BATCH in 0 10; do
         set +e
-        $PERF_CLIENT -v -i grpc -m $MODEL -t 1 -p20000 -b $STATIC_BATCH >$CLIENT_LOG 2>&1
+        $PERF_CLIENT -v -i grpc -m $MODEL -t 1 -p2000 -b $STATIC_BATCH >$CLIENT_LOG 2>&1
         if [ $? -eq 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -140,9 +152,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-set -e
 
-set +e
 $PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 --concurrency-range 1:5:2 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -154,10 +164,8 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec|Request concurrency: 2" |
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-set -e
 
 # Testing with string inputs
-set +e
 $PERF_CLIENT -v -i grpc -m graphdef_object_object_object --string-data=1 -p2000 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -169,10 +177,8 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-set -e
 
 # Testing with file input
-set +e
 $PERF_CLIENT -v -i grpc -m graphdef_object_object_object --input-data=$TESTDATADIR -p2000 \
 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -185,10 +191,8 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-set -e
 
 # Testing with variable shaped tensors
-set +e
 $PERF_CLIENT -v -i grpc -m graphdef_object_int32_int32 --input-data=$TESTDATADIR \
 --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -201,9 +205,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-set -e
 
-set +e
 $PERF_CLIENT -v -i grpc -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 \
 --shape INPUT1:2,8,2 -p2000 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -216,11 +218,34 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-set -e
 
 # Testing with ensemble and sequential model variants
-set +e
-$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_float32 -p 20000 -t5 --streaming \
+$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_float32 -p 2000 -t5 -a --streaming \
+>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_float32 -p 2000 -t5 \
+>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+$PERF_CLIENT -v -m  simple_savedmodel_sequence_float32 -p 2000 -t5 \
 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -233,6 +258,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     RET=1
 fi
 set -e
+
 
 
 kill $SERVER_PID
