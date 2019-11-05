@@ -111,6 +111,12 @@ class BaseBackend : public InferenceBackend {
         const std::vector<int64_t>& shape, const size_t batch1_byte_size,
         std::vector<Scheduler::Payload>* payloads, bool* cuda_copy);
 
+    // Helper function to set the output with String data type in payload
+    void ReadStringOutputTensor(
+        TRTISTF_Tensor* tensor, const std::string& output_name,
+        const std::vector<int64_t>& shape, const size_t batch1_element_cnt,
+        std::vector<Scheduler::Payload>* payloads, bool* cuda_copy);
+
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
     // is assigned to this context. A non-OK return status indicates
