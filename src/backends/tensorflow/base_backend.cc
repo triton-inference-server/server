@@ -56,15 +56,18 @@ BaseBackend::Context::~Context()
 }
 
 Status
-BaseBackend::Init(const std::string& path, const ModelConfig& config)
+BaseBackend::Init(
+    const std::string& path, const ModelConfig& model_config,
+    const GraphDefBackendFactory::Config* backend_config,
+    const std::string& platform)
 {
-  RETURN_IF_ERROR(SetModelConfig(path, config));
+  RETURN_IF_ERROR(InferenceBackend::Init(path, model_config, platform));
+  backend_config_ = backend_config;
   return Status::Success;
 }
 
 Status
 BaseBackend::CreateExecutionContexts(
-    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
     const std::unordered_map<std::string, std::string>& paths)
 {
   if (LOG_VERBOSE_IS_ON(1)) {
@@ -82,21 +85,21 @@ BaseBackend::CreateExecutionContexts(
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, Context::NO_GPU_DEVICE, backend_config, paths));
+            instance_name, Context::NO_GPU_DEVICE, paths));
         total_context_cnt++;
       } else if (group.kind() == ModelInstanceGroup::KIND_MODEL) {
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_model_device";
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, Context::MODEL_DEVICE, backend_config, paths));
+            instance_name, Context::MODEL_DEVICE, paths));
         total_context_cnt++;
       } else {
         for (int gpu_device : group.gpus()) {
           const std::string instance_name = group.name() + "_" +
                                             std::to_string(c) + "_gpu" +
                                             std::to_string(gpu_device);
-          RETURN_IF_ERROR(CreateExecutionContext(
-              instance_name, gpu_device, backend_config, paths));
+          RETURN_IF_ERROR(
+              CreateExecutionContext(instance_name, gpu_device, paths));
           total_context_cnt++;
         }
       }
@@ -122,7 +125,6 @@ BaseBackend::CreateExecutionContexts(
 Status
 BaseBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
-    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
     const std::unordered_map<std::string, std::string>& paths)
 {
   // For a GPU context, determine the model file to use for device
@@ -186,9 +188,6 @@ BaseBackend::CreateExecutionContext(
   Context* context = static_cast<Context*>(contexts_.back().get());
 
   RETURN_IF_ERROR(context->CreateCudaStream());
-
-  auto graphdef_backend_config =
-      std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
 
   RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
   RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
@@ -293,7 +292,7 @@ BaseBackend::CreateExecutionContext(
   }
 
   RETURN_IF_ERROR(CreateTRTISTFModel(
-      graphdef_backend_config, vgpu_device, Config().optimization().has_graph(),
+      backend_config_, vgpu_device, Config().optimization().has_graph(),
       Config().optimization().graph().level(), gdp_itr->second,
       &context->trtistf_model_, &context->input_name_map_,
       &context->output_name_map_, tftrt_config_ptr));

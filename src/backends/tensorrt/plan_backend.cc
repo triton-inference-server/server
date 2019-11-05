@@ -127,15 +127,6 @@ PlanBackend::Context::~Context()
 }
 
 Status
-PlanBackend::Init(const std::string& path, const ModelConfig& config)
-{
-  RETURN_IF_ERROR(ValidateModelConfig(config, kTensorRTPlanPlatform));
-  RETURN_IF_ERROR(SetModelConfig(path, config));
-
-  return Status::Success;
-}
-
-Status
 PlanBackend::CreateExecutionContexts(
     const std::unordered_map<std::string, std::vector<char>>& models)
 {

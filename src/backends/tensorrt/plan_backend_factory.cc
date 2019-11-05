@@ -87,7 +87,8 @@ PlanBackendFactory::CreateBackend(
   // Create the backend for the model and all the execution contexts
   // requested for this model.
   std::unique_ptr<PlanBackend> local_backend(new PlanBackend);
-  RETURN_IF_ERROR(local_backend->Init(path, model_config));
+  RETURN_IF_ERROR(
+      local_backend->Init(path, model_config, kTensorRTPlanPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
 
   *backend = std::move(local_backend);

@@ -41,17 +41,18 @@ class BaseBackend : public InferenceBackend {
   BaseBackend() = default;
   BaseBackend(BaseBackend&&) = default;
 
-  Status Init(const std::string& path, const ModelConfig& config);
+  Status Init(
+      const std::string& path, const ModelConfig& model_config,
+      const GraphDefBackendFactory::Config* backend_config,
+      const std::string& platform);
 
   // Create a context for execution for each instance of the
   // tensorflow model specified in 'paths'. The model can be either a
   // graphdef or savedmodel
   Status CreateExecutionContexts(
-      const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
       const std::unordered_map<std::string, std::string>& paths);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
-      const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
       const std::unordered_map<std::string, std::string>& paths);
 
  protected:
@@ -61,7 +62,7 @@ class BaseBackend : public InferenceBackend {
 
   // Load model and create a corresponding TRTISTF model object.
   virtual Status CreateTRTISTFModel(
-      const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
+      const GraphDefBackendFactory::Config* backend_config,
       const int gpu_device, const bool has_graph_level, const int graph_level,
       const std::string& model_path, TRTISTFModelHandle* trtistf_model,
       IONameMap* input_name_map, IONameMap* output_name_map,
@@ -146,6 +147,8 @@ class BaseBackend : public InferenceBackend {
  private:
   DISALLOW_COPY_AND_ASSIGN(BaseBackend);
   friend std::ostream& operator<<(std::ostream&, const BaseBackend&);
+
+  const GraphDefBackendFactory::Config* backend_config_;
 };
 
 std::ostream& operator<<(std::ostream& out, const BaseBackend& pb);

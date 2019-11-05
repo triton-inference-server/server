@@ -96,15 +96,6 @@ NetDefBackend::Context::~Context()
 }
 
 Status
-NetDefBackend::Init(const std::string& path, const ModelConfig& config)
-{
-  RETURN_IF_ERROR(ValidateModelConfig(config, kCaffe2NetDefPlatform));
-  RETURN_IF_ERROR(SetModelConfig(path, config));
-
-  return Status::Success;
-}
-
-Status
 NetDefBackend::CreateExecutionContexts(
     const std::unordered_map<std::string, std::vector<char>>& models)
 {

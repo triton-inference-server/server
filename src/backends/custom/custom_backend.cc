@@ -100,11 +100,8 @@ CustomBackend::Init(
     const std::string& path, const std::vector<std::string>& server_params,
     const ModelConfig& config)
 {
-  RETURN_IF_ERROR(ValidateModelConfig(config, kCustomPlatform));
-  RETURN_IF_ERROR(SetModelConfig(path, config));
-
+  RETURN_IF_ERROR(InferenceBackend::Init(path, config, kCustomPlatform));
   server_params_ = server_params;
-
   return Status::Success;
 }
 

@@ -68,15 +68,6 @@ OnnxBackend::Context::~Context()
 }
 
 Status
-OnnxBackend::Init(const std::string& path, const ModelConfig& config)
-{
-  RETURN_IF_ERROR(ValidateModelConfig(config, kOnnxRuntimeOnnxPlatform));
-  RETURN_IF_ERROR(SetModelConfig(path, config));
-
-  return Status::Success;
-}
-
-Status
 OnnxBackend::CreateExecutionContexts(
     const std::unordered_map<std::string, std::string>& models)
 {

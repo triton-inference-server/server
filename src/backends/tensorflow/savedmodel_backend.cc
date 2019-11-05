@@ -54,18 +54,9 @@ FindIOByName(const TRTISTF_IOList* ios, const std::string& name)
 }  // namespace
 
 Status
-SavedModelBackend::Init(const std::string& path, const ModelConfig& config)
-{
-  RETURN_IF_ERROR(ValidateModelConfig(config, kTensorFlowSavedModelPlatform));
-  RETURN_IF_ERROR(BaseBackend::Init(path, config));
-
-  return Status::Success;
-}
-
-Status
 SavedModelBackend::CreateTRTISTFModel(
-    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
-    const int device_id, const bool has_graph_level, const int graph_level,
+    const GraphDefBackendFactory::Config* backend_config, const int device_id,
+    const bool has_graph_level, const int graph_level,
     const std::string& model_path, TRTISTFModelHandle* trtistf_model,
     IONameMap* input_name_map, IONameMap* output_name_map,
     const TRTISTF_TFTRTConfig* tftrt_config)

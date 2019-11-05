@@ -39,8 +39,6 @@ class OnnxBackend : public InferenceBackend {
   OnnxBackend() = default;
   OnnxBackend(OnnxBackend&&) = default;
 
-  Status Init(const std::string& path, const ModelConfig& config);
-
   // Create a context for execution for each instance for the
   // serialized plans specified in 'models'.
   Status CreateExecutionContexts(

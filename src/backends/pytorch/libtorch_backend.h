@@ -46,8 +46,6 @@ class LibTorchBackend : public InferenceBackend {
   LibTorchBackend() = default;
   LibTorchBackend(LibTorchBackend&&) = default;
 
-  Status Init(const std::string& path, const ModelConfig& config);
-
   // Create a context for execution for each instance for the
   // serialized .pt models specified in 'paths'.
   Status CreateExecutionContexts(

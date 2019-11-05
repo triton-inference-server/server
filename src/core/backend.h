@@ -72,6 +72,10 @@ class InferenceBackend {
     return label_provider_;
   }
 
+  Status Init(
+      const std::string& path, const ModelConfig& config,
+      const std::string& platform);
+
   // Run inference using the provided request to produce outputs in the provide
   // response. The inference will run asynchronously and "OnCompleteHandleInfer"
   // callback will be called once the inference is completed

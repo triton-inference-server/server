@@ -130,6 +130,17 @@ InferenceBackend::SetConfiguredScheduler(
   return SetScheduler(std::move(scheduler));
 }
 
+Status
+InferenceBackend::Init(
+    const std::string& path, const ModelConfig& config,
+    const std::string& platform)
+{
+  RETURN_IF_ERROR(ValidateModelConfig(config, platform));
+  RETURN_IF_ERROR(SetModelConfig(path, config));
+
+  return Status::Success;
+}
+
 void
 InferenceBackend::Run(
     const std::shared_ptr<ModelInferStats>& stats,

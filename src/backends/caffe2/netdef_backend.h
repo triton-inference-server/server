@@ -39,8 +39,6 @@ class NetDefBackend : public InferenceBackend {
   NetDefBackend() = default;
   NetDefBackend(NetDefBackend&&) = default;
 
-  Status Init(const std::string& path, const ModelConfig& config);
-
   // Create a context for execution for each instance for the
   // serialized netdefs specified in 'models'.
   Status CreateExecutionContexts(
