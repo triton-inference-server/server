@@ -91,13 +91,13 @@ class BaseBackend : public InferenceBackend {
         const std::string& name, const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads,
-        TRTISTF_TensorList** input_tensors);
+        TRTISTF_TensorList** input_tensors, bool* cuda_copy);
 
     // Helper function to set the input for fixed-sized data type
     void SetFixedSizedInputTensor(
         TRTISTF_Tensor* tensor, const std::string& input_name,
         const size_t batch1_byte_size,
-        std::vector<Scheduler::Payload>* payloads);
+        std::vector<Scheduler::Payload>* payloads, bool* cuda_copy);
 
     // Helper function to set the input for String data type
     void SetStringInputTensor(

@@ -504,7 +504,7 @@ Status
 BaseBackend::Context::SetInput(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    TRTISTF_TensorList** input_tensors)
+    TRTISTF_TensorList** input_tensors, bool* cuda_copy)
 {
   // Get the shape of the input. The provider has already checked
   // that the request shape is valid so don't need to do it here.
@@ -556,7 +556,8 @@ BaseBackend::Context::SetInput(
               std::to_string(batch1_byte_size * total_batch_size) + ", got " +
               std::to_string(TRTISTF_TensorDataByteSize(tensor)));
     }
-    SetFixedSizedInputTensor(tensor, name, batch1_byte_size, payloads);
+    SetFixedSizedInputTensor(
+        tensor, name, batch1_byte_size, payloads, cuda_copy);
   } else {
     SetStringInputTensor(tensor, name, batch1_element_cnt, payloads);
   }
@@ -567,7 +568,8 @@ BaseBackend::Context::SetInput(
 void
 BaseBackend::Context::SetFixedSizedInputTensor(
     TRTISTF_Tensor* tensor, const std::string& input_name,
-    const size_t batch1_byte_size, std::vector<Scheduler::Payload>* payloads)
+    const size_t batch1_byte_size, std::vector<Scheduler::Payload>* payloads,
+    bool* cuda_copy)
 {
   char* buffer = TRTISTF_TensorData(tensor);
 
@@ -589,7 +591,7 @@ BaseBackend::Context::SetFixedSizedInputTensor(
       (TRTISTF_TensorIsGPUTensor(tensor)) ? gpu_device_ : 0;
   LOG_VERBOSE(1) << "input '" << input_name
                  << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
-  SetInputBuffer(
+  *cuda_copy |= SetInputBuffer(
       input_name, expected_byte_sizes, payloads, content_memory_type,
       content_memory_type_id, buffer);
 }
@@ -630,6 +632,14 @@ BaseBackend::Context::SetStringInputTensor(
           expected_element_cnt - element_idx);
       continue;
     }
+
+    // [TODO] defer synchronize as far as possible, need rework on setting
+    // String input. i.e. get all contiguous data first, then sync and set.
+#ifdef TRTIS_ENABLE_GPU
+    if (cuda_copy) {
+      cudaStreamSynchronize(stream_);
+    }
+#endif  // TRTIS_ENABLE_GPU
 
     // Parse content and assign them to the 'tensor'. Each string
     // in 'content' is a 4-byte length followed by the string
@@ -766,6 +776,7 @@ BaseBackend::Context::Run(
       &input_head_ptr, input_deleter);
 
   // Inputs from the request...
+  bool cuda_copy = false;
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
 
@@ -774,7 +785,7 @@ BaseBackend::Context::Run(
 
     RETURN_IF_ERROR(SetInput(
         name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, input_tensors.get()));
+        payloads, input_tensors.get(), &cuda_copy));
   }
 
   // Additional inputs added to the provider...
@@ -787,7 +798,7 @@ BaseBackend::Context::Run(
           pr.second;
       RETURN_IF_ERROR(SetInput(
           name, override->datatype_, override->dims_, total_batch_size,
-          payloads, input_tensors.get()));
+          payloads, input_tensors.get(), &cuda_copy));
     }
   }
 
@@ -820,9 +831,11 @@ BaseBackend::Context::Run(
     }
   }
 
-  // Run. Session will update the 'output_tensors'.
-  std::unique_ptr<TRTISTF_TensorList, decltype(&TRTISTF_TensorListDelete)>
-      output_tensors(nullptr, TRTISTF_TensorListDelete);
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
 
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
@@ -830,6 +843,10 @@ BaseBackend::Context::Run(
           ModelInferStats::TimestampKind::kComputeInputEnd);
     }
   }
+
+  // Run. Session will update the 'output_tensors'.
+  std::unique_ptr<TRTISTF_TensorList, decltype(&TRTISTF_TensorListDelete)>
+      output_tensors(nullptr, TRTISTF_TensorListDelete);
 
   {
     TRTISTF_TensorList* rtl;
@@ -848,7 +865,7 @@ BaseBackend::Context::Run(
 
   // Make sure each output is of the expected size and copy it into
   // the appropriate response providers.
-  bool cuda_copy = false;
+  cuda_copy = false;
   TRTISTF_TensorList* output_tensor_itr = output_tensors.get();
   for (const auto& name : model_output_names) {
     const ModelOutput* output_config;
