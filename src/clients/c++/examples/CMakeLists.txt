@@ -160,8 +160,6 @@ if(${TRTIS_ENABLE_GPU})
   target_link_libraries(
     simple_cuda_shm_client
     PRIVATE TRTIS::request_static
-    PRIVATE -L/usr/local/cuda/lib64/stubs
-    PRIVATE -lnvidia-ml
     PRIVATE ${CUDA_LIBRARIES}
   )
   install(
