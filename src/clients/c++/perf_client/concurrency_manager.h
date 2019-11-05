@@ -116,6 +116,22 @@ class ConcurrencyManager : public LoadManager {
   };
 
  private:
+  struct ThreadData {
+    // The status of the worker thread
+    nic::Error status_;
+    // The statistics of the InferContext
+    std::vector<nic::InferContext::Stat> contexts_stat_;
+    //  The concurrency level that the worker should produce
+    size_t concurrency_;
+    // A vector of request timestamps <start_time, end_time>
+    // Request latency will be end_time - start_time
+    TimestampVector request_timestamps_;
+    // A lock to protect thread data
+    std::mutex mu_;
+
+    ThreadData() : status_(ni::RequestStatusCode::SUCCESS), concurrency_(0) {}
+  };
+
   ConcurrencyManager(
       const bool async,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
@@ -124,13 +140,8 @@ class ConcurrencyManager : public LoadManager {
       const std::shared_ptr<ContextFactory>& factory);
 
   /// Function for worker that sends inference requests.
-  /// \param err Returns the status of the worker
-  /// \param stats Returns the statistic of the InferContexts
-  /// \param concurrency The concurrency level that the worker should produce.
-  void Infer(
-      std::shared_ptr<nic::Error> err,
-      std::shared_ptr<std::vector<nic::InferContext::Stat>> stats,
-      std::shared_ptr<size_t> concurrency);
+  /// \param thread_data Worker thread specific data.
+  void Infer(std::shared_ptr<ThreadData> thread_data);
 
   /// Helper function to prepare the InferContext for sending inference request.
   /// \param ctx Returns a new InferContext.
@@ -171,21 +182,11 @@ class ConcurrencyManager : public LoadManager {
 
   // Note: early_exit signal is kept global
   std::vector<std::thread> threads_;
-  std::vector<std::shared_ptr<nic::Error>> threads_status_;
-  std::vector<std::shared_ptr<std::vector<nic::InferContext::Stat>>>
-      threads_contexts_stat_;
-  std::vector<std::shared_ptr<size_t>> threads_concurrency_;
+  std::vector<std::shared_ptr<ThreadData>> threads_data_;
 
   // Use condition variable to pause/continue worker threads
   std::condition_variable wake_signal_;
   std::mutex wake_mutex_;
-
-  // Pointer to a vector of request timestamps <start_time, end_time>
-  // Request latency will be end_time - start_time
-  std::shared_ptr<TimestampVector> request_timestamps_;
-  // Mutex to avoid race condition on adding elements into the timestamp vector
-  // and on updating context statistic.
-  std::mutex status_report_mutex_;
 };
 
 }  // namespace perfclient

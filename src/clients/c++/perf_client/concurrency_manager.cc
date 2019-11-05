@@ -39,9 +39,10 @@ ConcurrencyManager::~ConcurrencyManager()
   size_t cnt = 0;
   for (auto& thread : threads_) {
     thread.join();
-    if (!threads_status_[cnt]->IsOk()) {
+    if (!threads_data_[cnt]->status_.IsOk()) {
       std::cerr << "Thread [" << cnt
-                << "] had error: " << *(threads_status_[cnt]) << std::endl;
+                << "] had error: " << (threads_data_[cnt]->status_)
+                << std::endl;
     }
     cnt++;
   }
@@ -191,9 +192,7 @@ ConcurrencyManager::Create(
   }
 
   // Reserve the required vector space
-  local_manager->threads_status_.reserve(max_threads);
-  local_manager->threads_contexts_stat_.reserve(max_threads);
-  local_manager->threads_concurrency_.reserve(max_threads);
+  local_manager->threads_data_.reserve(max_threads);
 
   *manager = std::move(local_manager);
   return nic::Error::Success;
@@ -209,7 +208,6 @@ ConcurrencyManager::ConcurrencyManager(
       sequence_length_(sequence_length), factory_(factory),
       input_shapes_(input_shapes)
 {
-  request_timestamps_.reset(new TimestampVector());
   on_sequence_model_ =
       ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
        (factory_->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE));
@@ -223,11 +221,7 @@ ConcurrencyManager::ChangeConcurrencyLevel(
   while ((concurrent_request_count > threads_.size()) &&
          (threads_.size() < max_threads_)) {
     // Launch new thread for inferencing
-    threads_status_.emplace_back(
-        new nic::Error(ni::RequestStatusCode::SUCCESS));
-    threads_contexts_stat_.emplace_back(
-        new std::vector<nic::InferContext::Stat>());
-    threads_concurrency_.emplace_back(new size_t(0));
+    threads_data_.emplace_back(new ThreadData());
 
     // Worker maintains concurrency in different ways.
     // For sequence models, multiple contexts must be created for multiple
@@ -236,16 +230,15 @@ ConcurrencyManager::ChangeConcurrencyLevel(
     // at the same time. Thus it uses one single context as every infer context
     // creates a worker thread implicitly.
     threads_.emplace_back(
-        &ConcurrencyManager::Infer, this, threads_status_.back(),
-        threads_contexts_stat_.back(), threads_concurrency_.back());
+        &ConcurrencyManager::Infer, this, threads_data_.back());
   }
 
   // Compute the new concurrency level for each thread (take floor)
   // and spread the remaining value
   size_t avg_concurrency = concurrent_request_count / threads_.size();
   size_t threads_add_one = concurrent_request_count % threads_.size();
-  for (size_t i = 0; i < threads_concurrency_.size(); i++) {
-    *(threads_concurrency_[i]) =
+  for (size_t i = 0; i < threads_data_.size(); i++) {
+    threads_data_[i]->concurrency_ =
         avg_concurrency + (i < threads_add_one ? 1 : 0);
   }
 
@@ -264,8 +257,8 @@ ConcurrencyManager::CheckHealth()
   // If some thread return early, main thread will return and
   // the worker thread's error message will be reported
   // when ConcurrencyManager's destructor get called.
-  for (auto& thread_status : threads_status_) {
-    if (!thread_status->IsOk()) {
+  for (auto& thread_data : threads_data_) {
+    if (!thread_data->status_.IsOk()) {
       return nic::Error(
           ni::RequestStatusCode::INTERNAL,
           "Failed to maintain concurrency level requested."
@@ -278,9 +271,17 @@ ConcurrencyManager::CheckHealth()
 nic::Error
 ConcurrencyManager::SwapTimestamps(TimestampVector& new_timestamps)
 {
-  // Get the requests in the shared vector
-  std::lock_guard<std::mutex> lock(status_report_mutex_);
-  request_timestamps_->swap(new_timestamps);
+  TimestampVector total_timestamp;
+  // Gather all the request timestamps from all the worker threads
+  for (auto& thread_data : threads_data_) {
+    std::lock_guard<std::mutex> lock(thread_data->mu_);
+    total_timestamp.insert(
+        total_timestamp.end(), thread_data->request_timestamps_.begin(),
+        thread_data->request_timestamps_.end());
+    thread_data->request_timestamps_.clear();
+  }
+  // Swap the results
+  total_timestamp.swap(new_timestamps);
   return nic::Error::Success;
 }
 
@@ -437,9 +438,11 @@ nic::Error
 ConcurrencyManager::GetAccumulatedContextStat(
     nic::InferContext::Stat* contexts_stat)
 {
-  std::lock_guard<std::mutex> lk(status_report_mutex_);
-  for (auto& thread_contexts_stat : threads_contexts_stat_) {
-    for (auto& context_stat : (*thread_contexts_stat)) {
+  // std::lock_guard<std::mutex> lk(status_report_mutex_);
+  for (auto& thread_data : threads_data_) {
+    // add thread based locks
+    std::lock_guard<std::mutex> lock(thread_data->mu_);
+    for (auto& context_stat : thread_data->contexts_stat_) {
       contexts_stat->completed_request_count +=
           context_stat.completed_request_count;
       contexts_stat->cumulative_total_request_time_ns +=
@@ -459,10 +462,7 @@ ConcurrencyManager::GetAccumulatedContextStat(
 // If the model is sequence model, each worker has to use multiples contexts
 // to maintain (sequence) concurrency assigned to worker.
 void
-ConcurrencyManager::Infer(
-    std::shared_ptr<nic::Error> err,
-    std::shared_ptr<std::vector<nic::InferContext::Stat>> stats,
-    std::shared_ptr<size_t> concurrency)
+ConcurrencyManager::Infer(std::shared_ptr<ThreadData> thread_data)
 {
   std::vector<std::unique_ptr<InferContextMetaData>> ctxs;
 
@@ -478,23 +478,24 @@ ConcurrencyManager::Infer(
   // run inferencing until receiving exit signal to maintain server load.
   do {
     // Only interact with synchronous mechanism if the worker should wait
-    if (*concurrency == 0) {
+    if (thread_data->concurrency_ == 0) {
       // Wait if no request should be sent and it is not exiting
       std::unique_lock<std::mutex> lock(wake_mutex_);
-      wake_signal_.wait(
-          lock, [concurrency]() { return early_exit || (*concurrency > 0); });
+      wake_signal_.wait(lock, [&thread_data]() {
+        return early_exit || (thread_data->concurrency_ > 0);
+      });
     }
 
-    size_t num_reqs = *concurrency;
+    size_t num_reqs = thread_data->concurrency_;
     // If the model is non-sequence model, use one InferContext to maintain
     // concurrency for this thread
     size_t active_ctx_cnt = on_sequence_model_ ? num_reqs : 1;
     // Create the context for inference of the specified model.
     while (active_ctx_cnt > ctxs.size()) {
       ctxs.emplace_back(new InferContextMetaData());
-      stats->emplace_back();
-      *err = PrepareInfer(&(ctxs.back()->ctx_), &options);
-      if (!err->IsOk()) {
+      thread_data->contexts_stat_.emplace_back();
+      thread_data->status_ = PrepareInfer(&(ctxs.back()->ctx_), &options);
+      if (!thread_data->status_.IsOk()) {
         return;
       }
     }
@@ -532,7 +533,7 @@ ConcurrencyManager::Infer(
         if (async_) {
           struct timespec start_time_async;
           clock_gettime(CLOCK_MONOTONIC, &start_time_async);
-          *err = ctxs[idx]->ctx_->AsyncRun(
+          thread_data->status_ = ctxs[idx]->ctx_->AsyncRun(
               [&notified, &cb_mtx, &cb_cv, &ctxs, start_time_async, flags, idx](
                   nic::InferContext* ctx,
                   std::shared_ptr<nic::InferContext::Request> request) {
@@ -551,23 +552,23 @@ ConcurrencyManager::Infer(
                   cb_cv.notify_all();
                 }
               });
-          if (!err->IsOk()) {
+          if (!thread_data->status_.IsOk()) {
             return;
           }
         } else {
           struct timespec start_time_sync, end_time_sync;
           clock_gettime(CLOCK_MONOTONIC, &start_time_sync);
-          *err = ctxs[idx]->ctx_->Run(&results);
-          if (!err->IsOk()) {
+          thread_data->status_ = ctxs[idx]->ctx_->Run(&results);
+          if (!thread_data->status_.IsOk()) {
             return;
           }
           clock_gettime(CLOCK_MONOTONIC, &end_time_sync);
           {
             // Add the request timestamp to shared vector with proper locking
-            std::lock_guard<std::mutex> lk(status_report_mutex_);
-            request_timestamps_->emplace_back(
+            std::lock_guard<std::mutex> lock(thread_data->mu_);
+            thread_data->request_timestamps_.emplace_back(
                 std::make_tuple(start_time_sync, end_time_sync, flags));
-            ctxs[idx]->ctx_->GetStat(&((*stats)[idx]));
+            ctxs[idx]->ctx_->GetStat(&(thread_data->contexts_stat_[idx]));
           }
         }
       }
@@ -595,9 +596,9 @@ ConcurrencyManager::Infer(
             swap_vector.swap(ctxs[idx]->completed_requests_);
           }
           for (const auto& request : swap_vector) {
-            *err =
+            thread_data->status_ =
                 ctxs[idx]->ctx_->GetAsyncRunResults(request.request_, &results);
-            if (!err->IsOk()) {
+            if (!thread_data->status_.IsOk()) {
               return;
             }
 
@@ -610,10 +611,10 @@ ConcurrencyManager::Infer(
 
             {
               // Add the request timestamp to shared vector with proper locking
-              std::lock_guard<std::mutex> lk(status_report_mutex_);
-              request_timestamps_->emplace_back(
+              std::lock_guard<std::mutex> lock(thread_data->mu_);
+              thread_data->request_timestamps_.emplace_back(
                   std::make_tuple(start_time_async, end_time_async, flags));
-              ctxs[idx]->ctx_->GetStat(&((*stats)[idx]));
+              ctxs[idx]->ctx_->GetStat(&thread_data->contexts_stat_[idx]);
             }
           }
         }
