@@ -55,17 +55,21 @@ class ConcurrencyManager : public LoadManager {
 
   /// Create a concurrency manager that is responsible to maintain specified
   /// load on inference server.
+  /// \param async Whether to use asynchronous or synchronous API for infer
+  /// request.
   /// \param batch_size The batch size used for each request.
   /// \param max_threads The maximum number of working threads to be spawned.
+  /// \param max_concurrency The maximum concurrency which will be requested.
   /// \param sequence_length The base length of each sequence.
   /// \param zero_input Whether to fill the input tensors with zero.
   /// \param factory The ContextFactory object used to create InferContext.
-  /// \param manger Returns a new ConcurrencyManager object.
+  /// \param manager Returns a new ConcurrencyManager object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const bool async, const int32_t batch_size, const size_t max_threads,
-      const size_t sequence_length, const size_t string_length,
-      const std::string& string_data, const bool zero_input,
+      const size_t max_concurrency, const size_t sequence_length,
+      const size_t string_length, const std::string& string_data,
+      const bool zero_input,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       const std::string& data_directory,
       const std::shared_ptr<ContextFactory>& factory,
@@ -108,11 +112,10 @@ class ConcurrencyManager : public LoadManager {
     InferContextMetaData(const InferContextMetaData&) = delete;
 
     std::unique_ptr<nic::InferContext> ctx_;
-    size_t inflight_request_cnt_;
-    // mutex to guard 'completed_requests_' which will be acessed by
+    // mutex to guard 'inflight_request_cnt_' which will be acessed by
     // both the main thread and callback thread
     std::mutex mtx_;
-    std::vector<RequestMetaData> completed_requests_;
+    size_t inflight_request_cnt_;
   };
 
  private:
@@ -136,7 +139,7 @@ class ConcurrencyManager : public LoadManager {
       const bool async,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       const int32_t batch_size, const size_t max_threads,
-      const size_t sequence_length,
+      const size_t max_concurrency, const size_t sequence_length,
       const std::shared_ptr<ContextFactory>& factory);
 
   /// Function for worker that sends inference requests.
@@ -160,6 +163,7 @@ class ConcurrencyManager : public LoadManager {
 
   size_t batch_size_;
   size_t max_threads_;
+  size_t max_concurrency_;
   size_t sequence_length_;
 
   bool on_sequence_model_;

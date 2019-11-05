@@ -286,6 +286,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-v" << std::endl;
   std::cerr << std::endl;
   std::cerr << "I. MEASUREMENT PARAMETERS: " << std::endl;
+  std::cerr << "\t--async (-a)" << std::endl;
   std::cerr << "\t--measurement-interval (-p) <measurement window (in msec)>"
             << std::endl;
   std::cerr << "\t--concurrency-range <start:end:step>" << std::endl;
@@ -303,7 +304,6 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-t <number of concurrent requests>" << std::endl;
   std::cerr << "\t-c <maximum concurrency>" << std::endl;
   std::cerr << "\t-d" << std::endl;
-  std::cerr << "\t--async (-a)" << std::endl;
   std::cerr << std::endl;
   std::cerr << "II. INPUT DATA OPTIONS: " << std::endl;
   std::cerr << "\t-b <batch size>" << std::endl;
@@ -347,6 +347,12 @@ Usage(char** argv, const std::string& msg = std::string())
             << std::endl;
   std::cerr << std::endl;
   std::cerr << "I. MEASUREMENT PARAMETERS: " << std::endl;
+  std::cerr << FormatMessage(
+                   " --async (-a): Enables asynchronous mode in perf_client. "
+                   "By default, perf_client will use synchronous API to "
+                   "request inference.",
+                   18)
+            << std::endl;
   std::cerr
       << FormatMessage(
              " --measurement-interval (-p): Indicates the time interval used "
@@ -366,7 +372,8 @@ Usage(char** argv, const std::string& msg = std::string())
              "run for a single concurrency level determined by 'start'. If "
              "'end' is set as 0, then the concurrency limit will be "
              "incremented by 'step' till latency threshold is met. 'end' and "
-             "--latency-threshold can not be both 0 simultaneously.",
+             "--latency-threshold can not be both 0 simultaneously. 'end' can "
+             "not be 0 for sequence models while using asynchronous mode.",
              18)
       << std::endl;
   std::cerr << FormatMessage(
@@ -842,9 +849,23 @@ main(int argc, char** argv)
     std::cerr << err << std::endl;
     return 1;
   }
+  if ((factory->SchedulerType() == perfclient::ContextFactory::SEQUENCE) ||
+      (factory->SchedulerType() ==
+       perfclient::ContextFactory::ENSEMBLE_SEQUENCE)) {
+    if (concurrency_range[CONCURRENCY_RANGE::kEND] == NO_LIMIT) {
+      std::cerr << "The 'end' concurrency must be specified for sequence "
+                   "models when using asynchronous API."
+                << std::endl;
+      return 1;
+    }
+  }
+  max_concurrency = std::max(
+      concurrency_range[CONCURRENCY_RANGE::kSTART],
+      concurrency_range[CONCURRENCY_RANGE::kEND]);
   err = perfclient::ConcurrencyManager::Create(
-      async, batch_size, max_threads, sequence_length, string_length,
-      string_data, zero_input, input_shapes, data_directory, factory, &manager);
+      async, batch_size, max_threads, max_concurrency, sequence_length,
+      string_length, string_data, zero_input, input_shapes, data_directory,
+      factory, &manager);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
