@@ -232,6 +232,11 @@ _crequest_get_shared_memory_handle_info = _crequest.SharedMemoryControlContextGe
 _crequest_get_shared_memory_handle_info.restype = c_void_p
 _crequest_get_shared_memory_handle_info.argtypes = [c_void_p, POINTER(c_void_p), POINTER(c_char_p), POINTER(c_int), POINTER(c_uint64), POINTER(c_uint64)]
 
+_crequest_infer_ctx_get_stat = _crequest.InferContextGetStat
+_crequest_infer_ctx_get_stat.restype = c_void_p
+_crequest_infer_ctx_get_stat.argtypes = [c_void_p, POINTER(c_uint64), POINTER(c_uint64),
+                                        POINTER(c_uint64), POINTER(c_uint64)]
+
 def _raise_if_error(err):
     """
     Raise InferenceServerException if 'err' is non-success.
@@ -1563,3 +1568,37 @@ class InferContext:
 
         """
         return self._last_request_model_version
+
+    def get_stat(self):
+        """Get the current statistics of the InferContext.
+
+        Returns
+        -------
+        dict
+            Containing the completed_request_count,
+            cumulative_total_request_time_ns, cumulative_send_time_ns
+            and cumulative_receive_time_ns with their respective keys.
+
+        Raises
+        ------
+        InferenceServerException
+            If fails to retrieve the statistics.
+
+        """
+        stat = dict()
+        completed_request_count = c_uint64()
+        cumulative_total_request_time_ns = c_uint64()
+        cumulative_send_time_ns = c_uint64()
+        cumulative_receive_time_ns = c_uint64()
+        _raise_if_error(c_void_p(_crequest_infer_ctx_get_stat(
+                self._ctx, byref(completed_request_count),
+                byref(cumulative_total_request_time_ns),
+                byref(cumulative_send_time_ns),
+                byref(cumulative_receive_time_ns))))
+        # Populate the dictionary with the values
+        stat["completed_request_count"] = completed_request_count.value
+        stat["cumulative_total_request_time_ns"] = cumulative_total_request_time_ns.value
+        stat["cumulative_send_time_ns"] = cumulative_send_time_ns.value
+        stat["cumulative_receive_time_ns"] = cumulative_receive_time_ns.value
+
+        return stat

@@ -184,6 +184,13 @@ nic::Error* InferContextResultNextClass(
     InferContextResultCtx* ctx, size_t batch_idx, uint64_t* idx, float* prob,
     const char** label);
 
+//==============================================================================
+// InferContext::Stat
+nic::Error* InferContextGetStat(
+    InferContextCtx* ctx, uint64_t* completed_request_count,
+    uint64_t* cumulative_total_request_time_ns,
+    uint64_t* cumulative_send_time_ns, uint64_t* cumulative_receive_time_ns);
+
 #ifdef __cplusplus
 }
 #endif
