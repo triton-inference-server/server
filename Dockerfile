@@ -30,7 +30,7 @@
 
 ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:19.11-py3
 ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:19.11-py3
-ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.11-py3
+ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.11-tf1-py3
 
 ############################################################################
 ## TensorFlow stage: Use TensorFlow container to build
