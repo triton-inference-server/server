@@ -825,9 +825,11 @@ main(int argc, char** argv)
           << std::endl;
       concurrency_range[CONCURRENCY_RANGE::kEND] = max_threads;
     } else {
+      // As only one synchronous request can be generated from a thread at a
+      // time, to maintain the requested concurrency, that many threads need to
+      // be generated.
       std::cerr << "WARNING: Overriding max_threads specification to ensure "
-                   "requested "
-                   "concurrency range."
+                   "requested concurrency range."
                 << std::endl;
       max_threads = std::max(
           concurrency_range[CONCURRENCY_RANGE::kSTART],
@@ -853,7 +855,7 @@ main(int argc, char** argv)
       (factory->SchedulerType() ==
        perfclient::ContextFactory::ENSEMBLE_SEQUENCE)) {
     if (concurrency_range[CONCURRENCY_RANGE::kEND] == NO_LIMIT) {
-      std::cerr << "The 'end' concurrency must be specified for sequence "
+      std::cerr << "The 'end' concurrency can not be 0 for sequence "
                    "models when using asynchronous API."
                 << std::endl;
       return 1;

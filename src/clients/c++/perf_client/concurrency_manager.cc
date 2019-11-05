@@ -277,7 +277,7 @@ nic::Error
 ConcurrencyManager::SwapTimestamps(TimestampVector& new_timestamps)
 {
   TimestampVector total_timestamp;
-  // Gather all the request timestamps from all the worker threads
+  // Gather request timestamps with proper locking from all the worker threads
   for (auto& thread_data : threads_data_) {
     std::lock_guard<std::mutex> lock(thread_data->mu_);
     total_timestamp.insert(
@@ -443,9 +443,7 @@ nic::Error
 ConcurrencyManager::GetAccumulatedContextStat(
     nic::InferContext::Stat* contexts_stat)
 {
-  // std::lock_guard<std::mutex> lk(status_report_mutex_);
   for (auto& thread_data : threads_data_) {
-    // add thread based locks
     std::lock_guard<std::mutex> lock(thread_data->mu_);
     for (auto& context_stat : thread_data->contexts_stat_) {
       contexts_stat->completed_request_count +=
@@ -556,8 +554,8 @@ ConcurrencyManager::Infer(std::shared_ptr<ThreadData> thread_data)
                 struct timespec end_time_async;
                 clock_gettime(CLOCK_MONOTONIC, &end_time_async);
                 {
-                  // Add the request timestamp to shared vector with proper
-                  // locking
+                  // Add the request timestamp to thread Timestamp vector with
+                  // proper locking
                   std::lock_guard<std::mutex> lock(thread_data->mu_);
                   thread_data->request_timestamps_.emplace_back(
                       std::make_tuple(start_time_async, end_time_async, flags));
@@ -594,7 +592,8 @@ ConcurrencyManager::Infer(std::shared_ptr<ThreadData> thread_data)
           }
           clock_gettime(CLOCK_MONOTONIC, &end_time_sync);
           {
-            // Add the request timestamp to shared vector with proper locking
+            // Add the request timestamp to thread Timestamp vector with proper
+            // locking
             std::lock_guard<std::mutex> lock(thread_data->mu_);
             thread_data->request_timestamps_.emplace_back(
                 std::make_tuple(start_time_sync, end_time_sync, flags));
@@ -605,9 +604,9 @@ ConcurrencyManager::Infer(std::shared_ptr<ThreadData> thread_data)
       }
     }
 
-    // If async, then wait for signal from callback.
     if (async_) {
       {
+        // If async, then wait for signal from callback.
         std::unique_lock<std::mutex> lk(cb_mtx);
         cb_cv.wait(lk, [&notified] {
           if (notified) {
@@ -626,12 +625,12 @@ ConcurrencyManager::Infer(std::shared_ptr<ThreadData> thread_data)
 
     if (early_exit) {
       if (async_) {
-        // Wait for all callbacks are invoked if an early exit has been
-        // signaled, in case of referencing on released resources in the
-        // callback function.
+        // Wait for all callbacks to complete.
         for (auto& ctx : ctxs) {
           // Loop to ensure all the inflight requests have been completed.
           while (ctx->inflight_request_cnt_ != 0) {
+            // lock on ctx's mutex so that the 'inflight_request_cnt_' is
+            // synchronized.
             std::unique_lock<std::mutex> lk(ctx->mtx_);
             cb_cv.wait_for(lk, std::chrono::milliseconds(500), [&ctx] {
               return (ctx->inflight_request_cnt_ == 0);

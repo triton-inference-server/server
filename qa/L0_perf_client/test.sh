@@ -260,7 +260,6 @@ fi
 set -e
 
 
-
 kill $SERVER_PID
 wait $SERVER_PID
 
