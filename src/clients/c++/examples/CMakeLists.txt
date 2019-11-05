@@ -134,11 +134,10 @@ set(
   SIMPLE_SHM_HDRS
   shm_utils.h
 )
-add_executable(simple_shm_client simple_shm_client.cc
-  ${SIMPLE_SHM_SRCS} ${SIMPLE_SHM_HDRS})
+add_executable(simple_shm_client ${SIMPLE_SHM_SRCS} ${SIMPLE_SHM_HDRS})
 target_link_libraries(
   simple_shm_client
-  PRIVATE request_static
+  PRIVATE TRTIS::request_static
 )
 install(
   TARGETS simple_shm_client
@@ -156,12 +155,11 @@ if(${TRTIS_ENABLE_GPU})
   set(
     SIMPLE_CUDA_SHM_HDRS
   )
-  add_executable(simple_cuda_shm_client simple_cuda_shm_client.cc
-    ${SIMPLE_CUDA_SHM_SRCS} ${SIMPLE_CUDA_SHM_HDRS})
+  add_executable(simple_cuda_shm_client ${SIMPLE_CUDA_SHM_SRCS} ${SIMPLE_CUDA_SHM_HDRS})
   target_include_directories(simple_cuda_shm_client PRIVATE ${CUDA_INCLUDE_DIRS})
   target_link_libraries(
     simple_cuda_shm_client
-    PRIVATE request_static
+    PRIVATE TRTIS::request_static
     PRIVATE -L/usr/local/cuda/lib64/stubs
     PRIVATE -lnvidia-ml
     PRIVATE ${CUDA_LIBRARIES}

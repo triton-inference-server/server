@@ -25,21 +25,41 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/clients/c++/library/request_grpc.h"
+#include "src/clients/c++/library/request_http.h"
+
+namespace ni = nvidia::inferenceserver;
+namespace nic = nvidia::inferenceserver::client;
+
 namespace nvidia { namespace inferenceserver { namespace client {
 
 // Create a shared memory region of the size 'byte_size' and return the unique
 // identifier.
-int CreateSharedMemoryRegion(std::string shm_key, size_t byte_size);
+// \param shm_key The string identifier of the shared memory region
+// \param byte_size The size in bytes of the shared memory region
+// \param shm_id Returns an int descriptor of the created shared memory region
+// \return error Returns if an error if unable to open shared memory region.
+nic::Error CreateSharedMemoryRegion(
+    std::string shm_key, size_t byte_size, int* shm_fd);
 
 // Mmap the shared memory region with the given 'offset' and 'byte_size' and
 // return the base address of the region.
-void* MapSharedMemory(int shm_fd, size_t offset, size_t byte_size);
+// \param shm_id The int descriptor of the created shared memory region
+// \param offset The offset of the shared memory block from the start of the
+// shared memory region
+// \param byte_size The size in bytes of the shared memory region
+// \param shm_addr Returns the base address of the shared memory region
+// \return error Returns if an error if unable to mmap shared memory region.
+nic::Error MapSharedMemory(
+    int shm_fd, size_t offset, size_t byte_size, void** shm_addr);
 
 // Destory the shared memory region with the given name.
-void UnlinkSharedMemoryRegion(std::string shm_key);
+// \return error Returns if an error if unable to unlink shared memory region.
+nic::Error UnlinkSharedMemoryRegion(std::string shm_key);
 
 // Munmap the shared memory region from the base address with the given
 // byte_size.
-void UnmapSharedMemory(void* shm_addr, size_t byte_size);
+// \return error Returns if an error if unable to unmap shared memory region.
+nic::Error UnmapSharedMemory(void* shm_addr, size_t byte_size);
 
 }}}  // namespace nvidia::inferenceserver::client

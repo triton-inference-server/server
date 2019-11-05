@@ -70,14 +70,13 @@ Usage(char** argv, const std::string& msg = std::string())
 
 }  // namespace
 
-#define CudaRTCheck(FUNC, previous_device)                         \
+#define FAIL_IF_CUDA_ERR(FUNC)                                     \
   {                                                                \
     const cudaError_t result = FUNC;                               \
     if (result != cudaSuccess) {                                   \
-      std::cout << "CUDA exception (line " << __LINE__             \
+      std::cerr << "CUDA exception (line " << __LINE__             \
                 << "): " << cudaGetErrorName(result) << " ("       \
                 << cudaGetErrorString(result) << ")" << std::endl; \
-      cudaSetDevice(previous_device);                              \
       exit(1);                                                     \
     }                                                              \
   }
@@ -88,10 +87,10 @@ CreateCUDAIPCHandle(
 {
   int previous_device;
   cudaGetDevice(&previous_device);
-  CudaRTCheck(cudaSetDevice(device_id), previous_device);
+  FAIL_IF_CUDA_ERR(cudaSetDevice(device_id));
 
   //  Create IPC handle for data on the gpu
-  CudaRTCheck(cudaIpcGetMemHandle(cuda_handle, input_d_ptr), previous_device);
+  FAIL_IF_CUDA_ERR(cudaIpcGetMemHandle(cuda_handle, input_d_ptr));
 
   // set device to previous GPU
   cudaSetDevice(previous_device);
@@ -249,20 +248,14 @@ main(int argc, char** argv)
   // Create Output0 and Output1 in CUDA Shared Memory
   int *output0_d_ptr, *output1_d_ptr;
   cudaMalloc((void**)&output0_d_ptr, output_byte_size * 2);
-  cudaMemset((void*)output0_d_ptr, 0, output_byte_size * 2);
   output1_d_ptr = (int*)output0_d_ptr + 16;
 
   cudaIpcMemHandle_t output_cuda_handle;
   CreateCUDAIPCHandle(&output_cuda_handle, (void*)output0_d_ptr);
 
   // Register Output shared memory with TRTIS
-  err = shared_memory_ctx->RegisterCudaSharedMemory(
-      "output_data", output_cuda_handle, output_byte_size * 2, 0);
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to register shared memory output region: "
-              << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(shared_memory_ctx->RegisterCudaSharedMemory(
+      "output_data", output_cuda_handle, output_byte_size * 2, 0), "unable to register shared memory output region");
 
   // Set the context options to do batch-size 1 requests. Also request that
   // all output tensors be returned using shared memory.
@@ -288,36 +281,22 @@ main(int argc, char** argv)
   }
 
   // copy INPUT0 and INPUT1 data in GPU shared memory
-  int *input0_d_ptr, *input1_d_ptr;
-  cudaMalloc((void**)&input0_d_ptr, input_byte_size * 2);
+  int *input_d_ptr;
+  cudaMalloc((void**)&input_d_ptr, input_byte_size * 2);
   cudaMemcpy(
-      (void*)input0_d_ptr, (void*)input_data, input_byte_size * 2,
+      (void*)input_d_ptr, (void*)input_data, input_byte_size * 2,
       cudaMemcpyHostToDevice);
-  input1_d_ptr = (int*)input0_d_ptr + 16;
 
   cudaIpcMemHandle_t input_cuda_handle;
-  CreateCUDAIPCHandle(&input_cuda_handle, (void*)input0_d_ptr);
+  CreateCUDAIPCHandle(&input_cuda_handle, (void*)input_d_ptr);
 
   // Register Input shared memory with TRTIS
-  err = shared_memory_ctx->RegisterCudaSharedMemory(
-      "input_data", input_cuda_handle, input_byte_size * 2, 0);
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to register shared memory input region: " << err
-              << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(shared_memory_ctx->RegisterCudaSharedMemory(
+      "input_data", input_cuda_handle, input_byte_size * 2, 0), "unable to register shared memory input region");
 
   // Set the shared memory region for Inputs
-  err = input0->SetSharedMemory("input_data", 0, input_byte_size);
-  if (!err.IsOk()) {
-    std::cerr << "failed setting shared memory input: " << err << std::endl;
-    exit(1);
-  }
-  err = input1->SetSharedMemory("input_data", input_byte_size, input_byte_size);
-  if (!err.IsOk()) {
-    std::cerr << "failed setting shared memory input: " << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(input0->SetSharedMemory("input_data", 0, input_byte_size), "failed to set shared memory input");
+  FAIL_IF_ERR(input1->SetSharedMemory("input_data", input_byte_size, input_byte_size), "failed to set shared memory input");
 
   // Send inference request to the inference server.
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
@@ -331,28 +310,23 @@ main(int argc, char** argv)
   }
 
   // Copy input and output data back to the CPU
-  int input0_data[16], input1_data[16];
   int output0_data[16], output1_data[16];
-  cudaMemcpy(
-      input0_data, input0_d_ptr, input_byte_size, cudaMemcpyDeviceToHost);
-  cudaMemcpy(
-      input1_data, input1_d_ptr, input_byte_size, cudaMemcpyDeviceToHost);
   cudaMemcpy(
       output0_data, output0_d_ptr, output_byte_size, cudaMemcpyDeviceToHost);
   cudaMemcpy(
       output1_data, output1_d_ptr, output_byte_size, cudaMemcpyDeviceToHost);
 
   for (size_t i = 0; i < 16; ++i) {
-    std::cout << input0_data[i] << " + " << input1_data[i] << " = "
+    std::cout << input_data[i] << " + " << input_data[16 + i] << " = "
               << output0_data[i] << std::endl;
-    std::cout << input0_data[i] << " - " << input1_data[i] << " = "
+    std::cout << input_data[i] << " + " << input_data[16 + i] << " = "
               << output1_data[i] << std::endl;
 
-    if ((input0_data[i] + input1_data[i]) != output0_data[i]) {
+    if ((input_data[i] + input_data[16 + i]) != output0_data[i]) {
       std::cerr << "error: incorrect sum" << std::endl;
       exit(1);
     }
-    if ((input0_data[i] - input1_data[i]) != output1_data[i]) {
+    if ((input_data[i] - input_data[16 + i]) != output1_data[i]) {
       std::cerr << "error: incorrect difference" << std::endl;
       exit(1);
     }
@@ -360,39 +334,17 @@ main(int argc, char** argv)
 
   // Get shared memory regions all active/registered within TRTIS
   ni::SharedMemoryStatus status;
-  err = shared_memory_ctx->GetSharedMemoryStatus(&status);
-  if (!err.IsOk()) {
-    std::cerr << "error: " << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(shared_memory_ctx->GetSharedMemoryStatus(&status), "failed to get shared memory status");
   std::cout << "Shared Memory Status:\n" << status.DebugString() << "\n";
 
   // Unregister shared memory (One by one or all at a time) from TRTIS
   // err = shared_memory_ctx->UnregisterAllSharedMemory();
-  err = shared_memory_ctx->UnregisterSharedMemory("input_data");
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to unregister shared memory input region: "
-              << err << std::endl;
-    exit(1);
-  }
-  err = shared_memory_ctx->UnregisterSharedMemory("output_data");
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to unregister shared memory output region: "
-              << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(shared_memory_ctx->UnregisterSharedMemory("input_data"), "unable to unregister shared memory input region");
+  FAIL_IF_ERR(shared_memory_ctx->UnregisterSharedMemory("output_data"), "unable to unregister shared memory output region");
 
   // Free GPU memory
-  cudaError_t cuerr = cudaFree(input0_d_ptr);
-  if (cuerr != cudaSuccess) {
-    std::cerr << "CUDA free (input0_d_ptr) error: " << cudaGetErrorName(cuerr)
-              << "\n";
-  }
-  cuerr = cudaFree(output0_d_ptr);
-  if (cuerr != cudaSuccess) {
-    std::cerr << "CUDA free (output0_d_ptr) error: " << cudaGetErrorName(cuerr)
-              << "\n";
-  }
+  FAIL_IF_CUDA_ERR(cudaFree(input_d_ptr));
+  FAIL_IF_CUDA_ERR(cudaFree(output0_d_ptr));
 
   return 0;
 }

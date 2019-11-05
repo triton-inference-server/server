@@ -38,66 +38,69 @@
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
-int
-CreateSharedMemoryRegion(std::string shm_key, size_t byte_size)
+nic::Error
+CreateSharedMemoryRegion(std::string shm_key, size_t byte_size, int* shm_fd)
 {
   // get shared memory region descriptor
-  int shm_fd = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-  if (shm_fd == -1) {
-    std::cerr << "error: unable to get shared memory descriptor for "
-                 "shared-memory key '" +
-                     shm_key + "'"
-              << std::endl;
-    exit(1);
+  *shm_fd = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+  if (*shm_fd == -1) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "unable to get shared memory descriptor for shared-memory key '" +
+            shm_key + "'");
   }
   // extend shared memory object as by default it's initialized with size 0
-  int res = ftruncate(shm_fd, byte_size);
+  int res = ftruncate(*shm_fd, byte_size);
   if (res == -1) {
-    std::cerr << "error: unable to initialize shared-memory key '" + shm_key +
-                     "' to requested size " + std::to_string(byte_size) +
-                     " bytes"
-              << std::endl;
-    exit(1);
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "unable to initialize shared-memory key '" + shm_key +
+            "' to requested size: " + std::to_string(byte_size) + " bytes");
   }
-  return shm_fd;
+
+  return nic::Error::Success;
 }
 
-void*
-MapSharedMemory(int shm_fd, size_t offset, size_t byte_size)
+nic::Error
+MapSharedMemory(int shm_fd, size_t offset, size_t byte_size, void** shm_addr)
 {
   // map shared memory to process address space
-  void* shm_addr =
+  *shm_addr =
       mmap(NULL, byte_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, offset);
-  if (shm_addr == MAP_FAILED) {
-    std::cerr << "error: unable to process address space or shared-memory "
-                 "descriptor: " +
-                     std::to_string(shm_fd)
-              << std::endl;
-    exit(1);
+  if (*shm_addr == MAP_FAILED) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "unable to process address space or shared-memory descriptor: " +
+            std::to_string(shm_fd));
   }
-  return shm_addr;
+
+  return nic::Error::Success;
 }
 
-void
+nic::Error
 UnlinkSharedMemoryRegion(std::string shm_key)
 {
   int shm_fd = shm_unlink(shm_key.c_str());
   if (shm_fd == -1) {
-    std::cerr << "error: unable to unlink shared memory for key '" + shm_key +
-                     "'"
-              << std::endl;
-    exit(1);
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "unable to unlink shared memory for key '" + shm_key + "'");
   }
+
+  return nic::Error::Success;
 }
 
-void
+nic::Error
 UnmapSharedMemory(void* shm_addr, size_t byte_size)
 {
   int tmp_fd = munmap(shm_addr, byte_size);
   if (tmp_fd == -1) {
-    std::cerr << "Unable to munmap shared memory region" << std::endl;
-    exit(1);
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "unable to munmap shared memory region");
   }
+
+  return nic::Error::Success;
 }
 
 }}}  // namespace nvidia::inferenceserver::client

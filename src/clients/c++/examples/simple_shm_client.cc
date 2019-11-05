@@ -217,9 +217,15 @@ main(int argc, char** argv)
 
   // Create Output0 and Output1 in Shared Memory
   std::string shm_key = "/output_simple";
-  int shm_fd_op = nic::CreateSharedMemoryRegion(shm_key, output_byte_size * 2);
-  int* output0_shm =
-      (int*)(nic::MapSharedMemory(shm_fd_op, 0, output_byte_size * 2));
+  int shm_fd_op;
+  int* output0_shm;
+  FAIL_IF_ERR(
+      nic::CreateSharedMemoryRegion(shm_key, output_byte_size * 2, &shm_fd_op),
+      "");
+  FAIL_IF_ERR(
+      nic::MapSharedMemory(
+          shm_fd_op, 0, output_byte_size * 2, (void**)&output0_shm),
+      "");
   int* output1_shm = (int*)(output0_shm + 16);
 
   // Register Output shared memory with TRTIS
@@ -249,34 +255,32 @@ main(int argc, char** argv)
   // Create Input0 and Input1 in Shared Memory. Initialize Input0 to unique
   // integers and Input1 to all ones.
   shm_key = "/input_simple";
-  int shm_fd_ip = nic::CreateSharedMemoryRegion(shm_key, input_byte_size * 2);
-  int* input0_shm =
-      (int*)(nic::MapSharedMemory(shm_fd_ip, 0, input_byte_size * 2));
+  int shm_fd_ip, *input0_shm;
+  FAIL_IF_ERR(
+      nic::CreateSharedMemoryRegion(shm_key, input_byte_size * 2, &shm_fd_ip),
+      "");
+  FAIL_IF_ERR(
+      nic::MapSharedMemory(
+          shm_fd_ip, 0, input_byte_size * 2, (void**)&input0_shm),
+      "");
   int* input1_shm = (int*)(input0_shm + 16);
   for (size_t i = 0; i < 16; ++i) {
     *(input0_shm + i) = i;
     *(input1_shm + i) = 1;
   }
   // Register Input shared memory with TRTIS
-  err = shared_memory_ctx->RegisterSharedMemory(
-      "input_data", "/input_simple", 0, input_byte_size * 2);
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to register shared memory input region: " << err
-              << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(
+      shared_memory_ctx->RegisterSharedMemory(
+          "input_data", "/input_simple", 0, input_byte_size * 2),
+      "unable to register shared memory output region");
 
   // Set the shared memory region for Inputs
-  err = input0->SetSharedMemory("input_data", 0, input_byte_size);
-  if (!err.IsOk()) {
-    std::cerr << "failed setting shared memory input: " << err << std::endl;
-    exit(1);
-  }
-  err = input1->SetSharedMemory("input_data", input_byte_size, input_byte_size);
-  if (!err.IsOk()) {
-    std::cerr << "failed setting shared memory input: " << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(
+      input0->SetSharedMemory("input_data", 0, input_byte_size),
+      "failed to set shared memory input");
+  FAIL_IF_ERR(
+      input1->SetSharedMemory("input_data", input_byte_size, input_byte_size),
+      "failed to set shared memory input");
 
   // Send inference request to the inference server.
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
@@ -307,32 +311,25 @@ main(int argc, char** argv)
 
   // Get shared memory regions all active/registered within TRTIS
   ni::SharedMemoryStatus status;
-  err = shared_memory_ctx->GetSharedMemoryStatus(&status);
-  if (!err.IsOk()) {
-    std::cerr << "error: " << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(
+      shared_memory_ctx->GetSharedMemoryStatus(&status),
+      "failed to get shared memory status");
   std::cout << "Shared Memory Status:\n" << status.DebugString() << "\n";
 
   // Unregister shared memory (One by one or all at a time) from TRTIS
   // err = shared_memory_ctx->UnregisterAllSharedMemory();
-  err = shared_memory_ctx->UnregisterSharedMemory("input_data");
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to unregister shared memory input region: "
-              << err << std::endl;
-    exit(1);
-  }
-  err = shared_memory_ctx->UnregisterSharedMemory("output_data");
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to unregister shared memory output region: "
-              << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(
+      shared_memory_ctx->UnregisterSharedMemory("input_data"),
+      "unable to unregister shared memory input region");
+  FAIL_IF_ERR(
+      shared_memory_ctx->UnregisterSharedMemory("output_data"),
+      "unable to unregister shared memory output region");
 
   // Cleanup shared memory
-  nic::UnmapSharedMemory(input0_shm, input_byte_size * 2);
-  nic::UnlinkSharedMemoryRegion("/input_simple");
-  nic::UnmapSharedMemory(output0_shm, output_byte_size * 2);
-  nic::UnlinkSharedMemoryRegion("/output_simple");
+  FAIL_IF_ERR(nic::UnmapSharedMemory(input0_shm, input_byte_size * 2), "");
+  FAIL_IF_ERR(nic::UnlinkSharedMemoryRegion("/input_simple"), "");
+  FAIL_IF_ERR(nic::UnmapSharedMemory(output0_shm, output_byte_size * 2), "");
+  FAIL_IF_ERR(nic::UnlinkSharedMemoryRegion("/output_simple"), "");
+
   return 0;
 }
