@@ -46,6 +46,8 @@ cshm.set_shared_memory_region(shm_op0_handle, [np.array([1,2], dtype=np.float32)
 shared_memory_ctx.unregister(shm_op0_handle)
 # Test if register is working
 shared_memory_ctx.cuda_register(shm_op0_handle)
+shm_status = shared_memory_ctx.get_shared_memory_status()
+assert len(shm_status.shared_memory_region) == 1
 
 # Raises error if registering already registered region
 try:
@@ -53,9 +55,11 @@ try:
 except Exception as ex:
     assert "shared memory block 'dummy_data' already in manager" in str(ex)
 
-# unregister after register
+# Test if unregister after register works
 shared_memory_ctx.unregister(shm_op0_handle)
 cshm.destroy_shared_memory_region(shm_op0_handle)
+shm_status = shared_memory_ctx.get_shared_memory_status()
+assert len(shm_status.shared_memory_region) == 0
 
 shm_op0_handle = cshm.create_shared_memory_region("output0_data", 64, 0)
 shm_op1_handle = cshm.create_shared_memory_region("output1_data", 64, 0)
