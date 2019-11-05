@@ -220,7 +220,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
 fi
 
 # Testing with ensemble and sequential model variants
-$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_float32 -p 2000 -t5 -a --streaming \
+$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_float32 -p 2000 -t5 --streaming \
 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -233,7 +233,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
-$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_float32 -p 2000 -t5 \
+$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_float32 -p 2000 -t5 --sync \
 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -245,7 +245,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-$PERF_CLIENT -v -m  simple_savedmodel_sequence_float32 -p 2000 -t5 \
+$PERF_CLIENT -v -m  simple_savedmodel_sequence_float32 -p 2000 -t5 --sync \
 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG

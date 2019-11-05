@@ -287,6 +287,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << std::endl;
   std::cerr << "I. MEASUREMENT PARAMETERS: " << std::endl;
   std::cerr << "\t--async (-a)" << std::endl;
+  std::cerr << "\t--sync" << std::endl;
   std::cerr << "\t--measurement-interval (-p) <measurement window (in msec)>"
             << std::endl;
   std::cerr << "\t--concurrency-range <start:end:step>" << std::endl;
@@ -347,10 +348,22 @@ Usage(char** argv, const std::string& msg = std::string())
             << std::endl;
   std::cerr << std::endl;
   std::cerr << "I. MEASUREMENT PARAMETERS: " << std::endl;
+  std::cerr
+      << FormatMessage(
+             " --async (-a): Enables asynchronous mode in perf_client. "
+             "By default, perf_client will use synchronous API to "
+             "request inference. However, if the model is sequential "
+             "then default mode is asynchronous. Specify --sync to "
+             "operate sequential models in synchronous mode. In synchronous "
+             "mode, perf_client will start threads equal to the concurrency "
+             "level. Use asynchronous mode to limit the number of threads, yet "
+             "maintain the concurrency.",
+             18)
+      << std::endl;
   std::cerr << FormatMessage(
-                   " --async (-a): Enables asynchronous mode in perf_client. "
-                   "By default, perf_client will use synchronous API to "
-                   "request inference.",
+                   " --sync: Force enables synchronous mode in perf_client. "
+                   "Can be used to operate perf_client with sequential model "
+                   "in synchronous mode.",
                    18)
             << std::endl;
   std::cerr
@@ -544,6 +557,7 @@ main(int argc, char** argv)
   size_t max_concurrency = 0;
   bool dynamic_concurrency_mode = false;
   bool async = false;
+  bool forced_sync = false;
 
   // Required for detecting the use of conflicting options
   bool using_concurrency_range = false;
@@ -567,6 +581,7 @@ main(int argc, char** argv)
                                          {"string-length", 1, 0, 12},
                                          {"string-data", 1, 0, 13},
                                          {"async", 0, 0, 14},
+                                         {"sync", 0, 0, 15},
                                          {0, 0, 0, 0}};
 
   // Parse commandline...
@@ -691,6 +706,10 @@ main(int argc, char** argv)
         async = true;
         break;
       }
+      case 15: {
+        forced_sync = true;
+        break;
+      }
       case 'v':
         verbose = true;
         break;
@@ -794,6 +813,9 @@ main(int argc, char** argv)
   if (zero_input && !data_directory.empty()) {
     Usage(argv, "zero input can't be set when data directory is provided");
   }
+  if (async && forced_sync) {
+    Usage(argv, "Both --async and --sync can not be specified simultaneously.");
+  }
 
 
   if (using_concurrency_range && using_old_options) {
@@ -851,10 +873,17 @@ main(int argc, char** argv)
     std::cerr << err << std::endl;
     return 1;
   }
+
+  // Special handling for sequence models
   if ((factory->SchedulerType() == perfclient::ContextFactory::SEQUENCE) ||
       (factory->SchedulerType() ==
        perfclient::ContextFactory::ENSEMBLE_SEQUENCE)) {
-    if (concurrency_range[CONCURRENCY_RANGE::kEND] == NO_LIMIT) {
+    // Change the default value for the --async option for sequential models
+    if (!async) {
+      async = forced_sync ? false : true;
+    }
+
+    if (concurrency_range[CONCURRENCY_RANGE::kEND] == NO_LIMIT && async) {
       std::cerr << "The 'end' concurrency can not be 0 for sequence "
                    "models when using asynchronous API."
                 << std::endl;

@@ -112,10 +112,7 @@ class ConcurrencyManager : public LoadManager {
     InferContextMetaData(const InferContextMetaData&) = delete;
 
     std::unique_ptr<nic::InferContext> ctx_;
-    // mutex to guard 'inflight_request_cnt_' which will be acessed by
-    // both the main thread and callback thread
-    std::mutex mtx_;
-    size_t inflight_request_cnt_;
+    std::atomic<size_t> inflight_request_cnt_;
   };
 
  private:

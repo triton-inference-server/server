@@ -469,9 +469,10 @@ ConcurrencyManager::Infer(std::shared_ptr<ThreadData> thread_data)
 {
   std::vector<std::unique_ptr<InferContextMetaData>> ctxs;
 
-  // Reserve the vectors in case of sequence models. In non-sequence only one
-  // context will be opened hence no need of reserving.
-  if (on_sequence_model_) {
+  // Reserve the vectors in case of sequence models. In non-sequence or
+  // synchronous mode only one context will be opened hence no need of
+  // reserving.
+  if (on_sequence_model_ && async_) {
     thread_data->contexts_stat_.reserve(max_concurrency_);
     ctxs.reserve(max_concurrency_);
   }
@@ -561,10 +562,7 @@ ConcurrencyManager::Infer(std::shared_ptr<ThreadData> thread_data)
                       std::make_tuple(start_time_async, end_time_async, flags));
                   ctxs[idx]->ctx_->GetStat(&(thread_data->contexts_stat_[idx]));
                 }
-                {
-                  std::lock_guard<std::mutex> lock(ctxs[idx]->mtx_);
-                  ctxs[idx]->inflight_request_cnt_--;
-                }
+                ctxs[idx]->inflight_request_cnt_--;
                 // avoid competition over 'cb_mtx'
                 if (!notified) {
                   {
@@ -577,10 +575,7 @@ ConcurrencyManager::Infer(std::shared_ptr<ThreadData> thread_data)
           if (!thread_data->status_.IsOk()) {
             return;
           }
-          {
-            std::lock_guard<std::mutex> lock(ctxs[idx]->mtx_);
-            ctxs[idx]->inflight_request_cnt_++;
-          }
+          ctxs[idx]->inflight_request_cnt_++;
         } else {
           std::map<std::string, std::unique_ptr<nic::InferContext::Result>>
               results;
@@ -629,12 +624,7 @@ ConcurrencyManager::Infer(std::shared_ptr<ThreadData> thread_data)
         for (auto& ctx : ctxs) {
           // Loop to ensure all the inflight requests have been completed.
           while (ctx->inflight_request_cnt_ != 0) {
-            // lock on ctx's mutex so that the 'inflight_request_cnt_' is
-            // synchronized.
-            std::unique_lock<std::mutex> lk(ctx->mtx_);
-            cb_cv.wait_for(lk, std::chrono::milliseconds(500), [&ctx] {
-              return (ctx->inflight_request_cnt_ == 0);
-            });
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
           }
         }
       }
