@@ -32,10 +32,10 @@ cmake_minimum_required (VERSION 3.5)
 add_library(crequest SHARED crequest.cc)
 if(${TRTIS_ENABLE_GPU})
   target_include_directories(crequest PUBLIC ${CUDA_INCLUDE_DIRS})
-target_link_libraries(
-  crequest
-  PRIVATE ${CUDA_LIBRARIES}
-)
+  target_link_libraries(
+    crequest
+    PRIVATE ${CUDA_LIBRARIES}
+  )
 endif() # TRTIS_ENABLE_GPU
 target_link_libraries(
   crequest
