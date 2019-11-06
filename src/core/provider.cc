@@ -316,18 +316,24 @@ NULLInferRequestProvider::GetNextInputContent(
   }
 
   if (!GetInputOverrideContent(name, content, content_byte_size)) {
-    std::lock_guard<std::mutex> lock(mu_);
+    if (inputs_retrieved_.find(name) != inputs_retrieved_.end()) {
+      *content = nullptr;
+      *content_byte_size = 0;
+    } else {
+      inputs_retrieved_.emplace(name);
+      std::lock_guard<std::mutex> lock(mu_);
 
-    // Must return content with all zero data. This is required by
-    // string-datatype tensors where it is interpreted as all empty
-    // strings. Clamp the maximum size that we allow the buffer to
-    // grow to avoid massive allocation.
-    if (buf_.size() < *content_byte_size) {
-      constexpr size_t max_size = 16 * 1024 * 1024;
-      buf_.resize(std::min(max_size, *content_byte_size), 0);
+      // Must return content with all zero data. This is required by
+      // string-datatype tensors where it is interpreted as all empty
+      // strings. Clamp the maximum size that we allow the buffer to
+      // grow to avoid massive allocation.
+      if (buf_.size() < *content_byte_size) {
+        constexpr size_t max_size = 16 * 1024 * 1024;
+        buf_.resize(std::min(max_size, *content_byte_size), 0);
+      }
+
+      *content = &(buf_[0]);
     }
-
-    *content = &(buf_[0]);
   }
 
   return Status::Success;
