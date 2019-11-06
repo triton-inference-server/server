@@ -38,10 +38,10 @@ show how to use the :ref:`client libraries
   that uses the C++ or Python client library to execute image
   classification models on the TensorRT Inference Server.
 
-* C++ version of *perf\_client*, an example application that issues a
-  large number of concurrent requests to the inference server to
-  measure latency and throughput for a given model. You can use this
-  to experiment with different model configuration settings for your
+* C++ version of *perf\_client*, an application that issues a large
+  number of concurrent requests to the inference server to measure
+  latency and throughput for a given model. You can use this to
+  experiment with different model configuration settings for your
   models.
 
 * A number of simple `C++
@@ -376,144 +376,11 @@ will be sent::
 
 .. _section-performance-example:
 
-Performance Example Application
--------------------------------
+Performance Measurement Application
+-----------------------------------
 
-The perf\_client example application located at
-`src/clients/c++/perf\_client.cc
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/perf_client.cc>`_
+The perf\_client application located at `src/clients/c++/perf\_client
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/perf_client>`_
 uses the C++ client API to send concurrent requests to the server to
-measure latency and inferences-per-second under varying client loads.
-
-To create each load level the perf\_client maintains a constant number
-of outstanding inference requests to the server. The lowest load level
-is created by having one outstanding request to the server. When that
-request completes (i.e. the response is received from the server), the
-perf\_client immediately sends another request. The next highest load
-level is created by having two outstanding requests to the server.
-When one of those requests completes, the perf\_client immediately
-sends another request so that there are always exactly two inference
-requests in-flight at all times. The next highest load level is
-created with three outstanding requests, etc.
-
-At each load level the perf\_client measures the throughput and
-latency over a time window, and then repeats the measurements until it
-gets stable results. The perf\_client then increases the load level
-and measures again. This repeats until the perf\_client reaches one of
-the specified limits: either the maximum latency value is reached or
-the maximum concurrency value is reached. To determine stable results
-perf\_client uses average request latency unless the --percentile flag
-is specified. If the --percentile flag is specified, perf\_client will
-stabilize the results based on that confidence level. For example,
-if --percentile=99 is used the results will be stabilized using the
-99-th percentile request latency.
-
-To use perf\_client you must first have a running inference server
-that is serving one or more models. The perf\_client application works
-with any type of model by sending random data for all input tensors
-and by reading and ignoring all output tensors. If you don't have a
-model repository see :ref:`section-example-model-repository` for
-instructions on how to create one.
-
-Follow the instructions in :ref:`section-running-the-inference-server`
-to launch the inference server using the model repository.
-
-The perf\_client application has two major modes. In the first mode
-you specify how many concurrent outstanding inference requests you
-want and perf\_client finds a stable latency and inferences/second for
-that level of concurrency. Use the \-t flag to control concurrency and
-\-v to see verbose output. The following example uses four outstanding
-inference requests to the inference server::
-
-  $ perf_client -m resnet50_netdef -p3000 -t4 -v
-  *** Measurement Settings ***
-    Batch size: 1
-    Measurement window: 3000 msec
-
-  Request concurrency: 4
-    Pass [1] throughput: 207 infer/sec. Avg latency: 19268 usec (std 910 usec)
-    Pass [2] throughput: 206 infer/sec. Avg latency: 19362 usec (std 941 usec)
-    Pass [3] throughput: 208 infer/sec. Avg latency: 19252 usec (std 841 usec)
-    Client:
-      Request count: 624
-      Throughput: 208 infer/sec
-      p50 latency: 19985 usec
-      p90 latency: 22524 usec
-      p95 latency: 23401 usec
-      p99 latency: 24866 usec
-      Avg latency: 19252 usec (standard deviation 841 usec)
-      Avg HTTP time: 19224 usec (send 714 usec + response wait 18486 usec + receive 24 usec)
-    Server:
-      Request count: 749
-      Avg request latency: 17886 usec (overhead 55 usec + queue 26 usec + compute 17805 usec)
-
-In the second mode perf\_client will generate an inferences/second
-vs. latency curve by increasing request concurrency until a specific
-latency limit or concurrency limit is reached. This mode is enabled by
-using the \-d option and \-l option to specify the latency limit, and
-optionally the \-c option to specify a maximum concurrency limit. By
-default the initial concurrency value is one, but the \-t option can
-be used to select a different starting value. The following example
-measures latency and inferences/second starting with request
-concurrency one and increasing until request concurrency equals three
-or average request latency exceeds 50 milliseconds::
-
-  $ perf_client -m resnet50_netdef -p3000 -d -l50 -c 3
-  *** Measurement Settings ***
-    Batch size: 1
-    Measurement window: 3000 msec
-    Latency limit: 50 msec
-    Concurrency limit: 3 concurrent requests
-
-  Request concurrency: 1
-    Client:
-      Request count: 327
-      Throughput: 109 infer/sec
-      Avg latency: 9191 usec (standard deviation 822 usec)
-      Avg HTTP time: 9188 usec (send/recv 1007 usec + response wait 8181 usec)
-    Server:
-      Request count: 391
-      Avg request latency: 7661 usec (overhead 90 usec + queue 68 usec + compute 7503 usec)
-
-  Request concurrency: 2
-    Client:
-      Request count: 521
-      Throughput: 173 infer/sec
-      Avg latency: 11523 usec (standard deviation 616 usec)
-      Avg HTTP time: 11448 usec (send/recv 711 usec + response wait 10737 usec)
-    Server:
-      Request count: 629
-      Avg request latency: 10018 usec (overhead 70 usec + queue 41 usec + compute 9907 usec)
-
-  Request concurrency: 3
-    Client:
-      Request count: 580
-      Throughput: 193 infer/sec
-      Avg latency: 15518 usec (standard deviation 635 usec)
-      Avg HTTP time: 15487 usec (send/recv 779 usec + response wait 14708 usec)
-    Server:
-      Request count: 697
-      Avg request latency: 14083 usec (overhead 59 usec + queue 30 usec + compute 13994 usec)
-
-  Inferences/Second vs. Client Average Batch Latency
-  Concurrency: 1, 109 infer/sec, latency 9191 usec
-  Concurrency: 2, 173 infer/sec, latency 11523 usec
-  Concurrency: 3, 193 infer/sec, latency 15518 usec
-
-Use the \-f option to generate a file containing CSV output of the
-results::
-
-  $ perf_client -m resnet50_netdef -p3000 -d -l50 -c 3 -f perf.csv
-
-You can then import the CSV file into a spreadsheet to help visualize
-the latency vs inferences/second tradeoff as well as see some
-components of the latency. Follow these steps:
-
-- Open `this spreadsheet
-  <https://docs.google.com/spreadsheets/d/1IsdW78x_F-jLLG4lTV0L-rruk0VEBRL7Mnb-80RGLL4>`_
-- Make a copy from the File menu "Make a copy..."
-- Open the copy
-- Select the A1 cell on the "Raw Data" tab
-- From the File menu select "Import..."
-- Select "Upload" and upload the file
-- Select "Replace data at selected cell" and then select the "Import data" button
+measure latency and inferences-per-second under varying client
+loads. See the :ref:`section-perf-client` for a full description.

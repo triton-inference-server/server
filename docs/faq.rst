@@ -82,7 +82,7 @@ The TensorRT Inference Server exposes performance information in two
 ways: by :ref:`Prometheus metrics <section-metrics>` and by the
 :ref:`Status API <section-api-status>`.
 
-A client application, :ref:`perf_client
+A client application, :ref:`perf\_client
 <section-performance-example>`, allows you to measure the performance
 of an individual model using a synthetic load. The perf\_client
 application is designed to show you the tradeoff of latency

@@ -58,6 +58,7 @@ NVIDIA TensorRT Inference Server
    model_repository
    model_configuration
    model_management
+   optimization
    metrics
 
 .. toctree::

@@ -193,9 +193,9 @@ portions of the model configuration if necessary, such as
 
 When serving a classification model, keep in mind that :cpp:var:`label_filename
 <nvidia::inferenceserver::ModelOutput::label_filename>` can not be automatically
-derived. You will need to either create a **config.pbtxt** file specifying all 
+derived. You will need to either create a **config.pbtxt** file specifying all
 required :cpp:var:`output<nvidia::inferenceserver::ModelOutput>` along with the
-:cpp:var:`label_filename<nvidia::inferenceserver::ModelOutput::label_filename>`, 
+:cpp:var:`label_filename<nvidia::inferenceserver::ModelOutput::label_filename>`,
 or handle the mapping from model output to label in the client code directly.
 
 .. _section-datatypes:
@@ -542,3 +542,16 @@ optimization and prioritization settings for a model. These settings
 control if/how a model is optimized by the backend framework and how
 it is scheduled and executed by the inference server. See the protobuf
 documentation for the currently available settings.
+
+.. _section-optimization-policy-tensorrt:
+
+TensorRT Optimization
+^^^^^^^^^^^^^^^^^^^^^
+
+The TensorRT optimization is an especially powerful optimization that
+can be enabled for TensorFlow and ONNX models. When enabled for a
+model, TensorRT optimization will be applied to the model at load time
+or when it first receives inference requests. TensorRT optimizations
+include specializing and fusing model layers, and using reduced
+precision (for example 16-bit floating-point) to provide significant
+throughput and latency improvements.

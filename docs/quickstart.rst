@@ -25,6 +25,8 @@
   # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+.. _section-quickstart:
+
 Quickstart
 ==========
 
@@ -32,13 +34,13 @@ The TensorRT Inference Server is available in two ways:
 
 * As a pre-built Docker container available from the `NVIDIA GPU Cloud
   (NGC) <https://ngc.nvidia.com>`_. For more information, see
-  :ref:`section-using-a-prebuilt-docker-container`.
+  :ref:`section-quickstart-using-a-prebuilt-docker-container`.
 
 * As buildable source code located in GitHub. You can :ref:`build your
-  own container using Docker<section-building-with-docker>` or you can
-  :ref:`build using CMake<section-building-with-cmake>`.
+  own container using Docker<section-quickstart-building-with-docker>` or you can
+  :ref:`build using CMake<section-quickstart-building-with-cmake>`.
 
-.. _section-prerequisites:
+.. _section-quickstart-prerequisites:
 
 Prerequisites
 -------------
@@ -81,13 +83,13 @@ additional steps:
   For users other than DGX, see the `nvidia-docker installation
   documentation <https://github.com/NVIDIA/nvidia-docker>`_.
 
-.. _section-using-a-prebuilt-docker-container:
+.. _section-quickstart-using-a-prebuilt-docker-container:
 
 Using A Prebuilt Docker Container
 ---------------------------------
 
 Make sure you log into NGC as described in
-:ref:`section-prerequisites` before attempting the steps in this
+:ref:`section-quickstart-prerequisites` before attempting the steps in this
 section.  Use docker pull to get the TensorRT Inference Server
 container from NGC::
 
@@ -97,17 +99,17 @@ Where <xx.yy> is the version of the inference server that you want to
 pull. Once you have the container follow these steps to run the server
 and the example client applications.
 
-#. :ref:`Run the inference server <section-run-tensorrt-inference-server>`.
-#. :ref:`Verify that the server is running correct <section-verify-inference-server-status>`.
-#. :ref:`Get the example client applications <section-getting-the-examples>`.
-#. :ref:`Run the image classification example <section-running-the-image-classification-example>`.
+#. :ref:`Run the inference server <section-quickstart-run-tensorrt-inference-server>`.
+#. :ref:`Verify that the server is running correct <section-quickstart-verify-inference-server-status>`.
+#. :ref:`Get the example client applications <section-quickstart-getting-the-examples>`.
+#. :ref:`Run the image classification example <section-quickstart-running-the-image-classification-example>`.
 
-.. _section-building-with-docker:
+.. _section-quickstart-building-with-docker:
 
 Building With Docker
 --------------------
 
-Make sure you complete the steps in :ref:`section-prerequisites`
+Make sure you complete the steps in :ref:`section-quickstart-prerequisites`
 before attempting to build the inference server. To build the
 inference server from source, change to the root directory of the
 GitHub repo and checkout the release version of the branch that you
@@ -123,17 +125,17 @@ Then use docker to build::
 After the build completes follow these steps to run the server and the
 example client applications.
 
-#. :ref:`Run the inference server <section-run-tensorrt-inference-server>`.
-#. :ref:`Verify that the server is running correct <section-verify-inference-server-status>`.
-#. :ref:`Get the example client applications <section-getting-the-examples>`.
-#. :ref:`Run the image classification example <section-running-the-image-classification-example>`.
+#. :ref:`Run the inference server <section-quickstart-run-tensorrt-inference-server>`.
+#. :ref:`Verify that the server is running correct <section-quickstart-verify-inference-server-status>`.
+#. :ref:`Get the example client applications <section-quickstart-getting-the-examples>`.
+#. :ref:`Run the image classification example <section-quickstart-running-the-image-classification-example>`.
 
-.. _section-building-with-cmake:
+.. _section-quickstart-building-with-cmake:
 
 Building With CMake
 -------------------
 
-Make sure you complete the steps in :ref:`section-prerequisites`
+Make sure you complete the steps in :ref:`section-quickstart-prerequisites`
 before attempting to build the inference server. To build with CMake
 you must decide which features of the inference server you want, build
 any required dependencies, and the lastly build the TensorRT Inference
@@ -143,12 +145,12 @@ details on how to build with CMake.
 After the build completes follow these steps to run the server and the
 example client applications.
 
-#. :ref:`Run the inference server <section-run-tensorrt-inference-server>`.
-#. :ref:`Verify that the server is running correct <section-verify-inference-server-status>`.
-#. :ref:`Get the example client applications <section-getting-the-examples>`.
-#. :ref:`Run the image classification example <section-running-the-image-classification-example>`.
+#. :ref:`Run the inference server <section-quickstart-run-tensorrt-inference-server>`.
+#. :ref:`Verify that the server is running correct <section-quickstart-verify-inference-server-status>`.
+#. :ref:`Get the example client applications <section-quickstart-getting-the-examples>`.
+#. :ref:`Run the image classification example <section-quickstart-running-the-image-classification-example>`.
 
-.. _section-run-tensorrt-inference-server:
+.. _section-quickstart-run-tensorrt-inference-server:
 
 Run TensorRT Inference Server
 -----------------------------
@@ -179,7 +181,7 @@ ready to accept inference requests::
 
 For more information, see :ref:`section-running-the-inference-server`.
 
-.. _section-verify-inference-server-status:
+.. _section-quickstart-verify-inference-server-status:
 
 Verify Inference Server Is Running Correctly
 --------------------------------------------
@@ -217,13 +219,13 @@ the server is ready to receive inference requests.
 For more information, see
 :ref:`section-checking-inference-server-status`.
 
-.. _section-getting-the-examples:
+.. _section-quickstart-getting-the-examples:
 
 Getting The Client Examples
 ---------------------------
 
 Make sure you log into NGC as described in
-:ref:`section-prerequisites` before attempting the steps in this
+:ref:`section-quickstart-prerequisites` before attempting the steps in this
 section. Use docker pull to get the client libraries and examples
 container from NGC::
 
@@ -239,7 +241,7 @@ Docker and for some platforms pre-compiled client examples are
 available. For more information, see
 :ref:`section-getting-the-client-examples`.
 
-.. _section-running-the-image-classification-example:
+.. _section-quickstart-running-the-image-classification-example:
 
 Running The Image Classification Example
 ----------------------------------------
