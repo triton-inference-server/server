@@ -26,7 +26,6 @@
 
 #include "src/clients/c++/perf_client/context_factory.h"
 
-namespace perfclient {
 nic::Error
 ContextFactory::Create(
     const std::string& url, const ProtocolType protocol,
@@ -131,5 +130,3 @@ ContextFactory::CreateInferContext(std::unique_ptr<nic::InferContext>* ctx)
   }
   return err;
 }
-
-}  // namespace perfclient

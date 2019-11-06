@@ -30,8 +30,6 @@
 #include <limits>
 #include <queue>
 
-namespace perfclient {
-
 nic::Error
 InferenceProfiler::Create(
     const bool verbose, const double stability_threshold,
@@ -597,5 +595,3 @@ InferenceProfiler::SummarizeServerStats(
       server_stats));
   return nic::Error::Success;
 }
-
-}  // namespace perfclient
