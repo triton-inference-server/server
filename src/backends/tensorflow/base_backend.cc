@@ -402,109 +402,13 @@ FillStringTensor(TRTISTF_Tensor* tensor, const size_t idx, const size_t cnt)
   }
 }
 
-void
-ReadStringOutputTensor(
-    TRTISTF_Tensor* tensor, const std::string& output_name,
-    const std::vector<int64_t>& shape, const size_t batch1_element_cnt,
-    std::vector<Scheduler::Payload>* payloads)
-{
-  size_t tensor_element_idx = 0;
-
-#ifdef TRTIS_ENABLE_GPU
-  bool cuda_copy = false;
-  cudaStream_t stream;
-  cudaError_t cuerr = cudaStreamCreate(&stream);
-  if (cuerr != cudaSuccess) {
-    LOG_VERBOSE(1) << "unable to create stream for " << output_name << ": "
-                   << cudaGetErrorString(cuerr);
-  }
-#endif  // TRTIS_ENABLE_GPU
-
-  for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-    const size_t expected_element_cnt =
-        request_header.batch_size() * batch1_element_cnt;
-
-    // If 'payload' requested this output then copy it from the
-    // GPU. If it did not request this output then just skip it in
-    // the output tensor.
-    if ((payload.response_provider_ != nullptr) &&
-        payload.response_provider_->RequiresOutput(output_name)) {
-      // Serialize the output tensor strings. Each string is
-      // serialized as a 4-byte length followed by the string itself
-      // with no null-terminator.
-      std::string serialized;
-      for (size_t e = 0; e < expected_element_cnt; ++e) {
-        size_t len;
-        const char* cstr =
-            TRTISTF_TensorString(tensor, tensor_element_idx + e, &len);
-        serialized.append(
-            reinterpret_cast<const char*>(&len), sizeof(uint32_t));
-        if (len > 0) {
-          serialized.append(cstr, len);
-        }
-      }
-
-      void* content;
-      TRTSERVER_Memory_Type preferred_memory_type = TRTSERVER_MEMORY_CPU;
-      TRTSERVER_Memory_Type actual_memory_type;
-      int64_t actual_memory_type_id;
-      Status status = payload.response_provider_->AllocateOutputBuffer(
-          output_name, &content, serialized.size(), shape,
-          preferred_memory_type, 0 /* preferred_memory_type_id */,
-          &actual_memory_type, &actual_memory_type_id);
-      if (status.IsOk()) {
-        if (actual_memory_type == TRTSERVER_MEMORY_GPU) {
-#ifdef TRTIS_ENABLE_GPU
-          cudaError_t err = cudaMemcpyAsync(
-              content, reinterpret_cast<const void*>(serialized.c_str()),
-              serialized.size(), cudaMemcpyDeviceToHost, stream);
-          if (err != cudaSuccess) {
-            payload.status_ = Status(
-                RequestStatusCode::INTERNAL,
-                "output '" + output_name +
-                    "' is in GPU memory and failed to use" +
-                    " CUDA copy from CPU memory to get String output data: " +
-                    std::string(cudaGetErrorString(err)));
-          } else {
-            cuda_copy = true;
-          }
-#endif  // TRTIS_ENABLE_GPU
-        } else {
-          memcpy(
-              content, reinterpret_cast<const void*>(serialized.c_str()),
-              serialized.size());
-        }
-      } else {
-        payload.status_ = status;
-      }
-    }
-
-    tensor_element_idx += expected_element_cnt;
-  }
-
-#ifdef TRTIS_ENABLE_GPU
-  if (cuda_copy) {
-    cudaStreamSynchronize(stream);
-  }
-  if (stream != nullptr) {
-    cudaError_t err = cudaStreamDestroy(stream);
-    if (err != cudaSuccess) {
-      LOG_ERROR << "Failed to destroy cuda stream: " << cudaGetErrorString(err);
-    }
-    stream = nullptr;
-  }
-#endif  // TRTIS_ENABLE_GPU
-}
-
 }  // namespace
 
 Status
 BaseBackend::Context::SetInput(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    TRTISTF_TensorList** input_tensors)
+    TRTISTF_TensorList** input_tensors, bool* cuda_copy)
 {
   // Get the shape of the input. The provider has already checked
   // that the request shape is valid so don't need to do it here.
@@ -556,7 +460,8 @@ BaseBackend::Context::SetInput(
               std::to_string(batch1_byte_size * total_batch_size) + ", got " +
               std::to_string(TRTISTF_TensorDataByteSize(tensor)));
     }
-    SetFixedSizedInputTensor(tensor, name, batch1_byte_size, payloads);
+    SetFixedSizedInputTensor(
+        tensor, name, batch1_byte_size, payloads, cuda_copy);
   } else {
     SetStringInputTensor(tensor, name, batch1_element_cnt, payloads);
   }
@@ -567,7 +472,8 @@ BaseBackend::Context::SetInput(
 void
 BaseBackend::Context::SetFixedSizedInputTensor(
     TRTISTF_Tensor* tensor, const std::string& input_name,
-    const size_t batch1_byte_size, std::vector<Scheduler::Payload>* payloads)
+    const size_t batch1_byte_size, std::vector<Scheduler::Payload>* payloads,
+    bool* cuda_copy)
 {
   char* buffer = TRTISTF_TensorData(tensor);
 
@@ -589,7 +495,7 @@ BaseBackend::Context::SetFixedSizedInputTensor(
       (TRTISTF_TensorIsGPUTensor(tensor)) ? gpu_device_ : 0;
   LOG_VERBOSE(1) << "input '" << input_name
                  << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
-  SetInputBuffer(
+  *cuda_copy |= SetInputBuffer(
       input_name, expected_byte_sizes, payloads, content_memory_type,
       content_memory_type_id, buffer);
 }
@@ -615,32 +521,14 @@ BaseBackend::Context::SetStringInputTensor(
     // we can read string length and construct the string properly.
     auto src_memory_type = TRTSERVER_MEMORY_CPU;
     int64_t src_memory_type_id = 0;
-    const void* vcontent;
+    const char* content;
     size_t content_byte_size = expected_element_cnt * sizeof(uint32_t);
-    payload.status_ = payload.request_provider_->GetNextInputContent(
-        input_name, &vcontent, &content_byte_size, &src_memory_type,
-        &src_memory_type_id, true);
-
-    const char* content = reinterpret_cast<const char*>(vcontent);
-#ifdef TRTIS_ENABLE_GPU
-    std::unique_ptr<char[]> cpu_buffer;
-    if (src_memory_type != TRTSERVER_MEMORY_CPU) {
-      cpu_buffer.reset(new char[content_byte_size]);
-      cudaError_t err = cudaMemcpyAsync(
-          cpu_buffer.get(), vcontent, content_byte_size, cudaMemcpyDeviceToHost,
-          stream_);
-      if (err != cudaSuccess) {
-        payload.status_ = Status(
-            RequestStatusCode::INTERNAL,
-            "input '" + input_name + "' is in GPU memory and failed to use" +
-                " CUDA copy to CPU memory for setting String input data: " +
-                std::string(cudaGetErrorString(err)));
-      } else {
-        cudaStreamSynchronize(stream_);
-      }
-      content = cpu_buffer.get();
-    }
-#endif  // TRTIS_ENABLE_GPU
+    // If contiguous buffer is created, it needs to live until tensor is filled
+    std::unique_ptr<AllocatedSystemMemory> contiguous_buffer;
+    bool cuda_copy = false;
+    payload.status_ = GetContiguousInputContent(
+        input_name, src_memory_type, src_memory_type_id, payload, &content,
+        &content_byte_size, &contiguous_buffer, &cuda_copy);
 
     if (!payload.status_.IsOk()) {
       FillStringTensor(
@@ -648,6 +536,14 @@ BaseBackend::Context::SetStringInputTensor(
           expected_element_cnt - element_idx);
       continue;
     }
+
+    // [TODO] defer synchronize as far as possible, need rework on setting
+    // String input. i.e. get all contiguous data first, then sync and set.
+#ifdef TRTIS_ENABLE_GPU
+    if (cuda_copy) {
+      cudaStreamSynchronize(stream_);
+    }
+#endif  // TRTIS_ENABLE_GPU
 
     // Parse content and assign them to the 'tensor'. Each string
     // in 'content' is a 4-byte length followed by the string
@@ -723,6 +619,67 @@ BaseBackend::Context::ReadFixedSizedOutputTensor(
       content_memory_type, memory_type_id, payloads);
 }
 
+void
+BaseBackend::Context::ReadStringOutputTensor(
+    TRTISTF_Tensor* tensor, const std::string& output_name,
+    const std::vector<int64_t>& shape, const size_t batch1_element_cnt,
+    std::vector<Scheduler::Payload>* payloads, bool* cuda_copy)
+{
+  size_t tensor_element_idx = 0;
+
+  for (auto& payload : *payloads) {
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+    const size_t expected_element_cnt =
+        request_header.batch_size() * batch1_element_cnt;
+
+    // If 'payload' should have valid output (status ok) and
+    // if 'payload' requested this output then copy it from
+    // tensor. If it did not request this output then just
+    // skip it.
+    if (payload.status_.IsOk() && (payload.response_provider_ != nullptr) &&
+        payload.response_provider_->RequiresOutput(output_name)) {
+      // Serialize the output tensor strings. Each string is
+      // serialized as a 4-byte length followed by the string itself
+      // with no null-terminator.
+      std::string serialized;
+      for (size_t e = 0; e < expected_element_cnt; ++e) {
+        size_t len;
+        const char* cstr =
+            TRTISTF_TensorString(tensor, tensor_element_idx + e, &len);
+        serialized.append(
+            reinterpret_cast<const char*>(&len), sizeof(uint32_t));
+        if (len > 0) {
+          serialized.append(cstr, len);
+        }
+      }
+
+      void* content;
+      TRTSERVER_Memory_Type actual_memory_type;
+      int64_t actual_memory_type_id;
+      Status status = payload.response_provider_->AllocateOutputBuffer(
+          output_name, &content, serialized.size(), shape,
+          TRTSERVER_MEMORY_CPU /* preferred_memory_type */,
+          0 /* preferred_memory_type_id */, &actual_memory_type,
+          &actual_memory_type_id);
+      if (status.IsOk()) {
+        bool cuda_used = false;
+        status = CopyBuffer(
+            output_name, TRTSERVER_MEMORY_CPU /* src_memory_type */,
+            0 /* src_memory_type_id */, actual_memory_type,
+            actual_memory_type_id, serialized.size(),
+            reinterpret_cast<const void*>(serialized.c_str()), content,
+            &cuda_used);
+        *cuda_copy |= cuda_used;
+      }
+
+      payload.status_ = status;
+    }
+
+    tensor_element_idx += expected_element_cnt;
+  }
+}
+
 Status
 BaseBackend::Context::Run(
     const BaseBackend* base, std::vector<Scheduler::Payload>* payloads)
@@ -784,6 +741,7 @@ BaseBackend::Context::Run(
       &input_head_ptr, input_deleter);
 
   // Inputs from the request...
+  bool cuda_copy = false;
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
 
@@ -792,7 +750,7 @@ BaseBackend::Context::Run(
 
     RETURN_IF_ERROR(SetInput(
         name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, input_tensors.get()));
+        payloads, input_tensors.get(), &cuda_copy));
   }
 
   // Additional inputs added to the provider...
@@ -805,7 +763,7 @@ BaseBackend::Context::Run(
           pr.second;
       RETURN_IF_ERROR(SetInput(
           name, override->datatype_, override->dims_, total_batch_size,
-          payloads, input_tensors.get()));
+          payloads, input_tensors.get(), &cuda_copy));
     }
   }
 
@@ -838,9 +796,11 @@ BaseBackend::Context::Run(
     }
   }
 
-  // Run. Session will update the 'output_tensors'.
-  std::unique_ptr<TRTISTF_TensorList, decltype(&TRTISTF_TensorListDelete)>
-      output_tensors(nullptr, TRTISTF_TensorListDelete);
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
 
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
@@ -848,6 +808,10 @@ BaseBackend::Context::Run(
           ModelInferStats::TimestampKind::kComputeInputEnd);
     }
   }
+
+  // Run. Session will update the 'output_tensors'.
+  std::unique_ptr<TRTISTF_TensorList, decltype(&TRTISTF_TensorListDelete)>
+      output_tensors(nullptr, TRTISTF_TensorListDelete);
 
   {
     TRTISTF_TensorList* rtl;
@@ -866,7 +830,7 @@ BaseBackend::Context::Run(
 
   // Make sure each output is of the expected size and copy it into
   // the appropriate response providers.
-  bool cuda_copy = false;
+  cuda_copy = false;
   TRTISTF_TensorList* output_tensor_itr = output_tensors.get();
   for (const auto& name : model_output_names) {
     const ModelOutput* output_config;
@@ -938,7 +902,8 @@ BaseBackend::Context::Run(
           &cuda_copy);
     } else {
       ReadStringOutputTensor(
-          output_tensor, name, shapevec, batch1_element_cnt, payloads);
+          output_tensor, name, shapevec, batch1_element_cnt, payloads,
+          &cuda_copy);
     }
 
     output_tensor_itr = output_tensor_itr->next_;

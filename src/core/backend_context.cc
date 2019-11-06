@@ -113,7 +113,7 @@ BackendContext::SetInputBuffer(
       size_t content_byte_size = expected_byte_size - copied_byte_size;
       payload.status_ = payload.request_provider_->GetNextInputContent(
           name, &content, &content_byte_size, &src_memory_type,
-          &src_memory_type_id, false);
+          &src_memory_type_id);
       if (!payload.status_.IsOk()) {
         break;
       }
@@ -257,6 +257,79 @@ BackendContext::CopyBuffer(
                                          name + "' while GPU is not supported");
 #endif  // TRTIS_ENABLE_GPU
   }
+  return Status::Success;
+}
+
+Status
+BackendContext::GetContiguousInputContent(
+    const std::string& name, TRTSERVER_Memory_Type memory_type,
+    int64_t memory_type_id, const Scheduler::Payload& payload,
+    const char** content, size_t* content_byte_size,
+    std::unique_ptr<AllocatedSystemMemory>* contiguous_buffer, bool* cuda_copy)
+{
+  contiguous_buffer->reset();
+
+  // Peek input buffers to check if data copy is necessary
+  MemoryReference input_buffers;
+  size_t chunk_count = 0;
+  bool type_mismatch = false;
+  while (true) {
+    TRTSERVER_Memory_Type src_memory_type = memory_type;
+    int64_t src_memory_type_id = memory_type_id;
+    size_t src_byte_size = *content_byte_size;
+    const void* src_ptr;
+
+    RETURN_IF_ERROR(payload.request_provider_->GetNextInputContent(
+        name, &src_ptr, &src_byte_size, &src_memory_type, &src_memory_type_id));
+
+    if (src_ptr != nullptr) {
+      input_buffers.AddBuffer(
+          (const char*)src_ptr, src_byte_size, src_memory_type,
+          src_memory_type_id);
+      chunk_count++;
+      type_mismatch |=
+          ((src_memory_type != memory_type) ||
+           (src_memory_type_id != memory_type_id));
+    } else {
+      break;
+    }
+  }
+
+  if (chunk_count == 0) {
+    *content = nullptr;
+    *content_byte_size = 0;
+  } else if ((chunk_count == 1) && !type_mismatch) {
+    *content = input_buffers.BufferAt(
+        0, content_byte_size, &memory_type, &memory_type_id);
+  } else {
+    contiguous_buffer->reset(new AllocatedSystemMemory(
+        input_buffers.TotalByteSize(), memory_type, memory_type_id));
+    auto dst_ptr =
+        (*contiguous_buffer)->MutableBuffer(&memory_type, &memory_type_id);
+    if (dst_ptr == nullptr) {
+      return Status(
+          RequestStatusCode::INTERNAL, "failed to allocate contiguous buffer");
+    }
+
+    size_t offset = 0;
+    for (size_t i = 0; i < chunk_count; i++) {
+      bool cuda_used;
+      TRTSERVER_Memory_Type src_memory_type;
+      int64_t src_memory_type_id;
+      auto src_ptr = input_buffers.BufferAt(
+          i, content_byte_size, &src_memory_type, &src_memory_type_id);
+      RETURN_IF_ERROR(CopyBuffer(
+          name, src_memory_type, src_memory_type_id, memory_type,
+          memory_type_id, *content_byte_size, src_ptr, dst_ptr + offset,
+          &cuda_used));
+      *cuda_copy |= cuda_used;
+      offset += *content_byte_size;
+    }
+
+    *content = dst_ptr;
+    *content_byte_size = (*contiguous_buffer)->TotalByteSize();
+  }
+
   return Status::Success;
 }
 

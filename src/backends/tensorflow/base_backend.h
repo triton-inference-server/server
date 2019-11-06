@@ -91,13 +91,13 @@ class BaseBackend : public InferenceBackend {
         const std::string& name, const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads,
-        TRTISTF_TensorList** input_tensors);
+        TRTISTF_TensorList** input_tensors, bool* cuda_copy);
 
     // Helper function to set the input for fixed-sized data type
     void SetFixedSizedInputTensor(
         TRTISTF_Tensor* tensor, const std::string& input_name,
         const size_t batch1_byte_size,
-        std::vector<Scheduler::Payload>* payloads);
+        std::vector<Scheduler::Payload>* payloads, bool* cuda_copy);
 
     // Helper function to set the input for String data type
     void SetStringInputTensor(
@@ -109,6 +109,12 @@ class BaseBackend : public InferenceBackend {
     void ReadFixedSizedOutputTensor(
         TRTISTF_Tensor* tensor, const std::string& output_name,
         const std::vector<int64_t>& shape, const size_t batch1_byte_size,
+        std::vector<Scheduler::Payload>* payloads, bool* cuda_copy);
+
+    // Helper function to set the output with String data type in payload
+    void ReadStringOutputTensor(
+        TRTISTF_Tensor* tensor, const std::string& output_name,
+        const std::vector<int64_t>& shape, const size_t batch1_element_cnt,
         std::vector<Scheduler::Payload>* payloads, bool* cuda_copy);
 
     // Run model to execute for one or more requests. This function
