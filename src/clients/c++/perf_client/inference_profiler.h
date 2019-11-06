@@ -30,7 +30,6 @@
 #include "src/clients/c++/perf_client/load_manager.h"
 
 
-namespace perfclient {
 using ModelInfo = std::pair<std::string, int64_t>;
 using ComposingModelMap = std::map<ModelInfo, std::set<ModelInfo>>;
 
@@ -171,7 +170,7 @@ class InferenceProfiler {
   /// models.
   /// \param model_name The ensemble model to be added into the map
   /// \param model_version The version of the model to be added
-  /// \server_status The server status response from TRTIS.
+  /// \param server_status The server status response from TRTIS.
   /// \return Error object indicating success or failure
   nic::Error BuildComposingModelMap(
       const std::string& model_name, const int64_t& model_version,
@@ -304,5 +303,3 @@ class InferenceProfiler {
   std::unique_ptr<LoadManager> manager_;
   LoadParams load_parameters_;
 };
-
-}  // namespace perfclient

@@ -26,8 +26,6 @@
 
 #include "src/clients/c++/perf_client/perf_utils.h"
 
-namespace perfclient {
-
 ProtocolType
 ParseProtocol(const std::string& str)
 {
@@ -120,5 +118,3 @@ GetRandomString(const int string_length)
   });
   return random_string;
 }
-
-}  // namespace perfclient

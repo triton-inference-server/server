@@ -39,8 +39,6 @@
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
 
-namespace perfclient {
-
 using TimestampVector =
     std::vector<std::tuple<struct timespec, struct timespec, uint32_t>>;
 
@@ -95,5 +93,3 @@ bool IsDirectory(const std::string& path);
 // Generates a random string of specified length using characters specified in
 // character_set.
 std::string GetRandomString(const int string_length);
-
-}  // namespace perfclient

@@ -29,8 +29,6 @@
 
 #include "src/clients/c++/perf_client/perf_utils.h"
 
-namespace perfclient {
-
 //==============================================================================
 /// ContextFactory is a helper class to create client contexts used
 /// in perf_client.
@@ -108,5 +106,3 @@ class ContextFactory {
   ni::CorrelationID current_correlation_id_;
   std::mutex correlation_id_mutex_;
 };
-
-}  // namespace perfclient

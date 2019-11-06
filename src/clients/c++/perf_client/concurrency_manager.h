@@ -33,7 +33,6 @@
 #include <thread>
 
 
-namespace perfclient {
 //==============================================================================
 /// ConcurrencyManager is a helper class to send inference requests to inference
 /// server consistently, based on the specified setting, so that the perf_client
@@ -189,5 +188,3 @@ class ConcurrencyManager : public LoadManager {
   std::condition_variable wake_signal_;
   std::mutex wake_mutex_;
 };
-
-}  // namespace perfclient
