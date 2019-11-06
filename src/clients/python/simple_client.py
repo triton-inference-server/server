@@ -88,6 +88,18 @@ if __name__ == '__main__':
                              'OUTPUT1' : InferContext.ResultFormat.RAW },
                            batch_size)
 
+    # Get the statistics
+    ctx_stats = infer_ctx.get_stat()
+    # Verify if the stats are correct
+    if ctx_stats["completed_request_count"] != 1:
+        print("error: incorrect statistics. Expected 1, Got {}".format(ctx_stats["completed_request_count"]));
+        sys.exit(1);
+    # Print complete statistics
+    print("====Infer Statistcs====")
+    for stat in ctx_stats:
+      print(stat +": " + str(ctx_stats[stat]))
+    print("======================= \n\n")
+
     # We expect there to be 2 results (each with batch-size 1). Walk
     # over all 16 result elements and print the sum and difference
     # calculated by the model.

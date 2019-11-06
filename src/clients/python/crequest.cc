@@ -980,3 +980,21 @@ InferContextResultNextClass(
 
   return new nic::Error(err);
 }
+
+//==============================================================================
+nic::Error*
+InferContextGetStat(
+    InferContextCtx* ctx, uint64_t* completed_request_count,
+    uint64_t* cumulative_total_request_time_ns,
+    uint64_t* cumulative_send_time_ns, uint64_t* cumulative_receive_time_ns)
+{
+  nic::InferContext::Stat stat;
+  nic::Error err = ctx->ctx->GetStat(&stat);
+  if (err.IsOk()) {
+    *completed_request_count = stat.completed_request_count;
+    *cumulative_total_request_time_ns = stat.cumulative_total_request_time_ns;
+    *cumulative_send_time_ns = stat.cumulative_send_time_ns;
+    *cumulative_receive_time_ns = stat.cumulative_receive_time_ns;
+  }
+  return new nic::Error(err);
+}
