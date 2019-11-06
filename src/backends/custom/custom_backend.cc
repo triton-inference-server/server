@@ -573,8 +573,7 @@ CustomBackend::Context::GetNextInput(
 
   auto src_memory_type = ToTRTServerMemoryType(*memory_type);
   Status status = payload->request_provider_->GetNextInputContent(
-      name, content, content_byte_size, &src_memory_type, memory_type_id,
-      false);
+      name, content, content_byte_size, &src_memory_type, memory_type_id);
   *memory_type = ToCustomMemoryType(src_memory_type);
   return status.IsOk();
 }

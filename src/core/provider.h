@@ -169,13 +169,9 @@ class InferRequestProvider {
   // buffer and the buffer owner may collect such information for other use.
   // On return 'memory_type_id' gives the actual memory type id of the chunk
   // pointed to by 'content'.
-  // If 'force_contiguous' is true then the entire (remaining) input will
-  // be returned as a single chunk. In some cases this will require
-  // copying the data.
   virtual Status GetNextInputContent(
       const std::string& name, const void** content, size_t* content_byte_size,
-      TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id,
-      bool force_contiguous);
+      TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
 
   // Retrieve the data buffer of input 'name'.
   Status GetMemory(
@@ -224,9 +220,6 @@ class InferRequestProvider {
   // has been consumed.
   std::set<std::string> overrides_consumed_;
 
-  // Placeholder for providing buffer as contiguous block.
-  std::vector<std::vector<char>> contiguous_buffers_;
-
   // Map from input name to the content of the input. The content contains
   // the buffer and index to the next data block for the named input.
   std::unordered_map<std::string, std::pair<std::shared_ptr<Memory>, size_t>>
@@ -249,8 +242,7 @@ class NULLInferRequestProvider : public InferRequestProvider {
 
   Status GetNextInputContent(
       const std::string& name, const void** content, size_t* content_byte_size,
-      TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id,
-      bool force_contiguous) override;
+      TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id) override;
 
  private:
   // A buffer of zero bytes that is used commonly as the NULL input.
