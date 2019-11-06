@@ -1,5 +1,5 @@
 diff --git a/tensorflow/examples/adding_an_op/cuda_op_kernel.cu.cc b/tensorflow/examples/adding_an_op/cuda_op_kernel.cu.cc
-index 1dcf23e..a92e218 100644
+index a9d66f9..a92e218 100644
 --- a/tensorflow/examples/adding_an_op/cuda_op_kernel.cu.cc
 +++ b/tensorflow/examples/adding_an_op/cuda_op_kernel.cu.cc
 @@ -14,10 +14,12 @@ limitations under the License.
@@ -23,8 +23,8 @@ index 1dcf23e..a92e218 100644
  }
  
  void AddOneKernelLauncher(const int* in, const int N, int* out) {
--  TF_CHECK_OK(::tensorflow::CudaLaunchKernel(AddOneKernel, 32, 256, 0, nullptr,
--                                             in, N, out));
+-  TF_CHECK_OK(::tensorflow::GpuLaunchKernel(AddOneKernel, 32, 256, 0, nullptr,
+-                                            in, N, out));
 +  int block_size = std::min(N, 1024);
 +  int grid_size = (N + block_size - 1) / block_size;
 +  AddOneKernel<<<grid_size, block_size>>>(in, N, out);
