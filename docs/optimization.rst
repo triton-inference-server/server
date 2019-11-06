@@ -40,7 +40,7 @@ examples running with the example model repository.
 Unless you already have a client application suitable for measuring
 the performance of your model on the interence server, you should
 familiarize yourself with :ref:`perf\_client
-<section-perf-client>`. The perf\_client application. is an essential
+<section-perf-client>`. The perf\_client application is an essential
 tool for optimizing your model's performance.
 
 As a running example demonstrating the optimization features and
@@ -63,7 +63,7 @@ throughput of about 200 inferences per second. Note how there is a
 significant throughput increase going from one concurrent request to
 two concurrent requests and then throughput levels off. With one
 concurrent request the inference server is idle during the time when
-the response is returned to the client and the next response is
+the response is returned to the client and the next request is
 received at the server. Throughput increases with a concurrency of 2
 because the inference server overlaps the processing of one request
 with the communication of the other. Because we are running
@@ -259,7 +259,10 @@ TensorFlow with TensorRT Optimization
 .....................................
 
 TensorRT optimization applied to a TensorFlow model works similarly to
-TensorRT and ONNX described above. To enable TensorRT optimization you set the model configuration appropriately. For TensorRT optimization of TensorFlow models that are several options that you can enable, including selection the precision. For example::
+TensorRT and ONNX described above. To enable TensorRT optimization you
+must set the model configuration appropriately. For TensorRT
+optimization of TensorFlow models that are several options that you
+can enable, including selection the precision. For example::
 
   optimization { execution_accelerators {
     gpu_execution_accelerator : [ {
