@@ -201,8 +201,8 @@ best satisfy your throughput and latency requirements.
 Framework-Specific Optimization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The inference server has several optimization setting that apply only
-to subset of the supported model frameworks. These optimization
+The inference server has several optimization settings that apply to
+only a subset of the supported model frameworks. These optimization
 settings are controlled by the model configuration :ref:`optimization
 policy <section-optimization-policy>`.
 
@@ -262,7 +262,8 @@ TensorRT optimization applied to a TensorFlow model works similarly to
 TensorRT and ONNX described above. To enable TensorRT optimization you
 must set the model configuration appropriately. For TensorRT
 optimization of TensorFlow models that are several options that you
-can enable, including selection the precision. For example::
+can enable, including selection of the compute precision. For
+example::
 
   optimization { execution_accelerators {
     gpu_execution_accelerator : [ {
