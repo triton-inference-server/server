@@ -250,6 +250,9 @@ class NULLInferRequestProvider : public InferRequestProvider {
 
   // Mutex to guard buf_
   static std::mutex mu_;
+
+  // Record whether an input has been retrieved completely
+  std::unordered_map<std::string, size_t> inputs_remaining_bytes_;
 };
 
 //

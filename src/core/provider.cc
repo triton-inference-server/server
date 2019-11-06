@@ -316,18 +316,36 @@ NULLInferRequestProvider::GetNextInputContent(
   }
 
   if (!GetInputOverrideContent(name, content, content_byte_size)) {
-    std::lock_guard<std::mutex> lock(mu_);
+    auto it = inputs_remaining_bytes_.find(name);
+    if ((it != inputs_remaining_bytes_.end()) && (it->second == 0)) {
+      *content = nullptr;
+      *content_byte_size = 0;
+    } else {
+      // If it is first time requesting the input, the byte size hint will be
+      // used as the expected input byte size.
+      if (it == inputs_remaining_bytes_.end()) {
+        it = inputs_remaining_bytes_.emplace(name, *content_byte_size).first;
+      }
 
-    // Must return content with all zero data. This is required by
-    // string-datatype tensors where it is interpreted as all empty
-    // strings. Clamp the maximum size that we allow the buffer to
-    // grow to avoid massive allocation.
-    if (buf_.size() < *content_byte_size) {
-      constexpr size_t max_size = 16 * 1024 * 1024;
-      buf_.resize(std::min(max_size, *content_byte_size), 0);
+      std::lock_guard<std::mutex> lock(mu_);
+
+      // Must return content with all zero data. This is required by
+      // string-datatype tensors where it is interpreted as all empty
+      // strings. Clamp the maximum size that we allow the buffer to
+      // grow to avoid massive allocation.
+      if (buf_.size() < *content_byte_size) {
+        constexpr size_t max_size = 16 * 1024 * 1024;
+        buf_.resize(std::min(max_size, *content_byte_size), 0);
+      }
+
+      *content = &(buf_[0]);
+
+      // byte size to be returned is the min of actual buffer size,
+      // expected remaining size (content_byte_size), and actual remaining size
+      *content_byte_size =
+          std::min(std::min(buf_.size(), *content_byte_size), it->second);
+      it->second -= *content_byte_size;
     }
-
-    *content = &(buf_[0]);
   }
 
   return Status::Success;
