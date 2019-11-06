@@ -127,15 +127,6 @@ PlanBackend::Context::~Context()
 }
 
 Status
-PlanBackend::Init(const std::string& path, const ModelConfig& config)
-{
-  RETURN_IF_ERROR(ValidateModelConfig(config, kTensorRTPlanPlatform));
-  RETURN_IF_ERROR(SetModelConfig(path, config));
-
-  return Status::Success;
-}
-
-Status
 PlanBackend::CreateExecutionContexts(
     const std::unordered_map<std::string, std::vector<char>>& models)
 {
@@ -247,7 +238,7 @@ PlanBackend::CreateExecutionContext(
   const int profile_index = GetProfileIndex(profile_name);
   contexts_.emplace_back(
       new Context(instance_name, gpu_device, mbs, profile_index));
-  const std::unique_ptr<Context>& context = contexts_.back();
+  Context* context = static_cast<Context*>(contexts_.back().get());
 
   // Set the device before generating engine and context.
   cuerr = cudaSetDevice(gpu_device);
@@ -708,43 +699,6 @@ PlanBackend::Context::InitializeConfigOutputBindings(
   return Status::Success;
 }
 
-void
-PlanBackend::Run(
-    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-    std::function<void(Status)> OnCompleteQueuedPayloads)
-{
-  // Each runner executes using the corresponding context...
-  if (runner_idx >= contexts_.size()) {
-    OnCompleteQueuedPayloads(Status(
-        RequestStatusCode::INTERNAL,
-        "unexpected runner index" + std::to_string(runner_idx) +
-            ", max allowed " + std::to_string(contexts_.size())));
-    return;
-  }
-
-  // Stop queue timer and start compute timer when the payload is
-  // scheduled to run
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeStart);
-      payload.stats_->SetGPUDevice(contexts_[runner_idx]->gpu_device_);
-    }
-  }
-
-  Status status = contexts_[runner_idx]->Run(payloads);
-
-  // Stop compute timers.
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeEnd);
-    }
-  }
-
-  OnCompleteQueuedPayloads(status);
-}
-
 // CUDA 10.1 starts to support CUDA graphs.
 #ifdef TRTIS_ENABLE_CUDA_GRAPH
 bool
@@ -796,7 +750,8 @@ PlanBackend::Context::BuildCudaGraph(const int batch_size)
 #endif
 
 Status
-PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
+PlanBackend::Context::Run(
+    const InferenceBackend* base, std::vector<Scheduler::Payload>* payloads)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
@@ -1033,7 +988,8 @@ operator<<(std::ostream& out, const PlanBackend& pb)
 {
   out << "name=" << pb.Name() << std::endl;
   out << "contexts:" << std::endl;
-  for (const auto& context : pb.contexts_) {
+  for (size_t idx = 0; idx < pb.contexts_.size(); idx++) {
+    auto context = static_cast<PlanBackend::Context*>(pb.contexts_[idx].get());
     out << "  name=" << context->name_ << ", gpu="
         << ((context->gpu_device_ == PlanBackend::Context::NO_GPU_DEVICE)
                 ? "<none>"

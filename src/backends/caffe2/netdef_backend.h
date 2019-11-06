@@ -39,8 +39,6 @@ class NetDefBackend : public InferenceBackend {
   NetDefBackend() = default;
   NetDefBackend(NetDefBackend&&) = default;
 
-  Status Init(const std::string& path, const ModelConfig& config);
-
   // Create a context for execution for each instance for the
   // serialized netdefs specified in 'models'.
   Status CreateExecutionContexts(
@@ -53,12 +51,6 @@ class NetDefBackend : public InferenceBackend {
   Status ValidateSequenceControl(
       const ModelSequenceBatching::Control::Kind control_kind,
       std::vector<std::string>* input_names);
-
-  // Run model on the context associated with 'runner_idx' to
-  // execute for one or more requests.
-  void Run(
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(NetDefBackend);
@@ -86,14 +78,10 @@ class NetDefBackend : public InferenceBackend {
         std::vector<Scheduler::Payload>* payloads,
         std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy);
 
-    // Run model to execute for one or more requests. This function
-    // assumes that it is only called by the single runner thread that
-    // is assigned to this context. A non-OK return status indicates
-    // an internal error that prevents any of the of requests from
-    // completing. If an error is isolate to a single request payload
-    // it will be reported in that payload.
+    // See BackendContext::Run()
     Status Run(
-        const NetDefBackend* base, std::vector<Scheduler::Payload>* payloads);
+        const InferenceBackend* base,
+        std::vector<Scheduler::Payload>* payloads) override;
 
     // Set an input tensor from one or more payloads.
     Status SetFixedSizedInputTensor(
@@ -112,8 +100,6 @@ class NetDefBackend : public InferenceBackend {
     // Caffe2 workspace.
     std::unique_ptr<Caffe2Workspace> workspace_;
   };
-
-  std::vector<std::unique_ptr<Context>> contexts_;
 };
 
 std::ostream& operator<<(std::ostream& out, const NetDefBackend& pb);

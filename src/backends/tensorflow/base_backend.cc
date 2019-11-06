@@ -56,15 +56,18 @@ BaseBackend::Context::~Context()
 }
 
 Status
-BaseBackend::Init(const std::string& path, const ModelConfig& config)
+BaseBackend::Init(
+    const std::string& path, const ModelConfig& model_config,
+    const GraphDefBackendFactory::Config* backend_config,
+    const std::string& platform)
 {
-  RETURN_IF_ERROR(SetModelConfig(path, config));
+  RETURN_IF_ERROR(InferenceBackend::Init(path, model_config, platform));
+  backend_config_ = backend_config;
   return Status::Success;
 }
 
 Status
 BaseBackend::CreateExecutionContexts(
-    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
     const std::unordered_map<std::string, std::string>& paths)
 {
   if (LOG_VERBOSE_IS_ON(1)) {
@@ -82,21 +85,21 @@ BaseBackend::CreateExecutionContexts(
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, Context::NO_GPU_DEVICE, backend_config, paths));
+            instance_name, Context::NO_GPU_DEVICE, paths));
         total_context_cnt++;
       } else if (group.kind() == ModelInstanceGroup::KIND_MODEL) {
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_model_device";
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, Context::MODEL_DEVICE, backend_config, paths));
+            instance_name, Context::MODEL_DEVICE, paths));
         total_context_cnt++;
       } else {
         for (int gpu_device : group.gpus()) {
           const std::string instance_name = group.name() + "_" +
                                             std::to_string(c) + "_gpu" +
                                             std::to_string(gpu_device);
-          RETURN_IF_ERROR(CreateExecutionContext(
-              instance_name, gpu_device, backend_config, paths));
+          RETURN_IF_ERROR(
+              CreateExecutionContext(instance_name, gpu_device, paths));
           total_context_cnt++;
         }
       }
@@ -122,7 +125,6 @@ BaseBackend::CreateExecutionContexts(
 Status
 BaseBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
-    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
     const std::unordered_map<std::string, std::string>& paths)
 {
   // For a GPU context, determine the model file to use for device
@@ -183,12 +185,9 @@ BaseBackend::CreateExecutionContext(
                                                    : Config().max_batch_size();
 
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
-  const std::unique_ptr<Context>& context = contexts_.back();
+  Context* context = static_cast<Context*>(contexts_.back().get());
 
   RETURN_IF_ERROR(context->CreateCudaStream());
-
-  auto graphdef_backend_config =
-      std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
 
   RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
   RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
@@ -293,7 +292,7 @@ BaseBackend::CreateExecutionContext(
   }
 
   RETURN_IF_ERROR(CreateTRTISTFModel(
-      graphdef_backend_config, vgpu_device, Config().optimization().has_graph(),
+      backend_config_, vgpu_device, Config().optimization().has_graph(),
       Config().optimization().graph().level(), gdp_itr->second,
       &context->trtistf_model_, &context->input_name_map_,
       &context->output_name_map_, tftrt_config_ptr));
@@ -353,43 +352,6 @@ BaseBackend::Context::ValidateOutputs(
   }
 
   return Status::Success;
-}
-
-void
-BaseBackend::Run(
-    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-    std::function<void(Status)> OnCompleteQueuedPayloads)
-{
-  // Each runner executes using the corresponding context...
-  if (runner_idx >= contexts_.size()) {
-    OnCompleteQueuedPayloads(Status(
-        RequestStatusCode::INTERNAL,
-        "unexpected runner index" + std::to_string(runner_idx) +
-            ", max allowed " + std::to_string(contexts_.size())));
-    return;
-  }
-
-  // Stop queue timer and start compute timer when the payload is
-  // scheduled to run
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeStart);
-      payload.stats_->SetGPUDevice(contexts_[runner_idx]->gpu_device_);
-    }
-  }
-
-  Status status = contexts_[runner_idx]->Run(this, payloads);
-
-  // Stop compute timers.
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeEnd);
-    }
-  }
-
-  OnCompleteQueuedPayloads(status);
 }
 
 namespace {
@@ -682,7 +644,7 @@ BaseBackend::Context::ReadStringOutputTensor(
 
 Status
 BaseBackend::Context::Run(
-    const BaseBackend* base, std::vector<Scheduler::Payload>* payloads)
+    const InferenceBackend* base, std::vector<Scheduler::Payload>* payloads)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";

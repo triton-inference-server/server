@@ -55,12 +55,6 @@ class CustomBackend : public InferenceBackend {
   // Init model on the context associated with 'runner_idx'.
   Status InitBackend(uint32_t runner_idx);
 
-  // Run model on the context associated with 'runner_idx' to
-  // execute for one or more requests.
-  void RunBackend(
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(Status)> OnCompleteQueuedPayloads);
-
  private:
   DISALLOW_COPY_AND_ASSIGN(CustomBackend);
   friend std::ostream& operator<<(std::ostream&, const CustomBackend&);
@@ -88,13 +82,10 @@ class CustomBackend : public InferenceBackend {
     // Return the shared library reported error string for 'err'.
     std::string LibraryErrorString(const int err);
 
-    // Run model to execute for one or more requests. This function
-    // assumes that it is only called by the single runner thread that
-    // is assigned to this context. A non-OK return status indicates
-    // an internal error that prevents any of the of requests from
-    // completing. If an error is isolate to a single request payload
-    // it will be reported in that payload.
-    Status Run(CustomBackend* base, std::vector<Scheduler::Payload>* payloads);
+    // See BackendContext::Run()
+    Status Run(
+        const InferenceBackend* base,
+        std::vector<Scheduler::Payload>* payloads) override;
 
     struct GetInputOutputContext {
       GetInputOutputContext(
@@ -158,7 +149,6 @@ class CustomBackend : public InferenceBackend {
   };
 
   std::vector<std::string> server_params_;
-  std::vector<std::unique_ptr<Context>> contexts_;
 };
 
 std::ostream& operator<<(std::ostream& out, const CustomBackend& pb);

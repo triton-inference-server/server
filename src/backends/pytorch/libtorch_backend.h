@@ -46,8 +46,6 @@ class LibTorchBackend : public InferenceBackend {
   LibTorchBackend() = default;
   LibTorchBackend(LibTorchBackend&&) = default;
 
-  Status Init(const std::string& path, const ModelConfig& config);
-
   // Create a context for execution for each instance for the
   // serialized .pt models specified in 'paths'.
   Status CreateExecutionContexts(
@@ -57,12 +55,6 @@ class LibTorchBackend : public InferenceBackend {
       const std::unordered_map<std::string, std::string>& paths);
 
  private:
-  // Run model on the context associated with 'runner_idx' to
-  // execute for one or more requests.
-  void Run(
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(Status)> OnCompleteQueuedPayloads);
-
  private:
   DISALLOW_COPY_AND_ASSIGN(LibTorchBackend);
   friend std::ostream& operator<<(std::ostream&, const LibTorchBackend&);
@@ -91,14 +83,10 @@ class LibTorchBackend : public InferenceBackend {
         std::vector<Scheduler::Payload>* payloads, InputMetaData* meta_data,
         bool* cuda_copy);
 
-    // Run model to execute for one or more requests. This function
-    // assumes that it is only called by the single runner thread that
-    // is assigned to this context. A non-OK return status indicates
-    // an internal error that prevents any of the of requests from
-    // completing. If an error is isolate to a single request payload
-    // it will be reported in that payload.
+    // See BackendContext::Run()
     Status Run(
-        const LibTorchBackend* base, std::vector<Scheduler::Payload>* payloads);
+        const InferenceBackend* base,
+        std::vector<Scheduler::Payload>* payloads) override;
 
     // Helper function to set an input buffer from one or more payloads.
     Status SetFixedSizedInputBuffer(
@@ -131,8 +119,6 @@ class LibTorchBackend : public InferenceBackend {
     std::unordered_map<std::string, int> input_index_map_;
     std::unordered_map<std::string, int> output_index_map_;
   };
-
-  std::vector<std::unique_ptr<Context>> contexts_;
 };
 
 std::ostream& operator<<(std::ostream& out, const LibTorchBackend& pb);

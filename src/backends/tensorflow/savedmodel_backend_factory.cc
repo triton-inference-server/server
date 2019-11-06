@@ -75,9 +75,10 @@ SavedModelBackendFactory::CreateBackend(
   }
 
   std::unique_ptr<SavedModelBackend> local_backend(new SavedModelBackend);
-  RETURN_IF_ERROR(local_backend->Init(path, model_config));
-  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(
-      backend_config_, savedmodel_paths));
+  RETURN_IF_ERROR(local_backend->Init(
+      path, model_config, backend_config_.get(),
+      kTensorFlowSavedModelPlatform));
+  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(savedmodel_paths));
 
   *backend = std::move(local_backend);
   return Status::Success;

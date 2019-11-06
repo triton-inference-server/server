@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/core/backend_context.h"
 #include "src/core/label_provider.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
@@ -71,6 +72,10 @@ class InferenceBackend {
     return label_provider_;
   }
 
+  Status Init(
+      const std::string& path, const ModelConfig& config,
+      const std::string& platform);
+
   // Run inference using the provided request to produce outputs in the provide
   // response. The inference will run asynchronously and "OnCompleteHandleInfer"
   // callback will be called once the inference is completed
@@ -81,6 +86,12 @@ class InferenceBackend {
       std::function<void(const Status&)> OnCompleteHandleInfer);
 
  protected:
+  // Run model on the context associated with 'runner_idx' to
+  // execute for one or more requests.
+  virtual void Run(
+      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+      std::function<void(Status)> OnCompleteQueuedPayloads);
+
   // Set the configuration of the model being served.
   Status SetModelConfig(const std::string& path, const ModelConfig& config);
 
@@ -96,6 +107,8 @@ class InferenceBackend {
 
   // Get the raw pointer to the scheduler of this backend.
   Scheduler* BackendScheduler() { return scheduler_.get(); }
+
+  std::vector<std::unique_ptr<BackendContext>> contexts_;
 
  private:
   // Configuration of the model that this backend represents.

@@ -39,8 +39,6 @@ class OnnxBackend : public InferenceBackend {
   OnnxBackend() = default;
   OnnxBackend(OnnxBackend&&) = default;
 
-  Status Init(const std::string& path, const ModelConfig& config);
-
   // Create a context for execution for each instance for the
   // serialized plans specified in 'models'.
   Status CreateExecutionContexts(
@@ -56,12 +54,6 @@ class OnnxBackend : public InferenceBackend {
   Status CreateExecutionContextsHelper(
       OrtSessionOptions* session_options,
       const std::unordered_map<std::string, std::string>& paths);
-
-  // Run model on the context associated with 'runner_idx' to
-  // execute for one or more requests.
-  void Run(
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(OnnxBackend);
@@ -88,14 +80,10 @@ class OnnxBackend : public InferenceBackend {
         const std::string& model_name, const ModelSequenceBatching& batcher,
         const ModelSequenceBatching::Control::Kind control_kind);
 
-    // Run model to execute for one or more requests. This function
-    // assumes that it is only called by the single runner thread that
-    // is assigned to this context. A non-OK return status indicates
-    // an internal error that prevents any of the of requests from
-    // completing. If an error is isolate to a single request payload
-    // it will be reported in that payload.
+    // See BackendContext::Run()
     Status Run(
-        const OnnxBackend* base, std::vector<Scheduler::Payload>* payloads);
+        const InferenceBackend* base,
+        std::vector<Scheduler::Payload>* payloads);
 
     // Set an input tensor from one or more payloads.
     Status SetInputTensor(
@@ -117,7 +105,7 @@ class OnnxBackend : public InferenceBackend {
 
     // Read output tensors into one or more payloads accordingly.
     Status ReadOutputTensors(
-        const OnnxBackend* base, const size_t total_batch_size,
+        const InferenceBackend* base, const size_t total_batch_size,
         const std::vector<const char*>& output_names,
         std::vector<Scheduler::Payload>* payloads);
 
@@ -140,8 +128,6 @@ class OnnxBackend : public InferenceBackend {
     std::vector<OrtValue*> input_tensors_;
     std::vector<OrtValue*> output_tensors_;
   };
-
-  std::vector<std::unique_ptr<Context>> contexts_;
 };
 
 std::ostream& operator<<(std::ostream& out, const OnnxBackend& pb);
