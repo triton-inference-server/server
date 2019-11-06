@@ -161,16 +161,20 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
     input1_byte_size = sum([i1.nbytes for i1 in input1_list])
 
     if output0_dtype == np.object:
-        expected0_list = _prepend_string_size(expected0_list)
+        expected0_list_tmp = _prepend_string_size(expected0_list)
+    else:
+        expected0_list_tmp = expected0_list
     output0_byte_size = sum([e0.nbytes for e0 in expected0_list])
 
     if output1_dtype == np.object:
-        expected1_list = _prepend_string_size(expected1_list)
+        expected1_list_tmp = _prepend_string_size(expected1_list)
+    else:
+        expected1_list_tmp = expected1_list
     output1_byte_size = sum([e1.nbytes for e1 in expected1_list])
 
     if TEST_CUDA_SHARED_MEMORY or TEST_SYSTEM_SHARED_MEMORY:
-        shm_handles = su.create_register_set_shm_regions(input0_list, input1_list, expected0_list, \
-                                        expected1_list, outputs, shm_region_names, precreated_shm_regions)
+        shm_handles = su.create_register_set_shm_regions(input0_list, input1_list, expected0_list_tmp, \
+                                        expected1_list_tmp, outputs, shm_region_names, precreated_shm_regions)
     for config in configs:
         model_name = tu.get_model_name(pf, input_dtype, output0_dtype, output1_dtype)
 
@@ -288,9 +292,9 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
     if use_http:
         configs.append(("localhost:8000", ProtocolType.HTTP, False))
     if use_grpc:
-        configs.append(("localhost:8000", ProtocolType.GRPC, False))
+        configs.append(("localhost:8001", ProtocolType.GRPC, False))
     if use_streaming:
-        configs.append(("localhost:8000", ProtocolType.GRPC, True))
+        configs.append(("localhost:8001", ProtocolType.GRPC, True))
     tester.assertEqual(len(input_shapes), len(output_shapes))
     io_cnt = len(input_shapes)
 

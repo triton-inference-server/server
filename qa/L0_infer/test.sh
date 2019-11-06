@@ -42,7 +42,7 @@ DATADIR=`pwd`/models
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 # Allow more time to exit. Ensemble brings in too many models
-SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --log-verbose=1"
+SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 
@@ -68,7 +68,7 @@ for TARGET in cpu gpu; do
         fi
         # set strict readiness=false on CPU-only device to allow
         # unsuccessful load of TensorRT plans, which require GPU.
-        SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --strict-readiness=false --exit-on-error=false --log-verbose=1"
+        SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --strict-readiness=false --exit-on-error=false"
     fi
 
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log
