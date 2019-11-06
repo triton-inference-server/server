@@ -230,6 +230,8 @@ required the minimal model repository would look like::
         model.savedmodel/
            <saved-model files>
 
+.. _section-tensorrt-tensorflow-models:
+
 TensorRT/TensorFlow Models
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -245,6 +247,12 @@ A TensorRT/TensorFlow integrated model is specific to CUDA Compute
 Capability and so it is typically necessary to use the :ref:`model
 configuration's <section-model-configuration>` *cc_model_filenames*
 property as described above.
+
+As an alternative to creating a TensorRT/TensorFlow model *offline* it
+is possible to use model configuration settings to have the TensorRT
+optimization performed dynamically, when the model is first loaded or
+in response to inference requests. See
+:ref:`section-optimization-policy-tensorrt` for more information.
 
 .. _section-onnx-models:
 
@@ -269,7 +277,9 @@ execution of models on GPU the default CUDA execution provider uses
 CuDNN to accelerate inference. The model configuration
 :ref:`section-optimization-policy` allows you to select the *tensorrt*
 execution provider for GPU which causes the ONNX Runtime to use
-TensorRT to accelerate all or part of the model.
+TensorRT to accelerate all or part of the model. See
+:ref:`section-optimization-policy-tensorrt` for more information on
+the *tensorrt* execution provider.
 
 A minimal model repository for a single ONNX model would look like::
 

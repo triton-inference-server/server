@@ -17,9 +17,3 @@ output [
     label_filename: "resnet50_labels.txt"
   }
 ]
-instance_group [
-  {
-    kind: KIND_GPU,
-    count: 4
-  }
-]
