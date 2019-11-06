@@ -72,7 +72,8 @@ NetDefBackendFactory::CreateBackend(
   // Create the backend for the model and all the execution contexts
   // requested for this model.
   std::unique_ptr<NetDefBackend> local_backend(new NetDefBackend);
-  RETURN_IF_ERROR(local_backend->Init(path, model_config));
+  RETURN_IF_ERROR(
+      local_backend->Init(path, model_config, kCaffe2NetDefPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
 
   *backend = std::move(local_backend);

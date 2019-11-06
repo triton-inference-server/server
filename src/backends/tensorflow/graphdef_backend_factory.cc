@@ -75,9 +75,9 @@ GraphDefBackendFactory::CreateBackend(
   }
 
   std::unique_ptr<GraphDefBackend> local_backend(new GraphDefBackend);
-  RETURN_IF_ERROR(local_backend->Init(path, model_config));
-  RETURN_IF_ERROR(
-      local_backend->CreateExecutionContexts(backend_config_, graphdef_paths));
+  RETURN_IF_ERROR(local_backend->Init(
+      path, model_config, backend_config_.get(), kTensorFlowGraphDefPlatform));
+  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(graphdef_paths));
 
   *backend = std::move(local_backend);
   return Status::Success;

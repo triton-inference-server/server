@@ -37,17 +37,9 @@
 namespace nvidia { namespace inferenceserver {
 
 Status
-GraphDefBackend::Init(const std::string& path, const ModelConfig& config)
-{
-  RETURN_IF_ERROR(ValidateModelConfig(config, kTensorFlowGraphDefPlatform));
-  RETURN_IF_ERROR(BaseBackend::Init(path, config));
-  return Status::Success;
-}
-
-Status
 GraphDefBackend::CreateTRTISTFModel(
-    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
-    const int device_id, const bool has_graph_level, const int graph_level,
+    const GraphDefBackendFactory::Config* backend_config, const int device_id,
+    const bool has_graph_level, const int graph_level,
     const std::string& model_path, TRTISTFModelHandle* trtistf_model,
     IONameMap* input_name_map, IONameMap* output_name_map,
     const TRTISTF_TFTRTConfig* tftrt_config)

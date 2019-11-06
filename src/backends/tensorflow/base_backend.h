@@ -41,17 +41,18 @@ class BaseBackend : public InferenceBackend {
   BaseBackend() = default;
   BaseBackend(BaseBackend&&) = default;
 
-  Status Init(const std::string& path, const ModelConfig& config);
+  Status Init(
+      const std::string& path, const ModelConfig& model_config,
+      const GraphDefBackendFactory::Config* backend_config,
+      const std::string& platform);
 
   // Create a context for execution for each instance of the
   // tensorflow model specified in 'paths'. The model can be either a
   // graphdef or savedmodel
   Status CreateExecutionContexts(
-      const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
       const std::unordered_map<std::string, std::string>& paths);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
-      const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
       const std::unordered_map<std::string, std::string>& paths);
 
  protected:
@@ -61,7 +62,7 @@ class BaseBackend : public InferenceBackend {
 
   // Load model and create a corresponding TRTISTF model object.
   virtual Status CreateTRTISTFModel(
-      const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
+      const GraphDefBackendFactory::Config* backend_config,
       const int gpu_device, const bool has_graph_level, const int graph_level,
       const std::string& model_path, TRTISTFModelHandle* trtistf_model,
       IONameMap* input_name_map, IONameMap* output_name_map,
@@ -123,8 +124,10 @@ class BaseBackend : public InferenceBackend {
     // an internal error that prevents any of the of requests from
     // completing. If an error is isolate to a single request payload
     // it will be reported in that payload.
+    // See BackendContext::Run()
     Status Run(
-        const BaseBackend* base, std::vector<Scheduler::Payload>* payloads);
+        const InferenceBackend* base,
+        std::vector<Scheduler::Payload>* payloads) override;
 
     // Map from configuration name for an input to tensor name for
     // that input in the model.
@@ -142,18 +145,10 @@ class BaseBackend : public InferenceBackend {
   };
 
  private:
-  // Run model on the context associated with 'runner_idx' to
-  // execute for one or more requests.
-  void Run(
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(Status)> OnCompleteQueuedPayloads);
-
- private:
   DISALLOW_COPY_AND_ASSIGN(BaseBackend);
   friend std::ostream& operator<<(std::ostream&, const BaseBackend&);
 
-  // The contexts for this backend.
-  std::vector<std::unique_ptr<Context>> contexts_;
+  const GraphDefBackendFactory::Config* backend_config_;
 };
 
 std::ostream& operator<<(std::ostream& out, const BaseBackend& pb);

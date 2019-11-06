@@ -130,6 +130,17 @@ InferenceBackend::SetConfiguredScheduler(
   return SetScheduler(std::move(scheduler));
 }
 
+Status
+InferenceBackend::Init(
+    const std::string& path, const ModelConfig& config,
+    const std::string& platform)
+{
+  RETURN_IF_ERROR(ValidateModelConfig(config, platform));
+  RETURN_IF_ERROR(SetModelConfig(path, config));
+
+  return Status::Success;
+}
+
 void
 InferenceBackend::Run(
     const std::shared_ptr<ModelInferStats>& stats,
@@ -139,6 +150,43 @@ InferenceBackend::Run(
 {
   scheduler_->Enqueue(
       stats, request_provider, response_provider, OnCompleteHandleInfer);
+}
+
+void
+InferenceBackend::Run(
+    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+    std::function<void(Status)> OnCompleteQueuedPayloads)
+{
+  // Each runner executes using the corresponding context...
+  if (runner_idx >= contexts_.size()) {
+    OnCompleteQueuedPayloads(Status(
+        RequestStatusCode::INTERNAL,
+        "unexpected runner index" + std::to_string(runner_idx) +
+            ", max allowed " + std::to_string(contexts_.size())));
+    return;
+  }
+
+  // Stop queue timer and start compute timer when the payload is
+  // scheduled to run
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeStart);
+      payload.stats_->SetGPUDevice(contexts_[runner_idx]->gpu_device_);
+    }
+  }
+
+  Status status = contexts_[runner_idx]->Run(this, payloads);
+
+  // Stop compute timers.
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeEnd);
+    }
+  }
+
+  OnCompleteQueuedPayloads(status);
 }
 
 }}  // namespace nvidia::inferenceserver

@@ -71,7 +71,8 @@ LibTorchBackendFactory::CreateBackend(
   // Create the backend for the model and all the execution contexts
   // requested for this model.
   std::unique_ptr<LibTorchBackend> local_backend(new LibTorchBackend);
-  RETURN_IF_ERROR(local_backend->Init(path, model_config));
+  RETURN_IF_ERROR(
+      local_backend->Init(path, model_config, kPyTorchLibTorchPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(torch_models));
 
   *backend = std::move(local_backend);
