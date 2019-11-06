@@ -33,33 +33,45 @@ source ../common/util.sh
 
 RET=0
 
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-SERVER_LOG="./$MODEL_DIR.serverlog"
-rm -f $SERVER_LOG
-rm -f $CLIENT_LOG
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+for i in \
+        test_invalid_create_shm \
+        test_valid_create_set_register \
+        test_unregister_before_register \
+        test_unregister_after_register \
+        test_reregister_after_register \
+        test_unregister_during_inference \
+        test_register_during_inference \
+        test_too_big_shm \
+        test_mixed_raw_shm \
+        test_unregisterall; do
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+    SERVER_LOG="./$i.serverlog"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-set +e
-python $SHM_TEST >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-set -e
+    echo "Test: $i" >>$CLIENT_LOG
 
-kill $SERVER_PID
-wait $SERVER_PID
+    set +e
+    python $SHM_TEST CudaSharedMemoryTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
     cat $CLIENT_LOG
-    echo -e "\n***\n*** Test FAILED\n***"
+    echo -e "\n***\n*** Test Failed\n***"
 fi
 
 exit $RET
