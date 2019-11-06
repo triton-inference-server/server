@@ -117,7 +117,7 @@ for t in threads:
 if len(error_msg) > 1:
     raise Exception(error_msg[-1])
 
-# Shared memory region larger than needed - Throws error
+# Shared memory input region larger than needed - Throws error
 basic_inference(shm_ip0_handle, shm_ip2_handle, shm_op0_handle, shm_op1_handle, error_msg)
 if len(error_msg) > 1:
     if error_msg[-1] != "The input 'INPUT1' has shared memory of size 128 bytes"\
