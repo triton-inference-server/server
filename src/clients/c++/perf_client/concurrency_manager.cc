@@ -39,9 +39,10 @@ ConcurrencyManager::~ConcurrencyManager()
   size_t cnt = 0;
   for (auto& thread : threads_) {
     thread.join();
-    if (!threads_status_[cnt]->IsOk()) {
+    if (!threads_data_[cnt]->status_.IsOk()) {
       std::cerr << "Thread [" << cnt
-                << "] had error: " << *(threads_status_[cnt]) << std::endl;
+                << "] had error: " << (threads_data_[cnt]->status_)
+                << std::endl;
     }
     cnt++;
   }
@@ -49,16 +50,18 @@ ConcurrencyManager::~ConcurrencyManager()
 
 nic::Error
 ConcurrencyManager::Create(
-    const int32_t batch_size, const size_t max_threads,
-    const size_t sequence_length, const size_t string_length,
-    const std::string& string_data, const bool zero_input,
+    const bool async, const int32_t batch_size, const size_t max_threads,
+    const size_t max_concurrency, const size_t sequence_length,
+    const size_t string_length, const std::string& string_data,
+    const bool zero_input,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     const std::string& data_directory,
     const std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<ConcurrencyManager> local_manager(new ConcurrencyManager(
-      input_shapes, batch_size, max_threads, sequence_length, factory));
+      async, input_shapes, batch_size, max_threads, max_concurrency,
+      sequence_length, factory));
 
   std::unique_ptr<nic::InferContext> ctx;
   RETURN_IF_ERROR(local_manager->factory_->CreateInferContext(&ctx));
@@ -190,21 +193,23 @@ ConcurrencyManager::Create(
     }
   }
 
+  // Reserve the required vector space
+  local_manager->threads_data_.reserve(max_threads);
 
   *manager = std::move(local_manager);
   return nic::Error::Success;
 }
 
 ConcurrencyManager::ConcurrencyManager(
+    const bool async,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     const int32_t batch_size, const size_t max_threads,
-    const size_t sequence_length,
+    const size_t max_concurrency, const size_t sequence_length,
     const std::shared_ptr<ContextFactory>& factory)
-    : batch_size_(batch_size), max_threads_(max_threads),
-      sequence_length_(sequence_length), factory_(factory),
-      input_shapes_(input_shapes)
+    : async_(async), batch_size_(batch_size), max_threads_(max_threads),
+      max_concurrency_(max_concurrency), sequence_length_(sequence_length),
+      factory_(factory), input_shapes_(input_shapes)
 {
-  request_timestamps_.reset(new TimestampVector());
   on_sequence_model_ =
       ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
        (factory_->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE));
@@ -218,11 +223,7 @@ ConcurrencyManager::ChangeConcurrencyLevel(
   while ((concurrent_request_count > threads_.size()) &&
          (threads_.size() < max_threads_)) {
     // Launch new thread for inferencing
-    threads_status_.emplace_back(
-        new nic::Error(ni::RequestStatusCode::SUCCESS));
-    threads_contexts_stat_.emplace_back(
-        new std::vector<nic::InferContext::Stat>());
-    threads_concurrency_.emplace_back(new size_t(0));
+    threads_data_.emplace_back(new ThreadData());
 
     // Worker maintains concurrency in different ways.
     // For sequence models, multiple contexts must be created for multiple
@@ -230,17 +231,19 @@ ConcurrencyManager::ChangeConcurrencyLevel(
     // For non-sequence models, one context can send out multiple requests
     // at the same time. Thus it uses one single context as every infer context
     // creates a worker thread implicitly.
+    // While operating in synchronous mode, each context can send only one
+    // request at a time, hence the number of worker threads should be equal to
+    // the requested concurrency levels.
     threads_.emplace_back(
-        &ConcurrencyManager::AsyncInfer, this, threads_status_.back(),
-        threads_contexts_stat_.back(), threads_concurrency_.back());
+        &ConcurrencyManager::Infer, this, threads_data_.back());
   }
 
   // Compute the new concurrency level for each thread (take floor)
   // and spread the remaining value
   size_t avg_concurrency = concurrent_request_count / threads_.size();
   size_t threads_add_one = concurrent_request_count % threads_.size();
-  for (size_t i = 0; i < threads_concurrency_.size(); i++) {
-    *(threads_concurrency_[i]) =
+  for (size_t i = 0; i < threads_data_.size(); i++) {
+    threads_data_[i]->concurrency_ =
         avg_concurrency + (i < threads_add_one ? 1 : 0);
   }
 
@@ -259,8 +262,8 @@ ConcurrencyManager::CheckHealth()
   // If some thread return early, main thread will return and
   // the worker thread's error message will be reported
   // when ConcurrencyManager's destructor get called.
-  for (auto& thread_status : threads_status_) {
-    if (!thread_status->IsOk()) {
+  for (auto& thread_data : threads_data_) {
+    if (!thread_data->status_.IsOk()) {
       return nic::Error(
           ni::RequestStatusCode::INTERNAL,
           "Failed to maintain concurrency level requested."
@@ -273,9 +276,17 @@ ConcurrencyManager::CheckHealth()
 nic::Error
 ConcurrencyManager::SwapTimestamps(TimestampVector& new_timestamps)
 {
-  // Get the requests in the shared vector
-  std::lock_guard<std::mutex> lock(status_report_mutex_);
-  request_timestamps_->swap(new_timestamps);
+  TimestampVector total_timestamp;
+  // Gather request timestamps with proper locking from all the worker threads
+  for (auto& thread_data : threads_data_) {
+    std::lock_guard<std::mutex> lock(thread_data->mu_);
+    total_timestamp.insert(
+        total_timestamp.end(), thread_data->request_timestamps_.begin(),
+        thread_data->request_timestamps_.end());
+    thread_data->request_timestamps_.clear();
+  }
+  // Swap the results
+  total_timestamp.swap(new_timestamps);
   return nic::Error::Success;
 }
 
@@ -432,9 +443,9 @@ nic::Error
 ConcurrencyManager::GetAccumulatedContextStat(
     nic::InferContext::Stat* contexts_stat)
 {
-  std::lock_guard<std::mutex> lk(status_report_mutex_);
-  for (auto& thread_contexts_stat : threads_contexts_stat_) {
-    for (auto& context_stat : (*thread_contexts_stat)) {
+  for (auto& thread_data : threads_data_) {
+    std::lock_guard<std::mutex> lock(thread_data->mu_);
+    for (auto& context_stat : thread_data->contexts_stat_) {
       contexts_stat->completed_request_count +=
           context_stat.completed_request_count;
       contexts_stat->cumulative_total_request_time_ns +=
@@ -454,16 +465,20 @@ ConcurrencyManager::GetAccumulatedContextStat(
 // If the model is sequence model, each worker has to use multiples contexts
 // to maintain (sequence) concurrency assigned to worker.
 void
-ConcurrencyManager::AsyncInfer(
-    std::shared_ptr<nic::Error> err,
-    std::shared_ptr<std::vector<nic::InferContext::Stat>> stats,
-    std::shared_ptr<size_t> concurrency)
+ConcurrencyManager::Infer(std::shared_ptr<ThreadData> thread_data)
 {
   std::vector<std::unique_ptr<InferContextMetaData>> ctxs;
 
+  // Reserve the vectors in case of sequence models. In non-sequence or
+  // synchronous mode only one context will be opened hence no need of
+  // reserving.
+  if (on_sequence_model_ && async_) {
+    thread_data->contexts_stat_.reserve(max_concurrency_);
+    ctxs.reserve(max_concurrency_);
+  }
+
   // Variable that can be used across InferContexts
   std::unique_ptr<nic::InferContext::Options> options(nullptr);
-  std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
 
   // Variable used to signal request completion
   bool notified = false;
@@ -473,23 +488,24 @@ ConcurrencyManager::AsyncInfer(
   // run inferencing until receiving exit signal to maintain server load.
   do {
     // Only interact with synchronous mechanism if the worker should wait
-    if (*concurrency == 0) {
+    if (thread_data->concurrency_ == 0) {
       // Wait if no request should be sent and it is not exiting
       std::unique_lock<std::mutex> lock(wake_mutex_);
-      wake_signal_.wait(
-          lock, [concurrency]() { return early_exit || (*concurrency > 0); });
+      wake_signal_.wait(lock, [&thread_data]() {
+        return early_exit || (thread_data->concurrency_ > 0);
+      });
     }
 
-    size_t num_reqs = *concurrency;
+    size_t num_reqs = thread_data->concurrency_;
     // If the model is non-sequence model, use one InferContext to maintain
     // concurrency for this thread
     size_t active_ctx_cnt = on_sequence_model_ ? num_reqs : 1;
     // Create the context for inference of the specified model.
     while (active_ctx_cnt > ctxs.size()) {
       ctxs.emplace_back(new InferContextMetaData());
-      stats->emplace_back();
-      *err = PrepareInfer(&(ctxs.back()->ctx_), &options);
-      if (!err->IsOk()) {
+      thread_data->contexts_stat_.emplace_back();
+      thread_data->status_ = PrepareInfer(&(ctxs.back()->ctx_), &options);
+      if (!thread_data->status_.IsOk()) {
         return;
       }
     }
@@ -506,14 +522,14 @@ ConcurrencyManager::AsyncInfer(
             ctxs[idx]->inflight_request_cnt_ == 0 ? GetRandomLength(0.2) : 0;
       }
 
-      auto& inflight_request_cnt = ctxs[idx]->inflight_request_cnt_;
-      for (; inflight_request_cnt < num_reqs; inflight_request_cnt++) {
+      auto& request_cnt = ctxs[idx]->inflight_request_cnt_;
+      while (request_cnt < num_reqs) {
         uint32_t flags = 0;
         if (on_sequence_model_) {
-          if (inflight_request_cnt == 0) {
+          if (request_cnt == 0) {
             flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;
           }
-          if (inflight_request_cnt == (num_reqs - 1)) {
+          if (request_cnt == (num_reqs - 1)) {
             flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
           }
           options->SetFlag(
@@ -524,93 +540,92 @@ ConcurrencyManager::AsyncInfer(
               flags & ni::InferRequestHeader::FLAG_SEQUENCE_END);
           ctxs[idx]->ctx_->SetRunOptions(*options);
         }
-        struct timespec start_time;
-        clock_gettime(CLOCK_MONOTONIC, &start_time);
-        *err = ctxs[idx]->ctx_->AsyncRun(
-            [&notified, &cb_mtx, &cb_cv, &ctxs, start_time, flags, idx](
-                nic::InferContext* ctx,
-                std::shared_ptr<nic::InferContext::Request> request) {
-              {
-                std::lock_guard<std::mutex> lk(ctxs[idx]->mtx_);
-                ctxs[idx]->completed_requests_.emplace_back(
-                    std::move(request), start_time, flags);
-              }
-
-              // avoid competition over 'cb_mtx'
-              if (!notified) {
+        if (async_) {
+          struct timespec start_time_async;
+          clock_gettime(CLOCK_MONOTONIC, &start_time_async);
+          thread_data->status_ = ctxs[idx]->ctx_->AsyncRun(
+              [&notified, &cb_mtx, &cb_cv, &ctxs, &thread_data,
+               start_time_async, flags, idx](
+                  nic::InferContext* ctx,
+                  std::shared_ptr<nic::InferContext::Request> request) {
+                std::map<
+                    std::string, std::unique_ptr<nic::InferContext::Result>>
+                    results;
+                ctxs[idx]->ctx_->GetAsyncRunResults(request, &results);
+                struct timespec end_time_async;
+                clock_gettime(CLOCK_MONOTONIC, &end_time_async);
                 {
-                  std::lock_guard<std::mutex> lk(cb_mtx);
-                  notified = true;
+                  // Add the request timestamp to thread Timestamp vector with
+                  // proper locking
+                  std::lock_guard<std::mutex> lock(thread_data->mu_);
+                  thread_data->request_timestamps_.emplace_back(
+                      std::make_tuple(start_time_async, end_time_async, flags));
+                  ctxs[idx]->ctx_->GetStat(&(thread_data->contexts_stat_[idx]));
                 }
-                cb_cv.notify_all();
-              }
-            });
-        if (!err->IsOk()) {
-          return;
-        }
-      }
-    }
-
-    // wait for signal from callback that there is completed request,
-    // and then record the end time of the request
-    {
-      std::unique_lock<std::mutex> lk(cb_mtx);
-      cb_cv.wait(lk, [&notified] {
-        if (notified) {
-          notified = false;
-          return true;
-        }
-        return false;
-      });
-    }
-
-    for (size_t idx = 0; idx < ctxs.size(); idx++) {
-      if (ctxs[idx]->inflight_request_cnt_ > 0) {
-        std::vector<RequestMetaData> swap_vector;
-        {
-          std::lock_guard<std::mutex> lk(ctxs[idx]->mtx_);
-          swap_vector.swap(ctxs[idx]->completed_requests_);
-        }
-        for (const auto& request : swap_vector) {
-          *err =
-              ctxs[idx]->ctx_->GetAsyncRunResults(request.request_, &results);
-          if (!err->IsOk()) {
+                ctxs[idx]->inflight_request_cnt_--;
+                // avoid competition over 'cb_mtx'
+                if (!notified) {
+                  {
+                    std::lock_guard<std::mutex> lk(cb_mtx);
+                    notified = true;
+                  }
+                  cb_cv.notify_all();
+                }
+              });
+          if (!thread_data->status_.IsOk()) {
             return;
           }
-
-          struct timespec end_time;
-          clock_gettime(CLOCK_MONOTONIC, &end_time);
-          struct timespec start_time = request.start_time_;
-          uint32_t flags = request.flags_;
-
-          ctxs[idx]->inflight_request_cnt_--;
-
-          {
-            // Add the request timestamp to shared vector with proper locking
-            std::lock_guard<std::mutex> lk(status_report_mutex_);
-            request_timestamps_->emplace_back(
-                std::make_tuple(start_time, end_time, flags));
-            ctxs[idx]->ctx_->GetStat(&((*stats)[idx]));
+          ctxs[idx]->inflight_request_cnt_++;
+        } else {
+          std::map<std::string, std::unique_ptr<nic::InferContext::Result>>
+              results;
+          struct timespec start_time_sync, end_time_sync;
+          clock_gettime(CLOCK_MONOTONIC, &start_time_sync);
+          thread_data->status_ = ctxs[idx]->ctx_->Run(&results);
+          if (!thread_data->status_.IsOk()) {
+            return;
           }
+          clock_gettime(CLOCK_MONOTONIC, &end_time_sync);
+          {
+            // Add the request timestamp to thread Timestamp vector with proper
+            // locking
+            std::lock_guard<std::mutex> lock(thread_data->mu_);
+            thread_data->request_timestamps_.emplace_back(
+                std::make_tuple(start_time_sync, end_time_sync, flags));
+            ctxs[idx]->ctx_->GetStat(&(thread_data->contexts_stat_[idx]));
+          }
+          request_cnt++;
         }
       }
     }
 
-    // Stop inferencing and wait for all callbacks are invoked
-    // if an early exit has been signaled, in case of referencing on
-    // released resources in the callback function.
+    if (async_) {
+      {
+        // If async, then wait for signal from callback.
+        std::unique_lock<std::mutex> lk(cb_mtx);
+        cb_cv.wait(lk, [&notified] {
+          if (notified) {
+            notified = false;
+            return true;
+          }
+          return false;
+        });
+      }
+    } else {
+      // If synchronous, then all the requests have already been completed.
+      for (size_t idx = 0; idx < ctxs.size(); idx++) {
+        ctxs[idx]->inflight_request_cnt_ = 0;
+      }
+    }
+
     if (early_exit) {
-      for (auto& ctx : ctxs) {
-        // Loop to ensure all the inflight requests have been completed.
-        while (ctx->inflight_request_cnt_ != 0) {
-          // lock on ctx's mutex so that the 'completed_requests' is
-          // synchronized
-          std::unique_lock<std::mutex> lk(ctx->mtx_);
-          cb_cv.wait_for(lk, std::chrono::milliseconds(500), [&ctx] {
-            ctx->inflight_request_cnt_ -= ctx->completed_requests_.size();
-            ctx->completed_requests_.clear();
-            return (ctx->inflight_request_cnt_ == 0);
-          });
+      if (async_) {
+        // Wait for all callbacks to complete.
+        for (auto& ctx : ctxs) {
+          // Loop to ensure all the inflight requests have been completed.
+          while (ctx->inflight_request_cnt_ != 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+          }
         }
       }
       // end loop
