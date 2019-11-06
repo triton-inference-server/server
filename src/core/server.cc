@@ -39,6 +39,7 @@
 #include "src/core/api.pb.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
+#include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
@@ -130,6 +131,12 @@ InferenceServer::Init()
   if (!status.IsOk()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
     return status;
+  }
+
+  status = EnablePeerAccess();
+  if (!status.IsOk()) {
+    // failed to enable peer access is not critical, just inefficient.
+    LOG_ERROR << status.Message();
   }
 
   // Create the model manager for the repository. Unless model control
