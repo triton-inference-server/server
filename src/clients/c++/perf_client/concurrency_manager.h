@@ -55,17 +55,21 @@ class ConcurrencyManager : public LoadManager {
 
   /// Create a concurrency manager that is responsible to maintain specified
   /// load on inference server.
+  /// \param async Whether to use asynchronous or synchronous API for infer
+  /// request.
   /// \param batch_size The batch size used for each request.
   /// \param max_threads The maximum number of working threads to be spawned.
+  /// \param max_concurrency The maximum concurrency which will be requested.
   /// \param sequence_length The base length of each sequence.
   /// \param zero_input Whether to fill the input tensors with zero.
   /// \param factory The ContextFactory object used to create InferContext.
-  /// \param manger Returns a new ConcurrencyManager object.
+  /// \param manager Returns a new ConcurrencyManager object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
-      const int32_t batch_size, const size_t max_threads,
-      const size_t sequence_length, const size_t string_length,
-      const std::string& string_data, const bool zero_input,
+      const bool async, const int32_t batch_size, const size_t max_threads,
+      const size_t max_concurrency, const size_t sequence_length,
+      const size_t string_length, const std::string& string_data,
+      const bool zero_input,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       const std::string& data_directory,
       const std::shared_ptr<ContextFactory>& factory,
@@ -108,28 +112,36 @@ class ConcurrencyManager : public LoadManager {
     InferContextMetaData(const InferContextMetaData&) = delete;
 
     std::unique_ptr<nic::InferContext> ctx_;
-    size_t inflight_request_cnt_;
-    // mutex to guard 'completed_requests_' which will be acessed by
-    // both the main thread and callback thread
-    std::mutex mtx_;
-    std::vector<RequestMetaData> completed_requests_;
+    std::atomic<size_t> inflight_request_cnt_;
   };
 
  private:
+  struct ThreadData {
+    // The status of the worker thread
+    nic::Error status_;
+    // The statistics of the InferContext
+    std::vector<nic::InferContext::Stat> contexts_stat_;
+    //  The concurrency level that the worker should produce
+    size_t concurrency_;
+    // A vector of request timestamps <start_time, end_time>
+    // Request latency will be end_time - start_time
+    TimestampVector request_timestamps_;
+    // A lock to protect thread data
+    std::mutex mu_;
+
+    ThreadData() : status_(ni::RequestStatusCode::SUCCESS), concurrency_(0) {}
+  };
+
   ConcurrencyManager(
+      const bool async,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       const int32_t batch_size, const size_t max_threads,
-      const size_t sequence_length,
+      const size_t max_concurrency, const size_t sequence_length,
       const std::shared_ptr<ContextFactory>& factory);
 
-  /// Function for worker that sends async inference requests.
-  /// \param err Returns the status of the worker
-  /// \param stats Returns the statistic of the InferContexts
-  /// \param concurrency The concurrency level that the worker should produce.
-  void AsyncInfer(
-      std::shared_ptr<nic::Error> err,
-      std::shared_ptr<std::vector<nic::InferContext::Stat>> stats,
-      std::shared_ptr<size_t> concurrency);
+  /// Function for worker that sends inference requests.
+  /// \param thread_data Worker thread specific data.
+  void Infer(std::shared_ptr<ThreadData> thread_data);
 
   /// Helper function to prepare the InferContext for sending inference request.
   /// \param ctx Returns a new InferContext.
@@ -144,8 +156,11 @@ class ConcurrencyManager : public LoadManager {
   /// \return random sequence length
   size_t GetRandomLength(double offset_ratio);
 
+  bool async_;
+
   size_t batch_size_;
   size_t max_threads_;
+  size_t max_concurrency_;
   size_t sequence_length_;
 
   bool on_sequence_model_;
@@ -168,21 +183,11 @@ class ConcurrencyManager : public LoadManager {
 
   // Note: early_exit signal is kept global
   std::vector<std::thread> threads_;
-  std::vector<std::shared_ptr<nic::Error>> threads_status_;
-  std::vector<std::shared_ptr<std::vector<nic::InferContext::Stat>>>
-      threads_contexts_stat_;
-  std::vector<std::shared_ptr<size_t>> threads_concurrency_;
+  std::vector<std::shared_ptr<ThreadData>> threads_data_;
 
   // Use condition variable to pause/continue worker threads
   std::condition_variable wake_signal_;
   std::mutex wake_mutex_;
-
-  // Pointer to a vector of request timestamps <start_time, end_time>
-  // Request latency will be end_time - start_time
-  std::shared_ptr<TimestampVector> request_timestamps_;
-  // Mutex to avoid race condition on adding elements into the timestamp vector
-  // and on updating context statistic.
-  std::mutex status_report_mutex_;
 };
 
 }  // namespace perfclient
