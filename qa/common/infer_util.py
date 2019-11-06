@@ -286,95 +286,88 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
-        if TEST_CUDA_SHARED_MEMORY:
-            configs.append(("localhost:8000", ProtocolType.HTTP, False, False, True))
-        else:
-            configs.append(("localhost:8000", ProtocolType.HTTP, False, TEST_SYSTEM_SHARED_MEMORY, False))
+        configs.append(("localhost:8000", ProtocolType.HTTP, False))
     if use_grpc:
-        if TEST_CUDA_SHARED_MEMORY:
-            configs.append(("localhost:8000", ProtocolType.GRPC, False, False, True))
-        else:
-            configs.append(("localhost:8000", ProtocolType.GRPC, False, TEST_SYSTEM_SHARED_MEMORY, False))
+        configs.append(("localhost:8000", ProtocolType.GRPC, False))
     if use_streaming:
-        if TEST_CUDA_SHARED_MEMORY:
-            configs.append(("localhost:8000", ProtocolType.GRPC, True, False, True))
-        else:
-            configs.append(("localhost:8000", ProtocolType.GRPC, True, TEST_SYSTEM_SHARED_MEMORY, False))
+        configs.append(("localhost:8000", ProtocolType.GRPC, True))
     tester.assertEqual(len(input_shapes), len(output_shapes))
     io_cnt = len(input_shapes)
 
+    if TEST_CUDA_SHARED_MEMORY and TEST_SYSTEM_SHARED_MEMORY:
+        raise ValueError("Cannot set both System and CUDA shared memory flags to 1")
+
+    input_dict = {}
+    output_dict = {}
+    expected_dict = {}
+    shm_ip_handles = list()
+    shm_op_handles = list()
+    shared_memory_ctx = SharedMemoryControlContext("localhost:8000",  ProtocolType.HTTP, verbose=False)
+
+    for io_num in range(io_cnt):
+        if pf == "libtorch" or pf == "libtorch_nobatch":
+            input_name = "INPUT__{}".format(io_num)
+            output_name = "OUTPUT__{}".format(io_num)
+        else:
+            input_name = "INPUT{}".format(io_num)
+            output_name = "OUTPUT{}".format(io_num)
+
+        input_list = list()
+        expected_list = list()
+        for b in range(batch_size):
+            rtensor_dtype = _range_repr_dtype(tensor_dtype)
+            in0 = np.random.randint(low=np.iinfo(rtensor_dtype).min,
+                                    high=np.iinfo(rtensor_dtype).max,
+                                    size=input_shapes[io_num], dtype=rtensor_dtype)
+            if tensor_dtype != np.object:
+                in0 = in0.astype(tensor_dtype)
+                expected0 = np.ndarray.copy(in0)
+            else:
+                expected0 = np.array([unicode(str(x), encoding='utf-8')
+                                for x in in0.flatten()], dtype=object)
+                in0 = np.array([str(x) for x in in0.flatten()],
+                                dtype=object).reshape(in0.shape)
+
+            expected0 = expected0.reshape(output_shapes[io_num])
+
+            input_list.append(in0)
+            expected_list.append(expected0)
+
+        expected_dict[output_name] = expected_list
+
+        input_byte_size = tu.shape_element_count(input_shapes[io_num]) *\
+                            np.dtype(tensor_dtype).itemsize * batch_size
+        output_byte_size = tu.shape_element_count(output_shapes[io_num]) *\
+                            np.dtype(tensor_dtype).itemsize * batch_size
+        # create and register shared memory region for inputs and outputs
+        if TEST_SYSTEM_SHARED_MEMORY:
+            shm_ip_handles.append(cudashm.create_shared_memory_region("input"+str(io_num)+"_data",
+                                                                input_byte_size, 0))
+            shm_op_handles.append(cudashm.create_shared_memory_region("output"+str(io_num)+"_data",
+                                                                output_byte_size, 0))
+            shared_memory_ctx.cuda_register(shm_ip_handles[io_num])
+            shared_memory_ctx.cuda_register(shm_op_handles[io_num])
+            # copy data into shared memory region for input values
+            cudashm.set_shared_memory_region(shm_ip_handles[io_num], input_list)
+        elif TEST_CUDA_SHARED_MEMORY:
+            shm_ip_handles.append(shm.create_shared_memory_region("input"+str(io_num)+"_data",\
+                                        "/input"+str(io_num), input_byte_size))
+            shm_op_handles.append(shm.create_shared_memory_region("output"+str(io_num)+"_data",\
+                                        "/output"+str(io_num), output_byte_size))
+            shared_memory_ctx.register(shm_ip_handles[io_num])
+            shared_memory_ctx.register(shm_op_handles[io_num])
+            # copy data into shared memory region for input values
+            shm.set_shared_memory_region(shm_ip_handles[io_num], input_list)
+
+        if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+            input_dict[input_name] = shm_ip_handles[io_num]
+            output_dict[output_name] = (InferContext.ResultFormat.RAW, shm_op_handles[io_num])
+        else:
+            input_dict[input_name] = input_list
+            output_dict[output_name] = InferContext.ResultFormat.RAW
+
     for config in configs:
         model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
-        input_dict = {}
-        output_dict = {}
-        expected_dict = {}
-
-        if config[3] or config[4]:
-            # create and register shared memory region for inputs and outputs
-            shm_ip_handles = list()
-            shm_op_handles = list()
-            shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
-            for io_num in range(io_cnt):
-                input_byte_size = tu.shape_element_count(input_shapes[io_num]) *\
-                                    np.dtype(tensor_dtype).itemsize * batch_size
-                output_byte_size = tu.shape_element_count(output_shapes[io_num]) *\
-                                    np.dtype(tensor_dtype).itemsize * batch_size
-                if config[3]:
-                    shm_ip_handles.append(cudashm.create_shared_memory_region("input"+str(io_num)+"_data",
-                                                                        input_byte_size, 0))
-                    shm_op_handles.append(cudashm.create_shared_memory_region("output"+str(io_num)+"_data",
-                                                                        output_byte_size, 0))
-                    shared_memory_ctx.cuda_register(shm_ip_handles[io_num])
-                    shared_memory_ctx.cuda_register(shm_op_handles[io_num])
-                else:
-                    shm_ip_handles.append(shm.create_shared_memory_region("input"+str(io_num)+"_data",\
-                                                "/input"+str(io_num), input_byte_size))
-                    shm_op_handles.append(shm.create_shared_memory_region("output"+str(io_num)+"_data",\
-                                                "/output"+str(io_num), output_byte_size))
-                    shared_memory_ctx.register(shm_ip_handles[io_num])
-                    shared_memory_ctx.register(shm_op_handles[io_num])
-
-        for io_num in range(io_cnt):
-            if pf == "libtorch" or pf == "libtorch_nobatch":
-                input_name = "INPUT__{}".format(io_num)
-                output_name = "OUTPUT__{}".format(io_num)
-            else:
-                input_name = "INPUT{}".format(io_num)
-                output_name = "OUTPUT{}".format(io_num)
-
-            input_list = list()
-            expected_list = list()
-            for b in range(batch_size):
-                rtensor_dtype = _range_repr_dtype(tensor_dtype)
-                in0 = np.random.randint(low=np.iinfo(rtensor_dtype).min,
-                                        high=np.iinfo(rtensor_dtype).max,
-                                        size=input_shapes[io_num], dtype=rtensor_dtype)
-                if tensor_dtype != np.object:
-                    in0 = in0.astype(tensor_dtype)
-                    expected0 = np.ndarray.copy(in0)
-                else:
-                    expected0 = np.array([unicode(str(x), encoding='utf-8')
-                                    for x in in0.flatten()], dtype=object)
-                    in0 = np.array([str(x) for x in in0.flatten()],
-                                   dtype=object).reshape(in0.shape)
-
-                expected0 = expected0.reshape(output_shapes[io_num])
-
-                input_list.append(in0)
-                expected_list.append(expected0)
-
-            expected_dict[output_name] = expected_list
-            if config[3] or config[4]:
-                # copy data into shared memory region for input values
-                if config[4]:
-                    cudashm.set_shared_memory_region(shm_ip_handles[io_num], input_list)
-                else:
-                    shm.set_shared_memory_region(shm_ip_handles[io_num], input_list)
-                input_dict[input_name] = shm_ip_handles[io_num]
-                output_dict[output_name] = (InferContext.ResultFormat.RAW, shm_op_handles[io_num])
-            else:
-                input_dict[input_name] = input_list
-                output_dict[output_name] = InferContext.ResultFormat.RAW
 
         ctx = InferContext(config[0], config[1], model_name, model_version,
                            correlation_id=0, streaming=config[2],
@@ -395,15 +388,16 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
                 tester.assertTrue(np.array_equal(result_val[b], expected),
                                   "{}, {}, slot {}, expected: {}, got {}".format(
                                       model_name, result_name, b, expected, result_val[b]))
-        if config[3] or config[4]:
-            for io_num in range(io_cnt):
-                shared_memory_ctx.unregister(shm_ip_handles[io_num])
-                shared_memory_ctx.unregister(shm_op_handles[io_num])
-                if config[4]:
-                    cudashm.destroy_shared_memory_region(shm_ip_handles[io_num])
-                    cudashm.destroy_shared_memory_region(shm_op_handles[io_num])
-                else:
-                    shm.destroy_shared_memory_region(shm_ip_handles[io_num])
-                    shm.destroy_shared_memory_region(shm_op_handles[io_num])
+
+    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+        for io_num in range(io_cnt):
+            shared_memory_ctx.unregister(shm_ip_handles[io_num])
+            shared_memory_ctx.unregister(shm_op_handles[io_num])
+            if TEST_CUDA_SHARED_MEMORY:
+                cudashm.destroy_shared_memory_region(shm_ip_handles[io_num])
+                cudashm.destroy_shared_memory_region(shm_op_handles[io_num])
+            else:
+                shm.destroy_shared_memory_region(shm_ip_handles[io_num])
+                shm.destroy_shared_memory_region(shm_op_handles[io_num])
 
     return results
