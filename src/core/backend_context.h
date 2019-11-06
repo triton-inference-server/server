@@ -88,13 +88,6 @@ struct BackendContext {
       TRTSERVER_Memory_Type src_memory_type, int64_t src_memory_type_id,
       std::vector<Scheduler::Payload>* payloads);
 
-  Status CopyBuffer(
-      const std::string& name, const TRTSERVER_Memory_Type src_memory_type,
-      const int64_t src_memory_type_id,
-      const TRTSERVER_Memory_Type dst_memory_type,
-      const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
-      void* dst, bool* cuda_used);
-
   // Helper function for handling string input. This function will return the
   // requested input content within a payload in a contiguous chunk. In some
   // cases this will require copying the data. If it happens,

@@ -30,6 +30,7 @@
 #include "src/backends/tensorflow/tf_utils.h"
 #include "src/backends/tensorflow/tf_virtual_device.h"
 #include "src/core/constants.h"
+#include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
@@ -630,7 +631,7 @@ BaseBackend::Context::ReadStringOutputTensor(
             output_name, TRTSERVER_MEMORY_CPU /* src_memory_type */,
             0 /* src_memory_type_id */, actual_memory_type,
             actual_memory_type_id, serialized.size(),
-            reinterpret_cast<const void*>(serialized.c_str()), content,
+            reinterpret_cast<const void*>(serialized.c_str()), content, stream_,
             &cuda_used);
         *cuda_copy |= cuda_used;
       }

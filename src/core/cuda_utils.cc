@@ -29,10 +29,6 @@
 #include "src/core/model_config_utils.h"
 #include "src/core/request_status.pb.h"
 
-#ifdef TRTIS_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
-
 namespace nvidia { namespace inferenceserver {
 
 Status
@@ -71,6 +67,56 @@ EnablePeerAccess()
         "failed to enable peer access for some device pairs");
   }
 #endif  // TRTIS_ENABLE_GPU
+  return Status::Success;
+}
+
+Status
+CopyBuffer(
+    const std::string& msg, const TRTSERVER_Memory_Type src_memory_type,
+    const int64_t src_memory_type_id,
+    const TRTSERVER_Memory_Type dst_memory_type,
+    const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
+    void* dst, cudaStream_t cuda_stream, bool* cuda_used)
+{
+  *cuda_used = false;
+
+  if ((src_memory_type == TRTSERVER_MEMORY_CPU) &&
+      (dst_memory_type == TRTSERVER_MEMORY_CPU)) {
+    memcpy(dst, src, byte_size);
+  } else {
+#ifdef TRTIS_ENABLE_GPU
+    // [TODO] use cudaMemcpyDefault if UVM is supported for the device
+    auto copy_kind = cudaMemcpyDeviceToDevice;
+    if (src_memory_type == TRTSERVER_MEMORY_CPU) {
+      copy_kind = cudaMemcpyHostToDevice;
+    } else if (dst_memory_type == TRTSERVER_MEMORY_CPU) {
+      copy_kind = cudaMemcpyDeviceToHost;
+    }
+
+    cudaError_t err;
+    if ((src_memory_type_id != dst_memory_type_id) &&
+        (copy_kind == cudaMemcpyDeviceToDevice)) {
+      err = cudaMemcpyPeerAsync(
+          dst, dst_memory_type_id, src, src_memory_type_id, byte_size,
+          cuda_stream);
+    } else {
+      err = cudaMemcpyAsync(dst, src, byte_size, copy_kind, cuda_stream);
+    }
+
+    if (err != cudaSuccess) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          msg + ": failed to use CUDA copy : " +
+              std::string(cudaGetErrorString(err)));
+    } else {
+      *cuda_used = true;
+    }
+#else
+    return Status(
+        RequestStatusCode::INTERNAL,
+        msg + ": try to use CUDA copy while GPU is not supported");
+#endif  // TRTIS_ENABLE_GPU
+  }
   return Status::Success;
 }
 
