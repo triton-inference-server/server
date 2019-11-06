@@ -48,7 +48,10 @@ class NetDefBackend : public InferenceBackend {
       const std::unordered_map<std::string, std::vector<char>>& models);
 
  private:
-  Status ValidateSequenceControl(
+  Status ValidateBooleanSequenceControl(
+      const ModelSequenceBatching::Control::Kind control_kind,
+      std::vector<std::string>* input_names, bool required);
+  Status ValidateTypedSequenceControl(
       const ModelSequenceBatching::Control::Kind control_kind,
       std::vector<std::string>* input_names, bool required);
 

@@ -159,7 +159,7 @@ SequenceBatchScheduler::CreateControlTensors(
 
   // START, optional
   {
-    RETURN_IF_ERROR(GetSequenceControlProperties(
+    RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         config.sequence_batching(), config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
@@ -201,7 +201,7 @@ SequenceBatchScheduler::CreateControlTensors(
 
   // END, optional
   {
-    RETURN_IF_ERROR(GetSequenceControlProperties(
+    RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         config.sequence_batching(), config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
@@ -243,7 +243,7 @@ SequenceBatchScheduler::CreateControlTensors(
 
   // READY, optional
   {
-    RETURN_IF_ERROR(GetSequenceControlProperties(
+    RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         config.sequence_batching(), config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
@@ -654,6 +654,42 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
       continue_input_overrides_(continue_input_overrides),
       notready_input_overrides_(notready_input_overrides)
 {
+  // If model wants CORRID control then get the name of the input
+  // tensor and initialize the override structure for each slot that
+  // is used to communicate the correlation ID. If error just exit
+  // now... that means the corresponding model instance will not have
+  // any runner and so will not get used for execution.
+  DataType correlation_id_datatype;
+  Status corrid_status = GetTypedSequenceControlProperties(
+      config.sequence_batching(), config.name(),
+      ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
+      false /* required */, &correlation_id_tensor_, &correlation_id_datatype);
+  if (!corrid_status.IsOk()) {
+    LOG_ERROR << "Failed validating CORRID control for sequence-batch "
+                 "scheduler thread "
+              << batcher_idx_ << ": " << corrid_status.Message();
+    is_initialized->set_value(false);
+    return;
+  }
+
+  if (!correlation_id_tensor_.empty()) {
+    if (correlation_id_datatype != TYPE_UINT64) {
+      LOG_ERROR << "unexpected control datatype, expected TYPE_UINT64 for "
+                << ModelSequenceBatching_Control_Kind_Name(
+                       ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID)
+                << " for " << config.name();
+      is_initialized->set_value(false);
+      return;
+    }
+
+    for (size_t b = 0; b < slot_correlation_ids_.size(); ++b) {
+      auto corrid_override = new InferRequestProvider::InputOverride();
+      corrid_override->dims_.Add(1);
+      corrid_override->datatype_ = TYPE_UINT64;
+      slot_corrid_overrides_.emplace_back(corrid_override);
+    }
+  }
+
   // Create a scheduler thread associated with 'batcher_idx' that
   // executes the queued payloads.
   const int nice = GetCpuNiceLevel(config);
@@ -850,6 +886,17 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
                 request_provider->SetInputOverride(end_input_overrides_);
               } else {
                 request_provider->SetInputOverride(continue_input_overrides_);
+              }
+
+              // Set correlation ID control tensor if requested by the
+              // model.
+              if (!correlation_id_tensor_.empty()) {
+                uint8_t* corrid_p =
+                    reinterpret_cast<uint8_t*>(&slot_correlation_ids_[slot]);
+                slot_corrid_overrides_[slot]->content_.assign(
+                    corrid_p, corrid_p + sizeof(uint64_t));
+                request_provider->AddInputOverride(
+                    correlation_id_tensor_, slot_corrid_overrides_[slot]);
               }
 
               payloads->emplace_back(

@@ -43,7 +43,10 @@ class SavedModelBackend : public BaseBackend {
       const TRTISTF_TFTRTConfig* tftrt_config) override;
 
  private:
-  Status ValidateSequenceControl(
+  Status ValidateBooleanSequenceControl(
+      const ModelSequenceBatching::Control::Kind control_kind,
+      const TRTISTF_IOList* inputs, bool required, bool* have_control);
+  Status ValidateTypedSequenceControl(
       const ModelSequenceBatching::Control::Kind control_kind,
       const TRTISTF_IOList* inputs, bool required, bool* have_control);
 

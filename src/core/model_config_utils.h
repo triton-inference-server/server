@@ -46,17 +46,27 @@ struct EnsembleTensor {
 /// \return The error status.
 Status GetModelVersionFromPath(const std::string& path, int64_t* version);
 
-/// Get the tensor name, false value, and true value for a sequence
-/// batcher control kind. If 'required' is true then must find a
-/// tensor for the control. If 'required' is false, return
+/// Get the tensor name, false value, and true value for a boolean
+/// sequence batcher control kind. If 'required' is true then must
+/// find a tensor for the control. If 'required' is false, return
 /// 'tensor_name' as empty-string if the control is not mapped to any
 /// tensor.
-Status GetSequenceControlProperties(
+Status GetBooleanSequenceControlProperties(
     const ModelSequenceBatching& batcher, const std::string& model_name,
     const ModelSequenceBatching::Control::Kind control_kind,
     const bool required, std::string* tensor_name, DataType* tensor_datatype,
     float* fp32_false_value, float* fp32_true_value, int32_t* int32_false_value,
     int32_t* int32_true_value);
+
+/// Get the tensor name and datatype for a non-boolean sequench
+/// batcher control kind. If 'required' is true then must find a
+/// tensor for the control. If 'required' is false, return
+/// 'tensor_name' as empty-string if the control is not mapped to any
+/// tensor.
+Status GetTypedSequenceControlProperties(
+    const ModelSequenceBatching& batcher, const std::string& model_name,
+    const ModelSequenceBatching::Control::Kind control_kind,
+    const bool required, std::string* tensor_name, DataType* tensor_datatype);
 
 /// Read a ModelConfig and normalize it as expected by model backends.
 /// \param path The full-path to the directory containing the

@@ -81,14 +81,17 @@ GraphDefBackend::CreateTRTISTFModel(
   // If this is a sequence model then make sure that the required
   // inputs are present in the model
   if (Config().has_sequence_batching()) {
-    RETURN_IF_ERROR(ValidateSequenceControl(
+    RETURN_IF_ERROR(ValidateBooleanSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, inputs,
         false /* required */));
-    RETURN_IF_ERROR(ValidateSequenceControl(
+    RETURN_IF_ERROR(ValidateBooleanSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, inputs,
         false /* required */));
-    RETURN_IF_ERROR(ValidateSequenceControl(
+    RETURN_IF_ERROR(ValidateBooleanSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, inputs,
+        false /* required */));
+    RETURN_IF_ERROR(ValidateTypedSequenceControl(
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID, inputs,
         false /* required */));
   }
 
@@ -103,14 +106,36 @@ GraphDefBackend::CreateTRTISTFModel(
 }
 
 Status
-GraphDefBackend::ValidateSequenceControl(
+GraphDefBackend::ValidateBooleanSequenceControl(
     const ModelSequenceBatching::Control::Kind control_kind,
     const TRTISTF_IOList* inputs, bool required)
 {
   std::string tensor_name;
-  RETURN_IF_ERROR(GetSequenceControlProperties(
+  RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
       Config().sequence_batching(), Name(), control_kind, required,
       &tensor_name, nullptr, nullptr, nullptr, nullptr, nullptr));
+  if (!tensor_name.empty()) {
+    const TRTISTF_IO* input = FindIOByName(inputs, tensor_name);
+    if (input == nullptr) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "configuration specified sequence control '" + tensor_name +
+              "', but model does not provide that input");
+    }
+  }
+
+  return Status::Success;
+}
+
+Status
+GraphDefBackend::ValidateTypedSequenceControl(
+    const ModelSequenceBatching::Control::Kind control_kind,
+    const TRTISTF_IOList* inputs, bool required)
+{
+  std::string tensor_name;
+  RETURN_IF_ERROR(GetTypedSequenceControlProperties(
+      Config().sequence_batching(), Name(), control_kind, required,
+      &tensor_name, nullptr));
   if (!tensor_name.empty()) {
     const TRTISTF_IO* input = FindIOByName(inputs, tensor_name);
     if (input == nullptr) {

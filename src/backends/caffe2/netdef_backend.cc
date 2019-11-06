@@ -223,14 +223,17 @@ NetDefBackend::CreateExecutionContext(
   // If this is a sequence model then make sure the require control
   // inputs are available in the model.
   if (Config().has_sequence_batching()) {
-    RETURN_IF_ERROR(ValidateSequenceControl(
+    RETURN_IF_ERROR(ValidateBooleanSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, &input_names,
         false /* required */));
-    RETURN_IF_ERROR(ValidateSequenceControl(
+    RETURN_IF_ERROR(ValidateBooleanSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, &input_names,
         false /* required */));
-    RETURN_IF_ERROR(ValidateSequenceControl(
+    RETURN_IF_ERROR(ValidateBooleanSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, &input_names,
+        false /* required */));
+    RETURN_IF_ERROR(ValidateTypedSequenceControl(
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID, &input_names,
         false /* required */));
   }
 
@@ -261,14 +264,30 @@ NetDefBackend::CreateExecutionContext(
 }
 
 Status
-NetDefBackend::ValidateSequenceControl(
+NetDefBackend::ValidateBooleanSequenceControl(
     const ModelSequenceBatching::Control::Kind control_kind,
     std::vector<std::string>* input_names, bool required)
 {
   std::string tensor_name;
-  RETURN_IF_ERROR(GetSequenceControlProperties(
+  RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
       Config().sequence_batching(), Name(), control_kind, required,
       &tensor_name, nullptr, nullptr, nullptr, nullptr, nullptr));
+  if (!tensor_name.empty()) {
+    input_names->push_back(tensor_name);
+  }
+
+  return Status::Success;
+}
+
+Status
+NetDefBackend::ValidateTypedSequenceControl(
+    const ModelSequenceBatching::Control::Kind control_kind,
+    std::vector<std::string>* input_names, bool required)
+{
+  std::string tensor_name;
+  RETURN_IF_ERROR(GetTypedSequenceControlProperties(
+      Config().sequence_batching(), Name(), control_kind, required,
+      &tensor_name, nullptr));
   if (!tensor_name.empty()) {
     input_names->push_back(tensor_name);
   }
