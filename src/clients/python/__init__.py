@@ -1500,8 +1500,7 @@ class InferContext:
         Returns
         -------
         dict
-            None if the results are not ready and 'wait' is False. A
-            dictionary from output name to the list of values for that
+            A dictionary from output name to the list of values for that
             output (one list element for each entry of the batch). The
             format of a value returned for an output depends on the
             output format specified in 'outputs'. For format RAW a
