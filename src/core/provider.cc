@@ -316,11 +316,17 @@ NULLInferRequestProvider::GetNextInputContent(
   }
 
   if (!GetInputOverrideContent(name, content, content_byte_size)) {
-    if (inputs_retrieved_.find(name) != inputs_retrieved_.end()) {
+    auto it = inputs_remaining_bytes_.find(name);
+    if ((it != inputs_remaining_bytes_.end()) && (it->second == 0)) {
       *content = nullptr;
       *content_byte_size = 0;
     } else {
-      inputs_retrieved_.emplace(name);
+      // If it is first time requesting the input, the byte size hint will be
+      // used as the expected input byte size.
+      if (it == inputs_remaining_bytes_.end()) {
+        it = inputs_remaining_bytes_.emplace(name, *content_byte_size).first;
+      }
+
       std::lock_guard<std::mutex> lock(mu_);
 
       // Must return content with all zero data. This is required by
@@ -333,6 +339,12 @@ NULLInferRequestProvider::GetNextInputContent(
       }
 
       *content = &(buf_[0]);
+
+      // byte size to be returned is the min of actual buffer size,
+      // expected remaining size (content_byte_size), and actual remaining size
+      *content_byte_size =
+          std::min(std::min(buf_.size(), *content_byte_size), it->second);
+      it->second -= *content_byte_size;
     }
   }
 
