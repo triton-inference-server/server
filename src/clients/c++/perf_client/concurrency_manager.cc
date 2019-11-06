@@ -28,8 +28,6 @@
 
 #include "src/core/model_config.h"
 
-namespace perfclient {
-
 ConcurrencyManager::~ConcurrencyManager()
 {
   early_exit = true;
@@ -644,5 +642,3 @@ ConcurrencyManager::GetRandomLength(double offset_ratio)
   }
   return sequence_length_ + random_offset;
 }
-
-}  // namespace perfclient

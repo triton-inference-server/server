@@ -27,8 +27,6 @@
 
 #include "src/clients/c++/perf_client/perf_utils.h"
 
-namespace perfclient {
-
 class LoadManager {
  public:
   /// Virtual destructor for well defined cleanup
@@ -36,7 +34,7 @@ class LoadManager {
 
   /// Adjust the number of concurrent requests to be the same as
   /// 'concurrent_request_count' (by creating threads or by pausing threads)
-  /// \parm concurent_request_count The number of concurrent requests.
+  /// \param concurent_request_count The number of concurrent requests.
   /// \return Error object indicating success or failure.
   virtual nic::Error ChangeConcurrencyLevel(
       const size_t concurrent_request_count) = 0;
@@ -60,5 +58,3 @@ class LoadManager {
   /// \return the batch size used for the inference requests
   virtual size_t BatchSize() const = 0;
 };
-
-}  // namespace perfclient

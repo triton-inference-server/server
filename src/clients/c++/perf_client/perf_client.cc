@@ -32,9 +32,6 @@
 #include "src/clients/c++/perf_client/load_manager.h"
 #include "src/clients/c++/perf_client/perf_utils.h"
 
-
-namespace perfclient {
-
 volatile bool early_exit = false;
 
 void
@@ -130,6 +127,11 @@ SignalHandler(int signum)
 //
 // For detail of the options not listed, please refer to the usage.
 //
+
+namespace {
+
+enum CONCURRENCY_RANGE { kSTART = 0, kEND = 1, kSTEP = 2 };
+const uint64_t NO_LIMIT = 0;
 
 nic::Error
 ReportServerSideStats(const ServerSideStats& stats, const int iteration)
@@ -254,7 +256,6 @@ Report(
 
   return nic::Error(ni::RequestStatusCode::SUCCESS);
 }
-}  // namespace perfclient
 
 // Used to format the usage message
 std::string
@@ -524,8 +525,7 @@ Usage(char** argv, const std::string& msg = std::string())
   exit(1);
 }
 
-enum CONCURRENCY_RANGE { kSTART = 0, kEND = 1, kSTEP = 2 };
-const uint64_t NO_LIMIT = 0;
+}  // namespace
 
 int
 main(int argc, char** argv)
@@ -546,7 +546,7 @@ main(int argc, char** argv)
   int64_t model_version = -1;
   std::string url("localhost:8000");
   std::string filename("");
-  perfclient::ProtocolType protocol = perfclient::ProtocolType::HTTP;
+  ProtocolType protocol = ProtocolType::HTTP;
   std::map<std::string, std::string> http_headers;
   std::unordered_map<std::string, std::vector<int64_t>> input_shapes;
   size_t string_length = 128;
@@ -683,7 +683,7 @@ main(int argc, char** argv)
       case 11: {
         std::string arg = optarg;
         // Check whether the argument is a directory
-        if (perfclient::IsDirectory(arg)) {
+        if (IsDirectory(arg)) {
           data_directory = optarg;
         } else if (arg.compare("zero") == 0) {
           zero_input = true;
@@ -741,7 +741,7 @@ main(int argc, char** argv)
         measurement_window_ms = std::atoi(optarg);
         break;
       case 'i':
-        protocol = perfclient::ParseProtocol(optarg);
+        protocol = ParseProtocol(optarg);
         break;
       case 'H': {
         std::string arg = optarg;
@@ -787,13 +787,13 @@ main(int argc, char** argv)
       concurrent_request_count < 0) {
     Usage(argv, "The start of the search range must be > 0");
   }
-  if (protocol == perfclient::ProtocolType::UNKNOWN) {
+  if (protocol == ProtocolType::UNKNOWN) {
     Usage(argv, "protocol should be either HTTP or gRPC");
   }
-  if (streaming && (protocol != perfclient::ProtocolType::GRPC)) {
+  if (streaming && (protocol != ProtocolType::GRPC)) {
     Usage(argv, "streaming is only allowed with gRPC protocol");
   }
-  if (!http_headers.empty() && (protocol != perfclient::ProtocolType::HTTP)) {
+  if (!http_headers.empty() && (protocol != ProtocolType::HTTP)) {
     std::cerr << "WARNING: HTTP headers specified with -H are ignored when "
                  "using non-HTTP protocol."
               << std::endl;
@@ -835,7 +835,7 @@ main(int argc, char** argv)
         "simultaneously");
   }
 
-  if (!url_specified && (protocol == perfclient::ProtocolType::GRPC)) {
+  if (!url_specified && (protocol == ProtocolType::GRPC)) {
     url = "localhost:8001";
   }
 
@@ -860,13 +860,13 @@ main(int argc, char** argv)
   }
 
   // trap SIGINT to allow threads to exit gracefully
-  signal(SIGINT, perfclient::SignalHandler);
+  signal(SIGINT, SignalHandler);
 
   nic::Error err;
-  std::shared_ptr<perfclient::ContextFactory> factory;
-  std::unique_ptr<perfclient::LoadManager> manager;
-  std::unique_ptr<perfclient::InferenceProfiler> profiler;
-  err = perfclient::ContextFactory::Create(
+  std::shared_ptr<ContextFactory> factory;
+  std::unique_ptr<LoadManager> manager;
+  std::unique_ptr<InferenceProfiler> profiler;
+  err = ContextFactory::Create(
       url, protocol, http_headers, streaming, model_name, model_version,
       &factory);
   if (!err.IsOk()) {
@@ -875,9 +875,8 @@ main(int argc, char** argv)
   }
 
   // Special handling for sequence models
-  if ((factory->SchedulerType() == perfclient::ContextFactory::SEQUENCE) ||
-      (factory->SchedulerType() ==
-       perfclient::ContextFactory::ENSEMBLE_SEQUENCE)) {
+  if ((factory->SchedulerType() == ContextFactory::SEQUENCE) ||
+      (factory->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE)) {
     // Change the default value for the --async option for sequential models
     if (!async) {
       async = forced_sync ? false : true;
@@ -893,7 +892,7 @@ main(int argc, char** argv)
   max_concurrency = std::max(
       concurrency_range[CONCURRENCY_RANGE::kSTART],
       concurrency_range[CONCURRENCY_RANGE::kEND]);
-  err = perfclient::ConcurrencyManager::Create(
+  err = ConcurrencyManager::Create(
       async, batch_size, max_threads, max_concurrency, sequence_length,
       string_length, string_data, zero_input, input_shapes, data_directory,
       factory, &manager);
@@ -901,7 +900,7 @@ main(int argc, char** argv)
     std::cerr << err << std::endl;
     return 1;
   }
-  err = perfclient::InferenceProfiler::Create(
+  err = InferenceProfiler::Create(
       verbose, stability_threshold, measurement_window_ms, max_trials,
       percentile, factory, std::move(manager), &profiler);
   if (!err.IsOk()) {
@@ -933,15 +932,14 @@ main(int argc, char** argv)
   }
   std::cout << std::endl;
 
-  perfclient::PerfStatus status_summary;
-  std::vector<perfclient::PerfStatus> summary;
+  PerfStatus status_summary;
+  std::vector<PerfStatus> summary;
 
   size_t count = concurrency_range[CONCURRENCY_RANGE::kSTART];
   do {
     err = profiler->Profile(count, status_summary);
     if (err.IsOk()) {
-      err = perfclient::Report(
-          status_summary, count, percentile, protocol, verbose);
+      err = Report(status_summary, count, percentile, protocol, verbose);
       summary.push_back(status_summary);
       if (latency_threshold_ms != NO_LIMIT) {
         uint64_t stabilizing_latency_ms =
@@ -968,7 +966,7 @@ main(int argc, char** argv)
     std::cerr << err << std::endl;
     // In the case of early_exit, the thread does not return and continues to
     // report the summary
-    if (!perfclient::early_exit) {
+    if (!early_exit) {
       return 1;
     }
   }
@@ -981,7 +979,7 @@ main(int argc, char** argv)
       std::cout << "p" << percentile << " Batch Latency" << std::endl;
     }
 
-    for (perfclient::PerfStatus& status : summary) {
+    for (PerfStatus& status : summary) {
       std::cout << "Concurrency: " << status.concurrency << ", "
                 << status.client_infer_per_sec << " infer/sec, latency "
                 << (status.stabilizing_latency_ns / 1000) << " usec"
@@ -1002,12 +1000,11 @@ main(int argc, char** argv)
       // Sort summary results in order of increasing infer/sec.
       std::sort(
           summary.begin(), summary.end(),
-          [](const perfclient::PerfStatus& a,
-             const perfclient::PerfStatus& b) -> bool {
+          [](const PerfStatus& a, const PerfStatus& b) -> bool {
             return a.client_infer_per_sec < b.client_infer_per_sec;
           });
 
-      for (perfclient::PerfStatus& status : summary) {
+      for (PerfStatus& status : summary) {
         uint64_t avg_queue_ns = status.server_stats.queue_time_ns /
                                 status.server_stats.request_count;
         uint64_t avg_compute_ns = status.server_stats.compute_time_ns /
@@ -1050,7 +1047,7 @@ main(int argc, char** argv)
               << "Network+Server Send/Recv,Server Queue,"
               << "Server Compute,Client Recv" << std::endl;
 
-          for (perfclient::PerfStatus& status : summary) {
+          for (PerfStatus& status : summary) {
             auto it = status.server_stats.composing_models_stat.find(
                 model_info.first);
             const auto& stats = it->second;
