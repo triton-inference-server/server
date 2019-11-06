@@ -111,7 +111,7 @@ BackendContext::SetInputBuffer(
       auto src_memory_type = dst_memory_type;
       auto src_memory_type_id = dst_memory_type_id;
       const void* content;
-      size_t content_byte_size = -copied_byte_size;
+      size_t content_byte_size = expected_byte_size - copied_byte_size;
       payload.status_ = payload.request_provider_->GetNextInputContent(
           name, &content, &content_byte_size, &src_memory_type,
           &src_memory_type_id);
