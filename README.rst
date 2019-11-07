@@ -113,7 +113,7 @@ inference server provides the following features:
 
 .. overview-end-marker-do-not-remove
 
-The current release of the TensorRT Inference Server is 1.6.0 and
+The current release of the TensorRT Inference Server is 1.7.0 and
 corresponds to the 19.10 release of the tensorrtserver container on
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. The branch for
 this release is `r19.10
