@@ -495,6 +495,8 @@ class SequenceEnsembleSchedule:
 
     @classmethod
     def _get_simple_ensemble_schedule(cls, base_model_name, shape, model_dtype):
+        # libtorch model uses other naming convention
+        index_suffix = "__0" if "libtorch" in base_model_name else ""
         # ensemble input -> sequence -> ensemble output
         schedule = '''
 ensemble_scheduling {{
@@ -503,17 +505,17 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT"
+        key: "INPUT{index}"
         value: "INPUT"
       }}
       output_map {{
-        key: "OUTPUT"
+        key: "OUTPUT{index}"
         value: "OUTPUT"
       }}
     }}
   ]
 }}
-'''.format(base_model_name)
+'''.format(base_model_name, index=index_suffix)
         return schedule
 
     @classmethod
@@ -522,6 +524,9 @@ ensemble_scheduling {{
         if model_dtype == "TYPE_STRING":
           return SequenceEnsembleSchedule._get_simple_ensemble_schedule(
                   base_model_name, shape, model_dtype)
+
+        # libtorch model uses other naming convention
+        index_suffix = "__0" if "libtorch" in base_model_name else ""
         # ensemble input -> nop -> sequence -> ensemble output
         nop_input_shape = fixed_to_variable_size(shape)
         schedule = '''
@@ -547,17 +552,17 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT"
+        key: "INPUT{index}"
         value: "same_input"
       }}
       output_map {{
-        key: "OUTPUT"
+        key: "OUTPUT{index}"
         value: "OUTPUT"
       }}
     }}
   ]
 }}
-'''.format(model_dtype, tu.shape_to_dims_str(nop_input_shape), base_model_name)
+'''.format(model_dtype, tu.shape_to_dims_str(nop_input_shape), base_model_name, index=index_suffix)
         return schedule
 
     @classmethod
@@ -566,6 +571,9 @@ ensemble_scheduling {{
         if model_dtype == "TYPE_STRING":
           return SequenceEnsembleSchedule._get_simple_ensemble_schedule(
                   base_model_name, shape, model_dtype)
+
+        # libtorch model uses other naming convention
+        index_suffix = "__0" if "libtorch" in base_model_name else ""
         # Not a "fan" due to configuration of base sequence model
         # ensemble input -> nop -> sequence -> nop -> ensemble output
         nop_shape = fixed_to_variable_size(shape)
@@ -592,11 +600,11 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT"
+        key: "INPUT{index}"
         value: "same_input"
       }}
       output_map {{
-        key: "OUTPUT"
+        key: "OUTPUT{index}"
         value: "same_output"
       }}
     }},
@@ -619,7 +627,7 @@ ensemble_scheduling {{
   ]
 }}
 '''.format(model_dtype, tu.shape_to_dims_str(nop_shape), base_model_name,
-              model_dtype, tu.shape_to_dims_str(nop_shape))
+              model_dtype, tu.shape_to_dims_str(nop_shape), index=index_suffix)
         return schedule
 
 
