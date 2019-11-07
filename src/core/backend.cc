@@ -274,7 +274,11 @@ InferenceBackend::WarmUp()
   }
 
   for (auto& res_future : warmup_res) {
-    RETURN_IF_ERROR(res_future.get());
+    auto status = res_future.get();
+    if (!status.IsOk()) {
+      return Status(RequestStatusCode::INTERNAL,
+      "failed to warm up model '" + Name() + "': " + status.AsString());
+    }
   }
 
   return Status::Success;
