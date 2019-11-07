@@ -38,13 +38,13 @@ follow the :ref:`section-quickstart` to get the server and client
 examples running with the example model repository.
 
 Unless you already have a client application suitable for measuring
-the performance of your model on the interence server, you should
+the performance of your model on the inference server, you should
 familiarize yourself with :ref:`perf\_client
 <section-perf-client>`. The perf\_client application is an essential
 tool for optimizing your model's performance.
 
 As a running example demonstrating the optimization features and
-options, we will use the Caffe2 ResNet50 model that you can obtain by
+options, we will use a Caffe2 ResNet50 model that you can obtain by
 following the :ref:`section-quickstart`. As a baseline we use
 perf\_client to determine the performance of the model using a `basic
 model configuration that does not enable any performance features
@@ -88,7 +88,7 @@ The dynamic batcher combines individual inference requests into a
 larger batch that will often execute much more efficiently than
 executing the individual requests independently. To enable the dynamic
 batcher stop the inference server, add the following lines to the end
-of the model configuration file for resnet50_netdef, and then restart
+of the model configuration file for resnet50\_netdef, and then restart
 the inference server::
 
   dynamic_batching { }
@@ -153,7 +153,7 @@ more inference work to be executed simultaneously on the GPU. Smaller
 models may benefit from more than two instances; you can use
 perf\_client to experiment.
 
-To specify two instances of the resnet50_netdef model: stop the
+To specify two instances of the resnet50\_netdef model: stop the
 inference server, remove any dynamic batching settings you may have
 previously added to the model configuration (we discuss combining
 dynamic batcher and multiple model instances below), add the following
@@ -214,7 +214,7 @@ ONNX with TensorRT Optimization
 ...............................
 
 As an example of TensorRT optimization applied to an ONNX model, we
-will use the ONNX DenseNet model that you can obtain by following the
+will use an ONNX DenseNet model that you can obtain by following the
 :ref:`section-quickstart`. As a baseline we use perf\_client to
 determine the performance of the model using a `basic model
 configuration that does not enable any performance features
@@ -250,7 +250,7 @@ baseline::
   Concurrency: 3, 272.2 infer/sec, latency 11046 usec
   Concurrency: 4, 266.8 infer/sec, latency 15089 usec
 
-The TensorRT optimization provided 2x throughput inprovement while
+The TensorRT optimization provided 2x throughput improvement while
 cutting latency in half. The benefit provided by TensorRT will vary
 based on the model, but in general it can provide significant
 performance improvement.
@@ -261,7 +261,7 @@ TensorFlow with TensorRT Optimization
 TensorRT optimization applied to a TensorFlow model works similarly to
 TensorRT and ONNX described above. To enable TensorRT optimization you
 must set the model configuration appropriately. For TensorRT
-optimization of TensorFlow models that are several options that you
+optimization of TensorFlow models there are several options that you
 can enable, including selection of the compute precision. For
 example::
 
@@ -275,6 +275,44 @@ The options are described in detail in the
 :cpp:var:`ModelOptimizationPolicy
 <nvidia::inferenceserver::ModelOptimizationPolicy>` section of the
 model configuration protobuf.
+
+As an example of TensorRT optimization applied to a TensorFlow model,
+we will use a TensorFlow Inception model that you can obtain by
+following the :ref:`section-quickstart`. As a baseline we use
+perf\_client to determine the performance of the model using a `basic
+model configuration that does not enable any performance features
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/docs/examples/model_repository/inception_graphdef/config.pbtxt>`_::
+
+  $ perf_client -m inception_graphdef --percentile=95 --concurrency-range 1:4
+  ...
+  Inferences/Second vs. Client p95 Batch Latency
+  Concurrency: 1, 105.6 infer/sec, latency 12865 usec
+  Concurrency: 2, 120.6 infer/sec, latency 20888 usec
+  Concurrency: 3, 122.8 infer/sec, latency 30308 usec
+  Concurrency: 4, 123.4 infer/sec, latency 39465 usec
+
+To enable TensorRT optimization for the model: stop the inference
+server, add the lines from above to the end of the model configuration
+file, and then restart the inference server. As the inference server
+starts you should check the console output and wait until the server
+prints the "Staring endpoints" message. Now run perf\_client using the
+same options as for the baseline. Note that the first run of
+perf\_client might timeout because the TensorRT optimization is
+performed when the inference request is received and may take
+significant time. If this happens just run perf\_client again::
+
+  $ perf_client -m inception_graphdef --percentile=95 --concurrency-range 1:4
+  ...
+  Inferences/Second vs. Client p95 Batch Latency
+  Concurrency: 1, 172 infer/sec, latency 6912 usec
+  Concurrency: 2, 265.2 infer/sec, latency 8905 usec
+  Concurrency: 3, 254.2 infer/sec, latency 13506 usec
+  Concurrency: 4, 257 infer/sec, latency 17715 usec
+
+The TensorRT optimization provided 2x throughput improvement while
+cutting latency in half. The benefit provided by TensorRT will vary
+based on the model, but in general it can provide significant
+performance improvement.
 
 
 .. include:: perf_client.rst
