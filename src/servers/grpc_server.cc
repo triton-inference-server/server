@@ -1331,16 +1331,21 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     }
 #endif  // TRTIS_ENABLE_TRACING
 
-    // Log an error and cancel the stream if write failed or 'state'
-    // is not the expected next response. We don't necessarily cancel
-    // right away. Need to wait for any pending reads, inferences and
-    // writes to complete.
+    // If the write failed (for example, client closed the stream)
+    // mark that the stream did not complete successfully but don't
+    // cancel right away... need to wait for any pending reads,
+    // inferences and writes to complete.
     if (!rpc_ok) {
-      LOG_ERROR << "Write for " << Name() << ", rpc_ok=" << rpc_ok
-                << ", context " << state->context_->unique_id_ << ", "
+      LOG_VERBOSE(1) << "Write for " << Name() << ", rpc_ok=" << rpc_ok
+                  << ", context " << state->context_->unique_id_ << ", "
                 << state->unique_id_ << " step " << state->step_ << ", failed";
       state->context_->finish_ok_ = false;
     }
+
+    // Log an error if 'state' is not the expected next response. Mark
+    // that the stream did not complete successfully but don't cancel
+    // right away... need to wait for any pending reads, inferences
+    // and writes to complete.
     if (!state->context_->PopCompletedResponse(state)) {
       LOG_ERROR << "Unexpected response for " << Name() << ", rpc_ok=" << rpc_ok
                 << ", context " << state->context_->unique_id_ << ", "
