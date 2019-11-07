@@ -1497,9 +1497,11 @@ class SequenceBatcherTest(unittest.TestCase):
         # Test model instances together are configured with
         # total-max-batch-size 4. Send 4 sequences in parallel and
         # make sure they get completely batched into batch-size 4
-        # inferences. The sequences do not have end markers and so
-        # should timeout and allow a 5th sequence to come out of the
-        # backlog and finish.
+        # inferences. One of the sequences has a long delay that
+        # causes it to timeout and that allows a 5th sequence to come
+        # out of the backlog and finish. The timed-out sequence will
+        # then send the delayed inference but it will appear as a new
+        # sequence and so fail because it doesn't have the START flag.
 
         # Only works with 1 model instance since otherwise an instance
         # can run ahead and handle more work than expected (leads to
@@ -1577,7 +1579,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1005,
-                          (None, _max_sequence_idle_ms - 2000),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11111, None),
                            ("end", 11113, None)),
