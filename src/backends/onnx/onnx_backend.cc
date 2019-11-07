@@ -31,6 +31,7 @@
 #include "src/backends/onnx/loader.h"
 #include "src/backends/onnx/onnx_utils.h"
 #include "src/core/constants.h"
+#include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_cuda.h"
 #include "src/core/model_config_utils.h"
@@ -851,54 +852,32 @@ OnnxBackend::Context::SetStringOutputBuffer(
           preferred_memory_type, 0 /* preferred_memory_type_id */,
           &actual_memory_type, &actual_memory_type_id);
       if (status.IsOk()) {
+        bool cuda_used = false;
         size_t copied_byte_size = 0;
         for (size_t e = 0; e < expected_element_cnt; ++e) {
           const uint32_t len =
               offsets[element_idx + e + 1] - offsets[element_idx + e];
-          if (actual_memory_type == TRTSERVER_MEMORY_GPU) {
-#ifdef TRTIS_ENABLE_GPU
-            cudaError_t err = cudaMemcpyAsync(
-                static_cast<char*>(buffer) + copied_byte_size,
-                static_cast<const void*>(&len), sizeof(uint32_t),
-                cudaMemcpyHostToDevice, stream_);
-            if (err != cudaSuccess) {
-              payload.status_ = Status(
-                  RequestStatusCode::INTERNAL,
-                  "output '" + name + "' is in GPU memory and failed to use" +
-                      " CUDA copy from CPU memory to get String output data: " +
-                      std::string(cudaGetErrorString(err)));
-            } else {
-              cuda_copy = true;
-            }
-#endif  // TRTIS_ENABLE_GPU
-          } else {
-            memcpy(
-                static_cast<char*>(buffer) + copied_byte_size,
-                static_cast<const void*>(&len), sizeof(uint32_t));
-          }
+          // Prepend size of the string
+          payload.status_ = CopyBuffer(
+              name, TRTSERVER_MEMORY_CPU /* src_memory_type */,
+              0 /* src_memory_type_id */, actual_memory_type,
+              actual_memory_type_id, sizeof(uint32_t),
+              static_cast<const void*>(&len),
+              static_cast<char*>(buffer) + copied_byte_size, stream_,
+              &cuda_used);
+
+          cuda_copy |= cuda_used;
           copied_byte_size += sizeof(uint32_t);
 
-          if (actual_memory_type == TRTSERVER_MEMORY_GPU) {
-#ifdef TRTIS_ENABLE_GPU
-            cudaError_t err = cudaMemcpyAsync(
-                static_cast<char*>(buffer) + copied_byte_size,
-                content + offsets[element_idx + e], len, cudaMemcpyHostToDevice,
-                stream_);
-            if (err != cudaSuccess) {
-              payload.status_ = Status(
-                  RequestStatusCode::INTERNAL,
-                  "output '" + name + "' is in GPU memory and failed to use" +
-                      " CUDA copy from CPU memory to get String output data: " +
-                      std::string(cudaGetErrorString(err)));
-            } else {
-              cuda_copy = true;
-            }
-#endif  // TRTIS_ENABLE_GPU
-          } else {
-            memcpy(
-                static_cast<char*>(buffer) + copied_byte_size,
-                content + offsets[element_idx + e], len);
-          }
+          // Copy raw string content
+          payload.status_ = CopyBuffer(
+              name, TRTSERVER_MEMORY_CPU /* src_memory_type */,
+              0 /* src_memory_type_id */, actual_memory_type,
+              actual_memory_type_id, len, content + offsets[element_idx + e],
+              static_cast<char*>(buffer) + copied_byte_size, stream_,
+              &cuda_used);
+
+          cuda_copy |= cuda_used;
           copied_byte_size += len;
         }
       } else {

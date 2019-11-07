@@ -29,6 +29,7 @@
 #include <mutex>
 #include "src/core/api.pb.h"
 #include "src/core/backend.h"
+#include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/provider_utils.h"
 #include "src/core/server.h"
@@ -687,59 +688,13 @@ EnsembleContext::CheckAndSetEnsembleOutput()
 
     const char* content = memory_block->BufferAt(
         content_idx, &content_size, &src_memory_type, &src_memory_type_id);
+    bool cuda_used = false;
     while (content != nullptr) {
-      if ((src_memory_type == TRTSERVER_MEMORY_CPU) &&
-          (allocated_memory_type == TRTSERVER_MEMORY_CPU)) {
-        memcpy(((char*)buffer) + content_offset, content, content_size);
-      } else {
-#ifdef TRTIS_ENABLE_GPU
-        auto copy_type = cudaMemcpyDeviceToDevice;
-        if (src_memory_type == TRTSERVER_MEMORY_CPU) {
-          copy_type = cudaMemcpyHostToDevice;
-        } else {
-          copy_type = cudaMemcpyDeviceToHost;
-        }
-
-        cudaError_t err;
-        // use default stream if no CUDA stream is created for the ensemble
-        if (stream_ == nullptr) {
-          if ((src_memory_type_id != allocated_memory_type_id) &&
-              (copy_type == cudaMemcpyDeviceToDevice)) {
-            err = cudaMemcpyPeer(
-                ((char*)buffer) + content_offset, allocated_memory_type_id,
-                content, src_memory_type_id, content_size);
-          } else {
-            err = cudaMemcpy(
-                ((char*)buffer) + content_offset, content, content_size,
-                copy_type);
-          }
-        } else {
-          if ((src_memory_type_id != allocated_memory_type_id) &&
-              (copy_type == cudaMemcpyDeviceToDevice)) {
-            err = cudaMemcpyPeerAsync(
-                ((char*)buffer) + content_offset, allocated_memory_type_id,
-                content, src_memory_type_id, content_size, stream_);
-          } else {
-            err = cudaMemcpyAsync(
-                ((char*)buffer) + content_offset, content, content_size,
-                copy_type, stream_);
-          }
-          cuda_async_copy |= (err == cudaSuccess);
-        }
-
-        if (err != cudaSuccess) {
-          return Status(
-              RequestStatusCode::INTERNAL,
-              "failed to use CUDA copy for output '" + output_pair.first +
-                  "': " + std::string(cudaGetErrorString(err)));
-        }
-#else
-        return Status(
-            RequestStatusCode::INTERNAL, "try to use CUDA copy for output '" +
-                                             output_pair.first +
-                                             "' while GPU is not supported");
-#endif  // TRTIS_ENABLE_GPU
-      }
+      RETURN_IF_ERROR(CopyBuffer(
+          output_pair.first, src_memory_type, src_memory_type_id,
+          allocated_memory_type, allocated_memory_type_id, content_size,
+          content, ((char*)buffer) + content_offset, stream_, &cuda_used));
+      cuda_async_copy |= cuda_used;
 
       content_offset += content_size;
       content_idx++;

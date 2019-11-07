@@ -27,10 +27,35 @@
 
 #include "src/core/status.h"
 
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 namespace nvidia { namespace inferenceserver {
+
+#ifndef TRTIS_ENABLE_GPU
+using cudaStream_t = void*;
+#endif  // TRTIS_ENABLE_GPU
 
 /// Enable peer access for all GPU device pairs
 /// \return The error status. A non-OK status means not all pairs are enabled
 Status EnablePeerAccess();
+
+/// Copy buffer from 'src' to 'dst' for given 'byte_size'. The buffer location
+/// is identified by the memory type and id, and the corresponding copy will be
+/// initiated.
+/// 'msg' is the message to be prepended in error message.
+/// 'cuda_stream' specifies the stream to be associated with, and 0 can be
+/// passed for default stream.
+/// 'cuda_used' returns whether a CUDA memory copy is initiated. If true,
+/// the caller should synchronize on the given 'cuda_stream' to ensure data copy
+/// is completed.
+/// \return The error status.
+Status CopyBuffer(
+    const std::string& msg, const TRTSERVER_Memory_Type src_memory_type,
+    const int64_t src_memory_type_id,
+    const TRTSERVER_Memory_Type dst_memory_type,
+    const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
+    void* dst, cudaStream_t cuda_stream, bool* cuda_used);
 
 }}  // namespace nvidia::inferenceserver

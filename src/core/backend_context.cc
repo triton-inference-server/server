@@ -26,6 +26,7 @@
 
 #include "src/core/backend_context.h"
 
+#include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/provider.h"
 
@@ -138,7 +139,8 @@ BackendContext::SetInputBuffer(
         payload.status_ = CopyBuffer(
             name, src_memory_type, src_memory_type_id, dst_memory_type,
             dst_memory_type_id, content_byte_size, content,
-            input_buffer + buffer_copy_offset + copied_byte_size, &cuda_used);
+            input_buffer + buffer_copy_offset + copied_byte_size, stream_,
+            &cuda_used);
         cuda_copy |= cuda_used;
       }
       copied_byte_size += content_byte_size;
@@ -197,7 +199,7 @@ BackendContext::SetFixedSizeOutputBuffer(
           status = CopyBuffer(
               name, src_memory_type, src_memory_type_id, dst_memory_type,
               dst_memory_type_id, expected_byte_size, content + content_offset,
-              buffer, &cuda_used);
+              buffer, stream_, &cuda_used);
           cuda_copy |= cuda_used;
         }
       }
@@ -209,55 +211,6 @@ BackendContext::SetFixedSizeOutputBuffer(
   }
 
   return cuda_copy;
-}
-
-Status
-BackendContext::CopyBuffer(
-    const std::string& name, const TRTSERVER_Memory_Type src_memory_type,
-    const int64_t src_memory_type_id,
-    const TRTSERVER_Memory_Type dst_memory_type,
-    const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
-    void* dst, bool* cuda_used)
-{
-  *cuda_used = false;
-
-  if ((src_memory_type == TRTSERVER_MEMORY_CPU) &&
-      (dst_memory_type == TRTSERVER_MEMORY_CPU)) {
-    memcpy(dst, src, byte_size);
-  } else {
-#ifdef TRTIS_ENABLE_GPU
-    // [TODO] use cudaMemcpyDefault if UVM is supported for the device
-    auto copy_kind = cudaMemcpyDeviceToDevice;
-    if (src_memory_type == TRTSERVER_MEMORY_CPU) {
-      copy_kind = cudaMemcpyHostToDevice;
-    } else if (dst_memory_type == TRTSERVER_MEMORY_CPU) {
-      copy_kind = cudaMemcpyDeviceToHost;
-    }
-
-    cudaError_t err;
-    if ((src_memory_type_id != dst_memory_type_id) &&
-        (copy_kind == cudaMemcpyDeviceToDevice)) {
-      err = cudaMemcpyPeerAsync(
-          dst, dst_memory_type_id, src, src_memory_type_id, byte_size, stream_);
-    } else {
-      err = cudaMemcpyAsync(dst, src, byte_size, copy_kind, stream_);
-    }
-
-    if (err != cudaSuccess) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "failed to use CUDA copy for tensor '" + name +
-              "': " + std::string(cudaGetErrorString(err)));
-    } else {
-      *cuda_used = true;
-    }
-#else
-    return Status(
-        RequestStatusCode::INTERNAL, "try to use CUDA copy for tensor '" +
-                                         name + "' while GPU is not supported");
-#endif  // TRTIS_ENABLE_GPU
-  }
-  return Status::Success;
 }
 
 Status
@@ -321,7 +274,7 @@ BackendContext::GetContiguousInputContent(
       RETURN_IF_ERROR(CopyBuffer(
           name, src_memory_type, src_memory_type_id, memory_type,
           memory_type_id, *content_byte_size, src_ptr, dst_ptr + offset,
-          &cuda_used));
+          stream_, &cuda_used));
       *cuda_copy |= cuda_used;
       offset += *content_byte_size;
     }
