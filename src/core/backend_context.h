@@ -113,10 +113,12 @@ struct BackendContext {
   // configuration.
   int max_batch_size_;
 
-#ifdef TRTIS_ENABLE_GPU
+#ifndef TRTIS_ENABLE_GPU
+  using cudaStream_t = void*;
+#endif  // !TRTIS_ENABLE_GPU
+
   // The stream where data transfer operations are executed on.
   cudaStream_t stream_;
-#endif  // TRTIS_ENABLE_GPU
 };
 
 }}  // namespace nvidia::inferenceserver
