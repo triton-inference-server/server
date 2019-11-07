@@ -924,6 +924,11 @@ main(int argc, char** argv)
                 << " concurrent requests" << std::endl;
     }
   }
+  if (async) {
+      std::cout << "  Using asynchronous calls for inference" << std::endl;
+  } else {
+      std::cout << "  Using synchronous calls for inference" << std::endl;
+  }
   if (percentile == -1) {
     std::cout << "  Stabilizing using average latency" << std::endl;
   } else {
