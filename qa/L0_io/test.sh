@@ -59,13 +59,10 @@ for trial in graphdef savedmodel netdef onnx libtorch plan ; do
                 sed -i "s/label_filename:.*//" config.pbtxt && \
                 echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
 
-    # set up "addsub" ensemble.
-    # [DLIS-843] Not copying the correspondent in ENSEMBLEDIR
-    # because some backends (ONNX, PyTorch) don't have ensemble for them
+    # ensemble version of the model.
     mkdir -p $MODELSDIR/fan_${full}/1 && \
-    cp $ENSEMBLEDIR/fan_graphdef_float32_float32_float32/config.pbtxt $MODELSDIR/fan_${full}/. && \
+    cp $ENSEMBLEDIR/fan_${full}/config.pbtxt $MODELSDIR/fan_${full}/. && \
         (cd $MODELSDIR/fan_${full} && \
-                sed -i "s/graphdef_float32_float32_float32/${full}/" config.pbtxt && \
                 sed -i "s/label_filename:.*//" config.pbtxt)
 
     if [ "$trial" == "libtorch" ]; then

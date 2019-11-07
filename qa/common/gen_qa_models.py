@@ -1449,33 +1449,37 @@ def create_models(
             if not pair[1](input_dtype, output0_dtype, output1_dtype,
                             input_shape, output0_shape, output1_shape):
                 continue
+            
+            config_input_shape = input_shape
+            config_output0_shape = output0_shape
+            config_output1_shape = output1_shape
             if pair[0] == "plan":
                 if len(input_shape) == 1 and input_dtype == np.int8:
-                    input_shape = (input_shape[0], 1, 1)
+                    config_input_shape = (input_shape[0], 1, 1)
                 if len(output0_shape) == 1 and output0_dtype == np.int8:
-                    output0_shape = (output0_shape[0], 1, 1)
+                    config_output0_shape = (output0_shape[0], 1, 1)
                 if len(output1_shape) == 1 and output1_dtype == np.int8:
-                    output1_shape = (output1_shape[0], 1, 1)
+                    config_output1_shape = (output1_shape[0], 1, 1)
 
             # max-batch 8
             emu.create_ensemble_modelconfig(
                 pair[0], models_dir, 8, model_version,
-                input_shape, output0_shape, output1_shape,
+                config_input_shape, config_output0_shape, config_output1_shape,
                 input_dtype, output0_dtype, output1_dtype,
                 output0_label_cnt, version_policy)
             emu.create_ensemble_modelfile(
                 pair[0], models_dir, 8, model_version,
-                input_shape, output0_shape, output1_shape,
+                config_input_shape, config_output0_shape, config_output1_shape,
                 input_dtype, output0_dtype, output1_dtype)
             # max-batch 0
             emu.create_ensemble_modelconfig(
                 pair[0], models_dir, 0, model_version,
-                input_shape, output0_shape, output1_shape,
+                config_input_shape, config_output0_shape, config_output1_shape,
                 input_dtype, output0_dtype, output1_dtype,
                 output0_label_cnt, version_policy)
             emu.create_ensemble_modelfile(
                 pair[0], models_dir, 0, model_version,
-                input_shape, output0_shape, output1_shape,
+                config_input_shape, config_output0_shape, config_output1_shape,
                 input_dtype, output0_dtype, output1_dtype)
 
 
