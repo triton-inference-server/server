@@ -860,7 +860,7 @@ OnnxBackend::Context::SetStringOutputBuffer(
             cudaError_t err = cudaMemcpyAsync(
                 static_cast<char*>(buffer) + copied_byte_size,
                 static_cast<const void*>(&len), sizeof(uint32_t),
-                cudaMemcpyDeviceToHost, stream_);
+                cudaMemcpyHostToDevice, stream_);
             if (err != cudaSuccess) {
               payload.status_ = Status(
                   RequestStatusCode::INTERNAL,
@@ -882,7 +882,7 @@ OnnxBackend::Context::SetStringOutputBuffer(
 #ifdef TRTIS_ENABLE_GPU
             cudaError_t err = cudaMemcpyAsync(
                 static_cast<char*>(buffer) + copied_byte_size,
-                content + offsets[element_idx + e], len, cudaMemcpyDeviceToHost,
+                content + offsets[element_idx + e], len, cudaMemcpyHostToDevice,
                 stream_);
             if (err != cudaSuccess) {
               payload.status_ = Status(
