@@ -149,37 +149,37 @@ for model_trial in v 0 1 2 4; do
     export BATCHER_TYPE="VARIABLE" &&
         [[ "$model_trial" != "v" ]] && export BATCHER_TYPE="FIXED"
 
-    for i in \
-            test_simple_sequence \
-            test_length1_sequence \
-            test_batch_size \
-            test_no_sequence_start \
-            test_no_sequence_start2 \
-            test_no_sequence_end \
-            test_no_correlation_id ; do
-        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
-        SERVER_LOG="./$i.$MODEL_DIR.serverlog"
-        run_server
-        if [ "$SERVER_PID" == "0" ]; then
-            echo -e "\n***\n*** Failed to start $SERVER\n***"
-            cat $SERVER_LOG
-            exit 1
-        fi
+    # for i in \
+    #         test_simple_sequence \
+    #         test_length1_sequence \
+    #         test_batch_size \
+    #         test_no_sequence_start \
+    #         test_no_sequence_start2 \
+    #         test_no_sequence_end \
+    #         test_no_correlation_id ; do
+    #     SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
+    #     SERVER_LOG="./$i.$MODEL_DIR.serverlog"
+    #     run_server
+    #     if [ "$SERVER_PID" == "0" ]; then
+    #         echo -e "\n***\n*** Failed to start $SERVER\n***"
+    #         cat $SERVER_LOG
+    #         exit 1
+    #     fi
 
-        echo "Test: $i, repository $MODEL_DIR" >>$CLIENT_LOG
+    #     echo "Test: $i, repository $MODEL_DIR" >>$CLIENT_LOG
 
-        set +e
-        python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-            echo -e "\n***\n*** Test $i Failed\n***"
-            RET=1
-        fi
-        set -e
+    #     set +e
+    #     python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+    #     if [ $? -ne 0 ]; then
+    #         echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+    #         echo -e "\n***\n*** Test $i Failed\n***"
+    #         RET=1
+    #     fi
+    #     set -e
 
-        kill $SERVER_PID
-        wait $SERVER_PID
-    done
+    #     kill $SERVER_PID
+    #     wait $SERVER_PID
+    # done
 
     # Tests that require TRTSERVER_DELAY_SCHEDULER so that the
     # scheduler is delayed and requests can collect in the queue.

@@ -41,6 +41,7 @@ import test_util as tu
 from functools import partial
 from tensorrtserver.api import *
 import tensorrtserver.shared_memory as shm
+import tensorrtserver.cuda_shared_memory as cudashm
 import tensorrtserver.api.server_status_pb2 as server_status
 if sys.version_info >= (3, 0):
   import queue
@@ -48,6 +49,7 @@ else:
   import Queue as queue
 
 _test_system_shared_memory = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
+_test_cuda_shared_memory = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
 
 _no_batching = (int(os.environ['NO_BATCHING']) == 1)
 _model_instances = int(os.environ['MODEL_INSTANCES'])
@@ -125,19 +127,29 @@ class SequenceBatcherTest(unittest.TestCase):
         # sequence model with state, so can have only a single config.
         configs = []
         if protocol == "http":
-            configs.append(("localhost:8000", ProtocolType.HTTP, False, _test_system_shared_memory))
+            configs.append(("localhost:8000", ProtocolType.HTTP, False))
         if protocol == "grpc":
-            configs.append(("localhost:8001", ProtocolType.GRPC, False, _test_system_shared_memory))
+            configs.append(("localhost:8001", ProtocolType.GRPC, False))
         if protocol == "streaming":
-            configs.append(("localhost:8001", ProtocolType.GRPC, True, _test_system_shared_memory))
+            configs.append(("localhost:8001", ProtocolType.GRPC, True))
 
         self.assertEqual(len(configs), 1)
+
+        # create and register shared memory output region in advance
+        if _test_system_shared_memory or _test_cuda_shared_memory:
+            shared_memory_ctx = SharedMemoryControlContext("localhost:8000",  ProtocolType.HTTP, verbose=False)
+            output_byte_size = 512
+            if _test_system_shared_memory:
+                shm_op_handle = shm.create_shared_memory_region("output_data", "/output", output_byte_size)
+            else:
+                shm_op_handle = cudashm.create_shared_memory_region("output_data", output_byte_size, 0)
+            shared_memory_ctx.unregister(shm_op_handle)
+            shared_memory_ctx.register(shm_op_handle)
 
         for config in configs:
             ctx = InferContext(config[0], config[1], model_name,
                                correlation_id=correlation_id, streaming=config[2],
                                verbose=True)
-            shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
             # Execute the sequence of inference...
             try:
                 seq_start_ms = int(round(time.time() * 1000))
@@ -163,25 +175,22 @@ class SequenceBatcherTest(unittest.TestCase):
                             in0 = np.full(tensor_shape, value, dtype=input_dtype)
                         input_list.append(in0)
 
-                    if config[3]:
+                    # create input shared memory and copy input data values into it
+                    if _test_system_shared_memory or _test_cuda_shared_memory:
                         if input_dtype == np.object:
                             input_list_tmp = iu._prepend_string_size(input_list)
                         else:
                             input_list_tmp = input_list
 
                         input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
-                        output_byte_size = np.dtype(input_dtype).itemsize + 2
-                        # create and register shared memory region for inputs and outputs
-                        shm_ip_handle = shm.create_shared_memory_region(
-                            "input_data", "/input", input_byte_size)
-                        shm_op_handle = shm.create_shared_memory_region(
-                            "output_data", "/output", output_byte_size)
-                        # copy data into shared memory region for input values
-                        shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
+                        if _test_system_shared_memory:
+                            shm_ip_handle = shm.create_shared_memory_region("input_data", "/input", input_byte_size)
+                            shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
+                        else:
+                            cudashm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
+                            shm_ip_handle = cudashm.create_shared_memory_region("input_data", input_byte_size, 0)
                         shared_memory_ctx.unregister(shm_ip_handle)
                         shared_memory_ctx.register(shm_ip_handle)
-                        shared_memory_ctx.unregister(shm_op_handle)
-                        shared_memory_ctx.register(shm_op_handle)
 
                         input_info = (shm_ip_handle, tensor_shape)
                         output_info = (InferContext.ResultFormat.RAW, shm_op_handle)
@@ -222,12 +231,6 @@ class SequenceBatcherTest(unittest.TestCase):
                     if delay_ms is not None:
                         time.sleep(delay_ms[1] / 1000.0)
 
-                    if config[3]:
-                        shared_memory_ctx.unregister(shm_ip_handle)
-                        shm.destroy_shared_memory_region(shm_ip_handle)
-                        shared_memory_ctx.unregister(shm_op_handle)
-                        shm.destroy_shared_memory_region(shm_op_handle)
-
                 seq_end_ms = int(round(time.time() * 1000))
 
                 if input_dtype == np.object:
@@ -248,6 +251,17 @@ class SequenceBatcherTest(unittest.TestCase):
                                         "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
             except Exception as ex:
                 self.add_deferred_exception(ex)
+
+        if _test_system_shared_memory or _test_cuda_shared_memory:
+            shared_memory_ctx.unregister(shm_ip_handle)
+            shared_memory_ctx.unregister(shm_op_handle)
+            if _test_system_shared_memory:
+                shm.destroy_shared_memory_region(shm_ip_handle)
+                shm.destroy_shared_memory_region(shm_op_handle)
+            else:
+                cudashm.destroy_shared_memory_region(shm_ip_handle)
+                cudashm.destroy_shared_memory_region(shm_op_handle)
+
 
     def check_sequence_async(self, trial, model_name, input_dtype, correlation_id,
                              sequence_thresholds, values, expected_result,
@@ -270,26 +284,83 @@ class SequenceBatcherTest(unittest.TestCase):
         # sequence model with state
         configs = []
         if protocol == "http":
-            configs.append(("localhost:8000", ProtocolType.HTTP, False, _test_system_shared_memory))
+            configs.append(("localhost:8000", ProtocolType.HTTP, False))
         if protocol == "grpc":
-            configs.append(("localhost:8001", ProtocolType.GRPC, False, _test_system_shared_memory))
+            configs.append(("localhost:8001", ProtocolType.GRPC, False))
         if protocol == "streaming":
-            configs.append(("localhost:8001", ProtocolType.GRPC, True, _test_system_shared_memory))
+            configs.append(("localhost:8001", ProtocolType.GRPC, True))
         self.assertEqual(len(configs), 1)
+
+        # Create input and output shared memory regions and set data in advance
+        if _test_system_shared_memory or _test_cuda_shared_memory:
+            shm_ip_handles = []
+            shm_op_handles = []
+            shared_memory_ctx = SharedMemoryControlContext("localhost:8000",  ProtocolType.HTTP, verbose=False)
+
+            # create and register shared memory region for inputs and outputs
+            for i, (_, value, _) in enumerate(values):
+                # create data
+                input_list = list()
+                for b in range(batch_size):
+                    if input_dtype == np.object:
+                        in0 = np.full(tensor_shape, value, dtype=np.int32)
+                        in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+                        in0 = in0n.reshape(tensor_shape)
+                    else:
+                        in0 = np.full(tensor_shape, value, dtype=input_dtype)
+                    input_list.append(in0)
+
+                input_list_tmp = iu._prepend_string_size(input_list) if (input_dtype == np.object) else input_list
+
+                input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
+                output_byte_size = np.dtype(input_dtype).itemsize + 2
+                if shm_region_names is None:
+                    if _test_system_shared_memory:
+                        shm_ip_handles.append(shm.create_shared_memory_region(
+                            "input_data"+str(i), "/input"+str(i), input_byte_size))
+                        shm_op_handles.append(shm.create_shared_memory_region(
+                            "output_data"+str(i), "/output"+str(i), output_byte_size))
+                    else:
+                        shm_ip_handles.append(cudashm.create_shared_memory_region(
+                            "input_data"+str(i), input_byte_size, 0))
+                        shm_op_handles.append(cudashm.create_shared_memory_region(
+                            "output_data"+str(i), output_byte_size, 0))
+                else:
+                    if _test_system_shared_memory:
+                        shm_ip_handles.append(shm.create_shared_memory_region(
+                            shm_region_names[0] + str(i) + '_data',
+                            '/' + shm_region_names[0] + str(i),
+                            input_byte_size))
+                        shm_op_handles.append(shm.create_shared_memory_region(
+                            shm_region_names[1] + str(i) + '_data',
+                            '/' + shm_region_names[1] + str(i),
+                            output_byte_size))
+                    else:
+                        shm_ip_handles.append(cudashm.create_shared_memory_region(
+                            shm_region_names[0] + str(i) + '_data',
+                            input_byte_size, 0))
+                        shm_op_handles.append(cudashm.create_shared_memory_region(
+                            shm_region_names[1] + str(i) + '_data',
+                            output_byte_size, 0))
+
+                # copy data into shared memory region for input values
+                if _test_system_shared_memory:
+                    shm.set_shared_memory_region(shm_ip_handles[-1], input_list_tmp)
+                else:
+                    cudashm.set_shared_memory_region(shm_ip_handles[-1], input_list_tmp)
+                shared_memory_ctx.unregister(shm_ip_handles[-1])
+                shared_memory_ctx.register(shm_ip_handles[-1])
+                shared_memory_ctx.unregister(shm_op_handles[-1])
+                shared_memory_ctx.register(shm_op_handles[-1])
 
         for config in configs:
             ctx = InferContext(config[0], config[1], model_name,
                                correlation_id=correlation_id, streaming=config[2],
                                verbose=True)
-            shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
             # Execute the sequence of inference...
             try:
                 seq_start_ms = int(round(time.time() * 1000))
                 user_data = UserData()
-
-                if config[3]:
-                    shm_ip_handle = []
-                    shm_op_handle = []
 
                 sent_count = 0
                 for flag_str, value, pre_delay_ms in values:
@@ -300,51 +371,22 @@ class SequenceBatcherTest(unittest.TestCase):
                         if "end" in flag_str:
                             flags = flags | InferRequestHeader.FLAG_SEQUENCE_END
 
-                    input_list = list()
-                    for b in range(batch_size):
-                        if input_dtype == np.object:
-                            in0 = np.full(tensor_shape, value, dtype=np.int32)
-                            in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
-                            in0 = in0n.reshape(tensor_shape)
-                        else:
-                            in0 = np.full(tensor_shape, value, dtype=input_dtype)
-                        input_list.append(in0)
+                    if not (_test_system_shared_memory or _test_cuda_shared_memory):
+                        input_list = list()
+                        for b in range(batch_size):
+                            if input_dtype == np.object:
+                                in0 = np.full(tensor_shape, value, dtype=np.int32)
+                                in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+                                in0 = in0n.reshape(tensor_shape)
+                            else:
+                                in0 = np.full(tensor_shape, value, dtype=input_dtype)
+                            input_list.append(in0)
 
-                    if config[3]:
-                        if input_dtype == np.object:
-                            input_list_tmp = iu._prepend_string_size(input_list)
-                        else:
-                            input_list_tmp = input_list
-
-                        input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
-                        output_byte_size = np.dtype(input_dtype).itemsize + 2
-                        # create and register shared memory region for inputs and outputs
-                        if shm_region_names is None:
-                            shm_ip_handle.append(shm.create_shared_memory_region(
-                                "input_data"+str(sent_count), "/input"+str(sent_count), input_byte_size))
-                            shm_op_handle.append(shm.create_shared_memory_region(
-                                "output_data"+str(sent_count), "/output"+str(sent_count), output_byte_size))
-                        else:
-                            shm_ip_handle.append(shm.create_shared_memory_region(
-                                shm_region_names[0] + str(sent_count) + '_data',
-                                '/' + shm_region_names[0] + str(sent_count),
-                                input_byte_size))
-                            shm_op_handle.append(shm.create_shared_memory_region(
-                                shm_region_names[1] + str(sent_count) + '_data',
-                                '/' + shm_region_names[1] + str(sent_count),
-                                output_byte_size))
-                        # copy data into shared memory region for input values
-                        shm.set_shared_memory_region(shm_ip_handle[-1], input_list_tmp)
-                        shared_memory_ctx.unregister(shm_ip_handle[-1])
-                        shared_memory_ctx.register(shm_ip_handle[-1])
-                        shared_memory_ctx.unregister(shm_op_handle[-1])
-                        shared_memory_ctx.register(shm_op_handle[-1])
-
-                        input_info = (shm_ip_handle[-1], tensor_shape)
-                        output_info = (InferContext.ResultFormat.RAW, shm_op_handle[-1])
-                    else:
                         input_info = input_list
                         output_info = InferContext.ResultFormat.RAW
+                    else:
+                        input_info = (shm_ip_handles[sent_count], tensor_shape)
+                        output_info = (InferContext.ResultFormat.RAW, shm_op_handles[sent_count])
 
                     if pre_delay_ms is not None:
                         time.sleep(pre_delay_ms / 1000.0)
@@ -375,13 +417,6 @@ class SequenceBatcherTest(unittest.TestCase):
 
                 seq_end_ms = int(round(time.time() * 1000))
 
-                if config[3]:
-                    for i in range(len(shm_ip_handle)):
-                        shared_memory_ctx.unregister(shm_ip_handle[i])
-                        shm.destroy_shared_memory_region(shm_ip_handle[i])
-                        shared_memory_ctx.unregister(shm_op_handle[i])
-                        shm.destroy_shared_memory_region(shm_op_handle[i])
-
                 if input_dtype == np.object:
                     self.assertEqual(int(result), expected_result)
                 else:
@@ -400,6 +435,18 @@ class SequenceBatcherTest(unittest.TestCase):
                                         "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
             except Exception as ex:
                 self.add_deferred_exception(ex)
+
+        if _test_system_shared_memory or _test_cuda_shared_memory:
+            for i in range(len(shm_ip_handles)):
+                shared_memory_ctx.unregister(shm_ip_handles[i])
+                shared_memory_ctx.unregister(shm_op_handles[i])
+                if _test_system_shared_memory:
+                    shm.destroy_shared_memory_region(shm_ip_handles[i])
+                    shm.destroy_shared_memory_region(shm_op_handles[i])
+                else:
+                    cudashm.destroy_shared_memory_region(shm_ip_handles[i])
+                    cudashm.destroy_shared_memory_region(shm_op_handles[i])
+
 
     def check_setup(self, model_name):
         # Make sure test.sh set up the correct batcher settings
