@@ -154,8 +154,11 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
     # prepend size of string to string input string data
     if input_dtype == np.object:
-        input0_list = _prepend_string_size(input0_list)
-        input1_list = _prepend_string_size(input1_list)
+        input0_list_tmp = _prepend_string_size(input0_list)
+        input1_list_tmp = _prepend_string_size(input1_list)
+    else:
+        input0_list_tmp = input0_list
+        input1_list_tmp = input1_list
 
     input0_byte_size = sum([i0.nbytes for i0 in input0_list])
     input1_byte_size = sum([i1.nbytes for i1 in input1_list])
@@ -164,19 +167,23 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         expected0_list_tmp = _prepend_string_size(expected0_list)
     else:
         expected0_list_tmp = expected0_list
-    output0_byte_size = sum([e0.nbytes for e0 in expected0_list])
 
     if output1_dtype == np.object:
         expected1_list_tmp = _prepend_string_size(expected1_list)
     else:
         expected1_list_tmp = expected1_list
-    output1_byte_size = sum([e1.nbytes for e1 in expected1_list])
 
     if TEST_CUDA_SHARED_MEMORY or TEST_SYSTEM_SHARED_MEMORY:
-        shm_handles = su.create_register_set_shm_regions(input0_list, input1_list, expected0_list_tmp, \
+        shm_handles = su.create_register_set_shm_regions(input0_list_tmp, input1_list_tmp, expected0_list_tmp, \
                                         expected1_list_tmp, outputs, shm_region_names, precreated_shm_regions)
+
+    # Run inference and check results for each config
     for config in configs:
         model_name = tu.get_model_name(pf, input_dtype, output0_dtype, output1_dtype)
+
+        ctx = InferContext(config[0], config[1], model_name, model_version,
+                       correlation_id=correlation_id, streaming=config[2],
+                       verbose=True)
 
         expected0_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected0_val_list ]
         expected1_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected1_val_list ]
@@ -210,9 +217,6 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 else:
                     output_req[OUTPUT1] = (InferContext.ResultFormat.CLASS, num_classes)
 
-            ctx = InferContext(config[0], config[1], model_name, model_version,
-                           correlation_id=correlation_id, streaming=config[2],
-                           verbose=True)
         if TEST_CUDA_SHARED_MEMORY or TEST_SYSTEM_SHARED_MEMORY:
             results = ctx.run(
                     { INPUT0 : (shm_handles[0], tensor_shape),
@@ -370,6 +374,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
             input_dict[input_name] = input_list
             output_dict[output_name] = InferContext.ResultFormat.RAW
 
+    # Run inference and check results for each config
     for config in configs:
         model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
 

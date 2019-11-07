@@ -68,12 +68,13 @@ def _create_advance(shm_regions = None):
                 shared_memory_ctx.cuda_register(shm_tmp_handle)
             precreated_shm_regions.append(shm_tmp_handle)
         return precreated_shm_regions
+    return []
 
 def _cleanup_after(shm_handles):
-    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+    if len(shm_handles) != 0:
         shared_memory_ctx = SharedMemoryControlContext("localhost:8000", ProtocolType.HTTP, verbose=True)
-        for shm_tmp_handle in shm_handles:
-            shared_memory_ctx.unregister(shm_tmp_handle)
+    for shm_tmp_handle in shm_handles:
+        shared_memory_ctx.unregister(shm_tmp_handle)
 
 
 class BatcherTest(unittest.TestCase):

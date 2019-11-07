@@ -47,7 +47,7 @@ if sys.version_info >= (3, 0):
 else:
   import Queue as queue
 
-TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
+_test_system_shared_memory = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 
 _no_batching = (int(os.environ['NO_BATCHING']) == 1)
 _model_instances = int(os.environ['MODEL_INSTANCES'])
@@ -125,11 +125,11 @@ class SequenceBatcherTest(unittest.TestCase):
         # sequence model with state, so can have only a single config.
         configs = []
         if protocol == "http":
-            configs.append(("localhost:8000", ProtocolType.HTTP, False, TEST_SYSTEM_SHARED_MEMORY))
+            configs.append(("localhost:8000", ProtocolType.HTTP, False, _test_system_shared_memory))
         if protocol == "grpc":
-            configs.append(("localhost:8001", ProtocolType.GRPC, False, TEST_SYSTEM_SHARED_MEMORY))
+            configs.append(("localhost:8001", ProtocolType.GRPC, False, _test_system_shared_memory))
         if protocol == "streaming":
-            configs.append(("localhost:8001", ProtocolType.GRPC, True, TEST_SYSTEM_SHARED_MEMORY))
+            configs.append(("localhost:8001", ProtocolType.GRPC, True, _test_system_shared_memory))
 
         self.assertEqual(len(configs), 1)
 
@@ -270,11 +270,11 @@ class SequenceBatcherTest(unittest.TestCase):
         # sequence model with state
         configs = []
         if protocol == "http":
-            configs.append(("localhost:8000", ProtocolType.HTTP, False, TEST_SYSTEM_SHARED_MEMORY))
+            configs.append(("localhost:8000", ProtocolType.HTTP, False, _test_system_shared_memory))
         if protocol == "grpc":
-            configs.append(("localhost:8001", ProtocolType.GRPC, False, TEST_SYSTEM_SHARED_MEMORY))
+            configs.append(("localhost:8001", ProtocolType.GRPC, False, _test_system_shared_memory))
         if protocol == "streaming":
-            configs.append(("localhost:8001", ProtocolType.GRPC, True, TEST_SYSTEM_SHARED_MEMORY))
+            configs.append(("localhost:8001", ProtocolType.GRPC, True, _test_system_shared_memory))
         self.assertEqual(len(configs), 1)
 
         for config in configs:
