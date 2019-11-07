@@ -67,6 +67,7 @@ for m in \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_netdef_sequence_int32 \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_sequence_object \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_sequence_float32 \
+        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_onnx_sequence_int32 \
         ../custom_models/custom_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/libtorch_sequence_int32 ; do
     cp -r $m models1/. && \
@@ -98,6 +99,7 @@ for m in \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_object \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_int32 \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_nobatch_sequence_float32 \
+        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_onnx_nobatch_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/libtorch_nobatch_sequence_int32 ; do
     cp -r $m models0/. && \
         (cd models0/$(basename $m) && \
@@ -117,6 +119,7 @@ for m in \
         $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_netdef_sequence_int32 \
         $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_graphdef_sequence_object \
         $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_savedmodel_sequence_float32 \
+        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_onnx_sequence_int32 \
         $DATADIR/qa_variable_sequence_model_repository/libtorch_sequence_int32 ; do
     cp -r $m modelsv/. && \
         (cd modelsv/$(basename $m) && \
