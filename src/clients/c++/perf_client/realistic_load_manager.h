@@ -25,34 +25,42 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/clients/c++/perf_client/context_factory.h"
 #include "src/clients/c++/perf_client/load_manager.h"
+#include "src/clients/c++/perf_client/perf_utils.h"
+
+#include <condition_variable>
+#include <thread>
+
 
 //==============================================================================
-/// ConcurrencyManager is a helper class to send inference requests to inference
-/// server consistently, based on the specified setting, so that the perf_client
-/// can measure performance under different concurrency.
+/// RealisticLoadManager is a helper class to send inference requests to
+/// inference server in accordance with a Poisson distribution. This
+/// distribution models the real-world traffic patterns.
 ///
-/// An instance of concurrency manager will be created at the beginning of the
-/// perf client and it will be used to simulate different load level in respect
-/// to number of concurrent infer requests and to collect per-request statistic.
+/// An instance of this load manager will be created at the beginning of the
+/// perf client and it will be used to simulate load with different target
+/// requests per second values and to collect per-request statistic.
 ///
 /// Detail:
-/// Concurrency Manager will maintain the number of concurrent requests by
-/// spawning worker threads that keep sending randomly generated requests to the
-/// server. The worker threads will record the start time and end
-/// time of each request into a shared vector.
+/// Realistic Load Manager will try to follow a pre-computed schedule while
+/// issuing requests to the server. The manager might spawn additional worker
+/// thread to meet the timeline imposed by the schedule. The worker threads will
+/// record the start time and end time of each request into a shared vector
+/// which will be used to report the observed latencies in serving requests.
+/// Additionally, they will report a vector of the number of requests missed
+/// their schedule.
 ///
-class ConcurrencyManager : public LoadManager {
+class RealisticLoadManager : public LoadManager {
  public:
-  ~ConcurrencyManager(){};
+  ~RealisticLoadManager();
 
-  /// Create a concurrency manager that is responsible to maintain specified
-  /// load on inference server.
+  /// Create an object of realistic load manager that is responsible to maintain
+  /// specified load on inference server.
   /// \param async Whether to use asynchronous or synchronous API for infer
   /// request.
   /// \param batch_size The batch size used for each request.
   /// \param max_threads The maximum number of working threads to be spawned.
-  /// \param max_concurrency The maximum concurrency which will be requested.
   /// \param sequence_length The base length of each sequence.
   /// \param zero_input Whether to fill the input tensors with zero.
   /// \param factory The ContextFactory object used to create InferContext.
@@ -60,38 +68,10 @@ class ConcurrencyManager : public LoadManager {
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const bool async, const int32_t batch_size, const size_t max_threads,
-      const size_t max_concurrency, const size_t sequence_length,
+      const size_t sequence_length,
       const size_t string_length, const std::string& string_data,
       const bool zero_input,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       const std::string& data_directory,
       const std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
-
-  /// Adjust the number of concurrent requests to be the same as
-  /// 'concurrent_request_count' (by creating threads or by pausing threads)
-  /// \param concurent_request_count The number of concurrent requests.
-  /// \return Error object indicating success or failure.
-  nic::Error UpdateLoad(const size_t concurrent_request_count) override;
-
- private:
-  ConcurrencyManager(
-      const bool async,
-      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      const int32_t batch_size, const size_t max_threads,
-      const size_t max_concurrency, const size_t sequence_length,
-      const std::shared_ptr<ContextFactory>& factory);
-
-  struct ThreadConfig {
-    //  The concurrency level that the worker should produce
-    size_t concurrency_;
-    ThreadConfig() : concurrency_(0) {}
-  };
-
-  /// Function for worker that sends inference requests.
-  /// \param thread_stat Worker thread specific data.
-  void Infer(std::shared_ptr<ThreadStat> thread_stat, std::shared_ptr<ThreadConfig> thread_config);
-
-  size_t max_concurrency_;
-  std::vector<std::shared_ptr<ThreadConfig>> threads_config_;
-};

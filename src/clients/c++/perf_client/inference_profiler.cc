@@ -115,7 +115,7 @@ InferenceProfiler::Profile(
 {
   status_summary.concurrency = concurrent_request_count;
 
-  RETURN_IF_ERROR(manager_->ChangeConcurrencyLevel(concurrent_request_count));
+  RETURN_IF_ERROR(manager_->UpdateLoad(concurrent_request_count));
 
   // Start measurement
   bool is_stable = false;

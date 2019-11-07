@@ -38,6 +38,7 @@ set(
   concurrency_manager.cc
   inference_profiler.cc
   perf_utils.cc
+  load_manager.cc
 )
 
 set(
