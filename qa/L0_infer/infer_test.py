@@ -35,11 +35,9 @@ import infer_util as iu
 import test_util as tu
 from tensorrtserver.api import *
 import os
-if "TEST_SHARED_MEMORY" in os.environ:
-    TEST_SHARED_MEMORY=int(os.environ["TEST_SHARED_MEMORY"])
-else:
-    TEST_SHARED_MEMORY=0
 
+TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
 CPU_ONLY = (os.environ.get('TENSORRT_SERVER_CPU_ONLY') is not None)
 
 np_dtype_string = np.dtype(object)
@@ -173,7 +171,6 @@ class InferTest(unittest.TestCase):
         self._full_exact(np.int32, np.float16, np.int16,
                          output0_raw=True, output1_raw=True, swap=False)
 
-
     def test_raw_ooo(self):
         self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string,
                          output0_raw=True, output1_raw=True, swap=False)
@@ -197,7 +194,7 @@ class InferTest(unittest.TestCase):
                          output0_raw=True, output1_raw=True, swap=False)
 
     # shared memory does not support class output
-    if not TEST_SHARED_MEMORY:
+    if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
         def test_class_bbb(self):
             self._full_exact(np.int8, np.int8, np.int8,
                              output0_raw=False, output1_raw=False, swap=True)
@@ -392,7 +389,7 @@ class InferTest(unittest.TestCase):
             iu.infer_exact(self, "mix_nobatch_batch", (16,), bs,
                 np.float32, np.float32, np.float32)
 
-    if not TEST_SHARED_MEMORY:
+    if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
         def test_ensemble_label_lookup(self):
             # Ensemble needs to look up label from the actual model
             for bs in (1, 8):
