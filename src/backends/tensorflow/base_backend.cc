@@ -195,25 +195,14 @@ BaseBackend::CreateExecutionContext(
   TRTISTF_TFTRTConfig* tftrt_config_ptr = nullptr;
   TRTISTF_TFTRTConfig tftrt_config;
   if (Config().optimization().has_execution_accelerators()) {
-    // Set default values
+    // Set default values. is_dynamic_op is always true for online
+    // TF-TRT.
     tftrt_config.minimum_segment_size_ = 3;
     tftrt_config.max_workspace_size_bytes_ = 1 << 30;
     tftrt_config.max_cached_engines_ = 100;
     tftrt_config.max_batch_size_ = std::max(Config().max_batch_size(), 1);
     tftrt_config.precision_mode_ = TRTISTF_MODE_FP32;
-    tftrt_config.is_dynamic_op_ = false;
-    for (const auto& io : Config().input()) {
-      const auto& dims = io.has_reshape() ? io.reshape().shape() : io.dims();
-      for (const auto& dim : dims) {
-        tftrt_config.is_dynamic_op_ |= (dim == -1);
-      }
-    }
-    for (const auto& io : Config().output()) {
-      const auto& dims = io.has_reshape() ? io.reshape().shape() : io.dims();
-      for (const auto& dim : dims) {
-        tftrt_config.is_dynamic_op_ |= (dim == -1);
-      }
-    }
+    tftrt_config.is_dynamic_op_ = true;
 
     if (!Config()
              .optimization()
@@ -261,10 +250,6 @@ BaseBackend::CreateExecutionContext(
             RETURN_IF_ERROR(ParseLongLongParameter(
                 parameter.first, parameter.second,
                 &tftrt_config.max_cached_engines_));
-          } else if (parameter.first == "is_dynamic_op") {
-            RETURN_IF_ERROR(ParseBoolParameter(
-                parameter.first, parameter.second,
-                &tftrt_config.is_dynamic_op_));
           } else {
             return Status(
                 RequestStatusCode::INVALID_ARG,
