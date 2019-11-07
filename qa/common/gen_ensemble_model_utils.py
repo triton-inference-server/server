@@ -65,7 +65,9 @@ def platform_types_and_validation():
         ("graphdef", tu.validate_for_tf_model),
         ("savedmodel", tu.validate_for_tf_model),
         ("netdef", tu.validate_for_c2_model),
-        ("plan", tu.validate_for_trt_model)]
+        ("plan", tu.validate_for_trt_model),
+        ("onnx", tu.validate_for_onnx_model),
+        ("libtorch", tu.validate_for_libtorch_model)]
     return res
 
 class AddSubEnsembleSchedule:
@@ -92,6 +94,8 @@ class AddSubEnsembleSchedule:
     def _get_simple_ensemble_schedule(cls, base_model_name,
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype):
+        # libtorch model uses other naming convention
+        index_delimiter = "__" if "libtorch" in base_model_name else ""
         # ensemble input -> addsub -> ensemble output
         schedule = '''
 ensemble_scheduling {{
@@ -100,31 +104,33 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT0"
+        key: "INPUT{delimiter}0"
         value: "INPUT0"
       }}
       input_map {{
-        key: "INPUT1"
+        key: "INPUT{delimiter}1"
         value: "INPUT1"
       }}
       output_map {{
-        key: "OUTPUT0"
+        key: "OUTPUT{delimiter}0"
         value: "OUTPUT0"
       }}
       output_map {{
-        key: "OUTPUT1"
+        key: "OUTPUT{delimiter}1"
         value: "OUTPUT1"
       }}
     }}
   ]
 }}
-'''.format(base_model_name)
+'''.format(base_model_name, delimiter=index_delimiter)
         return schedule
 
     @classmethod
     def _get_sequence_ensemble_schedule(cls, base_model_name,
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype):
+        # libtorch model uses other naming convention
+        index_delimiter = "__" if "libtorch" in base_model_name else ""
         # ensemble input -> nop -> addsub -> ensemble output
         nop_input_shape = fixed_to_variable_size(input_shape)
         schedule = '''
@@ -154,31 +160,35 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT0"
+        key: "INPUT{delimiter}0"
         value: "same_input0"
       }}
       input_map {{
-        key: "INPUT1"
+        key: "INPUT{delimiter}1"
         value: "same_input1"
       }}
       output_map {{
-        key: "OUTPUT0"
+        key: "OUTPUT{delimiter}0"
         value: "OUTPUT0"
       }}
       output_map {{
-        key: "OUTPUT1"
+        key: "OUTPUT{delimiter}1"
         value: "OUTPUT1"
       }}
     }}
   ]
 }}
-'''.format(input_dtype, tu.shape_to_dims_str(nop_input_shape), base_model_name)
+'''.format(input_dtype, tu.shape_to_dims_str(nop_input_shape), base_model_name,
+              delimiter=index_delimiter)
         return schedule
 
     @classmethod
     def _get_fan_ensemble_schedule(cls, base_model_name,
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype):
+        # libtorch model uses other naming convention
+        index_delimiter = "__" if "libtorch" in base_model_name else ""
+
         # ensemble input -> nop -> addsub ->
         # nop (fan out, one output send to one nop) -> ensemble output (fan in)
         nop_input_shape = fixed_to_variable_size(input_shape)
@@ -211,19 +221,19 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT0"
+        key: "INPUT{delimiter}0"
         value: "same_input0"
       }}
       input_map {{
-        key: "INPUT1"
+        key: "INPUT{delimiter}1"
         value: "same_input1"
       }}
       output_map {{
-        key: "OUTPUT0"
+        key: "OUTPUT{delimiter}0"
         value: "same_output0"
       }}
       output_map {{
-        key: "OUTPUT1"
+        key: "OUTPUT{delimiter}1"
         value: "same_output1"
       }}
     }},
@@ -263,7 +273,8 @@ ensemble_scheduling {{
 }}
 '''.format(input_dtype, tu.shape_to_dims_str(nop_input_shape), base_model_name,
               output0_dtype, tu.shape_to_dims_str(nop_output0_shape),
-              output1_dtype, tu.shape_to_dims_str(nop_output1_shape))
+              output1_dtype, tu.shape_to_dims_str(nop_output1_shape),
+              delimiter=index_delimiter)
         return schedule
 
 
@@ -484,6 +495,8 @@ class SequenceEnsembleSchedule:
 
     @classmethod
     def _get_simple_ensemble_schedule(cls, base_model_name, shape, model_dtype):
+        # libtorch model uses other naming convention
+        index_suffix = "__0" if "libtorch" in base_model_name else ""
         # ensemble input -> sequence -> ensemble output
         schedule = '''
 ensemble_scheduling {{
@@ -492,17 +505,17 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT"
+        key: "INPUT{index}"
         value: "INPUT"
       }}
       output_map {{
-        key: "OUTPUT"
+        key: "OUTPUT{index}"
         value: "OUTPUT"
       }}
     }}
   ]
 }}
-'''.format(base_model_name)
+'''.format(base_model_name, index=index_suffix)
         return schedule
 
     @classmethod
@@ -511,6 +524,9 @@ ensemble_scheduling {{
         if model_dtype == "TYPE_STRING":
           return SequenceEnsembleSchedule._get_simple_ensemble_schedule(
                   base_model_name, shape, model_dtype)
+
+        # libtorch model uses other naming convention
+        index_suffix = "__0" if "libtorch" in base_model_name else ""
         # ensemble input -> nop -> sequence -> ensemble output
         nop_input_shape = fixed_to_variable_size(shape)
         schedule = '''
@@ -536,17 +552,17 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT"
+        key: "INPUT{index}"
         value: "same_input"
       }}
       output_map {{
-        key: "OUTPUT"
+        key: "OUTPUT{index}"
         value: "OUTPUT"
       }}
     }}
   ]
 }}
-'''.format(model_dtype, tu.shape_to_dims_str(nop_input_shape), base_model_name)
+'''.format(model_dtype, tu.shape_to_dims_str(nop_input_shape), base_model_name, index=index_suffix)
         return schedule
 
     @classmethod
@@ -555,6 +571,9 @@ ensemble_scheduling {{
         if model_dtype == "TYPE_STRING":
           return SequenceEnsembleSchedule._get_simple_ensemble_schedule(
                   base_model_name, shape, model_dtype)
+
+        # libtorch model uses other naming convention
+        index_suffix = "__0" if "libtorch" in base_model_name else ""
         # Not a "fan" due to configuration of base sequence model
         # ensemble input -> nop -> sequence -> nop -> ensemble output
         nop_shape = fixed_to_variable_size(shape)
@@ -581,11 +600,11 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT"
+        key: "INPUT{index}"
         value: "same_input"
       }}
       output_map {{
-        key: "OUTPUT"
+        key: "OUTPUT{index}"
         value: "same_output"
       }}
     }},
@@ -608,7 +627,7 @@ ensemble_scheduling {{
   ]
 }}
 '''.format(model_dtype, tu.shape_to_dims_str(nop_shape), base_model_name,
-              model_dtype, tu.shape_to_dims_str(nop_shape))
+              model_dtype, tu.shape_to_dims_str(nop_shape), index=index_suffix)
         return schedule
 
 

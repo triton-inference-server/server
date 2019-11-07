@@ -1070,21 +1070,22 @@ def create_models(models_dir, dtype, shape, no_batch=True):
 
     if FLAGS.ensemble:
         for pair in emu.platform_types_and_validation():
+            config_shape = shape
             if pair[0] == "plan" and dtype == np.int8:
-                shape = shape + [1, 1]
+                config_shape = shape + [1, 1]
             if not pair[1](dtype, dtype, dtype,
-                            shape, shape, shape):
+                            config_shape, config_shape, config_shape):
                 continue
 
             emu.create_sequence_ensemble_modelconfig(
-                pair[0], models_dir, 8, model_version, shape, dtype)
+                pair[0], models_dir, 8, model_version, config_shape, dtype)
             emu.create_sequence_ensemble_modelfile(
-                pair[0], models_dir, 8, model_version, shape, dtype)
+                pair[0], models_dir, 8, model_version, config_shape, dtype)
             if no_batch:
                 emu.create_sequence_ensemble_modelconfig(
-                    pair[0], models_dir, 0, model_version, shape, dtype)
+                    pair[0], models_dir, 0, model_version, config_shape, dtype)
                 emu.create_sequence_ensemble_modelfile(
-                    pair[0], models_dir, 0, model_version, shape, dtype)
+                    pair[0], models_dir, 0, model_version, config_shape, dtype)
 
 
 if __name__ == '__main__':
