@@ -90,7 +90,9 @@ class ConcurrencyManager : public LoadManager {
 
   /// Function for worker that sends inference requests.
   /// \param thread_stat Worker thread specific data.
-  void Infer(std::shared_ptr<ThreadStat> thread_stat, std::shared_ptr<ThreadConfig> thread_config);
+  void Infer(
+      std::shared_ptr<ThreadStat> thread_stat,
+      std::shared_ptr<ThreadConfig> thread_config);
 
   size_t max_concurrency_;
   std::vector<std::shared_ptr<ThreadConfig>> threads_config_;

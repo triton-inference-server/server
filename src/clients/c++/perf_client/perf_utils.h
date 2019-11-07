@@ -39,8 +39,8 @@
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
 
-using TimestampVector =
-    std::vector<std::tuple<struct timespec, struct timespec, uint32_t, uint32_t>>;
+using TimestampVector = std::vector<
+    std::tuple<struct timespec, struct timespec, uint32_t, uint32_t>>;
 
 // Will use the characters specified here to construct random strings
 std::string const character_set =

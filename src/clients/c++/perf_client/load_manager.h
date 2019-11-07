@@ -73,6 +73,16 @@ class LoadManager {
 
 
  protected:
+  /// Helper funtion to retrieve the input data for the inferences
+  /// \param local_manager The current manager object under construction.
+  /// \param string_length The length of the random strings to be generated
+  /// for string inputs.
+  /// \param string_data The string to be used as string inputs for model.
+  /// \param zero_input Whether to use zero for model inputs.
+  /// \param data_directory The path to the directory containing the input data
+  /// in binary or text files.
+  /// \param manager Returns the final manager object with inputs initialized
+  /// \return Error object indicating success or failure.
   static nic::Error InitManagerInputs(
       std::unique_ptr<LoadManager> local_manager, const size_t string_length,
       const std::string& string_data, const bool zero_input,
@@ -131,8 +141,9 @@ class LoadManager {
     ThreadStat() : status_(ni::RequestStatusCode::SUCCESS) {}
   };
 
-  // Note: early_exit signal is kept global
+  // Worker threads that loads the server with inferences
   std::vector<std::thread> threads_;
+  // Contains the statistics on the current working threads
   std::vector<std::shared_ptr<ThreadStat>> threads_stat_;
 
   // Use condition variable to pause/continue worker threads

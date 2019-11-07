@@ -68,9 +68,8 @@ class RealisticLoadManager : public LoadManager {
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const bool async, const int32_t batch_size, const size_t max_threads,
-      const size_t sequence_length,
-      const size_t string_length, const std::string& string_data,
-      const bool zero_input,
+      const size_t sequence_length, const size_t string_length,
+      const std::string& string_data, const bool zero_input,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       const std::string& data_directory,
       const std::shared_ptr<ContextFactory>& factory,

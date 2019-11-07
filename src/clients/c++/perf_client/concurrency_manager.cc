@@ -40,7 +40,7 @@ ConcurrencyManager::Create(
   std::unique_ptr<ConcurrencyManager> local_manager(new ConcurrencyManager(
       async, input_shapes, batch_size, max_threads, max_concurrency,
       sequence_length, factory));
-    
+
   local_manager->threads_config_.reserve(max_threads);
 
   RETURN_IF_ERROR(InitManagerInputs(
@@ -90,7 +90,8 @@ ConcurrencyManager::UpdateLoad(const size_t concurrent_request_count)
     // request at a time, hence the number of worker threads should be equal to
     // the requested concurrency levels.
     threads_.emplace_back(
-        &ConcurrencyManager::Infer, this, threads_stat_.back(), threads_config_.back());
+        &ConcurrencyManager::Infer, this, threads_stat_.back(),
+        threads_config_.back());
   }
 
   // Compute the new concurrency level for each thread (take floor)
@@ -115,7 +116,9 @@ ConcurrencyManager::UpdateLoad(const size_t concurrent_request_count)
 // If the model is sequence model, each worker has to use multiples contexts
 // to maintain (sequence) concurrency assigned to worker.
 void
-ConcurrencyManager::Infer(std::shared_ptr<ThreadStat> thread_stat, std::shared_ptr<ThreadConfig> thread_config)
+ConcurrencyManager::Infer(
+    std::shared_ptr<ThreadStat> thread_stat,
+    std::shared_ptr<ThreadConfig> thread_config)
 {
   std::vector<std::unique_ptr<InferContextMetaData>> ctxs;
 
@@ -208,8 +211,8 @@ ConcurrencyManager::Infer(std::shared_ptr<ThreadStat> thread_stat, std::shared_p
                   // Add the request timestamp to thread Timestamp vector with
                   // proper locking
                   std::lock_guard<std::mutex> lock(thread_stat->mu_);
-                  thread_stat->request_timestamps_.emplace_back(
-                      std::make_tuple(start_time_async, end_time_async, flags, 0));
+                  thread_stat->request_timestamps_.emplace_back(std::make_tuple(
+                      start_time_async, end_time_async, flags, 0));
                   ctxs[idx]->ctx_->GetStat(&(thread_stat->contexts_stat_[idx]));
                 }
                 ctxs[idx]->inflight_request_cnt_--;
