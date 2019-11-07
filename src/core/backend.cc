@@ -27,13 +27,64 @@
 #include "src/core/backend.h"
 
 #include <chrono>
+#include <future>
 #include "src/core/constants.h"
 #include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/model_config_utils.h"
+#include "src/core/provider_utils.h"
 #include "src/core/sequence_batch_scheduler.h"
+#include "src/core/trtserver.h"
+
+namespace {
+
+// Declare allocator for model warmup globally as it is a handler without
+// internal state
+std::unique_ptr<
+    TRTSERVER_ResponseAllocator, decltype(&TRTSERVER_ResponseAllocatorDelete)>
+    warmup_allocator(nullptr, TRTSERVER_ResponseAllocatorDelete);
+
+TRTSERVER_Error*
+ResponseAlloc(
+    TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
+    int64_t preferred_memory_type_id, void* userp, void** buffer,
+    void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
+    int64_t* actual_memory_type_id)
+{
+  // Use system memory to simplify the process
+  *actual_memory_type = TRTSERVER_MEMORY_CPU;
+  *actual_memory_type_id = 0;
+
+  if (byte_size == 0) {
+    *buffer = nullptr;
+    *buffer_userp = nullptr;
+  } else {
+    *buffer = malloc(byte_size);
+    *buffer_userp = nullptr;
+  }
+
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+ResponseRelease(
+    TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
+{
+  if (memory_type == TRTSERVER_MEMORY_CPU) {
+    free(buffer);
+  } else {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INTERNAL, "unexpected warmup output allocation on GPU");
+  }
+
+  return nullptr;  // Success
+}
+
+}  // namespace
 
 namespace nvidia { namespace inferenceserver {
 
@@ -192,11 +243,38 @@ InferenceBackend::Run(
 Status
 InferenceBackend::WarmUp()
 {
-  // [TODO] run in parallel
+  LOG_VERBOSE(1) << "warming up model '" << Name() << "' with sample request";
+  static std::mutex mtx;
+  {
+    std::lock_guard<std::mutex> lk(mtx);
+    if (warmup_allocator == nullptr) {
+      TRTSERVER_ResponseAllocator* allocator;
+      auto err = TRTSERVER_ResponseAllocatorNew(
+          &allocator, ResponseAlloc, ResponseRelease);
+      if (err != nullptr) {
+        auto status = Status(
+            TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
+            TRTSERVER_ErrorMessage(err));
+        TRTSERVER_ErrorDelete(err);
+        return status;
+      }
+
+      warmup_allocator.reset(allocator);
+    }
+  }
+
+  std::vector<std::future<Status>> warmup_res;
   for (auto& context : contexts_) {
-    std::vector<Scheduler::Payload> payloads;
-    RETURN_IF_ERROR(CreateWarmUpPayload(&payloads));
-    RETURN_IF_ERROR(context->Run(this, &payloads));
+    warmup_res.emplace_back(std::async(std::launch::async, [this](BackendContext* context){
+      std::vector<Scheduler::Payload> payloads;
+      RETURN_IF_ERROR(CreateWarmUpPayload(&payloads));
+      RETURN_IF_ERROR(context->Run(this, &payloads));
+      return Status::Success;
+    }, context.get()));
+  }
+
+  for (auto& res_future : warmup_res) {
+    RETURN_IF_ERROR(res_future.get());
   }
 
   return Status::Success;
@@ -205,9 +283,43 @@ InferenceBackend::WarmUp()
 Status
 InferenceBackend::CreateWarmUpPayload(std::vector<Scheduler::Payload>* payloads)
 {
-  // [TODO] create request / response provider based on model_warm_up in config
-  payloads->clear();
-  return Status(RequestStatusCode::UNSUPPORTED, "Not implemented");
+  auto request_header = config_.model_warm_up().request_header();
+  RETURN_IF_ERROR(NormalizeRequestHeader(*this, request_header));
+
+  std::unordered_map<std::string, std::shared_ptr<Memory>> input_buffer;
+  for (const auto& input : request_header.input()) {
+    auto pr = input_buffer.emplace(input.name(), nullptr);
+    if (pr.second) {
+      // [TODO] just get the max and put to all input as ref
+      pr.first->second.reset(new AllocatedSystemMemory(
+          input.batch_byte_size(), TRTSERVER_MEMORY_CPU /* memory_type */,
+          0 /* memory_type_id */));
+      TRTSERVER_Memory_Type type;
+      int64_t type_id;
+      char* buffer = static_cast<AllocatedSystemMemory*>(pr.first->second.get())
+                         ->MutableBuffer(&type, &type_id);
+      if (config_.model_warm_up().use_zero_value()) {
+        memset(buffer, 0, input.batch_byte_size());
+      } else {
+        // [TODO] look up 'sample' data (similar to what is done in perf_client)
+        return Status(RequestStatusCode::UNSUPPORTED, "Not implemented");
+      }
+    }
+  }
+  std::shared_ptr<InferRequestProvider> request_provider;
+  RETURN_IF_ERROR(InferRequestProvider::Create(
+      config_.name(), version_, request_header, input_buffer,
+      &request_provider));
+
+  std::shared_ptr<InferResponseProvider> response_provider;
+  RETURN_IF_ERROR(InferResponseProvider::Create(
+      request_header, label_provider_, warmup_allocator.get(), ResponseAlloc, nullptr, ResponseRelease,
+      &response_provider));
+
+  // Only request / response providers are required for triggering model run
+  payloads->emplace_back(nullptr, request_provider, response_provider, nullptr);
+
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver
