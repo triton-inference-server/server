@@ -574,22 +574,27 @@ PlanBackend::Context::InitializeSequenceControlInputBindings(
   if (config.has_sequence_batching()) {
     std::vector<ModelSequenceBatching::Control::Kind> kinds{
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY};
 
     for (const ModelSequenceBatching::Control::Kind control_kind : kinds) {
+      const bool required =
+          (control_kind !=
+           ModelSequenceBatching::Control::CONTROL_SEQUENCE_END);
+
       std::string tensor_name;
       DataType tensor_datatype;
       RETURN_IF_ERROR(GetSequenceControlProperties(
-          config.sequence_batching(), config.name(), control_kind,
-          true /* required */, &tensor_name, &tensor_datatype, nullptr, nullptr,
-          nullptr, nullptr));
+          config.sequence_batching(), config.name(), control_kind, required,
+          &tensor_name, &tensor_datatype, nullptr, nullptr, nullptr, nullptr));
+      if (!tensor_name.empty()) {
+        // Control tensors must have shape [1].
+        DimsList dims;
+        dims.Add(1);
 
-      // Control tensors must have shape [1].
-      DimsList dims;
-      dims.Add(1);
-
-      RETURN_IF_ERROR(InitializeInputBinding(
-          tensor_name, tensor_datatype, dims, support_batching, true));
+        RETURN_IF_ERROR(InitializeInputBinding(
+            tensor_name, tensor_datatype, dims, support_batching, true));
+      }
     }
   }
 

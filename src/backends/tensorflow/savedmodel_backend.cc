@@ -37,22 +37,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-namespace {
-
-const TRTISTF_IO*
-FindIOByName(const TRTISTF_IOList* ios, const std::string& name)
-{
-  for (const TRTISTF_IOList* itr = ios; itr != nullptr; itr = itr->next_) {
-    if (itr->io_->name_ == name) {
-      return itr->io_;
-    }
-  }
-
-  return nullptr;
-}
-
-}  // namespace
-
 Status
 SavedModelBackend::CreateTRTISTFModel(
     const GraphDefBackendFactory::Config* backend_config, const int device_id,
@@ -93,11 +77,25 @@ SavedModelBackend::CreateTRTISTFModel(
   // inputs are present in the model and have the correct shape and
   // datatype.
   if (Config().has_sequence_batching()) {
+    bool have_start, have_end, have_ready;
     RETURN_IF_ERROR(ValidateSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, inputs));
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, inputs,
+        true /* required */, &have_start));
     RETURN_IF_ERROR(ValidateSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, inputs));
-    expected_input_cnt += 2;
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, inputs,
+        false /* required */, &have_end));
+    RETURN_IF_ERROR(ValidateSequenceControl(
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, inputs,
+        true /* required */, &have_ready));
+    if (have_start) {
+      expected_input_cnt += 1;
+    }
+    if (have_end) {
+      expected_input_cnt += 1;
+    }
+    if (have_ready) {
+      expected_input_cnt += 1;
+    }
   }
 
   // Verify that the model configuration input and outputs match what
@@ -203,42 +201,44 @@ SavedModelBackend::CreateTRTISTFModel(
 Status
 SavedModelBackend::ValidateSequenceControl(
     const ModelSequenceBatching::Control::Kind control_kind,
-    const TRTISTF_IOList* inputs)
+    const TRTISTF_IOList* inputs, bool required, bool* have_control)
 {
   std::string tensor_name;
   DataType tensor_datatype;
   RETURN_IF_ERROR(GetSequenceControlProperties(
-      Config().sequence_batching(), Name(), control_kind, true /* required */,
+      Config().sequence_batching(), Name(), control_kind, required,
       &tensor_name, &tensor_datatype, nullptr, nullptr, nullptr, nullptr));
+  *have_control = !tensor_name.empty();
+  if (*have_control) {
+    const TRTISTF_IO* input = FindIOByName(inputs, tensor_name);
+    if (input == nullptr) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "configuration specified sequence control '" + tensor_name +
+              "', but model does not provide that input");
+    }
 
-  const TRTISTF_IO* input = FindIOByName(inputs, tensor_name);
-  if (input == nullptr) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "configuration specified sequence control '" + tensor_name +
-            "', but model does not provide that input");
-  }
+    // Control tensors must have shape [1].
+    DimsList dims;
+    dims.Add(1);
 
-  // Control tensors must have shape [1].
-  DimsList dims;
-  dims.Add(1);
+    if (!CompareDimsExact(input->shape_, dims, Config().max_batch_size() > 0)) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + Name() + "', sequence control '" +
+              tensor_name + "' dims " + ShapeToString(input->shape_) +
+              " don't match expected dims [1]");
+    }
 
-  if (!CompareDimsExact(input->shape_, dims, Config().max_batch_size() > 0)) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "unable to load model '" + Name() + "', sequence control '" +
-            tensor_name + "' dims " + ShapeToString(input->shape_) +
-            " don't match expected dims [1]");
-  }
-
-  if (!CompareDataType(input->data_type_, tensor_datatype)) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "unable to load model '" + Name() + "', sequence control '" +
-            tensor_name + "' data-type " +
-            DataType_Name(ConvertDataType(input->data_type_)) +
-            " doesn't match required data-type " +
-            DataType_Name(tensor_datatype));
+    if (!CompareDataType(input->data_type_, tensor_datatype)) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + Name() + "', sequence control '" +
+              tensor_name + "' data-type " +
+              DataType_Name(ConvertDataType(input->data_type_)) +
+              " doesn't match required data-type " +
+              DataType_Name(tensor_datatype));
+    }
   }
 
   return Status::Success;

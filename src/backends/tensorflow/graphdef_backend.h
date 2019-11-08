@@ -44,6 +44,10 @@ class GraphDefBackend : public BaseBackend {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(GraphDefBackend);
+
+  Status ValidateSequenceControl(
+      const ModelSequenceBatching::Control::Kind control_kind,
+      const TRTISTF_IOList* inputs, bool required);
 };
 
 }}  // namespace nvidia::inferenceserver
