@@ -679,8 +679,8 @@ InferResponseAlloc(
         *actual_memory_type_id = pr->second.device_id_;
         use_shm = true;
 
-        LOG_VERBOSE(1) << "GRPC shared-memory: " << tensor_name << ", size "
-                       << byte_size << ", addr " << *buffer;
+        LOG_VERBOSE(1) << "GRPC: using shared-memory for '" << tensor_name
+                       << "', size: " << byte_size << ", addr: " << *buffer;
       }
     }
 
@@ -688,9 +688,9 @@ InferResponseAlloc(
       // Can't allocate for any memory type other than CPU. If asked to
       // allocate on GPU memory then force allocation on CPU instead.
       if (*actual_memory_type != TRTSERVER_MEMORY_CPU) {
-        LOG_VERBOSE(1) << "GRPC allocation failed for type "
-                       << *actual_memory_type << " for " << tensor_name
-                       << ", will use type " << TRTSERVER_MEMORY_CPU;
+        LOG_VERBOSE(1)
+            << "GRPC: unable to provide '" << tensor_name
+            << "' in TRTSERVER_MEMORY_GPU, will use type TRTSERVER_MEMORY_CPU";
         *actual_memory_type = TRTSERVER_MEMORY_CPU;
         *actual_memory_type_id = 0;
       }
@@ -698,8 +698,8 @@ InferResponseAlloc(
       raw_output->resize(byte_size);
       *buffer = static_cast<void*>(&((*raw_output)[0]));
 
-      LOG_VERBOSE(1) << "GRPC allocation: " << tensor_name << ", size "
-                     << byte_size << ", addr " << *buffer;
+      LOG_VERBOSE(1) << "GRPC: using buffer for '" << tensor_name
+                     << "', size: " << byte_size << ", addr: " << *buffer;
     }
   }
 
