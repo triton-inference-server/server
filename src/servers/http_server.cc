@@ -363,9 +363,9 @@ HTTPAPIServer::ResponseAlloc(
     } else {
       // Can't allocate for any memory type other than CPU.
       if (preferred_memory_type != TRTSERVER_MEMORY_CPU) {
-        LOG_VERBOSE(1) << "HTTP allocation failed for type "
-                       << preferred_memory_type << " for " << tensor_name
-                       << ", will use type " << TRTSERVER_MEMORY_CPU;
+        LOG_VERBOSE(1)
+            << "HTTP: unable to provide " << tensor_name
+            << " in requested memory type, will use type TRTSERVER_MEMORY_CPU";
         *actual_memory_type = TRTSERVER_MEMORY_CPU;
         *actual_memory_type_id = 0;
       }
