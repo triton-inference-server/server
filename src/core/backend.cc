@@ -40,6 +40,136 @@
 
 namespace nvidia { namespace inferenceserver {
 
+namespace {
+
+enum OverrideType { TYPE_STARTEND, TYPE_START, TYPE_END, TYPE_CONTINUE };
+
+Status
+CreateControlTensors(
+    const ModelConfig& config, const InferRequestHeader& request_header,
+    std::shared_ptr<InferRequestProvider::InputOverrideMap>* input_overrides)
+{
+  *input_overrides = std::make_shared<InferRequestProvider::InputOverrideMap>();
+
+  // Create InputOverrideMap according to control flags in request header
+  OverrideType override_type;
+  if ((request_header.flags() & (InferRequestHeader::FLAG_SEQUENCE_START |
+                                 InferRequestHeader::FLAG_SEQUENCE_END)) ==
+      (InferRequestHeader::FLAG_SEQUENCE_START |
+       InferRequestHeader::FLAG_SEQUENCE_END)) {
+    override_type = OverrideType::TYPE_STARTEND;
+  } else if (
+      (request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
+    override_type = OverrideType::TYPE_START;
+  } else if (
+      (request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+    override_type = OverrideType::TYPE_END;
+  } else {
+    override_type = OverrideType::TYPE_CONTINUE;
+  }
+
+  std::string tensor_name;
+  DataType tensor_datatype;
+  int32_t int32_false_value, int32_true_value;
+  float fp32_false_value, fp32_true_value;
+
+  // START
+  {
+    RETURN_IF_ERROR(GetSequenceControlProperties(
+        config.sequence_batching(), config.name(),
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        true /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
+        &fp32_true_value, &int32_false_value, &int32_true_value));
+
+    auto value_override =
+        std::make_shared<InferRequestProvider::InputOverride>();
+    uint8_t* value_p = nullptr;
+    switch (override_type) {
+      // True
+      case OverrideType::TYPE_START:
+      case OverrideType::TYPE_STARTEND:
+        value_p =
+            ((tensor_datatype == DataType::TYPE_INT32)
+                 ? reinterpret_cast<uint8_t*>(&int32_true_value)
+                 : reinterpret_cast<uint8_t*>(&fp32_true_value));
+        break;
+      // False
+      default:
+        value_p =
+            ((tensor_datatype == DataType::TYPE_INT32)
+                 ? reinterpret_cast<uint8_t*>(&int32_false_value)
+                 : reinterpret_cast<uint8_t*>(&fp32_false_value));
+        break;
+    }
+
+    value_override->content_.assign(value_p, value_p + sizeof(float));
+    value_override->dims_.Add(1);
+    value_override->datatype_ = tensor_datatype;
+    (*input_overrides)->insert(std::make_pair(tensor_name, value_override));
+  }
+
+  // END, optional
+  {
+    RETURN_IF_ERROR(GetSequenceControlProperties(
+        config.sequence_batching(), config.name(),
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
+        &fp32_true_value, &int32_false_value, &int32_true_value));
+    if (!tensor_name.empty()) {
+      auto value_override =
+          std::make_shared<InferRequestProvider::InputOverride>();
+      uint8_t* value_p = nullptr;
+      switch (override_type) {
+        // True
+        case OverrideType::TYPE_END:
+        case OverrideType::TYPE_STARTEND:
+          value_p =
+              ((tensor_datatype == DataType::TYPE_INT32)
+                   ? reinterpret_cast<uint8_t*>(&int32_true_value)
+                   : reinterpret_cast<uint8_t*>(&fp32_true_value));
+          break;
+        // False
+        default:
+          value_p =
+              ((tensor_datatype == DataType::TYPE_INT32)
+                   ? reinterpret_cast<uint8_t*>(&int32_false_value)
+                   : reinterpret_cast<uint8_t*>(&fp32_false_value));
+          break;
+      }
+
+      value_override->content_.assign(value_p, value_p + sizeof(float));
+      value_override->dims_.Add(1);
+      value_override->datatype_ = tensor_datatype;
+      (*input_overrides)->insert(std::make_pair(tensor_name, value_override));
+    }
+  }
+
+  // READY
+  {
+    RETURN_IF_ERROR(GetSequenceControlProperties(
+        config.sequence_batching(), config.name(),
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
+        true /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
+        &fp32_true_value, &int32_false_value, &int32_true_value));
+
+    auto value_override =
+        std::make_shared<InferRequestProvider::InputOverride>();
+    uint8_t* value_p =
+        ((tensor_datatype == DataType::TYPE_INT32)
+             ? reinterpret_cast<uint8_t*>(&int32_true_value)
+             : reinterpret_cast<uint8_t*>(&fp32_true_value));
+
+    value_override->content_.assign(value_p, value_p + sizeof(float));
+    value_override->dims_.Add(1);
+    value_override->datatype_ = tensor_datatype;
+    (*input_overrides)->insert(std::make_pair(tensor_name, value_override));
+  }
+
+  return Status::Success;
+}
+
+}  // namespace
+
 Status
 InferenceBackend::GetInput(
     const std::string& name, const ModelInput** input) const
@@ -251,20 +381,28 @@ InferenceBackend::WarmUp()
     }
   }
 
+  // Input override for model that uses sequence batcher
+  std::shared_ptr<InferRequestProvider::InputOverrideMap> input_overrides;
+  if (config_.has_sequence_batching()) {
+    RETURN_IF_ERROR(
+        CreateControlTensors(config_, request_header, &input_overrides));
+  }
+
   std::vector<std::future<Status>> warmup_res;
   for (auto& context : contexts_) {
     warmup_res.emplace_back(std::async(
         std::launch::async,
-        [this, &request_header, &input_buffer](BackendContext* context) {
+        [this, &request_header, &input_buffer,
+         &input_overrides](BackendContext* context) {
           std::shared_ptr<InferRequestProvider> request_provider;
           RETURN_IF_ERROR(InferRequestProvider::Create(
               config_.name(), version_, request_header, input_buffer,
               &request_provider));
+          RETURN_IF_ERROR(request_provider->SetInputOverride(input_overrides));
 
           std::vector<Scheduler::Payload> payloads;
           // Only request provider is required for triggering model run
-          payloads.emplace_back(
-              nullptr, request_provider, nullptr, nullptr);
+          payloads.emplace_back(nullptr, request_provider, nullptr, nullptr);
 
           RETURN_IF_ERROR(context->Run(this, &payloads));
           return Status::Success;
