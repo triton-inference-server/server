@@ -58,6 +58,10 @@ Status CompareDimsSupported(
     const TRTISTF_Shape* model_shape, const DimsList& dims,
     const bool supports_batching);
 
+/// \return a named input/output tensor. Return nullptr if not found.
+const TRTISTF_IO* FindIOByName(
+    const TRTISTF_IOList* ios, const std::string& name);
+
 // Convert a vector representing a shape to string representation.
 /// \param dims The vector of dimensions to be converted.
 /// \return String representation of the vector in pattern

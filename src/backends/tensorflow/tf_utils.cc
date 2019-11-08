@@ -109,6 +109,18 @@ CompareDimsSupported(
   return Status::Success;
 }
 
+const TRTISTF_IO*
+FindIOByName(const TRTISTF_IOList* ios, const std::string& name)
+{
+  for (const TRTISTF_IOList* itr = ios; itr != nullptr; itr = itr->next_) {
+    if (itr->io_->name_ == name) {
+      return itr->io_;
+    }
+  }
+
+  return nullptr;
+}
+
 std::string
 ShapeToString(const TRTISTF_Shape* shape, const size_t start_idx)
 {

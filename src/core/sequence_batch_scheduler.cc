@@ -68,10 +68,12 @@ SequenceBatchScheduler::Create(
   // signals indicating sequence start, sequence continue, and
   // sequence not ready.
   std::shared_ptr<InferRequestProvider::InputOverrideMap> start;
+  std::shared_ptr<InferRequestProvider::InputOverrideMap> end;
+  std::shared_ptr<InferRequestProvider::InputOverrideMap> startend;
   std::shared_ptr<InferRequestProvider::InputOverrideMap> cont;
   std::shared_ptr<InferRequestProvider::InputOverrideMap> notready;
-  RETURN_IF_ERROR(
-      sched->CreateControlTensors(config, &start, &cont, &notready));
+  RETURN_IF_ERROR(sched->CreateControlTensors(
+      config, &start, &end, &startend, &cont, &notready));
 
   // Create one SequenceBatch object for each requested runner. The
   // SequenceBatch object has a thread that manages the batch of
@@ -79,8 +81,8 @@ SequenceBatchScheduler::Create(
   for (uint32_t c = 0; c < runner_cnt; ++c) {
     std::promise<bool> init_state;
     std::shared_ptr<SequenceBatch> sb = std::make_shared<SequenceBatch>(
-        sched.get(), c, batch_size, config, OnInit, OnSchedule, start, cont,
-        notready, &init_state);
+        sched.get(), c, batch_size, config, OnInit, OnSchedule, start, end,
+        startend, cont, notready, &init_state);
 
     if (init_state.get_future().get()) {
       sched->batchers_.push_back(sb);
@@ -129,6 +131,10 @@ SequenceBatchScheduler::CreateControlTensors(
     std::shared_ptr<InferRequestProvider::InputOverrideMap>*
         start_input_overrides,
     std::shared_ptr<InferRequestProvider::InputOverrideMap>*
+        end_input_overrides,
+    std::shared_ptr<InferRequestProvider::InputOverrideMap>*
+        startend_input_overrides,
+    std::shared_ptr<InferRequestProvider::InputOverrideMap>*
         continue_input_overrides,
     std::shared_ptr<InferRequestProvider::InputOverrideMap>*
         notready_input_overrides)
@@ -136,6 +142,10 @@ SequenceBatchScheduler::CreateControlTensors(
   // Currently only batch-size 1 requests are supported so only need
   // to provide control vectors of that size.
   *start_input_overrides =
+      std::make_shared<InferRequestProvider::InputOverrideMap>();
+  *end_input_overrides =
+      std::make_shared<InferRequestProvider::InputOverrideMap>();
+  *startend_input_overrides =
       std::make_shared<InferRequestProvider::InputOverrideMap>();
   *continue_input_overrides =
       std::make_shared<InferRequestProvider::InputOverrideMap>();
@@ -177,10 +187,55 @@ SequenceBatchScheduler::CreateControlTensors(
 
     (*start_input_overrides)
         ->insert(std::make_pair(tensor_name, true_override));
+    (*end_input_overrides)->insert(std::make_pair(tensor_name, false_override));
+    (*startend_input_overrides)
+        ->insert(std::make_pair(tensor_name, true_override));
     (*continue_input_overrides)
         ->insert(std::make_pair(tensor_name, false_override));
     (*notready_input_overrides)
         ->insert(std::make_pair(tensor_name, false_override));
+  }
+
+  // END, optional
+  {
+    RETURN_IF_ERROR(GetSequenceControlProperties(
+        config.sequence_batching(), config.name(),
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
+        &fp32_true_value, &int32_false_value, &int32_true_value));
+    if (!tensor_name.empty()) {
+      uint8_t* false_p =
+          ((tensor_datatype == DataType::TYPE_INT32)
+               ? reinterpret_cast<uint8_t*>(&int32_false_value)
+               : reinterpret_cast<uint8_t*>(&fp32_false_value));
+      uint8_t* true_p =
+          ((tensor_datatype == DataType::TYPE_INT32)
+               ? reinterpret_cast<uint8_t*>(&int32_true_value)
+               : reinterpret_cast<uint8_t*>(&fp32_true_value));
+
+      auto false_override =
+          std::make_shared<InferRequestProvider::InputOverride>();
+      false_override->content_.assign(false_p, false_p + sizeof(float));
+      false_override->dims_.Add(1);
+      false_override->datatype_ = tensor_datatype;
+
+      auto true_override =
+          std::make_shared<InferRequestProvider::InputOverride>();
+      true_override->content_.assign(true_p, true_p + sizeof(float));
+      true_override->dims_.Add(1);
+      true_override->datatype_ = tensor_datatype;
+
+      (*start_input_overrides)
+          ->insert(std::make_pair(tensor_name, false_override));
+      (*end_input_overrides)
+          ->insert(std::make_pair(tensor_name, true_override));
+      (*startend_input_overrides)
+          ->insert(std::make_pair(tensor_name, true_override));
+      (*continue_input_overrides)
+          ->insert(std::make_pair(tensor_name, false_override));
+      (*notready_input_overrides)
+          ->insert(std::make_pair(tensor_name, false_override));
+    }
   }
 
   // READY
@@ -212,6 +267,9 @@ SequenceBatchScheduler::CreateControlTensors(
     true_override->datatype_ = tensor_datatype;
 
     (*start_input_overrides)
+        ->insert(std::make_pair(tensor_name, true_override));
+    (*end_input_overrides)->insert(std::make_pair(tensor_name, true_override));
+    (*startend_input_overrides)
         ->insert(std::make_pair(tensor_name, true_override));
     (*continue_input_overrides)
         ->insert(std::make_pair(tensor_name, true_override));
@@ -572,6 +630,10 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         start_input_overrides,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        end_input_overrides,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        startend_input_overrides,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         continue_input_overrides,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         notready_input_overrides,
@@ -581,6 +643,8 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
       scheduler_idle_(false), queues_(batch_size), max_active_slot_(-1),
       slot_correlation_ids_(batch_size, 0),
       start_input_overrides_(start_input_overrides),
+      end_input_overrides_(end_input_overrides),
+      startend_input_overrides_(startend_input_overrides),
       continue_input_overrides_(continue_input_overrides),
       notready_input_overrides_(notready_input_overrides)
 {
@@ -762,12 +826,22 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
               const auto& request_provider = slot_payload.request_provider_;
               const auto& request_header = request_provider->RequestHeader();
 
-              // If this is the first payload in a sequence then send
-              // the appropriate sequence start indicator to the
-              // backend.
+              // Set the start, end, and ready control tensors
+              // appropriately...
               if ((request_header.flags() &
+                   (InferRequestHeader::FLAG_SEQUENCE_START |
+                    InferRequestHeader::FLAG_SEQUENCE_END)) ==
+                  (InferRequestHeader::FLAG_SEQUENCE_START |
+                   InferRequestHeader::FLAG_SEQUENCE_END)) {
+                request_provider->SetInputOverride(startend_input_overrides_);
+              } else if (
+                  (request_header.flags() &
                    InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
                 request_provider->SetInputOverride(start_input_overrides_);
+              } else if (
+                  (request_header.flags() &
+                   InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+                request_provider->SetInputOverride(end_input_overrides_);
               } else {
                 request_provider->SetInputOverride(continue_input_overrides_);
               }

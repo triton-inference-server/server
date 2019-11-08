@@ -78,11 +78,47 @@ GraphDefBackend::CreateTRTISTFModel(
             std::to_string(potential_inputs.size()));
   }
 
+  // If this is a sequence model then make sure that the required
+  // inputs are present in the model
+  if (Config().has_sequence_batching()) {
+    RETURN_IF_ERROR(ValidateSequenceControl(
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, inputs,
+        true /* required */));
+    RETURN_IF_ERROR(ValidateSequenceControl(
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, inputs,
+        false /* required */));
+    RETURN_IF_ERROR(ValidateSequenceControl(
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, inputs,
+        true /* required */));
+  }
+
   for (const auto& io : Config().input()) {
     RETURN_IF_ERROR(CheckAllowedModelInput(io, potential_inputs));
   }
   for (const auto& io : Config().output()) {
     RETURN_IF_ERROR(CheckAllowedModelOutput(io, potential_outputs));
+  }
+
+  return Status::Success;
+}
+
+Status
+GraphDefBackend::ValidateSequenceControl(
+    const ModelSequenceBatching::Control::Kind control_kind,
+    const TRTISTF_IOList* inputs, bool required)
+{
+  std::string tensor_name;
+  RETURN_IF_ERROR(GetSequenceControlProperties(
+      Config().sequence_batching(), Name(), control_kind, required,
+      &tensor_name, nullptr, nullptr, nullptr, nullptr, nullptr));
+  if (!tensor_name.empty()) {
+    const TRTISTF_IO* input = FindIOByName(inputs, tensor_name);
+    if (input == nullptr) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "configuration specified sequence control '" + tensor_name +
+              "', but model does not provide that input");
+    }
   }
 
   return Status::Success;

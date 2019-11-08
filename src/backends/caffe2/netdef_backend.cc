@@ -220,12 +220,18 @@ NetDefBackend::CreateExecutionContext(
     output_names.push_back(io.name());
   }
 
-  // If this is a sequence model then add the required inputs...
+  // If this is a sequence model then make sure the require control
+  // inputs are available in the model.
   if (Config().has_sequence_batching()) {
     RETURN_IF_ERROR(ValidateSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, &input_names));
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, &input_names,
+        true /* required */));
     RETURN_IF_ERROR(ValidateSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, &input_names));
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, &input_names,
+        false /* required */));
+    RETURN_IF_ERROR(ValidateSequenceControl(
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, &input_names,
+        true /* required */));
   }
 
   try {
@@ -257,13 +263,15 @@ NetDefBackend::CreateExecutionContext(
 Status
 NetDefBackend::ValidateSequenceControl(
     const ModelSequenceBatching::Control::Kind control_kind,
-    std::vector<std::string>* input_names)
+    std::vector<std::string>* input_names, bool required)
 {
   std::string tensor_name;
   RETURN_IF_ERROR(GetSequenceControlProperties(
-      Config().sequence_batching(), Name(), control_kind, true /* required */,
+      Config().sequence_batching(), Name(), control_kind, required,
       &tensor_name, nullptr, nullptr, nullptr, nullptr, nullptr));
-  input_names->push_back(tensor_name);
+  if (!tensor_name.empty()) {
+    input_names->push_back(tensor_name);
+  }
 
   return Status::Success;
 }
