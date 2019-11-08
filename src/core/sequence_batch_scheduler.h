@@ -90,6 +90,10 @@ class SequenceBatchScheduler : public Scheduler {
       std::shared_ptr<InferRequestProvider::InputOverrideMap>*
           start_input_overrides,
       std::shared_ptr<InferRequestProvider::InputOverrideMap>*
+          end_input_overrides,
+      std::shared_ptr<InferRequestProvider::InputOverrideMap>*
+          startend_input_overrides,
+      std::shared_ptr<InferRequestProvider::InputOverrideMap>*
           continue_input_overrides,
       std::shared_ptr<InferRequestProvider::InputOverrideMap>*
           notready_input_overrides);
@@ -104,6 +108,10 @@ class SequenceBatchScheduler : public Scheduler {
         StandardInitFunc OnInit, StandardRunFunc OnSchedule,
         const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
             start_input_overrides,
+        const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+            end_input_overrides,
+        const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+            startend_input_overrides,
         const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
             continue_input_overrides,
         const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
@@ -164,10 +172,14 @@ class SequenceBatchScheduler : public Scheduler {
     std::vector<CorrelationID> slot_correlation_ids_;
 
     // The control values, delivered as input tensors, that should be
-    // used when starting a sequence, continuing a sequence, and
-    // showing that a sequence has not input available.
+    // used when starting a sequence, continuing a sequence, ending a
+    // sequence, and showing that a sequence has not input available.
     std::shared_ptr<InferRequestProvider::InputOverrideMap>
         start_input_overrides_;
+    std::shared_ptr<InferRequestProvider::InputOverrideMap>
+        end_input_overrides_;
+    std::shared_ptr<InferRequestProvider::InputOverrideMap>
+        startend_input_overrides_;
     std::shared_ptr<InferRequestProvider::InputOverrideMap>
         continue_input_overrides_;
     std::shared_ptr<InferRequestProvider::InputOverrideMap>

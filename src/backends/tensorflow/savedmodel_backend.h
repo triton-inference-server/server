@@ -45,7 +45,7 @@ class SavedModelBackend : public BaseBackend {
  private:
   Status ValidateSequenceControl(
       const ModelSequenceBatching::Control::Kind control_kind,
-      const TRTISTF_IOList* inputs);
+      const TRTISTF_IOList* inputs, bool required, bool* have_control);
 
   DISALLOW_COPY_AND_ASSIGN(SavedModelBackend);
 };

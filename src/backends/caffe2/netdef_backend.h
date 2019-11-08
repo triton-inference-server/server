@@ -50,7 +50,7 @@ class NetDefBackend : public InferenceBackend {
  private:
   Status ValidateSequenceControl(
       const ModelSequenceBatching::Control::Kind control_kind,
-      std::vector<std::string>* input_names);
+      std::vector<std::string>* input_names, bool required);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(NetDefBackend);

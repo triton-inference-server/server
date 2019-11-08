@@ -1,1 +1,1 @@
-sequence batching control tensor must specify a CONTROL_SEQUENCE_START value for control_kind_ready_multiple
+sequence batching specifies multiple CONTROL_SEQUENCE_READY tensors for control_kind_ready_multiple
