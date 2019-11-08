@@ -177,20 +177,18 @@ class SequenceBatcherTest(unittest.TestCase):
 
                     # create input shared memory and copy input data values into it
                     if _test_system_shared_memory or _test_cuda_shared_memory:
-                        if input_dtype == np.object:
-                            input_list_tmp = iu._prepend_string_size(input_list)
-                        else:
-                            input_list_tmp = input_list
-
+                        input_list_tmp = iu._prepend_string_size(input_list) if (input_dtype == np.object) else input_list
                         input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
                         if _test_system_shared_memory:
                             shm_ip_handle = shm.create_shared_memory_region("input_data", "/input", input_byte_size)
                             shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
+                            shared_memory_ctx.unregister(shm_ip_handle)
+                            shared_memory_ctx.register(shm_ip_handle)
                         else:
                             cudashm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
                             shm_ip_handle = cudashm.create_shared_memory_region("input_data", input_byte_size, 0)
-                        shared_memory_ctx.unregister(shm_ip_handle)
-                        shared_memory_ctx.register(shm_ip_handle)
+                            shared_memory_ctx.unregister(shm_ip_handle)
+                            shared_memory_ctx.cuda_register(shm_ip_handle)
 
                         input_info = (shm_ip_handle, tensor_shape)
                         output_info = (InferContext.ResultFormat.RAW, shm_op_handle)
@@ -344,14 +342,16 @@ class SequenceBatcherTest(unittest.TestCase):
                             output_byte_size, 0))
 
                 # copy data into shared memory region for input values
+                # shared_memory_ctx.unregister(shm_ip_handles[i])
+                # shared_memory_ctx.unregister(shm_op_handles[i])
                 if _test_system_shared_memory:
-                    shm.set_shared_memory_region(shm_ip_handles[-1], input_list_tmp)
+                    shm.set_shared_memory_region(shm_ip_handles[i], input_list_tmp)
+                    shared_memory_ctx.register(shm_ip_handles[i])
+                    shared_memory_ctx.register(shm_op_handles[i])
                 else:
-                    cudashm.set_shared_memory_region(shm_ip_handles[-1], input_list_tmp)
-                shared_memory_ctx.unregister(shm_ip_handles[-1])
-                shared_memory_ctx.register(shm_ip_handles[-1])
-                shared_memory_ctx.unregister(shm_op_handles[-1])
-                shared_memory_ctx.register(shm_op_handles[-1])
+                    cudashm.set_shared_memory_region(shm_ip_handles[i], input_list_tmp)
+                    shared_memory_ctx.cuda_register(shm_ip_handles[i])
+                    shared_memory_ctx.cuda_register(shm_op_handles[i])
 
         for config in configs:
             ctx = InferContext(config[0], config[1], model_name,
