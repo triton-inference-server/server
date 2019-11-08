@@ -940,6 +940,8 @@ message ModelConfig
   //@@
   //@@     Warm up setting of this model. If specified, all instances
   //@@     will be run with a request sample before serving the model.
+  //@@     This field can only be specified if the model is not an ensemble
+  //@@     model.
   //@@
   ModelWarmUp model_warm_up = 16;
 }

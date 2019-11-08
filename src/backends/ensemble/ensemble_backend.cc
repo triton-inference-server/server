@@ -46,8 +46,6 @@ EnsembleBackend::Init(
   RETURN_IF_ERROR(EnsembleScheduler::Create(server, config, &scheduler));
   RETURN_IF_ERROR(SetScheduler(std::move(scheduler)));
 
-  // [TODO] what does "warmup" mean for ensemble model?
-
   LOG_VERBOSE(1) << "ensemble backend for " << Name() << std::endl << *this;
 
   return Status::Success;
