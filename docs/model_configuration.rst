@@ -555,3 +555,20 @@ or when it first receives inference requests. TensorRT optimizations
 include specializing and fusing model layers, and using reduced
 precision (for example 16-bit floating-point) to provide significant
 throughput and latency improvements.
+
+.. _section-model-warm-up:
+
+Model Warm Up
+-------------------
+
+For some framework backends, model initialization may be delayed until the
+first inference is requested, TF-TRT optimization for example, which introduces
+unexpected latency seen by the client. The model configuration
+:cpp:var:`ModelWarmUp <nvidia::inferenceserver::ModelWarmUp>` is used to specify
+warm up settings for a model. The settings define an sample inference request
+that will be sent to each model instance. The model will be marked as available
+only if all model instances complete the sample request successfully.
+Note that the effect of warming up models varies depending on the framework
+backend, and it will cause the server to be less responsive to model update, so
+the users should experiment and choose the configuration that suits their need.
+See the protobuf documentation for the currently available settings.
