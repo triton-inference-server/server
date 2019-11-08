@@ -223,7 +223,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
     python get-pip.py && \
     rm get-pip.py
-RUN pip install --upgrade numpy pillow future grpcio requests gsutil awscli
+RUN pip install --upgrade numpy pillow future grpcio requests gsutil awscli six
 
 # CI expects tests in /opt/tensorrtserver/qa. The tensorrt-server
 # (1000) user should own all artifacts in case CI is run using
