@@ -114,9 +114,6 @@ class InferenceBackend {
   std::vector<std::unique_ptr<BackendContext>> contexts_;
 
  private:
-  // Helper function to create the sample payload for warm up.
-  Status CreateWarmUpPayload(std::vector<Scheduler::Payload>* payloads);
-
   // Configuration of the model that this backend represents.
   ModelConfig config_;
 
@@ -137,6 +134,9 @@ class InferenceBackend {
 
   // Map from output name to the model configuration for that output.
   std::unordered_map<std::string, ModelOutput> output_map_;
+
+  // Path to model
+  std::string model_dir_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -136,12 +136,12 @@ InferenceBackend::SetModelConfig(
 
   // Initialize the output map and label provider for each output
   label_provider_ = std::make_shared<LabelProvider>();
-  const auto model_dir = DirName(path);
+  model_dir_ = DirName(path);
   for (const auto& io : config.output()) {
     output_map_.insert(std::make_pair(io.name(), io));
 
     if (!io.label_filename().empty()) {
-      const auto label_path = JoinPath({model_dir, io.label_filename()});
+      const auto label_path = JoinPath({model_dir_, io.label_filename()});
       RETURN_IF_ERROR(label_provider_->AddLabels(io.name(), label_path));
     }
   }
@@ -243,6 +243,8 @@ InferenceBackend::Run(
 Status
 InferenceBackend::WarmUp()
 {
+  static std::string warmup_data_folder = "sample";
+
   LOG_VERBOSE(1) << "warming up model '" << Name() << "' with sample request";
   static std::mutex mtx;
   {
@@ -263,65 +265,93 @@ InferenceBackend::WarmUp()
     }
   }
 
+  // Request header and input data can be produced for all contexts,
+  // only providers need to be unique for every context.
+  auto request_header = config_.model_warm_up().request_header();
+  RETURN_IF_ERROR(NormalizeRequestHeader(*this, request_header));
+
+  std::unordered_map<std::string, std::shared_ptr<Memory>> input_buffer;
+
+  // Placeholder for input data
+  std::unique_ptr<AllocatedSystemMemory> zero_buffer;
+  std::vector<std::string> provided_data;
+
+  if (config_.model_warm_up().use_zero_value()) {
+    // Allocate large enough zero buffer, and used by all inputs.
+    size_t max_byte_size = 0;
+    for (const auto& input : request_header.input()) {
+      max_byte_size = std::max(input.batch_byte_size(), max_byte_size);
+    }
+    zero_buffer.reset(new AllocatedSystemMemory(
+        max_byte_size, TRTSERVER_MEMORY_CPU /* memory_type */,
+        0 /* memory_type_id */));
+    TRTSERVER_Memory_Type type;
+    int64_t type_id;
+    char* allocated_buffer =
+        static_cast<AllocatedSystemMemory*>(zero_buffer.get())
+            ->MutableBuffer(&type, &type_id);
+    memset(allocated_buffer, 0, max_byte_size);
+
+    for (const auto& input : request_header.input()) {
+      auto pr = input_buffer.emplace(input.name(), nullptr);
+      pr.first->second.reset(new MemoryReference());
+      static_cast<MemoryReference*>(pr.first->second.get())
+          ->AddBuffer(
+              allocated_buffer, input.batch_byte_size(),
+              TRTSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */);
+    }
+  } else {
+    for (const auto& input : request_header.input()) {
+      provided_data.emplace_back();
+      auto& input_data = provided_data.back();
+      RETURN_IF_ERROR(ReadTextFile(
+          JoinPath({model_dir_, warmup_data_folder, input.name()}),
+          &input_data));
+
+      auto pr = input_buffer.emplace(input.name(), nullptr);
+      pr.first->second.reset(new MemoryReference());
+      static_cast<MemoryReference*>(pr.first->second.get())
+          ->AddBuffer(
+              input_data.data(), input_data.size(),
+              TRTSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */);
+    }
+  }
+
   std::vector<std::future<Status>> warmup_res;
   for (auto& context : contexts_) {
-    warmup_res.emplace_back(std::async(std::launch::async, [this](BackendContext* context){
-      std::vector<Scheduler::Payload> payloads;
-      RETURN_IF_ERROR(CreateWarmUpPayload(&payloads));
-      RETURN_IF_ERROR(context->Run(this, &payloads));
-      return Status::Success;
-    }, context.get()));
+    warmup_res.emplace_back(std::async(
+        std::launch::async,
+        [this, &request_header, &input_buffer](BackendContext* context) {
+          std::shared_ptr<InferRequestProvider> request_provider;
+          RETURN_IF_ERROR(InferRequestProvider::Create(
+              config_.name(), version_, request_header, input_buffer,
+              &request_provider));
+
+          std::shared_ptr<InferResponseProvider> response_provider;
+          RETURN_IF_ERROR(InferResponseProvider::Create(
+              request_header, label_provider_, warmup_allocator.get(),
+              ResponseAlloc, nullptr, ResponseRelease, &response_provider));
+
+          std::vector<Scheduler::Payload> payloads;
+          // Only request / response providers are required for triggering model
+          // run
+          payloads.emplace_back(
+              nullptr, request_provider, response_provider, nullptr);
+
+          RETURN_IF_ERROR(context->Run(this, &payloads));
+          return Status::Success;
+        },
+        context.get()));
   }
 
   for (auto& res_future : warmup_res) {
     auto status = res_future.get();
     if (!status.IsOk()) {
-      return Status(RequestStatusCode::INTERNAL,
-      "failed to warm up model '" + Name() + "': " + status.AsString());
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to warm up model '" + Name() + "': " + status.AsString());
     }
   }
-
-  return Status::Success;
-}
-
-Status
-InferenceBackend::CreateWarmUpPayload(std::vector<Scheduler::Payload>* payloads)
-{
-  auto request_header = config_.model_warm_up().request_header();
-  RETURN_IF_ERROR(NormalizeRequestHeader(*this, request_header));
-
-  std::unordered_map<std::string, std::shared_ptr<Memory>> input_buffer;
-  for (const auto& input : request_header.input()) {
-    auto pr = input_buffer.emplace(input.name(), nullptr);
-    if (pr.second) {
-      // [TODO] just get the max and put to all input as ref
-      pr.first->second.reset(new AllocatedSystemMemory(
-          input.batch_byte_size(), TRTSERVER_MEMORY_CPU /* memory_type */,
-          0 /* memory_type_id */));
-      TRTSERVER_Memory_Type type;
-      int64_t type_id;
-      char* buffer = static_cast<AllocatedSystemMemory*>(pr.first->second.get())
-                         ->MutableBuffer(&type, &type_id);
-      if (config_.model_warm_up().use_zero_value()) {
-        memset(buffer, 0, input.batch_byte_size());
-      } else {
-        // [TODO] look up 'sample' data (similar to what is done in perf_client)
-        return Status(RequestStatusCode::UNSUPPORTED, "Not implemented");
-      }
-    }
-  }
-  std::shared_ptr<InferRequestProvider> request_provider;
-  RETURN_IF_ERROR(InferRequestProvider::Create(
-      config_.name(), version_, request_header, input_buffer,
-      &request_provider));
-
-  std::shared_ptr<InferResponseProvider> response_provider;
-  RETURN_IF_ERROR(InferResponseProvider::Create(
-      request_header, label_provider_, warmup_allocator.get(), ResponseAlloc, nullptr, ResponseRelease,
-      &response_provider));
-
-  // Only request / response providers are required for triggering model run
-  payloads->emplace_back(nullptr, request_provider, response_provider, nullptr);
 
   return Status::Success;
 }
