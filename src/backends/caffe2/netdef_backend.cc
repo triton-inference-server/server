@@ -225,13 +225,13 @@ NetDefBackend::CreateExecutionContext(
   if (Config().has_sequence_batching()) {
     RETURN_IF_ERROR(ValidateSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, &input_names,
-        true /* required */));
+        false /* required */));
     RETURN_IF_ERROR(ValidateSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, &input_names,
         false /* required */));
     RETURN_IF_ERROR(ValidateSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, &input_names,
-        true /* required */));
+        false /* required */));
   }
 
   try {

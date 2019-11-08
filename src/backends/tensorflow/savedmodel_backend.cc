@@ -80,13 +80,13 @@ SavedModelBackend::CreateTRTISTFModel(
     bool have_start, have_end, have_ready;
     RETURN_IF_ERROR(ValidateSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, inputs,
-        true /* required */, &have_start));
+        false /* required */, &have_start));
     RETURN_IF_ERROR(ValidateSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, inputs,
         false /* required */, &have_end));
     RETURN_IF_ERROR(ValidateSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, inputs,
-        true /* required */, &have_ready));
+        false /* required */, &have_ready));
     if (have_start) {
       expected_input_cnt += 1;
     }

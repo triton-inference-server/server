@@ -285,7 +285,7 @@ OnnxBackend::CreateExecutionContext(
     RETURN_IF_ERROR(context->ValidateSequenceControl(
         Config().name(), Config().sequence_batching(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
-        true /* required */, &have_start));
+        false /* required */, &have_start));
     RETURN_IF_ERROR(context->ValidateSequenceControl(
         Config().name(), Config().sequence_batching(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
@@ -293,7 +293,7 @@ OnnxBackend::CreateExecutionContext(
     RETURN_IF_ERROR(context->ValidateSequenceControl(
         Config().name(), Config().sequence_batching(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
-        true /* required */, &have_ready));
+        false /* required */, &have_ready));
     if (have_start) {
       expected_input_cnt += 1;
     }
