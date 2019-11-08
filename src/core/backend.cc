@@ -38,54 +38,6 @@
 #include "src/core/sequence_batch_scheduler.h"
 #include "src/core/trtserver.h"
 
-namespace {
-
-// Declare allocator for model warmup globally as it is a handler without
-// internal state
-std::unique_ptr<
-    TRTSERVER_ResponseAllocator, decltype(&TRTSERVER_ResponseAllocatorDelete)>
-    warmup_allocator(nullptr, TRTSERVER_ResponseAllocatorDelete);
-
-TRTSERVER_Error*
-ResponseAlloc(
-    TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
-    size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
-    int64_t preferred_memory_type_id, void* userp, void** buffer,
-    void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
-    int64_t* actual_memory_type_id)
-{
-  // Use system memory to simplify the process
-  *actual_memory_type = TRTSERVER_MEMORY_CPU;
-  *actual_memory_type_id = 0;
-
-  if (byte_size == 0) {
-    *buffer = nullptr;
-    *buffer_userp = nullptr;
-  } else {
-    *buffer = malloc(byte_size);
-    *buffer_userp = nullptr;
-  }
-
-  return nullptr;  // Success
-}
-
-TRTSERVER_Error*
-ResponseRelease(
-    TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
-    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
-{
-  if (memory_type == TRTSERVER_MEMORY_CPU) {
-    free(buffer);
-  } else {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INTERNAL, "unexpected warmup output allocation on GPU");
-  }
-
-  return nullptr;  // Success
-}
-
-}  // namespace
-
 namespace nvidia { namespace inferenceserver {
 
 Status
@@ -243,27 +195,9 @@ InferenceBackend::Run(
 Status
 InferenceBackend::WarmUp()
 {
-  static std::string warmup_data_folder = "sample";
-
   LOG_VERBOSE(1) << "warming up model '" << Name() << "' with sample request";
-  static std::mutex mtx;
-  {
-    std::lock_guard<std::mutex> lk(mtx);
-    if (warmup_allocator == nullptr) {
-      TRTSERVER_ResponseAllocator* allocator;
-      auto err = TRTSERVER_ResponseAllocatorNew(
-          &allocator, ResponseAlloc, ResponseRelease);
-      if (err != nullptr) {
-        auto status = Status(
-            TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
-            TRTSERVER_ErrorMessage(err));
-        TRTSERVER_ErrorDelete(err);
-        return status;
-      }
 
-      warmup_allocator.reset(allocator);
-    }
-  }
+  static std::string warmup_data_folder = "sample";
 
   // Request header and input data can be produced for all contexts,
   // only providers need to be unique for every context.
@@ -327,16 +261,10 @@ InferenceBackend::WarmUp()
               config_.name(), version_, request_header, input_buffer,
               &request_provider));
 
-          std::shared_ptr<InferResponseProvider> response_provider;
-          RETURN_IF_ERROR(InferResponseProvider::Create(
-              request_header, label_provider_, warmup_allocator.get(),
-              ResponseAlloc, nullptr, ResponseRelease, &response_provider));
-
           std::vector<Scheduler::Payload> payloads;
-          // Only request / response providers are required for triggering model
-          // run
+          // Only request provider is required for triggering model run
           payloads.emplace_back(
-              nullptr, request_provider, response_provider, nullptr);
+              nullptr, request_provider, nullptr, nullptr);
 
           RETURN_IF_ERROR(context->Run(this, &payloads));
           return Status::Success;
