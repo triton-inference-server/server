@@ -1337,8 +1337,9 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // inferences and writes to complete.
     if (!rpc_ok) {
       LOG_VERBOSE(1) << "Write for " << Name() << ", rpc_ok=" << rpc_ok
-                  << ", context " << state->context_->unique_id_ << ", "
-                << state->unique_id_ << " step " << state->step_ << ", failed";
+                     << ", context " << state->context_->unique_id_ << ", "
+                     << state->unique_id_ << " step " << state->step_
+                     << ", failed";
       state->context_->finish_ok_ = false;
     }
 
