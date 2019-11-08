@@ -51,7 +51,8 @@ RET=0
 # Use one of the addsub model as example.
 rm -fr models && \
     mkdir models && \
-    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_float16_float16_float16 models/.
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_float16_float16_float16 models/. && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/graphdef_sequence_float32 models/.
 
 # Provide warmup instruction in model config
 (cd models/graphdef_float16_float16_float16 && \
@@ -66,6 +67,19 @@ rm -fr models && \
     echo '    use_zero_value: true' >> config.pbtxt && \
     echo '}' >> config.pbtxt )
 
+# Instruction for sequence model
+(cd models/graphdef_sequence_float32 && \
+    echo 'model_warm_up {' >> config.pbtxt && \
+    echo '    request_header {' >> config.pbtxt && \
+    echo '        batch_size: 1' >> config.pbtxt && \
+    echo '        input { name: "INPUT" dims: 1 }' >> config.pbtxt && \
+    echo '        output { name: "OUTPUT" }' >> config.pbtxt && \
+    echo '        correlation_id: 1' >> config.pbtxt && \
+    echo '        flags: 1' >> config.pbtxt && \
+    echo '    }' >> config.pbtxt && \
+    echo '    use_zero_value: true' >> config.pbtxt && \
+    echo '}' >> config.pbtxt )
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -76,6 +90,11 @@ fi
 set +e
 
 grep "warming up model 'graphdef_float16_float16_float16' with sample request" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected warm up message is logged\n***"
+    RET=1
+fi
+grep "warming up model 'graphdef_sequence_float32' with sample request" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected warm up message is logged\n***"
     RET=1
