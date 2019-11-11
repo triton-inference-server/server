@@ -317,7 +317,7 @@ and install the tensorrtserver whl, then::
   $ python simple_client.py
 
 System Shared Memory
-^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
 
 A simple C++ example application using system shared memory at
 `src/clients/c++/examples/simple\_shm\_client.cc
@@ -353,7 +353,7 @@ tensorrtserver whl and then::
   $ python simple_shm_client.py
 
 CUDA Shared Memory
-^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^
 
 A simple C++ example application using CUDA shared memory at
 `src/clients/c++/examples/simple\_cuda\_shm\_client.cc
