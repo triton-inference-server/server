@@ -76,7 +76,6 @@ install(
   FILES
     ../../core/model_config.h
     ${CMAKE_CURRENT_BINARY_DIR}/../../core/model_config.pb.h
-    ${CMAKE_CURRENT_BINARY_DIR}/../../core/api.pb.h
   DESTINATION include/src/core
 )
 install(

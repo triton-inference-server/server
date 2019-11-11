@@ -28,8 +28,6 @@
 
 syntax = "proto3";
 
-import "api.proto";
-
 package nvidia.inferenceserver;
 
 //@@.. cpp:namespace:: nvidia::inferenceserver
@@ -767,27 +765,77 @@ message ModelParameter
 }
 
 //@@
-//@@.. cpp:var:: message ModelWarmUp
+//@@.. cpp:var:: message ModelWarmup
 //@@
-//@@   Settings for warming up the model instances.
+//@@   Settings used to construct the request sample for model warmup.
 //@@
-message ModelWarmUp
+message ModelWarmup
 {
-  //@@  .. cpp:var:: InferRequestHeader request_header
-  //@@
-  //@@     The header message of the request sample.
-  //@@
-  InferRequestHeader request_header = 1;
+  message InputMetaData
+  {
+    //@@    .. cpp:var:: int64 dims (repeated)
+    //@@
+    //@@       The shape of the input tensor, not including the batch dimension.
+    //@@
+    repeated int64 dims = 1;
 
-  //@@  .. cpp:var:: bool use_zero_value
+    //@@  .. cpp:var:: oneof input_data_type
+    //@@
+    //@@     Specify how the input data is generated. If the input has STRING
+    //@@     data type and 'random_data' is set, the data generation will fall
+    //@@     back to 'zero_data'.
+    //@@
+    oneof input_data_type
+    {
+      //@@
+      //@@  .. cpp:var:: bool zero_data
+      //@@
+      //@@     The identifier for using zeros as input data. Note that the
+      //@@     field data will not be checked, instead, zero data will be used
+      //@@     as long as the field is set.
+      //@@
+      bool zero_data = 2;
+
+      //@@
+      //@@  .. cpp:var:: bool random_data
+      //@@
+      //@@     The identifier for using random data as input data. Note that
+      //@@     the field data will not be checked, instead, random data will
+      //@@     be used as long as the field is set.
+      //@@
+      bool random_data = 3;
+
+      //@@  .. cpp:var:: string input_data_file
+      //@@
+      //@@     The file whose content will be used as raw input data in
+      //@@     row-major order. The file must be provided in a sub-directory 
+      //@@     'warmup' under the model directory.
+      //@@
+      string input_data_file = 4;
+    }
+  }
+
+  //@@  .. cpp:var:: string name
   //@@
-  //@@     Whether to fill input data with zero value. If false, all input data
-  //@@     must be provided in a directory 'sample' under the model directory.
-  //@@     the data for each input must be the raw binary representation of the
-  //@@     input in row-major and it must correspond to the batch size in
-  //@@     'request_header'. The data file must be named the same as the input.
+  //@@     The name of the request sample.
   //@@
-  bool use_zero_value = 2;
+  string name = 1;
+
+  //@@  .. cpp:var:: uint32 batch_size
+  //@@
+  //@@     The batch size of the inference request. This must be >= 1. For
+  //@@     models that don't support batching, batch_size must be 1. If
+  //@@     batch_size > 1, the 'inputs' specified below will be duplicated to
+  //@@     match the batch size requested.
+  //@@
+  uint32 batch_size = 2;
+
+  //@@  .. cpp:var:: map<string, string> inputs
+  //@@
+  //@@     The warmup meta data associated with every model input, including
+  //@@     control tensors.
+  //@@
+  map<string, InputMetaData> inputs = 3;
 }
 
 //@@
@@ -936,12 +984,13 @@ message ModelConfig
   //@@
   map<string, ModelParameter> parameters = 14;
 
-  //@@  .. cpp:var:: ModelWarmUp model_warm_up
+  //@@  .. cpp:var:: ModelWarmup model_warmup (repeated)
   //@@
-  //@@     Warm up setting of this model. If specified, all instances
-  //@@     will be run with a request sample before serving the model.
+  //@@     Warmup setting of this model. If specified, all instances
+  //@@     will be run with the request samples in sequence before
+  //@@     serving the model.
   //@@     This field can only be specified if the model is not an ensemble
   //@@     model.
   //@@
-  ModelWarmUp model_warm_up = 16;
+  repeated ModelWarmup model_warmup = 16;
 }
