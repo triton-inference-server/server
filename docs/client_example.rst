@@ -81,13 +81,14 @@ all the dependencies required to run those examples within the
 container. The easiest way to try the examples described in the
 following sections is to run the client image with -\\-net=host so
 that the client examples can access the inference server running in
-its own container. To be able to use shared memory you need to run the
-client and server image with -\\-ipc=host so that the inference server
-can access the shared memory in the client container. Additionally, to
-create shared memory regions that are larger than 64MB, the
--\\-shm-size=1g flag is needed while running the client image (see
-:ref:`section-running-the-inference-server` for more information about
-running the inference server)::
+its own container. To be able to use system shared memory you need to run
+the client and server image with -\\-ipc=host so that the inference server
+can access the system shared memory in the client container. Additionally,
+to create system shared memory regions that are larger than 64MB, the
+-\\-shm-size=1g flag is needed while running the client image. To be able
+to use CUDA shared memory you need to use nvidia-docker instead of Docker
+to run the client image. (see :ref:`section-running-the-inference-server`
+for more information about running the inference server)::
 
   $ docker run -it --rm --net=host tensorrtserver_client
 
@@ -166,13 +167,14 @@ configured with all the dependencies required to run those examples
 within the container. The easiest way to try the examples described in
 the following sections is to run the client image with -\\-net=host so
 that the client examples can access the inference server running in
-its own container. To be able to use shared memory you need to run the
-client and server image with -\\-ipc=host so that the inference server
-can access the shared memory in the client container. Additionally, to
-create shared memory regions that are larger than 64MB, the
--\\-shm-size=1g flag is needed while running the client image (see
-:ref:`section-running-the-inference-server` for more information about
-running the inference server)::
+its own container. To be able to use system shared memory you need to run
+the client and server image with -\\-ipc=host so that the inference server
+can access the system shared memory in the client container. Additionally,
+to create system shared memory regions that are larger than 64MB, the
+-\\-shm-size=1g flag is needed while running the client image. To be able
+to use CUDA shared memory you need to use nvidia-docker instead of Docker
+to run the client image. (see :ref:`section-running-the-inference-server`
+for more information about running the inference server)::
 
   $ docker run -it --rm --net=host nvcr.io/nvidia/tensorrtserver:<xx.yy>-clientsdk-py3
 
