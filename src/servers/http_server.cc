@@ -1117,7 +1117,6 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
         req, (request_status.code() == RequestStatusCode::SUCCESS)
                  ? EVHTP_RES_OK
                  : EVHTP_RES_BADREQ);
-    evhtp_request_resume(req);
   }
 
   TRTSERVER_ErrorDelete(err);

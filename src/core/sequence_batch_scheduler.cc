@@ -707,7 +707,19 @@ SequenceBatchScheduler::SequenceBatch::~SequenceBatch()
   }
 
   cv_.notify_one();
-  scheduler_thread_->join();
+
+  // It is possible for the scheduler thread to be the last holder of
+  // a backend object, and when that scheduler thread releases the
+  // object the scheduler thread itself will destroy this
+  // SequenceBatch object. So we need to check to make sure the
+  // scheduler thread does not join it against itself and instead
+  // detach it so there is not a problem when its thread object is
+  // destroyed.
+  if (scheduler_thread_->get_id() != std::this_thread::get_id()) {
+    scheduler_thread_->join();
+  } else {
+    scheduler_thread_->detach();
+  }
 }
 
 void
@@ -791,6 +803,18 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
     delay_cnt = atoi(dstr);
     LOG_INFO << "Delaying scheduler thread " << batcher_idx_ << " until "
              << delay_cnt << " queued payloads...";
+  }
+
+  // For testing this scheduler thread to be the last to release the
+  // backend object.
+  uint64_t backend_release_wait_milliseconds = 0;
+  {
+    const char* dstr = getenv("TRTSERVER_DELAY_SCHEDULER_BACKEND_RELEASE");
+    if (dstr != nullptr) {
+      backend_release_wait_milliseconds = atoi(dstr);
+      LOG_INFO << "Delaying scheduler backend release for " << batcher_idx_
+               << ": " << backend_release_wait_milliseconds << "ms";
+    }
   }
 
   const uint64_t default_wait_microseconds = 500 * 1000;
@@ -1011,7 +1035,29 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
 
       // Run the backend...
       OnSchedule_(batcher_idx_, payloads.get(), OnCompleteQueuedPayloads);
+
+      // For testing we introduce a delay here to make the
+      // "SequenceBatchScheduler destroyed by this thread" case
+      // described in the comment below reproducible.
+      if (backend_release_wait_milliseconds > 0) {
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(backend_release_wait_milliseconds));
+      }
     }
+
+    // At the end of this scope 'payloads' will be destroyed.  A
+    // handle to the backend is held through the
+    // payload.complete_function_. If the server is exiting or the
+    // backend is unloaded, it could be that this handle is the last
+    // one for the backend and so destroying 'payloads' will cause the
+    // backend to be deleted which in turn will call this thread's
+    // SequenceBatchScheduler to be destroyed by this thread
+    // itself. In that case it is important that this thread not
+    // reference the object after this point since the object will be
+    // invalid. The while statement above uses a local atomic which is
+    // set to false by the destructor (and so the while look will
+    // exit) and the logging below uses only local variables... so
+    // this code is ok.
   }  // end runner loop
 
   LOG_VERBOSE(1) << "Stopping sequence-batch scheduler thread " << batcher_idx_
