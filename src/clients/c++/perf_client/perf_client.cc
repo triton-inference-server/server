@@ -870,6 +870,11 @@ main(int argc, char** argv)
         "The end of the range can not be 0 (or 0.0) for binary search mode.");
   }
 
+  if ((search_mode == SearchMode::BINARY) &&
+      (latency_threshold_ms == NO_LIMIT)) {
+    Usage(argv, "The latency threshold can not be 0 for binary search mode.");
+  }
+
   if (((concurrency_range[SEARCH_RANGE::kEND] <
         concurrency_range[SEARCH_RANGE::kSTART]) ||
        (request_rate_range[SEARCH_RANGE::kEND] <
