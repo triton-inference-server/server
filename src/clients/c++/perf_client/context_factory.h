@@ -79,6 +79,9 @@ class ContextFactory {
   /// \return The scheduler type of the model.
   ModelSchedulerType SchedulerType() const { return scheduler_type_; }
 
+  /// \return The communication protocol.
+  ProtocolType Protocol() const { return protocol_; }
+
  private:
   ContextFactory(
       const std::string& url, const ProtocolType protocol,

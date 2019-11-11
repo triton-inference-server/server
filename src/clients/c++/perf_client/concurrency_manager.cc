@@ -71,7 +71,8 @@ ConcurrencyManager::ConcurrencyManager(
 }
 
 nic::Error
-ConcurrencyManager::UpdateLoad(const size_t concurrent_request_count)
+ConcurrencyManager::ChangeConcurrencyLevel(
+    const size_t concurrent_request_count)
 {
   // Always prefer to create new threads if the maximum limit has not been met
   while ((concurrent_request_count > threads_.size()) &&
@@ -212,7 +213,8 @@ ConcurrencyManager::Infer(
                   // proper locking
                   std::lock_guard<std::mutex> lock(thread_stat->mu_);
                   thread_stat->request_timestamps_.emplace_back(std::make_tuple(
-                      start_time_async, end_time_async, flags, 0));
+                      start_time_async, end_time_async, flags,
+                      false /* delayed */));
                   ctxs[idx]->ctx_->GetStat(&(thread_stat->contexts_stat_[idx]));
                 }
                 ctxs[idx]->inflight_request_cnt_--;
@@ -243,8 +245,8 @@ ConcurrencyManager::Infer(
             // Add the request timestamp to thread Timestamp vector with proper
             // locking
             std::lock_guard<std::mutex> lock(thread_stat->mu_);
-            thread_stat->request_timestamps_.emplace_back(
-                std::make_tuple(start_time_sync, end_time_sync, flags, 0));
+            thread_stat->request_timestamps_.emplace_back(std::make_tuple(
+                start_time_sync, end_time_sync, flags, false /* delayed */));
             ctxs[idx]->ctx_->GetStat(&(thread_stat->contexts_stat_[idx]));
           }
           request_cnt++;

@@ -35,14 +35,28 @@ class LoadManager {
  public:
   ~LoadManager();
 
-  /// Updates the load in accordance with the value specified as load_spec
-  /// \param load_spec The interpretation of this specification will depend upon
-  /// the kind of LoadManager. For ConcurrencyManager, 'load spec' will be
-  /// interpreted as new 'concurrent_request_count' while for
-  /// RealisticLoadManager this parameter will be treated as new
-  /// 'target_request_rate'.
+  /// Adjusts the number of concurrent requests to be the same as
+  /// 'concurrent_request_count' (by creating or pausing threads)
+  /// \param concurent_request_count The number of concurrent requests.
   /// \return Error object indicating success or failure.
-  virtual nic::Error UpdateLoad(const size_t load_spec) = 0;
+  virtual nic::Error ChangeConcurrencyLevel(
+      const size_t concurrent_request_count)
+  {
+    return nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "changing concurrency level is not supported in this load manager.");
+  }
+
+  /// Adjusts the rate of issuing requests to be the same as 'request_rate'
+  /// \param request_rate The rate at which requests must be issued to the
+  /// server.
+  /// \return Error object indicating success or failure.
+  virtual nic::Error ChangeRequestRate(const double request_rate)
+  {
+    return nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "changing request rate is not supported in this load manager.");
+  }
 
   /// Check if the load manager is working as expected.
   /// \return Error object indicating success or failure.

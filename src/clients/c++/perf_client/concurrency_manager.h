@@ -68,11 +68,9 @@ class ConcurrencyManager : public LoadManager {
       const std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
 
-  /// Adjust the number of concurrent requests to be the same as
-  /// 'concurrent_request_count' (by creating threads or by pausing threads)
-  /// \param concurent_request_count The number of concurrent requests.
-  /// \return Error object indicating success or failure.
-  nic::Error UpdateLoad(const size_t concurrent_request_count) override;
+  /// @ See LoadManager::ChangeConurrencyLevel()
+  nic::Error ChangeConcurrencyLevel(
+      const size_t concurrent_request_count) override;
 
  private:
   ConcurrencyManager(
@@ -89,7 +87,8 @@ class ConcurrencyManager : public LoadManager {
   };
 
   /// Function for worker that sends inference requests.
-  /// \param thread_stat Worker thread specific data.
+  /// \param thread_stat Worker thread status specific data.
+  /// \param thread_config Worker thread configuration specific data.
   void Infer(
       std::shared_ptr<ThreadStat> thread_stat,
       std::shared_ptr<ThreadConfig> thread_config);
