@@ -436,13 +436,12 @@ ValidateModelConfig(
               config.name());
     }
 
-    // Make sure at most one SEQUENCE_START, one SEQUENCE_END, and one
-    // SEQUENCE_READY control is specified.
+    // Check controls...
     std::string tensor_name;
     RETURN_IF_ERROR(GetSequenceControlProperties(
         batcher, config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
-        true /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
+        false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
         nullptr));
     RETURN_IF_ERROR(GetSequenceControlProperties(
         batcher, config.name(),
@@ -452,7 +451,7 @@ ValidateModelConfig(
     RETURN_IF_ERROR(GetSequenceControlProperties(
         batcher, config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
-        true /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
+        false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
         nullptr));
   }
 

@@ -615,7 +615,7 @@ message ModelSequenceBatching
       //@@
       //@@         A new sequence is/is-not starting. If true a sequence is
       //@@         starting, if false a sequence is continuing. This control
-      //@@         must be specified.
+      //@@         is optional.
       //@@
       CONTROL_SEQUENCE_START = 0;
 
@@ -632,7 +632,7 @@ message ModelSequenceBatching
       //@@         A sequence is/is-not ready for inference. If true the
       //@@         input tensor data is valid and should be used. If false
       //@@         the input tensor data is invalid and inferencing should
-      //@@         be "skipped". This control must be specified.
+      //@@         be "skipped". This control is optional.
       //@@
       CONTROL_SEQUENCE_READY = 1;
     }
