@@ -34,8 +34,8 @@ The inference server *client libraries* make it easy to communicate
 with the TensorRT Inference Server from your C++ or Python
 application. Using these libraries you can send either HTTP or GRPC
 requests to the server to check status or health and to make inference
-requests. These libraries also support using shared memory for passing
-inputs to and receiving outputs from the inference server.
+requests. These libraries also support using system and CUDA shared memory for
+passing inputs to and receiving outputs from the inference server.
 :ref:`section-client-examples` describes examples that show the use of
 both the C++ and Python libraries.
 
@@ -84,8 +84,8 @@ a Python wheel file for the Python client library::
 You can optionally add *-\\-build-arg "BASE_IMAGE=<base_image>"* to set
 the base image that you want the client library built for. Must be a
 Ubuntu CUDA devel image to be able to build CUDA shared memory support.
-If CUDA shared memory support is not required, you can build with Ubuntu
-16.04 or 18.04.
+If CUDA shared memory support is not required, you can use an Ubuntu
+16.04 or 18.04 as the base image.
 
 The generated Python wheel file works with both Python2 and Python3,
 but you can control which version of Python (and pip) are used to
@@ -294,7 +294,7 @@ and a Python version at `src/clients/python/simple\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_client.py>`_
 demonstrate basic client API usage.
 
-To run the the C++ version of the simple example, first build or
+To run the C++ version of the simple example, first build or
 download it as described in :ref:`section-getting-the-client-examples`
 and then::
 
@@ -310,23 +310,23 @@ and then::
   15 + 1 = 16
   15 - 1 = 14
 
-To run the the Python version of the simple example, first build or
+To run the Python version of the simple example, first build or
 download it as described in :ref:`section-getting-the-client-examples`
 and install the tensorrtserver whl, then::
 
   $ python simple_client.py
 
-Shared Memory
-^^^^^^^^^^^^^
+System Shared Memory
+^^^^^^^^^^^^^^^^^^^^
 
-A simple C++ example application using shared memory at
+A simple C++ example application using system shared memory at
 `src/clients/c++/examples/simple\_shm\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/simple_shm_client.cc>`_
 and a Python version at `src/clients/python/simple\_shm\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_shm_client.py>`_
 demonstrate the usage of shared memory with the client API.
 
-To run the the C++ version of the simple shared memory example, first
+To run the C++ version of the simple system shared memory example, first
 build or download it as described in
 :ref:`section-getting-the-client-examples` and then::
 
@@ -342,12 +342,51 @@ build or download it as described in
   15 + 1 = 16
   15 - 1 = 14
 
-To run the the Python version of the simple shared memory example,
+We have added a simple `system shared memory module
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/shared_memory/__init__.py>`_
+that extends the Python client API to create, set and destroy system shared
+memory. To run the Python version of the simple system shared memory example,
+first build or download it as described in
+:ref:`section-getting-the-client-examples` and install the
+tensorrtserver whl and then::
+
+  $ python simple_shm_client.py
+
+CUDA Shared Memory
+^^^^^^^^^^^^^^^^^^
+
+A simple C++ example application using CUDA shared memory at
+`src/clients/c++/examples/simple\_cuda\_shm\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/simple_cuda_shm_client.cc>`_
+and a Python version at `src/clients/python/simple\_shm\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_cuda_shm_client.py>`_
+demonstrate the usage of shared memory with the client API.
+
+To run the C++ version of the simple CUDA shared memory example, first
+build or download it as described in
+:ref:`section-getting-the-client-examples` and then::
+
+$ simple_cuda_shm_client
+0 + 1 = 1
+0 - 1 = -1
+1 + 1 = 2
+1 - 1 = 0
+2 + 1 = 3
+2 - 1 = 1
+...
+14 - 1 = 13
+15 + 1 = 16
+15 - 1 = 14
+
+We have added a simple `CUDA shared memory module
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/cuda_shared_memory/__init__.py>`_
+that extends the Python client API to create, set and destroy CUDA shared
+memory. To run the Python version of the simple CUDA shared memory example,
 first build or download it as described in
 :ref:`section-getting-the-client-examples` and install the
 tensorrtserver whl, then::
 
-  $ python simple_shm_client.py
+$ python simple_cuda_shm_client.py
 
 String Datatype
 ^^^^^^^^^^^^^^^
