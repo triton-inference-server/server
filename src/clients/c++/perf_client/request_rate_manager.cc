@@ -59,7 +59,8 @@ RequestRateManager::RequestRateManager(
     const uint64_t measurement_window_ms, const size_t max_threads,
     const uint32_t num_of_sequences, const size_t sequence_length,
     const std::shared_ptr<ContextFactory>& factory)
-    : request_distribution_(request_distribution), execute_(false)
+    : request_distribution_(request_distribution), execute_(false),
+      next_corr_id_(1)
 {
   async_ = async;
   batch_size_ = batch_size;
@@ -73,8 +74,9 @@ RequestRateManager::RequestRateManager(
        (factory_->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE));
 
   if (on_sequence_model_) {
-    std::vector<SequenceData> init(num_of_sequences);
-    sequence_stat_.swap(init);
+    for (uint64_t i = 0; i < num_of_sequences; i++) {
+      sequence_stat_.emplace_back(new SequenceStat(next_corr_id_++));
+    }
   }
   gen_duration_.reset(
       new std::chrono::nanoseconds(2 * measurement_window_ms * 1000 * 1000));
@@ -204,17 +206,18 @@ RequestRateManager::Infer(
     if (on_sequence_model_) {
       flags = 0;
       // Select one of the sequence at random for this request
-      seq_id = rand() % sequence_stat_.size() + 1;
+      seq_id = rand() % sequence_stat_.size();
       // Need lock to protect the order of dispatch across worker threads. This
       // also helps in reporting the realistic latencies.
-      std::lock_guard<std::mutex> guard(sequence_stat_[seq_id - 1].mtx_);
-      if (sequence_stat_[seq_id - 1].remaining_queries_ == 0) {
+      std::lock_guard<std::mutex> guard(sequence_stat_[seq_id]->mtx_);
+      if (sequence_stat_[seq_id]->remaining_queries_ == 0) {
         flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;
         size_t new_length = GetRandomLength(0.2);
-        sequence_stat_[seq_id - 1].remaining_queries_ =
+        sequence_stat_[seq_id]->remaining_queries_ =
             new_length == 0 ? 1 : new_length;
+        sequence_stat_[seq_id]->corr_id_ = next_corr_id_++;
       }
-      if (sequence_stat_[seq_id - 1].remaining_queries_ == 1) {
+      if (sequence_stat_[seq_id]->remaining_queries_ == 1) {
         flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
       }
       options->SetFlag(
@@ -225,10 +228,10 @@ RequestRateManager::Infer(
           flags & ni::InferRequestHeader::FLAG_SEQUENCE_END);
 
       // Override the correlation ID.
-      options->SetCorrelationId(seq_id);
+      options->SetCorrelationId(sequence_stat_[seq_id]->corr_id_);
       ctx->ctx_->SetRunOptions(*options);
       Request(ctx, flags, delayed, start_time, thread_stat);
-      sequence_stat_[seq_id - 1].remaining_queries_--;
+      sequence_stat_[seq_id]->remaining_queries_--;
     } else {
       Request(ctx, flags, delayed, start_time, thread_stat);
     }
@@ -238,8 +241,8 @@ RequestRateManager::Infer(
         // Finish off all the ongoing sequences for graceful exit
         for (size_t i = thread_config->id_; i < sequence_stat_.size();
              i += thread_config->stride_) {
-          std::lock_guard<std::mutex> guard(sequence_stat_[i].mtx_);
-          if (sequence_stat_[i].remaining_queries_ != 0) {
+          std::lock_guard<std::mutex> guard(sequence_stat_[i]->mtx_);
+          if (sequence_stat_[i]->remaining_queries_ != 0) {
             uint32_t flags = 0;
             flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
             options->SetFlag(
@@ -250,10 +253,10 @@ RequestRateManager::Infer(
                 flags & ni::InferRequestHeader::FLAG_SEQUENCE_END);
 
             // Override the correlation ID.
-            options->SetCorrelationId(i + 1);
+            options->SetCorrelationId(sequence_stat_[i]->corr_id_);
             ctx->ctx_->SetRunOptions(*options);
             Request(ctx, flags, false /* delayed */, start_time, thread_stat);
-            sequence_stat_[i].remaining_queries_ = 0;
+            sequence_stat_[i]->remaining_queries_ = 0;
           }
         }
       }

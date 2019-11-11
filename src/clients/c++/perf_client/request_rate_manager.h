@@ -96,10 +96,11 @@ class RequestRateManager : public LoadManager {
     }
   };
 
-  struct SequenceData {
+  struct SequenceStat {
+    uint64_t corr_id_;
     size_t remaining_queries_;
     std::mutex mtx_;
-    SequenceData() : remaining_queries_(0) {}
+    SequenceStat(uint64_t corr_id) : corr_id_(corr_id), remaining_queries_(0) {}
   };
 
   RequestRateManager(
@@ -141,5 +142,6 @@ class RequestRateManager : public LoadManager {
   std::chrono::steady_clock::time_point start_time_;
   bool execute_;
 
-  std::vector<SequenceData> sequence_stat_;
+  std::vector<std::shared_ptr<SequenceStat>> sequence_stat_;
+  int next_corr_id_;
 };
