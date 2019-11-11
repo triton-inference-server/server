@@ -77,14 +77,14 @@ SignalHandler(int signum)
 // There are broadly two ways to load server for the data collection using
 // perf_client:
 // - Maintaining Target Concurrency:
-//     In this setting, the client will maintain a fixed number of concurrent
+//     In this setting, the client will maintain a target number of concurrent
 //     requests sent to the server (see --concurrency-range option) while
-//     taking measurements. See ConcurrencyManager for more detail.
+//     taking measurements.
 //     The number of requests will be the total number of requests sent within
 //     the time interval for measurement (see --measurement-interval option) and
 //     the latency will be the average latency across all requests.
 //
-//     Besides throughput and latency, which is measured in client side,
+//     Besides throughput and latency, which is measured on client side,
 //     the following data measured by the server will also be reported
 //     in this setting:
 //     - Concurrent request: the number of concurrent requests as specified
@@ -120,11 +120,30 @@ SignalHandler(int signum)
 //     reported in increasing load level order.
 //
 // - Maintaining Target Request Rate:
-//     Unlike above, here the client will maintain a fixed rate of requests
-//     issued to the server (see --request-rate-range option) while taking
-//     measurements. See RequestRateManager for more detail. Rest of the
-//     behaviour of client is identical as above.
+//     This mode is enabled only when --request-rate-range option is specified.
+//     Unlike above, here the client will try to maintain a target rate of
+//     requests issued to the server while taking measurements. Rest of the
+//     behaviour of client is identical as above. It is important to note that
+//     enven though over a  sufficiently large interval the rate of requests
+//     will tend to the target request rate, the actual request rate for a small
+//     time interval will depend upon the selected request distribution
+//     (--request-distribution). For 'constant' request distribution the time
+//     interval between successive requests is maintained to be constant, hence
+//     request rate is constant over time. However, 'poisson' request
+//     distribution varies the time interval between successive requests such
+//     that there are periods of bursts and nulls in request generation.
+//     Additionally, 'poisson' distribution mimics the real-world traffic and
+//     can be used to obtain measurements for a realistic-load.
+//     With each request-rate, the client also reports the 'Delayed Request
+//     Count' which gives an idea of how many requests missed their schedule as
+//     specified by the distribution. Users can use --max-threads to increase
+//     the number of threads which might help in dispatching requests as per
+//     the schedule. Also note that a very large number of threads might be
+//     counter-productive with most of the time being spent on context-switching
+//     the threads.
 //
+// By default, perf_client will maintain target concurrency while measuring the
+// performance.
 //
 // Options:
 // -b: batch size for each request sent.
@@ -1074,12 +1093,12 @@ main(int argc, char** argv)
     for (PerfStatus& status : summary) {
       if (!using_request_rate_range) {
         std::cout << "Concurrency: " << status.concurrency << ", "
-                  << status.client_infer_per_sec << " infer/sec, latency "
+                  << status.client_stats.infer_per_sec << " infer/sec, latency "
                   << (status.stabilizing_latency_ns / 1000) << " usec"
                   << std::endl;
       } else {
         std::cout << "Request Rate: " << status.request_rate << ", "
-                  << status.client_infer_per_sec << " infer/sec, latency "
+                  << status.client_stats.infer_per_sec << " infer/sec, latency "
                   << (status.stabilizing_latency_ns / 1000) << " usec"
                   << std::endl;
       }
@@ -1096,7 +1115,8 @@ main(int argc, char** argv)
             << "Network+Server Send/Recv,Server Queue,"
             << "Server Compute,Client Recv";
       }
-      for (const auto& percentile : summary[0].client_percentile_latency_ns) {
+      for (const auto& percentile :
+           summary[0].client_stats.percentile_latency_ns) {
         ofs << ",p" << percentile.first << " latency";
       }
       ofs << std::endl;
@@ -1105,7 +1125,7 @@ main(int argc, char** argv)
       std::sort(
           summary.begin(), summary.end(),
           [](const PerfStatus& a, const PerfStatus& b) -> bool {
-            return a.client_infer_per_sec < b.client_infer_per_sec;
+            return a.client_stats.infer_per_sec < b.client_stats.infer_per_sec;
           });
 
       for (PerfStatus& status : summary) {
@@ -1113,9 +1133,9 @@ main(int argc, char** argv)
                                 status.server_stats.request_count;
         uint64_t avg_compute_ns = status.server_stats.compute_time_ns /
                                   status.server_stats.request_count;
-        uint64_t avg_client_wait_ns = status.client_avg_latency_ns -
-                                      status.client_avg_send_time_ns -
-                                      status.client_avg_receive_time_ns;
+        uint64_t avg_client_wait_ns = status.client_stats.avg_latency_ns -
+                                      status.client_stats.avg_send_time_ns -
+                                      status.client_stats.avg_receive_time_ns;
         // Network misc is calculated by subtracting data from different
         // measurements (server v.s. client), so the result needs to be capped
         // at 0
@@ -1124,19 +1144,20 @@ main(int argc, char** argv)
                 ? avg_client_wait_ns - (avg_queue_ns + avg_compute_ns)
                 : 0;
         if (!using_request_rate_range) {
-          ofs << status.concurrency << "," << status.client_infer_per_sec << ","
-              << (status.client_avg_send_time_ns / 1000) << ","
+          ofs << status.concurrency << "," << status.client_stats.infer_per_sec
+              << "," << (status.client_stats.avg_send_time_ns / 1000) << ","
               << (avg_network_misc_ns / 1000) << "," << (avg_queue_ns / 1000)
               << "," << (avg_compute_ns / 1000) << ","
-              << (status.client_avg_receive_time_ns / 1000);
+              << (status.client_stats.avg_receive_time_ns / 1000);
         } else {
-          ofs << status.request_rate << "," << status.client_infer_per_sec
-              << "," << (status.client_avg_send_time_ns / 1000) << ","
+          ofs << status.request_rate << "," << status.client_stats.infer_per_sec
+              << "," << (status.client_stats.avg_send_time_ns / 1000) << ","
               << (avg_network_misc_ns / 1000) << "," << (avg_queue_ns / 1000)
               << "," << (avg_compute_ns / 1000) << ","
-              << (status.client_avg_receive_time_ns / 1000);
+              << (status.client_stats.avg_receive_time_ns / 1000);
         }
-        for (const auto& percentile : status.client_percentile_latency_ns) {
+        for (const auto& percentile :
+             status.client_stats.percentile_latency_ns) {
           ofs << "," << (percentile.second / 1000);
         }
         ofs << std::endl;
@@ -1174,7 +1195,8 @@ main(int argc, char** argv)
             // request count ratio between the composing model and the ensemble
             double infer_ratio =
                 1.0 * stats.request_count / status.server_stats.request_count;
-            double infer_per_sec = infer_ratio * status.client_infer_per_sec;
+            double infer_per_sec =
+                infer_ratio * status.client_stats.infer_per_sec;
             if (!using_request_rate_range) {
               ofs << status.concurrency << "," << infer_per_sec << ",0,"
                   << (avg_overhead_ns / 1000) << "," << (avg_queue_ns / 1000)

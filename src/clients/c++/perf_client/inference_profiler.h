@@ -68,31 +68,37 @@ struct ServerSideStats {
   std::map<ModelInfo, ServerSideStats> composing_models_stat;
 };
 
+struct ClientSideStats {
+  // Request count and elapsed time measured by client
+  uint64_t request_count;
+  // Only record sequences that finish within the measurement window
+  uint64_t sequence_count;
+  // The number of requests that missed their schedule
+  uint64_t delayed_request_count;
+  uint64_t duration_ns;
+  uint64_t avg_latency_ns;
+  // a ordered map of percentiles to be reported (<percentile, value> pair)
+  std::map<size_t, uint64_t> percentile_latency_ns;
+  // Using usec to avoid square of large number (large in nsec)
+  uint64_t std_us;
+  uint64_t avg_request_time_ns;
+  uint64_t avg_send_time_ns;
+  uint64_t avg_receive_time_ns;
+  // Per sec stat
+  double infer_per_sec;
+  double sequence_per_sec;
+};
+
 struct PerfStatus {
   uint32_t concurrency;
   double request_rate;
   size_t batch_size;
+
   // Request count and elapsed time measured by server
   ServerSideStats server_stats;
+  // Measurements on the client side
+  ClientSideStats client_stats;
 
-  // Request count and elapsed time measured by client
-  uint64_t client_request_count;
-  // Only record sequences that finish within the measurement window
-  uint64_t client_sequence_count;
-  // The number of requests that missed their schedule
-  uint64_t delayed_request_count;
-  uint64_t client_duration_ns;
-  uint64_t client_avg_latency_ns;
-  // a ordered map of percentiles to be reported (<percentile, value> pair)
-  std::map<size_t, uint64_t> client_percentile_latency_ns;
-  // Using usec to avoid square of large number (large in nsec)
-  uint64_t std_us;
-  uint64_t client_avg_request_time_ns;
-  uint64_t client_avg_send_time_ns;
-  uint64_t client_avg_receive_time_ns;
-  // Per sec stat
-  double client_infer_per_sec;
-  double client_sequence_per_sec;
   bool on_sequence_model;
 
   // placeholder for the latency value that is used for conditional checking

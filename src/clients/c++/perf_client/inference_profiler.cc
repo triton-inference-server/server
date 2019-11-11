@@ -81,18 +81,17 @@ ReportServerSideStats(const ServerSideStats& stats, const int iteration)
 }
 
 nic::Error
-Report(
-    const PerfStatus& summary, const int64_t percentile,
-    const ProtocolType protocol, const bool verbose)
+ReportClientSideStats(
+    const ClientSideStats& stats, const int64_t percentile,
+    const ProtocolType protocol, const bool verbose,
+    const bool on_sequence_model)
 {
-  const uint64_t avg_latency_us = summary.client_avg_latency_ns / 1000;
-  const uint64_t std_us = summary.std_us;
+  const uint64_t avg_latency_us = stats.avg_latency_ns / 1000;
+  const uint64_t std_us = stats.std_us;
 
-  const uint64_t avg_request_time_us =
-      summary.client_avg_request_time_ns / 1000;
-  const uint64_t avg_send_time_us = summary.client_avg_send_time_ns / 1000;
-  const uint64_t avg_receive_time_us =
-      summary.client_avg_receive_time_ns / 1000;
+  const uint64_t avg_request_time_us = stats.avg_request_time_ns / 1000;
+  const uint64_t avg_send_time_us = stats.avg_send_time_ns / 1000;
+  const uint64_t avg_receive_time_us = stats.avg_receive_time_ns / 1000;
   const uint64_t avg_response_wait_time_us =
       avg_request_time_us - avg_send_time_us - avg_receive_time_us;
 
@@ -129,30 +128,41 @@ Report(
     }
   }
 
-  std::cout << "  Client: " << std::endl
-            << "    Request count: " << summary.client_request_count
-            << std::endl;
-  if (summary.delayed_request_count != 0) {
-    std::cout << "    Delayed Request Count: " << summary.delayed_request_count
+  std::cout << "    Request count: " << stats.request_count << std::endl;
+  if (stats.delayed_request_count != 0) {
+    std::cout << "    Delayed Request Count: " << stats.delayed_request_count
               << std::endl;
   }
-  if (summary.on_sequence_model) {
-    std::cout << "    Sequence count: " << summary.client_sequence_count << " ("
-              << summary.client_sequence_per_sec << " seq/sec)" << std::endl;
+  if (on_sequence_model) {
+    std::cout << "    Sequence count: " << stats.sequence_count << " ("
+              << stats.sequence_per_sec << " seq/sec)" << std::endl;
   }
-  std::cout << "    Throughput: " << summary.client_infer_per_sec
-            << " infer/sec" << std::endl;
+  std::cout << "    Throughput: " << stats.infer_per_sec << " infer/sec"
+            << std::endl;
   if (percentile == -1) {
     std::cout << "    Avg latency: " << avg_latency_us << " usec"
               << " (standard deviation " << std_us << " usec)" << std::endl;
   }
-  for (const auto& percentile : summary.client_percentile_latency_ns) {
+  for (const auto& percentile : stats.percentile_latency_ns) {
     std::cout << "    p" << percentile.first
               << " latency: " << (percentile.second / 1000) << " usec"
               << std::endl;
   }
 
   std::cout << client_library_detail << std::endl;
+
+  return nic::Error(ni::RequestStatusCode::SUCCESS);
+}
+
+nic::Error
+Report(
+    const PerfStatus& summary, const int64_t percentile,
+    const ProtocolType protocol, const bool verbose)
+{
+  std::cout << "  Client: " << std::endl;
+  ReportClientSideStats(
+      summary.client_stats, percentile, protocol, verbose,
+      summary.on_sequence_model);
 
   std::cout << "  Server: " << std::endl;
   ReportServerSideStats(summary.server_stats, 1);
@@ -349,7 +359,8 @@ InferenceProfiler::ProfileHelper(PerfStatus& status_summary, bool* is_stable)
     }
 
     if (error.back().IsOk()) {
-      load_status.infer_per_sec.push_back(status_summary.client_infer_per_sec);
+      load_status.infer_per_sec.push_back(
+          status_summary.client_stats.infer_per_sec);
       load_status.latencies.push_back(status_summary.stabilizing_latency_ns);
     } else {
       load_status.infer_per_sec.push_back(0);
@@ -368,16 +379,16 @@ InferenceProfiler::ProfileHelper(PerfStatus& status_summary, bool* is_stable)
                   << " infer/sec. ";
         if (extra_percentile_) {
           std::cout << "p" << percentile_ << " latency: "
-                    << (status_summary.client_percentile_latency_ns
+                    << (status_summary.client_stats.percentile_latency_ns
                             .find(percentile_)
                             ->second /
                         1000)
                     << " usec" << std::endl;
         } else {
           std::cout << "Avg latency: "
-                    << (status_summary.client_avg_latency_ns / 1000)
-                    << " usec (std " << status_summary.std_us << " usec)"
-                    << std::endl;
+                    << (status_summary.client_stats.avg_latency_ns / 1000)
+                    << " usec (std " << status_summary.client_stats.std_us
+                    << " usec)" << std::endl;
         }
       } else {
         std::cout << "  Pass [" << (completed_trials + 1)
@@ -646,10 +657,10 @@ InferenceProfiler::SummarizeLatency(
     tol_square_latency_us += (latency * latency) / (1000 * 1000);
   }
 
-  summary.client_avg_latency_ns = tol_latency_ns / latencies.size();
+  summary.client_stats.avg_latency_ns = tol_latency_ns / latencies.size();
 
   // retrieve other interesting percentile
-  summary.client_percentile_latency_ns.clear();
+  summary.client_stats.percentile_latency_ns.clear();
   std::set<size_t> percentiles{50, 90, 95, 99};
   if (extra_percentile_) {
     percentiles.emplace(percentile_);
@@ -657,26 +668,27 @@ InferenceProfiler::SummarizeLatency(
 
   for (const auto percentile : percentiles) {
     size_t index = (percentile / 100.0) * (latencies.size() - 1) + 0.5;
-    summary.client_percentile_latency_ns.emplace(percentile, latencies[index]);
+    summary.client_stats.percentile_latency_ns.emplace(
+        percentile, latencies[index]);
   }
 
   if (extra_percentile_) {
     summary.stabilizing_latency_ns =
-        summary.client_percentile_latency_ns.find(percentile_)->second;
+        summary.client_stats.percentile_latency_ns.find(percentile_)->second;
   } else {
-    summary.stabilizing_latency_ns = summary.client_avg_latency_ns;
+    summary.stabilizing_latency_ns = summary.client_stats.avg_latency_ns;
   }
 
   // calculate standard deviation
   uint64_t expected_square_latency_us =
       tol_square_latency_us / latencies.size();
-  uint64_t square_avg_latency_us =
-      (summary.client_avg_latency_ns * summary.client_avg_latency_ns) /
-      (1000 * 1000);
+  uint64_t square_avg_latency_us = (summary.client_stats.avg_latency_ns *
+                                    summary.client_stats.avg_latency_ns) /
+                                   (1000 * 1000);
   uint64_t var_us = (expected_square_latency_us > square_avg_latency_us)
                         ? (expected_square_latency_us - square_avg_latency_us)
                         : 0;
-  summary.std_us = (uint64_t)(sqrt(var_us));
+  summary.client_stats.std_us = (uint64_t)(sqrt(var_us));
 
   return nic::Error::Success;
 }
@@ -692,14 +704,15 @@ InferenceProfiler::SummarizeClientStat(
       ((scheduler_type_ == ContextFactory::SEQUENCE) ||
        (scheduler_type_ == ContextFactory::ENSEMBLE_SEQUENCE));
   summary.batch_size = manager_->BatchSize();
-  summary.client_request_count = valid_request_count;
-  summary.client_sequence_count = valid_sequence_count;
-  summary.delayed_request_count = delayed_request_count;
-  summary.client_duration_ns = duration_ns;
+  summary.client_stats.request_count = valid_request_count;
+  summary.client_stats.sequence_count = valid_sequence_count;
+  summary.client_stats.delayed_request_count = delayed_request_count;
+  summary.client_stats.duration_ns = duration_ns;
   float client_duration_sec =
-      (float)summary.client_duration_ns / ni::NANOS_PER_SECOND;
-  summary.client_sequence_per_sec = valid_sequence_count / client_duration_sec;
-  summary.client_infer_per_sec =
+      (float)summary.client_stats.duration_ns / ni::NANOS_PER_SECOND;
+  summary.client_stats.sequence_per_sec =
+      valid_sequence_count / client_duration_sec;
+  summary.client_stats.infer_per_sec =
       (valid_request_count * summary.batch_size) / client_duration_sec;
 
   size_t completed_count =
@@ -711,9 +724,11 @@ InferenceProfiler::SummarizeClientStat(
   uint64_t receive_time_ns = end_stat.cumulative_receive_time_ns -
                              start_stat.cumulative_receive_time_ns;
   if (completed_count != 0) {
-    summary.client_avg_request_time_ns = request_time_ns / completed_count;
-    summary.client_avg_send_time_ns = send_time_ns / completed_count;
-    summary.client_avg_receive_time_ns = receive_time_ns / completed_count;
+    summary.client_stats.avg_request_time_ns =
+        request_time_ns / completed_count;
+    summary.client_stats.avg_send_time_ns = send_time_ns / completed_count;
+    summary.client_stats.avg_receive_time_ns =
+        receive_time_ns / completed_count;
   }
 
   return nic::Error::Success;

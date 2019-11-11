@@ -44,7 +44,7 @@
 ///
 class ConcurrencyManager : public LoadManager {
  public:
-  ~ConcurrencyManager(){};
+  ~ConcurrencyManager() = default;
 
   /// Create a concurrency manager that is responsible to maintain specified
   /// load on inference server.
@@ -81,9 +81,10 @@ class ConcurrencyManager : public LoadManager {
       const std::shared_ptr<ContextFactory>& factory);
 
   struct ThreadConfig {
+    ThreadConfig() : concurrency_(0) {}
+
     //  The concurrency level that the worker should produce
     size_t concurrency_;
-    ThreadConfig() : concurrency_(0) {}
   };
 
   /// Function for worker that sends inference requests.

@@ -140,6 +140,8 @@ class LoadManager {
   std::vector<std::string> input_string_buf_;
 
   struct ThreadStat {
+    ThreadStat() : status_(ni::RequestStatusCode::SUCCESS) {}
+
     // The status of the worker thread
     nic::Error status_;
     // The statistics of the InferContext
@@ -151,8 +153,6 @@ class LoadManager {
     TimestampVector request_timestamps_;
     // A lock to protect thread data
     std::mutex mu_;
-
-    ThreadStat() : status_(ni::RequestStatusCode::SUCCESS) {}
   };
 
   // Worker threads that loads the server with inferences

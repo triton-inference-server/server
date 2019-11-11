@@ -53,7 +53,7 @@
 ///
 class RequestRateManager : public LoadManager {
  public:
-  ~RequestRateManager(){};
+  ~RequestRateManager() = default;
 
   /// Create an object of realistic load manager that is responsible to maintain
   /// specified load on inference server.
@@ -84,23 +84,24 @@ class RequestRateManager : public LoadManager {
 
  private:
   struct ThreadConfig {
-    uint32_t index_;
-    uint32_t id_;
-    uint32_t stride_;
-    bool is_paused_;
-    uint64_t rounds_;
     ThreadConfig(uint32_t index, uint32_t stride)
         : index_(index), id_(index), stride_(stride), is_paused_(false),
           rounds_(0)
     {
     }
+
+    uint32_t index_;
+    uint32_t id_;
+    uint32_t stride_;
+    bool is_paused_;
+    uint64_t rounds_;
   };
 
   struct SequenceStat {
+    SequenceStat(uint64_t corr_id) : corr_id_(corr_id), remaining_queries_(0) {}
     uint64_t corr_id_;
     size_t remaining_queries_;
     std::mutex mtx_;
-    SequenceStat(uint64_t corr_id) : corr_id_(corr_id), remaining_queries_(0) {}
   };
 
   RequestRateManager(
