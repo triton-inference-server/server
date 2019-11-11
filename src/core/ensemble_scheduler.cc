@@ -611,10 +611,6 @@ EnsembleContext::FinishEnsemble()
   }
   OnComplete_(ensemble_status_);
 
-  // Reset stats_ to make sure the timers are stopped even though
-  // there may be other internal requests (i.e. invoke FinishEnsemble()
-  // because of failure in one of the internal requests)
-  stats_.reset();
   return ensemble_status_;
 }
 
@@ -742,15 +738,17 @@ EnsembleContext::ScheduleSteps(
 
           infer_stats->CaptureTimestamp(
               ModelInferStats::TimestampKind::kRequestEnd);
-
-          // Accumulate the queue and compute durations from this
-          // composing model
-          context->stats_->IncrementQueueDuration(*infer_stats);
-          context->stats_->IncrementComputeDuration(*infer_stats);
-
           infer_stats->Report();
-
           step->infer_status_ = status;
+
+          {
+            std::lock_guard<std::mutex> lk(context->mutex_);
+            // Accumulate the queue and compute durations from this
+            // composing model
+            context->stats_->IncrementQueueDuration(*infer_stats);
+            context->stats_->IncrementComputeDuration(*infer_stats);
+          }
+
           Proceed(context, step);
         });
   }
