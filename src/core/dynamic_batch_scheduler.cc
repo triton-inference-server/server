@@ -48,7 +48,6 @@ DynamicBatchScheduler::DynamicBatchScheduler(
       pending_batch_size_(0), pending_batch_queue_cnt_(0)
 {
   dynamic_batching_enabled_ = config.has_dynamic_batching();
-  scheduler_threads_exit_.store(false);
 
   // Need to keep track of input tensor shapes if the model allows one
   // or more variable-size input tensors. Requests to the same model
@@ -92,17 +91,21 @@ DynamicBatchScheduler::Create(
   const int nice = GetCpuNiceLevel(config);
   for (uint32_t c = 0; c < sched->scheduler_thread_cnt_; ++c) {
     std::promise<bool> init_state;
+    auto thread_exit = std::make_shared<std::atomic<bool>>(false);
+    sched->scheduler_threads_exit_.emplace_back(thread_exit);
     sched->scheduler_threads_.emplace_back(
-        new std::thread([dyna_sched, c, nice, &init_state]() {
-          dyna_sched->SchedulerThread(c, nice, &init_state);
+        new std::thread([dyna_sched, c, nice, thread_exit, &init_state]() {
+          dyna_sched->SchedulerThread(c, nice, thread_exit, &init_state);
         }));
     if (!init_state.get_future().get()) {
       if (sched->scheduler_threads_.back()->joinable()) {
         sched->scheduler_threads_.back()->join();
       }
+      sched->scheduler_threads_exit_.pop_back();
       sched->scheduler_threads_.pop_back();
     }
   }
+
   if (sched->scheduler_threads_.empty()) {
     return Status(
         RequestStatusCode::INTERNAL,
@@ -119,12 +122,27 @@ DynamicBatchScheduler::~DynamicBatchScheduler()
   // Signal the scheduler threads to exit and then wait for them...
   {
     std::unique_lock<std::mutex> lock(mu_);
-    scheduler_threads_exit_.store(true);
+    for (auto& ex : scheduler_threads_exit_) {
+      ex->store(true);
+    }
+
     cv_.notify_all();
   }
 
+  // It is possible for (one of) the scheduler threads to be the last
+  // holder of a backend object, and when that scheduler thread
+  // releases the object the scheduler thread itself will destroy the
+  // DynamicBatchScheduler object. So we need to check for a scheduler
+  // thread and not join it against itself. Instead we detach it so
+  // there is not a problem when its thread object is destroyed.
   for (auto& thd : scheduler_threads_) {
-    thd->join();
+    if (thd->get_id() != std::this_thread::get_id()) {
+      if (thd->joinable()) {
+        thd->join();
+      }
+    } else {
+      thd->detach();
+    }
   }
 }
 
@@ -158,6 +176,7 @@ DynamicBatchScheduler::Enqueue(
 void
 DynamicBatchScheduler::SchedulerThread(
     const uint32_t runner_id, const int nice,
+    const std::shared_ptr<std::atomic<bool>>& rthread_exit,
     std::promise<bool>* is_initialized)
 {
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
@@ -188,19 +207,37 @@ DynamicBatchScheduler::SchedulerThread(
     is_initialized->set_value(true);
   }
 
+  // For testing this scheduler thread to be the last to release the
+  // backend object.
+  uint64_t backend_release_wait_milliseconds = 0;
+  {
+    const char* dstr = getenv("TRTSERVER_DELAY_SCHEDULER_BACKEND_RELEASE");
+    if (dstr != nullptr) {
+      backend_release_wait_milliseconds = atoi(dstr);
+      LOG_INFO << "Delaying scheduler backend release for " << runner_id << ": "
+               << backend_release_wait_milliseconds << "ms";
+    }
+  }
+
   // For debugging/testing, delay start of threads until the queue
   // contains the specified number of entries.
-  const char* dstr = getenv("TRTSERVER_DELAY_SCHEDULER");
   size_t delay_cnt = 0;
-  if (dstr != nullptr) {
-    delay_cnt = atoi(dstr);
-    LOG_INFO << "Delaying scheduler thread " << runner_id << " until "
-             << delay_cnt << " queued payloads...";
+  {
+    const char* dstr = getenv("TRTSERVER_DELAY_SCHEDULER");
+    if (dstr != nullptr) {
+      delay_cnt = atoi(dstr);
+      LOG_INFO << "Delaying scheduler thread " << runner_id << " until "
+               << delay_cnt << " queued payloads...";
+    }
   }
+
+  // Make a local copy of the atomic used to signal the thread to
+  // exit. See comment at end of function for explanation.
+  std::shared_ptr<std::atomic<bool>> thread_exit = rthread_exit;
 
   const uint64_t default_wait_microseconds = 500 * 1000;
 
-  while (!scheduler_threads_exit_.load()) {
+  while (!thread_exit->load()) {
     std::shared_ptr<std::vector<Scheduler::Payload>> payloads;
     bool wake_thread = false;
     uint64_t wait_microseconds = 0;
@@ -285,7 +322,28 @@ DynamicBatchScheduler::SchedulerThread(
       };
 
       OnSchedule_(runner_id, payloads.get(), OnCompleteQueuedPayloads);
+
+      // For testing we introduce a delay here to make the
+      // "DynamicBatchScheduler destroyed by this thread" case
+      // described in the comment below reproducible.
+      if (backend_release_wait_milliseconds > 0) {
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(backend_release_wait_milliseconds));
+      }
     }
+
+    // At the end of this scope 'payloads' will be destroyed.  A
+    // handle to the backend is held through the
+    // payload.complete_function_. If the server is exiting or the
+    // backend is unloaded, it could be that this handle is the last
+    // one for the backend and so destroying 'payloads' will cause the
+    // backend to be deleted which in turn will call this thread's
+    // DynamicBatchScheduler to be destroyed by this thread itself. In
+    // that case it is important that this thread not reference the
+    // object after this point since the object will be invalid. The
+    // while statement above uses a local atomic which is set to false
+    // by the destructor (and so the while look will exit) and the
+    // logging below uses only local variables... so this code is ok.
   }  // end runner loop
 
   LOG_VERBOSE(1) << "Stopping dynamic-batch scheduler thread " << runner_id
