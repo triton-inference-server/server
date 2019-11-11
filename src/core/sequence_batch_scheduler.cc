@@ -157,50 +157,53 @@ SequenceBatchScheduler::CreateControlTensors(
   int32_t int32_false_value, int32_true_value;
   float fp32_false_value, fp32_true_value;
 
-  // START
+  // START, optional
   {
     RETURN_IF_ERROR(GetSequenceControlProperties(
         config.sequence_batching(), config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
-        true /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
+        false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
         &fp32_true_value, &int32_false_value, &int32_true_value));
-    uint8_t* false_p =
-        ((tensor_datatype == DataType::TYPE_INT32)
-             ? reinterpret_cast<uint8_t*>(&int32_false_value)
-             : reinterpret_cast<uint8_t*>(&fp32_false_value));
-    uint8_t* true_p =
-        ((tensor_datatype == DataType::TYPE_INT32)
-             ? reinterpret_cast<uint8_t*>(&int32_true_value)
-             : reinterpret_cast<uint8_t*>(&fp32_true_value));
+    if (!tensor_name.empty()) {
+      uint8_t* false_p =
+          ((tensor_datatype == DataType::TYPE_INT32)
+               ? reinterpret_cast<uint8_t*>(&int32_false_value)
+               : reinterpret_cast<uint8_t*>(&fp32_false_value));
+      uint8_t* true_p =
+          ((tensor_datatype == DataType::TYPE_INT32)
+               ? reinterpret_cast<uint8_t*>(&int32_true_value)
+               : reinterpret_cast<uint8_t*>(&fp32_true_value));
 
-    auto false_override =
-        std::make_shared<InferRequestProvider::InputOverride>();
-    false_override->content_.assign(false_p, false_p + sizeof(float));
-    false_override->dims_.Add(1);
-    false_override->datatype_ = tensor_datatype;
+      auto false_override =
+          std::make_shared<InferRequestProvider::InputOverride>();
+      false_override->content_.assign(false_p, false_p + sizeof(float));
+      false_override->dims_.Add(1);
+      false_override->datatype_ = tensor_datatype;
 
-    auto true_override =
-        std::make_shared<InferRequestProvider::InputOverride>();
-    true_override->content_.assign(true_p, true_p + sizeof(float));
-    true_override->dims_.Add(1);
-    true_override->datatype_ = tensor_datatype;
+      auto true_override =
+          std::make_shared<InferRequestProvider::InputOverride>();
+      true_override->content_.assign(true_p, true_p + sizeof(float));
+      true_override->dims_.Add(1);
+      true_override->datatype_ = tensor_datatype;
 
-    (*start_input_overrides)
-        ->insert(std::make_pair(tensor_name, true_override));
-    (*end_input_overrides)->insert(std::make_pair(tensor_name, false_override));
-    (*startend_input_overrides)
-        ->insert(std::make_pair(tensor_name, true_override));
-    (*continue_input_overrides)
-        ->insert(std::make_pair(tensor_name, false_override));
-    (*notready_input_overrides)
-        ->insert(std::make_pair(tensor_name, false_override));
+      (*start_input_overrides)
+          ->insert(std::make_pair(tensor_name, true_override));
+      (*end_input_overrides)
+          ->insert(std::make_pair(tensor_name, false_override));
+      (*startend_input_overrides)
+          ->insert(std::make_pair(tensor_name, true_override));
+      (*continue_input_overrides)
+          ->insert(std::make_pair(tensor_name, false_override));
+      (*notready_input_overrides)
+          ->insert(std::make_pair(tensor_name, false_override));
+    }
   }
 
   // END, optional
   {
     RETURN_IF_ERROR(GetSequenceControlProperties(
         config.sequence_batching(), config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
         &fp32_true_value, &int32_false_value, &int32_true_value));
     if (!tensor_name.empty()) {
@@ -238,43 +241,46 @@ SequenceBatchScheduler::CreateControlTensors(
     }
   }
 
-  // READY
+  // READY, optional
   {
     RETURN_IF_ERROR(GetSequenceControlProperties(
         config.sequence_batching(), config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
-        true /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
+        false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
         &fp32_true_value, &int32_false_value, &int32_true_value));
-    uint8_t* false_p =
-        ((tensor_datatype == DataType::TYPE_INT32)
-             ? reinterpret_cast<uint8_t*>(&int32_false_value)
-             : reinterpret_cast<uint8_t*>(&fp32_false_value));
-    uint8_t* true_p =
-        ((tensor_datatype == DataType::TYPE_INT32)
-             ? reinterpret_cast<uint8_t*>(&int32_true_value)
-             : reinterpret_cast<uint8_t*>(&fp32_true_value));
+    if (!tensor_name.empty()) {
+      uint8_t* false_p =
+          ((tensor_datatype == DataType::TYPE_INT32)
+               ? reinterpret_cast<uint8_t*>(&int32_false_value)
+               : reinterpret_cast<uint8_t*>(&fp32_false_value));
+      uint8_t* true_p =
+          ((tensor_datatype == DataType::TYPE_INT32)
+               ? reinterpret_cast<uint8_t*>(&int32_true_value)
+               : reinterpret_cast<uint8_t*>(&fp32_true_value));
 
-    auto false_override =
-        std::make_shared<InferRequestProvider::InputOverride>();
-    false_override->content_.assign(false_p, false_p + sizeof(float));
-    false_override->dims_.Add(1);
-    false_override->datatype_ = tensor_datatype;
+      auto false_override =
+          std::make_shared<InferRequestProvider::InputOverride>();
+      false_override->content_.assign(false_p, false_p + sizeof(float));
+      false_override->dims_.Add(1);
+      false_override->datatype_ = tensor_datatype;
 
-    auto true_override =
-        std::make_shared<InferRequestProvider::InputOverride>();
-    true_override->content_.assign(true_p, true_p + sizeof(float));
-    true_override->dims_.Add(1);
-    true_override->datatype_ = tensor_datatype;
+      auto true_override =
+          std::make_shared<InferRequestProvider::InputOverride>();
+      true_override->content_.assign(true_p, true_p + sizeof(float));
+      true_override->dims_.Add(1);
+      true_override->datatype_ = tensor_datatype;
 
-    (*start_input_overrides)
-        ->insert(std::make_pair(tensor_name, true_override));
-    (*end_input_overrides)->insert(std::make_pair(tensor_name, true_override));
-    (*startend_input_overrides)
-        ->insert(std::make_pair(tensor_name, true_override));
-    (*continue_input_overrides)
-        ->insert(std::make_pair(tensor_name, true_override));
-    (*notready_input_overrides)
-        ->insert(std::make_pair(tensor_name, false_override));
+      (*start_input_overrides)
+          ->insert(std::make_pair(tensor_name, true_override));
+      (*end_input_overrides)
+          ->insert(std::make_pair(tensor_name, true_override));
+      (*startend_input_overrides)
+          ->insert(std::make_pair(tensor_name, true_override));
+      (*continue_input_overrides)
+          ->insert(std::make_pair(tensor_name, true_override));
+      (*notready_input_overrides)
+          ->insert(std::make_pair(tensor_name, false_override));
+    }
   }
 
   return Status::Success;

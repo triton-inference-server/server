@@ -578,9 +578,7 @@ PlanBackend::Context::InitializeSequenceControlInputBindings(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY};
 
     for (const ModelSequenceBatching::Control::Kind control_kind : kinds) {
-      const bool required =
-          (control_kind !=
-           ModelSequenceBatching::Control::CONTROL_SEQUENCE_END);
+      const bool required = false;
 
       std::string tensor_name;
       DataType tensor_datatype;
