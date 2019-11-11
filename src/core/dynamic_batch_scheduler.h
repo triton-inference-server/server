@@ -64,6 +64,7 @@ class DynamicBatchScheduler : public Scheduler {
       StandardRunFunc OnSchedule);
   void SchedulerThread(
       const uint32_t runner_id, const int nice,
+      const std::shared_ptr<std::atomic<bool>>& rthread_exit,
       std::promise<bool>* is_initialized);
   void InitPendingShape(const InferRequestHeader& request);
   bool CompareWithPendingShape(const InferRequestHeader& request) const;
@@ -97,7 +98,7 @@ class DynamicBatchScheduler : public Scheduler {
   std::deque<Scheduler::Payload> queue_;
 
   std::vector<std::unique_ptr<std::thread>> scheduler_threads_;
-  std::atomic<bool> scheduler_threads_exit_;
+  std::vector<std::shared_ptr<std::atomic<bool>>> scheduler_threads_exit_;
 
   size_t max_preferred_batch_size_;
   std::set<int32_t> preferred_batch_sizes_;

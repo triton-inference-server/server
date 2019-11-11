@@ -57,6 +57,8 @@ WORKDIR /workspace
 RUN mkdir -p qa/common && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
+    mkdir qa/L0_backend_release/simple_models && \
+    cp -r docs/examples/model_repository/simple qa/L0_backend_release/simple_models/. && \
     mkdir qa/L0_simple_callback_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_callback_example/models/. && \
     mkdir qa/L0_simple_string_example/models && \
@@ -114,6 +116,9 @@ RUN mkdir -p qa/L0_custom_param/models/param/1 && \
 RUN mkdir -p qa/L0_simple_sequence_example/models/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/L0_simple_sequence_example/models/simple_sequence/1/. && \
+    mkdir -p qa/L0_backend_release/simple_seq_models/simple_sequence/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libsequence.so \
+        qa/L0_backend_release/simple_seq_models/simple_sequence/1/. && \
     mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/custom_models/custom_sequence_int32/1/.
