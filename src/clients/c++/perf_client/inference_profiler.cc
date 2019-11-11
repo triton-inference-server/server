@@ -281,8 +281,7 @@ InferenceProfiler::Profile(
     } else if (
         (stabilizing_latency_ms >= latency_threshold_ms_) &&
         (latency_threshold_ms_ != NO_LIMIT)) {
-      std::cerr << "Aborting execution as measured latency went over "
-                   "the set limit of "
+      std::cerr << "Measured latency went over the set limit of "
                 << latency_threshold_ms_ << " msec. " << std::endl;
       *meets_threshold = false;
     } else if (!is_stable) {
@@ -326,8 +325,7 @@ InferenceProfiler::Profile(
     } else if (
         (stabilizing_latency_ms >= latency_threshold_ms_) &&
         (latency_threshold_ms_ != NO_LIMIT)) {
-      std::cerr << "Aborting execution as measured latency went over "
-                   "the set limit of "
+      std::cerr << "Measured latency went over the set limit of "
                 << latency_threshold_ms_ << " msec. " << std::endl;
       *meets_threshold = false;
     } else if (!is_stable) {
@@ -413,8 +411,7 @@ InferenceProfiler::ProfileHelper(PerfStatus& status_summary, bool* is_stable)
           *is_stable = false;
         }
         if ((load_status.latencies[idx] <
-             (latency_threshold_ms_ * 1000 * 1000)) &&
-            (latency_threshold_ms_ != NO_LIMIT)) {
+             (latency_threshold_ms_ * 1000 * 1000))) {
           within_threshold = true;
         }
         // We call it complete only if stability_window measurements are within
@@ -439,7 +436,7 @@ InferenceProfiler::ProfileHelper(PerfStatus& status_summary, bool* is_stable)
       if (*is_stable) {
         break;
       }
-      if (!within_threshold) {
+      if ((!within_threshold) && (latency_threshold_ms_ != NO_LIMIT)) {
         break;
       }
     }
