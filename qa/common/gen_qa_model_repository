@@ -38,9 +38,11 @@
 ## local system that you want to target for the generated models.
 ##
 ## 3. Run this script to create /tmp/qa_model_repository,
-## /tmp/qa_variable_model_repository, /tmp/qa_identity_model_repository,
+## /tmp/qa_variable_model_repository,
+## /tmp/qa_identity_model_repository,
 ## /tmp/qa_reshape_model_repository, /tmp/qa_noshape_model_repository,
-## /tmp/qa_sequence_model_repository, and
+## /tmp/qa_sequence_model_repository,
+## /tmp/qa_dyna_sequence_model_repository, and
 ## /tmp/qa_variable_sequence_model_repository directories containing
 ## all the models needed for CI testing.
 ##
@@ -60,6 +62,7 @@ HOST_IDENTITYDESTDIR=/tmp/$TRTIS_VERSION/qa_identity_model_repository
 HOST_IDENTITYBIGDESTDIR=/tmp/$TRTIS_VERSION/qa_identity_big_model_repository
 HOST_RESHAPEDESTDIR=/tmp/$TRTIS_VERSION/qa_reshape_model_repository
 HOST_SEQDESTDIR=/tmp/$TRTIS_VERSION/qa_sequence_model_repository
+HOST_DYNASEQDESTDIR=/tmp/$TRTIS_VERSION/qa_dyna_sequence_model_repository
 HOST_VARSEQDESTDIR=/tmp/$TRTIS_VERSION/qa_variable_sequence_model_repository
 HOST_ENSEMBLEDESTDIR=/tmp/$TRTIS_VERSION/qa_ensemble_model_repository
 HOST_NOSHAPEDESTDIR=/tmp/$TRTIS_VERSION/qa_noshape_model_repository
@@ -67,7 +70,7 @@ HOST_PLGDESTDIR=/tmp/$TRTIS_VERSION/qa_trt_plugin_model_repository
 
 rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR
 rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_RESHAPEDESTDIR
-rm -fr $HOST_SEQDESTDIR $HOST_VARSEQDESTDIR
+rm -fr $HOST_SEQDESTDIR $HOST_DYNASEQDESTDIR $HOST_VARSEQDESTDIR
 rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR
 rm -fr $HOST_PLGDESTDIR
 mkdir -p $HOST_SRCDIR
@@ -77,6 +80,7 @@ mkdir -p $HOST_IDENTITYDESTDIR
 mkdir -p $HOST_IDENTITYBIGDESTDIR
 mkdir -p $HOST_RESHAPEDESTDIR
 mkdir -p $HOST_SEQDESTDIR
+mkdir -p $HOST_DYNASEQDESTDIR
 mkdir -p $HOST_VARSEQDESTDIR
 mkdir -p $HOST_ENSEMBLEDESTDIR
 mkdir -p $HOST_NOSHAPEDESTDIR
@@ -100,6 +104,7 @@ cp ./gen_qa_identity_models.py $HOST_SRCDIR/.
 cp ./gen_qa_reshape_models.py $HOST_SRCDIR/.
 cp ./gen_qa_noshape_models.py $HOST_SRCDIR/.
 cp ./gen_qa_sequence_models.py $HOST_SRCDIR/.
+cp ./gen_qa_dyna_sequence_models.py $HOST_SRCDIR/.
 cp ./gen_ensemble_model_utils.py $HOST_SRCDIR/.
 cp ./gen_qa_trt_plugin_models.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
@@ -115,6 +120,7 @@ IDENTITYDESTDIR=/tmp/zeromodels
 IDENTITYBIGDESTDIR=/tmp/zerobigmodels
 RESHAPEDESTDIR=/tmp/reshapemodels
 SEQDESTDIR=/tmp/seqmodels
+DYNASEQDESTDIR=/tmp/dynaseqmodels
 VARSEQDESTDIR=/tmp/varseqmodels
 ENSEMBLEDESTDIR=/tmp/ensemblemodels
 NOSHAPEDESTDIR=/tmp/noshapemodels
@@ -138,6 +144,8 @@ python3 $SRCDIR/gen_qa_sequence_models.py --onnx --netdef --libtorch --models_di
 chown -R $(id -u):$(id -g) $SEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --onnx --netdef --libtorch --variable --models_dir=$VARSEQDESTDIR
 chown -R $(id -u):$(id -g) $VARSEQDESTDIR
+python3 $SRCDIR/gen_qa_dyna_sequence_models.py --onnx --netdef --libtorch --models_dir=$DYNASEQDESTDIR
+chown -R $(id -u):$(id -g) $DYNASEQDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$C2SCRIPT
@@ -154,6 +162,7 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$C2SCRIPT \
        --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
+       --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        -u $(id -u):$(id -g) $PYTORCH_IMAGE
 if [ $? -ne 0 ]; then
@@ -179,6 +188,8 @@ python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --models_dir=$
 chown -R $(id -u):$(id -g) $SEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --variable --models_dir=$VARSEQDESTDIR
 chown -R $(id -u):$(id -g) $VARSEQDESTDIR
+python3 $SRCDIR/gen_qa_dyna_sequence_models.py --graphdef --savedmodel --models_dir=$DYNASEQDESTDIR
+chown -R $(id -u):$(id -g) $DYNASEQDESTDIR
 python3 $SRCDIR/gen_qa_noshape_models.py --savedmodel --models_dir=$NOSHAPEDESTDIR
 chown -R $(id -u):$(id -g) $NOSHAPEDESTDIR
 python3 $SRCDIR/gen_qa_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_model_repository
@@ -204,6 +215,7 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
+       --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_NOSHAPEDESTDIR,target=$NOSHAPEDESTDIR \
        --mount type=bind,source=$HOST_ENSEMBLEDESTDIR,target=$ENSEMBLEDESTDIR \
@@ -232,13 +244,15 @@ python3 $SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$RES
 chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$SEQDESTDIR
 chown -R $(id -u):$(id -g) $SEQDESTDIR
+python3 $SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$DYNASEQDESTDIR
+chown -R $(id -u):$(id -g) $DYNASEQDESTDIR
+python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VARSEQDESTDIR
+chown -R $(id -u):$(id -g) $VARSEQDESTDIR
 # make shared library for custom clip plugin
 (cd /workspace/tensorrt/samples/python/uff_custom_plugin && cmake . && make && \
 cp libclipplugin.so $PLGDESTDIR/.)
 LD_PRELOAD=$PLGDESTDIR/libclipplugin.so python3 $SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$PLGDESTDIR
 chown -R $(id -u):$(id -g) $PLGDESTDIR
-python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VARSEQDESTDIR
-chown -R $(id -u):$(id -g) $VARSEQDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TRTSCRIPT
@@ -256,8 +270,9 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_IDENTITYBIGDESTDIR,target=$IDENTITYBIGDESTDIR \
        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
-       --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \
+       --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
+       --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \
        -u $(id -u):$(id -g) $TENSORRT_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"

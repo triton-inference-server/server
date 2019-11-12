@@ -203,5 +203,8 @@ def get_model_name(pf, input_dtype, output0_dtype, output1_dtype):
 def get_sequence_model_name(pf, dtype):
     return "{}_sequence_{}".format(pf, np.dtype(dtype).name)
 
+def get_dyna_sequence_model_name(pf, dtype):
+    return "{}_dyna_sequence_{}".format(pf, np.dtype(dtype).name)
+
 def get_zero_model_name(pf, io_cnt, dtype):
     return "{}_zero_{}_{}".format(pf, io_cnt, np.dtype(dtype).name)
