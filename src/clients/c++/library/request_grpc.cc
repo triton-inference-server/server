@@ -307,11 +307,9 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
   Error RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, size_t offset,
       size_t byte_size) override;
-#if TRTIS_ENABLE_GPU
   Error RegisterCudaSharedMemory(
       const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
       size_t byte_size, int device_id) override;
-#endif  // TRTIS_ENABLE_GPU
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
   Error GetSharedMemoryStatus(SharedMemoryStatus* shm_status) override;
@@ -359,12 +357,12 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
   }
 }
 
-#if TRTIS_ENABLE_GPU
 Error
 SharedMemoryControlGrpcContextImpl::RegisterCudaSharedMemory(
     const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
     size_t byte_size, int device_id)
 {
+#if TRTIS_ENABLE_GPU
   SharedMemoryControlRequest request;
   SharedMemoryControlResponse response;
   grpc::ClientContext context;
@@ -393,8 +391,12 @@ SharedMemoryControlGrpcContextImpl::RegisterCudaSharedMemory(
         "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
             status.error_message());
   }
-}
+#else
+  return Error(
+      RequestStatusCode::INVALID_ARG,
+      "Cannot register CUDA shared memory region when TRTIS_ENABLE_GPU=0");
 #endif  // TRTIS_ENABLE_GPU
+}
 
 Error
 SharedMemoryControlGrpcContextImpl::UnregisterSharedMemory(

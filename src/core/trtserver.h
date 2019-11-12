@@ -45,6 +45,8 @@ extern "C" {
 
 #if TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
+#else
+typedef void cudaIpcMemHandle_t;
 #endif  // TRTIS_ENABLE_GPU
 
 struct TRTSERVER_Error;
@@ -155,12 +157,10 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockCpuNew(
 /// \param byte_size The size, in bytes of the block.
 /// \param device_id The GPU number the CUDA shared memory region is in.
 /// \return a TRTSERVER_Error indicating success or failure.
-#ifdef TRTIS_ENABLE_GPU
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockGpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
     const cudaIpcMemHandle_t* cuda_shm_handle, const size_t byte_size,
     const int device_id);
-#endif  // TRTIS_ENABLE_GPU
 
 /// Delete a shared memory block object.
 /// \param shared_memory_block The object to delete.
