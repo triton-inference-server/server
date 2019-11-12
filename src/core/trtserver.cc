@@ -546,19 +546,23 @@ TRTSERVER_SharedMemoryBlockCpuNew(
   return nullptr;  // Success
 }
 
-#ifdef TRTIS_ENABLE_GPU
 TRTSERVER_Error*
 TRTSERVER_SharedMemoryBlockGpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
     const cudaIpcMemHandle_t* cuda_shm_handle, const size_t byte_size,
     const int device_id)
 {
+#ifdef TRTIS_ENABLE_GPU
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
       new TrtServerSharedMemoryBlock(
           TRTSERVER_MEMORY_GPU, name, cuda_shm_handle, device_id, byte_size));
   return nullptr;  // Success
-}
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED,
+      "CUDA shared memory not supported when TRTIS_ENABLE_GPU=0");
 #endif  // TRTIS_ENABLE_GPU
+}
 
 TRTSERVER_Error*
 TRTSERVER_SharedMemoryBlockDelete(

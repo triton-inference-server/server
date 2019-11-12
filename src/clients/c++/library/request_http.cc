@@ -597,11 +597,9 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
   Error RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, size_t offset,
       size_t byte_size) override;
-#if TRTIS_ENABLE_GPU
   Error RegisterCudaSharedMemory(
       const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
       size_t byte_size, int device_id) override;
-#endif  // TRTIS_ENABLE_GPU
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
   Error GetSharedMemoryStatus(SharedMemoryStatus* status) override;
@@ -660,12 +658,12 @@ SharedMemoryControlHttpContextImpl::RegisterSharedMemory(
   return SendRequest("register", name, shm_key, offset, byte_size);
 }
 
-#if TRTIS_ENABLE_GPU
 Error
 SharedMemoryControlHttpContextImpl::RegisterCudaSharedMemory(
     const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
     size_t byte_size, int device_id)
 {
+#if TRTIS_ENABLE_GPU
   response_.clear();
   request_status_.Clear();
 
@@ -742,8 +740,12 @@ SharedMemoryControlHttpContextImpl::RegisterCudaSharedMemory(
   }
 
   return Error(request_status_);
-}
+#else
+  return Error(
+      RequestStatusCode::INVALID_ARG,
+      "Cannot register CUDA shared memory region when TRTIS_ENABLE_GPU=0");
 #endif  // TRTIS_ENABLE_GPU
+}
 
 Error
 SharedMemoryControlHttpContextImpl::UnregisterSharedMemory(
