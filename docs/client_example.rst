@@ -176,7 +176,7 @@ to use CUDA shared memory you need to use nvidia-docker instead of Docker
 to run the client image. (see :ref:`section-running-the-inference-server`
 for more information about running the inference server)::
 
-  $ docker run -it --rm --net=host nvcr.io/nvidia/tensorrtserver:<xx.yy>-clientsdk-py3
+  $ docker run -it --rm --net=host nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3-clientsdk
 
 In the image you can find the example executables in
 /workspace/install/bin, and the Python examples in
