@@ -147,7 +147,12 @@ InferenceBackend::SetConfiguredScheduler(
         payloads.emplace_back(nullptr, request_provider, nullptr, nullptr);
       }
 
-      Run(runner_idx, &payloads, [](Status status) {});
+      std::promise<Status> warmup_promise;
+      auto warmup_future = warmup_promise.get_future();
+      Run(runner_idx, &payloads, [&warmup_promise](Status status) {
+        warmup_promise.set_value(status);
+      });
+      RETURN_IF_ERROR(warmup_future.get());
     }
     return Status::Success;
   };
