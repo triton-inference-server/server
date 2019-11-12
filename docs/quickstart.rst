@@ -229,12 +229,12 @@ Make sure you log into NGC as described in
 section. Use docker pull to get the client libraries and examples
 container from NGC::
 
-  $ docker pull nvcr.io/nvidia/tensorrtserver:<xx.yy>-clientsdk-py3
+  $ docker pull nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3-clientsdk
 
 Where <xx.yy> is the version that you want to pull. Run the client
 image so that the client examples can access the inference server::
 
-  $ docker run -it --rm --net=host nvcr.io/nvidia/tensorrtserver:<xx.yy>-clientsdk-py3
+  $ docker run -it --rm --net=host nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3-clientsdk
 
 It is also possible to build the client examples with or without
 Docker and for some platforms pre-compiled client examples are

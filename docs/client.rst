@@ -224,7 +224,7 @@ instructions, see the `NGC Getting Started Guide
 Use docker pull to get the client libraries and examples container
 from NGC::
 
-  $ docker pull nvcr.io/nvidia/tensorrtserver:<xx.yy>-clientsdk-py3
+  $ docker pull nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3-clientsdk
 
 Where <xx.yy> is the version that you want to pull.
 
