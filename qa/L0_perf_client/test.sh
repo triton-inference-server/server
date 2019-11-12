@@ -165,6 +165,31 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec|Request concurrency: 2" |
     RET=1
 fi
 
+$PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 -p1000 -b 1 -a>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+$PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:100 -p1000 -b 1 \
+-a --binary-search --request-distribution "poisson" -l 10 >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
 # Testing with string inputs
 $PERF_CLIENT -v -i grpc -m graphdef_object_object_object --string-data=1 -p2000 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -257,8 +282,20 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-set -e
 
+$PERF_CLIENT -v -m  simple_savedmodel_sequence_float32 -p 1000 --request-rate-range 100:200:50 --sync \
+>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID

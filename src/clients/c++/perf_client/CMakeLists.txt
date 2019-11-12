@@ -35,9 +35,11 @@ set(
   PERF_CLIENT_SRCS
   perf_client.cc
   context_factory.cc
-  concurrency_manager.cc
   inference_profiler.cc
   perf_utils.cc
+  load_manager.cc
+  concurrency_manager.cc
+  request_rate_manager.cc
 )
 
 set(
@@ -46,6 +48,8 @@ set(
   inference_profiler.h
   perf_utils.h
   load_manager.h
+  concurrency_manager.h
+  request_rate_manager.h
 )
 
 add_executable(perf_client

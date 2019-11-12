@@ -25,13 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/clients/c++/perf_client/context_factory.h"
 #include "src/clients/c++/perf_client/load_manager.h"
-#include "src/clients/c++/perf_client/perf_utils.h"
-
-#include <condition_variable>
-#include <thread>
-
 
 //==============================================================================
 /// ConcurrencyManager is a helper class to send inference requests to inference
@@ -50,7 +44,7 @@
 ///
 class ConcurrencyManager : public LoadManager {
  public:
-  ~ConcurrencyManager();
+  ~ConcurrencyManager() = default;
 
   /// Create a concurrency manager that is responsible to maintain specified
   /// load on inference server.
@@ -74,63 +68,11 @@ class ConcurrencyManager : public LoadManager {
       const std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
 
-  /// @ See LoadManager.ChangeConurrencyLevel()
+  /// @ See LoadManager::ChangeConurrencyLevel()
   nic::Error ChangeConcurrencyLevel(
       const size_t concurrent_request_count) override;
 
-  /// @ See LoadManager.CheckHealth()
-  nic::Error CheckHealth() override;
-
-  /// @ See LoadManager.SwapTimestamps()
-  nic::Error SwapTimestamps(TimestampVector& new_timestamps) override;
-
-  /// @ See LoadManager.GetAccumulatedContextStat()
-  nic::Error GetAccumulatedContextStat(
-      nic::InferContext::Stat* contexts_stat) override;
-
-  /// @ See LoadManager.BatchSize()
-  size_t BatchSize() const override { return batch_size_; }
-
- public:
-  struct RequestMetaData {
-    RequestMetaData(
-        const std::shared_ptr<nic::InferContext::Request> request,
-        const struct timespec start_time, const uint32_t flags)
-        : request_(std::move(request)), start_time_(start_time), flags_(flags)
-    {
-    }
-
-    const std::shared_ptr<nic::InferContext::Request> request_;
-    const struct timespec start_time_;
-    const uint32_t flags_;
-  };
-
-  struct InferContextMetaData {
-    InferContextMetaData() : inflight_request_cnt_(0) {}
-    InferContextMetaData(InferContextMetaData&&) = delete;
-    InferContextMetaData(const InferContextMetaData&) = delete;
-
-    std::unique_ptr<nic::InferContext> ctx_;
-    std::atomic<size_t> inflight_request_cnt_;
-  };
-
  private:
-  struct ThreadData {
-    // The status of the worker thread
-    nic::Error status_;
-    // The statistics of the InferContext
-    std::vector<nic::InferContext::Stat> contexts_stat_;
-    //  The concurrency level that the worker should produce
-    size_t concurrency_;
-    // A vector of request timestamps <start_time, end_time>
-    // Request latency will be end_time - start_time
-    TimestampVector request_timestamps_;
-    // A lock to protect thread data
-    std::mutex mu_;
-
-    ThreadData() : status_(ni::RequestStatusCode::SUCCESS), concurrency_(0) {}
-  };
-
   ConcurrencyManager(
       const bool async,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
@@ -138,53 +80,20 @@ class ConcurrencyManager : public LoadManager {
       const size_t max_concurrency, const size_t sequence_length,
       const std::shared_ptr<ContextFactory>& factory);
 
+  struct ThreadConfig {
+    ThreadConfig() : concurrency_(0) {}
+
+    //  The concurrency level that the worker should produce
+    size_t concurrency_;
+  };
+
   /// Function for worker that sends inference requests.
-  /// \param thread_data Worker thread specific data.
-  void Infer(std::shared_ptr<ThreadData> thread_data);
+  /// \param thread_stat Worker thread status specific data.
+  /// \param thread_config Worker thread configuration specific data.
+  void Infer(
+      std::shared_ptr<ThreadStat> thread_stat,
+      std::shared_ptr<ThreadConfig> thread_config);
 
-  /// Helper function to prepare the InferContext for sending inference request.
-  /// \param ctx Returns a new InferContext.
-  /// \param options Returns the options used by 'ctx'.
-  nic::Error PrepareInfer(
-      std::unique_ptr<nic::InferContext>* ctx,
-      std::unique_ptr<nic::InferContext::Options>* options);
-
-  /// Generate random sequence length based on 'offset_ratio' and
-  /// 'sequence_length_'. (1 +/- 'offset_ratio') * 'sequence_length_'
-  /// \param offset_ratio The offset ratio of the generated length
-  /// \return random sequence length
-  size_t GetRandomLength(double offset_ratio);
-
-  bool async_;
-
-  size_t batch_size_;
-  size_t max_threads_;
   size_t max_concurrency_;
-  size_t sequence_length_;
-
-  bool on_sequence_model_;
-
-  std::shared_ptr<ContextFactory> factory_;
-
-  // User provided input shape
-  std::unordered_map<std::string, std::vector<int64_t>> input_shapes_;
-
-  // User provided input data, it will be preferred over synthetic data
-  std::unordered_map<std::string, std::vector<char>> input_data_;
-  std::unordered_map<std::string, std::vector<std::string>> input_string_data_;
-
-  // Placeholder for generated input data, which will be used for all inputs
-  // except string
-  std::vector<uint8_t> input_buf_;
-  // Placeholder for generated string data, which will be used for all string
-  // inputs
-  std::vector<std::string> input_string_buf_;
-
-  // Note: early_exit signal is kept global
-  std::vector<std::thread> threads_;
-  std::vector<std::shared_ptr<ThreadData>> threads_data_;
-
-  // Use condition variable to pause/continue worker threads
-  std::condition_variable wake_signal_;
-  std::mutex wake_mutex_;
+  std::vector<std::shared_ptr<ThreadConfig>> threads_config_;
 };

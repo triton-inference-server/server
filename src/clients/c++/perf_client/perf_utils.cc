@@ -118,3 +118,25 @@ GetRandomString(const int string_length)
   });
   return random_string;
 }
+
+template <>
+std::function<std::chrono::nanoseconds(std::mt19937&)>
+ScheduleDistribution<Distribution::POISSON>(const double request_rate)
+{
+  std::exponential_distribution<> dist =
+      std::exponential_distribution<>(request_rate);
+  return [dist](std::mt19937& gen) mutable {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::duration<double>(dist(gen)));
+  };
+}
+
+template <>
+std::function<std::chrono::nanoseconds(std::mt19937&)>
+ScheduleDistribution<Distribution::CONSTANT>(const double request_rate)
+{
+  std::chrono::nanoseconds period =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::duration<double>(1.0 / request_rate));
+  return [period](std::mt19937& /*gen*/) { return period; };
+}
