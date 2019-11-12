@@ -25,36 +25,142 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/clients/c++/perf_client/context_factory.h"
 #include "src/clients/c++/perf_client/perf_utils.h"
+
+#include <condition_variable>
+#include <thread>
 
 class LoadManager {
  public:
-  /// Virtual destructor for well defined cleanup
-  virtual ~LoadManager(){};
+  ~LoadManager();
 
-  /// Adjust the number of concurrent requests to be the same as
-  /// 'concurrent_request_count' (by creating threads or by pausing threads)
+  /// Adjusts the number of concurrent requests to be the same as
+  /// 'concurrent_request_count' (by creating or pausing threads)
   /// \param concurent_request_count The number of concurrent requests.
   /// \return Error object indicating success or failure.
   virtual nic::Error ChangeConcurrencyLevel(
-      const size_t concurrent_request_count) = 0;
+      const size_t concurrent_request_count)
+  {
+    return nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "changing concurrency level is not supported in this load manager.");
+  }
+
+  /// Adjusts the rate of issuing requests to be the same as 'request_rate'
+  /// \param request_rate The rate at which requests must be issued to the
+  /// server.
+  /// \return Error object indicating success or failure.
+  virtual nic::Error ChangeRequestRate(const double request_rate)
+  {
+    return nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "changing request rate is not supported in this load manager.");
+  }
 
   /// Check if the load manager is working as expected.
   /// \return Error object indicating success or failure.
-  virtual nic::Error CheckHealth() = 0;
+  nic::Error CheckHealth();
 
   /// Swap the content of the timestamp vector recorded by the load
   /// manager with a new timestamp vector
   /// \param new_timestamps The timestamp vector to be swapped.
   /// \return Error object indicating success or failure.
-  virtual nic::Error SwapTimestamps(TimestampVector& new_timestamps) = 0;
+  nic::Error SwapTimestamps(TimestampVector& new_timestamps);
 
   /// Get the sum of all contexts' stat
   /// \param contexts_stat Returned the accumulated stat from all contexts
   /// in load manager
-  virtual nic::Error GetAccumulatedContextStat(
-      nic::InferContext::Stat* contexts_stat) = 0;
+  nic::Error GetAccumulatedContextStat(nic::InferContext::Stat* contexts_stat);
 
   /// \return the batch size used for the inference requests
-  virtual size_t BatchSize() const = 0;
+  size_t BatchSize() const { return batch_size_; }
+
+  struct InferContextMetaData {
+    InferContextMetaData() : inflight_request_cnt_(0) {}
+    InferContextMetaData(InferContextMetaData&&) = delete;
+    InferContextMetaData(const InferContextMetaData&) = delete;
+
+    std::unique_ptr<nic::InferContext> ctx_;
+    std::atomic<size_t> inflight_request_cnt_;
+  };
+
+
+ protected:
+  /// Helper funtion to retrieve the input data for the inferences
+  /// \param local_manager The current manager object under construction.
+  /// \param string_length The length of the random strings to be generated
+  /// for string inputs.
+  /// \param string_data The string to be used as string inputs for model.
+  /// \param zero_input Whether to use zero for model inputs.
+  /// \param data_directory The path to the directory containing the input data
+  /// in binary or text files.
+  /// \param manager Returns the final manager object with inputs initialized
+  /// \return Error object indicating success or failure.
+  static nic::Error InitManagerInputs(
+      std::unique_ptr<LoadManager> local_manager, const size_t string_length,
+      const std::string& string_data, const bool zero_input,
+      const std::string& data_directory, std::unique_ptr<LoadManager>* manager);
+
+
+  /// Helper function to prepare the InferContext for sending inference request.
+  /// \param ctx Returns a new InferContext.
+  /// \param options Returns the options used by 'ctx'.
+  nic::Error PrepareInfer(
+      std::unique_ptr<nic::InferContext>* ctx,
+      std::unique_ptr<nic::InferContext::Options>* options);
+
+  /// Generate random sequence length based on 'offset_ratio' and
+  /// 'sequence_length_'. (1 +/- 'offset_ratio') * 'sequence_length_'
+  /// \param offset_ratio The offset ratio of the generated length
+  /// \return random sequence length
+  size_t GetRandomLength(double offset_ratio);
+
+  bool async_;
+  size_t batch_size_;
+  size_t max_threads_;
+
+  size_t sequence_length_;
+  bool on_sequence_model_;
+
+  std::shared_ptr<ContextFactory> factory_;
+
+  // User provided input shape
+  std::unordered_map<std::string, std::vector<int64_t>> input_shapes_;
+
+  // User provided input data, it will be preferred over synthetic data
+  std::unordered_map<std::string, std::vector<char>> input_data_;
+  std::unordered_map<std::string, std::vector<std::string>> input_string_data_;
+
+  // Placeholder for generated input data, which will be used for all inputs
+  // except string
+  std::vector<uint8_t> input_buf_;
+  // Placeholder for generated string data, which will be used for all string
+  // inputs
+  std::vector<std::string> input_string_buf_;
+
+  struct ThreadStat {
+    ThreadStat() : status_(ni::RequestStatusCode::SUCCESS) {}
+
+    // The status of the worker thread
+    nic::Error status_;
+    // The statistics of the InferContext
+    std::vector<nic::InferContext::Stat> contexts_stat_;
+    //  The concurrency level that the worker should produce
+    size_t concurrency_;
+    // A vector of request timestamps <start_time, end_time>
+    // Request latency will be end_time - start_time
+    TimestampVector request_timestamps_;
+    // A lock to protect thread data
+    std::mutex mu_;
+  };
+
+  // Worker threads that loads the server with inferences
+  std::vector<std::thread> threads_;
+  // Contains the statistics on the current working threads
+  std::vector<std::shared_ptr<ThreadStat>> threads_stat_;
+
+  // Use condition variable to pause/continue worker threads
+  std::condition_variable wake_signal_;
+  std::mutex wake_mutex_;
 };

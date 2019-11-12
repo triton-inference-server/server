@@ -68,28 +68,37 @@ struct ServerSideStats {
   std::map<ModelInfo, ServerSideStats> composing_models_stat;
 };
 
-struct PerfStatus {
-  uint32_t concurrency;
-  size_t batch_size;
-  // Request count and elapsed time measured by server
-  ServerSideStats server_stats;
-
+struct ClientSideStats {
   // Request count and elapsed time measured by client
-  uint64_t client_request_count;
+  uint64_t request_count;
   // Only record sequences that finish within the measurement window
-  uint64_t client_sequence_count;
-  uint64_t client_duration_ns;
-  uint64_t client_avg_latency_ns;
+  uint64_t sequence_count;
+  // The number of requests that missed their schedule
+  uint64_t delayed_request_count;
+  uint64_t duration_ns;
+  uint64_t avg_latency_ns;
   // a ordered map of percentiles to be reported (<percentile, value> pair)
-  std::map<size_t, uint64_t> client_percentile_latency_ns;
+  std::map<size_t, uint64_t> percentile_latency_ns;
   // Using usec to avoid square of large number (large in nsec)
   uint64_t std_us;
-  uint64_t client_avg_request_time_ns;
-  uint64_t client_avg_send_time_ns;
-  uint64_t client_avg_receive_time_ns;
+  uint64_t avg_request_time_ns;
+  uint64_t avg_send_time_ns;
+  uint64_t avg_receive_time_ns;
   // Per sec stat
-  double client_infer_per_sec;
-  double client_sequence_per_sec;
+  double infer_per_sec;
+  double sequence_per_sec;
+};
+
+struct PerfStatus {
+  uint32_t concurrency;
+  double request_rate;
+  size_t batch_size;
+
+  // Request count and elapsed time measured by server
+  ServerSideStats server_stats;
+  // Measurements on the client side
+  ClientSideStats client_stats;
+
   bool on_sequence_model;
 
   // placeholder for the latency value that is used for conditional checking
@@ -132,35 +141,81 @@ class InferenceProfiler {
   /// if it is a valid percentile value, the percentile latency will reported
   /// and used as stable criteria instead of average latency. If it is -1,
   /// average latency will be reported and used as stable criteria.
+  /// \param latency_threshold_ms The threshold on the latency measurements in
+  /// microseconds.
   /// \param factory The ContextFactory object used to create InferContext.
-  /// \param manger Returns a new InferenceProfiler object.
+  /// \param manager Returns a new InferenceProfiler object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const bool verbose, const double stability_threshold,
       const uint64_t measurement_window_ms, const size_t max_trials,
-      const int64_t percentile, std::shared_ptr<ContextFactory>& factory,
+      const int64_t percentile, const uint64_t latency_threshold_ms,
+      std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager> manager,
       std::unique_ptr<InferenceProfiler>* profiler);
 
-  /// Actively measure throughput in every 'measurement_window' msec until the
-  /// throughput is stable. Once the throughput is stable, it summarize the most
-  /// recent measurement into 'status_summary'.
-  /// NOTE: the requests are being sent regardless of the measurement, so the
-  /// data returned by the server (see struct PerforamnceStatusStruct) will
-  /// include more requests than what the client measures (we can't get the
-  /// exact server status right before the first request and right after the
-  /// last request in the measurement window).
-  /// \param concurrent_request_count The concurrency level for the measurement.
-  /// \param status_summary Returns the summary of the measurement.
+  /// Performs the profiling on the given range with the given search algorithm.
+  /// For profiling using request rate invoke template with double, otherwise
+  /// invoke with size_t for concurrency search.
+  /// \param start The starting point of the search range.
+  /// \param end The ending point of the search range.
+  /// \param step The step size to move along the search range in linear search
+  /// or the precision in binary search.
+  /// \param search_mode The search algorithm to be applied.
+  /// \param summary Returns the trace of the measurement along the search
+  /// path.
   /// \return Error object indicating success or failure.
+  template <typename T>
   nic::Error Profile(
-      const size_t concurrent_request_count, PerfStatus& status_summary);
+      const T start, const T end, const T step, const SearchMode search_mode,
+      std::vector<PerfStatus>& summary)
+  {
+    nic::Error err;
+    bool meets_threshold;
+    if (search_mode == SearchMode::LINEAR) {
+      T current_value = start;
+      do {
+        err = Profile(current_value, summary, &meets_threshold);
+        if (!err.IsOk()) {
+          return err;
+        }
+        current_value += step;
+      } while (((current_value <= end) || (end == static_cast<T>(NO_LIMIT))) &&
+               (meets_threshold));
+    } else {
+      err = Profile(start, summary, &meets_threshold);
+      if (!err.IsOk() || (!meets_threshold)) {
+        return err;
+      }
+      err = Profile(end, summary, &meets_threshold);
+      if (!err.IsOk() || (meets_threshold)) {
+        return err;
+      }
+
+      T this_start = start;
+      T this_end = end;
+      while ((this_end - this_start) > step) {
+        T current_value = (this_end + this_start) / 2;
+        err = Profile(current_value, summary, &meets_threshold);
+        if (!err.IsOk()) {
+          return err;
+        }
+        if (meets_threshold) {
+          this_start = current_value;
+        } else {
+          this_end = current_value;
+        }
+      }
+    }
+    return nic::Error::Success;
+  }
 
  private:
   InferenceProfiler(
       const bool verbose, const double stability_threshold,
       const int32_t measurement_window_ms, const size_t max_trials,
       const bool extra_percentile, const size_t percentile,
+      const uint64_t latency_threshold_ms, const ProtocolType protocol,
       const ContextFactory::ModelSchedulerType scheduler_type,
       const std::string& model_name, const int64_t model_version,
       std::unique_ptr<nic::ServerStatusContext> status_ctx,
@@ -180,6 +235,38 @@ class InferenceProfiler {
   /// \param The server status response from TRTIS
   /// \return Error object indicating success or failure
   nic::Error BuildComposingModelMap(const ni::ServerStatus& server_status);
+
+  /// Actively measure throughput in every 'measurement_window' msec until the
+  /// throughput is stable. Once the throughput is stable, it adds the
+  /// observations on summary trace and returns whether the setting met the
+  /// threshold. NOTE: the requests are being sent regardless of the
+  /// measurement, so the data returned by the server (see struct
+  /// PerforamnceStatusStruct) will include more requests than what the client
+  /// measures (we can't get the exact server status right before the first
+  /// request and right after the last request in the measurement window).
+  /// \param concurrent_request_count The concurrency level for the measurement.
+  /// \param summary Appends the measurements summary at the end of this list.
+  /// \param meets_threshold Returns whether the setting meets the threshold.
+  /// \return Error object indicating success or failure.
+  nic::Error Profile(
+      const size_t concurrent_request_count, std::vector<PerfStatus>& summary,
+      bool* meets_threshold);
+
+  /// Similar to above function, but instead of setting the concurrency, it sets
+  /// the specified request rate for measurements.
+  /// \param request_rate The request rate for inferences.
+  /// \param summary Appends the measurements summary at the end of this list.
+  /// \param meets_threshold Returns whether the setting meets the threshold.
+  /// \return Error object indicating success or failure.
+  nic::Error Profile(
+      const double request_rate, std::vector<PerfStatus>& summary,
+      bool* meets_threshold);
+
+  /// A helper function for profiling functions.
+  /// \param status_summary Returns the summary of the measurement.
+  /// \param is_stable Returns whether the measurement stabilized or not.
+  /// \return Error object indicating success or failure.
+  nic::Error ProfileHelper(PerfStatus& status_summary, bool* is_stable);
 
   /// Helper function to perform measurement.
   /// \param status_summary The summary of this measurement.
@@ -231,7 +318,7 @@ class InferenceProfiler {
   std::vector<uint64_t> ValidLatencyMeasurement(
       const TimestampVector& timestamps,
       const std::pair<uint64_t, uint64_t>& valid_range,
-      size_t& valid_sequence_count);
+      size_t& valid_sequence_count, size_t& delayed_request_count);
 
   /// \param latencies The vector of request latencies collected.
   /// \param summary Returns the summary that the latency related fields are
@@ -245,14 +332,16 @@ class InferenceProfiler {
   /// \param duration_ns The duration of the measurement in nsec.
   /// \param valid_request_count The number of completed requests recorded.
   /// \param valid_sequence_count The number of completed sequences recorded.
-  /// \param summary Returns the summary that the fileds recorded by client
-  /// are set.
+  /// \param delayed_request_count The number of requests that missed their
+  /// schedule.
+  /// \param summary Returns the summary that the fields recorded by
+  /// client are set.
   /// \return Error object indicating success or failure.
   nic::Error SummarizeClientStat(
       const nic::InferContext::Stat& start_stat,
       const nic::InferContext::Stat& end_stat, const uint64_t duration_ns,
-      const size_t valid_request_count, const size_t valid_sequence_count,
-      PerfStatus& summary);
+      const size_t valid_request_count, const size_t delayed_request_count,
+      const size_t valid_sequence_count, PerfStatus& summary);
 
   /// \param model_name The name of the model to summarize the server side stats
   /// \param model_version The version of the model
@@ -293,7 +382,9 @@ class InferenceProfiler {
   size_t max_trials_;
   bool extra_percentile_;
   size_t percentile_;
+  uint64_t latency_threshold_ms_;
 
+  ProtocolType protocol_;
   ContextFactory::ModelSchedulerType scheduler_type_;
   std::string model_name_;
   int64_t model_version_;

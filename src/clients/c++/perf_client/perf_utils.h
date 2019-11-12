@@ -40,7 +40,7 @@ namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
 
 using TimestampVector =
-    std::vector<std::tuple<struct timespec, struct timespec, uint32_t>>;
+    std::vector<std::tuple<struct timespec, struct timespec, uint32_t, bool>>;
 
 // Will use the characters specified here to construct random strings
 std::string const character_set =
@@ -68,6 +68,10 @@ extern volatile bool early_exit;
   }
 
 enum ProtocolType { HTTP = 0, GRPC = 1, UNKNOWN = 2 };
+enum Distribution { POISSON = 0, CONSTANT = 1 };
+enum SearchMode { LINEAR = 0, BINARY = 1 };
+
+constexpr uint64_t NO_LIMIT = 0;
 
 // Parse the communication protocol type
 ProtocolType ParseProtocol(const std::string& str);
@@ -93,3 +97,9 @@ bool IsDirectory(const std::string& path);
 // Generates a random string of specified length using characters specified in
 // character_set.
 std::string GetRandomString(const int string_length);
+
+// Returns the request schedule distribution generator with the specified
+// request rate.
+template <Distribution distribution>
+std::function<std::chrono::nanoseconds(std::mt19937&)> ScheduleDistribution(
+    const double request_rate);

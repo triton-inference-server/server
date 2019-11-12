@@ -31,6 +31,7 @@
 #include "src/clients/c++/perf_client/inference_profiler.h"
 #include "src/clients/c++/perf_client/load_manager.h"
 #include "src/clients/c++/perf_client/perf_utils.h"
+#include "src/clients/c++/perf_client/request_rate_manager.h"
 
 volatile bool early_exit = false;
 
@@ -73,22 +74,23 @@ SignalHandler(int signum)
 //     specified, the selected percentile value will be reported instead of
 //     average value.
 //
-// There are two settings (see -d option) for the data collection:
-// - Fixed concurrent request mode:
-//     In this setting, the client will maintain a fixed number of concurrent
-//     requests sent to the server (see --concurrency-range option). See
-//     ConcurrencyManager for more detail. The number of requests will be the
-//     total number of requests sent within the time interval for measurement
-//     (see --measurement-interval option) and the latency will be the average
-//     latency across all requests.
+// There are broadly two ways to load server for the data collection using
+// perf_client:
+// - Maintaining Target Concurrency:
+//     In this setting, the client will maintain a target number of concurrent
+//     requests sent to the server (see --concurrency-range option) while
+//     taking measurements.
+//     The number of requests will be the total number of requests sent within
+//     the time interval for measurement (see --measurement-interval option) and
+//     the latency will be the average latency across all requests.
 //
-//     Besides throughput and latency, which is measured in client side,
+//     Besides throughput and latency, which is measured on client side,
 //     the following data measured by the server will also be reported
 //     in this setting:
 //     - Concurrent request: the number of concurrent requests as specified
-//         in --concurrency-range option. Note, for fixed concurrent request
-//         mode, user must specify --concurrency-range <'start'>,
-//         omitting 'end' and 'step' values.
+//         in --concurrency-range option. Note, for running perf client for
+//         a single concurrency, user must specify --concurrency-range
+//         <'start'>, omitting 'end' and 'step' values.
 //     - Batch size: the batch size of each request as specified in -b option
 //     - Inference count: batch size * number of inference requests
 //     - Cumulative time: the total time between request received and
@@ -102,9 +104,8 @@ SignalHandler(int signum)
 //     - Queue time: the total time it takes to wait for an available model
 //         instance for the requests sent by perf client.
 //     - Average queue time: queue time / number of inference requests
-//
-// - Dynamic concurrent request mode:
-//     In this setting, the client will perform the following procedure:
+//     If all fields of --concurrency-range are specified, the client will
+//     perform the following procedure:
 //       1. Follows the procedure in fixed concurrent request mode using
 //          k concurrent requests (k starts at 'start').
 //       2. Gathers data reported from step 1.
@@ -118,144 +119,51 @@ SignalHandler(int signum)
 //     of "throughput, latency, concurrent request count" tuples will be
 //     reported in increasing load level order.
 //
+// - Maintaining Target Request Rate:
+//     This mode is enabled only when --request-rate-range option is specified.
+//     Unlike above, here the client will try to maintain a target rate of
+//     requests issued to the server while taking measurements. Rest of the
+//     behaviour of client is identical as above. It is important to note that
+//     enven though over a  sufficiently large interval the rate of requests
+//     will tend to the target request rate, the actual request rate for a small
+//     time interval will depend upon the selected request distribution
+//     (--request-distribution). For 'constant' request distribution the time
+//     interval between successive requests is maintained to be constant, hence
+//     request rate is constant over time. However, 'poisson' request
+//     distribution varies the time interval between successive requests such
+//     that there are periods of bursts and nulls in request generation.
+//     Additionally, 'poisson' distribution mimics the real-world traffic and
+//     can be used to obtain measurements for a realistic-load.
+//     With each request-rate, the client also reports the 'Delayed Request
+//     Count' which gives an idea of how many requests missed their schedule as
+//     specified by the distribution. Users can use --max-threads to increase
+//     the number of threads which might help in dispatching requests as per
+//     the schedule. Also note that a very large number of threads might be
+//     counter-productive with most of the time being spent on context-switching
+//     the threads.
+//
+// By default, perf_client will maintain target concurrency while measuring the
+// performance.
+//
 // Options:
 // -b: batch size for each request sent.
 // --concurrency-range: The range of concurrency levels perf_client will use.
 //     A concurrency level indicates the number of concurrent requests in queue.
+// --request-rate-range: The range of request rates perf_client will use to load
+//     the server.
 // --latency-threshold: latency threshold in msec.
 // --measurement-interval: time interval for each measurement window in msec.
+// --async: Enables Asynchronous inference calls.
+// --binary-search: Enables binary search within the specified range.
+// --request-distribution: Allows user to specify the distribution for selecting
+//     the time intervals between the request dispatch.
 //
 // For detail of the options not listed, please refer to the usage.
 //
 
 namespace {
 
-enum CONCURRENCY_RANGE { kSTART = 0, kEND = 1, kSTEP = 2 };
-const uint64_t NO_LIMIT = 0;
-
-nic::Error
-ReportServerSideStats(const ServerSideStats& stats, const int iteration)
-{
-  const std::string ident = std::string(2 * iteration, ' ');
-  const uint64_t cnt = stats.request_count;
-  if (cnt == 0) {
-    std::cout << ident << "  Request count: " << cnt << std::endl;
-    return nic::Error(ni::RequestStatusCode::SUCCESS);
-  }
-
-  const uint64_t cumm_time_us = stats.cumm_time_ns / 1000;
-  const uint64_t cumm_avg_us = cumm_time_us / cnt;
-
-  const uint64_t queue_time_us = stats.queue_time_ns / 1000;
-  const uint64_t queue_avg_us = queue_time_us / cnt;
-
-  const uint64_t compute_time_us = stats.compute_time_ns / 1000;
-  const uint64_t compute_avg_us = compute_time_us / cnt;
-
-  const uint64_t overhead = (cumm_avg_us > queue_avg_us + compute_avg_us)
-                                ? (cumm_avg_us - queue_avg_us - compute_avg_us)
-                                : 0;
-  std::cout << ident << "  Request count: " << cnt << std::endl
-            << ident << "  Avg request latency: " << cumm_avg_us << " usec";
-  if (stats.composing_models_stat.empty()) {
-    std::cout << " (overhead " << overhead << " usec + "
-              << "queue " << queue_avg_us << " usec + "
-              << "compute " << compute_avg_us << " usec)" << std::endl
-              << std::endl;
-  } else {
-    std::cout << std::endl;
-    std::cout << ident << "  Total avg compute time : " << compute_avg_us
-              << " usec" << std::endl;
-    std::cout << ident << "  Total avg queue time : " << queue_avg_us << " usec"
-              << std::endl
-              << std::endl;
-
-    std::cout << ident << "Composing models: " << std::endl;
-    for (const auto& model_stats : stats.composing_models_stat) {
-      const auto& model_info = model_stats.first;
-      std::cout << ident << model_info.first
-                << ", version: " << model_info.second << std::endl;
-      ReportServerSideStats(model_stats.second, iteration + 1);
-    }
-  }
-
-  return nic::Error(ni::RequestStatusCode::SUCCESS);
-}
-
-nic::Error
-Report(
-    const PerfStatus& summary, const size_t concurrent_request_count,
-    const int64_t percentile, const ProtocolType protocol, const bool verbose)
-{
-  const uint64_t avg_latency_us = summary.client_avg_latency_ns / 1000;
-  const uint64_t std_us = summary.std_us;
-
-  const uint64_t avg_request_time_us =
-      summary.client_avg_request_time_ns / 1000;
-  const uint64_t avg_send_time_us = summary.client_avg_send_time_ns / 1000;
-  const uint64_t avg_receive_time_us =
-      summary.client_avg_receive_time_ns / 1000;
-  const uint64_t avg_response_wait_time_us =
-      avg_request_time_us - avg_send_time_us - avg_receive_time_us;
-
-  std::string client_library_detail = "    ";
-  if (protocol == ProtocolType::GRPC) {
-    client_library_detail +=
-        "Avg gRPC time: " + std::to_string(avg_request_time_us) + " usec (";
-    if (!verbose) {
-      client_library_detail +=
-          "(un)marshal request/response " +
-          std::to_string(avg_send_time_us + avg_receive_time_us) +
-          " usec + response wait " + std::to_string(avg_response_wait_time_us) +
-          " usec)";
-    } else {
-      client_library_detail +=
-          "marshal " + std::to_string(avg_send_time_us) +
-          " usec + response wait " + std::to_string(avg_response_wait_time_us) +
-          " usec + unmarshal " + std::to_string(avg_receive_time_us) + " usec)";
-    }
-  } else {
-    client_library_detail +=
-        "Avg HTTP time: " + std::to_string(avg_request_time_us) + " usec (";
-    if (!verbose) {
-      client_library_detail +=
-          "send/recv " +
-          std::to_string(avg_send_time_us + avg_receive_time_us) +
-          " usec + response wait " + std::to_string(avg_response_wait_time_us) +
-          " usec)";
-    } else {
-      client_library_detail +=
-          "send " + std::to_string(avg_send_time_us) +
-          " usec + response wait " + std::to_string(avg_response_wait_time_us) +
-          " usec + receive " + std::to_string(avg_receive_time_us) + " usec)";
-    }
-  }
-
-  std::cout << "  Client: " << std::endl
-            << "    Request count: " << summary.client_request_count
-            << std::endl;
-  if (summary.on_sequence_model) {
-    std::cout << "    Sequence count: " << summary.client_sequence_count << " ("
-              << summary.client_sequence_per_sec << " seq/sec)" << std::endl;
-  }
-  std::cout << "    Throughput: " << summary.client_infer_per_sec
-            << " infer/sec" << std::endl;
-  if (percentile == -1) {
-    std::cout << "    Avg latency: " << avg_latency_us << " usec"
-              << " (standard deviation " << std_us << " usec)" << std::endl;
-  }
-  for (const auto& percentile : summary.client_percentile_latency_ns) {
-    std::cout << "    p" << percentile.first
-              << " latency: " << (percentile.second / 1000) << " usec"
-              << std::endl;
-  }
-  std::cout << client_library_detail << std::endl;
-
-  std::cout << "  Server: " << std::endl;
-  ReportServerSideStats(summary.server_stats, 1);
-
-  return nic::Error(ni::RequestStatusCode::SUCCESS);
-}
+enum SEARCH_RANGE { kSTART = 0, kEND = 1, kSTEP = 2 };
 
 // Used to format the usage message
 std::string
@@ -292,6 +200,12 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t--measurement-interval (-p) <measurement window (in msec)>"
             << std::endl;
   std::cerr << "\t--concurrency-range <start:end:step>" << std::endl;
+  std::cerr << "\t--request-rate-range <start:end:step>" << std::endl;
+  std::cerr << "\t--request-distribution <\"poisson\"|\"constant\">"
+            << std::endl;
+  std::cerr << "\t--binary-search" << std::endl;
+  std::cerr << "\t--num-of-sequences <number of concurrent sequences>"
+            << std::endl;
   std::cerr << "\t--latency-threshold (-l) <latency threshold (in msec)>"
             << std::endl;
   std::cerr << "\t--max-threads <thread counts>" << std::endl;
@@ -390,6 +304,53 @@ Usage(char** argv, const std::string& msg = std::string())
              "not be 0 for sequence models while using asynchronous mode.",
              18)
       << std::endl;
+  std::cerr
+      << FormatMessage(
+             " --request-rate-range <start:end:step>: Determines the range of "
+             "request rates for load generated by client. This option can take "
+             "floating-point values. The search along the request rate range "
+             "is enabled only when using this option. If not specified, then "
+             "client will search along the concurrency-range. The perf_client "
+             "will start from the request rate of 'start' and go till "
+             "'end' with a stride of 'step'. The default values of 'start', "
+             "'end' and 'step' are all 1.0. If 'end' is not specified then "
+             "perf_client will run for a single request rate as determined by "
+             "'start'. If 'end' is set as 0.0, then the request rate will be "
+             "incremented by 'step' till latency threshold is met. 'end' and "
+             "--latency-threshold can not be both 0 simultaneously.",
+             18)
+      << std::endl;
+  std::cerr
+      << FormatMessage(
+             " --request-distribution <\"poisson\"|\"constant\">: Specifies "
+             "the time interval distribution between dispatching inference "
+             "requests to the server. Poisson distribution closely mimics the "
+             "real-world work load on a server. This option is ignored if not "
+             "using --request-rate-range. By default, this option is set to be "
+             "constant.",
+             18)
+      << std::endl;
+  std::cerr
+      << FormatMessage(
+             "--binary-search: Enables the binary search on the specified "
+             "search range. This option requires 'start' and 'end' to be "
+             "expilicitly specified in the --concurrency-range or "
+             "--request-rate-range. When using this option, 'step' is more "
+             "like the precision. Lower the 'step', more the number of "
+             "iterations along the search path to find suitable convergence. "
+             "By default, linear search is used.",
+             18)
+      << std::endl;
+
+  std::cerr << FormatMessage(
+                   "--num-of-sequences: Sets the number of concurrent "
+                   "sequences for sequence models. This option is ignored when "
+                   "--request-rate-range is not specified. By default, its "
+                   "value is 4.",
+                   18)
+            << std::endl;
+
+
   std::cerr << FormatMessage(
                    " --latency-threshold (-l): Sets the limit on the observed "
                    "latency. Client will terminate the concurrency search once "
@@ -401,9 +362,12 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr
       << FormatMessage(
              " --max-threads: Sets the maximum number of threads that will be "
-             "created for providing desired concurrency. However, when running "
-             "in synchronous mode with a given max concurrency limit,"
-             "this value will be ignored. Default is 16.",
+             "created for providing desired concurrency or request rate. "
+             "However, when running"
+             "in synchronous mode with concurrency-range having explicit 'end' "
+             "specification,"
+             "this value will be ignored. Default is 4 if --request-rate-range "
+             "is specified otherwise default is 16.",
              18)
       << std::endl;
   std::cerr
@@ -539,6 +503,7 @@ main(int argc, char** argv)
   uint64_t latency_threshold_ms = NO_LIMIT;
   int32_t batch_size = 1;
   uint64_t concurrency_range[3] = {1, 1, 1};
+  double request_rate_range[3] = {1.0, 1.0, 1.0};
   double stability_threshold = 0.1;
   uint64_t measurement_window_ms = 5000;
   size_t max_trials = 10;
@@ -555,14 +520,20 @@ main(int argc, char** argv)
   bool zero_input = false;
   int32_t concurrent_request_count = 1;
   size_t max_concurrency = 0;
+  uint32_t num_of_sequences = 4;
   bool dynamic_concurrency_mode = false;
   bool async = false;
   bool forced_sync = false;
 
-  // Required for detecting the use of conflicting options
   bool using_concurrency_range = false;
+  bool using_request_rate_range = false;
+  SearchMode search_mode = SearchMode::LINEAR;
+  Distribution request_distribution = Distribution::CONSTANT;
+
+  // Required for detecting the use of conflicting options
   bool using_old_options = false;
   bool url_specified = false;
+  bool max_threads_specified = false;
 
 
   // {name, has_arg, *flag, val}
@@ -582,6 +553,10 @@ main(int argc, char** argv)
                                          {"string-data", 1, 0, 13},
                                          {"async", 0, 0, 14},
                                          {"sync", 0, 0, 15},
+                                         {"request-rate-range", 1, 0, 16},
+                                         {"num-of-sequences", 1, 0, 17},
+                                         {"binary-search", 0, 0, 18},
+                                         {"request-distribution", 1, 0, 19},
                                          {0, 0, 0, 0}};
 
   // Parse commandline...
@@ -595,6 +570,7 @@ main(int argc, char** argv)
         break;
       case 1:
         max_threads = std::atoi(optarg);
+        max_threads_specified = true;
         break;
       case 2:
         sequence_length = std::atoi(optarg);
@@ -664,7 +640,9 @@ main(int argc, char** argv)
           }
         }
         catch (const std::invalid_argument& ia) {
-          Usage(argv, "failed to parse search range: " + std::string(optarg));
+          Usage(
+              argv,
+              "failed to parse concurrency range: " + std::string(optarg));
         }
         break;
       }
@@ -708,6 +686,57 @@ main(int argc, char** argv)
       }
       case 15: {
         forced_sync = true;
+        break;
+      }
+      case 16: {
+        using_request_rate_range = true;
+        std::string arg = optarg;
+        size_t pos = 0;
+        int index = 0;
+        try {
+          while (pos != std::string::npos) {
+            size_t colon_pos = arg.find(":", pos);
+            if (index > 2) {
+              Usage(
+                  argv,
+                  "option request_rate_range can have maximum of three "
+                  "elements");
+            }
+            if (colon_pos == std::string::npos) {
+              request_rate_range[index] = std::stod(arg.substr(pos, colon_pos));
+              pos = colon_pos;
+            } else {
+              request_rate_range[index] =
+                  std::stod(arg.substr(pos, colon_pos - pos));
+              pos = colon_pos + 1;
+              index++;
+            }
+          }
+        }
+        catch (const std::invalid_argument& ia) {
+          Usage(
+              argv,
+              "failed to parse request rate range: " + std::string(optarg));
+        }
+        break;
+      }
+      case 17: {
+        num_of_sequences = std::atoi(optarg);
+        break;
+      }
+      case 18: {
+        search_mode = SearchMode::BINARY;
+        break;
+      }
+      case 19: {
+        std::string arg = optarg;
+        if (arg.compare("poisson") == 0) {
+          request_distribution = Distribution::POISSON;
+        } else if (arg.compare("constant") == 0) {
+          request_distribution = Distribution::CONSTANT;
+        } else {
+          Usage(argv, "unsupported input data provided " + std::string(optarg));
+        }
         break;
       }
       case 'v':
@@ -783,8 +812,11 @@ main(int argc, char** argv)
   if (measurement_window_ms <= 0) {
     Usage(argv, "measurement window must be > 0 in msec");
   }
-  if (concurrency_range[CONCURRENCY_RANGE::kSTART] <= 0 ||
+  if (concurrency_range[SEARCH_RANGE::kSTART] <= 0 ||
       concurrent_request_count < 0) {
+    Usage(argv, "The start of the search range must be > 0");
+  }
+  if (request_rate_range[SEARCH_RANGE::kSTART] <= 0) {
     Usage(argv, "The start of the search range must be > 0");
   }
   if (protocol == ProtocolType::UNKNOWN) {
@@ -822,30 +854,74 @@ main(int argc, char** argv)
     Usage(argv, "can not use deprecated options with concurrency_range");
   } else if (using_old_options) {
     if (dynamic_concurrency_mode) {
-      concurrency_range[CONCURRENCY_RANGE::kEND] = max_concurrency;
+      concurrency_range[SEARCH_RANGE::kEND] = max_concurrency;
     }
-    concurrency_range[CONCURRENCY_RANGE::kSTART] = concurrent_request_count;
+    concurrency_range[SEARCH_RANGE::kSTART] = concurrent_request_count;
   }
 
-  if ((concurrency_range[CONCURRENCY_RANGE::kEND] == NO_LIMIT) &&
+  if (using_request_rate_range && using_old_options) {
+    Usage(argv, "can not use concurrency options with request_rate_range");
+  }
+
+  if (using_request_rate_range && using_concurrency_range) {
+    Usage(
+        argv,
+        "can not specify concurrency_range and request_rate_range "
+        "simultaneously");
+  }
+
+  if (((concurrency_range[SEARCH_RANGE::kEND] == NO_LIMIT) ||
+       (request_rate_range[SEARCH_RANGE::kEND] ==
+        static_cast<double>(NO_LIMIT))) &&
       (latency_threshold_ms == NO_LIMIT)) {
     Usage(
         argv,
         "The end of the search range and the latency limit can not be both 0 "
-        "simultaneously");
+        "(or 0.0) simultaneously");
+  }
+
+  if (((concurrency_range[SEARCH_RANGE::kEND] == NO_LIMIT) ||
+       (request_rate_range[SEARCH_RANGE::kEND] ==
+        static_cast<double>(NO_LIMIT))) &&
+      (search_mode == SearchMode::BINARY)) {
+    Usage(
+        argv,
+        "The end of the range can not be 0 (or 0.0) for binary search mode.");
+  }
+
+  if ((search_mode == SearchMode::BINARY) &&
+      (latency_threshold_ms == NO_LIMIT)) {
+    Usage(argv, "The latency threshold can not be 0 for binary search mode.");
+  }
+
+  if (((concurrency_range[SEARCH_RANGE::kEND] <
+        concurrency_range[SEARCH_RANGE::kSTART]) ||
+       (request_rate_range[SEARCH_RANGE::kEND] <
+        request_rate_range[SEARCH_RANGE::kSTART])) &&
+      (search_mode == SearchMode::BINARY)) {
+    Usage(
+        argv,
+        "The end of the range can not be less than start of the range for "
+        "binary search mode.");
   }
 
   if (!url_specified && (protocol == ProtocolType::GRPC)) {
     url = "localhost:8001";
   }
 
-  if (!async) {
-    if (concurrency_range[CONCURRENCY_RANGE::kEND] == NO_LIMIT) {
+
+  // Overriding the max_threads default for request_rate search
+  if (!max_threads_specified and using_request_rate_range) {
+    max_threads = 4;
+  }
+
+  if (!using_request_rate_range && !async) {
+    if (concurrency_range[SEARCH_RANGE::kEND] == NO_LIMIT) {
       std::cerr
           << "WARNING: The maximum attainable concurrency will be limited by "
              "max_threads specification."
           << std::endl;
-      concurrency_range[CONCURRENCY_RANGE::kEND] = max_threads;
+      concurrency_range[SEARCH_RANGE::kEND] = max_threads;
     } else {
       // As only one synchronous request can be generated from a thread at a
       // time, to maintain the requested concurrency, that many threads need to
@@ -854,8 +930,8 @@ main(int argc, char** argv)
                    "requested concurrency range."
                 << std::endl;
       max_threads = std::max(
-          concurrency_range[CONCURRENCY_RANGE::kSTART],
-          concurrency_range[CONCURRENCY_RANGE::kEND]);
+          concurrency_range[SEARCH_RANGE::kSTART],
+          concurrency_range[SEARCH_RANGE::kEND]);
     }
   }
 
@@ -874,35 +950,57 @@ main(int argc, char** argv)
     return 1;
   }
 
-  // Special handling for sequence models
-  if ((factory->SchedulerType() == ContextFactory::SEQUENCE) ||
-      (factory->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE)) {
-    // Change the default value for the --async option for sequential models
-    if (!async) {
-      async = forced_sync ? false : true;
-    }
+  if (!using_request_rate_range) {
+    // Special handling for sequence models
+    if ((factory->SchedulerType() == ContextFactory::SEQUENCE) ||
+        (factory->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE)) {
+      // Change the default value for the --async option for sequential models
+      if (!async) {
+        async = forced_sync ? false : true;
+      }
 
-    if (concurrency_range[CONCURRENCY_RANGE::kEND] == NO_LIMIT && async) {
-      std::cerr << "The 'end' concurrency can not be 0 for sequence "
-                   "models when using asynchronous API."
-                << std::endl;
+      if (concurrency_range[SEARCH_RANGE::kEND] == NO_LIMIT && async) {
+        std::cerr << "The 'end' concurrency can not be 0 for sequence "
+                     "models when using asynchronous API."
+                  << std::endl;
+        return 1;
+      }
+    }
+    max_concurrency = std::max(
+        concurrency_range[SEARCH_RANGE::kSTART],
+        concurrency_range[SEARCH_RANGE::kEND]);
+
+    err = ConcurrencyManager::Create(
+        async, batch_size, max_threads, max_concurrency, sequence_length,
+        string_length, string_data, zero_input, input_shapes, data_directory,
+        factory, &manager);
+    if (!err.IsOk()) {
+      std::cerr << err << std::endl;
+      return 1;
+    }
+  } else {
+    // Special handling for sequence models
+    if ((factory->SchedulerType() == ContextFactory::SEQUENCE) ||
+        (factory->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE)) {
+      // Change the default value for the --async option for sequential models
+      if (!async) {
+        async = forced_sync ? false : true;
+      }
+    }
+    err = RequestRateManager::Create(
+        async, measurement_window_ms, request_distribution, batch_size,
+        max_threads, num_of_sequences, sequence_length, string_length,
+        string_data, zero_input, input_shapes, data_directory, factory,
+        &manager);
+    if (!err.IsOk()) {
+      std::cerr << err << std::endl;
       return 1;
     }
   }
-  max_concurrency = std::max(
-      concurrency_range[CONCURRENCY_RANGE::kSTART],
-      concurrency_range[CONCURRENCY_RANGE::kEND]);
-  err = ConcurrencyManager::Create(
-      async, batch_size, max_threads, max_concurrency, sequence_length,
-      string_length, string_data, zero_input, input_shapes, data_directory,
-      factory, &manager);
-  if (!err.IsOk()) {
-    std::cerr << err << std::endl;
-    return 1;
-  }
+
   err = InferenceProfiler::Create(
       verbose, stability_threshold, measurement_window_ms, max_trials,
-      percentile, factory, std::move(manager), &profiler);
+      percentile, latency_threshold_ms, factory, std::move(manager), &profiler);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
@@ -913,16 +1011,40 @@ main(int argc, char** argv)
             << "  Batch size: " << batch_size << std::endl
             << "  Measurement window: " << measurement_window_ms << " msec"
             << std::endl;
-  if (concurrency_range[CONCURRENCY_RANGE::kEND] != 1) {
+  if (concurrency_range[SEARCH_RANGE::kEND] != 1) {
     std::cout << "  Latency limit: " << latency_threshold_ms << " msec"
               << std::endl;
-    if (concurrency_range[CONCURRENCY_RANGE::kEND] != NO_LIMIT) {
+    if (concurrency_range[SEARCH_RANGE::kEND] != NO_LIMIT) {
       std::cout << "  Concurrency limit: "
                 << std::max(
-                       concurrency_range[CONCURRENCY_RANGE::kSTART],
-                       concurrency_range[CONCURRENCY_RANGE::kEND])
+                       concurrency_range[SEARCH_RANGE::kSTART],
+                       concurrency_range[SEARCH_RANGE::kEND])
                 << " concurrent requests" << std::endl;
     }
+  }
+  if (request_rate_range[SEARCH_RANGE::kEND] != 1.0) {
+    std::cout << "  Latency limit: " << latency_threshold_ms << " msec"
+              << std::endl;
+    if (request_rate_range[SEARCH_RANGE::kEND] !=
+        static_cast<double>(NO_LIMIT)) {
+      std::cout << "  Request Rate limit: "
+                << std::max(
+                       request_rate_range[SEARCH_RANGE::kSTART],
+                       request_rate_range[SEARCH_RANGE::kEND])
+                << " requests per seconds" << std::endl;
+    }
+  }
+  if (using_request_rate_range) {
+    if (request_distribution == Distribution::POISSON) {
+      std::cout << "  Using poisson distribution on request generation"
+                << std::endl;
+    } else {
+      std::cout << "  Using uniform distribution on request generation"
+                << std::endl;
+    }
+  }
+  if (search_mode == SearchMode::BINARY) {
+    std::cout << "  Using Binary Search algorithm" << std::endl;
   }
   if (async) {
     std::cout << "  Using asynchronous calls for inference" << std::endl;
@@ -937,35 +1059,19 @@ main(int argc, char** argv)
   }
   std::cout << std::endl;
 
-  PerfStatus status_summary;
   std::vector<PerfStatus> summary;
 
-  size_t count = concurrency_range[CONCURRENCY_RANGE::kSTART];
-  do {
-    err = profiler->Profile(count, status_summary);
-    if (err.IsOk()) {
-      err = Report(status_summary, count, percentile, protocol, verbose);
-      summary.push_back(status_summary);
-      if (latency_threshold_ms != NO_LIMIT) {
-        uint64_t stabilizing_latency_ms =
-            status_summary.stabilizing_latency_ns / (1000 * 1000);
-        if (!err.IsOk()) {
-          std::cerr << err << std::endl;
-          break;
-        } else if (stabilizing_latency_ms >= latency_threshold_ms) {
-          std::cerr << "Aborting execution as measured latency went over "
-                       "the set limit of "
-                    << latency_threshold_ms << " msec. " << std::endl;
-          break;
-        }
-      }
-    } else {
-      break;
-    }
-    count += concurrency_range[CONCURRENCY_RANGE::kSTEP];
-  } while ((count <= concurrency_range[CONCURRENCY_RANGE::kEND]) ||
-           (concurrency_range[CONCURRENCY_RANGE::kEND] == NO_LIMIT));
-
+  if (!using_request_rate_range) {
+    err = profiler->Profile<size_t>(
+        concurrency_range[SEARCH_RANGE::kSTART],
+        concurrency_range[SEARCH_RANGE::kEND],
+        concurrency_range[SEARCH_RANGE::kSTEP], search_mode, summary);
+  } else {
+    err = profiler->Profile<double>(
+        request_rate_range[SEARCH_RANGE::kSTART],
+        request_rate_range[SEARCH_RANGE::kEND],
+        request_rate_range[SEARCH_RANGE::kSTEP], search_mode, summary);
+  }
 
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
@@ -985,19 +1091,32 @@ main(int argc, char** argv)
     }
 
     for (PerfStatus& status : summary) {
-      std::cout << "Concurrency: " << status.concurrency << ", "
-                << status.client_infer_per_sec << " infer/sec, latency "
-                << (status.stabilizing_latency_ns / 1000) << " usec"
-                << std::endl;
+      if (!using_request_rate_range) {
+        std::cout << "Concurrency: " << status.concurrency << ", "
+                  << status.client_stats.infer_per_sec << " infer/sec, latency "
+                  << (status.stabilizing_latency_ns / 1000) << " usec"
+                  << std::endl;
+      } else {
+        std::cout << "Request Rate: " << status.request_rate << ", "
+                  << status.client_stats.infer_per_sec << " infer/sec, latency "
+                  << (status.stabilizing_latency_ns / 1000) << " usec"
+                  << std::endl;
+      }
     }
 
     if (!filename.empty()) {
       std::ofstream ofs(filename, std::ofstream::out);
-
-      ofs << "Concurrency,Inferences/Second,Client Send,"
-          << "Network+Server Send/Recv,Server Queue,"
-          << "Server Compute,Client Recv";
-      for (const auto& percentile : summary[0].client_percentile_latency_ns) {
+      if (!using_request_rate_range) {
+        ofs << "Concurrency,Inferences/Second,Client Send,"
+            << "Network+Server Send/Recv,Server Queue,"
+            << "Server Compute,Client Recv";
+      } else {
+        ofs << "Request Rate,Inferences/Second,Client Send,"
+            << "Network+Server Send/Recv,Server Queue,"
+            << "Server Compute,Client Recv";
+      }
+      for (const auto& percentile :
+           summary[0].client_stats.percentile_latency_ns) {
         ofs << ",p" << percentile.first << " latency";
       }
       ofs << std::endl;
@@ -1006,7 +1125,7 @@ main(int argc, char** argv)
       std::sort(
           summary.begin(), summary.end(),
           [](const PerfStatus& a, const PerfStatus& b) -> bool {
-            return a.client_infer_per_sec < b.client_infer_per_sec;
+            return a.client_stats.infer_per_sec < b.client_stats.infer_per_sec;
           });
 
       for (PerfStatus& status : summary) {
@@ -1014,9 +1133,9 @@ main(int argc, char** argv)
                                 status.server_stats.request_count;
         uint64_t avg_compute_ns = status.server_stats.compute_time_ns /
                                   status.server_stats.request_count;
-        uint64_t avg_client_wait_ns = status.client_avg_latency_ns -
-                                      status.client_avg_send_time_ns -
-                                      status.client_avg_receive_time_ns;
+        uint64_t avg_client_wait_ns = status.client_stats.avg_latency_ns -
+                                      status.client_stats.avg_send_time_ns -
+                                      status.client_stats.avg_receive_time_ns;
         // Network misc is calculated by subtracting data from different
         // measurements (server v.s. client), so the result needs to be capped
         // at 0
@@ -1024,13 +1143,21 @@ main(int argc, char** argv)
             avg_client_wait_ns > (avg_queue_ns + avg_compute_ns)
                 ? avg_client_wait_ns - (avg_queue_ns + avg_compute_ns)
                 : 0;
-
-        ofs << status.concurrency << "," << status.client_infer_per_sec << ","
-            << (status.client_avg_send_time_ns / 1000) << ","
-            << (avg_network_misc_ns / 1000) << "," << (avg_queue_ns / 1000)
-            << "," << (avg_compute_ns / 1000) << ","
-            << (status.client_avg_receive_time_ns / 1000);
-        for (const auto& percentile : status.client_percentile_latency_ns) {
+        if (!using_request_rate_range) {
+          ofs << status.concurrency << "," << status.client_stats.infer_per_sec
+              << "," << (status.client_stats.avg_send_time_ns / 1000) << ","
+              << (avg_network_misc_ns / 1000) << "," << (avg_queue_ns / 1000)
+              << "," << (avg_compute_ns / 1000) << ","
+              << (status.client_stats.avg_receive_time_ns / 1000);
+        } else {
+          ofs << status.request_rate << "," << status.client_stats.infer_per_sec
+              << "," << (status.client_stats.avg_send_time_ns / 1000) << ","
+              << (avg_network_misc_ns / 1000) << "," << (avg_queue_ns / 1000)
+              << "," << (avg_compute_ns / 1000) << ","
+              << (status.client_stats.avg_receive_time_ns / 1000);
+        }
+        for (const auto& percentile :
+             status.client_stats.percentile_latency_ns) {
           ofs << "," << (percentile.second / 1000);
         }
         ofs << std::endl;
@@ -1068,10 +1195,17 @@ main(int argc, char** argv)
             // request count ratio between the composing model and the ensemble
             double infer_ratio =
                 1.0 * stats.request_count / status.server_stats.request_count;
-            double infer_per_sec = infer_ratio * status.client_infer_per_sec;
-            ofs << status.concurrency << "," << infer_per_sec << ",0,"
-                << (avg_overhead_ns / 1000) << "," << (avg_queue_ns / 1000)
-                << "," << (avg_compute_ns / 1000) << ",0" << std::endl;
+            double infer_per_sec =
+                infer_ratio * status.client_stats.infer_per_sec;
+            if (!using_request_rate_range) {
+              ofs << status.concurrency << "," << infer_per_sec << ",0,"
+                  << (avg_overhead_ns / 1000) << "," << (avg_queue_ns / 1000)
+                  << "," << (avg_compute_ns / 1000) << ",0" << std::endl;
+            } else {
+              ofs << status.request_rate << "," << infer_per_sec << ",0,"
+                  << (avg_overhead_ns / 1000) << "," << (avg_queue_ns / 1000)
+                  << "," << (avg_compute_ns / 1000) << ",0" << std::endl;
+            }
           }
         }
       }
