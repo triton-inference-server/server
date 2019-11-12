@@ -87,10 +87,6 @@ OnnxBackend::CreateExecutionContexts(
 
   RETURN_IF_ERROR(CreateExecutionContextsHelper(session_options, models));
 
-  if (Config().has_model_warm_up()) {
-    RETURN_IF_ERROR(WarmUp());
-  }
-
   LOG_VERBOSE(1) << "onnx backend for " << Name() << std::endl << *this;
 
   return Status::Success;

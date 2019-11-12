@@ -175,10 +175,6 @@ LibTorchBackend::CreateExecutionContexts(
         Run(runner_idx, payloads, func);
       }));
 
-  if (Config().has_model_warm_up()) {
-    RETURN_IF_ERROR(WarmUp());
-  }
-
   return Status::Success;
 }
 

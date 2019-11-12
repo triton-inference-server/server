@@ -605,7 +605,7 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
         "optimization should not be specified for ensemble '" + config.name() +
             "'");
   }
-  if (config.has_model_warm_up()) {
+  if (config.model_warmup_size() != 0) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "model warm up should not be specified for ensemble '" + config.name() +

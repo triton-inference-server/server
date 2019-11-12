@@ -773,11 +773,17 @@ message ModelWarmup
 {
   message InputMetaData
   {
+    //@@  .. cpp:var:: DataType data_type
+    //@@
+    //@@     The data-type of the input.
+    //@@
+    DataType data_type = 1;
+
     //@@    .. cpp:var:: int64 dims (repeated)
     //@@
     //@@       The shape of the input tensor, not including the batch dimension.
     //@@
-    repeated int64 dims = 1;
+    repeated int64 dims = 2;
 
     //@@  .. cpp:var:: oneof input_data_type
     //@@
@@ -794,7 +800,7 @@ message ModelWarmup
       //@@     field data will not be checked, instead, zero data will be used
       //@@     as long as the field is set.
       //@@
-      bool zero_data = 2;
+      bool zero_data = 3;
 
       //@@
       //@@  .. cpp:var:: bool random_data
@@ -803,15 +809,15 @@ message ModelWarmup
       //@@     the field data will not be checked, instead, random data will
       //@@     be used as long as the field is set.
       //@@
-      bool random_data = 3;
+      bool random_data = 4;
 
       //@@  .. cpp:var:: string input_data_file
       //@@
       //@@     The file whose content will be used as raw input data in
-      //@@     row-major order. The file must be provided in a sub-directory 
+      //@@     row-major order. The file must be provided in a sub-directory
       //@@     'warmup' under the model directory.
       //@@
-      string input_data_file = 4;
+      string input_data_file = 5;
     }
   }
 

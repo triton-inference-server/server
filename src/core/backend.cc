@@ -40,136 +40,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-namespace {
-
-enum OverrideType { TYPE_STARTEND, TYPE_START, TYPE_END, TYPE_CONTINUE };
-
-Status
-CreateControlTensors(
-    const ModelConfig& config, const InferRequestHeader& request_header,
-    std::shared_ptr<InferRequestProvider::InputOverrideMap>* input_overrides)
-{
-  *input_overrides = std::make_shared<InferRequestProvider::InputOverrideMap>();
-
-  // Create InputOverrideMap according to control flags in request header
-  OverrideType override_type;
-  if ((request_header.flags() & (InferRequestHeader::FLAG_SEQUENCE_START |
-                                 InferRequestHeader::FLAG_SEQUENCE_END)) ==
-      (InferRequestHeader::FLAG_SEQUENCE_START |
-       InferRequestHeader::FLAG_SEQUENCE_END)) {
-    override_type = OverrideType::TYPE_STARTEND;
-  } else if (
-      (request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
-    override_type = OverrideType::TYPE_START;
-  } else if (
-      (request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
-    override_type = OverrideType::TYPE_END;
-  } else {
-    override_type = OverrideType::TYPE_CONTINUE;
-  }
-
-  std::string tensor_name;
-  DataType tensor_datatype;
-  int32_t int32_false_value, int32_true_value;
-  float fp32_false_value, fp32_true_value;
-
-  // START
-  {
-    RETURN_IF_ERROR(GetSequenceControlProperties(
-        config.sequence_batching(), config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
-        true /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
-        &fp32_true_value, &int32_false_value, &int32_true_value));
-
-    auto value_override =
-        std::make_shared<InferRequestProvider::InputOverride>();
-    uint8_t* value_p = nullptr;
-    switch (override_type) {
-      // True
-      case OverrideType::TYPE_START:
-      case OverrideType::TYPE_STARTEND:
-        value_p =
-            ((tensor_datatype == DataType::TYPE_INT32)
-                 ? reinterpret_cast<uint8_t*>(&int32_true_value)
-                 : reinterpret_cast<uint8_t*>(&fp32_true_value));
-        break;
-      // False
-      default:
-        value_p =
-            ((tensor_datatype == DataType::TYPE_INT32)
-                 ? reinterpret_cast<uint8_t*>(&int32_false_value)
-                 : reinterpret_cast<uint8_t*>(&fp32_false_value));
-        break;
-    }
-
-    value_override->content_.assign(value_p, value_p + sizeof(float));
-    value_override->dims_.Add(1);
-    value_override->datatype_ = tensor_datatype;
-    (*input_overrides)->insert(std::make_pair(tensor_name, value_override));
-  }
-
-  // END, optional
-  {
-    RETURN_IF_ERROR(GetSequenceControlProperties(
-        config.sequence_batching(), config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
-        false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
-        &fp32_true_value, &int32_false_value, &int32_true_value));
-    if (!tensor_name.empty()) {
-      auto value_override =
-          std::make_shared<InferRequestProvider::InputOverride>();
-      uint8_t* value_p = nullptr;
-      switch (override_type) {
-        // True
-        case OverrideType::TYPE_END:
-        case OverrideType::TYPE_STARTEND:
-          value_p =
-              ((tensor_datatype == DataType::TYPE_INT32)
-                   ? reinterpret_cast<uint8_t*>(&int32_true_value)
-                   : reinterpret_cast<uint8_t*>(&fp32_true_value));
-          break;
-        // False
-        default:
-          value_p =
-              ((tensor_datatype == DataType::TYPE_INT32)
-                   ? reinterpret_cast<uint8_t*>(&int32_false_value)
-                   : reinterpret_cast<uint8_t*>(&fp32_false_value));
-          break;
-      }
-
-      value_override->content_.assign(value_p, value_p + sizeof(float));
-      value_override->dims_.Add(1);
-      value_override->datatype_ = tensor_datatype;
-      (*input_overrides)->insert(std::make_pair(tensor_name, value_override));
-    }
-  }
-
-  // READY
-  {
-    RETURN_IF_ERROR(GetSequenceControlProperties(
-        config.sequence_batching(), config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
-        true /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
-        &fp32_true_value, &int32_false_value, &int32_true_value));
-
-    auto value_override =
-        std::make_shared<InferRequestProvider::InputOverride>();
-    uint8_t* value_p =
-        ((tensor_datatype == DataType::TYPE_INT32)
-             ? reinterpret_cast<uint8_t*>(&int32_true_value)
-             : reinterpret_cast<uint8_t*>(&fp32_true_value));
-
-    value_override->content_.assign(value_p, value_p + sizeof(float));
-    value_override->dims_.Add(1);
-    value_override->datatype_ = tensor_datatype;
-    (*input_overrides)->insert(std::make_pair(tensor_name, value_override));
-  }
-
-  return Status::Success;
-}
-
-}  // namespace
-
 Status
 InferenceBackend::GetInput(
     const std::string& name, const ModelInput** input) const
@@ -250,14 +120,46 @@ InferenceBackend::SetConfiguredScheduler(
 {
   std::unique_ptr<Scheduler> scheduler;
 
+  // Create a warmup function for the scheduler thread to run the contexts
+  // in corresponding threads. Currently the warmup function can't be run
+  // asynchronously with respect to Scheduler::Create() as there is no way to
+  // change ModelReadyState, which is controlled by model manager, from within
+  // the scheduler.
+  // But running warmup synchronously allows us to use one set of warmup data
+  // for all contexts.
+  std::vector<WarmupData> samples;
+  if (Config().model_warmup_size() != 0) {
+    RETURN_IF_ERROR(GenerateWarmupData(&samples));
+  }
+
+  auto& model_name = Name();
+  auto version = Version();
+  auto OnWarmup = [this, &model_name, &version,
+                   &samples](uint32_t runner_idx) -> Status {
+    for (const auto& sample : samples) {
+      std::vector<Scheduler::Payload> payloads;
+      // Duplicate payloads to match batch size requirement.
+      for (size_t idx = 0; idx < sample.batch_size_; idx++) {
+        std::shared_ptr<InferRequestProvider> request_provider;
+        RETURN_IF_ERROR(InferRequestProvider::Create(
+            model_name, version, sample.request_header_, sample.input_buffer_,
+            &request_provider));
+        payloads.emplace_back(nullptr, request_provider, nullptr, nullptr);
+      }
+
+      Run(runner_idx, &payloads, [](Status status) {});
+    }
+    return Status::Success;
+  };
+
   // If 'sequence_batching' is configured use the SequenceBatchScheduler,
   // otherwise use the default DynamicBatchScheduler.
   if (config_.has_sequence_batching()) {
     RETURN_IF_ERROR(SequenceBatchScheduler::Create(
-        config_, runner_cnt, OnInit, OnRun, &scheduler));
+        config_, runner_cnt, OnInit, OnWarmup, OnRun, &scheduler));
   } else {
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
-        config_, runner_cnt, OnInit, OnRun, &scheduler));
+        config_, runner_cnt, OnInit, OnWarmup, OnRun, &scheduler));
   }
 
   return SetScheduler(std::move(scheduler));
@@ -323,99 +225,132 @@ InferenceBackend::Run(
 }
 
 Status
-InferenceBackend::WarmUp()
+InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
 {
-  LOG_VERBOSE(1) << "warming up model '" << Name() << "' with sample request";
+  static std::string warmup_data_folder = "warmup";
 
-  static std::string warmup_data_folder = "sample";
+  samples->clear();
+  for (const auto& warmup_setting : config_.model_warmup()) {
+    samples->emplace_back(warmup_setting.name(), warmup_setting.batch_size());
+    auto& warmup_data = samples->back();
 
-  // Request header and input data can be produced for all contexts,
-  // only providers need to be unique for every context.
-  auto request_header = config_.model_warm_up().request_header();
-  RETURN_IF_ERROR(NormalizeRequestHeader(*this, request_header));
+    // Two passes. First pass to get max byte size for synthetic data and
+    // to generate request header
+    size_t max_zero_byte_size = 0;
+    size_t max_random_byte_size = 0;
+    // use batch-1 for every request, batch size is simulated by populating
+    // requests for single run.
+    warmup_data.request_header_.set_batch_size(1);
+    for (const auto& input_meta : warmup_setting.inputs()) {
+      auto input = warmup_data.request_header_.add_input();
+      input->set_name(input_meta.first);
+      (*input->mutable_dims()) = input_meta.second.dims();
 
-  std::unordered_map<std::string, std::shared_ptr<Memory>> input_buffer;
+      auto batch_byte_size =
+          GetByteSize(input_meta.second.data_type(), input_meta.second.dims());
+      switch (input_meta.second.input_data_type_case()) {
+        case ModelWarmup_InputMetaData::InputDataTypeCase::kZeroData: {
+          if (batch_byte_size == -1) {
+            batch_byte_size =
+                GetElementCount(input_meta.second.dims()) * sizeof(int32_t);
+          }
+          max_zero_byte_size =
+              std::max((size_t)batch_byte_size, max_zero_byte_size);
+          break;
+        }
+        case ModelWarmup_InputMetaData::InputDataTypeCase::kRandomData: {
+          if (batch_byte_size == -1) {
+            batch_byte_size =
+                GetElementCount(input_meta.second.dims()) * sizeof(int32_t);
+            max_zero_byte_size =
+                std::max((size_t)batch_byte_size, max_zero_byte_size);
+          } else {
+            max_random_byte_size =
+                std::max((size_t)batch_byte_size, max_random_byte_size);
+          }
+          break;
+        }
+        case ModelWarmup_InputMetaData::InputDataTypeCase::kInputDataFile: {
+          // For data provided from file, we can set buffer in first pass
+          warmup_data.provided_data_.emplace_back();
+          auto& input_data = warmup_data.provided_data_.back();
+          RETURN_IF_ERROR(ReadTextFile(
+              JoinPath({model_dir_, warmup_data_folder,
+                        input_meta.second.input_data_file()}),
+              &input_data));
 
-  // Placeholder for input data
-  std::unique_ptr<AllocatedSystemMemory> zero_buffer;
-  std::vector<std::string> provided_data;
+          if (batch_byte_size == -1) {
+            batch_byte_size = input_data.size();
+          } else if (((size_t)batch_byte_size) > input_data.size()) {
+            return Status(
+                RequestStatusCode::INVALID_ARG,
+                "warmup setting expects " + std::to_string(batch_byte_size) +
+                    " bytes, but the data "
+                    "provided from " +
+                    input_meta.second.input_data_file() + "only has " +
+                    std::to_string(input_data.size()) + " bytes");
+          }
 
-  if (config_.model_warm_up().use_zero_value()) {
-    // Allocate large enough zero buffer, and used by all inputs.
-    size_t max_byte_size = 0;
-    for (const auto& input : request_header.input()) {
-      max_byte_size = std::max(input.batch_byte_size(), max_byte_size);
+          auto pr = warmup_data.input_buffer_.emplace(input->name(), nullptr);
+          pr.first->second.reset(new MemoryReference());
+          static_cast<MemoryReference*>(pr.first->second.get())
+              ->AddBuffer(
+                  input_data.data(), input_data.size(),
+                  TRTSERVER_MEMORY_CPU /* memory_type */,
+                  0 /* memory_type_id */);
+          break;
+        }
+        default:
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "warmup setting expects input '" + input_meta.first +
+                  "' to have input_data_type set");
+      }
+
+      input->set_batch_byte_size(batch_byte_size);
     }
-    zero_buffer.reset(new AllocatedSystemMemory(
-        max_byte_size, TRTSERVER_MEMORY_CPU /* memory_type */,
-        0 /* memory_type_id */));
+    for (const auto& io : Config().output()) {
+      auto output = warmup_data.request_header_.add_output();
+      output->set_name(io.name());
+    }
+
+    // Second pass to prepare input buffer if using synthetic data
     TRTSERVER_Memory_Type type;
     int64_t type_id;
-    char* allocated_buffer =
-        static_cast<AllocatedSystemMemory*>(zero_buffer.get())
-            ->MutableBuffer(&type, &type_id);
-    memset(allocated_buffer, 0, max_byte_size);
 
-    for (const auto& input : request_header.input()) {
-      auto pr = input_buffer.emplace(input.name(), nullptr);
+    warmup_data.zero_data_.reset(new AllocatedSystemMemory(
+        max_zero_byte_size, TRTSERVER_MEMORY_CPU /* memory_type */,
+        0 /* memory_type_id */));
+    char* zero_buffer = warmup_data.zero_data_->MutableBuffer(&type, &type_id);
+    memset(zero_buffer, 0, max_zero_byte_size);
+
+    warmup_data.random_data_.reset(new AllocatedSystemMemory(
+        max_random_byte_size, TRTSERVER_MEMORY_CPU /* memory_type */,
+        0 /* memory_type_id */));
+    char* random_buffer =
+        warmup_data.random_data_->MutableBuffer(&type, &type_id);
+
+    for (const auto& input : warmup_data.request_header_.input()) {
+      auto& input_meta = warmup_setting.inputs().find(input.name())->second;
+      const auto input_data_type = input_meta.input_data_type_case();
+      if (input_data_type ==
+          ModelWarmup_InputMetaData::InputDataTypeCase::kInputDataFile) {
+        continue;
+      }
+
+      auto allocated_buffer =
+          ((input_data_type ==
+            ModelWarmup_InputMetaData::InputDataTypeCase::kZeroData) ||
+           (input_meta.data_type() == DataType::TYPE_STRING))
+              ? zero_buffer
+              : random_buffer;
+
+      auto pr = warmup_data.input_buffer_.emplace(input.name(), nullptr);
       pr.first->second.reset(new MemoryReference());
       static_cast<MemoryReference*>(pr.first->second.get())
           ->AddBuffer(
               allocated_buffer, input.batch_byte_size(),
               TRTSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */);
-    }
-  } else {
-    for (const auto& input : request_header.input()) {
-      provided_data.emplace_back();
-      auto& input_data = provided_data.back();
-      RETURN_IF_ERROR(ReadTextFile(
-          JoinPath({model_dir_, warmup_data_folder, input.name()}),
-          &input_data));
-
-      auto pr = input_buffer.emplace(input.name(), nullptr);
-      pr.first->second.reset(new MemoryReference());
-      static_cast<MemoryReference*>(pr.first->second.get())
-          ->AddBuffer(
-              input_data.data(), input_data.size(),
-              TRTSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */);
-    }
-  }
-
-  // Input override for model that uses sequence batcher
-  std::shared_ptr<InferRequestProvider::InputOverrideMap> input_overrides;
-  if (config_.has_sequence_batching()) {
-    RETURN_IF_ERROR(
-        CreateControlTensors(config_, request_header, &input_overrides));
-  }
-
-  std::vector<std::future<Status>> warmup_res;
-  for (auto& context : contexts_) {
-    warmup_res.emplace_back(std::async(
-        std::launch::async,
-        [this, &request_header, &input_buffer,
-         &input_overrides](BackendContext* context) {
-          std::shared_ptr<InferRequestProvider> request_provider;
-          RETURN_IF_ERROR(InferRequestProvider::Create(
-              config_.name(), version_, request_header, input_buffer,
-              &request_provider));
-          RETURN_IF_ERROR(request_provider->SetInputOverride(input_overrides));
-
-          std::vector<Scheduler::Payload> payloads;
-          // Only request provider is required for triggering model run
-          payloads.emplace_back(nullptr, request_provider, nullptr, nullptr);
-
-          RETURN_IF_ERROR(context->Run(this, &payloads));
-          return Status::Success;
-        },
-        context.get()));
-  }
-
-  for (auto& res_future : warmup_res) {
-    auto status = res_future.get();
-    if (!status.IsOk()) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "failed to warm up model '" + Name() + "': " + status.AsString());
     }
   }
 
