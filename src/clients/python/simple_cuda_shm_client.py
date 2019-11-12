@@ -89,7 +89,7 @@ if __name__ == '__main__':
     input_byte_size = input0_data.size * input0_data.itemsize
     output_byte_size = input_byte_size
 
-    # Create Output0 and Output1 in Shared Memory and store shared memory handle
+    # Create Output0 and Output1 in Shared Memory and store shared memory handles
     shm_op0_handle = cudashm.create_shared_memory_region("output0_data", output_byte_size, 0)
     shm_op1_handle = cudashm.create_shared_memory_region("output1_data", output_byte_size, 0)
 
@@ -97,7 +97,7 @@ if __name__ == '__main__':
     shared_memory_ctx.cuda_register(shm_op0_handle)
     shared_memory_ctx.cuda_register(shm_op1_handle)
 
-    # Create Input0 and Input1 in Shared Memory and store shared memory handle
+    # Create Input0 and Input1 in Shared Memory and store shared memory handles
     shm_ip0_handle = cudashm.create_shared_memory_region("input0_data", input_byte_size, 0)
     shm_ip1_handle = cudashm.create_shared_memory_region("input1_data", input_byte_size, 0)
 
