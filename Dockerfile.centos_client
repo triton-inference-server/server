@@ -1,0 +1,89 @@
+# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Default setting is building on nvidia/cuda:10.1-devel-centos7
+ARG BASE_IMAGE=nvidia/cuda:10.1-devel-centos7
+
+FROM ${BASE_IMAGE}
+
+# Default to use Python3. Allowed values are "2" and "3".
+ARG PYVER=3
+
+ENV PYVER=$PYVER
+
+RUN yum -y update; yum clean all
+RUN yum -y install epel-release
+RUN PYSFX=`[ "$PYVER" != "2" ] && echo "$PYVER" || echo ""` && \
+    yum install -y \
+        autoconf \
+        automake \
+        cmake3 \
+        git \
+        opencv-devel \
+        openssl-devel \
+        libtool \
+        make \
+        python${PYSFX} \
+        python${PYSFX}-pip && \
+    yum clean all && \
+    pip${PYSFX} install --upgrade wheel setuptools grpcio-tools
+
+# QA scripts expect "cmake" executable (not cmake3).
+RUN rm -f /usr/bin/cmake && \
+    ln -s /usr/bin/cmake3 /usr/bin/cmake
+
+# Build expects "python" executable (not python3).
+RUN rm -f /usr/bin/python && \
+    ln -s /usr/bin/python$PYVER /usr/bin/python
+
+# Build the client library and examples
+WORKDIR /workspace
+COPY VERSION .
+COPY build build
+COPY src/clients src/clients
+COPY src/core src/core
+
+RUN cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install . && \
+    make -j16 trtis-clients
+RUN cd install && \
+    export VERSION=`cat /workspace/VERSION` && \
+    tar zcf /workspace/v$VERSION.clients.tar.gz *
+
+# For CI testing need to install a test script.
+COPY qa/L0_client_tar/test.sh /tmp/test.sh
+
+# Install an image needed by the quickstart and other documentation.
+COPY qa/images/mug.jpg images/mug.jpg
+
+# Install the dependencies needed to run the client examples. These
+# are not needed for building but including them allows this image to
+# be used to run the client examples.
+RUN python -m pip install --user --upgrade pip && \
+    python -m pip install --upgrade --ignore-installed install/python/tensorrtserver-*.whl numpy pillow
+
+ENV PATH //workspace/install/bin:${PATH}
+ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
