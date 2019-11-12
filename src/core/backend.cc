@@ -137,6 +137,10 @@ InferenceBackend::SetConfiguredScheduler(
   auto OnWarmup = [this, &model_name, &version,
                    &samples](uint32_t runner_idx) -> Status {
     for (const auto& sample : samples) {
+      LOG_VERBOSE(1) << "model '" << model_name << "' instance "
+                     << std::to_string(runner_idx)
+                     << " is running warmup sample '" << sample.sample_name_
+                     << "'";
       std::vector<Scheduler::Payload> payloads;
       // Duplicate payloads to match batch size requirement.
       for (size_t idx = 0; idx < sample.batch_size_; idx++) {
@@ -236,6 +240,8 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
 
   samples->clear();
   for (const auto& warmup_setting : config_.model_warmup()) {
+    LOG_VERBOSE(1) << "Generating warmup sample data for '"
+                   << warmup_setting.name() << "'";
     samples->emplace_back(warmup_setting.name(), warmup_setting.batch_size());
     auto& warmup_data = samples->back();
 
