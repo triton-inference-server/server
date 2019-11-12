@@ -180,9 +180,13 @@ class HandlerState {
       states_.push(state);
     }
 
-    // If the state at the front of the queue is ready for writing
-    // then return it, otherwise return nullptr.
-    HandlerStateType* ReadyResponse()
+    // Check the state at the front of the queue and write it if
+    // ready. The state at the front of the queue is ready if it is in
+    // the WRITEREADY state and it equals 'required_state' (or
+    // 'required_state' is nullptr). Return nullptr if front of queue
+    // was not ready (and so not written), or return the state if it
+    // was ready and written.
+    HandlerStateType* WriteResponseIfReady(HandlerStateType* required_state)
     {
       std::lock_guard<std::mutex> lock(mu_);
       if (states_.empty()) {
@@ -190,11 +194,25 @@ class HandlerState {
       }
 
       HandlerStateType* state = states_.front();
-      if (state->step_ == Steps::WRITEREADY) {
-        return state;
+      if (state->step_ != Steps::WRITEREADY) {
+        return nullptr;
       }
 
-      return nullptr;
+      if ((required_state != nullptr) && (state != required_state)) {
+        return nullptr;
+      }
+
+#ifdef TRTIS_ENABLE_TRACING
+      if (state->tracer_ != nullptr) {
+        state->tracer_->CaptureTimestamp(
+            TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
+      }
+#endif  // TRTIS_ENABLE_TRACING
+
+      state->step_ = Steps::WRITTEN;
+      responder_->Write(state->response_, state);
+
+      return state;
     }
 
     // If 'state' is at the front of the queue and written, pop it and
@@ -1129,7 +1147,6 @@ class StreamInferHandler
   static void StreamInferComplete(
       TRTSERVER_Server* server, TRTSERVER_Trace* trace,
       TRTSERVER_InferenceResponse* response, void* userp);
-  static void CompleteResponse(Handler::State* state);
 
   std::shared_ptr<TraceManager> trace_manager_;
   std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
@@ -1300,7 +1317,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
       response.mutable_meta_data()->set_id(request.meta_data().id());
 
       state->step_ = Steps::WRITEREADY;
-      CompleteResponse(state);
+      state->context_->WriteResponseIfReady(state);
     }
 
     // Now that the inference request is in flight, create a copy of
@@ -1355,19 +1372,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     }
 
     // Write the next response if it is ready...
-    auto next_state = state->context_->ReadyResponse();
-    if (next_state != nullptr) {
-#ifdef TRTIS_ENABLE_TRACING
-      if (next_state->tracer_ != nullptr) {
-        next_state->tracer_->CaptureTimestamp(
-            TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
-      }
-#endif  // TRTIS_ENABLE_TRACING
-
-      next_state->step_ = Steps::WRITTEN;
-      next_state->context_->responder_->Write(
-          next_state->response_, next_state);
-    }
+    state->context_->WriteResponseIfReady(nullptr);
 
     // If done reading and no in-flight requests then can finish the
     // entire stream. Otherwise just finish this state.
@@ -1459,28 +1464,7 @@ StreamInferHandler::StreamInferComplete(
   response.mutable_meta_data()->set_id(request.meta_data().id());
 
   state->step_ = Steps::WRITEREADY;
-  CompleteResponse(state);
-}
-
-void
-StreamInferHandler::CompleteResponse(Handler::State* state)
-{
-  // If 'state' is at the front of the queued states then it's
-  // response should be sent next... so go ahead and send it. If
-  // 'state' is not the next to be sent then do nothing. When the
-  // front state is eventually written it will trigger a write of the
-  // next state in the queue.
-  if (state == state->context_->ReadyResponse()) {
-#ifdef TRTIS_ENABLE_TRACING
-    if (state->tracer_ != nullptr) {
-      state->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
-    }
-#endif  // TRTIS_ENABLE_TRACING
-
-    state->step_ = Steps::WRITTEN;
-    state->context_->responder_->Write(state->response_, state);
-  }
+  state->context_->WriteResponseIfReady(state);
 }
 
 //
@@ -1820,20 +1804,28 @@ GRPCServer::Start()
   hstatus->Start(1 /* thread_cnt */);
   status_handler_.reset(hstatus);
 
-  // Handler for inference requests.
+  // Handler for inference requests. 'infer_thread_cnt_' is not used
+  // below due to thread-safety requirements and the way
+  // InferHandler::Process is written. We should likely implement it
+  // by making multiple completion queues each of which is serviced by
+  // a single thread.
   InferHandler* hinfer = new InferHandler(
       "InferHandler", server_, server_id_, trace_manager_, smb_manager_,
       &service_, infer_cq_.get(),
       infer_allocation_pool_size_ /* max_state_bucket_count */);
-  hinfer->Start(infer_thread_cnt_);
+  hinfer->Start(/* infer_thread_cnt_ */ 1);
   infer_handler_.reset(hinfer);
 
   // Handler for streaming inference requests.
+  // 'stream_infer_thread_cnt_' is not used below due to thread-safety
+  // requirements and the way StreamInferHandler::Process is
+  // written. We should likely implement it by making multiple
+  // completion queues each of which is serviced by a single thread.
   StreamInferHandler* hstreaminfer = new StreamInferHandler(
       "StreamInferHandler", server_, server_id_, trace_manager_, smb_manager_,
       &service_, stream_infer_cq_.get(),
       infer_allocation_pool_size_ /* max_state_bucket_count */);
-  hstreaminfer->Start(stream_infer_thread_cnt_);
+  hstreaminfer->Start(/* stream_infer_thread_cnt_ */ 1);
   stream_infer_handler_.reset(hstreaminfer);
 
   // Handler for model-control requests. A single thread processes all
