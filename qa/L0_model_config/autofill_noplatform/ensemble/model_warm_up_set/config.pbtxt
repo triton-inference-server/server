@@ -1,4 +1,4 @@
-name: "model_warm_up_set"
+name: "model_warmup_set"
 max_batch_size: 8
 platform: "ensemble"
 ensemble_scheduling {
@@ -31,6 +31,4 @@ output [
     dims: [ 10, 1, 1 ]
   }
 ]
-model_warm_up {
-  use_zero_value : true
-}
+model_warmup [{}]

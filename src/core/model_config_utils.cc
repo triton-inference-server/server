@@ -608,7 +608,7 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
   if (config.model_warmup_size() != 0) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "model warm up should not be specified for ensemble '" + config.name() +
+        "model_warmup can not be specified for ensemble '" + config.name() +
             "'");
   }
 

@@ -1,1 +1,1 @@
-model warm up should not be specified for ensemble 'model_warm_up_set'
+model_warmup can not be specified for ensemble 'model_warmup_set'

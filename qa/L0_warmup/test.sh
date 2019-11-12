@@ -54,6 +54,7 @@ rm -fr models && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_float16_float16_float16 models/. && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/graphdef_sequence_float32 models/.
 
+# [TODO] update below
 # Provide warmup instruction in model config
 (cd models/graphdef_float16_float16_float16 && \
     echo 'model_warm_up {' >> config.pbtxt && \
