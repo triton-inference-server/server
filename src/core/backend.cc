@@ -299,15 +299,15 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
     char* random_buffer =
         warmup_data.random_data_->MutableBuffer(&type, &type_id);
 
+    // use batch-1 for every request, batch size is simulated by populating
+    // requests for single run.
+    warmup_data.request_header_.set_batch_size(1);
+
+    // Request all outputs
     for (const auto& io : Config().output()) {
       auto output = warmup_data.request_header_.add_output();
       output->set_name(io.name());
     }
-
-
-    // use batch-1 for every request, batch size is simulated by populating
-    // requests for single run.
-    warmup_data.request_header_.set_batch_size(1);
 
     // Second pass to prepare input buffer and request header
     for (const auto& input_meta : warmup_setting.inputs()) {

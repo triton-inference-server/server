@@ -35,6 +35,11 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+CLIENT=../clients/image_client
+CLIENT_LOG="./client.log"
+
+IMAGE="../images/vulture.jpeg"
+
 DATADIR=`pwd`/models
 
 SERVER=/opt/tensorrtserver/bin/trtserver
@@ -42,13 +47,11 @@ SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1 --exit-timeout-secs=120
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
-rm -f $SERVER_LOG
+rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
 
-# [TODO] use a model that takes time for first time inference and compare
-# first time inference with and without warmup
-# Use one of the addsub model as example.
+# Use the addsub models as example.
 rm -fr models && \
     mkdir models && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_float16_float16_float16 models/. && \
@@ -125,6 +128,74 @@ fi
 grep "is running warmup sample 'sequence sample'" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected warmup for stateful model\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Show effect of warmup by using a TF model with TF-TRT optimization which is
+# known to be slow on first inference.
+# Note: model can be obatined via the fetching script in docs/example
+rm -fr models && \
+    mkdir models && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/inception_v3_graphdef models/.
+
+# Enable TF-TRT optimization
+(cd models/inception_v3_graphdef && \
+    echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\"} ] } }" >> config.pbtxt)
+
+# Duplicate the same model with warmup enabled
+cp -r models/inception_v3_graphdef models/inception_v3_warmup &&
+    (cd models/inception_v3_warmup && \
+        sed -i 's/inception_v3_graphdef/inception_v3_warmup/' config.pbtxt)
+
+(cd models/inception_v3_warmup && \
+    echo 'model_warmup [{' >> config.pbtxt && \
+    echo '    name : "image sample"' >> config.pbtxt && \
+    echo '    batch_size: 1' >> config.pbtxt && \
+    echo '    inputs {' >> config.pbtxt && \
+    echo '        key: "input"' >> config.pbtxt && \
+    echo '        value: {' >> config.pbtxt && \
+    echo '            data_type: TYPE_FP32' >> config.pbtxt && \
+    echo '            dims: [ 299, 299, 3 ]' >> config.pbtxt && \
+    echo '            input_data_file: "raw_mug_data"' >> config.pbtxt && \
+    echo '        }' >> config.pbtxt && \
+    echo '    }' >> config.pbtxt && \
+    echo '}]' >> config.pbtxt )
+
+# prepare provided data instead of synthetic one
+mkdir -p models/inception_v3_warmup/warmup && \
+    cp raw_mug_data models/inception_v3_warmup/warmup/.
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+grep "is running warmup sample 'image sample'" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected warmup for stateless model\n***"
+    RET=1
+fi
+
+# Time the first inference for both models
+time $CLIENT -m inception_v3_graphdef -s INCEPTION $IMAGE >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+time $CLIENT -m inception_v3_warmup -s INCEPTION $IMAGE >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
     RET=1
 fi
 
