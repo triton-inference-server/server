@@ -1804,20 +1804,28 @@ GRPCServer::Start()
   hstatus->Start(1 /* thread_cnt */);
   status_handler_.reset(hstatus);
 
-  // Handler for inference requests.
+  // Handler for inference requests. 'infer_thread_cnt_' is not used
+  // below due to thread-safety requirements and the way
+  // InferHandler::Process is written. We should likely implement it
+  // by making multiple completion queues each of which is serviced by
+  // a single thread.
   InferHandler* hinfer = new InferHandler(
       "InferHandler", server_, server_id_, trace_manager_, smb_manager_,
       &service_, infer_cq_.get(),
       infer_allocation_pool_size_ /* max_state_bucket_count */);
-  hinfer->Start(/* infer_thread_cnt_ FIXME */ 1);
+  hinfer->Start(/* infer_thread_cnt_ */ 1);
   infer_handler_.reset(hinfer);
 
   // Handler for streaming inference requests.
+  // 'stream_infer_thread_cnt_' is not used below due to thread-safety
+  // requirements and the way StreamInferHandler::Process is
+  // written. We should likely implement it by making multiple
+  // completion queues each of which is serviced by a single thread.
   StreamInferHandler* hstreaminfer = new StreamInferHandler(
       "StreamInferHandler", server_, server_id_, trace_manager_, smb_manager_,
       &service_, stream_infer_cq_.get(),
       infer_allocation_pool_size_ /* max_state_bucket_count */);
-  hstreaminfer->Start(/* stream_infer_thread_cnt_ FIXME */ 1);
+  hstreaminfer->Start(/* stream_infer_thread_cnt_ */ 1);
   stream_infer_handler_.reset(hstreaminfer);
 
   // Handler for model-control requests. A single thread processes all
