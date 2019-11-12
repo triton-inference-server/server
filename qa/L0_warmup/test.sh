@@ -56,7 +56,7 @@ rm -fr models && \
 
 # Provide warmup instruction (batch size 1) in model config
 (cd models/graphdef_float16_float16_float16 && \
-    echo 'model_warm_up [{' >> config.pbtxt && \
+    echo 'model_warmup [{' >> config.pbtxt && \
     echo '    name : "regular sample"' >> config.pbtxt && \
     echo '    batch_size: 1' >> config.pbtxt && \
     echo '    inputs {' >> config.pbtxt && \
@@ -79,7 +79,7 @@ rm -fr models && \
 
 # Instruction for sequence model (batch size 8), need to specify control tensor
 (cd models/graphdef_sequence_float32 && \
-    echo 'model_warm_up [{' >> config.pbtxt && \
+    echo 'model_warmup [{' >> config.pbtxt && \
     echo '    name : "sequence sample"' >> config.pbtxt && \
     echo '    batch_size: 8' >> config.pbtxt && \
     echo '    inputs {' >> config.pbtxt && \
