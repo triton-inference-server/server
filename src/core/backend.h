@@ -25,9 +25,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/core/api.pb.h"
 #include "src/core/backend_context.h"
 #include "src/core/label_provider.h"
 #include "src/core/model_config.pb.h"
+#include "src/core/provider.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 
@@ -111,6 +113,27 @@ class InferenceBackend {
   std::vector<std::unique_ptr<BackendContext>> contexts_;
 
  private:
+  struct WarmupData {
+    WarmupData(const std::string& sample_name, size_t batch_size)
+        : sample_name_(sample_name), batch_size_(batch_size)
+    {
+    }
+
+    std::string sample_name_;
+    size_t batch_size_;
+    InferRequestHeader request_header_;
+    std::unordered_map<std::string, std::shared_ptr<Memory>> input_buffer_;
+    std::shared_ptr<InferRequestProvider::InputOverrideMap> input_override_;
+
+    // Placeholder for input data
+    std::unique_ptr<AllocatedSystemMemory> zero_data_;
+    std::unique_ptr<AllocatedSystemMemory> random_data_;
+    std::vector<std::string> provided_data_;
+  };
+
+  // Generate warmup data
+  Status GenerateWarmupData(std::vector<WarmupData>* samples);
+
   // Configuration of the model that this backend represents.
   ModelConfig config_;
 
@@ -131,6 +154,9 @@ class InferenceBackend {
 
   // Map from output name to the model configuration for that output.
   std::unordered_map<std::string, ModelOutput> output_map_;
+
+  // Path to model
+  std::string model_dir_;
 };
 
 }}  // namespace nvidia::inferenceserver

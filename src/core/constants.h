@@ -83,6 +83,8 @@ constexpr char kMetricsLabelModelName[] = "model";
 constexpr char kMetricsLabelModelVersion[] = "version";
 constexpr char kMetricsLabelGpuUuid[] = "gpu_uuid";
 
+constexpr char kWarmupDataFolder[] = "warmup";
+
 constexpr uint64_t NANOS_PER_SECOND = 1000000000;
 constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 constexpr int SCHEDULER_DEFAULT_NICE = 5;

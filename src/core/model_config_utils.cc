@@ -688,6 +688,12 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
         "optimization should not be specified for ensemble '" + config.name() +
             "'");
   }
+  if (config.model_warmup_size() != 0) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "model_warmup can not be specified for ensemble '" + config.name() +
+            "'");
+  }
 
   // Make sure step is not empty and all fields are set
   if (config.ensemble_scheduling().step_size() == 0) {

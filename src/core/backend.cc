@@ -27,13 +27,16 @@
 #include "src/core/backend.h"
 
 #include <chrono>
+#include <future>
 #include "src/core/constants.h"
 #include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/model_config_utils.h"
+#include "src/core/provider_utils.h"
 #include "src/core/sequence_batch_scheduler.h"
+#include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -85,12 +88,12 @@ InferenceBackend::SetModelConfig(
 
   // Initialize the output map and label provider for each output
   label_provider_ = std::make_shared<LabelProvider>();
-  const auto model_dir = DirName(path);
+  model_dir_ = DirName(path);
   for (const auto& io : config.output()) {
     output_map_.insert(std::make_pair(io.name(), io));
 
     if (!io.label_filename().empty()) {
-      const auto label_path = JoinPath({model_dir, io.label_filename()});
+      const auto label_path = JoinPath({model_dir_, io.label_filename()});
       RETURN_IF_ERROR(label_provider_->AddLabels(io.name(), label_path));
     }
   }
@@ -117,14 +120,57 @@ InferenceBackend::SetConfiguredScheduler(
 {
   std::unique_ptr<Scheduler> scheduler;
 
+  // Create a warmup function for the scheduler thread to run the contexts
+  // in corresponding threads. Currently the warmup function can't be run
+  // asynchronously with respect to Scheduler::Create() as there is no way to
+  // change ModelReadyState, which is controlled by model manager, from within
+  // the scheduler.
+  // But running warmup synchronously allows us to use one set of warmup data
+  // for all contexts.
+  std::vector<WarmupData> samples;
+  if (Config().model_warmup_size() != 0) {
+    RETURN_IF_ERROR(GenerateWarmupData(&samples));
+  }
+
+  auto& model_name = Name();
+  auto version = Version();
+  auto OnWarmup = [this, &model_name, &version,
+                   &samples](uint32_t runner_idx) -> Status {
+    for (const auto& sample : samples) {
+      LOG_VERBOSE(1) << "model '" << model_name << "' instance "
+                     << std::to_string(runner_idx)
+                     << " is running warmup sample '" << sample.sample_name_
+                     << "'";
+      std::vector<Scheduler::Payload> payloads;
+      // Duplicate payloads to match batch size requirement.
+      for (size_t idx = 0; idx < sample.batch_size_; idx++) {
+        std::shared_ptr<InferRequestProvider> request_provider;
+        RETURN_IF_ERROR(InferRequestProvider::Create(
+            model_name, version, sample.request_header_, sample.input_buffer_,
+            &request_provider));
+        RETURN_IF_ERROR(
+            request_provider->SetInputOverride(sample.input_override_));
+        payloads.emplace_back(nullptr, request_provider, nullptr, nullptr);
+      }
+
+      std::promise<Status> warmup_promise;
+      auto warmup_future = warmup_promise.get_future();
+      Run(runner_idx, &payloads, [&warmup_promise](Status status) {
+        warmup_promise.set_value(status);
+      });
+      RETURN_IF_ERROR(warmup_future.get());
+    }
+    return Status::Success;
+  };
+
   // If 'sequence_batching' is configured use the SequenceBatchScheduler,
   // otherwise use the default DynamicBatchScheduler.
   if (config_.has_sequence_batching()) {
     RETURN_IF_ERROR(SequenceBatchScheduler::Create(
-        config_, runner_cnt, OnInit, OnRun, &scheduler));
+        config_, runner_cnt, OnInit, OnWarmup, OnRun, &scheduler));
   } else {
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
-        config_, runner_cnt, OnInit, OnRun, &scheduler));
+        config_, runner_cnt, OnInit, OnWarmup, OnRun, &scheduler));
   }
 
   return SetScheduler(std::move(scheduler));
@@ -187,6 +233,220 @@ InferenceBackend::Run(
   }
 
   OnCompleteQueuedPayloads(status);
+}
+
+Status
+InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
+{
+  samples->clear();
+  for (const auto& warmup_setting : config_.model_warmup()) {
+    LOG_VERBOSE(1) << "Generating warmup sample data for '"
+                   << warmup_setting.name() << "'";
+
+    // Two passes. First pass to get max byte size for synthetic data
+    int64_t max_zero_byte_size = 0;
+    int64_t max_random_byte_size = 0;
+    for (const auto& input_meta : warmup_setting.inputs()) {
+      auto element_count = GetElementCount(input_meta.second.dims());
+      if (element_count == -1) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "warmup setting expects all variable-size dimensions are specified "
+            "for input '" +
+                input_meta.first + "'");
+      }
+
+      int64_t batch_byte_size =
+          element_count * GetDataTypeByteSize(input_meta.second.data_type());
+      if (batch_byte_size == 0) {
+        batch_byte_size = element_count * sizeof(int32_t);
+      }
+
+      switch (input_meta.second.input_data_type_case()) {
+        case ModelWarmup_Input::InputDataTypeCase::kZeroData:
+          max_zero_byte_size = std::max(batch_byte_size, max_zero_byte_size);
+          break;
+        case ModelWarmup_Input::InputDataTypeCase::kRandomData: {
+          if (input_meta.second.data_type() == DataType::TYPE_STRING) {
+            max_zero_byte_size = std::max(batch_byte_size, max_zero_byte_size);
+          } else {
+            max_random_byte_size =
+                std::max(batch_byte_size, max_random_byte_size);
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    samples->emplace_back(warmup_setting.name(), warmup_setting.batch_size());
+    auto& warmup_data = samples->back();
+    // Create buffers for synthetic data
+    TRTSERVER_Memory_Type type;
+    int64_t type_id;
+    warmup_data.zero_data_.reset(new AllocatedSystemMemory(
+        max_zero_byte_size, TRTSERVER_MEMORY_CPU /* memory_type */,
+        0 /* memory_type_id */));
+    char* zero_buffer = warmup_data.zero_data_->MutableBuffer(&type, &type_id);
+    memset(zero_buffer, 0, max_zero_byte_size);
+
+    warmup_data.random_data_.reset(new AllocatedSystemMemory(
+        max_random_byte_size, TRTSERVER_MEMORY_CPU /* memory_type */,
+        0 /* memory_type_id */));
+    char* random_buffer =
+        warmup_data.random_data_->MutableBuffer(&type, &type_id);
+    for (int64_t offset = 0; offset < max_random_byte_size; offset++) {
+      random_buffer[offset] = rand();
+    }
+
+    // use batch-1 for every request, batch size is simulated by populating
+    // requests for single run.
+    warmup_data.request_header_.set_batch_size(1);
+
+    // Request all outputs
+    for (const auto& io : Config().output()) {
+      auto output = warmup_data.request_header_.add_output();
+      output->set_name(io.name());
+    }
+
+    // Second pass to prepare input buffer and request header
+    for (const auto& input_meta : warmup_setting.inputs()) {
+      // If not found in model inputs, then treat it as control tensor
+      const ModelInput* input_config;
+      if (!GetInput(input_meta.first, &input_config).IsOk()) {
+        if (warmup_data.input_override_ == nullptr) {
+          warmup_data.input_override_ =
+              std::make_shared<InferRequestProvider::InputOverrideMap>();
+        }
+
+        auto element_count = GetElementCount(input_meta.second.dims());
+        auto batch_byte_size =
+            element_count * GetDataTypeByteSize(input_meta.second.data_type());
+        if (batch_byte_size == 0) {
+          batch_byte_size = element_count * sizeof(int32_t);
+        }
+
+        auto value_override =
+            std::make_shared<InferRequestProvider::InputOverride>();
+        value_override->dims_ = input_meta.second.dims();
+        value_override->datatype_ = input_meta.second.data_type();
+        switch (input_meta.second.input_data_type_case()) {
+          case ModelWarmup_Input::InputDataTypeCase::kZeroData:
+            value_override->content_.assign(
+                zero_buffer, zero_buffer + batch_byte_size);
+            break;
+          case ModelWarmup_Input::InputDataTypeCase::kRandomData: {
+            if (input_meta.second.data_type() == DataType::TYPE_STRING) {
+              value_override->content_.assign(
+                  zero_buffer, zero_buffer + batch_byte_size);
+            } else {
+              value_override->content_.assign(
+                  random_buffer, random_buffer + batch_byte_size);
+            }
+            break;
+          }
+          case ModelWarmup_Input::InputDataTypeCase::kInputDataFile: {
+            std::string input_data;
+            RETURN_IF_ERROR(ReadTextFile(
+                JoinPath({model_dir_, kWarmupDataFolder,
+                          input_meta.second.input_data_file()}),
+                &input_data));
+
+            if (input_meta.second.data_type() == DataType::TYPE_STRING) {
+              batch_byte_size = input_data.size();
+            } else if (((size_t)batch_byte_size) > input_data.size()) {
+              return Status(
+                  RequestStatusCode::INVALID_ARG,
+                  "warmup setting expects " + std::to_string(batch_byte_size) +
+                      " bytes, but the data "
+                      "provided from " +
+                      input_meta.second.input_data_file() + "only has " +
+                      std::to_string(input_data.size()) + " bytes");
+            }
+
+            value_override->content_.assign(
+                input_data.data(), input_data.data() + input_data.size());
+            break;
+          }
+          default:
+            return Status(
+                RequestStatusCode::INVALID_ARG,
+                "warmup setting expects input '" + input_meta.first +
+                    "' to have input_data_type set");
+        }
+        warmup_data.input_override_->emplace(
+            input_meta.first, std::move(value_override));
+        continue;
+      }
+
+      auto input = warmup_data.request_header_.add_input();
+      input->set_name(input_meta.first);
+      (*input->mutable_dims()) = input_meta.second.dims();
+
+      auto element_count = GetElementCount(input_meta.second.dims());
+      auto batch_byte_size =
+          element_count * GetDataTypeByteSize(input_meta.second.data_type());
+      if (batch_byte_size == 0) {
+        batch_byte_size = element_count * sizeof(int32_t);
+      }
+
+      const char* allocated_ptr;
+      switch (input_meta.second.input_data_type_case()) {
+        case ModelWarmup_Input::InputDataTypeCase::kZeroData: 
+          allocated_ptr = zero_buffer;
+          break;
+        case ModelWarmup_Input::InputDataTypeCase::kRandomData: {
+          if (input_meta.second.data_type() == DataType::TYPE_STRING) {
+            allocated_ptr = zero_buffer;
+          } else {
+            allocated_ptr = random_buffer;
+          }
+          break;
+        }
+        case ModelWarmup_Input::InputDataTypeCase::kInputDataFile: {
+          // For data provided from file, we can set buffer in first pass
+          warmup_data.provided_data_.emplace_back();
+          auto& input_data = warmup_data.provided_data_.back();
+          RETURN_IF_ERROR(ReadTextFile(
+              JoinPath({model_dir_, kWarmupDataFolder,
+                        input_meta.second.input_data_file()}),
+              &input_data));
+
+          if (input_meta.second.data_type() == DataType::TYPE_STRING) {
+            batch_byte_size = input_data.size();
+          } else if (((size_t)batch_byte_size) > input_data.size()) {
+            return Status(
+                RequestStatusCode::INVALID_ARG,
+                "warmup setting expects " + std::to_string(batch_byte_size) +
+                    " bytes, but the data "
+                    "provided from " +
+                    input_meta.second.input_data_file() + "only has " +
+                    std::to_string(input_data.size()) + " bytes");
+          }
+          allocated_ptr = input_data.data();
+          break;
+        }
+        default:
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "warmup setting expects input '" + input_meta.first +
+                  "' to have input_data_type set");
+      }
+
+      auto pr = warmup_data.input_buffer_.emplace(input_meta.first, nullptr);
+      pr.first->second.reset(new MemoryReference());
+      static_cast<MemoryReference*>(pr.first->second.get())
+              ->AddBuffer(
+                  allocated_ptr, batch_byte_size,
+                  TRTSERVER_MEMORY_CPU /* memory_type */,
+                  0 /* memory_type_id */);
+
+      input->set_batch_byte_size(batch_byte_size);
+    }
+  }
+
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver
