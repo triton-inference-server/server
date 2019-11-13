@@ -269,7 +269,7 @@ InferenceProfiler::Profile(
 
   RETURN_IF_ERROR(manager_->ChangeConcurrencyLevel(concurrent_request_count));
 
-  err = ProfileHelper(status_summary, &is_stable);
+  err = ProfileHelper(false /* clean_starts */, status_summary, &is_stable);
   if (err.IsOk()) {
     err = Report(status_summary, percentile_, protocol_, verbose_);
     summary.push_back(status_summary);
@@ -313,7 +313,46 @@ InferenceProfiler::Profile(
 
   RETURN_IF_ERROR(manager_->ChangeRequestRate(request_rate));
 
-  err = ProfileHelper(status_summary, &is_stable);
+  err = ProfileHelper(false /*clean_starts*/, status_summary, &is_stable);
+  if (err.IsOk()) {
+    err = Report(status_summary, percentile_, protocol_, verbose_);
+    summary.push_back(status_summary);
+    uint64_t stabilizing_latency_ms =
+        status_summary.stabilizing_latency_ns / (1000 * 1000);
+    if (!err.IsOk()) {
+      std::cerr << err << std::endl;
+      *meets_threshold = false;
+    } else if (
+        (stabilizing_latency_ms >= latency_threshold_ms_) &&
+        (latency_threshold_ms_ != NO_LIMIT)) {
+      std::cerr << "Measured latency went over the set limit of "
+                << latency_threshold_ms_ << " msec. " << std::endl;
+      *meets_threshold = false;
+    } else if (!is_stable) {
+      std::cerr << "Failed to obtain stable measurement." << std::endl;
+      *meets_threshold = false;
+    }
+  } else {
+    return err;
+  }
+
+  return nic::Error::Success;
+}
+
+nic::Error
+InferenceProfiler::Profile(
+    std::vector<PerfStatus>& summary, bool* meets_threshold)
+{
+  nic::Error err;
+  PerfStatus status_summary;
+
+  RETURN_IF_ERROR(manager_->InitCustomIntervals());
+  RETURN_IF_ERROR(manager_->GetCustomRequestRate(&status_summary.request_rate));
+
+  bool is_stable = false;
+  *meets_threshold = true;
+
+  err = ProfileHelper(true /* clean_starts */, status_summary, &is_stable);
   if (err.IsOk()) {
     err = Report(status_summary, percentile_, protocol_, verbose_);
     summary.push_back(status_summary);
@@ -341,7 +380,8 @@ InferenceProfiler::Profile(
 
 
 nic::Error
-InferenceProfiler::ProfileHelper(PerfStatus& status_summary, bool* is_stable)
+InferenceProfiler::ProfileHelper(
+    const bool clean_starts, PerfStatus& status_summary, bool* is_stable)
 {
   // Start measurement
   LoadStatus load_status;
@@ -350,6 +390,11 @@ InferenceProfiler::ProfileHelper(PerfStatus& status_summary, bool* is_stable)
 
   do {
     RETURN_IF_ERROR(manager_->CheckHealth());
+
+    // Needed to obtain stable measurements
+    if (clean_starts) {
+      manager_->ResetWorkers();
+    }
 
     error.push(Measure(status_summary));
     if (error.size() >= load_parameters_.stability_window) {

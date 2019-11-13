@@ -59,6 +59,11 @@ class RequestRateManager : public LoadManager {
   /// specified load on inference server.
   /// \param async Whether to use asynchronous or synchronous API for infer
   /// request.
+  /// \param measurement_window_ms The time window for measurements.
+  /// \param request_distribution The kind of distribution to use for drawing
+  /// out intervals between successive requests.
+  /// \param request_intervals_file The path to the file to use to pick up the
+  /// time intervals between the successive requests.
   /// \param batch_size The batch size used for each request.
   /// \param max_threads The maximum number of working threads to be spawned.
   /// \param num_of_sequences The number of concurrent sequences that must be
@@ -70,7 +75,8 @@ class RequestRateManager : public LoadManager {
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const bool async, const uint64_t measurement_window_ms,
-      Distribution request_distribution, const int32_t batch_size,
+      Distribution request_distribution,
+      const std::string& request_intervals_file, const int32_t batch_size,
       const size_t max_threads, const uint32_t num_of_sequences,
       const size_t sequence_length, const size_t string_length,
       const std::string& string_data, const bool zero_input,
@@ -81,6 +87,16 @@ class RequestRateManager : public LoadManager {
 
   /// @ See LoadManager::ChangeRequestRate()
   nic::Error ChangeRequestRate(const double target_request_rate) override;
+
+  /// @ See LoadManager::InitCustomIntervals()
+  nic::Error InitCustomIntervals() override;
+
+  /// @ See LoadManager::GetCustomRequestRate()
+  nic::Error GetCustomRequestRate(double* request_rate) override;
+
+  /// @ See LoadManager::ResetWorkers()
+  nic::Error ResetWorkers() override;
+
 
  private:
   struct ThreadConfig {
@@ -107,7 +123,8 @@ class RequestRateManager : public LoadManager {
   RequestRateManager(
       const bool async,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      Distribution request_distribution, const int32_t batch_size,
+      Distribution request_distribution,
+      const std::string& request_intervals_file, const int32_t batch_size,
       const uint64_t measurement_window_ms, const size_t max_threads,
       const uint32_t num_of_sequences, const size_t sequence_length,
       const std::shared_ptr<ContextFactory>& factory);
@@ -115,6 +132,12 @@ class RequestRateManager : public LoadManager {
   /// Generates and update the request schedule as per the given request rate.
   /// \param request_rate The request rate to use for new schedule.
   void GenerateSchedule(const double request_rate);
+
+  // Pauses the worker threads
+  void PauseWorkers();
+
+  // Resets the counters and resumes the worker threads
+  void ResumeWorkers();
 
   /// Function for worker that sends inference requests.
   /// \param thread_stat Worker thread specific data.
@@ -139,10 +162,12 @@ class RequestRateManager : public LoadManager {
 
   std::unique_ptr<std::chrono::nanoseconds> gen_duration_;
   Distribution request_distribution_;
+  std::string request_intervals_file_;
+  std::vector<std::chrono::nanoseconds> custom_intervals_;
   std::vector<std::chrono::nanoseconds> schedule_;
   std::chrono::steady_clock::time_point start_time_;
   bool execute_;
 
   std::vector<std::shared_ptr<SequenceStat>> sequence_stat_;
-  int next_corr_id_;
+  uint64_t next_corr_id_;
 };

@@ -29,7 +29,8 @@
 nic::Error
 RequestRateManager::Create(
     const bool async, const uint64_t measurement_window_ms,
-    Distribution request_distribution, const int32_t batch_size,
+    Distribution request_distribution,
+    const std::string& request_intervals_file, const int32_t batch_size,
     const size_t max_threads, const uint32_t num_of_sequences,
     const size_t sequence_length, const size_t string_length,
     const std::string& string_data, const bool zero_input,
@@ -39,9 +40,9 @@ RequestRateManager::Create(
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<RequestRateManager> local_manager(new RequestRateManager(
-      async, input_shapes, request_distribution, batch_size,
-      measurement_window_ms, max_threads, num_of_sequences, sequence_length,
-      factory));
+      async, input_shapes, request_distribution, request_intervals_file,
+      batch_size, measurement_window_ms, max_threads, num_of_sequences,
+      sequence_length, factory));
 
   local_manager->threads_config_.reserve(max_threads);
 
@@ -55,11 +56,13 @@ RequestRateManager::Create(
 RequestRateManager::RequestRateManager(
     const bool async,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-    Distribution request_distribution, const int32_t batch_size,
+    Distribution request_distribution,
+    const std::string& request_intervals_file, int32_t batch_size,
     const uint64_t measurement_window_ms, const size_t max_threads,
     const uint32_t num_of_sequences, const size_t sequence_length,
     const std::shared_ptr<ContextFactory>& factory)
-    : request_distribution_(request_distribution), execute_(false),
+    : request_distribution_(request_distribution),
+      request_intervals_file_(request_intervals_file), execute_(false),
       next_corr_id_(1)
 {
   async_ = async;
@@ -83,7 +86,91 @@ RequestRateManager::RequestRateManager(
 }
 
 nic::Error
+RequestRateManager::InitCustomIntervals()
+{
+  schedule_.clear();
+  schedule_.emplace_back(0);
+  if (!request_intervals_file_.empty()) {
+    RETURN_IF_ERROR(
+        ReadTimeIntervalsFile(request_intervals_file_, &custom_intervals_));
+    size_t index = 0;
+    while (schedule_.back() < *gen_duration_) {
+      std::chrono::nanoseconds next_timestamp(
+          schedule_.back() + custom_intervals_[index++]);
+      schedule_.emplace_back(next_timestamp);
+      if (index == custom_intervals_.size()) {
+        index = 0;
+      }
+    }
+  }
+
+  return nic::Error::Success;
+}
+
+nic::Error
 RequestRateManager::ChangeRequestRate(const double request_rate)
+{
+  PauseWorkers();
+  // Can safely update the schedule
+  GenerateSchedule(request_rate);
+  ResumeWorkers();
+
+  return nic::Error::Success;
+}
+
+
+nic::Error
+RequestRateManager::ResetWorkers()
+{
+  PauseWorkers();
+  ResumeWorkers();
+
+  return nic::Error::Success;
+}
+
+
+nic::Error
+RequestRateManager::GetCustomRequestRate(double* request_rate)
+{
+  if (custom_intervals_.empty()) {
+    return nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "The custom intervals vector is empty");
+  }
+  uint64_t total_time_ns = 0;
+  for (auto interval : custom_intervals_) {
+    total_time_ns += interval.count();
+  }
+
+  *request_rate =
+      (custom_intervals_.size() * 1000 * 1000 * 1000) / (total_time_ns);
+  return nic::Error::Success;
+}
+
+void
+RequestRateManager::GenerateSchedule(const double request_rate)
+{
+  schedule_.clear();
+  schedule_.emplace_back(0);
+  std::function<std::chrono::nanoseconds(std::mt19937&)> distribution;
+  if (request_distribution_ == Distribution::POISSON) {
+    distribution = ScheduleDistribution<Distribution::POISSON>(request_rate);
+  } else {
+    distribution = ScheduleDistribution<Distribution::CONSTANT>(request_rate);
+  }
+
+  std::mt19937 schedule_rng;
+  while (schedule_.back() < *gen_duration_) {
+    std::chrono::nanoseconds next_timestamp(
+        schedule_.back() + distribution(schedule_rng));
+    schedule_.emplace_back(next_timestamp);
+  }
+  std::cout << "Request Rate: " << request_rate
+            << " inference requests per seconds" << std::endl;
+}
+
+void
+RequestRateManager::PauseWorkers()
 {
   // Pause all the threads
   execute_ = false;
@@ -95,8 +182,8 @@ RequestRateManager::ChangeRequestRate(const double request_rate)
       threads_config_.emplace_back(
           new ThreadConfig(threads_.size(), max_threads_));
 
-      // Worker threads share the responsibility to generate the inferences at a
-      // particular schedule.
+      // Worker threads share the responsibility to generate the inferences at
+      // a particular schedule.
       threads_.emplace_back(
           &RequestRateManager::Infer, this, threads_stat_.back(),
           threads_config_.back());
@@ -109,14 +196,14 @@ RequestRateManager::ChangeRequestRate(const double request_rate)
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
+}
 
-  // Can safely update the schedule
-  GenerateSchedule(request_rate);
-
+void
+RequestRateManager::ResumeWorkers()
+{
   // Reset all the thread counters
-  uint32_t count = 1;
   for (auto& thread_config : threads_config_) {
-    thread_config->index_ = count++;
+    thread_config->index_ = thread_config->id_;
     thread_config->rounds_ = 0;
   }
 
@@ -126,24 +213,6 @@ RequestRateManager::ChangeRequestRate(const double request_rate)
   // Wake up all the threads to begin execution
   execute_ = true;
   wake_signal_.notify_all();
-
-  return nic::Error::Success;
-}
-
-void
-RequestRateManager::GenerateSchedule(const double request_rate)
-{
-  auto distribution = ScheduleDistribution<Distribution::POISSON>(request_rate);
-  std::mt19937 schedule_rng;
-  schedule_.clear();
-  schedule_.emplace_back(0);
-  while (schedule_.back() < *gen_duration_) {
-    std::chrono::nanoseconds next_timestamp(
-        schedule_.back() + distribution(schedule_rng));
-    schedule_.emplace_back(next_timestamp);
-  }
-  std::cout << "Request Rate: " << request_rate
-            << " inference requests per seconds" << std::endl;
 }
 
 
@@ -207,8 +276,8 @@ RequestRateManager::Infer(
       flags = 0;
       // Select one of the sequence at random for this request
       seq_id = rand() % sequence_stat_.size();
-      // Need lock to protect the order of dispatch across worker threads. This
-      // also helps in reporting the realistic latencies.
+      // Need lock to protect the order of dispatch across worker threads.
+      // This also helps in reporting the realistic latencies.
       std::lock_guard<std::mutex> guard(sequence_stat_[seq_id]->mtx_);
       if (sequence_stat_[seq_id]->remaining_queries_ == 0) {
         flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;

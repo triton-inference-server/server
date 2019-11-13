@@ -69,7 +69,7 @@ extern volatile bool early_exit;
 
 enum ProtocolType { HTTP = 0, GRPC = 1, UNKNOWN = 2 };
 enum Distribution { POISSON = 0, CONSTANT = 1 };
-enum SearchMode { LINEAR = 0, BINARY = 1 };
+enum SearchMode { LINEAR = 0, BINARY = 1, NONE = 2 };
 
 constexpr uint64_t NO_LIMIT = 0;
 
@@ -90,6 +90,15 @@ nic::Error ReadFile(const std::string& path, std::vector<char>* contents);
 //  read operation.
 nic::Error ReadTextFile(
     const std::string& path, std::vector<std::string>* contents);
+
+// Reads the time intervals in microseconds from file specified by path into
+// vector of time intervals in nanoseconds.
+// \param path The complete path to the file to be read
+// \param contents The time interval vector that will contain the data read.
+// \return error status. Returns Non-Ok if an error is encountered during
+//  read operation.
+nic::Error ReadTimeIntervalsFile(
+    const std::string& path, std::vector<std::chrono::nanoseconds>* contents);
 
 // To check whether the path points to a valid system directory
 bool IsDirectory(const std::string& path);
