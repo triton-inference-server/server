@@ -47,7 +47,7 @@ ignored. Model control requests using the :ref:`Model Control API
 error response.
 
 This model control mode is selected by specifing
--\\-allow-poll-model-repository=false when starting the inference
+-\\-model-control-mode=none when starting the inference
 server.
 
 Model Control Mode POLL
@@ -72,7 +72,7 @@ Model control requests using the :ref:`Model Control API
 error response.
 
 This model control mode is the default but can be explicitly enabled
-by specifing -\\-allow-poll-model-repository=true and by setting
+by specifing -\\-model-control-mode=poll and by setting
 -\\-repository-poll-secs to a non-zero value when starting the
 inference server.
 
@@ -120,8 +120,7 @@ status of the model control request indicates success or failure of
 the load or unload action.
 
 This model control mode is enabled by specifing
--\\-allow-poll-model-repository=false and
--\\-allow-model-control=true.
+-\\-model-control-mode=explicit.
 
 **The EXPLICIT model control mode is experimental**. The inference
 server will attempt to load and unload models using the APIs provided
