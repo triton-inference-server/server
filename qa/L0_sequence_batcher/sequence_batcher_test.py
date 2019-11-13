@@ -135,7 +135,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
                     shared_memory_ctx.register(shm_ip_handle)
                     shared_memory_ctx.register(shm_op_handle)
-                else:
+                elif _test_cuda_shared_memory:
                     shm_ip_handle = cudashm.create_shared_memory_region(
                         'ip{}{}_data'.format(i,j), input_byte_size, 0)
                     shm_op_handle = cudashm.create_shared_memory_region(
@@ -156,7 +156,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 shared_memory_ctx.unregister(shm_tmp_handle)
                 if _test_system_shared_memory:
                     shm.destroy_shared_memory_region(shm_tmp_handle)
-                else:
+                elif _test_cuda_shared_memory:
                     cudashm.destroy_shared_memory_region(shm_tmp_handle)
 
     def check_sequence(self, trial, model_name, input_dtype, correlation_id,
@@ -186,6 +186,9 @@ class SequenceBatcherTest(unittest.TestCase):
         if protocol == "streaming":
             configs.append(("localhost:8001", ProtocolType.GRPC, True))
 
+        self.assertFalse(_test_system_shared_memory and _test_cuda_shared_memory,
+                        "Cannot set both System and CUDA shared memory flags to 1")
+
         self.assertEqual(len(configs), 1)
 
         # create and register shared memory output region in advance
@@ -196,7 +199,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 shm_op_handle = shm.create_shared_memory_region("output_data", "/output", output_byte_size)
                 shared_memory_ctx.unregister(shm_op_handle)
                 shared_memory_ctx.register(shm_op_handle)
-            else:
+            elif _test_cuda_shared_memory:
                 shm_op_handle = cudashm.create_shared_memory_region("output_data", output_byte_size, 0)
                 shared_memory_ctx.unregister(shm_op_handle)
                 shared_memory_ctx.cuda_register(shm_op_handle)
@@ -239,9 +242,9 @@ class SequenceBatcherTest(unittest.TestCase):
                             shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
                             shared_memory_ctx.unregister(shm_ip_handle)
                             shared_memory_ctx.register(shm_ip_handle)
-                        else:
-                            cudashm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
+                        elif _test_cuda_shared_memory:
                             shm_ip_handle = cudashm.create_shared_memory_region("input_data", input_byte_size, 0)
+                            cudashm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
                             shared_memory_ctx.unregister(shm_ip_handle)
                             shared_memory_ctx.cuda_register(shm_ip_handle)
 
@@ -303,17 +306,13 @@ class SequenceBatcherTest(unittest.TestCase):
                                         "sequence expected greater than " + str(gt_ms) +
                                         "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
             except Exception as ex:
-                print("zz", str(ex))
                 self.add_deferred_exception(ex)
 
         if _test_system_shared_memory or _test_cuda_shared_memory:
-            shared_memory_ctx.unregister(shm_ip_handle)
             shared_memory_ctx.unregister(shm_op_handle)
             if _test_system_shared_memory:
-                shm.destroy_shared_memory_region(shm_ip_handle)
                 shm.destroy_shared_memory_region(shm_op_handle)
-            else:
-                cudashm.destroy_shared_memory_region(shm_ip_handle)
+            elif _test_cuda_shared_memory:
                 cudashm.destroy_shared_memory_region(shm_op_handle)
 
 
@@ -333,6 +332,9 @@ class SequenceBatcherTest(unittest.TestCase):
             tensor_shape = (1,)
         else:
             self.assertFalse(True, "unknown trial type: " + trial)
+
+        self.assertFalse(_test_system_shared_memory and _test_cuda_shared_memory,
+                        "Cannot set both System and CUDA shared memory flags to 1")
 
         # Can only send the request exactly once since it is a
         # sequence model with state
@@ -426,7 +428,6 @@ class SequenceBatcherTest(unittest.TestCase):
                                         "sequence expected greater than " + str(gt_ms) +
                                         "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
             except Exception as ex:
-                print("zz", str(ex))
                 self.add_deferred_exception(ex)
 
     def check_setup(self, model_name):

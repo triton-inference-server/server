@@ -90,6 +90,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
     if use_streaming:
         configs.append(("localhost:8001", ProtocolType.GRPC, True))
 
+    if TEST_CUDA_SHARED_MEMORY and TEST_SYSTEM_SHARED_MEMORY:
+        raise ValueError("Cannot set both System and CUDA shared memory flags to 1")
+
     # outputs are sum and difference of inputs so set max input
     # values so that they will not overflow the output. This
     # allows us to do an exact match. For float types use 8, 16,
