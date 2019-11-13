@@ -238,8 +238,6 @@ InferenceBackend::Run(
 Status
 InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
 {
-  static std::string warmup_data_folder = "warmup";
-
   samples->clear();
   for (const auto& warmup_setting : config_.model_warmup()) {
     LOG_VERBOSE(1) << "Generating warmup sample data for '"
@@ -265,10 +263,10 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
       }
 
       switch (input_meta.second.input_data_type_case()) {
-        case ModelWarmup_InputMetaData::InputDataTypeCase::kZeroData:
+        case ModelWarmup_Input::InputDataTypeCase::kZeroData:
           max_zero_byte_size = std::max(batch_byte_size, max_zero_byte_size);
           break;
-        case ModelWarmup_InputMetaData::InputDataTypeCase::kRandomData: {
+        case ModelWarmup_Input::InputDataTypeCase::kRandomData: {
           if (input_meta.second.data_type() == DataType::TYPE_STRING) {
             max_zero_byte_size = std::max(batch_byte_size, max_zero_byte_size);
           } else {
@@ -298,6 +296,9 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
         0 /* memory_type_id */));
     char* random_buffer =
         warmup_data.random_data_->MutableBuffer(&type, &type_id);
+    for (int64_t offset = 0; offset < max_random_byte_size; offset++) {
+      random_buffer[offset] = rand();
+    }
 
     // use batch-1 for every request, batch size is simulated by populating
     // requests for single run.
@@ -331,11 +332,11 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
         value_override->dims_ = input_meta.second.dims();
         value_override->datatype_ = input_meta.second.data_type();
         switch (input_meta.second.input_data_type_case()) {
-          case ModelWarmup_InputMetaData::InputDataTypeCase::kZeroData:
+          case ModelWarmup_Input::InputDataTypeCase::kZeroData:
             value_override->content_.assign(
                 zero_buffer, zero_buffer + batch_byte_size);
             break;
-          case ModelWarmup_InputMetaData::InputDataTypeCase::kRandomData: {
+          case ModelWarmup_Input::InputDataTypeCase::kRandomData: {
             if (input_meta.second.data_type() == DataType::TYPE_STRING) {
               value_override->content_.assign(
                   zero_buffer, zero_buffer + batch_byte_size);
@@ -345,10 +346,10 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
             }
             break;
           }
-          case ModelWarmup_InputMetaData::InputDataTypeCase::kInputDataFile: {
+          case ModelWarmup_Input::InputDataTypeCase::kInputDataFile: {
             std::string input_data;
             RETURN_IF_ERROR(ReadTextFile(
-                JoinPath({model_dir_, warmup_data_folder,
+                JoinPath({model_dir_, kWarmupDataFolder,
                           input_meta.second.input_data_file()}),
                 &input_data));
 
@@ -392,10 +393,10 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
 
       const char* allocated_ptr;
       switch (input_meta.second.input_data_type_case()) {
-        case ModelWarmup_InputMetaData::InputDataTypeCase::kZeroData: 
+        case ModelWarmup_Input::InputDataTypeCase::kZeroData: 
           allocated_ptr = zero_buffer;
           break;
-        case ModelWarmup_InputMetaData::InputDataTypeCase::kRandomData: {
+        case ModelWarmup_Input::InputDataTypeCase::kRandomData: {
           if (input_meta.second.data_type() == DataType::TYPE_STRING) {
             allocated_ptr = zero_buffer;
           } else {
@@ -403,12 +404,12 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
           }
           break;
         }
-        case ModelWarmup_InputMetaData::InputDataTypeCase::kInputDataFile: {
+        case ModelWarmup_Input::InputDataTypeCase::kInputDataFile: {
           // For data provided from file, we can set buffer in first pass
           warmup_data.provided_data_.emplace_back();
           auto& input_data = warmup_data.provided_data_.back();
           RETURN_IF_ERROR(ReadTextFile(
-              JoinPath({model_dir_, warmup_data_folder,
+              JoinPath({model_dir_, kWarmupDataFolder,
                         input_meta.second.input_data_file()}),
               &input_data));
 

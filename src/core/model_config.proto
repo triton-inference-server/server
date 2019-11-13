@@ -771,11 +771,16 @@ message ModelParameter
 //@@
 message ModelWarmup
 {
-  message InputMetaData
+  //@@
+  //@@  .. cpp:var:: message Input
+  //@@
+  //@@     Meta data associated with an input.
+  //@@
+  message Input
   {
-    //@@  .. cpp:var:: DataType data_type
+    //@@    .. cpp:var:: DataType data_type
     //@@
-    //@@     The data-type of the input.
+    //@@       The data-type of the input.
     //@@
     DataType data_type = 1;
 
@@ -785,37 +790,37 @@ message ModelWarmup
     //@@
     repeated int64 dims = 2;
 
-    //@@  .. cpp:var:: oneof input_data_type
+    //@@    .. cpp:var:: oneof input_data_type
     //@@
-    //@@     Specify how the input data is generated. If the input has STRING
-    //@@     data type and 'random_data' is set, the data generation will fall
-    //@@     back to 'zero_data'.
+    //@@       Specify how the input data is generated. If the input has STRING
+    //@@       data type and 'random_data' is set, the data generation will fall
+    //@@       back to 'zero_data'.
     //@@
     oneof input_data_type
     {
       //@@
-      //@@  .. cpp:var:: bool zero_data
+      //@@    .. cpp:var:: bool zero_data
       //@@
-      //@@     The identifier for using zeros as input data. Note that the
-      //@@     field data will not be checked, instead, zero data will be used
-      //@@     as long as the field is set.
+      //@@       The identifier for using zeros as input data. Note that the
+      //@@       value of 'zero_data' will not be checked, instead, zero data
+      //@@       will be used as long as the field is set.
       //@@
       bool zero_data = 3;
 
       //@@
-      //@@  .. cpp:var:: bool random_data
+      //@@    .. cpp:var:: bool random_data
       //@@
-      //@@     The identifier for using random data as input data. Note that
-      //@@     the field data will not be checked, instead, random data will
-      //@@     be used as long as the field is set.
+      //@@       The identifier for using random data as input data. Note that
+      //@@       the value of 'random_data' will not be checked, instead,
+      //@@       random data will be used as long as the field is set.
       //@@
       bool random_data = 4;
 
-      //@@  .. cpp:var:: string input_data_file
+      //@@    .. cpp:var:: string input_data_file
       //@@
-      //@@     The file whose content will be used as raw input data in
-      //@@     row-major order. The file must be provided in a sub-directory
-      //@@     'warmup' under the model directory.
+      //@@       The file whose content will be used as raw input data in
+      //@@       row-major order. The file must be provided in a sub-directory
+      //@@       'warmup' under the model directory.
       //@@
       string input_data_file = 5;
     }
@@ -836,12 +841,12 @@ message ModelWarmup
   //@@
   uint32 batch_size = 2;
 
-  //@@  .. cpp:var:: map<string, string> inputs
+  //@@  .. cpp:var:: map<string, Input> inputs
   //@@
   //@@     The warmup meta data associated with every model input, including
   //@@     control tensors.
   //@@
-  map<string, InputMetaData> inputs = 3;
+  map<string, Input> inputs = 3;
 }
 
 //@@
