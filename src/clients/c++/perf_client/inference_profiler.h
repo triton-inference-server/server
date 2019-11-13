@@ -172,7 +172,12 @@ class InferenceProfiler {
   {
     nic::Error err;
     bool meets_threshold;
-    if (search_mode == SearchMode::LINEAR) {
+    if (search_mode == SearchMode::NONE) {
+      err = Profile(summary, &meets_threshold);
+      if (!err.IsOk()) {
+        return err;
+      }
+    } else if (search_mode == SearchMode::LINEAR) {
       T current_value = start;
       do {
         err = Profile(current_value, summary, &meets_threshold);
@@ -262,11 +267,23 @@ class InferenceProfiler {
       const double request_rate, std::vector<PerfStatus>& summary,
       bool* meets_threshold);
 
+  /// Measures throughput and latencies for custom load without controling
+  /// request rate nor concurrency. Requires load manager to be loaded with
+  /// a file specifying the time intervals.
+  /// \param summary Appends the measurements summary at the end of this list.
+  /// \param meets_threshold Returns whether the measurement met the threshold.
+  /// \return Error object indicating success
+  /// or failure.
+  nic::Error Profile(std::vector<PerfStatus>& summary, bool* meets_threshold);
+
   /// A helper function for profiling functions.
+  /// \param clean_starts Whether or not to reset load cycle with every
+  /// measurement trials.
   /// \param status_summary Returns the summary of the measurement.
   /// \param is_stable Returns whether the measurement stabilized or not.
   /// \return Error object indicating success or failure.
-  nic::Error ProfileHelper(PerfStatus& status_summary, bool* is_stable);
+  nic::Error ProfileHelper(
+      const bool clean_starts, PerfStatus& status_summary, bool* is_stable);
 
   /// Helper function to perform measurement.
   /// \param status_summary The summary of this measurement.
