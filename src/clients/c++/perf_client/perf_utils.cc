@@ -96,6 +96,32 @@ ReadTextFile(const std::string& path, std::vector<std::string>* contents)
   return nic::Error::Success;
 }
 
+nic::Error
+ReadTimeIntervalsFile(
+    const std::string& path, std::vector<std::chrono::nanoseconds>* contents)
+{
+  std::ifstream in(path);
+  if (!in) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "failed to open file '" + path + "'");
+  }
+
+  std::string current_string;
+  while (std::getline(in, current_string)) {
+    std::chrono::nanoseconds curent_time_interval_ns(
+        std::stol(current_string) * 1000);
+    contents->push_back(curent_time_interval_ns);
+  }
+  in.close();
+
+  if (contents->size() == 0) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG, "file '" + path + "' is empty");
+  }
+  return nic::Error::Success;
+}
+
 bool
 IsDirectory(const std::string& path)
 {

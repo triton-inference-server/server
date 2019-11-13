@@ -47,6 +47,30 @@ class LoadManager {
         "changing concurrency level is not supported in this load manager.");
   }
 
+  /// Initializes the load manager with the provided file containing request
+  /// intervals
+  /// \return Error object indicating success or failure.
+  virtual nic::Error InitCustomIntervals()
+  {
+    return nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "initializing custom intervals is not supported for this load "
+        "manager.");
+  }
+
+  /// Computes the request rate from the time interval file. Fails with an error
+  /// if the file is not present or is empty.
+  /// \param request_rate Returns request rate as computed from the time
+  /// interval file.
+  /// \return Error object indicating success or failure.
+  virtual nic::Error GetCustomRequestRate(double* request_rate)
+  {
+    return nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "obtaining request rate from custom time interval file is not "
+        "supported for this load manager");
+  }
+
   /// Adjusts the rate of issuing requests to be the same as 'request_rate'
   /// \param request_rate The rate at which requests must be issued to the
   /// server.
@@ -56,6 +80,15 @@ class LoadManager {
     return nic::Error(
         ni::RequestStatusCode::INTERNAL,
         "changing request rate is not supported in this load manager.");
+  }
+
+  /// Resets all worker thread states to beginning of schedule.
+  /// \return Error object indicating success or failure.
+  virtual nic::Error ResetWorkers()
+  {
+    return nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "resetting worker threads not supported for this load manager.");
   }
 
   /// Check if the load manager is working as expected.
