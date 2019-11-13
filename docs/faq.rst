@@ -62,6 +62,33 @@ non-Docker environments. For more details, see
 then run the inference server outside of Docker as described in
 :ref:`section-running-the-inference-server-without-docker`.
 
+Do you provide client libraries for languages other than C++ and Python?
+------------------------------------------------------------------------
+
+We provide a C++ and Python client library to make it easy for users
+to write client applications that communicate with TRTIS. We chose
+those languages because they were likely to be popular and performant
+in the ML inference space, but in the future we could possibly do
+another language if there was a need.
+
+We provide the GRPC API as a way to generate your own client library
+for a large number of languages. By following the official GRPC
+documentation and using src/core/grpc_service.proto you can generate
+language bindings for all the languages you mention, and many more. We
+provide two examples of this:
+
+- Go:
+  `https://github.com/NVIDIA/tensorrt-inference-server/tree/master/src/clients/go`_.
+
+- Python:
+  `https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/grpc_image_client.py`_.
+
+In general the client libraries (and client examples) are meant to be
+just that, examples. We feel the client libraries are well written and
+well tested, but they are not meant to serve every possible use
+case. In some cases you may want to develop your own customized
+library to suit your specific needs.
+
 How would you use TensorRT Inference Server within the AWS environment?
 -----------------------------------------------------------------------
 
