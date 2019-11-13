@@ -982,13 +982,13 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
                 trtserver_.get(), trace, request_provider, allocator_,
                 &state->alloc_payload_ /* response_allocator_userp */,
                 InferComplete, reinterpret_cast<void*>(state));
-
-            // The request provider can be deleted immediately after the
-            // ServerInferAsync call returns.
-            TRTSERVER_InferenceRequestProviderDelete(request_provider);
           }
         }
       }
+
+      // The request provider can be deleted before ServerInferAsync
+      // callback completes.
+      TRTSERVER_InferenceRequestProviderDelete(request_provider);
     }
 
     // If not error then state->step_ == ISSUED and inference request
@@ -1287,13 +1287,13 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
                 trtserver_.get(), trace, request_provider, allocator_,
                 &state->alloc_payload_ /* response_allocator_userp */,
                 StreamInferComplete, reinterpret_cast<void*>(state));
-
-            // The request provider can be deleted immediately after the
-            // ServerInferAsync call returns.
-            TRTSERVER_InferenceRequestProviderDelete(request_provider);
           }
         }
       }
+
+      // The request provider can be deleted before ServerInferAsync
+      // callback completes.
+      TRTSERVER_InferenceRequestProviderDelete(request_provider);
     }
 
     // If there was not an error in issuing the 'state' request then

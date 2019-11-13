@@ -1085,12 +1085,12 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
         delete infer_request;
         infer_request = nullptr;
       }
-
-      // The request provider can be deleted immediately after the
-      // ServerInferAsync call returns.
-      TRTSERVER_InferenceRequestProviderDelete(request_provider);
     }
   }
+
+  // The request provider can be deleted before ServerInferAsync
+  // callback completes.
+  TRTSERVER_InferenceRequestProviderDelete(request_provider);
 
   if (err != nullptr) {
     RequestStatus request_status;
