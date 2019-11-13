@@ -204,16 +204,17 @@ InferComplete(
 
 TRTSERVER_Error*
 ParseModelConfig(
-    const ni::ModelConfig& config, bool* is_int, bool* is_torch_model)
+    const ni::ModelConfig& config, ni::DataType* dtype, bool* is_torch_model)
 {
   auto data_type = ni::TYPE_INVALID;
   for (const auto& input : config.input()) {
     if ((input.data_type() != ni::TYPE_INT32) &&
-        (input.data_type() != ni::TYPE_FP32)) {
+        (input.data_type() != ni::TYPE_FP32) &&
+        (input.data_type() != ni::TYPE_STRING)) {
       return TRTSERVER_ErrorNew(
           TRTSERVER_ERROR_UNSUPPORTED,
-          "IO test utility only supports model with data type INT32 or "
-          "FP32");
+          "IO test utility only supports model with data type INT32, "
+          "FP32 or STRING");
     }
     if (data_type == ni::TYPE_INVALID) {
       data_type = input.data_type();
@@ -225,11 +226,12 @@ ParseModelConfig(
   }
   for (const auto& output : config.output()) {
     if ((output.data_type() != ni::TYPE_INT32) &&
-        (output.data_type() != ni::TYPE_FP32)) {
+        (output.data_type() != ni::TYPE_FP32) &&
+        (output.data_type() != ni::TYPE_STRING)) {
       return TRTSERVER_ErrorNew(
           TRTSERVER_ERROR_UNSUPPORTED,
-          "IO test utility only supports model with data type INT32 or "
-          "FP32");
+          "IO test utility only supports model with data type INT32, "
+          "FP32 or STRING");
     } else if (output.data_type() != data_type) {
       auto err_str = "the inputs and outputs of '" + config.name() +
                      "' model must have the same data type";
@@ -237,7 +239,7 @@ ParseModelConfig(
     }
   }
 
-  *is_int = (data_type == ni::TYPE_INT32);
+  *dtype = data_type;
   *is_torch_model = (config.platform() == "pytorch_libtorch");
   return nullptr;
 }
@@ -253,6 +255,28 @@ GenerateInputData(
     ((T*)input0_data->data())[i] = i;
     ((T*)input1_data->data())[i] = 1;
   }
+}
+
+void
+GenerateStringInputData(
+    std::vector<char>* input0_data, std::vector<char>* input1_data)
+{
+  std::string input0_str = "";
+  std::string input1_str = "";
+  for (size_t i = 0; i < 16; ++i) {
+    std::string i0 = std::to_string(i);
+    uint32_t i0_len = i0.size();
+    input0_str.append(reinterpret_cast<const char*>(&i0_len), sizeof(uint32_t));
+    input0_str.append(i0);
+    std::string i1 = std::to_string(i);
+    uint32_t i1_len = i0.size();
+    input0_str.append(reinterpret_cast<const char*>(&i1_len), sizeof(uint32_t));
+    input1_str.append(i1);
+  }
+  std::copy(
+      input0_str.begin(), input0_str.end(), std::back_inserter(*input0_data));
+  std::copy(
+      input1_str.begin(), input1_str.end(), std::back_inserter(*input1_data));
 }
 
 template <typename T>
@@ -272,6 +296,31 @@ CompareResult(
       FAIL("incorrect sum in " + output0_name);
     }
     if ((((T*)input0)[i] - ((T*)input1)[i]) != ((T*)output1)[i]) {
+      FAIL("incorrect difference in " + output1_name);
+    }
+  }
+}
+
+void
+CompareStringResult(
+    const std::string& output0_name, const std::string& output1_name,
+    const void* input0, const void* input1, const void* output0,
+    const void* output1)
+{
+  for (size_t i = 0; i < 16; ++i) {
+    LOG_INFO << ((std::string*)input0)[i] << " + " << ((std::string*)input1)[i]
+             << " = " << ((std::string*)output0)[i];
+    LOG_INFO << ((std::string*)input0)[i] << " - " << ((std::string*)input1)[i]
+             << " = " << ((std::string*)output1)[i];
+
+    if ((std::stoi(((std::string*)input0)[i]) +
+         std::stoi(((std::string*)input1)[i])) !=
+        std::stoi(((std::string*)output0)[i])) {
+      FAIL("incorrect sum in " + output0_name);
+    }
+    if ((std::stoi(((std::string*)input0)[i]) -
+         std::stoi(((std::string*)input1)[i])) !=
+        std::stoi(((std::string*)output1)[i])) {
       FAIL("incorrect difference in " + output1_name);
     }
   }
@@ -417,7 +466,7 @@ main(int argc, char** argv)
 
   // Wait for the model to become available.
   bool is_torch_model = false;
-  bool is_int = true;
+  ni::DataType dtype = ni::TYPE_INT32;
   while (true) {
     TRTSERVER_Protobuf* model_status_protobuf;
     FAIL_IF_ERR(
@@ -453,7 +502,7 @@ main(int argc, char** argv)
              << ni::ModelReadyState_Name(vitr->second.ready_state());
     if (vitr->second.ready_state() == ni::ModelReadyState::MODEL_READY) {
       FAIL_IF_ERR(
-          ParseModelConfig(itr->second.config(), &is_int, &is_torch_model),
+          ParseModelConfig(itr->second.config(), &dtype, &is_torch_model),
           "parsing model config");
       break;
     }
@@ -503,10 +552,12 @@ main(int argc, char** argv)
   // to unique integers and the second to all ones.
   std::vector<char> input0_data;
   std::vector<char> input1_data;
-  if (is_int) {
+  if (dtype == ni::TYPE_INT32) {
     GenerateInputData<int32_t>(&input0_data, &input1_data);
-  } else {
+  } else if (dtype == ni::TYPE_FP32) {
     GenerateInputData<float>(&input0_data, &input1_data);
+  } else {
+    GenerateStringInputData(&input0_data, &input1_data);
   }
 
   size_t input0_size = input0_data.size();
@@ -685,12 +736,16 @@ main(int argc, char** argv)
     output1_result = &output1_data[0];
   }
 
-  if (is_int) {
+  if (dtype == ni::TYPE_INT32) {
     CompareResult<int32_t>(
         output0->name(), output1->name(), &input0_data[0], &input1_data[0],
         output0_result, output1_result);
-  } else {
+  } else if (dtype == ni::TYPE_FP32) {
     CompareResult<float>(
+        output0->name(), output1->name(), &input0_data[0], &input1_data[0],
+        output0_result, output1_result);
+  } else {
+    CompareStringResult(
         output0->name(), output1->name(), &input0_data[0], &input1_data[0],
         output0_result, output1_result);
   }
