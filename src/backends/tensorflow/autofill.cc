@@ -273,11 +273,17 @@ AutoFillSavedModel::Create(
   // directory...
   std::set<std::string> savedmodel_dirs;
   RETURN_IF_ERROR(GetDirectorySubdirs(version_path, &savedmodel_dirs));
-  if (savedmodel_dirs.size() != 1) {
+  if (savedmodel_dirs.size() == 0) {
     return Status(
         RequestStatusCode::INTERNAL,
         "unable to autofill for '" + model_name +
             "', unable to find savedmodel directory");
+  } else if (savedmodel_dirs.size() > 1) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "expects exactly 1 sub-directory in the version directory. Instead "
+        "found: " +
+            std::to_string(savedmodel_dirs.size()) + " sub-directories.");
   }
 
   const std::string savedmodel_dir = *(savedmodel_dirs.begin());

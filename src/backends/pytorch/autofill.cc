@@ -74,10 +74,15 @@ AutoFillPyTorch::Create(
   // There must be a single pt model within the version directory...
   std::set<std::string> pytorch_files;
   RETURN_IF_ERROR(GetDirectoryFiles(version_path, &pytorch_files));
-  if (pytorch_files.size() != 1) {
+  if (pytorch_files.size() == 0) {
     return Status(
         RequestStatusCode::INTERNAL,
         "unable to autofill for '" + model_name + "', unable to find pt file");
+  } else if (pytorch_files.size() > 1) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "expects exactly 1 file in the version directory. Instead found: " +
+            std::to_string(pytorch_files.size()) + " files.");
   }
 
   const std::string pt_file = *(pytorch_files.begin());

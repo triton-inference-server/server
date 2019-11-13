@@ -332,10 +332,15 @@ AutoFillOnnx::Create(
     // There must be a single onnx file within the version directory...
     std::set<std::string> onnx_files;
     RETURN_IF_ERROR(GetDirectoryFiles(version_path, &onnx_files));
-    if (onnx_files.size() != 1) {
+    if (onnx_files.size() == 0) {
       return Status(
           RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
                                            "', unable to find onnx file");
+    } else if (onnx_files.size() > 1) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "expects exactly 1 file in the version directory. Instead found: " +
+              std::to_string(onnx_files.size()) + " files.");
     }
 
     const std::string onnx_file = *(onnx_files.begin());

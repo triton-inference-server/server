@@ -437,10 +437,15 @@ AutoFillPlan::Create(
   // There must be a single plan file within the version directory...
   std::set<std::string> plan_files;
   RETURN_IF_ERROR(GetDirectoryFiles(version_path, &plan_files));
-  if (plan_files.size() != 1) {
+  if (plan_files.size() == 0) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
                                          "', unable to find plan file");
+  } else if (plan_files.size() > 1) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "expects exactly 1 file in the version directory. Instead found: " +
+            std::to_string(plan_files.size()) + " files.");
   }
 
   const std::string plan_file = *(plan_files.begin());

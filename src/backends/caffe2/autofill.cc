@@ -78,12 +78,17 @@ AutoFillNetDef::Create(
   const std::string expected_init_filename =
       std::string(kCaffe2NetDefInitFilenamePrefix) +
       std::string(kCaffe2NetDefFilename);
-  if (netdef_files.size() != 2) {
+  if (netdef_files.size() < 2) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
                                          "', unable to find netdef files: '" +
                                          kCaffe2NetDefFilename + "' and '" +
                                          expected_init_filename + "'");
+  } else if (netdef_files.size() > 2) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "expects exactly 2 files in the version directory. Instead found: " +
+            std::to_string(netdef_files.size()) + " files.");
   }
 
   const std::string netdef0_file = *(netdef_files.begin());
