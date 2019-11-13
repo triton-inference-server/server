@@ -166,9 +166,11 @@ class SequenceBatchScheduler : public Scheduler {
     // are active in the backend.
     int32_t max_active_slot_;
 
-    // Is each batch slot active or not. An empty queue for a batch
-    // slot does not mean its empty... it could just not have any
-    // requests pending at the moment.
+    // Is each batch slot active or not? A zero value indicates
+    // inactive, a non-zero value indicates active and is the
+    // correlation ID of the sequence active in the slot. An empty
+    // queue for a batch slot does not mean its empty... it could just
+    // not have any requests pending at the moment.
     std::vector<CorrelationID> slot_correlation_ids_;
 
     // The control values, delivered as input tensors, that should be
@@ -184,6 +186,17 @@ class SequenceBatchScheduler : public Scheduler {
         continue_input_overrides_;
     std::shared_ptr<InferRequestProvider::InputOverrideMap>
         notready_input_overrides_;
+
+    // The name of the model input to which each slots correlation ID
+    // should be delivered. Empty if the model does not specify the
+    // CONTROL_SEQUENCE_CORRID control.
+    std::string correlation_id_tensor_;
+
+    // For each slot the override entry that provides the correlation
+    // ID for that slot. Empty if model does not specify the
+    // CONTROL_SEQUENCE_CORRID control.
+    std::vector<std::shared_ptr<InferRequestProvider::InputOverride>>
+        slot_corrid_overrides_;
   };
 
  private:

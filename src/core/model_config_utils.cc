@@ -58,7 +58,7 @@ GetModelVersionFromPath(const std::string& path, int64_t* version)
 }
 
 Status
-GetSequenceControlProperties(
+GetBooleanSequenceControlProperties(
     const ModelSequenceBatching& batcher, const std::string& model_name,
     const ModelSequenceBatching::Control::Kind control_kind,
     const bool required, std::string* tensor_name, DataType* tensor_datatype,
@@ -157,6 +157,86 @@ GetSequenceControlProperties(
           if (fp32_true_value != nullptr) {
             *fp32_true_value = c.fp32_false_true(1);
           }
+        }
+      }
+    }
+  }
+
+  if (!seen_control) {
+    if (required) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "sequence batching control tensor must specify a " +
+              ModelSequenceBatching_Control_Kind_Name(control_kind) +
+              " value for " + model_name);
+    }
+
+    tensor_name->clear();
+  }
+
+  return Status::Success;
+}
+
+Status
+GetTypedSequenceControlProperties(
+    const ModelSequenceBatching& batcher, const std::string& model_name,
+    const ModelSequenceBatching::Control::Kind control_kind,
+    const bool required, std::string* tensor_name, DataType* tensor_datatype)
+{
+  // Make sure same tensor is not configured for multiple controls
+  std::set<std::string> seen_tensors;
+
+  // Make sure the control kind is not mentioned multiple times.
+  bool seen_control = false;
+
+  for (const auto& control_input : batcher.control_input()) {
+    if (control_input.name().empty()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "sequence batching control tensor must have a name for " +
+              model_name);
+    }
+
+    if (seen_tensors.find(control_input.name()) != seen_tensors.end()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "sequence batching control tensor '" + control_input.name() +
+              "' is specified for multiple control kinds for " + model_name);
+    }
+
+    seen_tensors.insert(control_input.name());
+
+    for (const auto& c : control_input.control()) {
+      if (c.kind() == control_kind) {
+        if (seen_control) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "sequence batching specifies multiple " +
+                  ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                  " tensors for " + model_name);
+        }
+
+        *tensor_name = control_input.name();
+        if (tensor_datatype != nullptr) {
+          switch (control_kind) {
+            case ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID:
+              *tensor_datatype = DataType::TYPE_UINT64;
+              break;
+            default:
+              *tensor_datatype = DataType::TYPE_INVALID;
+              break;
+          }
+        }
+
+        seen_control = true;
+
+        if ((c.int32_false_true_size() > 0) || (c.fp32_false_true_size() > 0)) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "sequence batching must not specify either 'int32_false_true' "
+              "nor 'fp32_false_true' for " +
+                  ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                  " for " + model_name);
         }
       }
     }
@@ -438,21 +518,25 @@ ValidateModelConfig(
 
     // Check controls...
     std::string tensor_name;
-    RETURN_IF_ERROR(GetSequenceControlProperties(
+    RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         batcher, config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
         nullptr));
-    RETURN_IF_ERROR(GetSequenceControlProperties(
+    RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         batcher, config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
         false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
         nullptr));
-    RETURN_IF_ERROR(GetSequenceControlProperties(
+    RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         batcher, config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
         nullptr));
+    RETURN_IF_ERROR(GetTypedSequenceControlProperties(
+        batcher, config.name(),
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
+        false /* required */, &tensor_name, nullptr));
   }
 
   // If ensemble scheduling is specified, validate it.
