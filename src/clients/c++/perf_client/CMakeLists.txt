@@ -40,6 +40,7 @@ set(
   load_manager.cc
   concurrency_manager.cc
   request_rate_manager.cc
+  custom_load_manager.cc
 )
 
 set(
@@ -50,6 +51,7 @@ set(
   load_manager.h
   concurrency_manager.h
   request_rate_manager.h
+  custom_load_manager.h
 )
 
 add_executable(perf_client

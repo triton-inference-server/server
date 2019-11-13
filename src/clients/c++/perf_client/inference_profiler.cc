@@ -267,7 +267,8 @@ InferenceProfiler::Profile(
   bool is_stable = false;
   *meets_threshold = true;
 
-  RETURN_IF_ERROR(manager_->ChangeConcurrencyLevel(concurrent_request_count));
+  RETURN_IF_ERROR(dynamic_cast<ConcurrencyManager*>(manager_.get())
+                      ->ChangeConcurrencyLevel(concurrent_request_count));
 
   err = ProfileHelper(false /* clean_starts */, status_summary, &is_stable);
   if (err.IsOk()) {
@@ -311,7 +312,8 @@ InferenceProfiler::Profile(
   bool is_stable = false;
   *meets_threshold = true;
 
-  RETURN_IF_ERROR(manager_->ChangeRequestRate(request_rate));
+  RETURN_IF_ERROR(dynamic_cast<RequestRateManager*>(manager_.get())
+                      ->ChangeRequestRate(request_rate));
 
   err = ProfileHelper(false /*clean_starts*/, status_summary, &is_stable);
   if (err.IsOk()) {
@@ -346,8 +348,10 @@ InferenceProfiler::Profile(
   nic::Error err;
   PerfStatus status_summary;
 
-  RETURN_IF_ERROR(manager_->InitCustomIntervals());
-  RETURN_IF_ERROR(manager_->GetCustomRequestRate(&status_summary.request_rate));
+  RETURN_IF_ERROR(
+      dynamic_cast<CustomLoadManager*>(manager_.get())->InitCustomIntervals());
+  RETURN_IF_ERROR(dynamic_cast<CustomLoadManager*>(manager_.get())
+                      ->GetCustomRequestRate(&status_summary.request_rate));
 
   bool is_stable = false;
   *meets_threshold = true;

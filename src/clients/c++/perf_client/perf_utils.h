@@ -68,7 +68,7 @@ extern volatile bool early_exit;
   }
 
 enum ProtocolType { HTTP = 0, GRPC = 1, UNKNOWN = 2 };
-enum Distribution { POISSON = 0, CONSTANT = 1 };
+enum Distribution { POISSON = 0, CONSTANT = 1, CUSTOM = 2 };
 enum SearchMode { LINEAR = 0, BINARY = 1, NONE = 2 };
 
 constexpr uint64_t NO_LIMIT = 0;
