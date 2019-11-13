@@ -56,6 +56,7 @@ SKIP_PATHS = ('builddir',
               'qa/L0_model_config/autofill_noplatform_success',
               'qa/L0_perf_nomodel/baseline',
               'qa/L0_perf_nomodel/legacy_baseline',
+              'qa/L0_warmup/raw_mug_data',
               'tools/patch',
               'VERSION')
 

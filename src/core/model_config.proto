@@ -775,6 +775,91 @@ message ModelParameter
 }
 
 //@@
+//@@.. cpp:var:: message ModelWarmup
+//@@
+//@@   Settings used to construct the request sample for model warmup.
+//@@
+message ModelWarmup
+{
+  //@@
+  //@@  .. cpp:var:: message Input
+  //@@
+  //@@     Meta data associated with an input.
+  //@@
+  message Input
+  {
+    //@@    .. cpp:var:: DataType data_type
+    //@@
+    //@@       The data-type of the input.
+    //@@
+    DataType data_type = 1;
+
+    //@@    .. cpp:var:: int64 dims (repeated)
+    //@@
+    //@@       The shape of the input tensor, not including the batch dimension.
+    //@@
+    repeated int64 dims = 2;
+
+    //@@    .. cpp:var:: oneof input_data_type
+    //@@
+    //@@       Specify how the input data is generated. If the input has STRING
+    //@@       data type and 'random_data' is set, the data generation will fall
+    //@@       back to 'zero_data'.
+    //@@
+    oneof input_data_type
+    {
+      //@@
+      //@@    .. cpp:var:: bool zero_data
+      //@@
+      //@@       The identifier for using zeros as input data. Note that the
+      //@@       value of 'zero_data' will not be checked, instead, zero data
+      //@@       will be used as long as the field is set.
+      //@@
+      bool zero_data = 3;
+
+      //@@
+      //@@    .. cpp:var:: bool random_data
+      //@@
+      //@@       The identifier for using random data as input data. Note that
+      //@@       the value of 'random_data' will not be checked, instead,
+      //@@       random data will be used as long as the field is set.
+      //@@
+      bool random_data = 4;
+
+      //@@    .. cpp:var:: string input_data_file
+      //@@
+      //@@       The file whose content will be used as raw input data in
+      //@@       row-major order. The file must be provided in a sub-directory
+      //@@       'warmup' under the model directory.
+      //@@
+      string input_data_file = 5;
+    }
+  }
+
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the request sample.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: uint32 batch_size
+  //@@
+  //@@     The batch size of the inference request. This must be >= 1. For
+  //@@     models that don't support batching, batch_size must be 1. If
+  //@@     batch_size > 1, the 'inputs' specified below will be duplicated to
+  //@@     match the batch size requested.
+  //@@
+  uint32 batch_size = 2;
+
+  //@@  .. cpp:var:: map<string, Input> inputs
+  //@@
+  //@@     The warmup meta data associated with every model input, including
+  //@@     control tensors.
+  //@@
+  map<string, Input> inputs = 3;
+}
+
+//@@
 //@@.. cpp:var:: message ModelConfig
 //@@
 //@@   A model configuration.
@@ -919,4 +1004,14 @@ message ModelConfig
   //@@     are made available to custom backends.
   //@@
   map<string, ModelParameter> parameters = 14;
+
+  //@@  .. cpp:var:: ModelWarmup model_warmup (repeated)
+  //@@
+  //@@     Warmup setting of this model. If specified, all instances
+  //@@     will be run with the request samples in sequence before
+  //@@     serving the model.
+  //@@     This field can only be specified if the model is not an ensemble
+  //@@     model.
+  //@@
+  repeated ModelWarmup model_warmup = 16;
 }

@@ -41,8 +41,9 @@ namespace nvidia { namespace inferenceserver {
 
 DynamicBatchScheduler::DynamicBatchScheduler(
     const ModelConfig& config, const uint32_t runner_cnt,
-    StandardInitFunc OnInit, StandardRunFunc OnSchedule)
-    : OnInit_(OnInit), OnSchedule_(OnSchedule),
+    StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
+    StandardRunFunc OnSchedule)
+    : OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
       scheduler_thread_cnt_(runner_cnt), idle_scheduler_thread_cnt_(0),
       pending_batch_size_(0), pending_batch_queue_cnt_(0)
 {
@@ -79,11 +80,11 @@ DynamicBatchScheduler::DynamicBatchScheduler(
 Status
 DynamicBatchScheduler::Create(
     const ModelConfig& config, const uint32_t runner_cnt,
-    StandardInitFunc OnInit, StandardRunFunc OnSchedule,
-    std::unique_ptr<Scheduler>* scheduler)
+    StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
+    StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler)
 {
-  DynamicBatchScheduler* dyna_sched =
-      new DynamicBatchScheduler(config, runner_cnt, OnInit, OnSchedule);
+  DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
+      config, runner_cnt, OnInit, OnWarmup, OnSchedule);
   std::unique_ptr<DynamicBatchScheduler> sched(dyna_sched);
 
   // Create one scheduler thread for each requested runner. Associate
@@ -171,10 +172,16 @@ DynamicBatchScheduler::SchedulerThread(
   // Initialize using the thread. If error then just exit this thread
   // now... that means the corresponding model instance will not have
   // any runner and so will not get used for execution.
-  Status init_status = OnInit_(runner_id);
-  if (!init_status.IsOk()) {
+  Status startup_status = OnInit_(runner_id);
+
+  // Run warmup function if initialization succeed.
+  if (startup_status.IsOk()) {
+    startup_status = OnWarmup_(runner_id);
+  }
+
+  if (!startup_status.IsOk()) {
     LOG_ERROR << "Initialization failed for dynamic-batch scheduler thread "
-              << runner_id << ": " << init_status.Message();
+              << runner_id << ": " << startup_status.Message();
     is_initialized->set_value(false);
     return;
   } else {

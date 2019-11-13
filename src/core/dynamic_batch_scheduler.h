@@ -45,8 +45,8 @@ class DynamicBatchScheduler : public Scheduler {
   // function to call when a request is scheduled.
   static Status Create(
       const ModelConfig& config, const uint32_t runner_cnt,
-      StandardInitFunc OnInit, StandardRunFunc OnSchedule,
-      std::unique_ptr<Scheduler>* scheduler);
+      StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
+      StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler);
 
   ~DynamicBatchScheduler();
 
@@ -60,7 +60,8 @@ class DynamicBatchScheduler : public Scheduler {
  private:
   DynamicBatchScheduler(
       const ModelConfig& config, const uint32_t runner_cnt,
-      StandardInitFunc OnInit, StandardRunFunc OnSchedule);
+      StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
+      StandardRunFunc OnSchedule);
   void SchedulerThread(
       const uint32_t runner_id, const int nice,
       std::promise<bool>* is_initialized);
@@ -70,6 +71,9 @@ class DynamicBatchScheduler : public Scheduler {
 
   // Function the scheduler will call to initialize a runner.
   const StandardInitFunc OnInit_;
+
+  // Function the scheduler will call to warmup a runner.
+  const StandardWarmupFunc OnWarmup_;
 
   // Function the scheduler will call to schedule a payload(s) for
   // execution.
