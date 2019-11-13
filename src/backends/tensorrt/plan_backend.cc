@@ -572,19 +572,42 @@ PlanBackend::Context::InitializeSequenceControlInputBindings(
     const ModelConfig& config, const bool support_batching)
 {
   if (config.has_sequence_batching()) {
-    std::vector<ModelSequenceBatching::Control::Kind> kinds{
+    std::vector<ModelSequenceBatching::Control::Kind> boolean_kinds{
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY};
 
-    for (const ModelSequenceBatching::Control::Kind control_kind : kinds) {
+    for (const ModelSequenceBatching::Control::Kind control_kind :
+         boolean_kinds) {
       const bool required = false;
 
       std::string tensor_name;
       DataType tensor_datatype;
-      RETURN_IF_ERROR(GetSequenceControlProperties(
+      RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
           config.sequence_batching(), config.name(), control_kind, required,
           &tensor_name, &tensor_datatype, nullptr, nullptr, nullptr, nullptr));
+      if (!tensor_name.empty()) {
+        // Control tensors must have shape [1].
+        DimsList dims;
+        dims.Add(1);
+
+        RETURN_IF_ERROR(InitializeInputBinding(
+            tensor_name, tensor_datatype, dims, support_batching, true));
+      }
+    }
+
+    std::vector<ModelSequenceBatching::Control::Kind> typdef_kinds{
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID};
+
+    for (const ModelSequenceBatching::Control::Kind control_kind :
+         typdef_kinds) {
+      const bool required = false;
+
+      std::string tensor_name;
+      DataType tensor_datatype;
+      RETURN_IF_ERROR(GetTypedSequenceControlProperties(
+          config.sequence_batching(), config.name(), control_kind, required,
+          &tensor_name, &tensor_datatype));
       if (!tensor_name.empty()) {
         // Control tensors must have shape [1].
         DimsList dims;

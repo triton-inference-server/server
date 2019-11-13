@@ -587,21 +587,10 @@ message ModelDynamicBatching
 //@@
 message ModelSequenceBatching
 {
-  //@@  .. cpp:var:: uint64 max_sequence_idle_microseconds
-  //@@
-  //@@     The maximum time, in microseconds, that a sequence is allowed to
-  //@@     be idle before it is aborted. The inference server considers a
-  //@@     sequence idle when it does not have any inference request queued
-  //@@     for the sequence. If this limit is exceeded, the inference server
-  //@@     will free the sequence slot allocated by the sequence and make it
-  //@@     available for another sequence. If not specified (or specified as
-  //@@     zero) a default value of 1000000 (1 second) is used.
-  //@@
-  uint64 max_sequence_idle_microseconds = 1;
-
   //@@  .. cpp:var:: message Control
   //@@
-  //@@     A control is a binary signal to a backend.
+  //@@     A control is a signal that the sequence batcher uses to
+  //@@     communicate with a backend.
   //@@
   message Control
   {
@@ -619,6 +608,15 @@ message ModelSequenceBatching
       //@@
       CONTROL_SEQUENCE_START = 0;
 
+      //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_READY = 1
+      //@@
+      //@@         A sequence is/is-not ready for inference. If true the
+      //@@         input tensor data is valid and should be used. If false
+      //@@         the input tensor data is invalid and inferencing should
+      //@@         be "skipped". This control is required.
+      //@@
+      CONTROL_SEQUENCE_READY = 1;
+
       //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_END = 2
       //@@
       //@@         A sequence is/is-not ending. If true a sequence is
@@ -627,14 +625,14 @@ message ModelSequenceBatching
       //@@
       CONTROL_SEQUENCE_END = 2;
 
-      //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_READY = 1
+      //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_CORRID = 3
       //@@
-      //@@         A sequence is/is-not ready for inference. If true the
-      //@@         input tensor data is valid and should be used. If false
-      //@@         the input tensor data is invalid and inferencing should
-      //@@         be "skipped". This control is optional.
+      //@@         The correlation ID of the sequence. This control's
+      //@@         value is communicated by a uint64 tensor. The tensor
+      //@@         must be a 1-dimensional tensor with size equal to the
+      //@@         batch size of the request. This control is optional.
       //@@
-      CONTROL_SEQUENCE_READY = 1;
+      CONTROL_SEQUENCE_CORRID = 3;
     }
 
     //@@    .. cpp:var:: Kind kind
@@ -683,6 +681,18 @@ message ModelSequenceBatching
     //@@
     repeated Control control = 2;
   }
+
+  //@@  .. cpp:var:: uint64 max_sequence_idle_microseconds
+  //@@
+  //@@     The maximum time, in microseconds, that a sequence is allowed to
+  //@@     be idle before it is aborted. The inference server considers a
+  //@@     sequence idle when it does not have any inference request queued
+  //@@     for the sequence. If this limit is exceeded, the inference server
+  //@@     will free the sequence slot allocated by the sequence and make it
+  //@@     available for another sequence. If not specified (or specified as
+  //@@     zero) a default value of 1000000 (1 second) is used.
+  //@@
+  uint64 max_sequence_idle_microseconds = 1;
 
   //@@  .. cpp:var:: ControlInput control_input (repeated)
   //@@

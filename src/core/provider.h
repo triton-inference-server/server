@@ -178,7 +178,7 @@ class InferRequestProvider {
       const std::string& name, std::shared_ptr<Memory>* input_buffer);
 
   // Set content for named inputs. If the input already has content,
-  // this content will be in-place of existing content.
+  // this content will be used in-place of existing content.
   struct InputOverride {
     std::vector<uint8_t> content_;
     DimsList dims_;
@@ -189,6 +189,9 @@ class InferRequestProvider {
       std::unordered_map<std::string, std::shared_ptr<InputOverride>>;
   const std::shared_ptr<InputOverrideMap>& GetInputOverride() const;
   Status SetInputOverride(const std::shared_ptr<InputOverrideMap>& override);
+  Status AddInputOverride(
+      const std::string& tensor_name,
+      const std::shared_ptr<InferRequestProvider::InputOverride>& override);
 
  protected:
   explicit InferRequestProvider(

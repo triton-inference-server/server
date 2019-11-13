@@ -281,19 +281,23 @@ OnnxBackend::CreateExecutionContext(
   // inputs are present in the model and have the correct shape and
   // datatype.
   if (Config().has_sequence_batching()) {
-    bool have_start, have_end, have_ready;
-    RETURN_IF_ERROR(context->ValidateSequenceControl(
+    bool have_start, have_end, have_ready, have_corrid;
+    RETURN_IF_ERROR(context->ValidateBooleanSequenceControl(
         Config().name(), Config().sequence_batching(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         false /* required */, &have_start));
-    RETURN_IF_ERROR(context->ValidateSequenceControl(
+    RETURN_IF_ERROR(context->ValidateBooleanSequenceControl(
         Config().name(), Config().sequence_batching(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
         false /* required */, &have_end));
-    RETURN_IF_ERROR(context->ValidateSequenceControl(
+    RETURN_IF_ERROR(context->ValidateBooleanSequenceControl(
         Config().name(), Config().sequence_batching(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         false /* required */, &have_ready));
+    RETURN_IF_ERROR(context->ValidateTypedSequenceControl(
+        Config().name(), Config().sequence_batching(),
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
+        false /* required */, &have_corrid));
     if (have_start) {
       expected_input_cnt += 1;
     }
@@ -301,6 +305,9 @@ OnnxBackend::CreateExecutionContext(
       expected_input_cnt += 1;
     }
     if (have_ready) {
+      expected_input_cnt += 1;
+    }
+    if (have_corrid) {
       expected_input_cnt += 1;
     }
   }
@@ -313,16 +320,71 @@ OnnxBackend::CreateExecutionContext(
 }
 
 Status
-OnnxBackend::Context::ValidateSequenceControl(
+OnnxBackend::Context::ValidateBooleanSequenceControl(
     const std::string& model_name, const ModelSequenceBatching& batcher,
     const ModelSequenceBatching::Control::Kind control_kind, bool required,
     bool* have_control)
 {
   std::string tensor_name;
   DataType tensor_datatype;
-  RETURN_IF_ERROR(GetSequenceControlProperties(
+  RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
       batcher, model_name, control_kind, required, &tensor_name,
       &tensor_datatype, nullptr, nullptr, nullptr, nullptr));
+  *have_control = !tensor_name.empty();
+  if (*have_control) {
+    OnnxTensorInfoMap input_tensor_infos;
+    RETURN_IF_ERROR(InputInfos(session_, allocator_, input_tensor_infos));
+    const auto& iit = input_tensor_infos.find(tensor_name);
+    if (iit == input_tensor_infos.end()) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "configuration specified sequence control '" + tensor_name +
+              "', but model does not provide that input");
+    }
+
+    // Control tensors must have shape [1].
+    DimsList dims;
+    dims.Add(1);
+
+    const int nonbatch_start_idx = (max_batch_size_ > 0) ? 1 : 0;
+    std::vector<int64_t> debatched_dims;
+    for (size_t i = nonbatch_start_idx; i < iit->second.dims_.size(); i++) {
+      debatched_dims.push_back(iit->second.dims_[i]);
+    }
+
+    if ((debatched_dims.size() != 1) || (debatched_dims[0] != 1)) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + model_name + "', sequence control '" +
+              tensor_name + "' dims " + DimsListToString(debatched_dims) +
+              " don't match expected dims [1]");
+    }
+
+    if (ConvertToOnnxDataType(tensor_datatype) != iit->second.type_) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + model_name + "', sequence control '" +
+              tensor_name + "' datatype " +
+              OnnxDataTypeName(iit->second.type_) +
+              " doesn't match required data-type " +
+              DataType_Name(tensor_datatype));
+    }
+  }
+
+  return Status::Success;
+}
+
+Status
+OnnxBackend::Context::ValidateTypedSequenceControl(
+    const std::string& model_name, const ModelSequenceBatching& batcher,
+    const ModelSequenceBatching::Control::Kind control_kind, bool required,
+    bool* have_control)
+{
+  std::string tensor_name;
+  DataType tensor_datatype;
+  RETURN_IF_ERROR(GetTypedSequenceControlProperties(
+      batcher, model_name, control_kind, required, &tensor_name,
+      &tensor_datatype));
   *have_control = !tensor_name.empty();
   if (*have_control) {
     OnnxTensorInfoMap input_tensor_infos;

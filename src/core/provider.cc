@@ -230,6 +230,15 @@ InferRequestProvider::SetInputOverride(
   return Status::Success;
 }
 
+Status
+InferRequestProvider::AddInputOverride(
+    const std::string& tensor_name,
+    const std::shared_ptr<InferRequestProvider::InputOverride>& override)
+{
+  overrides_->insert(std::make_pair(tensor_name, override));
+  return Status::Success;
+}
+
 bool
 InferRequestProvider::GetInputOverrideContent(
     const std::string& name, const void** content, size_t* content_byte_size)

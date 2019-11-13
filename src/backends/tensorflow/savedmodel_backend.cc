@@ -77,16 +77,19 @@ SavedModelBackend::CreateTRTISTFModel(
   // inputs are present in the model and have the correct shape and
   // datatype.
   if (Config().has_sequence_batching()) {
-    bool have_start, have_end, have_ready;
-    RETURN_IF_ERROR(ValidateSequenceControl(
+    bool have_start, have_end, have_ready, have_corrid;
+    RETURN_IF_ERROR(ValidateBooleanSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, inputs,
         false /* required */, &have_start));
-    RETURN_IF_ERROR(ValidateSequenceControl(
+    RETURN_IF_ERROR(ValidateBooleanSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_END, inputs,
         false /* required */, &have_end));
-    RETURN_IF_ERROR(ValidateSequenceControl(
+    RETURN_IF_ERROR(ValidateBooleanSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, inputs,
         false /* required */, &have_ready));
+    RETURN_IF_ERROR(ValidateTypedSequenceControl(
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID, inputs,
+        false /* required */, &have_corrid));
     if (have_start) {
       expected_input_cnt += 1;
     }
@@ -94,6 +97,9 @@ SavedModelBackend::CreateTRTISTFModel(
       expected_input_cnt += 1;
     }
     if (have_ready) {
+      expected_input_cnt += 1;
+    }
+    if (have_corrid) {
       expected_input_cnt += 1;
     }
   }
@@ -199,15 +205,61 @@ SavedModelBackend::CreateTRTISTFModel(
 }
 
 Status
-SavedModelBackend::ValidateSequenceControl(
+SavedModelBackend::ValidateBooleanSequenceControl(
     const ModelSequenceBatching::Control::Kind control_kind,
     const TRTISTF_IOList* inputs, bool required, bool* have_control)
 {
   std::string tensor_name;
   DataType tensor_datatype;
-  RETURN_IF_ERROR(GetSequenceControlProperties(
+  RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
       Config().sequence_batching(), Name(), control_kind, required,
       &tensor_name, &tensor_datatype, nullptr, nullptr, nullptr, nullptr));
+  *have_control = !tensor_name.empty();
+  if (*have_control) {
+    const TRTISTF_IO* input = FindIOByName(inputs, tensor_name);
+    if (input == nullptr) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "configuration specified sequence control '" + tensor_name +
+              "', but model does not provide that input");
+    }
+
+    // Control tensors must have shape [1].
+    DimsList dims;
+    dims.Add(1);
+
+    if (!CompareDimsExact(input->shape_, dims, Config().max_batch_size() > 0)) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + Name() + "', sequence control '" +
+              tensor_name + "' dims " + ShapeToString(input->shape_) +
+              " don't match expected dims [1]");
+    }
+
+    if (!CompareDataType(input->data_type_, tensor_datatype)) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + Name() + "', sequence control '" +
+              tensor_name + "' data-type " +
+              DataType_Name(ConvertDataType(input->data_type_)) +
+              " doesn't match required data-type " +
+              DataType_Name(tensor_datatype));
+    }
+  }
+
+  return Status::Success;
+}
+
+Status
+SavedModelBackend::ValidateTypedSequenceControl(
+    const ModelSequenceBatching::Control::Kind control_kind,
+    const TRTISTF_IOList* inputs, bool required, bool* have_control)
+{
+  std::string tensor_name;
+  DataType tensor_datatype;
+  RETURN_IF_ERROR(GetTypedSequenceControlProperties(
+      Config().sequence_batching(), Name(), control_kind, required,
+      &tensor_name, &tensor_datatype));
   *have_control = !tensor_name.empty();
   if (*have_control) {
     const TRTISTF_IO* input = FindIOByName(inputs, tensor_name);
