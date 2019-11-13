@@ -74,7 +74,7 @@ def _raise_error(msg):
     raise ex
 
 def serialize_string_tensor(input_tensor):
-    """Creates a shared memory region with the specified name and size.
+    """Serializes a string tensor into a flat numpy array of type uint8.
 
     Parameters
     ----------
@@ -84,7 +84,7 @@ def serialize_string_tensor(input_tensor):
     Returns
     -------
     serialized_string_tensor : np.array
-        The serialized string tensor.
+        The 1-D numpy array of type uint8 containing the serialized string in 'C' order.
 
     Raises
     ------
@@ -98,11 +98,9 @@ def serialize_string_tensor(input_tensor):
     if input_tensor.size == 0:
         _raise_error("input cannot be empty")
 
-    # If the input is a tensor of string objects,
-    # then must flatten those into a 1-dimensional
-    # array containing the 4-byte string length
-    # followed by the actual string characters.
-    # All strings are concatenated together in "C"
+    # If the input is a tensor of string objects, then must flatten those into
+    # a 1-dimensional array containing the 4-byte string length followed by the
+    # actual string characters. All strings are concatenated together in "C"
     # order.
     if (input_tensor.dtype == np.object) or (input_tensor.dtype.type == np.bytes_):
         flattened = bytes()
