@@ -141,7 +141,7 @@ future 1.x.y releases (see below for exceptions):
   <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/grpc_service.proto>`_,
   except as noted below.
 
-* The custom backend interface as defined in `custom.h
+* The V1 custom backend interface as defined in `custom.h
   <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/backends/custom/custom.h>`_.
 
 As new features are introduced they may temporarily have beta status
@@ -158,6 +158,11 @@ following features are in beta:
 * The inference server HTTP and GRPC APIs related to system and CUDA
   shared memory are currently in beta and may undergo
   non-backwards-compatible changes.
+
+* The V2 custom backend interface as defined in `custom.h
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/backends/custom/custom.h>`_
+  is currently in beta and may undergo non-backwards-compatible
+  changes.
 
 * The C++ and Python client libraries are not stictly included in the
   inference server compatibility guarantees and so should be
