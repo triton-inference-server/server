@@ -78,7 +78,7 @@ for trial in graphdef savedmodel netdef onnx libtorch plan ; do
     fi
 done
 
-# Prepare object models with basic config
+# Prepare string models with basic config
 for trial in graphdef savedmodel onnx ; do
     full=${trial}_object_object_object
     mkdir -p $MODELSDIR/${full}/1 && \
@@ -87,24 +87,6 @@ for trial in graphdef savedmodel onnx ; do
         (cd $MODELSDIR/${full} && \
                 sed -i "s/label_filename:.*//" config.pbtxt && \
                 echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
-
-    # ensemble version of the model.
-    mkdir -p $MODELSDIR/fan_${full}/1 && \
-    cp $ENSEMBLEDIR/fan_${full}/config.pbtxt $MODELSDIR/fan_${full}/. && \
-        (cd $MODELSDIR/fan_${full} && \
-                sed -i "s/label_filename:.*//" config.pbtxt)
-
-    if [ "$trial" == "libtorch" ]; then
-        (cd $MODELSDIR/fan_${full} && \
-                sed -i -e '{
-                    N
-                    s/key: "INPUT\([0-9]\)"\n\(.*\)value: "same_input/key: "INPUT__\1"\n\2value: "same_input/
-                }' config.pbtxt && \
-                sed -i -e '{
-                    N
-                    s/key: "OUTPUT\([0-9]\)"\n\(.*\)value: "same_output/key: "OUTPUT__\1"\n\2value: "same_output/
-                }' config.pbtxt)
-    fi
 done
 
 # custom float32 model needs to be obtained elsewhere
@@ -135,7 +117,7 @@ for input_device in -1 0 1; do
             for model_device in $model_devices; do
                 full=${trial}_float32_float32_float32
                 full_log=$CLIENT_LOG.$full.$input_device.$output_device.$model_device
-                
+
                 if [ "$model_device" == "-1" ]; then
                     (cd $MODELSDIR/${full} && \
                         sed -i "s/instance_group.*/instance_group [{ kind: KIND_CPU }]/" config.pbtxt)
@@ -143,7 +125,7 @@ for input_device in -1 0 1; do
                     (cd $MODELSDIR/${full} && \
                         sed -i "s/instance_group.*/instance_group [{ kind: KIND_GPU, gpus: [${model_device}] }]/" config.pbtxt)
                 fi
-                
+
                 set +e
                 $IO_TEST_UTIL -i $input_device -o $output_device -r $MODELSDIR -m $full >>$full_log 2>&1
                 if [ $? -ne 0 ]; then
@@ -170,7 +152,7 @@ for input_device in -1 0 1; do
             for model_device in $model_devices; do
                 full=${trial}_object_object_object
                 full_log=$CLIENT_LOG.$full.$input_device.$output_device.$model_device
-                
+
                 if [ "$model_device" == "-1" ]; then
                     (cd $MODELSDIR/${full} && \
                         sed -i "s/instance_group.*/instance_group [{ kind: KIND_CPU }]/" config.pbtxt)
@@ -178,7 +160,7 @@ for input_device in -1 0 1; do
                     (cd $MODELSDIR/${full} && \
                         sed -i "s/instance_group.*/instance_group [{ kind: KIND_GPU, gpus: [${model_device}] }]/" config.pbtxt)
                 fi
-                
+
                 set +e
                 $IO_TEST_UTIL -i $input_device -o $output_device -r $MODELSDIR -m $full >>$full_log 2>&1
                 if [ $? -ne 0 ]; then
