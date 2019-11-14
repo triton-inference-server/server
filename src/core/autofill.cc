@@ -226,8 +226,8 @@ AutoFill::Create(
                      "contents of version directory or use --log-verbose=1 for "
                      "more details)";
     } else {
-      LOG_WARNING << "Autofiller failed to retrieve models. Error Details: "
-                << status.AsString();
+      LOG_WARNING << "Autofiller failed to retrieve model. Error Details: "
+                  << status.AsString();
     }
     LOG_WARNING << "Proceeding with simple config for now";
     std::unique_ptr<AutoFill> afs;
