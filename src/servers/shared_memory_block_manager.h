@@ -102,6 +102,7 @@ class SharedMemoryBlockManager {
   TRTSERVER_Error* Clear();
 
  private:
+  std::mutex mu_;
   std::unordered_map<std::string, TRTSERVER_SharedMemoryBlock*> blocks_;
 };
 
