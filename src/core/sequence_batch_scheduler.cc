@@ -673,8 +673,12 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
   }
 
   if (!correlation_id_tensor_.empty()) {
-    if (correlation_id_datatype != TYPE_UINT64) {
-      LOG_ERROR << "unexpected control datatype, expected TYPE_UINT64 for "
+    if ((correlation_id_datatype != TYPE_UINT64) &&
+        (correlation_id_datatype != TYPE_INT64) &&
+        (correlation_id_datatype != TYPE_UINT32) &&
+        (correlation_id_datatype != TYPE_INT32)) {
+      LOG_ERROR << "unexpected control datatype, expected TYPE_UINT64, "
+                   "TYPE_INT64, TYPE_UINT32 or TYPE_INT32 for "
                 << ModelSequenceBatching_Control_Kind_Name(
                        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID)
                 << " for " << config.name();
@@ -685,7 +689,9 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
     for (size_t b = 0; b < slot_correlation_ids_.size(); ++b) {
       auto corrid_override = new InferRequestProvider::InputOverride();
       corrid_override->dims_.Add(1);
-      corrid_override->datatype_ = TYPE_UINT64;
+      corrid_override->datatype_ = correlation_id_datatype;
+      corrid_override->content_.resize(
+          GetDataTypeByteSize(correlation_id_datatype));
       slot_corrid_overrides_.emplace_back(corrid_override);
     }
   }
@@ -922,8 +928,9 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
               if (!correlation_id_tensor_.empty()) {
                 uint8_t* corrid_p =
                     reinterpret_cast<uint8_t*>(&slot_correlation_ids_[slot]);
-                slot_corrid_overrides_[slot]->content_.assign(
-                    corrid_p, corrid_p + sizeof(uint64_t));
+                std::vector<uint8_t>& content =
+                    slot_corrid_overrides_[slot]->content_;
+                content.assign(corrid_p, corrid_p + content.size());
                 request_provider->AddInputOverride(
                     correlation_id_tensor_, slot_corrid_overrides_[slot]);
               }

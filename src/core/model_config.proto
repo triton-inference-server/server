@@ -603,8 +603,9 @@ message ModelSequenceBatching
       //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_START = 0
       //@@
       //@@         A new sequence is/is-not starting. If true a sequence is
-      //@@         starting, if false a sequence is continuing. This control
-      //@@         is optional.
+      //@@         starting, if false a sequence is continuing. Must
+      //@@         specify either int32_false_true or fp32_false_true for
+      //@@         this control. This control is optional.
       //@@
       CONTROL_SEQUENCE_START = 0;
 
@@ -613,24 +614,29 @@ message ModelSequenceBatching
       //@@         A sequence is/is-not ready for inference. If true the
       //@@         input tensor data is valid and should be used. If false
       //@@         the input tensor data is invalid and inferencing should
-      //@@         be "skipped". This control is required.
+      //@@         be "skipped".  Must specify either int32_false_true or
+      //@@         fp32_false_true for this control. This control is optional.
       //@@
       CONTROL_SEQUENCE_READY = 1;
 
       //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_END = 2
       //@@
       //@@         A sequence is/is-not ending. If true a sequence is
-      //@@         ending, if false a sequence is continuing. This control
-      //@@         is optional.
+      //@@         ending, if false a sequence is continuing. Must
+      //@@         specify either int32_false_true or fp32_false_true for
+      //@@         this control. This control is optional.
       //@@
       CONTROL_SEQUENCE_END = 2;
 
       //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_CORRID = 3
       //@@
-      //@@         The correlation ID of the sequence. This control's
-      //@@         value is communicated by a uint64 tensor. The tensor
-      //@@         must be a 1-dimensional tensor with size equal to the
-      //@@         batch size of the request. This control is optional.
+      //@@         The correlation ID of the sequence. The correlation ID
+      //@@         is an uint64_t value that is communicated in whole or
+      //@@         in part by the tensor. The tensor's datatype must be
+      //@@         specified by data_type and must be TYPE_UINT64, TYPE_INT64,
+      //@@         TYPE_UINT32 or TYPE_INT32. If a 32-bit datatype is specified
+      //@@         the correlation ID will be truncated to the low-order 32
+      //@@         bits. This control is optional.
       //@@
       CONTROL_SEQUENCE_CORRID = 3;
     }
@@ -660,6 +666,12 @@ message ModelSequenceBatching
     //@@       first the false value and the second the true value.
     //@@
     repeated float fp32_false_true = 3;
+
+    //@@    .. cpp:var:: DataType data_type
+    //@@
+    //@@       The control's datatype.
+    //@@
+    DataType data_type = 4;
   }
 
   //@@  .. cpp:var:: message ControlInput
