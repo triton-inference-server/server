@@ -813,7 +813,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   std::set<std::string> startup_models_;
 
   bool control_mode_set = false;
-  TRTSERVER_Model_Control_Mode control_mode;
+  TRTSERVER_Model_Control_Mode control_mode = TRTSERVER_MODEL_CONTROL_POLL;
 
   bool log_info = true;
   bool log_warn = true;
