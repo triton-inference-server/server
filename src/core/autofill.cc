@@ -223,7 +223,7 @@ AutoFill::Create(
   {
     if (platform == Platform::PLATFORM_UNKNOWN) {
       LOG_WARNING << "Autofiller failed to detect the platform (verify "
-                     "contents of version directory or use --log-verbose=1 for "
+                     "contents of model directory or use --log-verbose=1 for "
                      "more details)";
     } else {
       LOG_WARNING << "Autofiller failed to retrieve model. Error Details: "
