@@ -434,7 +434,8 @@ for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
-SERVER_ARGS="--model-repository=`pwd`/models --allow-poll-model-repository=false \
+# Show model control mode will override deprecated model control options
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=none \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -611,8 +612,9 @@ cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/. && \
     rm -rf models/savedmodel_float32_float32_float32/3
 
+# Show model control mode will override deprecated model control options
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
-             --allow-model-control=true  --allow-poll-model-repository=false \
+             --model-control-mode=explicit \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server

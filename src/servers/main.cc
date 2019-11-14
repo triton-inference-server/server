@@ -159,6 +159,7 @@ enum OptionId {
   OPTION_TRACE_LEVEL,
   OPTION_TRACE_RATE,
 #endif  // TRTIS_ENABLE_TRACING
+  OPTION_MODEL_CONTROL_MODE,
   OPTION_ALLOW_POLL_REPO,
   OPTION_POLL_REPO_SECS,
   OPTION_ALLOW_MODEL_CONTROL,
@@ -265,18 +266,32 @@ std::vector<Option> options_{
     {OPTION_TRACE_RATE, "trace-rate",
      "Set the trace sampling rate. Default is 1000."},
 #endif  // TRTIS_ENABLE_TRACING
+    {OPTION_MODEL_CONTROL_MODE, "model-control-mode",
+     "Specify the mode for model management. Options are \"none\", \"poll\" "
+     "and \"explicit\". The default is \"poll\". "
+     "For \"none\", the server will load all models in the model repositories "
+     "only once at startup. For \"poll\", the server will poll the model "
+     "repository to detect changes. The poll rate is controlled by "
+     "'repository-poll-secs'. For \"explicit\", the model load and unload is "
+     "initiated by using the model control APIs, and the models in the model "
+     "repository will not be loaded at startup, unless the model is specified "
+     "by --load-model."},
     {OPTION_ALLOW_POLL_REPO, "allow-poll-model-repository",
-     "Poll the model repository to detect changes. The poll rate is "
-     "controlled by 'repository-poll-secs'."},
+     "[DEPRECATED] Poll the model repository to detect changes. The poll rate "
+     "is controlled by 'repository-poll-secs'. This option is deprecated by "
+     "--model-control-mode, this option can not be specified if "
+     "--model-control-mode is specified."},
     {OPTION_POLL_REPO_SECS, "repository-poll-secs",
      "Interval in seconds between each poll of the model repository to check "
      "for changes. Valid only when "
      "--allow-poll-model-repository=true is specified."},
     {OPTION_ALLOW_MODEL_CONTROL, "allow-model-control",
-     "Allow to load or to unload models explicitly using model control API. "
-     "If true the models in the model repository will not be loaded at "
-     "startup, unless the model is specified by --load-model. Cannot be "
-     "specified if --allow-poll-model-repository is true."},
+     "[DEPRECATED] Allow to load or to unload models explicitly using model "
+     "control API. If true the models in the model repository will not be "
+     "loaded at startup, unless the model is specified by --load-model. Cannot "
+     "be specified if --allow-poll-model-repository is true. This option is "
+     "deprecated by --model-control-mode, this option can not be specified if "
+     "--model-control-mode is specified."},
     {OPTION_STARTUP_MODEL, "load-model",
      "Name of the model to be loaded on server startup. It may be specified "
      "multiple times to add multiple models. Note that this option will only "
@@ -792,9 +807,13 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   int32_t trace_rate = trace_rate_;
 #endif  // TRTIS_ENABLE_TRACING
 
+  bool deprecated_control_mode_set = false;
   bool allow_poll_model_repository = repository_poll_secs > 0;
   bool allow_model_control = allow_model_control_;
   std::set<std::string> startup_models_;
+
+  bool control_mode_set = false;
+  TRTSERVER_Model_Control_Mode control_mode = TRTSERVER_MODEL_CONTROL_POLL;
 
   bool log_info = true;
   bool log_warn = true;
@@ -905,16 +924,36 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 
       case OPTION_ALLOW_POLL_REPO:
         allow_poll_model_repository = ParseBoolOption(optarg);
+        deprecated_control_mode_set = true;
         break;
       case OPTION_POLL_REPO_SECS:
         repository_poll_secs = ParseIntOption(optarg);
         break;
       case OPTION_ALLOW_MODEL_CONTROL:
         allow_model_control = ParseBoolOption(optarg);
+        deprecated_control_mode_set = true;
         break;
       case OPTION_STARTUP_MODEL:
         startup_models_.insert(optarg);
         break;
+      case OPTION_MODEL_CONTROL_MODE: {
+        std::string mode_str(optarg);
+        std::transform(
+            mode_str.begin(), mode_str.end(), mode_str.begin(), ::tolower);
+        if (mode_str == "none") {
+          control_mode = TRTSERVER_MODEL_CONTROL_NONE;
+        } else if (mode_str == "poll") {
+          control_mode = TRTSERVER_MODEL_CONTROL_POLL;
+        } else if (mode_str == "explicit") {
+          control_mode = TRTSERVER_MODEL_CONTROL_EXPLICIT;
+        } else {
+          LOG_ERROR << "invalid argument for --model-control-mode";
+          LOG_ERROR << Usage();
+          return false;
+        }
+        control_mode_set = true;
+        break;
+      }
       case OPTION_PINNED_MEMORY_POOL_BYTE_SIZE:
         pinned_memory_pool_byte_size = ParseLongLongOption(optarg);
         break;
@@ -953,21 +992,34 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   repository_poll_secs_ =
       (allow_poll_model_repository) ? std::max(0, repository_poll_secs) : 0;
 
-  if (allow_model_control && allow_poll_model_repository) {
-    LOG_ERROR << "--allow-model-control and --allow-poll-model-repository "
-              << "can not be both set to true";
+  if (control_mode_set && deprecated_control_mode_set) {
+    LOG_ERROR << "--allow-model-control or --allow-poll-model-repository "
+                << "can not be specified if --model-control-mode is specified";
     LOG_ERROR << Usage();
-    return false;
   }
 
-  TRTSERVER_Model_Control_Mode control_mode;
-  if (allow_model_control) {
-    control_mode = TRTSERVER_MODEL_CONTROL_EXPLICIT;
-  } else if (repository_poll_secs_ > 0) {
-    control_mode = TRTSERVER_MODEL_CONTROL_POLL;
+  if (!control_mode_set) {
+    if (allow_model_control && allow_poll_model_repository) {
+      LOG_ERROR << "--allow-model-control and --allow-poll-model-repository "
+                << "can not be both set to true";
+      LOG_ERROR << Usage();
+      return false;
+    }
+
+    if (allow_model_control) {
+      control_mode = TRTSERVER_MODEL_CONTROL_EXPLICIT;
+    } else if (repository_poll_secs_ > 0) {
+      control_mode = TRTSERVER_MODEL_CONTROL_POLL;
+    } else {
+      control_mode = TRTSERVER_MODEL_CONTROL_NONE;
+    }
   } else {
-    control_mode = TRTSERVER_MODEL_CONTROL_NONE;
+    // May sure main() will not try to invoke polling periodically
+    if (control_mode != TRTSERVER_MODEL_CONTROL_POLL) {
+      repository_poll_secs_ = 0;
+    }
   }
+
 
 #ifdef TRTIS_ENABLE_HTTP
   http_port_ = http_port;
