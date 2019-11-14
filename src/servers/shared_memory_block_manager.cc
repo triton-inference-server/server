@@ -43,6 +43,8 @@ SharedMemoryBlockManager::CpuCreate(
 {
   *smb = nullptr;
 
+  std::lock_guard<std::mutex> lock(mu_);
+
   if (blocks_.find(name) != blocks_.end()) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_ALREADY_EXISTS,
@@ -67,6 +69,8 @@ SharedMemoryBlockManager::GpuCreate(
 {
   *smb = nullptr;
 
+  std::lock_guard<std::mutex> lock(mu_);
+
   if (blocks_.find(name) != blocks_.end()) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_ALREADY_EXISTS,
@@ -89,6 +93,8 @@ SharedMemoryBlockManager::Get(
 {
   *smb = nullptr;
 
+  std::lock_guard<std::mutex> lock(mu_);
+
   auto itr = blocks_.find(name);
   if (itr == blocks_.end()) {
     return TRTSERVER_ErrorNew(
@@ -108,6 +114,8 @@ SharedMemoryBlockManager::Find(
 {
   *smb = nullptr;
 
+  std::lock_guard<std::mutex> lock(mu_);
+
   auto itr = blocks_.find(name);
   if (itr != blocks_.end()) {
     *smb = itr->second;
@@ -122,6 +130,8 @@ SharedMemoryBlockManager::Remove(
 {
   *smb = nullptr;
 
+  std::lock_guard<std::mutex> lock(mu_);
+
   auto itr = blocks_.find(name);
   if (itr != blocks_.end()) {
     *smb = itr->second;
@@ -135,6 +145,8 @@ TRTSERVER_Error*
 SharedMemoryBlockManager::Clear()
 {
   std::string failed_blocks;
+
+  std::lock_guard<std::mutex> lock(mu_);
 
   auto it = blocks_.begin();
   while (it != blocks_.cend()) {
