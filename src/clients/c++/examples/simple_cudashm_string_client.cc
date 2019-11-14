@@ -24,11 +24,10 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <fcntl.h>
-#include <sys/mman.h>
 #include <unistd.h>
 #include <iostream>
 #include <string>
+#include "src/clients/c++/examples/shm_utils.h"
 #include "src/clients/c++/library/request_grpc.h"
 #include "src/clients/c++/library/request_http.h"
 
@@ -67,8 +66,6 @@ Usage(char** argv, const std::string& msg = std::string())
   exit(1);
 }
 
-}  // namespace
-
 #define FAIL_IF_CUDA_ERR(FUNC)                                     \
   {                                                                \
     const cudaError_t result = FUNC;                               \
@@ -91,6 +88,40 @@ CreateCUDAIPCHandle(
   FAIL_IF_CUDA_ERR(cudaIpcGetMemHandle(cuda_handle, input_d_ptr));
 }
 
+
+void
+SerializeStringTensor(
+    std::vector<std::string> string_tensor, std::vector<char>* serialized_data)
+{
+  std::string serialized = "";
+  for (auto s : string_tensor) {
+    uint32_t len = s.size();
+    serialized.append(reinterpret_cast<const char*>(&len), sizeof(uint32_t));
+    serialized.append(s);
+  }
+
+  std::copy(
+      serialized.begin(), serialized.end(),
+      std::back_inserter(*serialized_data));
+}
+
+void
+DerializeToIntTensor(
+    const uint8_t* serialized_data, std::vector<int>* int_tensor)
+{
+  // preprocess results from serialized buffer to string tensor
+  size_t buf_offset = 0;
+  for (size_t i = 0; i < 16; ++i) {
+    const uint32_t len =
+        *(reinterpret_cast<const uint32_t*>(serialized_data + buf_offset));
+    (*int_tensor)[i] = std::stoi(std::string(reinterpret_cast<const char*>(
+        serialized_data + buf_offset + sizeof(len))));
+    buf_offset += sizeof(len) + len;
+  }
+}
+
+}  // namespace
+
 int
 main(int argc, char** argv)
 {
@@ -100,7 +131,6 @@ main(int argc, char** argv)
   std::map<std::string, std::string> http_headers;
 
   // Parse commandline...
-
   int opt;
   while ((opt = getopt(argc, argv, "vi:u:")) != -1) {
     switch (opt) {
@@ -121,11 +151,12 @@ main(int argc, char** argv)
 
   nic::Error err;
 
-  // We use a simple model that takes 2 input tensors of 16 integers
-  // each and returns 2 output tensors of 16 integers each. One output
-  // tensor is the element-wise sum of the inputs and one output is
-  // the element-wise difference.
-  std::string model_name = "simple";
+  // We use a simple model that takes 2 input tensors of 16 strings
+  // each and returns 2 output tensors of 16 strings each. The input
+  // strings must represent integers. One output tensor is the
+  // element-wise sum of the inputs and one output is the element-wise
+  // difference.
+  std::string model_name = "simple_string";
 
   // Create a health context and get the ready and live state of the
   // server.
@@ -234,16 +265,37 @@ main(int argc, char** argv)
   FAIL_IF_ERR(input0->Reset(), "unable to reset INPUT0");
   FAIL_IF_ERR(input1->Reset(), "unable to reset INPUT1");
 
-  // Get the size of the inputs and outputs from the Shape and DataType
-  int input_byte_size =
-      infer_ctx->ByteSize(input0->Dims(), ni::DataType::TYPE_INT32);
-  int output_byte_size =
-      infer_ctx->ByteSize(output0->Dims(), ni::DataType::TYPE_INT32);
+  // Create the data for the two input tensors. Initialize the first
+  // to unique integers and the second to all ones. The input tensors
+  // are the string representation of these values. Create the expected outputs
+  // as well.
+  std::vector<std::string> input0_str(16);
+  std::vector<std::string> input1_str(16);
+  std::vector<std::string> expected_sum_str(16);
+  std::vector<std::string> expected_diff_str(16);
+  for (size_t i = 0; i < 16; ++i) {
+    input0_str[i] = std::to_string(i + 1);
+    input1_str[i] = std::to_string(1);
+    expected_sum_str[i] = std::to_string(i + 2);
+    expected_diff_str[i] = std::to_string(i);
+  }
+
+  std::vector<char> input0_data, input1_data, expected_sum, expected_diff;
+  SerializeStringTensor(input0_str, &input0_data);
+  SerializeStringTensor(input1_str, &input1_data);
+  SerializeStringTensor(expected_sum_str, &expected_sum);
+  SerializeStringTensor(expected_diff_str, &expected_diff);
+
+  // Get the size of the inputs and outputs from the serialized buffer
+  int input0_byte_size = input0_data.size();
+  int input1_byte_size = input1_data.size();
+  int output0_byte_size = expected_sum.size();
+  int output1_byte_size = expected_diff.size();
 
   // Create Output0 and Output1 in CUDA Shared Memory
-  int *output0_d_ptr, *output1_d_ptr;
-  cudaMalloc((void**)&output0_d_ptr, output_byte_size * 2);
-  output1_d_ptr = (int*)output0_d_ptr + 16;
+  uint8_t *output0_d_ptr, *output1_d_ptr;
+  cudaMalloc((void**)&output0_d_ptr, output0_byte_size + output1_byte_size);
+  output1_d_ptr = reinterpret_cast<uint8_t*>(output0_d_ptr + output0_byte_size);
 
   cudaIpcMemHandle_t output_cuda_handle;
   CreateCUDAIPCHandle(&output_cuda_handle, (void*)output0_d_ptr);
@@ -251,7 +303,8 @@ main(int argc, char** argv)
   // Register Output shared memory with TRTIS
   FAIL_IF_ERR(
       shared_memory_ctx->RegisterCudaSharedMemory(
-          "output_data", output_cuda_handle, output_byte_size * 2, 0),
+          "output_data", output_cuda_handle,
+          output0_byte_size + output1_byte_size, 0),
       "unable to register shared memory output region");
 
   // Set the context options to do batch-size 1 requests. Also request that
@@ -262,43 +315,41 @@ main(int argc, char** argv)
       "unable to create inference options");
 
   options->SetBatchSize(1);
-  options->AddSharedMemoryResult(output0, "output_data", 0, output_byte_size);
+  options->AddSharedMemoryResult(output0, "output_data", 0, output0_byte_size);
   options->AddSharedMemoryResult(
-      output1, "output_data", output_byte_size, output_byte_size);
+      output1, "output_data", output0_byte_size, output1_byte_size);
 
   FAIL_IF_ERR(
       infer_ctx->SetRunOptions(*options), "unable to set inference options");
 
-  // Create Input0 and Input1 in CUDA Shared Memory. Initialize Input0 to
-  // unique integers and Input1 to all ones.
-  int input_data[32];
-  for (size_t i = 0; i < 16; ++i) {
-    input_data[i] = i;
-    input_data[16 + i] = 1;
-  }
-
-  // copy INPUT0 and INPUT1 data in GPU shared memory
-  int* input_d_ptr;
-  cudaMalloc((void**)&input_d_ptr, input_byte_size * 2);
+  // copy INPUT0 and INPUT1 data into GPU shared memory
+  int* input0_d_ptr;
+  cudaMalloc((void**)&input0_d_ptr, input0_byte_size + input1_byte_size);
   cudaMemcpy(
-      (void*)input_d_ptr, (void*)input_data, input_byte_size * 2,
+      input0_d_ptr, input0_data.data(), input0_byte_size,
+      cudaMemcpyHostToDevice);
+  cudaMemcpy(
+      input1_d_ptr, input1_data.data(), input1_byte_size,
       cudaMemcpyHostToDevice);
 
   cudaIpcMemHandle_t input_cuda_handle;
-  CreateCUDAIPCHandle(&input_cuda_handle, (void*)input_d_ptr);
+  CreateCUDAIPCHandle(&input_cuda_handle, (void*)input0_d_ptr);
+  uint8_t* input1_d_ptr =
+      reinterpret_cast<uint8_t*>(input0_d_ptr + input0_byte_size);
 
   // Register Input shared memory with TRTIS
   FAIL_IF_ERR(
       shared_memory_ctx->RegisterCudaSharedMemory(
-          "input_data", input_cuda_handle, input_byte_size * 2, 0),
-      "unable to register shared memory input region");
+          "input_data", input_cuda_handle, input0_byte_size + input1_byte_size,
+          0),
+      "unable to register shared memory output region");
 
   // Set the shared memory region for Inputs
   FAIL_IF_ERR(
-      input0->SetSharedMemory("input_data", 0, input_byte_size),
+      input0->SetSharedMemory("input_data", 0, input0_byte_size),
       "failed to set shared memory input");
   FAIL_IF_ERR(
-      input1->SetSharedMemory("input_data", input_byte_size, input_byte_size),
+      input1->SetSharedMemory("input_data", input0_byte_size, input1_byte_size),
       "failed to set shared memory input");
 
   // Send inference request to the inference server.
@@ -312,24 +363,19 @@ main(int argc, char** argv)
               << std::endl;
   }
 
-  // Copy input and output data back to the CPU
-  int output0_data[16], output1_data[16];
-  cudaMemcpy(
-      output0_data, output0_d_ptr, output_byte_size, cudaMemcpyDeviceToHost);
-  cudaMemcpy(
-      output1_data, output1_d_ptr, output_byte_size, cudaMemcpyDeviceToHost);
+  std::vector<int> output0_data(16), output1_data(16);
+  DerializeToIntTensor(output0_d_ptr, &output0_data);
+  DerializeToIntTensor(output1_d_ptr, &output1_data);
 
-  for (size_t i = 0; i < 16; ++i) {
-    std::cout << input_data[i] << " + " << input_data[16 + i] << " = "
-              << output0_data[i] << std::endl;
-    std::cout << input_data[i] << " + " << input_data[16 + i] << " = "
-              << output1_data[i] << std::endl;
+  for (int i = 0; i < 16; ++i) {
+    std::cout << (i + 1) << " + " << 1 << " = " << output0_data[i] << std::endl;
+    std::cout << (i + 1) << " - " << 1 << " = " << output1_data[i] << std::endl;
 
-    if ((input_data[i] + input_data[16 + i]) != output0_data[i]) {
+    if (((i + 1) + 1) != output0_data[i]) {
       std::cerr << "error: incorrect sum" << std::endl;
       exit(1);
     }
-    if ((input_data[i] - input_data[16 + i]) != output1_data[i]) {
+    if (((i + 1) - 1) != output1_data[i]) {
       std::cerr << "error: incorrect difference" << std::endl;
       exit(1);
     }
@@ -351,8 +397,9 @@ main(int argc, char** argv)
       shared_memory_ctx->UnregisterSharedMemory("output_data"),
       "unable to unregister shared memory output region");
 
+
   // Free GPU memory
-  FAIL_IF_CUDA_ERR(cudaFree(input_d_ptr));
+  FAIL_IF_CUDA_ERR(cudaFree(input0_d_ptr));
   FAIL_IF_CUDA_ERR(cudaFree(output0_d_ptr));
 
   return 0;

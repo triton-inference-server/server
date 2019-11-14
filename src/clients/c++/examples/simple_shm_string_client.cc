@@ -284,14 +284,11 @@ main(int argc, char** argv)
       reinterpret_cast<uint8_t*>(output0_shm + output0_byte_size);
 
   // Register Output shared memory with TRTIS
-  err = shared_memory_ctx->RegisterSharedMemory(
-      "output_data", "/output_simple_string", 0,
-      output0_byte_size + output1_byte_size);
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to register shared memory output region: "
-              << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(
+      shared_memory_ctx->RegisterSharedMemory(
+          "output_data", "/output_simple_string", 0,
+          output0_byte_size + output1_byte_size),
+      "unable to register shared memory output region");
 
   // Set the context options to do batch-size 1 requests. Also request that
   // all output tensors be returned using shared memory.
