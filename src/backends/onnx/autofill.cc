@@ -324,58 +324,62 @@ AutoFillOnnx::Create(
   // one that can be loaded successfully.
   Status status;
   bool unsupported_opset = false;
+  bool found = false;
+  OrtStatus* ort_status;
   const std::string opset_error(
       "onnx runtime error " + std::to_string(ORT_NOT_IMPLEMENTED));
   for (const auto& version : version_dirs) {
     const auto version_path = JoinPath({model_path, version});
 
-    // There must be a single onnx file within the version directory...
     std::set<std::string> onnx_files;
-    RETURN_IF_ERROR(GetDirectoryFiles(version_path, &onnx_files));
-    if (onnx_files.size() == 0) {
-      return Status(
-          RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                           "', unable to find onnx file");
-    } else if (onnx_files.size() > 1) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "expects exactly 1 file in the version directory. Instead found: " +
-              std::to_string(onnx_files.size()) + " files.");
+    RETURN_IF_ERROR(GetDirectoryFiles(
+        version_path, true /* skip_hidden_files */, &onnx_files));
+
+    for (auto file : onnx_files) {
+      const auto onnx_path = JoinPath({version_path, file});
+
+      // Load session
+      std::string onnx_file_content;
+      status = ReadTextFile(onnx_path, &onnx_file_content);
+      if (!status.IsOk()) {
+        continue;
+      }
+      status =
+          OnnxLoader::LoadSession(onnx_file_content, session_options, &session);
+
+      if (status.IsOk()) {
+        local_autofill.reset(new AutoFillOnnxImpl(model_name, file));
+        found = true;
+        break;
+      } else if (
+          (status.Message().compare(0, opset_error.size(), opset_error)) == 0) {
+        local_autofill.reset(new AutoFillOnnxImpl(model_name, file));
+        unsupported_opset = true;
+        // no break in case there is a valid version
+      }
     }
-
-    const std::string onnx_file = *(onnx_files.begin());
-    const auto onnx_path = JoinPath({version_path, onnx_file});
-
-    // Load session
-    std::string onnx_file_content;
-    RETURN_IF_ERROR(ReadTextFile(onnx_path, &onnx_file_content));
-    status =
-        OnnxLoader::LoadSession(onnx_file_content, session_options, &session);
-
-    if (status.IsOk()) {
-      local_autofill.reset(new AutoFillOnnxImpl(model_name, onnx_file));
+    if (found) {
       break;
-    } else if (
-        (status.Message().compare(0, opset_error.size(), opset_error)) == 0) {
-      local_autofill.reset(new AutoFillOnnxImpl(model_name, onnx_file));
-      unsupported_opset = true;
-      // no break in case there is a valid version
     }
   }
 
   // If it is due to unsupported opset, return success with limited autofill
   // capability
-  if (!status.IsOk() && unsupported_opset) {
+  if ((!found) && unsupported_opset) {
     *autofill = std::move(local_autofill);
     return Status::Success;
   }
 
   // Return if none of the version can be loaded successfully
   // due to reasons other than unsupported opset
-  RETURN_IF_ERROR(status);
+  if (!found) {
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
+                                         "', unable to find onnx file");
+  }
 
   OrtAllocator* allocator;
-  OrtStatus* ort_status = ort_api->GetAllocatorWithDefaultOptions(&allocator);
+  ort_status = ort_api->GetAllocatorWithDefaultOptions(&allocator);
 
   if (ort_status == nullptr) {
     status = local_autofill->SetConfigFromOrtSession(session, allocator);

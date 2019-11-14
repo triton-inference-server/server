@@ -71,42 +71,24 @@ AutoFillNetDef::Create(
 
   const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
 
-  // There must be a single netdef model (which is spread across two
-  // files) within the version directory...
   std::set<std::string> netdef_files;
-  RETURN_IF_ERROR(GetDirectoryFiles(version_path, &netdef_files));
+  RETURN_IF_ERROR(GetDirectoryFiles(
+      version_path, true /* skip_hidden_files */, &netdef_files));
   const std::string expected_init_filename =
       std::string(kCaffe2NetDefInitFilenamePrefix) +
       std::string(kCaffe2NetDefFilename);
-  if (netdef_files.size() < 2) {
-    return Status(
-        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "', unable to find netdef files: '" +
-                                         kCaffe2NetDefFilename + "' and '" +
-                                         expected_init_filename + "'");
-  } else if (netdef_files.size() > 2) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "expects exactly 2 files in the version directory. Instead found: " +
-            std::to_string(netdef_files.size()) + " files.");
-  }
-
-  const std::string netdef0_file = *(netdef_files.begin());
-  const std::string netdef1_file = *(std::next(netdef_files.begin()));
 
   // If find both files named with the default netdef names then
   // assume it is a netdef. In the future we can be smarter here and
   // try to parse to see if it really is a netdef, and then try to
   // derive more of the configuration...
-  if (!(((netdef0_file == kCaffe2NetDefFilename) &&
-         (netdef1_file == expected_init_filename)) ||
-        ((netdef1_file == kCaffe2NetDefFilename) &&
-         (netdef0_file == expected_init_filename)))) {
+  if ((netdef_files.find(expected_init_filename) == netdef_files.end()) ||
+      (netdef_files.find(kCaffe2NetDefFilename) == netdef_files.end())) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to autofill for '" + model_name +
-            "', unable to find netdef files named '" + kCaffe2NetDefFilename +
-            "' and '" + expected_init_filename + "'");
+        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
+                                         "', unable to find netdef files: '" +
+                                         kCaffe2NetDefFilename + "' and '" +
+                                         expected_init_filename + "'");
   }
 
   autofill->reset(new AutoFillNetDefImpl(model_name));
