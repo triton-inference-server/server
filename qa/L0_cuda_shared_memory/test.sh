@@ -39,32 +39,35 @@ for i in \
         test_unregister_before_register \
         test_unregister_after_register \
         test_reregister_after_register \
-        test_unregister_during_inference \
-        test_register_during_inference \
+        test_unregister_after_inference \
+        test_register_after_inference \
         test_too_big_shm \
         test_mixed_raw_shm \
         test_unregisterall; do
-    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-    SERVER_LOG="./$i.serverlog"
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
+    for client_type in http grpc; do
+        SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+        SERVER_LOG="./$i.$client_type.serverlog"
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
 
-    echo "Test: $i" >>$CLIENT_LOG
+        export CLIENT_TYPE=$client_type
+        echo "Test: $i, client type: $client_type" >>$CLIENT_LOG
 
-    set +e
-    python $SHM_TEST CudaSharedMemoryTest.$i >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
+        set +e
+        python $SHM_TEST CudaSharedMemoryTest.$i >>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+        kill $SERVER_PID
+        wait $SERVER_PID
+    done
 done
 
 if [ $RET -eq 0 ]; then
