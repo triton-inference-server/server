@@ -114,9 +114,11 @@ install(
     simple_client.py
     simple_callback_client.py
     simple_string_client.py
-    simple_shm_client.py
-    simple_cuda_shm_client.py
     simple_sequence_client.py
+    simple_shm_client.py
+    simple_shm_string_client.py
+    simple_cuda_shm_client.py
+    simple_cuda_shm_string_client.py
   DESTINATION python
 )
 
