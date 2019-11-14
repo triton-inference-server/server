@@ -218,14 +218,7 @@ GetTypedSequenceControlProperties(
 
         *tensor_name = control_input.name();
         if (tensor_datatype != nullptr) {
-          switch (control_kind) {
-            case ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID:
-              *tensor_datatype = DataType::TYPE_UINT64;
-              break;
-            default:
-              *tensor_datatype = DataType::TYPE_INVALID;
-              break;
-          }
+          *tensor_datatype = c.data_type();
         }
 
         seen_control = true;
@@ -516,7 +509,7 @@ ValidateModelConfig(
               config.name());
     }
 
-    // Check controls...
+    // Check boolean controls...
     std::string tensor_name;
     RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         batcher, config.name(),
@@ -533,10 +526,26 @@ ValidateModelConfig(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
         nullptr));
+
+    // Check CORRID control and make sure it is one of the allowed types.
+    DataType tensor_datatype;
     RETURN_IF_ERROR(GetTypedSequenceControlProperties(
         batcher, config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
-        false /* required */, &tensor_name, nullptr));
+        false /* required */, &tensor_name, &tensor_datatype));
+    if (!tensor_name.empty()) {
+      if ((tensor_datatype != TYPE_UINT64) && (tensor_datatype != TYPE_INT64) &&
+          (tensor_datatype != TYPE_UINT32) && (tensor_datatype != TYPE_INT32)) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected datatype for control " +
+                ModelSequenceBatching_Control_Kind_Name(
+                    ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID) +
+                " for " + config.name() +
+                ". Allowed datattypes are TYPE_UINT64, TYPE_INT64, TYPE_UINT32 "
+                "and TYPE_INT32");
+      }
+    }
   }
 
   // If ensemble scheduling is specified, validate it.
