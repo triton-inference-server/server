@@ -145,9 +145,31 @@ install(
 )
 
 #
-# simple_cuda_shm_client
+# simple_shm_string_client
 #
+set(
+  SIMPLE_SHM_STRING_SRCS
+  simple_shm_string_client.cc
+  shm_utils.cc
+)
+set(
+  SIMPLE_SHM_STRING_HDRS
+  shm_utils.h
+)
+add_executable(simple_shm_string_client ${SIMPLE_SHM_STRING_SRCS} ${SIMPLE_SHM_STRING_HDRS})
+target_link_libraries(
+  simple_shm_string_client
+  PRIVATE TRTIS::request_static
+)
+install(
+  TARGETS simple_shm_string_client
+  RUNTIME DESTINATION bin
+)
+
 if(${TRTIS_ENABLE_GPU})
+  #
+  # simple_cuda_shm_client
+  #
   set(
     SIMPLE_CUDA_SHM_SRCS
     simple_cuda_shm_client.cc
@@ -164,6 +186,28 @@ if(${TRTIS_ENABLE_GPU})
   )
   install(
     TARGETS simple_cuda_shm_client
+    RUNTIME DESTINATION bin
+  )
+
+  #
+  # simple_cuda_shm_string_client
+  #
+  set(
+    SIMPLE_CUDA_SHM_STRING_SRCS
+    simple_cuda_shm_client.cc
+  )
+  set(
+    SIMPLE_CUDA_SHM_STRING_HDRS
+  )
+  add_executable(simple_cuda_shm_string_client ${SIMPLE_CUDA_SHM_STRING_SRCS} ${SIMPLE_CUDA_SHM_STRING_HDRS})
+  target_include_directories(simple_cuda_shm_string_client PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_link_libraries(
+    simple_cuda_shm_string_client
+    PRIVATE TRTIS::request_static
+    PRIVATE ${CUDA_LIBRARIES}
+  )
+  install(
+    TARGETS simple_cuda_shm_string_client
     RUNTIME DESTINATION bin
   )
 endif() # TRTIS_ENABLE_GPU
