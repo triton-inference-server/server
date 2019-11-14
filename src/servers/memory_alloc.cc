@@ -264,19 +264,47 @@ GenerateStringInputData(
   std::string input0_str = "";
   std::string input1_str = "";
   for (size_t i = 0; i < 16; ++i) {
-    std::string i0 = std::to_string(i);
+    std::string i0 = std::to_string(i + 1);
     uint32_t i0_len = i0.size();
     input0_str.append(reinterpret_cast<const char*>(&i0_len), sizeof(uint32_t));
     input0_str.append(i0);
-    std::string i1 = std::to_string(i);
-    uint32_t i1_len = i0.size();
-    input0_str.append(reinterpret_cast<const char*>(&i1_len), sizeof(uint32_t));
+    std::string i1 = std::to_string(1);
+    uint32_t i1_len = i1.size();
+    input1_str.append(reinterpret_cast<const char*>(&i1_len), sizeof(uint32_t));
     input1_str.append(i1);
   }
+
   std::copy(
       input0_str.begin(), input0_str.end(), std::back_inserter(*input0_data));
   std::copy(
       input1_str.begin(), input1_str.end(), std::back_inserter(*input1_data));
+}
+
+void
+GenerateStringOutputData(
+    std::vector<char>* output0_data, std::vector<char>* output1_data)
+{
+  std::string output0_str = "";
+  std::string output1_str = "";
+  for (size_t i = 0; i < 16; ++i) {
+    std::string o0 = std::to_string(i + 2);
+    uint32_t o0_len = o0.size();
+    output0_str.append(
+        reinterpret_cast<const char*>(&o0_len), sizeof(uint32_t));
+    output0_str.append(o0);
+    std::string o1 = std::to_string(i);
+    uint32_t o1_len = o1.size();
+    output1_str.append(
+        reinterpret_cast<const char*>(&o1_len), sizeof(uint32_t));
+    output1_str.append(o1);
+  }
+
+  std::copy(
+      output0_str.begin(), output0_str.end(),
+      std::back_inserter(*output0_data));
+  std::copy(
+      output1_str.begin(), output1_str.end(),
+      std::back_inserter(*output1_data));
 }
 
 template <typename T>
@@ -307,20 +335,38 @@ CompareStringResult(
     const void* input0, const void* input1, const void* output0,
     const void* output1)
 {
+  // preprocess results from serialized buffer to integers
+  std::vector<int> output0_numbers;
+  std::vector<int> output1_numbers;
+  size_t buf_offset0 = 0, buf_offset1 = 0;
+  const uint8_t* base0 = reinterpret_cast<const uint8_t*>(output0);
+  const uint8_t* base1 = reinterpret_cast<const uint8_t*>(output1);
   for (size_t i = 0; i < 16; ++i) {
-    LOG_INFO << ((std::string*)input0)[i] << " + " << ((std::string*)input1)[i]
-             << " = " << ((std::string*)output0)[i];
-    LOG_INFO << ((std::string*)input0)[i] << " - " << ((std::string*)input1)[i]
-             << " = " << ((std::string*)output1)[i];
+    const uint32_t len0 =
+        *(reinterpret_cast<const uint32_t*>(base0 + buf_offset0));
+    std::string o0_tmp(
+        reinterpret_cast<const char*>(base0 + buf_offset0 + sizeof(len0)),
+        len0);
+    output0_numbers.push_back(std::atoi(o0_tmp.c_str()));
+    buf_offset0 += sizeof(len0) + len0;
 
-    if ((std::stoi(((std::string*)input0)[i]) +
-         std::stoi(((std::string*)input1)[i])) !=
-        std::stoi(((std::string*)output0)[i])) {
+    const uint32_t len1 =
+        *(reinterpret_cast<const uint32_t*>(base1 + buf_offset1));
+    std::string o1_tmp(
+        reinterpret_cast<const char*>(base1 + buf_offset1 + sizeof(len1)),
+        len1);
+    output1_numbers.push_back(std::atoi(o1_tmp.c_str()));
+    buf_offset1 += sizeof(len1) + len1;
+  }
+
+  for (int i = 0; i < 16; ++i) {
+    LOG_INFO << (i + 1) << " + " << 1 << " = " << output0_numbers[i];
+    LOG_INFO << (i + 1) << " - " << 1 << " = " << output1_numbers[i];
+
+    if (((i + 1) + 1) != output0_numbers[i]) {
       FAIL("incorrect sum in " + output0_name);
     }
-    if ((std::stoi(((std::string*)input0)[i]) -
-         std::stoi(((std::string*)input1)[i])) !=
-        std::stoi(((std::string*)output1)[i])) {
+    if (((i + 1) - 1) != output1_numbers[i]) {
       FAIL("incorrect difference in " + output1_name);
     }
   }
@@ -536,18 +582,6 @@ main(int argc, char** argv)
   auto output1 = request_header.add_output();
   output1->set_name(is_torch_model ? "OUTPUT__1" : "OUTPUT1");
 
-  std::string request_header_serialized;
-  request_header.SerializeToString(&request_header_serialized);
-
-  // Create the inference request provider which provides all the
-  // input information needed for an inference.
-  TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
-  FAIL_IF_ERR(
-      TRTSERVER_InferenceRequestProviderNew(
-          &request_provider, server.get(), model_name.c_str(), model_version,
-          request_header_serialized.c_str(), request_header_serialized.size()),
-      "creating inference request provider");
-
   // Create the data for the two input tensors. Initialize the first
   // to unique integers and the second to all ones.
   std::vector<char> input0_data;
@@ -560,8 +594,27 @@ main(int argc, char** argv)
     GenerateStringInputData(&input0_data, &input1_data);
   }
 
+  // Get the size of the input tensors
   size_t input0_size = input0_data.size();
   size_t input1_size = input1_data.size();
+
+  // For string we need to set batch byte size explicitly
+  if (dtype == ni::TYPE_STRING) {
+    input0->set_batch_byte_size(input0_size);
+    input1->set_batch_byte_size(input1_size);
+  }
+
+  std::string request_header_serialized;
+  request_header.SerializeToString(&request_header_serialized);
+
+  // Create the inference request provider which provides all the
+  // input information needed for an inference.
+  TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestProviderNew(
+          &request_provider, server.get(), model_name.c_str(), model_version,
+          request_header_serialized.c_str(), request_header_serialized.size()),
+      "creating inference request provider");
 
   const void* input0_base = &input0_data[0];
   const void* input1_base = &input1_data[0];
@@ -650,6 +703,13 @@ main(int argc, char** argv)
         "deleting response protobuf");
   }
 
+  // Create the expected data for the two output tensors.
+  std::vector<char> expected0_data;
+  std::vector<char> expected1_data;
+  if (dtype == ni::TYPE_STRING) {
+    GenerateStringOutputData(&expected0_data, &expected1_data);
+  }
+
   // Check the output tensor values...
   // Note that depending on whether the backend supports outputs in GPU memory,
   // the output tensor may be in CPU memory even if -g flag is set.
@@ -662,7 +722,15 @@ main(int argc, char** argv)
           response, output0->name().c_str(), &output0_content,
           &output0_byte_size, &output0_memory_type, &output0_memory_type_id),
       "getting output0 result");
-  if (output0_byte_size != input0_size) {
+  if (dtype == ni::TYPE_STRING) {
+    size_t expected0_size = expected0_data.size();
+    if (expected0_size != output0_byte_size) {
+      FAIL(
+          "unexpected output0 byte-size, expected " +
+          std::to_string(expected0_size) + ", got " +
+          std::to_string(output0_byte_size));
+    }
+  } else if (output0_byte_size != input0_size) {
     FAIL(
         "unexpected output0 byte-size, expected " +
         std::to_string(input0_size) + ", got " +
@@ -688,7 +756,15 @@ main(int argc, char** argv)
           response, output1->name().c_str(), &output1_content,
           &output1_byte_size, &output1_memory_type, &output1_memory_type_id),
       "getting output1 result");
-  if (output1_byte_size != input1_size) {
+  if (dtype == ni::TYPE_STRING) {
+    size_t expected1_size = expected1_data.size();
+    if (expected1_size != output1_byte_size) {
+      FAIL(
+          "unexpected output1 byte-size, expected " +
+          std::to_string(expected1_size) + ", got " +
+          std::to_string(output1_byte_size));
+    }
+  } else if (output1_byte_size != input1_size) {
     FAIL(
         "unexpected output1 byte-size, expected " +
         std::to_string(input1_size) + ", got " +
