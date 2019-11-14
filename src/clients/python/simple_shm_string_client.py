@@ -111,10 +111,11 @@ if __name__ == '__main__':
     shared_memory_ctx.register(shm_ip0_handle)
     shared_memory_ctx.register(shm_ip1_handle)
 
-    # Send inference request to the inference server. Get results for
-    # both output tensors.
-    results = infer_ctx.run({ 'INPUT0' : (shm_ip0_handle, (16,)),
-                            'INPUT1' : (shm_ip1_handle, (16,)) },
+    # Send inference request to the inference server. Get results for both
+    # output tensors. Passing shape of input tensors is necessary for
+    # String and variable size tensors.
+    results = infer_ctx.run({ 'INPUT0' : (shm_ip0_handle, input0_data.shape),
+                            'INPUT1' : (shm_ip1_handle, input1_data.shape)},
                             { 'OUTPUT0' : (InferContext.ResultFormat.RAW, shm_op0_handle),
                             'OUTPUT1' : (InferContext.ResultFormat.RAW, shm_op1_handle) },
                             batch_size)
