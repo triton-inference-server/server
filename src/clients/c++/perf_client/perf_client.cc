@@ -28,6 +28,7 @@
 
 #include "src/clients/c++/perf_client/concurrency_manager.h"
 #include "src/clients/c++/perf_client/context_factory.h"
+#include "src/clients/c++/perf_client/custom_load_manager.h"
 #include "src/clients/c++/perf_client/inference_profiler.h"
 #include "src/clients/c++/perf_client/load_manager.h"
 #include "src/clients/c++/perf_client/perf_utils.h"
@@ -1032,20 +1033,25 @@ main(int argc, char** argv)
         async, batch_size, max_threads, max_concurrency, sequence_length,
         string_length, string_data, zero_input, input_shapes, data_directory,
         factory, &manager);
-    if (!err.IsOk()) {
-      std::cerr << err << std::endl;
-      return 1;
-    }
-  } else {
+
+  } else if (using_request_rate_range) {
     err = RequestRateManager::Create(
-        async, measurement_window_ms, request_distribution,
-        request_intervals_file, batch_size, max_threads, num_of_sequences,
-        sequence_length, string_length, string_data, zero_input, input_shapes,
-        data_directory, factory, &manager);
-    if (!err.IsOk()) {
-      std::cerr << err << std::endl;
-      return 1;
-    }
+        async, measurement_window_ms, request_distribution, batch_size,
+        max_threads, num_of_sequences, sequence_length, string_length,
+        string_data, zero_input, input_shapes, data_directory, factory,
+        &manager);
+
+  } else {
+    err = CustomLoadManager::Create(
+        async, measurement_window_ms, request_intervals_file, batch_size,
+        max_threads, num_of_sequences, sequence_length, string_length,
+        string_data, zero_input, input_shapes, data_directory, factory,
+        &manager);
+  }
+
+  if (!err.IsOk()) {
+    std::cerr << err << std::endl;
+    return 1;
   }
 
   err = InferenceProfiler::Create(

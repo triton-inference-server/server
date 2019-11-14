@@ -62,8 +62,6 @@ class RequestRateManager : public LoadManager {
   /// \param measurement_window_ms The time window for measurements.
   /// \param request_distribution The kind of distribution to use for drawing
   /// out intervals between successive requests.
-  /// \param request_intervals_file The path to the file to use to pick up the
-  /// time intervals between the successive requests.
   /// \param batch_size The batch size used for each request.
   /// \param max_threads The maximum number of working threads to be spawned.
   /// \param num_of_sequences The number of concurrent sequences that must be
@@ -75,8 +73,7 @@ class RequestRateManager : public LoadManager {
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const bool async, const uint64_t measurement_window_ms,
-      Distribution request_distribution,
-      const std::string& request_intervals_file, const int32_t batch_size,
+      Distribution request_distribution, const int32_t batch_size,
       const size_t max_threads, const uint32_t num_of_sequences,
       const size_t sequence_length, const size_t string_length,
       const std::string& string_data, const bool zero_input,
@@ -85,20 +82,17 @@ class RequestRateManager : public LoadManager {
       const std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
 
-  /// @ See LoadManager::ChangeRequestRate()
-  nic::Error ChangeRequestRate(const double target_request_rate) override;
+  /// Adjusts the rate of issuing requests to be the same as 'request_rate'
+  /// \param request_rate The rate at which requests must be issued to the
+  /// server.
+  /// \return Error object indicating success or failure.
+  nic::Error ChangeRequestRate(const double target_request_rate);
 
-  /// @ See LoadManager::InitCustomIntervals()
-  nic::Error InitCustomIntervals() override;
-
-  /// @ See LoadManager::GetCustomRequestRate()
-  nic::Error GetCustomRequestRate(double* request_rate) override;
-
-  /// @ See LoadManager::ResetWorkers()
+  /// Resets all worker thread states to beginning of schedule.
+  /// \return Error object indicating success or failure.
   nic::Error ResetWorkers() override;
 
-
- private:
+ protected:
   struct ThreadConfig {
     ThreadConfig(uint32_t index, uint32_t stride)
         : index_(index), id_(index), stride_(stride), is_paused_(false),
@@ -120,11 +114,12 @@ class RequestRateManager : public LoadManager {
     std::mutex mtx_;
   };
 
+  RequestRateManager() = default;
+
   RequestRateManager(
       const bool async,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      Distribution request_distribution,
-      const std::string& request_intervals_file, const int32_t batch_size,
+      Distribution request_distribution, const int32_t batch_size,
       const uint64_t measurement_window_ms, const size_t max_threads,
       const uint32_t num_of_sequences, const size_t sequence_length,
       const std::shared_ptr<ContextFactory>& factory);
@@ -162,8 +157,6 @@ class RequestRateManager : public LoadManager {
 
   std::unique_ptr<std::chrono::nanoseconds> gen_duration_;
   Distribution request_distribution_;
-  std::string request_intervals_file_;
-  std::vector<std::chrono::nanoseconds> custom_intervals_;
   std::vector<std::chrono::nanoseconds> schedule_;
   std::chrono::steady_clock::time_point start_time_;
   bool execute_;
