@@ -58,11 +58,12 @@ Status GetBooleanSequenceControlProperties(
     float* fp32_false_value, float* fp32_true_value, int32_t* int32_false_value,
     int32_t* int32_true_value);
 
-/// Get the tensor name and datatype for a non-boolean sequench
+/// Get the tensor name and datatype for a non-boolean sequence
 /// batcher control kind. If 'required' is true then must find a
 /// tensor for the control. If 'required' is false, return
 /// 'tensor_name' as empty-string if the control is not mapped to any
-/// tensor.
+/// tensor. 'tensor_datatype' returns the required datatype for the
+/// control.
 Status GetTypedSequenceControlProperties(
     const ModelSequenceBatching& batcher, const std::string& model_name,
     const ModelSequenceBatching::Control::Kind control_kind,
