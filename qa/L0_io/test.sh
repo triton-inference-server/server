@@ -48,7 +48,7 @@ rm -f $CLIENT_LOG.*
 
 RET=0
 
-# Prepare models with basic config
+# Prepare float32 models with basic config
 rm -rf $MODELSDIR
 for trial in graphdef savedmodel netdef onnx libtorch plan ; do
     full=${trial}_float32_float32_float32
@@ -78,7 +78,18 @@ for trial in graphdef savedmodel netdef onnx libtorch plan ; do
     fi
 done
 
-# custom model needs to be obtained elsewhere
+# Prepare string models with basic config
+for trial in graphdef savedmodel onnx ; do
+    full=${trial}_object_object_object
+    mkdir -p $MODELSDIR/${full}/1 && \
+        cp -r $DATADIR/${full}/1/* $MODELSDIR/${full}/1/. && \
+        cp $DATADIR/${full}/config.pbtxt $MODELSDIR/${full}/. && \
+        (cd $MODELSDIR/${full} && \
+                sed -i "s/label_filename:.*//" config.pbtxt && \
+                echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
+done
+
+# custom float32 model needs to be obtained elsewhere
 full=custom_float32_float32_float32
 rm -rf $MODELSDIR/${full}/1/*
 mkdir -p $MODELSDIR/${full}/1 && \
@@ -88,12 +99,12 @@ mkdir -p $MODELSDIR/${full}/1 && \
                 sed -i "s/label_filename:.*//" config.pbtxt && \
                 echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
 
-# set up "addsub" ensemble for custom model
+# set up "addsub" ensemble for custom float32 model
 cp -r $MODELSDIR/fan_graphdef_float32_float32_float32 $MODELSDIR/fan_${full} && \
     (cd $MODELSDIR/fan_${full} && \
             sed -i "s/graphdef_float32_float32_float32/${full}/" config.pbtxt)
 
-# custom component of ensemble
+# custom float32 component of ensemble
 cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
     mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1 && \
     cp libidentity.so $MODELSDIR/nop_TYPE_FP32_-1/1/.
@@ -105,8 +116,8 @@ for input_device in -1 0 1; do
             model_devices="-1 0 1" && [[ "$trial" == "plan" ]] && model_devices="0 1"
             for model_device in $model_devices; do
                 full=${trial}_float32_float32_float32
-                full_log=$CLIENT_LOG.$trial.$input_device.$output_device.$model_device
-                
+                full_log=$CLIENT_LOG.$full.$input_device.$output_device.$model_device
+
                 if [ "$model_device" == "-1" ]; then
                     (cd $MODELSDIR/${full} && \
                         sed -i "s/instance_group.*/instance_group [{ kind: KIND_CPU }]/" config.pbtxt)
@@ -114,7 +125,7 @@ for input_device in -1 0 1; do
                     (cd $MODELSDIR/${full} && \
                         sed -i "s/instance_group.*/instance_group [{ kind: KIND_GPU, gpus: [${model_device}] }]/" config.pbtxt)
                 fi
-                
+
                 set +e
                 $IO_TEST_UTIL -i $input_device -o $output_device -r $MODELSDIR -m $full >>$full_log 2>&1
                 if [ $? -ne 0 ]; then
@@ -129,6 +140,31 @@ for input_device in -1 0 1; do
                 $IO_TEST_UTIL -i $input_device -o $output_device -r $MODELSDIR -m fan_$full >>$full_log.ensemble 2>&1
                 if [ $? -ne 0 ]; then
                     cat $full_log.ensemble
+                    echo -e "\n***\n*** Test Failed\n***"
+                    RET=1
+                fi
+                set -e
+            done
+        done
+
+        for trial in graphdef savedmodel onnx; do
+            model_devices="-1 0 1"
+            for model_device in $model_devices; do
+                full=${trial}_object_object_object
+                full_log=$CLIENT_LOG.$full.$input_device.$output_device.$model_device
+
+                if [ "$model_device" == "-1" ]; then
+                    (cd $MODELSDIR/${full} && \
+                        sed -i "s/instance_group.*/instance_group [{ kind: KIND_CPU }]/" config.pbtxt)
+                else
+                    (cd $MODELSDIR/${full} && \
+                        sed -i "s/instance_group.*/instance_group [{ kind: KIND_GPU, gpus: [${model_device}] }]/" config.pbtxt)
+                fi
+
+                set +e
+                $IO_TEST_UTIL -i $input_device -o $output_device -r $MODELSDIR -m $full >>$full_log 2>&1
+                if [ $? -ne 0 ]; then
+                    cat $full_log
                     echo -e "\n***\n*** Test Failed\n***"
                     RET=1
                 fi

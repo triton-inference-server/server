@@ -204,16 +204,17 @@ InferComplete(
 
 TRTSERVER_Error*
 ParseModelConfig(
-    const ni::ModelConfig& config, bool* is_int, bool* is_torch_model)
+    const ni::ModelConfig& config, ni::DataType* dtype, bool* is_torch_model)
 {
   auto data_type = ni::TYPE_INVALID;
   for (const auto& input : config.input()) {
     if ((input.data_type() != ni::TYPE_INT32) &&
-        (input.data_type() != ni::TYPE_FP32)) {
+        (input.data_type() != ni::TYPE_FP32) &&
+        (input.data_type() != ni::TYPE_STRING)) {
       return TRTSERVER_ErrorNew(
           TRTSERVER_ERROR_UNSUPPORTED,
-          "IO test utility only supports model with data type INT32 or "
-          "FP32");
+          "IO test utility only supports model with data type INT32, "
+          "FP32 or STRING");
     }
     if (data_type == ni::TYPE_INVALID) {
       data_type = input.data_type();
@@ -225,11 +226,12 @@ ParseModelConfig(
   }
   for (const auto& output : config.output()) {
     if ((output.data_type() != ni::TYPE_INT32) &&
-        (output.data_type() != ni::TYPE_FP32)) {
+        (output.data_type() != ni::TYPE_FP32) &&
+        (output.data_type() != ni::TYPE_STRING)) {
       return TRTSERVER_ErrorNew(
           TRTSERVER_ERROR_UNSUPPORTED,
-          "IO test utility only supports model with data type INT32 or "
-          "FP32");
+          "IO test utility only supports model with data type INT32, "
+          "FP32 or STRING");
     } else if (output.data_type() != data_type) {
       auto err_str = "the inputs and outputs of '" + config.name() +
                      "' model must have the same data type";
@@ -237,7 +239,7 @@ ParseModelConfig(
     }
   }
 
-  *is_int = (data_type == ni::TYPE_INT32);
+  *dtype = data_type;
   *is_torch_model = (config.platform() == "pytorch_libtorch");
   return nullptr;
 }
@@ -253,6 +255,56 @@ GenerateInputData(
     ((T*)input0_data->data())[i] = i;
     ((T*)input1_data->data())[i] = 1;
   }
+}
+
+void
+GenerateStringInputData(
+    std::vector<char>* input0_data, std::vector<char>* input1_data)
+{
+  std::string input0_str = "";
+  std::string input1_str = "";
+  for (size_t i = 0; i < 16; ++i) {
+    std::string i0 = std::to_string(i + 1);
+    uint32_t i0_len = i0.size();
+    input0_str.append(reinterpret_cast<const char*>(&i0_len), sizeof(uint32_t));
+    input0_str.append(i0);
+    std::string i1 = std::to_string(1);
+    uint32_t i1_len = i1.size();
+    input1_str.append(reinterpret_cast<const char*>(&i1_len), sizeof(uint32_t));
+    input1_str.append(i1);
+  }
+
+  std::copy(
+      input0_str.begin(), input0_str.end(), std::back_inserter(*input0_data));
+  std::copy(
+      input1_str.begin(), input1_str.end(), std::back_inserter(*input1_data));
+}
+
+void
+GenerateStringOutputData(
+    std::vector<char>* output0_data, std::vector<char>* output1_data)
+{
+  std::string output0_str = "";
+  std::string output1_str = "";
+  for (size_t i = 0; i < 16; ++i) {
+    std::string o0 = std::to_string(i + 2);
+    uint32_t o0_len = o0.size();
+    output0_str.append(
+        reinterpret_cast<const char*>(&o0_len), sizeof(uint32_t));
+    output0_str.append(o0);
+    std::string o1 = std::to_string(i);
+    uint32_t o1_len = o1.size();
+    output1_str.append(
+        reinterpret_cast<const char*>(&o1_len), sizeof(uint32_t));
+    output1_str.append(o1);
+  }
+
+  std::copy(
+      output0_str.begin(), output0_str.end(),
+      std::back_inserter(*output0_data));
+  std::copy(
+      output1_str.begin(), output1_str.end(),
+      std::back_inserter(*output1_data));
 }
 
 template <typename T>
@@ -272,6 +324,49 @@ CompareResult(
       FAIL("incorrect sum in " + output0_name);
     }
     if ((((T*)input0)[i] - ((T*)input1)[i]) != ((T*)output1)[i]) {
+      FAIL("incorrect difference in " + output1_name);
+    }
+  }
+}
+
+void
+CompareStringResult(
+    const std::string& output0_name, const std::string& output1_name,
+    const void* input0, const void* input1, const void* output0,
+    const void* output1)
+{
+  // preprocess results from serialized buffer to integers
+  std::vector<int> output0_numbers;
+  std::vector<int> output1_numbers;
+  size_t buf_offset0 = 0, buf_offset1 = 0;
+  const uint8_t* base0 = reinterpret_cast<const uint8_t*>(output0);
+  const uint8_t* base1 = reinterpret_cast<const uint8_t*>(output1);
+  for (size_t i = 0; i < 16; ++i) {
+    const uint32_t len0 =
+        *(reinterpret_cast<const uint32_t*>(base0 + buf_offset0));
+    std::string o0_tmp(
+        reinterpret_cast<const char*>(base0 + buf_offset0 + sizeof(len0)),
+        len0);
+    output0_numbers.push_back(std::atoi(o0_tmp.c_str()));
+    buf_offset0 += sizeof(len0) + len0;
+
+    const uint32_t len1 =
+        *(reinterpret_cast<const uint32_t*>(base1 + buf_offset1));
+    std::string o1_tmp(
+        reinterpret_cast<const char*>(base1 + buf_offset1 + sizeof(len1)),
+        len1);
+    output1_numbers.push_back(std::atoi(o1_tmp.c_str()));
+    buf_offset1 += sizeof(len1) + len1;
+  }
+
+  for (int i = 0; i < 16; ++i) {
+    LOG_INFO << (i + 1) << " + " << 1 << " = " << output0_numbers[i];
+    LOG_INFO << (i + 1) << " - " << 1 << " = " << output1_numbers[i];
+
+    if (((i + 1) + 1) != output0_numbers[i]) {
+      FAIL("incorrect sum in " + output0_name);
+    }
+    if (((i + 1) - 1) != output1_numbers[i]) {
       FAIL("incorrect difference in " + output1_name);
     }
   }
@@ -417,7 +512,7 @@ main(int argc, char** argv)
 
   // Wait for the model to become available.
   bool is_torch_model = false;
-  bool is_int = true;
+  ni::DataType dtype = ni::TYPE_INT32;
   while (true) {
     TRTSERVER_Protobuf* model_status_protobuf;
     FAIL_IF_ERR(
@@ -453,7 +548,7 @@ main(int argc, char** argv)
              << ni::ModelReadyState_Name(vitr->second.ready_state());
     if (vitr->second.ready_state() == ni::ModelReadyState::MODEL_READY) {
       FAIL_IF_ERR(
-          ParseModelConfig(itr->second.config(), &is_int, &is_torch_model),
+          ParseModelConfig(itr->second.config(), &dtype, &is_torch_model),
           "parsing model config");
       break;
     }
@@ -487,6 +582,28 @@ main(int argc, char** argv)
   auto output1 = request_header.add_output();
   output1->set_name(is_torch_model ? "OUTPUT__1" : "OUTPUT1");
 
+  // Create the data for the two input tensors. Initialize the first
+  // to unique integers and the second to all ones.
+  std::vector<char> input0_data;
+  std::vector<char> input1_data;
+  if (dtype == ni::TYPE_INT32) {
+    GenerateInputData<int32_t>(&input0_data, &input1_data);
+  } else if (dtype == ni::TYPE_FP32) {
+    GenerateInputData<float>(&input0_data, &input1_data);
+  } else {
+    GenerateStringInputData(&input0_data, &input1_data);
+  }
+
+  // Get the size of the input tensors
+  size_t input0_size = input0_data.size();
+  size_t input1_size = input1_data.size();
+
+  // For string we need to set batch byte size explicitly
+  if (dtype == ni::TYPE_STRING) {
+    input0->set_batch_byte_size(input0_size);
+    input1->set_batch_byte_size(input1_size);
+  }
+
   std::string request_header_serialized;
   request_header.SerializeToString(&request_header_serialized);
 
@@ -498,19 +615,6 @@ main(int argc, char** argv)
           &request_provider, server.get(), model_name.c_str(), model_version,
           request_header_serialized.c_str(), request_header_serialized.size()),
       "creating inference request provider");
-
-  // Create the data for the two input tensors. Initialize the first
-  // to unique integers and the second to all ones.
-  std::vector<char> input0_data;
-  std::vector<char> input1_data;
-  if (is_int) {
-    GenerateInputData<int32_t>(&input0_data, &input1_data);
-  } else {
-    GenerateInputData<float>(&input0_data, &input1_data);
-  }
-
-  size_t input0_size = input0_data.size();
-  size_t input1_size = input1_data.size();
 
   const void* input0_base = &input0_data[0];
   const void* input1_base = &input1_data[0];
@@ -599,6 +703,13 @@ main(int argc, char** argv)
         "deleting response protobuf");
   }
 
+  // Create the expected data for the two output tensors.
+  std::vector<char> expected0_data;
+  std::vector<char> expected1_data;
+  if (dtype == ni::TYPE_STRING) {
+    GenerateStringOutputData(&expected0_data, &expected1_data);
+  }
+
   // Check the output tensor values...
   // Note that depending on whether the backend supports outputs in GPU memory,
   // the output tensor may be in CPU memory even if -g flag is set.
@@ -611,7 +722,15 @@ main(int argc, char** argv)
           response, output0->name().c_str(), &output0_content,
           &output0_byte_size, &output0_memory_type, &output0_memory_type_id),
       "getting output0 result");
-  if (output0_byte_size != input0_size) {
+  if (dtype == ni::TYPE_STRING) {
+    size_t expected0_size = expected0_data.size();
+    if (expected0_size != output0_byte_size) {
+      FAIL(
+          "unexpected output0 byte-size, expected " +
+          std::to_string(expected0_size) + ", got " +
+          std::to_string(output0_byte_size));
+    }
+  } else if (output0_byte_size != input0_size) {
     FAIL(
         "unexpected output0 byte-size, expected " +
         std::to_string(input0_size) + ", got " +
@@ -637,7 +756,15 @@ main(int argc, char** argv)
           response, output1->name().c_str(), &output1_content,
           &output1_byte_size, &output1_memory_type, &output1_memory_type_id),
       "getting output1 result");
-  if (output1_byte_size != input1_size) {
+  if (dtype == ni::TYPE_STRING) {
+    size_t expected1_size = expected1_data.size();
+    if (expected1_size != output1_byte_size) {
+      FAIL(
+          "unexpected output1 byte-size, expected " +
+          std::to_string(expected1_size) + ", got " +
+          std::to_string(output1_byte_size));
+    }
+  } else if (output1_byte_size != input1_size) {
     FAIL(
         "unexpected output1 byte-size, expected " +
         std::to_string(input1_size) + ", got " +
@@ -685,12 +812,16 @@ main(int argc, char** argv)
     output1_result = &output1_data[0];
   }
 
-  if (is_int) {
+  if (dtype == ni::TYPE_INT32) {
     CompareResult<int32_t>(
         output0->name(), output1->name(), &input0_data[0], &input1_data[0],
         output0_result, output1_result);
-  } else {
+  } else if (dtype == ni::TYPE_FP32) {
     CompareResult<float>(
+        output0->name(), output1->name(), &input0_data[0], &input1_data[0],
+        output0_result, output1_result);
+  } else {
+    CompareStringResult(
         output0->name(), output1->name(), &input0_data[0], &input1_data[0],
         output0_result, output1_result);
   }
