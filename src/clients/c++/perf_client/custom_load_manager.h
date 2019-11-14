@@ -25,77 +25,66 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/clients/c++/perf_client/load_manager.h"
+#include "src/clients/c++/perf_client/request_rate_manager.h"
 
 //==============================================================================
-/// ConcurrencyManager is a helper class to send inference requests to inference
-/// server consistently, based on the specified setting, so that the perf_client
-/// can measure performance under different concurrency.
+/// CustomLoadManager is a helper class to send inference requests to
+/// inference server in accordance with  user provided time intervals. This
+/// load manager can be used to model certain patterns of interest.
 ///
-/// An instance of concurrency manager will be created at the beginning of the
-/// perf client and it will be used to simulate different load level in respect
-/// to number of concurrent infer requests and to collect per-request statistic.
-///
-/// Detail:
-/// Concurrency Manager will maintain the number of concurrent requests by
-/// spawning worker threads that keep sending randomly generated requests to the
-/// server. The worker threads will record the start time and end
-/// time of each request into a shared vector.
-///
-class ConcurrencyManager : public LoadManager {
+class CustomLoadManager : public RequestRateManager {
  public:
-  ~ConcurrencyManager() = default;
+  ~CustomLoadManager() = default;
 
-  /// Create a concurrency manager that is responsible to maintain specified
-  /// load on inference server.
+  /// Create an object of realistic load manager that is responsible to maintain
+  /// specified load on inference server.
   /// \param async Whether to use asynchronous or synchronous API for infer
   /// request.
+  /// \param measurement_window_ms The time window for measurements.
+  /// \param request_intervals_file The path to the file to use to pick up the
+  /// time intervals between the successive requests.
   /// \param batch_size The batch size used for each request.
   /// \param max_threads The maximum number of working threads to be spawned.
-  /// \param max_concurrency The maximum concurrency which will be requested.
+  /// \param num_of_sequences The number of concurrent sequences that must be
+  /// maintained on the server.
   /// \param sequence_length The base length of each sequence.
   /// \param zero_input Whether to fill the input tensors with zero.
   /// \param factory The ContextFactory object used to create InferContext.
   /// \param manager Returns a new ConcurrencyManager object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
-      const bool async, const int32_t batch_size, const size_t max_threads,
-      const size_t max_concurrency, const size_t sequence_length,
-      const size_t string_length, const std::string& string_data,
-      const bool zero_input,
+      const bool async, const uint64_t measurement_window_ms,
+      const std::string& request_intervals_file, const int32_t batch_size,
+      const size_t max_threads, const uint32_t num_of_sequences,
+      const size_t sequence_length, const size_t string_length,
+      const std::string& string_data, const bool zero_input,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       const std::string& data_directory,
       const std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
 
-  /// Adjusts the number of concurrent requests to be the same as
-  /// 'concurrent_request_count' (by creating or pausing threads)
-  /// \param concurent_request_count The number of concurrent requests.
+
+  /// Initializes the load manager with the provided file containing request
+  /// intervals
   /// \return Error object indicating success or failure.
-  nic::Error ChangeConcurrencyLevel(const size_t concurrent_request_count);
+  nic::Error InitCustomIntervals();
+
+  /// Computes the request rate from the time interval file. Fails with an error
+  /// if the file is not present or is empty.
+  /// \param request_rate Returns request rate as computed from the time
+  /// interval file.
+  /// \return Error object indicating success or failure.
+  nic::Error GetCustomRequestRate(double* request_rate);
 
  private:
-  ConcurrencyManager(
+  CustomLoadManager(
       const bool async,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      const int32_t batch_size, const size_t max_threads,
-      const size_t max_concurrency, const size_t sequence_length,
+      const std::string& request_intervals_file, const int32_t batch_size,
+      const uint64_t measurement_window_ms, const size_t max_threads,
+      const uint32_t num_of_sequences, const size_t sequence_length,
       const std::shared_ptr<ContextFactory>& factory);
 
-  struct ThreadConfig {
-    ThreadConfig() : concurrency_(0) {}
-
-    //  The concurrency level that the worker should produce
-    size_t concurrency_;
-  };
-
-  /// Function for worker that sends inference requests.
-  /// \param thread_stat Worker thread status specific data.
-  /// \param thread_config Worker thread configuration specific data.
-  void Infer(
-      std::shared_ptr<ThreadStat> thread_stat,
-      std::shared_ptr<ThreadConfig> thread_config);
-
-  size_t max_concurrency_;
-  std::vector<std::shared_ptr<ThreadConfig>> threads_config_;
+  std::string request_intervals_file_;
+  std::vector<std::chrono::nanoseconds> custom_intervals_;
 };

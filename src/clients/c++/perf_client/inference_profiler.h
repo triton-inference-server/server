@@ -26,9 +26,10 @@
 #pragma once
 
 #include <thread>
+#include "src/clients/c++/perf_client/concurrency_manager.h"
 #include "src/clients/c++/perf_client/context_factory.h"
-#include "src/clients/c++/perf_client/load_manager.h"
-
+#include "src/clients/c++/perf_client/custom_load_manager.h"
+#include "src/clients/c++/perf_client/request_rate_manager.h"
 
 using ModelInfo = std::pair<std::string, int64_t>;
 using ComposingModelMap = std::map<ModelInfo, std::set<ModelInfo>>;
