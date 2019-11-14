@@ -28,7 +28,6 @@
 import tensorrtserver.shared_memory as shm
 from tensorrtserver.api import *
 import numpy as np
-import threading
 
 # Raises error since invalid shm region
 try:
@@ -80,40 +79,23 @@ def basic_inference(shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_hand
     except Exception as ex:
         error_msg.append(str(ex.message()))
 
-# Unregister during inference
+# Unregister then infer
 error_msg = []
-threads = []
-threads.append(threading.Thread(target=basic_inference,
-    args=(shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle, error_msg)))
-threads.append(threading.Thread(target=shared_memory_ctx.unregister, args=(shm_op0_handle,)))
-for t in threads:
-    t.start()
-for t in threads:
-    t.join()
-
+shared_memory_ctx.unregister(shm_op0_handle)
+basic_inference(shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle, error_msg)
 assert error_msg[0] == "shared memory block 'output0_data' not found in manager"
 shared_memory_ctx.register(shm_op0_handle)
 
-# Destory during inference (Does not destroy_shared_memory_region)
-threads[0] = threading.Thread(target=basic_inference,
-    args=(shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle, error_msg))
-threads[1] = threading.Thread(target=shm.destroy_shared_memory_region, args=(shm_op0_handle,))
-for t in threads:
-    t.start()
-for t in threads:
-    t.join()
+# Destroy shared memory then infer
+shm.destroy_shared_memory_region(shm_op0_handle)
+basic_inference(shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle, error_msg)
 if len(error_msg) > 1:
     raise Exception(error_msg[-1])
 
-# Register during inference - Should work fine
+# Register and inference - Should work fine
 shm_ip2_handle = shm.create_shared_memory_region("input2_data", "/input2", 128)
-threads[0] = threading.Thread(target=basic_inference,
-    args=(shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle, error_msg))
-threads[1] = threading.Thread(target=shared_memory_ctx.register, args=(shm_ip2_handle,))
-for t in threads:
-    t.start()
-for t in threads:
-    t.join()
+shared_memory_ctx.register(shm_ip2_handle)
+basic_inference(shm_ip0_handle, shm_ip1_handle, shm_op0_handle, shm_op1_handle, error_msg)
 if len(error_msg) > 1:
     raise Exception(error_msg[-1])
 
