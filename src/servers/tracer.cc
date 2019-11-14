@@ -169,6 +169,9 @@ void
 Tracer::CaptureTimestamp(
     TRTSERVER_Trace_Level level, const std::string& name, uint64_t timestamp_ns)
 {
+  // In the case of tracing an ensemble, it is possible to access a trace object
+  // concurrently
+  std::lock_guard<std::mutex> lk(mtx_);
   if (level <= level_) {
     if (timestamp_ns == 0) {
       struct timespec ts;

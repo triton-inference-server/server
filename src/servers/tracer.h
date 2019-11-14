@@ -116,6 +116,8 @@ class Tracer {
   uint32_t timestamp_cnt_;
 
   TRTSERVER_Trace* trace_;
+
+  std::mutex mtx_;
 };
 
 }}  // namespace nvidia::inferenceserver

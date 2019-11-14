@@ -726,6 +726,7 @@ EnsembleContext::ScheduleSteps(
     infer_stats->SetBatchSize(
         step->request_provider_->RequestHeader().batch_size());
     infer_stats->SetFailed(true);
+    infer_stats->SetTrace(context->stats_->GetTrace());
 
     context->is_->InferAsync(
         step->backend_, step->request_provider_, step->response_provider_,
