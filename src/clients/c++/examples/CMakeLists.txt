@@ -145,6 +145,28 @@ install(
 )
 
 #
+# simple_shm_string_client
+#
+set(
+  SIMPLE_SHM_SRCS
+  simple_shm_string_client.cc
+  shm_utils.cc
+)
+set(
+  SIMPLE_SHM_HDRS
+  shm_utils.h
+)
+add_executable(simple_shm_string_client ${SIMPLE_SHM_SRCS} ${SIMPLE_SHM_HDRS})
+target_link_libraries(
+  simple_shm_string_client
+  PRIVATE TRTIS::request_static
+)
+install(
+  TARGETS simple_shm_string_client
+  RUNTIME DESTINATION bin
+)
+
+#
 # simple_cuda_shm_client
 #
 if(${TRTIS_ENABLE_GPU})
