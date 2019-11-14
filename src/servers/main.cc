@@ -1132,7 +1132,9 @@ main(int argc, char** argv)
     exit_cv_.wait_for(lock, wait_timeout);
   }
 
-  LOG_IF_ERR(TRTSERVER_ServerStop(server.get()), "failed to stop server");
+  TRTSERVER_Error* stop_err = TRTSERVER_ServerStop(server.get());
+  const int ret = (stop_err != nullptr) ? 1 : 0;
+  LOG_IF_ERR(stop_err, "failed to stop server");
 
   // Stop tracing and the HTTP, GRPC, and metrics endpoints.
   StopTracing(trace_manager);
@@ -1150,4 +1152,6 @@ main(int argc, char** argv)
   if (keep_alive == nullptr) {
     return 1;
   }
+
+  return ret;
 }
