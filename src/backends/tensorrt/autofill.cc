@@ -438,11 +438,6 @@ AutoFillPlan::Create(
   std::set<std::string> plan_files;
   RETURN_IF_ERROR(GetDirectoryFiles(
       version_path, true /* skip_hidden_files */, &plan_files));
-  if (plan_files.size() == 0) {
-    return Status(
-        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "', unable to find plan file");
-  }
 
   nvinfer1::IRuntime* runtime = nullptr;
   nvinfer1::ICudaEngine* engine = nullptr;

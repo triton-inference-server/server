@@ -221,13 +221,16 @@ AutoFill::Create(
   // Unable to determine the platform so just use the simple autofill,
   // or null if that fails.
   {
-    if (platform == Platform::PLATFORM_UNKNOWN) {
-      LOG_WARNING << "Autofiller failed to detect the platform (verify "
-                     "contents of model directory or use --log-verbose=1 for "
-                     "more details)";
-    } else {
-      LOG_WARNING << "Autofiller failed to retrieve model. Error Details: "
-                  << status.AsString();
+    if (!LOG_VERBOSE_IS_ON(1)) {
+      if (platform == Platform::PLATFORM_UNKNOWN) {
+        LOG_WARNING << "Autofiller failed to detect the platform for "
+                    << model_name
+                    << " (verify contents of model directory or use "
+                       "--log-verbose=1 for more details)";
+      } else {
+        LOG_WARNING << "Autofiller failed to retrieve model. Error Details: "
+                    << status.AsString();
+      }
     }
     LOG_WARNING << "Proceeding with simple config for now";
     std::unique_ptr<AutoFill> afs;
