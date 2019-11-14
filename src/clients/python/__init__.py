@@ -191,9 +191,6 @@ _crequest_infer_ctx_input_set_raw.argtypes = [c_void_p, c_void_p, c_uint64]
 _crequest_infer_ctx_input_set_shared_memory = _crequest.InferContextInputSetSharedMemory
 _crequest_infer_ctx_input_set_shared_memory.restype = c_void_p
 _crequest_infer_ctx_input_set_shared_memory.argtypes = [c_void_p, c_void_p]
-_crequest_infer_ctx_input_set_cuda_shared_memory = _crequest.InferContextInputSetCudaSharedMemory
-_crequest_infer_ctx_input_set_cuda_shared_memory.restype = c_void_p
-_crequest_infer_ctx_input_set_cuda_shared_memory.argtypes = [c_void_p, c_void_p]
 
 _crequest_infer_ctx_result_new = _crequest.InferContextResultNew
 _crequest_infer_ctx_result_new.restype = c_void_p
@@ -1366,11 +1363,11 @@ class InferContext:
         batch_size : int
             The batch size of the inference. Each input must provide
             an appropriately sized batch of inputs.
-        
+
         flags : int
             The flags to use for the inference. The bitwise-or of
             InferRequestHeader.Flag values.
-        
+
         corr_id : int
             The correlation id of the inference. Used to differentiate
             sequences.

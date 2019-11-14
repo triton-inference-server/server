@@ -153,8 +153,6 @@ nic::Error* InferContextInputSetRaw(
     InferContextInputCtx* ctx, const void* data, uint64_t byte_size);
 nic::Error* InferContextInputSetSharedMemory(
     InferContextInputCtx* ctx, void* shm_handle);
-nic::Error* InferContextInputSetCudaSharedMemory(
-    InferContextInputCtx* ctx, void* cuda_shm_handle);
 
 //==============================================================================
 // InferContext::Result

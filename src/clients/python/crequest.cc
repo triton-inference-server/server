@@ -769,19 +769,6 @@ InferContextInputSetSharedMemory(InferContextInputCtx* ctx, void* shm_handle)
   return new nic::Error(err);
 }
 
-#if TRTIS_ENABLE_GPU
-nic::Error*
-InferContextInputSetCudaSharedMemory(
-    InferContextInputCtx* ctx, void* cuda_shm_handle)
-{
-  SharedMemoryHandle* handle =
-      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle);
-  nic::Error err = ctx->input->SetSharedMemory(
-      handle->trtis_shm_name_, 0, handle->byte_size_);
-  return new nic::Error(err);
-}
-#endif  // TRTIS_ENABLE_GPU
-
 //==============================================================================
 struct InferContextResultCtx {
   std::unique_ptr<nic::InferContext::Result> result;

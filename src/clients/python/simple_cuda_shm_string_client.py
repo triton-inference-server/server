@@ -52,42 +52,44 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
     protocol = ProtocolType.from_str(FLAGS.protocol)
 
-    # We use a simple model that takes 2 input tensors of 16 integers
-    # each and returns 2 output tensors of 16 integers each. One
-    # output tensor is the element-wise sum of the inputs and one
-    # output is the element-wise difference.
-    model_name = "simple"
+    # We use a simple model that takes 2 input tensors of 16 strings
+    # each and returns 2 output tensors of 16 strings each. The input
+    # strings must represent integers. One output tensor is the
+    # element-wise sum of the inputs and one output is the element-wise
+    # difference.
+    model_name = "simple_string"
     model_version = -1
     batch_size = 1
 
-    # Create a health context, get the ready and live state of server.
-    health_ctx = ServerHealthContext(FLAGS.url, protocol,
-                                     http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
-    print("Health for model {}".format(model_name))
-    print("Live: {}".format(health_ctx.is_live()))
-    print("Ready: {}".format(health_ctx.is_ready()))
-
-    # Create a status context and get server status
-    status_ctx = ServerStatusContext(FLAGS.url, protocol, model_name,
-                                     http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
-    print("Status for model {}".format(model_name))
-    print(status_ctx.get_server_status())
-
     # Create the inference context for the model.
-    infer_ctx = InferContext(FLAGS.url, protocol, model_name, model_version,
-                             http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
+    infer_ctx = InferContext(FLAGS.url, protocol, model_name, model_version, FLAGS.verbose)
 
     # Create the shared memory control context
     shared_memory_ctx = SharedMemoryControlContext(FLAGS.url, protocol, \
                             http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
 
     # Create the data for the two input tensors. Initialize the first
-    # to unique integers and the second to all ones.
-    input0_data = np.arange(start=0, stop=16, dtype=np.int32)
-    input1_data = np.ones(shape=16, dtype=np.int32)
+    # to unique integers and the second to all ones. The input tensors
+    # are the string representation of these values.
+    in0 = np.arange(start=0, stop=16, dtype=np.int32)
+    in1 = np.ones(shape=16, dtype=np.int32)
+    expected_sum = np.add(in0, in1)
+    expected_diff = np.subtract(in0, in1)
 
-    input_byte_size = input0_data.size * input0_data.itemsize
-    output_byte_size = input_byte_size
+    in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+    input0_data = in0n.reshape(in0.shape)
+    in1n = np.array([str(x) for x in in1.reshape(in1.size)], dtype=object)
+    input1_data = in1n.reshape(in1.shape)
+
+    # serialize the string tensors
+    input0_data_serialized = cudashm.serialize_string_tensor(input0_data)
+    input1_data_serialized = cudashm.serialize_string_tensor(input1_data)
+
+    # Use the size of the serialized tensors to create the shared memory regions
+    input0_byte_size = input0_data_serialized.size * input0_data_serialized.itemsize
+    input1_byte_size = input1_data_serialized.size * input1_data_serialized.itemsize
+    output_byte_size = max(input0_byte_size, input1_byte_size) + 1
+    output_byte_size = max(input0_byte_size, input1_byte_size) + 1
 
     # Create Output0 and Output1 in Shared Memory and store shared memory handles
     shm_op0_handle = cudashm.create_shared_memory_region("output0_data", output_byte_size, 0)
@@ -98,12 +100,12 @@ if __name__ == '__main__':
     shared_memory_ctx.cuda_register(shm_op1_handle)
 
     # Create Input0 and Input1 in Shared Memory and store shared memory handles
-    shm_ip0_handle = cudashm.create_shared_memory_region("input0_data", input_byte_size, 0)
-    shm_ip1_handle = cudashm.create_shared_memory_region("input1_data", input_byte_size, 0)
+    shm_ip0_handle = cudashm.create_shared_memory_region("input0_data", input0_byte_size, 0)
+    shm_ip1_handle = cudashm.create_shared_memory_region("input1_data", input1_byte_size, 0)
 
     # Put input data values into shared memory
-    cudashm.set_shared_memory_region(shm_ip0_handle, [input0_data])
-    cudashm.set_shared_memory_region(shm_ip1_handle, [input1_data])
+    cudashm.set_shared_memory_region(shm_ip0_handle, [input0_data_serialized])
+    cudashm.set_shared_memory_region(shm_ip1_handle, [input1_data_serialized])
 
     # Register Input0 and Input1 shared memory with TRTIS
     shared_memory_ctx.cuda_register(shm_ip0_handle)
@@ -111,30 +113,32 @@ if __name__ == '__main__':
 
     # Send inference request to the inference server. Get results for
     # both output tensors.
-    results = infer_ctx.run({ 'INPUT0' : shm_ip0_handle,
-                            'INPUT1' : shm_ip1_handle, },
+    results = infer_ctx.run({ 'INPUT0' : (shm_ip0_handle, (16,)),
+                            'INPUT1' : (shm_ip1_handle, (16,)) },
                             { 'OUTPUT0' : (InferContext.ResultFormat.RAW, shm_op0_handle),
                             'OUTPUT1' : (InferContext.ResultFormat.RAW, shm_op1_handle) },
                             batch_size)
 
-    # Read output from shared memory
-    output0_data = results['OUTPUT0'][0]
-    output1_data = results['OUTPUT1'][0]
-
     # We expect there to be 2 results (each with batch-size 1). Walk
     # over all 16 result elements and print the sum and difference
     # calculated by the model.
+    output0_data = results['OUTPUT0'][0]
+    output1_data = results['OUTPUT1'][0]
+
     for i in range(16):
-        print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " + str(output0_data[i]))
-        print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " + str(output1_data[i]))
-        if (input0_data[i] + input1_data[i]) != output0_data[i]:
+        print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " + output0_data[i].decode("utf-8"))
+        print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " + output1_data[i].decode("utf-8"))
+
+        # Convert result from string to int to check result
+        r0 = int(output0_data[i])
+        r1 = int(output1_data[i])
+        if expected_sum[i] != r0:
             print("error: incorrect sum");
             sys.exit(1);
-        if (input0_data[i] - input1_data[i]) != output1_data[i]:
+        if expected_diff[i] != r1:
             print("error: incorrect difference");
             sys.exit(1);
 
-    del results
     print(shared_memory_ctx.get_shared_memory_status())
     shared_memory_ctx.unregister_all()
     cudashm.destroy_shared_memory_region(shm_ip0_handle)

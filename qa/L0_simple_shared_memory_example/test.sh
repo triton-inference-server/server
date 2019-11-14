@@ -27,6 +27,7 @@
 
 SIMPLE_SHM_CLIENT=../clients/simple_shm_client
 SIMPLE_SHM_CLIENT_PY=../clients/simple_shm_client.py
+SIMPLE_SHM_STRING_CLIENT_PY=../clients/simple_shm_string_client.py
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-repository=`pwd`/models
@@ -63,6 +64,11 @@ if [ $? -ne 0 ]; then
 fi
 
 python $SIMPLE_SHM_CLIENT_PY -v >>client_py.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+python $SIMPLE_SHM_STRING_CLIENT_PY -v >>client_py.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
