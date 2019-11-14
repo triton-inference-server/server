@@ -436,7 +436,7 @@ done
 
 # Show model control mode will override deprecated model control options
 SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=none \
-             --allow-model-control=true --exit-timeout-secs=5"
+             --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -614,7 +614,7 @@ cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/. &
 
 # Show model control mode will override deprecated model control options
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
-             --model-control-mode=explicit --allow-poll-model-repository=true\
+             --model-control-mode=explicit \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server

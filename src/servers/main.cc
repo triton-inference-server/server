@@ -268,7 +268,7 @@ std::vector<Option> options_{
 #endif  // TRTIS_ENABLE_TRACING
     {OPTION_MODEL_CONTROL_MODE, "model-control-mode",
      "Specify the mode for model management. Options are \"none\", \"poll\" "
-     "and \"explicit\". "
+     "and \"explicit\". The default is \"poll\". "
      "For \"none\", the server will load all models in the model repositories "
      "only once at startup. For \"poll\", the server will poll the model "
      "repository to detect changes. The poll rate is controlled by "
@@ -279,8 +279,8 @@ std::vector<Option> options_{
     {OPTION_ALLOW_POLL_REPO, "allow-poll-model-repository",
      "[DEPRECATED] Poll the model repository to detect changes. The poll rate "
      "is controlled by 'repository-poll-secs'. This option is deprecated by "
-     "--model-control-mode, this option will be overridden if "
-     "--model-control-mode is set."},
+     "--model-control-mode, this option can not be specified if "
+     "--model-control-mode is specified."},
     {OPTION_POLL_REPO_SECS, "repository-poll-secs",
      "Interval in seconds between each poll of the model repository to check "
      "for changes. Valid only when "
@@ -290,8 +290,8 @@ std::vector<Option> options_{
      "control API. If true the models in the model repository will not be "
      "loaded at startup, unless the model is specified by --load-model. Cannot "
      "be specified if --allow-poll-model-repository is true. This option is "
-     "deprecated by --model-control-mode, this option will be overridden if "
-     "--model-control-mode is set."},
+     "deprecated by --model-control-mode, this option can not be specified if "
+     "--model-control-mode is specified."},
     {OPTION_STARTUP_MODEL, "load-model",
      "Name of the model to be loaded on server startup. It may be specified "
      "multiple times to add multiple models. Note that this option will only "
@@ -807,6 +807,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   int32_t trace_rate = trace_rate_;
 #endif  // TRTIS_ENABLE_TRACING
 
+  bool deprecated_control_mode_set = false;
   bool allow_poll_model_repository = repository_poll_secs > 0;
   bool allow_model_control = allow_model_control_;
   std::set<std::string> startup_models_;
@@ -923,12 +924,14 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 
       case OPTION_ALLOW_POLL_REPO:
         allow_poll_model_repository = ParseBoolOption(optarg);
+        deprecated_control_mode_set = true;
         break;
       case OPTION_POLL_REPO_SECS:
         repository_poll_secs = ParseIntOption(optarg);
         break;
       case OPTION_ALLOW_MODEL_CONTROL:
         allow_model_control = ParseBoolOption(optarg);
+        deprecated_control_mode_set = true;
         break;
       case OPTION_STARTUP_MODEL:
         startup_models_.insert(optarg);
@@ -988,6 +991,12 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 
   repository_poll_secs_ =
       (allow_poll_model_repository) ? std::max(0, repository_poll_secs) : 0;
+
+  if (control_mode_set && deprecated_control_mode_set) {
+    LOG_ERROR << "--allow-model-control or --allow-poll-model-repository "
+                << "can not be specified if --model-control-mode is specified";
+    LOG_ERROR << Usage();
+  }
 
   if (!control_mode_set) {
     if (allow_model_control && allow_poll_model_repository) {
