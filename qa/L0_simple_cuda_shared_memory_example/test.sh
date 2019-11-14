@@ -27,6 +27,7 @@
 
 SIMPLE_CUDA_SHM_CLIENT=../clients/simple_cuda_shm_client
 SIMPLE_CUDA_SHM_CLIENT_PY=../clients/simple_cuda_shm_client.py
+SIMPLE_CUDA_SHM_STRING_CLIENT=../clients/simple_cuda_shm_string_client
 SIMPLE_CUDA_SHM_STRING_CLIENT_PY=../clients/simple_cuda_shm_string_client.py
 
 SERVER=/opt/tensorrtserver/bin/trtserver
@@ -58,6 +59,16 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+$SIMPLE_CUDA_SHM_STRING_CLIENT -i grpc -u localhost:8001 -v >>client_c++.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+$SIMPLE_CUDA_SHM_STRING_CLIENT -v >>client_c++.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
 python $SIMPLE_CUDA_SHM_CLIENT_PY -i grpc -u localhost:8001 -v >>client_py.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
@@ -68,13 +79,18 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+python $SIMPLE_CUDA_SHM_STRING_CLIENT_PY -i grpc -u localhost:8001 -v >>client_py.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
 python $SIMPLE_CUDA_SHM_STRING_CLIENT_PY -v >>client_py.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
 
-if [ `grep -c "localhost:8000" client_c++.log` != "10" ]; then
-    echo -e "\n***\n*** Failed. Expected 10 Host: localhost:8000 headers for C++ client\n***"
+if [ `grep -c "localhost:8000" client_c++.log` != "20" ]; then
+    echo -e "\n***\n*** Failed. Expected 20 Host: localhost:8000 headers for C++ client\n***"
     RET=1
 fi
 
