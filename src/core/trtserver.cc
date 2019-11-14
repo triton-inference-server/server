@@ -1366,6 +1366,7 @@ TRTSERVER_ServerInferAsync(
   infer_stats->SetMetricReporter(lprovider->Backend()->MetricReporter());
   infer_stats->SetBatchSize(request_header->batch_size());
   infer_stats->SetFailed(true);
+  infer_stats->SetTrace(trace);
 
   std::shared_ptr<ni::InferRequestProvider> infer_request_provider;
   RETURN_IF_STATUS_ERROR(ni::InferRequestProvider::Create(
@@ -1394,13 +1395,6 @@ TRTSERVER_ServerInferAsync(
 
         infer_stats->CaptureTimestamp(
             ni::ModelInferStats::TimestampKind::kRequestEnd);
-
-#ifdef TRTIS_ENABLE_TRACING
-        if (trace != nullptr) {
-          ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
-          ltrace->Report(infer_stats);
-        }
-#endif  // TRTIS_ENABLE_TRACING
 
         // We must explicitly update the inference stats before
         // sending the response... otherwise it is possible that the

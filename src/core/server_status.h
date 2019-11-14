@@ -103,7 +103,7 @@ class ModelInferStats {
         requested_model_version_(-1), batch_size_(0), gpu_device_(-1),
         failed_(false), execution_count_(0),
         timestamps_((size_t)TimestampKind::COUNT__), extra_queue_duration_(0),
-        extra_compute_duration_(0)
+        extra_compute_duration_(0), trace_(nullptr)
   {
     memset(&timestamps_[0], 0, sizeof(struct timespec) * timestamps_.size());
   }
@@ -135,6 +135,12 @@ class ModelInferStats {
   // batched with another request (in dynamic batch case only one of
   // the batched requests will count the execution).
   void SetModelExecutionCount(uint32_t count) { execution_count_ = count; }
+
+  // Set the trace object if the inference will be traced.
+  void SetTrace(TRTSERVER_Trace* trace) { trace_ = trace; }
+
+  // Get the trace object related to the inference.
+  TRTSERVER_Trace* GetTrace() { return trace_; }
 
   // Get the timestamp for a kind.
   const struct timespec& Timestamp(TimestampKind kind) const
@@ -175,6 +181,8 @@ class ModelInferStats {
 
   uint64_t extra_queue_duration_;
   uint64_t extra_compute_duration_;
+
+  TRTSERVER_Trace* trace_;
 };
 
 // Manage access and updates to server status information.

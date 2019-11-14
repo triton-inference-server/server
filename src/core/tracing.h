@@ -47,7 +47,7 @@ class Trace {
     return Status::Success;
   }
 
-  void Report(const std::shared_ptr<ModelInferStats>& infer_stats);
+  void Report(const ModelInferStats* infer_stats);
 
  private:
   Trace(

@@ -32,6 +32,7 @@
 #include "src/core/metric_model_reporter.h"
 #include "src/core/metrics.h"
 #include "src/core/provider.h"
+#include "src/core/tracing.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -339,6 +340,13 @@ ServerStatTimerScoped::~ServerStatTimerScoped()
 void
 ModelInferStats::Report()
 {
+#ifdef TRTIS_ENABLE_TRACING
+  if (trace_ != nullptr) {
+    Trace* ltrace = reinterpret_cast<Trace*>(trace_);
+    ltrace->Report(this);
+  }
+#endif  // TRTIS_ENABLE_TRACING
+
   // If the inference request failed before a backend could be
   // determined, there will be no metrics reporter.. so just use the
   // version directly from the inference request.

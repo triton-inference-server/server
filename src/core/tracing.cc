@@ -33,7 +33,7 @@
 namespace nvidia { namespace inferenceserver {
 
 void
-Trace::Report(const std::shared_ptr<ModelInferStats>& infer_stats)
+Trace::Report(const ModelInferStats* infer_stats)
 {
   if (level_ != TRTSERVER_TRACE_LEVEL_DISABLED) {
     activity_fn_(
