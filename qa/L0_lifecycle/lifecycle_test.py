@@ -178,6 +178,8 @@ class LifeCycleTest(unittest.TestCase):
                                 "expected status for model " + model_name)
                 for (k, v) in iteritems(ss.model_status[model_name].version_status):
                     self.assertEqual(v.ready_state, server_status.MODEL_UNAVAILABLE)
+                    self.assertNotEqual(len(v.ready_state_info.message),
+                        "expected non-empty message for load failure")
 
                 hctx = ServerHealthContext(pair[0], pair[1], True)
                 self.assertFalse(hctx.is_ready())
@@ -444,6 +446,8 @@ class LifeCycleTest(unittest.TestCase):
 
                 version_status = ss.model_status[savedmodel_name].version_status[3]
                 self.assertEqual(version_status.ready_state, server_status.MODEL_UNAVAILABLE)
+                self.assertEqual(version_status.ready_state_info.message, "unloaded",
+                                "expected message \"unloaded\" for unloaded model version")
                 self.assertEqual(version_status.model_execution_count, expected_exec_cnt)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
