@@ -51,7 +51,7 @@ else:
 _test_system_shared_memory = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 _test_cuda_shared_memory = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
 
-_trials = ("savedmodel", "graphdef", "netdef", "plan", "onnx", "libtorch")
+_trials = ("custom", "savedmodel", "graphdef", "netdef", "plan", "onnx", "libtorch")
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
 
@@ -453,9 +453,7 @@ class DynaSequenceBatcherTest(unittest.TestCase):
         # couldn't implement the full accumulator. See
         # qa/common/gen_qa_dyna_sequence_models.py for more
         # information.
-        if (("custom" not in trial) or
-            ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial) or
-            ("onnx" in trial))  or ("libtorch" in trial):
+        if "custom" not in trial:
             expected_result = value
             if flag_str is not None:
                 if "start" in flag_str:

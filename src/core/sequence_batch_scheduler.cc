@@ -677,7 +677,7 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
         (correlation_id_datatype != TYPE_INT64) &&
         (correlation_id_datatype != TYPE_UINT32) &&
         (correlation_id_datatype != TYPE_INT32)) {
-      LOG_ERROR << "unexpected control datatype, expected TYPE_UINT64, "
+      LOG_ERROR << "unexpected control data type, expected TYPE_UINT64, "
                    "TYPE_INT64, TYPE_UINT32 or TYPE_INT32 for "
                 << ModelSequenceBatching_Control_Kind_Name(
                        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID)
