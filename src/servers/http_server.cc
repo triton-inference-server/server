@@ -202,12 +202,13 @@ class HTTPAPIServer : public HTTPServerImpl {
         trace_manager_(trace_manager), smb_manager_(smb_manager),
         endpoint_names_(endpoints), allocator_(nullptr),
         api_regex_(
-            R"(/api/(health|infer|status|modelcontrol|sharedmemorycontrol)(.*))"),
+            R"(/api/(health|infer|status|modelcontrol|sharedmemorycontrol|repository)(.*))"),
         health_regex_(R"(/(live|ready))"),
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
         modelcontrol_regex_(R"(/(load|unload)/([^/]+))"),
         sharedmemorycontrol_regex_(
-            R"(/(register|cudaregister|unregister|status)(.*))")
+            R"(/(register|cudaregister|unregister|status)(.*))"),
+        repository_regex_(R"(/(index))")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -281,6 +282,8 @@ class HTTPAPIServer : public HTTPServerImpl {
   void HandleHealth(evhtp_request_t* req, const std::string& health_uri);
   void HandleInfer(evhtp_request_t* req, const std::string& infer_uri);
   void HandleStatus(evhtp_request_t* req, const std::string& status_uri);
+  void HandleRepository(
+      evhtp_request_t* req, const std::string& repository_uri);
   void HandleModelControl(
       evhtp_request_t* req, const std::string& modelcontrol_uri);
   void HandleSharedMemoryControl(
@@ -319,6 +322,7 @@ class HTTPAPIServer : public HTTPServerImpl {
   re2::RE2 status_regex_;
   re2::RE2 modelcontrol_regex_;
   re2::RE2 sharedmemorycontrol_regex_;
+  re2::RE2 repository_regex_;
 };
 
 TRTSERVER_Error*
@@ -473,6 +477,14 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
       HandleSharedMemoryControl(req, rest);
       return;
     }
+    // repository
+    if (endpoint == "repository" &&
+        (std::find(
+             endpoint_names_.begin(), endpoint_names_.end(), "repository") !=
+         endpoint_names_.end())) {
+      HandleRepository(req, rest);
+      return;
+    }
   }
 
   LOG_VERBOSE(1) << "HTTP error: " << req->method << " " << req->uri->path->full
@@ -582,6 +594,93 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
   }
 
   TRTSERVER_ProtobufDelete(server_status_protobuf);
+
+  RequestStatus request_status;
+  RequestStatusUtil::Create(
+      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
+      server_id_);
+
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(
+          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
+
+  evhtp_send_reply(
+      req, (request_status.code() == RequestStatusCode::SUCCESS)
+               ? EVHTP_RES_OK
+               : EVHTP_RES_BADREQ);
+
+  TRTSERVER_ErrorDelete(err);
+}
+
+void
+HTTPAPIServer::HandleRepository(
+    evhtp_request_t* req, const std::string& repository_uri)
+{
+  if (req->method != htp_method_GET) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  // For now, type is "index", but may be expanded to do more
+  std::string query_type_str;
+  if ((repository_uri.empty()) ||
+      (!RE2::FullMatch(repository_uri, repository_regex_, &query_type_str))) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+
+  LOG_VERBOSE(1) << "parsed: " << query_type_str;
+
+  TRTSERVER_Error* err = nullptr;
+  if (query_type_str == "index") {
+    TRTSERVER_Protobuf* repository_index_protobuf = nullptr;
+    err = TRTSERVER_ModelRepositoryIndex(
+        server_.get(), &repository_index_protobuf);
+    if (err == nullptr) {
+      const char* serialized_buffer;
+      size_t serialized_byte_size;
+      err = TRTSERVER_ProtobufSerialize(
+          repository_index_protobuf, &serialized_buffer, &serialized_byte_size);
+      if (err == nullptr) {
+        // Request text or binary format for status?
+        std::string format;
+        const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
+        if (format_c_str != NULL) {
+          format = std::string(format_c_str);
+        } else {
+          format = "text";
+        }
+
+        if (format == "binary") {
+          evbuffer_add(
+              req->buffer_out, serialized_buffer, serialized_byte_size);
+          evhtp_headers_add_header(
+              req->headers_out,
+              evhtp_header_new(
+                  "Content-Type", "application/octet-stream", 1, 1));
+        } else {
+          ModelRepositoryIndex repository_index;
+          if (!repository_index.ParseFromArray(
+                  serialized_buffer, serialized_byte_size)) {
+            err = TRTSERVER_ErrorNew(
+                TRTSERVER_ERROR_UNKNOWN,
+                "failed to parse model repository index");
+          } else {
+            std::string repository_index_str = repository_index.DebugString();
+            evbuffer_add(
+                req->buffer_out, repository_index_str.c_str(),
+                repository_index_str.size());
+          }
+        }
+      }
+    }
+
+    TRTSERVER_ProtobufDelete(repository_index_protobuf);
+  } else {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
 
   RequestStatus request_status;
   RequestStatusUtil::Create(

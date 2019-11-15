@@ -82,7 +82,8 @@ int32_t http_port_ = 8000;
 int32_t http_health_port_ = -1;
 std::vector<int32_t> http_ports_;
 std::vector<std::string> endpoint_names = {
-    "status", "health", "infer", "modelcontrol", "sharedmemorycontrol"};
+    "status",    "health", "infer", "modelcontrol", "sharedmemorycontrol",
+    "repository"};
 #endif  // TRTIS_ENABLE_HTTP
 
 #ifdef TRTIS_ENABLE_GRPC
@@ -994,7 +995,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 
   if (control_mode_set && deprecated_control_mode_set) {
     LOG_ERROR << "--allow-model-control or --allow-poll-model-repository "
-                << "can not be specified if --model-control-mode is specified";
+              << "can not be specified if --model-control-mode is specified";
     LOG_ERROR << Usage();
   }
 
@@ -1024,8 +1025,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #ifdef TRTIS_ENABLE_HTTP
   http_port_ = http_port;
   http_health_port_ = http_health_port;
-  http_ports_ = {http_port_, http_health_port_, http_port_, http_port_,
-                 http_port_};
+  http_ports_ = {http_port_, http_health_port_, http_port_,
+                 http_port_, http_port_,        http_port_};
   http_thread_cnt_ = http_thread_cnt;
 #endif  // TRTIS_ENABLE_HTTP
 
