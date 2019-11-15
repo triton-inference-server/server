@@ -85,9 +85,12 @@ Status GetDirectorySubdirs(
 
 /// Get the files contained in a directory.
 /// \param path The directory.
+/// \param skip_hidden_files Ignores the hidden files in the directory.
 /// \param files Returns the names of the files.
 /// \return Error status
-Status GetDirectoryFiles(const std::string& path, std::set<std::string>* files);
+Status GetDirectoryFiles(
+    const std::string& path, const bool skip_hidden_files,
+    std::set<std::string>* files);
 
 /// Read a text file into a string.
 /// \param path The path of the file.

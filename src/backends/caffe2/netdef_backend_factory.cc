@@ -57,7 +57,8 @@ NetDefBackendFactory::CreateBackend(
 {
   // Read all the netdef files in 'path'.
   std::set<std::string> netdef_files;
-  RETURN_IF_ERROR(GetDirectoryFiles(path, &netdef_files));
+  RETURN_IF_ERROR(
+      GetDirectoryFiles(path, true /* skip_hidden_files */, &netdef_files));
 
   std::unordered_map<std::string, std::vector<char>> models;
   for (const auto& filename : netdef_files) {

@@ -987,11 +987,21 @@ GetDirectorySubdirs(const std::string& path, std::set<std::string>* subdirs)
 }
 
 Status
-GetDirectoryFiles(const std::string& path, std::set<std::string>* files)
+GetDirectoryFiles(
+    const std::string& path, const bool skip_hidden_files,
+    std::set<std::string>* files)
 {
   FileSystem* fs;
   RETURN_IF_ERROR(GetFileSystem(path, &fs));
-  return fs->GetDirectoryFiles(path, files);
+  std::set<std::string> all_files;
+  RETURN_IF_ERROR(fs->GetDirectoryFiles(path, &all_files));
+  // Remove the hidden files
+  for (auto f : all_files) {
+    if ((f[0] != '.') || (!skip_hidden_files)) {
+      files->insert(f);
+    }
+  }
+  return Status::Success;
 }
 
 Status

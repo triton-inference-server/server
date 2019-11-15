@@ -58,7 +58,8 @@ LibTorchBackendFactory::CreateBackend(
 {
   // Read all the *.pt files in 'path'.
   std::set<std::string> torch_files;
-  RETURN_IF_ERROR(GetDirectoryFiles(path, &torch_files));
+  RETURN_IF_ERROR(
+      GetDirectoryFiles(path, true /* skip_hidden_files */, &torch_files));
 
   std::unordered_map<std::string, std::string> torch_models;
   for (const auto& filename : torch_files) {

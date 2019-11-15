@@ -64,7 +64,8 @@ GraphDefBackendFactory::CreateBackend(
 {
   // Read all the graphdef files in 'path'.
   std::set<std::string> graphdef_files;
-  RETURN_IF_ERROR(GetDirectoryFiles(path, &graphdef_files));
+  RETURN_IF_ERROR(
+      GetDirectoryFiles(path, true /* skip_hidden_files */, &graphdef_files));
 
   std::unordered_map<std::string, std::string> graphdef_paths;
   for (const auto& filename : graphdef_files) {

@@ -267,33 +267,49 @@ AutoFillSavedModel::Create(
                                          "' due to no version directories");
   }
 
+  // The model configuration will be identical across all the version
+  // directories.
   const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
 
   // There must be a single savedmodel directory within the version
   // directory...
   std::set<std::string> savedmodel_dirs;
   RETURN_IF_ERROR(GetDirectorySubdirs(version_path, &savedmodel_dirs));
-  if (savedmodel_dirs.size() != 1) {
+
+  bool found = false;
+  std::string savedmodel_dir;
+  TRTISTF_Error* err;
+  TRTISTF_Model* trtistf_model;
+
+  for (auto dir : savedmodel_dirs) {
+    const auto savedmodel_path = JoinPath({version_path, dir});
+
+    auto graphdef_backend_config =
+        std::static_pointer_cast<GraphDefBackendFactory::Config>(
+            backend_config);
+
+    trtistf_model = nullptr;
+    err = TRTISTF_ModelCreateFromSavedModel(
+        &trtistf_model, model_name.c_str(), savedmodel_path.c_str(),
+        TRTISTF_NO_GPU_DEVICE, false /* have_graph */, 0 /* graph_level */,
+        graphdef_backend_config->allow_gpu_memory_growth,
+        graphdef_backend_config->per_process_gpu_memory_fraction,
+        graphdef_backend_config->allow_soft_placement,
+        graphdef_backend_config->memory_limit_mb, nullptr /* tftrt_config */);
+
+    if (err == nullptr) {
+      savedmodel_dir = dir;
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) {
     return Status(
         RequestStatusCode::INTERNAL,
         "unable to autofill for '" + model_name +
-            "', unable to find savedmodel directory");
+            "', unable to find savedmodel directory.");
   }
-
-  const std::string savedmodel_dir = *(savedmodel_dirs.begin());
-  const auto savedmodel_path = JoinPath({version_path, savedmodel_dir});
-
-  auto graphdef_backend_config =
-      std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
-
-  TRTISTF_Model* trtistf_model = nullptr;
-  RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelCreateFromSavedModel(
-      &trtistf_model, model_name.c_str(), savedmodel_path.c_str(),
-      TRTISTF_NO_GPU_DEVICE, false /* have_graph */, 0 /* graph_level */,
-      graphdef_backend_config->allow_gpu_memory_growth,
-      graphdef_backend_config->per_process_gpu_memory_fraction,
-      graphdef_backend_config->allow_soft_placement,
-      graphdef_backend_config->memory_limit_mb, nullptr /* tftrt_config */));
 
   autofill->reset(
       new AutoFillSavedModelImpl(model_name, savedmodel_dir, trtistf_model));
@@ -341,25 +357,17 @@ AutoFillGraphDef::Create(
 
   const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
 
-  // There must be a single graphdef file within the version
-  // directory...
   std::set<std::string> graphdef_files;
-  RETURN_IF_ERROR(GetDirectoryFiles(version_path, &graphdef_files));
-  if (graphdef_files.size() != 1) {
-    return Status(
-        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "', unable to find graphdef file");
-  }
-
-  const std::string graphdef_file = *(graphdef_files.begin());
-  const auto graphdef_path = JoinPath({version_path, graphdef_file});
+  RETURN_IF_ERROR(GetDirectoryFiles(
+      version_path, true /* skip_hidden_files */, &graphdef_files));
 
   // If find a file named with the default graphdef name then assume
   // it is a graphdef. We could be smarter here and try to parse to
   // see if it really is a graphdef. We could also guess thae
   // placeholders are inputs... but we have no way to know what the
   // outputs are.
-  if (graphdef_file != kTensorFlowGraphDefFilename) {
+  if (graphdef_files.find(kTensorFlowGraphDefFilename) ==
+      graphdef_files.end()) {
     return Status(
         RequestStatusCode::INTERNAL,
         "unable to autofill for '" + model_name +

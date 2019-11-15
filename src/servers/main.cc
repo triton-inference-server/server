@@ -994,7 +994,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 
   if (control_mode_set && deprecated_control_mode_set) {
     LOG_ERROR << "--allow-model-control or --allow-poll-model-repository "
-                << "can not be specified if --model-control-mode is specified";
+              << "can not be specified if --model-control-mode is specified";
     LOG_ERROR << Usage();
   }
 
