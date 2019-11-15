@@ -32,6 +32,7 @@ SERVER=/opt/tensorrtserver/bin/trtserver
 source ../common/util.sh
 
 RET=0
+rm -fr *.log
 
 for i in \
         test_invalid_create_shm \
@@ -69,6 +70,11 @@ for i in \
         wait $SERVER_PID
     done
 done
+
+if [ `grep -c "localhost:8000" $CLIENT_LOG` != "46" ]; then
+    echo -e "\n***\n*** Failed. Expected 46 Host: localhost:8000 headers for client\n***"
+    RET=1
+fi
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
