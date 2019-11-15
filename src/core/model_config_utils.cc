@@ -538,11 +538,11 @@ ValidateModelConfig(
           (tensor_datatype != TYPE_UINT32) && (tensor_datatype != TYPE_INT32)) {
         return Status(
             RequestStatusCode::INVALID_ARG,
-            "unexpected datatype for control " +
+            "unexpected data type for control " +
                 ModelSequenceBatching_Control_Kind_Name(
                     ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID) +
                 " for " + config.name() +
-                ". Allowed datattypes are TYPE_UINT64, TYPE_INT64, TYPE_UINT32 "
+                ". Allowed data types are TYPE_UINT64, TYPE_INT64, TYPE_UINT32 "
                 "and TYPE_INT32");
       }
     }
