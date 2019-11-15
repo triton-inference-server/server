@@ -189,9 +189,10 @@ class ServerStatusManager {
   Status UpdateConfigForModel(
       const std::string& model_name, const ModelConfig& model_config);
 
+  // Update the version ready state and reason for an existing model.
   Status SetModelVersionReadyState(
       const std::string& model_name, int64_t version, ModelReadyState state,
-      const ModelReadyStateInfo& state_info);
+      const ModelReadyStateReason& state_reason);
 
   // Get the entire server status, including status for all models.
   Status Get(

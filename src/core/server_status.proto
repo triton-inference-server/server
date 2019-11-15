@@ -193,11 +193,11 @@ enum ModelReadyState {
 }
 
 //@@
-//@@.. cpp:enum:: ModelReadyStateInfo
+//@@.. cpp:enum:: ModelReadyStateReason
 //@@
 //@@   Detail associated with a model's readiness status.
 //@@
-message ModelReadyStateInfo
+message ModelReadyStateReason
 {
   //@@  .. cpp:var:: string message
   //@@
@@ -220,11 +220,11 @@ message ModelVersionStatus
   //@@
   ModelReadyState ready_state = 1;
 
-  //@@  .. cpp:var:: ModelReadyStateInfo ready_state_info
+  //@@  .. cpp:var:: ModelReadyStateReason ready_state_reason
   //@@
   //@@     Supplemental information regarding the current readiness state.
   //@@
-  ModelReadyStateInfo ready_state_info = 5;
+  ModelReadyStateReason ready_state_reason = 5;
 
   //@@  .. cpp:var:: map<uint32, InferRequestStats> infer_stats
   //@@

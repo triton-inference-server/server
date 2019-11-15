@@ -85,7 +85,7 @@ ServerStatusManager::UpdateConfigForModel(
 Status
 ServerStatusManager::SetModelVersionReadyState(
     const std::string& model_name, int64_t version, ModelReadyState state,
-    const ModelReadyStateInfo& state_info)
+    const ModelReadyStateReason& state_reason)
 {
   std::lock_guard<std::mutex> lock(mu_);
   auto itr = server_status_.mutable_model_status()->find(model_name);
@@ -100,11 +100,11 @@ ServerStatusManager::SetModelVersionReadyState(
     // Completely fresh
     ModelVersionStatus version_status;
     version_status.set_ready_state(state);
-    *version_status.mutable_ready_state_info() = state_info;
+    *version_status.mutable_ready_state_reason() = state_reason;
     (*(itr->second.mutable_version_status()))[version] = version_status;
   } else {
     vitr->second.set_ready_state(state);
-    *(vitr->second.mutable_ready_state_info()) = state_info;
+    *(vitr->second.mutable_ready_state_reason()) = state_reason;
   }
 
   return Status::Success;

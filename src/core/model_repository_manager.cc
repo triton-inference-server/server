@@ -265,7 +265,8 @@ struct ModelRepositoryManager::ModelInfo {
 class ModelRepositoryManager::BackendLifeCycle {
  public:
   static Status Create(
-      InferenceServer* server, ServerStatusManager* status_manager,
+      InferenceServer* server,
+      const std::shared_ptr<ServerStatusManager>& status_manager,
       const BackendConfigMap& backend_map,
       std::unique_ptr<BackendLifeCycle>* life_cycle);
 
@@ -322,7 +323,7 @@ class ModelRepositoryManager::BackendLifeCycle {
     std::shared_ptr<InferenceBackend> backend_;
   };
 
-  BackendLifeCycle(ServerStatusManager* status_manager)
+  BackendLifeCycle(const std::shared_ptr<ServerStatusManager>& status_manager)
       : status_manager_(status_manager)
   {
   }
@@ -352,7 +353,7 @@ class ModelRepositoryManager::BackendLifeCycle {
   BackendMap map_;
   std::mutex map_mtx_;
 
-  ServerStatusManager* status_manager_;
+  std::shared_ptr<ServerStatusManager> status_manager_;
 
 #ifdef TRTIS_ENABLE_CAFFE2
   std::unique_ptr<NetDefBackendFactory> netdef_factory_;
@@ -378,7 +379,8 @@ class ModelRepositoryManager::BackendLifeCycle {
 
 Status
 ModelRepositoryManager::BackendLifeCycle::Create(
-    InferenceServer* server, ServerStatusManager* status_manager,
+    InferenceServer* server,
+    const std::shared_ptr<ServerStatusManager>& status_manager,
     const BackendConfigMap& backend_map,
     std::unique_ptr<BackendLifeCycle>* life_cycle)
 {
@@ -660,7 +662,7 @@ ModelRepositoryManager::BackendLifeCycle::Load(
       LOG_INFO << "re-loading: " << model_name << ":" << version;
       backend_info->state_ = ModelReadyState::MODEL_UNLOADING;
       status_manager_->SetModelVersionReadyState(
-          model_name, version, backend_info->state_, ModelReadyStateInfo());
+          model_name, version, backend_info->state_, ModelReadyStateReason());
       backend_info->next_action_ = ActionType::LOAD;
       // The load will be triggered once the unload is done (deleter is called)
       backend_info->backend_.reset();
@@ -673,7 +675,7 @@ ModelRepositoryManager::BackendLifeCycle::Load(
       LOG_INFO << "loading: " << model_name << ":" << version;
       backend_info->state_ = ModelReadyState::MODEL_LOADING;
       status_manager_->SetModelVersionReadyState(
-          model_name, version, backend_info->state_, ModelReadyStateInfo());
+          model_name, version, backend_info->state_, ModelReadyStateReason());
       {
         std::thread worker(
             &ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend,
@@ -701,7 +703,7 @@ ModelRepositoryManager::BackendLifeCycle::Unload(
       LOG_INFO << "unloading: " << model_name << ":" << version;
       backend_info->state_ = ModelReadyState::MODEL_UNLOADING;
       status_manager_->SetModelVersionReadyState(
-          model_name, version, backend_info->state_, ModelReadyStateInfo());
+          model_name, version, backend_info->state_, ModelReadyStateReason());
       backend_info->backend_.reset();
       break;
     case ModelReadyState::MODEL_LOADING:
@@ -813,27 +815,27 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
             {
               std::lock_guard<std::recursive_mutex> lock(backend_info->mtx_);
               backend_info->state_ = ModelReadyState::MODEL_UNAVAILABLE;
-              ModelReadyStateInfo state_info;
-              state_info.set_message("unloaded");
+              ModelReadyStateReason state_reason;
+              state_reason.set_message("unloaded");
               status_manager_->SetModelVersionReadyState(
-                  model_name, version, backend_info->state_, state_info);
+                  model_name, version, backend_info->state_, state_reason);
               // Check if next action is requested
               this->TriggerNextAction(model_name, version, backend_info);
             }
           }));
       backend_info->state_ = ModelReadyState::MODEL_READY;
       status_manager_->SetModelVersionReadyState(
-          model_name, version, backend_info->state_, ModelReadyStateInfo());
+          model_name, version, backend_info->state_, ModelReadyStateReason());
       LOG_INFO << "successfully loaded '" << model_name << "' version "
                << version;
     } else {
       LOG_ERROR << "failed to load '" << model_name << "' version " << version
                 << ": " << status.AsString();
       backend_info->state_ = ModelReadyState::MODEL_UNAVAILABLE;
-      ModelReadyStateInfo state_info;
-      state_info.set_message(status.AsString());
+      ModelReadyStateReason state_reason;
+      state_reason.set_message(status.AsString());
       status_manager_->SetModelVersionReadyState(
-          model_name, version, backend_info->state_, state_info);
+          model_name, version, backend_info->state_, state_reason);
     }
   }
 
@@ -894,7 +896,7 @@ ModelRepositoryManager::Create(
 
   std::unique_ptr<BackendLifeCycle> life_cycle;
   RETURN_IF_ERROR(BackendLifeCycle::Create(
-      server, status_manager.get(), backend_config_map, &life_cycle));
+      server, status_manager, backend_config_map, &life_cycle));
 
   // Not setting the smart pointer directly to simplify clean up
   std::unique_ptr<ModelRepositoryManager> local_manager(
