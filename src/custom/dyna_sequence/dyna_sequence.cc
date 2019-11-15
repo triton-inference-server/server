@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -35,23 +35,27 @@
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
 
-// This custom backend takes three one-element input tensors, two
-// INT32 control values and one an INT32 value input; and produces a
-// one-element output tensor. The input tensors must be named "START",
-// "READY" and "INPUT". The output tensor must be named "OUTPUT".
+// This custom backend takes 5 input tensors, three INT32 [ 1 ]
+// control values, one UINT64 [ 1 ] correlation ID control, and one
+// INT32 [ 1 ] value input; and produces a INT32 [ 1 ] output
+// tensor. The input tensors must be named "START", "END", "READY",
+// "CORRID" and "INPUT". The output tensor must be named "OUTPUT".
 //
-// The backend maintains an INT32 accumulator which is updated based
-// on the control values in "START" and "READY":
+// The backend maintains an INT32 accumulator for each sequence which
+// is updated based on the control values in "START", "END", "READY"
+// and "CORRID":
 //
-//   READY=0, START=x: Ignore value input, do not change accumulator value.
-//   READY=1, START=1: Start accumulating. Set accumulator equal to value input.
-//   READY=1, START=0: Add value input to accumulator.
+//   READY=0, START=x, END=x: Ignore value input, do not change accumulator
+//   value. READY=1, START=1, END=x: Start accumulating. Set accumulator equal
+//   to value input. READY=1, START=0, END=x: Add value input to accumulator.
+//
+// In addition to the above, when END=1 CORRID is added to the accumulator.
 //
 // When READY=1, the accumulator is returned in the output.
 //
 
 namespace nvidia { namespace inferenceserver { namespace custom {
-namespace sequence {
+namespace dyna_sequence {
 
 // Context object. All state must be kept in this object.
 class Context : public CustomInstance {
@@ -78,27 +82,29 @@ class Context : public CustomInstance {
   // Delay to introduce into execution, in milliseconds.
   int execute_delay_ms_;
 
-  // Accumulators maintained by this context, one for each batch slot.
-  std::vector<int32_t> accumulator_;
+  // Accumulators maintained by this context, as a map from
+  // correlation ID to the accumulator.
+  std::unordered_map<uint64_t, int32_t> accumulator_;
 
   // Local error codes
   const int kGpuNotSupported = RegisterError("execution on GPU not supported");
   const int kSequenceBatcher =
       RegisterError("model configuration must configure sequence batcher");
   const int kModelControl = RegisterError(
-      "'START' and 'READY' must be configured as the control inputs");
-  const int kInputOutput =
-      RegisterError("model must have two inputs and one output with shape [1]");
+      "'START', 'END, 'READY' and 'CORRID' must be configured as the control "
+      "inputs");
+  const int kInputOutput = RegisterError(
+      "model must have one non-control input and one output with shape [1]");
   const int kInputName = RegisterError("model input must be named 'INPUT'");
   const int kOutputName = RegisterError("model output must be named 'OUTPUT'");
   const int kInputOutputDataType =
       RegisterError("model input and output must have TYPE_INT32 data-type");
+  const int kCorrIDType =
+      RegisterError("model CORRID control input must have type UINT64");
   const int kInputContents = RegisterError("unable to get input tensor values");
   const int kInputSize = RegisterError("unexpected size for input tensor");
   const int kOutputBuffer =
       RegisterError("unable to get buffer for output tensor values");
-  const int kBatchTooBig =
-      RegisterError("unable to execute batch larger than max-batch-size");
   const int kTimesteps =
       RegisterError("unable to execute more than one timestep at a time");
 };
@@ -115,8 +121,6 @@ Context::Context(
       execute_delay_ms_ = std::stoi(itr->second.string_value());
     }
   }
-
-  accumulator_.resize(std::max(1, model_config_.max_batch_size()));
 }
 
 Context::~Context() {}
@@ -131,20 +135,34 @@ Context::Init()
   }
 
   // The model configuration must specify the sequence batcher and
-  // must use the START and READY input to indicate control values.
+  // must use the START, END, READY and CORRID input to indicate
+  // control values.
   if (!model_config_.has_sequence_batching()) {
     return kSequenceBatcher;
   }
 
   auto& batcher = model_config_.sequence_batching();
-  if (batcher.control_input_size() != 2) {
+
+  std::unordered_map<std::string, const ModelSequenceBatching::ControlInput*>
+      controls;
+  for (const auto& ci : batcher.control_input()) {
+    controls.insert({ ci.name(), &ci });
+  }
+
+  if (controls.size() != 4) {
     return kModelControl;
   }
-  if (!(((batcher.control_input(0).name() == "START") &&
-         (batcher.control_input(1).name() == "READY")) ||
-        ((batcher.control_input(0).name() == "READY") &&
-         (batcher.control_input(1).name() == "START")))) {
+
+  if ((controls.find("START") == controls.end()) ||
+      (controls.find("END") == controls.end()) ||
+      (controls.find("READY") == controls.end()) ||
+      (controls.find("CORRID") == controls.end())) {
     return kModelControl;
+  }
+
+  // The CORRID input must be UINT64 type.
+  if (controls.find("CORRID")->second->control(0).data_type() != DataType::TYPE_UINT64) {
+    return kCorrIDType;
   }
 
   // There must be one INT32 input called INPUT defined in the model
@@ -233,18 +251,15 @@ Context::Execute(
     const uint32_t payload_cnt, CustomPayload* payloads,
     CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
 {
-  std::cout << "Sequence executing " << payload_cnt << " payloads" << std::endl;
+  std::cout << "Dyna Sequence executing " << payload_cnt << " payloads"
+            << std::endl;
 
-  // Each payload represents different sequence, which corresponds to
-  // the accumulator at the same index. Each payload must have
-  // batch-size 1 inputs which is the next timestep for that
-  // sequence. The total number of payloads will not exceed the
-  // max-batch-size specified in the model configuration.
+  // Each payload represents different sequence and the CORRID input
+  // identifies the input.  Each payload must have batch-size 1 inputs
+  // which is the next timestep for that sequence. The total number of
+  // payloads will not exceed the max-batch-size specified in the
+  // model configuration.
   int err;
-
-  if (payload_cnt > accumulator_.size()) {
-    return kBatchTooBig;
-  }
 
   // Delay if requested...
   if (execute_delay_ms_ > 0) {
@@ -259,12 +274,21 @@ Context::Execute(
     }
 
     const size_t batch1_byte_size = GetDataTypeByteSize(TYPE_INT32);
+    const size_t batch1_corrid_byte_size = GetDataTypeByteSize(TYPE_UINT64);
 
     // Get the input tensors.
-    std::vector<uint8_t> start_buffer, ready_buffer, input_buffer;
+    std::vector<uint8_t> start_buffer, end_buffer, ready_buffer, corrid_buffer, input_buffer;
     err = GetInputTensor(
         input_fn, payload.input_context, "START", batch1_byte_size,
         &start_buffer);
+    if (err != ErrorCodes::Success) {
+      payload.error_code = err;
+      continue;
+    }
+
+    err = GetInputTensor(
+        input_fn, payload.input_context, "END", batch1_byte_size,
+        &end_buffer);
     if (err != ErrorCodes::Success) {
       payload.error_code = err;
       continue;
@@ -279,6 +303,14 @@ Context::Execute(
     }
 
     err = GetInputTensor(
+        input_fn, payload.input_context, "CORRID", batch1_corrid_byte_size,
+        &corrid_buffer);
+    if (err != ErrorCodes::Success) {
+      payload.error_code = err;
+      continue;
+    }
+
+    err = GetInputTensor(
         input_fn, payload.input_context, "INPUT", batch1_byte_size,
         &input_buffer);
     if (err != ErrorCodes::Success) {
@@ -286,22 +318,34 @@ Context::Execute(
       continue;
     }
 
-    int32_t* start = reinterpret_cast<int32_t*>(&start_buffer[0]);
-    int32_t* ready = reinterpret_cast<int32_t*>(&ready_buffer[0]);
-    int32_t* input = reinterpret_cast<int32_t*>(&input_buffer[0]);
+    const int32_t start = *reinterpret_cast<int32_t*>(&start_buffer[0]);
+    const int32_t end = *reinterpret_cast<int32_t*>(&end_buffer[0]);
+    const int32_t ready = *reinterpret_cast<int32_t*>(&ready_buffer[0]);
+    const uint64_t corrid = *reinterpret_cast<int32_t*>(&corrid_buffer[0]);
+    const int32_t input = *reinterpret_cast<int32_t*>(&input_buffer[0]);
 
-    // Update the accumulator value based on START/READY and calculate
-    // the output value.
-    if (ready[0] != 0) {
-      if (start[0] == 0) {
+    // Update the accumulator value based on START/END/READY/CORRID
+    // and calculate the output value.
+    if (ready != 0) {
+      if (start == 0) {
         // Update accumulator.
-        accumulator_[pidx] += input[0];
+        accumulator_[corrid] += input;
       } else {
         // Set accumulator.
-        accumulator_[pidx] = input[0];
+        accumulator_[corrid] = input;
       }
 
-      const int32_t output = accumulator_[pidx];
+      if (end != 0) {
+        // Add CORRID (truncated to 32 bits) to accumulator.
+        accumulator_[corrid] += (int32_t)corrid;
+      }
+
+      const int32_t output = accumulator_[corrid];
+
+      // If seqence has ended remove CORRID from the accumulator map.
+      if (end != 0) {
+        accumulator_.erase(corrid);
+      }
 
       // If the output is requested, copy the calculated output value
       // into the output buffer.
@@ -337,17 +381,17 @@ Context::Execute(
   return ErrorCodes::Success;
 }
 
-}  // namespace sequence
+}  // namespace dyna_sequence
 
-// Creates a new sequence context instance
+// Creates a new dyna_sequence context instance
 int
 CustomInstance::Create(
     CustomInstance** instance, const std::string& name,
     const ModelConfig& model_config, int gpu_device,
     const CustomInitializeData* data)
 {
-  sequence::Context* context =
-      new sequence::Context(name, model_config, gpu_device);
+  dyna_sequence::Context* context =
+      new dyna_sequence::Context(name, model_config, gpu_device);
 
   *instance = context;
 

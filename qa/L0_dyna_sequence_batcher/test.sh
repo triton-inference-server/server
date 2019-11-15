@@ -40,7 +40,7 @@ BATCHER_TEST=dyna_sequence_batcher_test.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
-SERVER_ARGS="--model-repository=${DATADIR}/qa_dyna_sequence_model_repository"
+SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER=/opt/tensorrtserver/bin/trtserver
 source ../common/util.sh
 
@@ -49,6 +49,10 @@ export CUDA_VISIBLE_DEVICES=0
 RET=0
 
 rm -fr *.log *.serverlog
+
+rm -fr *.log *.serverlog models && mkdir models
+cp -r ${DATADIR}/qa_dyna_sequence_model_repository/* models/.
+cp -r ../custom_models/custom_dyna_sequence_int32 models/.
 
 # Need to launch the server for each test so that the model status is
 # reset (which is used to make sure the correct batch size was used
