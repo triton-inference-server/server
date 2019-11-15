@@ -121,15 +121,6 @@ class ModelRepositoryManager {
   /// \return the states of all versions of all live model backends.
   const ModelStateMap GetLiveBackendStates();
 
-  /// ModelRepositoryManager is improved as it will manage the backends
-  /// directly. \param model_name The model to get version states from. \return
-  /// the states of all versions of the specified model backends.
-  ///
-  /// [TODO] Instead of providing this function for server status manager to
-  /// poll version state, adding a mirror function in ServerStatusManager and
-  /// publish the version state changes via that mirror function.
-  const VersionStateMap GetVersionStates(const std::string& model_name);
-
   /// Obtain the specified backend.
   /// \param model_name The model name of the backend handle.
   /// \param model_version The model version of the backend handle.

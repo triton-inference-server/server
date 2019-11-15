@@ -271,9 +271,8 @@ InferenceServer::IsReady(bool* ready)
     // Strict readiness... get the model status and make sure all
     // models are ready.
     ServerStatus server_status;
-    Status status = status_manager_->Get(
-        &server_status, id_, ready_state_, UptimeNs(),
-        model_repository_manager_.get());
+    Status status =
+        status_manager_->Get(&server_status, id_, ready_state_, UptimeNs());
 
     *ready = status.IsOk();
     if (*ready) {
@@ -344,13 +343,10 @@ InferenceServer::GetStatus(
   // If no specific model request just return the entire status
   // object.
   if (model_name.empty()) {
-    return status_manager_->Get(
-        server_status, id_, ready_state_, UptimeNs(),
-        model_repository_manager_.get());
+    return status_manager_->Get(server_status, id_, ready_state_, UptimeNs());
   } else {
     return status_manager_->Get(
-        server_status, id_, ready_state_, UptimeNs(), model_name,
-        model_repository_manager_.get());
+        server_status, id_, ready_state_, UptimeNs(), model_name);
   }
 
   return Status::Success;

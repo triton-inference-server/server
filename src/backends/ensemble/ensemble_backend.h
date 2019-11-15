@@ -32,6 +32,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
+class InferenceServer;
+
 class EnsembleBackend : public InferenceBackend {
  public:
   EnsembleBackend() = default;
