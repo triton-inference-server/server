@@ -393,7 +393,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
 
       const char* allocated_ptr;
       switch (input_meta.second.input_data_type_case()) {
-        case ModelWarmup_Input::InputDataTypeCase::kZeroData: 
+        case ModelWarmup_Input::InputDataTypeCase::kZeroData:
           allocated_ptr = zero_buffer;
           break;
         case ModelWarmup_Input::InputDataTypeCase::kRandomData: {
@@ -437,10 +437,9 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
       auto pr = warmup_data.input_buffer_.emplace(input_meta.first, nullptr);
       pr.first->second.reset(new MemoryReference());
       static_cast<MemoryReference*>(pr.first->second.get())
-              ->AddBuffer(
-                  allocated_ptr, batch_byte_size,
-                  TRTSERVER_MEMORY_CPU /* memory_type */,
-                  0 /* memory_type_id */);
+          ->AddBuffer(
+              allocated_ptr, batch_byte_size,
+              TRTSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */);
 
       input->set_batch_byte_size(batch_byte_size);
     }

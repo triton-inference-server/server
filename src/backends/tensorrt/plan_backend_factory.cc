@@ -73,7 +73,8 @@ PlanBackendFactory::CreateBackend(
     std::unique_ptr<InferenceBackend>* backend)
 {
   std::set<std::string> plan_files;
-  RETURN_IF_ERROR(GetDirectoryFiles(path, &plan_files));
+  RETURN_IF_ERROR(
+      GetDirectoryFiles(path, true /* skip_hidden_files */, &plan_files));
 
   std::unordered_map<std::string, std::vector<char>> models;
   for (const auto& filename : plan_files) {

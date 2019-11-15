@@ -71,22 +71,15 @@ AutoFillPyTorch::Create(
 
   const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
 
-  // There must be a single pt model within the version directory...
   std::set<std::string> pytorch_files;
-  RETURN_IF_ERROR(GetDirectoryFiles(version_path, &pytorch_files));
-  if (pytorch_files.size() != 1) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to autofill for '" + model_name + "', unable to find pt file");
-  }
-
-  const std::string pt_file = *(pytorch_files.begin());
+  RETURN_IF_ERROR(GetDirectoryFiles(
+      version_path, true /* skip_hidden_files */, &pytorch_files));
 
   // If find model file named with the default libtorch name then
   // assume it is a libtorch model. In the future we can be smarter
   // here and try to parse to see if it really is a libtorch, and then
   // try to derive more of the configuration...
-  if (pt_file != kPyTorchLibTorchFilename) {
+  if (pytorch_files.find(kPyTorchLibTorchFilename) == pytorch_files.end()) {
     return Status(
         RequestStatusCode::INTERNAL,
         "unable to autofill for '" + model_name +

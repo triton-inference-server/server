@@ -124,6 +124,8 @@ AutoFill::Create(
   const Platform platform = GetPlatform(config.platform());
 #endif
 
+  Status status;
+
 #ifdef TRTIS_ENABLE_TENSORFLOW
   if ((platform == Platform::PLATFORM_TENSORFLOW_SAVEDMODEL) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
@@ -133,7 +135,7 @@ AutoFill::Create(
     if (it != backend_config_map.end()) {
       backend_config = it->second;
     }
-    Status status = AutoFillSavedModel::Create(
+    status = AutoFillSavedModel::Create(
         model_name, backend_config, model_path, &afsm);
     LOG_VERBOSE(1) << "TensorFlow SavedModel autofill: " << status.AsString();
     if (status.IsOk()) {
@@ -145,7 +147,7 @@ AutoFill::Create(
   if ((platform == Platform::PLATFORM_TENSORFLOW_GRAPHDEF) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afgd;
-    Status status = AutoFillGraphDef::Create(model_name, model_path, &afgd);
+    status = AutoFillGraphDef::Create(model_name, model_path, &afgd);
     LOG_VERBOSE(1) << "TensorFlow GraphDef autofill: " << status.AsString();
     if (status.IsOk()) {
       *autofill = std::move(afgd);
@@ -158,7 +160,7 @@ AutoFill::Create(
   if ((platform == Platform::PLATFORM_PYTORCH_LIBTORCH) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afpt;
-    Status status = AutoFillPyTorch::Create(model_name, model_path, &afpt);
+    status = AutoFillPyTorch::Create(model_name, model_path, &afpt);
     LOG_VERBOSE(1) << "PyTorch autofill: " << status.AsString();
     if (status.IsOk()) {
       *autofill = std::move(afpt);
@@ -171,7 +173,7 @@ AutoFill::Create(
   if ((platform == Platform::PLATFORM_CAFFE2_NETDEF) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afnd;
-    Status status = AutoFillNetDef::Create(model_name, model_path, &afnd);
+    status = AutoFillNetDef::Create(model_name, model_path, &afnd);
     LOG_VERBOSE(1) << "Caffe2 NetDef autofill: " << status.AsString();
     if (status.IsOk()) {
       *autofill = std::move(afnd);
@@ -194,7 +196,7 @@ AutoFill::Create(
   if ((platform == Platform::PLATFORM_ONNXRUNTIME_ONNX) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afox;
-    Status status = AutoFillOnnx::Create(model_name, model_path, &afox);
+    status = AutoFillOnnx::Create(model_name, model_path, &afox);
     LOG_VERBOSE(1) << "ONNX autofill: " << status.AsString();
     if (status.IsOk()) {
       *autofill = std::move(afox);
@@ -207,7 +209,7 @@ AutoFill::Create(
   if ((platform == Platform::PLATFORM_TENSORRT_PLAN) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afp;
-    Status status = AutoFillPlan::Create(model_name, model_path, &afp);
+    status = AutoFillPlan::Create(model_name, model_path, &afp);
     LOG_VERBOSE(1) << "TensorRT autofill: " << status.AsString();
     if (status.IsOk()) {
       *autofill = std::move(afp);
@@ -219,8 +221,24 @@ AutoFill::Create(
   // Unable to determine the platform so just use the simple autofill,
   // or null if that fails.
   {
+#if defined(TRTIS_ENABLE_TENSORFLOW) || defined(TRTIS_ENABLE_TENSORRT) || \
+    defined(TRTIS_ENABLE_CAFFE2) || defined(TRTIS_ENABLE_ONNXRUNTIME) ||  \
+    defined(TRTIS_ENABLE_PYTORCH)
+    if (!LOG_VERBOSE_IS_ON(1)) {
+      if (platform == Platform::PLATFORM_UNKNOWN) {
+        LOG_WARNING << "Autofiller failed to detect the platform for "
+                    << model_name
+                    << " (verify contents of model directory or use "
+                       "--log-verbose=1 for more details)";
+      } else {
+        LOG_WARNING << "Autofiller failed to retrieve model. Error Details: "
+                    << status.AsString();
+      }
+    }
+    LOG_WARNING << "Proceeding with simple config for now";
+#endif
     std::unique_ptr<AutoFill> afs;
-    Status status = AutoFillSimple::Create(model_name, &afs);
+    status = AutoFillSimple::Create(model_name, &afs);
     if (status.IsOk()) {
       *autofill = std::move(afs);
     } else {

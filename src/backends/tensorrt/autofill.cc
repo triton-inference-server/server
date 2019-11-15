@@ -432,37 +432,48 @@ AutoFillPlan::Create(
                                          "' due to no version directories");
   }
 
+  // The model configuration will be the same across all the version directories
   const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
 
-  // There must be a single plan file within the version directory...
   std::set<std::string> plan_files;
-  RETURN_IF_ERROR(GetDirectoryFiles(version_path, &plan_files));
-  if (plan_files.size() != 1) {
-    return Status(
-        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "', unable to find plan file");
-  }
-
-  const std::string plan_file = *(plan_files.begin());
-  const auto plan_path = JoinPath({version_path, plan_file});
-
-  std::string plan_data_str;
-  RETURN_IF_ERROR(ReadTextFile(plan_path, &plan_data_str));
-  std::vector<char> plan_data(plan_data_str.begin(), plan_data_str.end());
+  RETURN_IF_ERROR(GetDirectoryFiles(
+      version_path, true /* skip_hidden_files */, &plan_files));
 
   nvinfer1::IRuntime* runtime = nullptr;
   nvinfer1::ICudaEngine* engine = nullptr;
-  if (!LoadPlan(plan_data, &runtime, &engine).IsOk()) {
-    if (engine != nullptr) {
-      engine->destroy();
+  std::string plan_file;
+  Status status;
+  bool found = false;
+
+  for (auto file : plan_files) {
+    const auto plan_path = JoinPath({version_path, file});
+
+    std::string plan_data_str;
+    status = ReadTextFile(plan_path, &plan_data_str);
+    if (!status.IsOk()) {
+      continue;
     }
-    if (runtime != nullptr) {
-      runtime->destroy();
+    std::vector<char> plan_data(plan_data_str.begin(), plan_data_str.end());
+
+    if (!LoadPlan(plan_data, &runtime, &engine).IsOk()) {
+      if (engine != nullptr) {
+        engine->destroy();
+      }
+      if (runtime != nullptr) {
+        runtime->destroy();
+      }
+    } else {
+      plan_file = file;
+      found = true;
+      break;
     }
+  }
+
+  if (!found) {
     return Status(
         RequestStatusCode::INTERNAL,
         "unable to autofill for '" + model_name +
-            "', unable to create TensorRT runtime and engine");
+            "', unable to find a compatible plan file.");
   }
 
   autofill->reset(new AutoFillPlanImpl(model_name, plan_file, engine, runtime));

@@ -61,7 +61,8 @@ CustomBackendFactory::CreateBackend(
 
   // Read all the files in 'path'.
   std::set<std::string> custom_files;
-  RETURN_IF_ERROR(GetDirectoryFiles(path, &custom_files));
+  RETURN_IF_ERROR(
+      GetDirectoryFiles(path, true /* skip_hidden_files */, &custom_files));
 
   std::unordered_map<std::string, std::string> custom_paths;
   for (const auto& filename : custom_files) {
