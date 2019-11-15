@@ -178,6 +178,8 @@ class LifeCycleTest(unittest.TestCase):
                                 "expected status for model " + model_name)
                 for (k, v) in iteritems(ss.model_status[model_name].version_status):
                     self.assertEqual(v.ready_state, server_status.MODEL_UNAVAILABLE)
+                    self.assertNotEqual(len(v.ready_state_reason.message),
+                        "expected non-empty message for load failure")
 
                 hctx = ServerHealthContext(pair[0], pair[1], True)
                 self.assertFalse(hctx.is_ready())
@@ -444,6 +446,8 @@ class LifeCycleTest(unittest.TestCase):
 
                 version_status = ss.model_status[savedmodel_name].version_status[3]
                 self.assertEqual(version_status.ready_state, server_status.MODEL_UNAVAILABLE)
+                self.assertEqual(version_status.ready_state_reason.message, "unloaded",
+                                "expected message \"unloaded\" for unloaded model version")
                 self.assertEqual(version_status.model_execution_count, expected_exec_cnt)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -1351,12 +1355,20 @@ class LifeCycleTest(unittest.TestCase):
                         self.assertEqual(len(ss.model_status), 1)
                         self.assertTrue(model in ss.model_status,
                                         "expected status for model " + model)
-                        self.assertTrue(1 in ss.model_status[model].version_status,
-                                        "expected status for version 1 of model " + model)
+                        # Because the depending model is re-added, the status
+                        # for it will be reset. As a result, version 1 will be
+                        # missing due to version policy becoming latest
+                        if ensemble_prefix not in model:
+                            self.assertFalse(1 in ss.model_status[model].version_status,
+                                            "unexpected status for version 1 of re-added model " + model)
+                        else:
+                            self.assertTrue(1 in ss.model_status[model].version_status,
+                                            "expected status for version 1 of model " + model)
+                            self.assertEqual(ss.model_status[model].version_status[1].ready_state,
+                                            server_status.MODEL_UNAVAILABLE)
+                        
                         self.assertTrue(3 in ss.model_status[model].version_status,
                                         "expected status for version 3 of model " + model)
-                        self.assertEqual(ss.model_status[model].version_status[1].ready_state,
-                                        server_status.MODEL_UNAVAILABLE)
                         model_status = server_status.MODEL_UNAVAILABLE if ensemble_prefix in model \
                                             else server_status.MODEL_READY
                         self.assertEqual(ss.model_status[model].version_status[3].ready_state,
@@ -1528,12 +1540,20 @@ class LifeCycleTest(unittest.TestCase):
                     self.assertEqual(len(ss.model_status), 1)
                     self.assertTrue(model in ss.model_status,
                                     "expected status for model " + model)
-                    self.assertTrue(1 in ss.model_status[model].version_status,
-                                    "expected status for version 1 of model " + model)
+                    # Because the depending model is re-added, the status
+                    # for it will be reset. As a result, version 1 will be
+                    # missing due to version policy becoming latest
+                    if ensemble_prefix not in model:
+                        self.assertFalse(1 in ss.model_status[model].version_status,
+                                        "unexpected status for version 1 of re-added model " + model)
+                    else:
+                        self.assertTrue(1 in ss.model_status[model].version_status,
+                                        "expected status for version 1 of model " + model)
+                        self.assertEqual(ss.model_status[model].version_status[1].ready_state,
+                                        server_status.MODEL_UNAVAILABLE)
+
                     self.assertTrue(3 in ss.model_status[model].version_status,
                                     "expected status for version 3 of model " + model)
-                    self.assertEqual(ss.model_status[model].version_status[1].ready_state,
-                                    server_status.MODEL_UNAVAILABLE)
                     model_status = server_status.MODEL_UNAVAILABLE if ensemble_prefix in model \
                                         else server_status.MODEL_READY
                     self.assertEqual(ss.model_status[model].version_status[3].ready_state,

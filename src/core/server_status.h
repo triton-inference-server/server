@@ -28,7 +28,6 @@
 #include <time.h>
 #include <mutex>
 #include "src/core/model_config.pb.h"
-#include "src/core/model_repository_manager.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/status.h"
 
@@ -190,18 +189,21 @@ class ServerStatusManager {
   Status UpdateConfigForModel(
       const std::string& model_name, const ModelConfig& model_config);
 
+  // Update the version ready state and reason for an existing model.
+  Status SetModelVersionReadyState(
+      const std::string& model_name, int64_t version, ModelReadyState state,
+      const ModelReadyStateReason& state_reason);
+
   // Get the entire server status, including status for all models.
   Status Get(
       ServerStatus* server_status, const std::string& server_id,
-      ServerReadyState server_ready_state, uint64_t server_uptime_ns,
-      ModelRepositoryManager* model_repository_manager) const;
+      ServerReadyState server_ready_state, uint64_t server_uptime_ns) const;
 
   // Get the server status and the status for a single model.
   Status Get(
       ServerStatus* server_status, const std::string& server_id,
       ServerReadyState server_ready_state, uint64_t server_uptime_ns,
-      const std::string& model_name,
-      ModelRepositoryManager* model_repository_manager) const;
+      const std::string& model_name) const;
 
   // Add a duration to the Server Stat specified by 'kind'.
   void UpdateServerStat(uint64_t duration, ServerStatTimerScoped::Kind kind);

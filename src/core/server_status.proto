@@ -193,17 +193,38 @@ enum ModelReadyState {
 }
 
 //@@
+//@@.. cpp:enum:: ModelReadyStateReason
+//@@
+//@@   Detail associated with a model's readiness status.
+//@@
+message ModelReadyStateReason
+{
+  //@@  .. cpp:var:: string message
+  //@@
+  //@@     The message that explains the cause of being in the current readiness
+  //@@     state.
+  //@@
+  string message = 1;
+}
+
+//@@
 //@@.. cpp:var:: message ModelVersionStatus
 //@@
 //@@   Status for a version of a model.
 //@@
 message ModelVersionStatus
 {
-  //@@  .. cpp:var:: ModelReadyState ready_statue
+  //@@  .. cpp:var:: ModelReadyState ready_state
   //@@
   //@@     Current readiness state for the model.
   //@@
   ModelReadyState ready_state = 1;
+
+  //@@  .. cpp:var:: ModelReadyStateReason ready_state_reason
+  //@@
+  //@@     Supplemental information regarding the current readiness state.
+  //@@
+  ModelReadyStateReason ready_state_reason = 5;
 
   //@@  .. cpp:var:: map<uint32, InferRequestStats> infer_stats
   //@@

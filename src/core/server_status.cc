@@ -35,35 +35,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-namespace {
-
-void
-SetModelVersionReadyState(
-    ModelStatus& ms, ModelRepositoryManager* model_repository_manager)
-{
-  const std::string& model_name = ms.config().name();
-
-  // Set all model versions for which we have status to
-  // unavailable... and then override that with actual status for the
-  // versions that are currently being served.
-  auto& mvs = *ms.mutable_version_status();
-  for (auto& itr : mvs) {
-    itr.second.set_ready_state(ModelReadyState::MODEL_UNAVAILABLE);
-  }
-
-  // [TODO] Once ModelRepositoryManager (MRM) is improved, instead of polling
-  // version states from MRM, MRM will notify ServerStatusManager if there are
-  // version state changes. In this way, there is no cross referencing between
-  // these two classes.
-  const auto versions_and_states =
-      model_repository_manager->GetVersionStates(model_name);
-  for (const auto& version_and_state : versions_and_states) {
-    mvs[version_and_state.first].set_ready_state(version_and_state.second);
-  }
-}
-
-}  // namespace
-
 ServerStatusManager::ServerStatusManager(const std::string& server_version)
 {
   const auto& version = server_version;
@@ -112,19 +83,28 @@ ServerStatusManager::UpdateConfigForModel(
 }
 
 Status
-ServerStatusManager::Get(
-    ServerStatus* server_status, const std::string& server_id,
-    ServerReadyState server_ready_state, uint64_t server_uptime_ns,
-    ModelRepositoryManager* model_repository_manager) const
+ServerStatusManager::SetModelVersionReadyState(
+    const std::string& model_name, int64_t version, ModelReadyState state,
+    const ModelReadyStateReason& state_reason)
 {
   std::lock_guard<std::mutex> lock(mu_);
-  server_status->CopyFrom(server_status_);
-  server_status->set_id(server_id);
-  server_status->set_ready_state(server_ready_state);
-  server_status->set_uptime_ns(server_uptime_ns);
+  auto itr = server_status_.mutable_model_status()->find(model_name);
+  if (itr == server_status_.model_status().end()) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "fail to update ready state for unknown model '" + model_name + "'");
+  }
 
-  for (auto& msitr : *server_status->mutable_model_status()) {
-    SetModelVersionReadyState(msitr.second, model_repository_manager);
+  auto vitr = itr->second.mutable_version_status()->find(version);
+  if (vitr == itr->second.version_status().end()) {
+    // Completely fresh
+    ModelVersionStatus version_status;
+    version_status.set_ready_state(state);
+    *version_status.mutable_ready_state_reason() = state_reason;
+    (*(itr->second.mutable_version_status()))[version] = version_status;
+  } else {
+    vitr->second.set_ready_state(state);
+    *(vitr->second.mutable_ready_state_reason()) = state_reason;
   }
 
   return Status::Success;
@@ -133,9 +113,22 @@ ServerStatusManager::Get(
 Status
 ServerStatusManager::Get(
     ServerStatus* server_status, const std::string& server_id,
+    ServerReadyState server_ready_state, uint64_t server_uptime_ns) const
+{
+  std::lock_guard<std::mutex> lock(mu_);
+  server_status->CopyFrom(server_status_);
+  server_status->set_id(server_id);
+  server_status->set_ready_state(server_ready_state);
+  server_status->set_uptime_ns(server_uptime_ns);
+
+  return Status::Success;
+}
+
+Status
+ServerStatusManager::Get(
+    ServerStatus* server_status, const std::string& server_id,
     ServerReadyState server_ready_state, uint64_t server_uptime_ns,
-    const std::string& model_name,
-    ModelRepositoryManager* model_repository_manager) const
+    const std::string& model_name) const
 {
   std::lock_guard<std::mutex> lock(mu_);
 
@@ -154,7 +147,6 @@ ServerStatusManager::Get(
 
   auto& ms = *server_status->mutable_model_status();
   ms[model_name].CopyFrom(itr->second);
-  SetModelVersionReadyState(ms[model_name], model_repository_manager);
 
   return Status::Success;
 }
