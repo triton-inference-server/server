@@ -40,55 +40,43 @@
 namespace nvidia { namespace inferenceserver {
 
 DynamicBatchScheduler::DynamicBatchScheduler(
-    const ModelConfig& config, const uint32_t runner_cnt,
-    StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
-    StandardRunFunc OnSchedule)
+    const uint32_t runner_cnt, StandardInitFunc OnInit,
+    StandardWarmupFunc OnWarmup, StandardRunFunc OnSchedule,
+    const bool dynamic_batching_enabled, const bool enforce_equal_shape_batch,
+    const std::set<int32_t>& preferred_batch_sizes,
+    const uint64_t max_queue_delay_microseconds)
     : OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
+      dynamic_batching_enabled_(dynamic_batching_enabled),
       scheduler_thread_cnt_(runner_cnt), idle_scheduler_thread_cnt_(0),
-      pending_batch_size_(0), pending_batch_queue_cnt_(0)
+      preferred_batch_sizes_(preferred_batch_sizes),
+      pending_batch_delay_ns_(max_queue_delay_microseconds * 1000),
+      pending_batch_size_(0), pending_batch_queue_cnt_(0),
+      enforce_equal_shape_batch_(enforce_equal_shape_batch)
 {
-  dynamic_batching_enabled_ = config.has_dynamic_batching();
-
-  // Need to keep track of input tensor shapes if the model allows one
-  // or more variable-size input tensors. Requests to the same model
-  // can't be batched if any of the inputs have different shape.
-  need_pending_shape_ = false;
-  for (const auto input : config.input()) {
-    if (GetElementCount(input) == -1) {
-      need_pending_shape_ = true;
-      break;
-    }
-  }
-
   max_preferred_batch_size_ = 0;
-  preferred_batch_sizes_.clear();
-  pending_batch_delay_ns_ = 0;
-
-  if (dynamic_batching_enabled_) {
-    for (const auto size : config.dynamic_batching().preferred_batch_size()) {
-      max_preferred_batch_size_ =
-          std::max(max_preferred_batch_size_, (size_t)size);
-      preferred_batch_sizes_.insert(size);
-    }
-
-    pending_batch_delay_ns_ =
-        config.dynamic_batching().max_queue_delay_microseconds() * 1000;
+  for (const auto size : preferred_batch_sizes_) {
+    max_preferred_batch_size_ =
+        std::max(max_preferred_batch_size_, (size_t)size);
   }
 }
 
 Status
 DynamicBatchScheduler::Create(
-    const ModelConfig& config, const uint32_t runner_cnt,
-    StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
-    StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler)
+    const uint32_t runner_cnt, const int nice, StandardInitFunc OnInit,
+    StandardWarmupFunc OnWarmup, StandardRunFunc OnSchedule,
+    const bool dynamic_batching_enabled, const bool enforce_equal_shape_batch,
+    const std::set<int32_t>& preferred_batch_sizes,
+    const uint64_t max_queue_delay_microseconds,
+    std::unique_ptr<Scheduler>* scheduler)
 {
   DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
-      config, runner_cnt, OnInit, OnWarmup, OnSchedule);
+      runner_cnt, OnInit, OnWarmup, OnSchedule, dynamic_batching_enabled,
+      enforce_equal_shape_batch, preferred_batch_sizes,
+      max_queue_delay_microseconds);
   std::unique_ptr<DynamicBatchScheduler> sched(dyna_sched);
 
   // Create one scheduler thread for each requested runner. Associate
   // each scheduler thread with a runner.
-  const int nice = GetCpuNiceLevel(config);
   for (uint32_t c = 0; c < sched->scheduler_thread_cnt_; ++c) {
     std::promise<bool> init_state;
     auto thread_exit = std::make_shared<std::atomic<bool>>(false);
@@ -406,7 +394,7 @@ DynamicBatchScheduler::GetDynamicBatch()
     // new batch.
     if (search_batch_cnt == 0) {
       // Get the shape of the new batch that is being started...
-      if (need_pending_shape_) {
+      if (enforce_equal_shape_batch_) {
         InitPendingShape(queue_[idx].request_provider_->RequestHeader());
       }
     } else {
@@ -419,7 +407,7 @@ DynamicBatchScheduler::GetDynamicBatch()
 
       // There is a pending batch and it has a different shape then
       // this request, so send the pending batch as it is.
-      if (need_pending_shape_ &&
+      if (enforce_equal_shape_batch_ &&
           !CompareWithPendingShape(
               queue_[idx].request_provider_->RequestHeader())) {
         send_now = true;

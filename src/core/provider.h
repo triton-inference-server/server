@@ -185,8 +185,7 @@ class InferRequestProvider {
     DataType datatype_;
   };
 
-  using InputOverrideMap =
-      std::unordered_map<std::string, std::shared_ptr<InputOverride>>;
+  using InputOverrideMap = std::unordered_map<std::string, InputOverride>;
   using InputOverrideMapVec = std::vector<std::shared_ptr<InputOverrideMap>>;
   const InputOverrideMapVec& GetInputOverrides() const;
   Status AddInputOverrides(const std::shared_ptr<InputOverrideMap>& overrides);

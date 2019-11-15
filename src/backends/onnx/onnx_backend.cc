@@ -601,12 +601,11 @@ OnnxBackend::Context::Run(
   for (const auto& ovr_map : input_override_maps) {
     for (const auto& pr : *ovr_map) {
       const std::string& name = pr.first;
-      const std::shared_ptr<InferRequestProvider::InputOverride>& override =
-          pr.second;
+      const InferRequestProvider::InputOverride& override = pr.second;
 
       RETURN_IF_ERROR(SetInputTensor(
-          name, override->datatype_, override->dims_, total_batch_size,
-          payloads, &input_buffers, &input_names));
+          name, override.datatype_, override.dims_, total_batch_size, payloads,
+          &input_buffers, &input_names));
     }
   }
 
