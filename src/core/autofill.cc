@@ -221,6 +221,9 @@ AutoFill::Create(
   // Unable to determine the platform so just use the simple autofill,
   // or null if that fails.
   {
+#if defined(TRTIS_ENABLE_TENSORFLOW) || defined(TRTIS_ENABLE_TENSORRT) || \
+    defined(TRTIS_ENABLE_CAFFE2) || defined(TRTIS_ENABLE_ONNXRUNTIME) ||  \
+    defined(TRTIS_ENABLE_PYTORCH)
     if (!LOG_VERBOSE_IS_ON(1)) {
       if (platform == Platform::PLATFORM_UNKNOWN) {
         LOG_WARNING << "Autofiller failed to detect the platform for "
@@ -233,6 +236,7 @@ AutoFill::Create(
       }
     }
     LOG_WARNING << "Proceeding with simple config for now";
+#endif
     std::unique_ptr<AutoFill> afs;
     status = AutoFillSimple::Create(model_name, &afs);
     if (status.IsOk()) {
