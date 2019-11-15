@@ -692,6 +692,89 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
+# [TODO] turn the following in Python unittest once the client library
+# supports the repository API.
+# LifeCycleTest.test_multiple_model_repository_index
+rm -fr models models_0 config.pbtxt.*
+mkdir models models_0
+# Ensemble models in the second repository
+for i in graphdef savedmodel ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models_0/.
+done
+rm -r models/savedmodel_float32_float32_float32/3
+
+for i in netdef ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
+done
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+             --allow-model-control=true --allow-poll-model-repository=false \
+             --strict-model-config=false --exit-on-error=false \
+             --load-model=netdef_float32_float32_float32 \
+             --load-model=graphdef_float32_float32_float32 \
+             --load-model=simple_savedmodel_float32_float32_float32"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# 3 models should be loaded:
+#     simple_savedmodel_float32_float32_float32
+#     savedmodel_float32_float32_float32 (due to load above)
+#     graphdef_float32_float32_float32
+# netdef_float32_float32_float32 is asked to be loaded but failed
+set +e
+model_count=`curl -s localhost:8000/api/status | grep "model_status" | wc -l`
+set -e
+if [ "$model_count" != "3" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+# 4 models should be shown:
+#     simple_savedmodel_float32_float32_float32
+#     simple_graphdef_float32_float32_float32
+#     savedmodel_float32_float32_float32
+#     graphdef_float32_float32_float32
+# netdef_float32_float32_float32 is ignored due to duplication
+REPOSITORY_LOG="./repository_index.log"
+set +e
+
+curl -s localhost:8000/api/repository/index >>$REPOSITORY_LOG 2>&1
+model_count=`grep "models" $REPOSITORY_LOG | wc -l`
+if [ "$model_count" != "4" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+for model in \
+        savedmodel_float32_float32_float32 \
+        graphdef_float32_float32_float32 ; do
+    grep "name: \"${model}\"" $REPOSITORY_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected ${model} is shown in model repository index\n***"
+        RET=1
+    fi
+    ensemble=simple_${model}
+    grep "name: \"${ensemble}\"" $REPOSITORY_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected ${ensemble} is shown in model repository index\n***"
+        RET=1
+    fi
+done 
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
 # Send HTTP request to control endpoint
 rm -fr models config.pbtxt.*
 mkdir models
