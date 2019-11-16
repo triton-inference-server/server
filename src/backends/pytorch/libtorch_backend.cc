@@ -575,12 +575,12 @@ LibTorchBackend::Context::Run(
   }
 
   // Additional inputs added to the provider...
-  const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
-      input_override_map = input_request_provider->GetInputOverride();
+  const InferRequestProvider::InputOverrideMapVec& input_override_maps =
+      input_request_provider->GetInputOverrides();
 
   size_t input_count = input_request_provider->RequestHeader().input().size();
-  if (input_override_map != nullptr) {
-    input_count += input_override_map->size();
+  for (const auto& ovr_map : input_override_maps) {
+    input_count += ovr_map->size();
   }
 
   // Hold reference to each buffer of input data to that it stays
@@ -607,8 +607,8 @@ LibTorchBackend::Context::Run(
   std::string deliminator = "__";
   int ip_index;
 
-  if (input_override_map != nullptr) {
-    for (const auto& pr : *input_override_map) {
+  for (const auto& ovr_map : input_override_maps) {
+    for (const auto& pr : *ovr_map) {
       const std::string& name = pr.first;
       LOG_VERBOSE(1) << "Processing extra input: " << name;
       const std::shared_ptr<InferRequestProvider::InputOverride>& override =

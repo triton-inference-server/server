@@ -529,5 +529,94 @@ class DynaSequenceBatcherTest(unittest.TestCase):
                 except InferenceServerException as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_multi_sequence(self):
+        # Send four sequences in parallel and make sure they get
+        # completely batched into batch-size 4 inferences.
+        for trial in _trials:
+            self.clear_deferred_exceptions()
+            dtype = self.get_datatype(trial)
+            precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions((11,12,13), dtype, 1)
+            precreated_shm2_handles = self.precreate_register_regions((111,112,113), dtype, 2)
+            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3)
+            try:
+                model_name = tu.get_dyna_sequence_model_name(trial, dtype)
+                protocol = "streaming"
+
+                self.check_setup(model_name)
+
+                # Need scheduler to wait for queue to contain all
+                # inferences for all sequences.
+                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 11)
+                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+
+                corrids = [ 1001, 1002, 1003, 1004 ]
+                threads = []
+                threads.append(threading.Thread(
+                    target=self.check_sequence_async,
+                    args=(trial, model_name, dtype, corrids[0],
+                          (None, None),
+                          # (flag_str, value, pre_delay_ms)
+                          (("start", 1, None),
+                           ("end", 3, None)),
+                          self.get_expected_result(4 + corrids[0], corrids[0], 3, trial, "end"),
+                          protocol, precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}_{}_{}".format(
+                      self._testMethodName, protocol, corrids[0])}))
+                threads.append(threading.Thread(
+                    target=self.check_sequence_async,
+                    args=(trial, model_name, dtype, corrids[1],
+                          (None, None),
+                          # (flag_str, value, pre_delay_ms)
+                          (("start", 11, None),
+                           (None, 12, None),
+                           ("end", 13, None)),
+                          self.get_expected_result(36 + corrids[1], corrids[1], 13, trial, "end"),
+                          protocol, precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}_{}_{}".format(
+                      self._testMethodName, protocol, corrids[1])}))
+                threads.append(threading.Thread(
+                    target=self.check_sequence_async,
+                    args=(trial, model_name, dtype, corrids[2],
+                          (None, None),
+                          # (flag_str, value, pre_delay_ms)
+                          (("start", 111, None),
+                           (None, 112, None),
+                           ("end", 113, None)),
+                          self.get_expected_result(336 + corrids[2], corrids[2], 113, trial, "end"),
+                          protocol, precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}_{}_{}".format(
+                      self._testMethodName, protocol, corrids[2])}))
+                threads.append(threading.Thread(
+                    target=self.check_sequence_async,
+                    args=(trial, model_name, dtype, corrids[3],
+                          (None, None),
+                          # (flag_str, value, pre_delay_ms)
+                          (("start", 1111, None),
+                           (None, 1112, None),
+                           ("end", 1113, None)),
+                          self.get_expected_result(3336 + corrids[3], corrids[3], 1113, trial, "end"),
+                          protocol, precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}_{}_{}".format(
+                      self._testMethodName, protocol, corrids[3])}))
+
+                for t in threads:
+                    t.start()
+                for t in threads:
+                    t.join()
+                self.check_deferred_exception()
+                self.check_status(model_name, (1,), 3, 11)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+            finally:
+                if _test_system_shared_memory or _test_cuda_shared_memory:
+                    self.cleanup_shm_regions(precreated_shm0_handles)
+                    self.cleanup_shm_regions(precreated_shm1_handles)
+                    self.cleanup_shm_regions(precreated_shm2_handles)
+                    self.cleanup_shm_regions(precreated_shm3_handles)
+
+
 if __name__ == '__main__':
     unittest.main()
