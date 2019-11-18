@@ -100,6 +100,24 @@ LoadManager::GetAccumulatedContextStat(nic::InferContext::Stat* contexts_stat)
   return nic::Error::Success;
 }
 
+
+LoadManager::LoadManager(
+    const bool async,
+    const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
+    const int32_t batch_size, const size_t max_threads,
+    const size_t sequence_length, const SharedMemoryType shared_memory_type,
+    const size_t output_shm_size,
+    const std::shared_ptr<ContextFactory>& factory)
+    : async_(async), input_shapes_(input_shapes), batch_size_(batch_size),
+      max_threads_(max_threads), sequence_length_(sequence_length),
+      shared_memory_type_(shared_memory_type),
+      output_shm_size_(output_shm_size), factory_(factory)
+{
+  on_sequence_model_ =
+      ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
+       (factory_->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE));
+}
+
 nic::Error
 LoadManager::InitManagerInputs(
     std::unique_ptr<LoadManager> local_manager, const size_t string_length,

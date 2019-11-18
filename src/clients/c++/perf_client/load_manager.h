@@ -73,6 +73,14 @@ class LoadManager {
 
 
  protected:
+  LoadManager(
+      const bool async,
+      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
+      const int32_t batch_size, const size_t max_threads,
+      const size_t sequence_length, const SharedMemoryType shared_memory_type,
+      const size_t output_shm_size,
+      const std::shared_ptr<ContextFactory>& factory);
+
   /// Helper funtion to retrieve the input data for the inferences
   /// \param local_manager The current manager object under construction.
   /// \param string_length The length of the random strings to be generated
@@ -103,16 +111,17 @@ class LoadManager {
   size_t GetRandomLength(double offset_ratio);
 
   bool async_;
+  // User provided input shape
+  std::unordered_map<std::string, std::vector<int64_t>> input_shapes_;
   size_t batch_size_;
   size_t max_threads_;
 
   size_t sequence_length_;
+  SharedMemoryType shared_memory_type_;
+  size_t output_shm_size_;
   bool on_sequence_model_;
 
   std::shared_ptr<ContextFactory> factory_;
-
-  // User provided input shape
-  std::unordered_map<std::string, std::vector<int64_t>> input_shapes_;
 
   // User provided input data, it will be preferred over synthetic data
   std::unordered_map<std::string, std::vector<char>> input_data_;

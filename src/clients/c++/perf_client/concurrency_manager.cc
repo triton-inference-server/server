@@ -34,12 +34,13 @@ ConcurrencyManager::Create(
     const bool zero_input,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     const std::string& data_directory,
+    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<ConcurrencyManager> local_manager(new ConcurrencyManager(
       async, input_shapes, batch_size, max_threads, max_concurrency,
-      sequence_length, factory));
+      sequence_length, shared_memory_type, output_shm_size, factory));
 
   local_manager->threads_config_.reserve(max_threads);
 
@@ -55,19 +56,13 @@ ConcurrencyManager::ConcurrencyManager(
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     const int32_t batch_size, const size_t max_threads,
     const size_t max_concurrency, const size_t sequence_length,
+    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory)
-    : max_concurrency_(max_concurrency)
+    : LoadManager(
+          async, input_shapes, batch_size, max_threads, sequence_length,
+          shared_memory_type, output_shm_size, factory),
+      max_concurrency_(max_concurrency)
 {
-  async_ = async;
-  batch_size_ = batch_size;
-  max_threads_ = max_threads;
-  sequence_length_ = sequence_length;
-  factory_ = factory;
-  input_shapes_ = input_shapes;
-
-  on_sequence_model_ =
-      ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
-       (factory_->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE));
 }
 
 nic::Error

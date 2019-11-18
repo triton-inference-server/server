@@ -35,13 +35,14 @@ RequestRateManager::Create(
     const std::string& string_data, const bool zero_input,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     const std::string& data_directory,
+    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<RequestRateManager> local_manager(new RequestRateManager(
       async, input_shapes, request_distribution, batch_size,
       measurement_window_ms, max_threads, num_of_sequences, sequence_length,
-      factory));
+      shared_memory_type, output_shm_size, factory));
 
   local_manager->threads_config_.reserve(max_threads);
 
@@ -58,21 +59,14 @@ RequestRateManager::RequestRateManager(
     Distribution request_distribution, int32_t batch_size,
     const uint64_t measurement_window_ms, const size_t max_threads,
     const uint32_t num_of_sequences, const size_t sequence_length,
+    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory)
-    : request_distribution_(request_distribution), execute_(false),
+    : LoadManager(
+          async, input_shapes, batch_size, max_threads, sequence_length,
+          shared_memory_type, output_shm_size, factory),
+      request_distribution_(request_distribution), execute_(false),
       next_corr_id_(1)
 {
-  async_ = async;
-  batch_size_ = batch_size;
-  max_threads_ = max_threads;
-  sequence_length_ = sequence_length;
-  factory_ = factory;
-  input_shapes_ = input_shapes;
-
-  on_sequence_model_ =
-      ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
-       (factory_->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE));
-
   if (on_sequence_model_) {
     for (uint64_t i = 0; i < num_of_sequences; i++) {
       sequence_stat_.emplace_back(new SequenceStat(next_corr_id_++));
