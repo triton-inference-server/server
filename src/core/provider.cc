@@ -216,26 +216,20 @@ InferRequestProvider::Create(
   return Status::Success;
 }
 
-const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
-InferRequestProvider::GetInputOverride() const
+const InferRequestProvider::InputOverrideMapVec&
+InferRequestProvider::GetInputOverrides() const
 {
-  return overrides_;
+  return overrides_maps_;
 }
 
 Status
-InferRequestProvider::SetInputOverride(
-    const std::shared_ptr<InputOverrideMap>& override)
+InferRequestProvider::AddInputOverrides(
+    const std::shared_ptr<InputOverrideMap>& overrides)
 {
-  overrides_ = override;
-  return Status::Success;
-}
+  if ((overrides != nullptr) && !overrides->empty()) {
+    overrides_maps_.emplace_back(overrides);
+  }
 
-Status
-InferRequestProvider::AddInputOverride(
-    const std::string& tensor_name,
-    const std::shared_ptr<InferRequestProvider::InputOverride>& override)
-{
-  overrides_->insert(std::make_pair(tensor_name, override));
   return Status::Success;
 }
 
@@ -243,9 +237,9 @@ bool
 InferRequestProvider::GetInputOverrideContent(
     const std::string& name, const void** content, size_t* content_byte_size)
 {
-  if (overrides_ != nullptr) {
-    const auto& pr = overrides_->find(name);
-    if (pr != overrides_->end()) {
+  for (const auto& override_map : overrides_maps_) {
+    const auto& pr = override_map->find(name);
+    if (pr != override_map->end()) {
       if ((*content_byte_size == 0) ||
           (overrides_consumed_.find(name) != overrides_consumed_.end())) {
         *content = nullptr;

@@ -596,10 +596,10 @@ OnnxBackend::Context::Run(
   }
 
   // Additional inputs added to the provider...
-  const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
-      input_override_map = input_request_provider->GetInputOverride();
-  if (input_override_map != nullptr) {
-    for (const auto& pr : *input_override_map) {
+  const InferRequestProvider::InputOverrideMapVec& input_override_maps =
+      input_request_provider->GetInputOverrides();
+  for (const auto& ovr_map : input_override_maps) {
+    for (const auto& pr : *ovr_map) {
       const std::string& name = pr.first;
       const std::shared_ptr<InferRequestProvider::InputOverride>& override =
           pr.second;

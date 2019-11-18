@@ -146,7 +146,7 @@ Context::Init()
   std::unordered_map<std::string, const ModelSequenceBatching::ControlInput*>
       controls;
   for (const auto& ci : batcher.control_input()) {
-    controls.insert({ ci.name(), &ci });
+    controls.insert({ci.name(), &ci});
   }
 
   if (controls.size() != 4) {
@@ -161,7 +161,8 @@ Context::Init()
   }
 
   // The CORRID input must be UINT64 type.
-  if (controls.find("CORRID")->second->control(0).data_type() != DataType::TYPE_UINT64) {
+  if (controls.find("CORRID")->second->control(0).data_type() !=
+      DataType::TYPE_UINT64) {
     return kCorrIDType;
   }
 
@@ -277,7 +278,8 @@ Context::Execute(
     const size_t batch1_corrid_byte_size = GetDataTypeByteSize(TYPE_UINT64);
 
     // Get the input tensors.
-    std::vector<uint8_t> start_buffer, end_buffer, ready_buffer, corrid_buffer, input_buffer;
+    std::vector<uint8_t> start_buffer, end_buffer, ready_buffer, corrid_buffer,
+        input_buffer;
     err = GetInputTensor(
         input_fn, payload.input_context, "START", batch1_byte_size,
         &start_buffer);
@@ -287,8 +289,7 @@ Context::Execute(
     }
 
     err = GetInputTensor(
-        input_fn, payload.input_context, "END", batch1_byte_size,
-        &end_buffer);
+        input_fn, payload.input_context, "END", batch1_byte_size, &end_buffer);
     if (err != ErrorCodes::Success) {
       payload.error_code = err;
       continue;

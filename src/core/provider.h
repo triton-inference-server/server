@@ -187,11 +187,9 @@ class InferRequestProvider {
 
   using InputOverrideMap =
       std::unordered_map<std::string, std::shared_ptr<InputOverride>>;
-  const std::shared_ptr<InputOverrideMap>& GetInputOverride() const;
-  Status SetInputOverride(const std::shared_ptr<InputOverrideMap>& override);
-  Status AddInputOverride(
-      const std::string& tensor_name,
-      const std::shared_ptr<InferRequestProvider::InputOverride>& override);
+  using InputOverrideMapVec = std::vector<std::shared_ptr<InputOverrideMap>>;
+  const InputOverrideMapVec& GetInputOverrides() const;
+  Status AddInputOverrides(const std::shared_ptr<InputOverrideMap>& overrides);
 
  protected:
   explicit InferRequestProvider(
@@ -213,8 +211,9 @@ class InferRequestProvider {
   const int64_t version_;
   InferRequestHeader request_header_;
 
-  // Input content overrides.
-  std::shared_ptr<InputOverrideMap> overrides_;
+  // Input content overrides. Multiple maps can be provided but a
+  // given tensor must not appear in more than one map.
+  InputOverrideMapVec overrides_maps_;
 
   // The inputs that have had their override content consumed by a
   // call to GetInputOverrideContent. A given input override will only
