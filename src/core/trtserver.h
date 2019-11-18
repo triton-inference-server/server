@@ -774,7 +774,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerModelStatus(
 /// \param server The inference server object.
 /// \param repository_index Returns the model repository index protobuf.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ModelRepositoryIndex(
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerModelRepositoryIndex(
     TRTSERVER_Server* server, TRTSERVER_Protobuf** repository_index);
 
 /// Load the requested model or reload the model if it is already

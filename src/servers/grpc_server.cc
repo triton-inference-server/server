@@ -707,7 +707,7 @@ RepositoryHandler::Process(Handler::State* state, bool rpc_ok)
     switch (request.request_type_case()) {
       case RepositoryRequest::RequestTypeCase::kIndex: {
         TRTSERVER_Protobuf* repository_index_protobuf = nullptr;
-        err = TRTSERVER_ModelRepositoryIndex(
+        err = TRTSERVER_ServerModelRepositoryIndex(
             trtserver_.get(), &repository_index_protobuf);
         if (err == nullptr) {
           const char* serialized_buffer;
@@ -744,9 +744,9 @@ RepositoryHandler::Process(Handler::State* state, bool rpc_ok)
     state->step_ = Steps::FINISH;
   }
 
-  // Only handle one status request at a time (to avoid having status
-  // request cause too much load on server), so register for next
-  // request only after this one finished.
+  // Only handle one model repository request at a time (to avoid having
+  // model repository request cause too much load on server),
+  // so register for next request only after this one finished.
   if (!shutdown && (state->step_ == Steps::FINISH)) {
     StartNewRequest();
   }

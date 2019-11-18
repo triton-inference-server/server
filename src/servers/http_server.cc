@@ -635,7 +635,7 @@ HTTPAPIServer::HandleRepository(
   TRTSERVER_Error* err = nullptr;
   if (query_type_str == "index") {
     TRTSERVER_Protobuf* repository_index_protobuf = nullptr;
-    err = TRTSERVER_ModelRepositoryIndex(
+    err = TRTSERVER_ServerModelRepositoryIndex(
         server_.get(), &repository_index_protobuf);
     if (err == nullptr) {
       const char* serialized_buffer;

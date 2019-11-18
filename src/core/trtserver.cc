@@ -1190,7 +1190,7 @@ TRTSERVER_ServerModelStatus(
 }
 
 TRTSERVER_Error*
-TRTSERVER_ModelRepositoryIndex(
+TRTSERVER_ServerModelRepositoryIndex(
     TRTSERVER_Server* server, TRTSERVER_Protobuf** repository_index)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
