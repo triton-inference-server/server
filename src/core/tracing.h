@@ -47,6 +47,8 @@ class Trace {
     return Status::Success;
   }
 
+  int64_t NextId() { return ++id_; }
+
   void Report(const ModelInferStats* infer_stats);
 
  private:
@@ -54,13 +56,14 @@ class Trace {
       TRTSERVER_Trace_Level level, TRTSERVER_TraceActivityFn_t activity_fn,
       void* activity_userp)
       : level_(level), activity_fn_(activity_fn),
-        activity_userp_(activity_userp)
+        activity_userp_(activity_userp), id_(0)
   {
   }
 
   const TRTSERVER_Trace_Level level_;
   TRTSERVER_TraceActivityFn_t activity_fn_;
   void* activity_userp_;
+  std::atomic<int64_t> id_;
 };
 
 }}  // namespace nvidia::inferenceserver

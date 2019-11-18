@@ -35,32 +35,33 @@ namespace nvidia { namespace inferenceserver {
 void
 Trace::Report(const ModelInferStats* infer_stats)
 {
+  auto ensemble_phase = infer_stats->GetEnsemblePhase();
   if (level_ != TRTSERVER_TRACE_LEVEL_DISABLED) {
     activity_fn_(
         reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_REQUEST_START,
         TIMESPEC_TO_NANOS(infer_stats->Timestamp(
             ModelInferStats::TimestampKind::kRequestStart)),
-        activity_userp_);
+        ensemble_phase, activity_userp_);
     activity_fn_(
         reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_QUEUE_START,
         TIMESPEC_TO_NANOS(infer_stats->Timestamp(
             ModelInferStats::TimestampKind::kQueueStart)),
-        activity_userp_);
+        ensemble_phase, activity_userp_);
     activity_fn_(
         reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_COMPUTE_START,
         TIMESPEC_TO_NANOS(infer_stats->Timestamp(
             ModelInferStats::TimestampKind::kComputeStart)),
-        activity_userp_);
+        ensemble_phase, activity_userp_);
     activity_fn_(
         reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_COMPUTE_END,
         TIMESPEC_TO_NANOS(infer_stats->Timestamp(
             ModelInferStats::TimestampKind::kComputeEnd)),
-        activity_userp_);
+        ensemble_phase, activity_userp_);
     activity_fn_(
         reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_REQUEST_END,
         TIMESPEC_TO_NANOS(infer_stats->Timestamp(
             ModelInferStats::TimestampKind::kRequestEnd)),
-        activity_userp_);
+        ensemble_phase, activity_userp_);
   }
 
   if (level_ == TRTSERVER_TRACE_LEVEL_MAX) {
@@ -69,13 +70,13 @@ Trace::Report(const ModelInferStats* infer_stats)
         TRTSERVER_TRACE_COMPUTE_INPUT_END,
         TIMESPEC_TO_NANOS(infer_stats->Timestamp(
             ModelInferStats::TimestampKind::kComputeInputEnd)),
-        activity_userp_);
+        ensemble_phase, activity_userp_);
     activity_fn_(
         reinterpret_cast<TRTSERVER_Trace*>(this),
         TRTSERVER_TRACE_COMPUTE_OUTPUT_START,
         TIMESPEC_TO_NANOS(infer_stats->Timestamp(
             ModelInferStats::TimestampKind::kComputeOutputStart)),
-        activity_userp_);
+        ensemble_phase, activity_userp_);
   }
 }
 

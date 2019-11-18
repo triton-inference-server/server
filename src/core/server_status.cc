@@ -338,6 +338,22 @@ ServerStatTimerScoped::~ServerStatTimerScoped()
 }
 
 void
+ModelInferStats::InitEnsemblePhase(TRTSERVER_Ensemble_Phase* parent_phase)
+{
+#ifdef TRTIS_ENABLE_TRACING
+  if (trace_ != nullptr) {
+    ensemble_phase_.reset(new TRTSERVER_Ensemble_Phase);
+    Trace* ltrace = reinterpret_cast<Trace*>(trace_);
+    // Get an ID that is unique in respect to the trace
+    ensemble_phase_->phase_id_ = ltrace->NextId();
+    ensemble_phase_->model_name_ = model_name_.c_str();
+    ensemble_phase_->parent_id_ =
+        (parent_phase != nullptr) ? parent_phase->phase_id_ : -1;
+  }
+#endif  // TRTIS_ENABLE_TRACING
+}
+
+void
 ModelInferStats::Report()
 {
 #ifdef TRTIS_ENABLE_TRACING

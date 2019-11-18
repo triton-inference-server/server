@@ -142,6 +142,18 @@ class ModelInferStats {
   // Get the trace object related to the inference.
   TRTSERVER_Trace* GetTrace() { return trace_; }
 
+  // Populate the ensemble phase associated with this infer stats,
+  // which will be passed to tracer if it is being traced.
+  // This function Has no effect if not being traced.
+  void InitEnsemblePhase(TRTSERVER_Ensemble_Phase* parent_phase);
+
+  // Get the ensemble phase struct. nullptr will be returned if
+  // InitEnsemblePhase() hasn't been called.
+  TRTSERVER_Ensemble_Phase* GetEnsemblePhase() const
+  {
+    return ensemble_phase_.get();
+  }
+
   // Get the timestamp for a kind.
   const struct timespec& Timestamp(TimestampKind kind) const
   {
@@ -183,6 +195,7 @@ class ModelInferStats {
   uint64_t extra_compute_duration_;
 
   TRTSERVER_Trace* trace_;
+  std::unique_ptr<TRTSERVER_Ensemble_Phase> ensemble_phase_;
 };
 
 // Manage access and updates to server status information.

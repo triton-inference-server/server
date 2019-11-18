@@ -167,7 +167,8 @@ Tracer::~Tracer()
 
 void
 Tracer::CaptureTimestamp(
-    TRTSERVER_Trace_Level level, const std::string& name, uint64_t timestamp_ns)
+    TRTSERVER_Trace_Level level, const std::string& name, uint64_t timestamp_ns,
+    TRTSERVER_Ensemble_Phase* ensemble_phase)
 {
   // In the case of tracing an ensemble, it is possible to access a trace object
   // concurrently
@@ -183,7 +184,13 @@ Tracer::CaptureTimestamp(
       tout_ << ",";
     }
 
-    tout_ << "{\"name\":\"" << name << "\", \"ns\":" << timestamp_ns << "}";
+    tout_ << "{\"name\":\"" << name << "\", \"ns\":" << timestamp_ns;
+    if (ensemble_phase != nullptr) {
+      tout_ << ", \"model_name\":\"" << ensemble_phase->model_name_
+            << "\", \"phase_id\":" << ensemble_phase->phase_id_
+            << ", \"parent_id\":" << ensemble_phase->parent_id_;
+    }
+    tout_ << "}";
     timestamp_cnt_++;
   }
 }
@@ -191,7 +198,8 @@ Tracer::CaptureTimestamp(
 void
 Tracer::TraceActivity(
     TRTSERVER_Trace* trace, TRTSERVER_Trace_Activity activity,
-    uint64_t timestamp_ns, void* userp)
+    uint64_t timestamp_ns, TRTSERVER_Ensemble_Phase* ensemble_phase,
+    void* userp)
 {
   Tracer* tracer = reinterpret_cast<Tracer*>(userp);
 
@@ -220,7 +228,8 @@ Tracer::TraceActivity(
       break;
   }
 
-  tracer->CaptureTimestamp(tracer->level_, activity_name, timestamp_ns);
+  tracer->CaptureTimestamp(
+      tracer->level_, activity_name, timestamp_ns, ensemble_phase);
 }
 
 }}  // namespace nvidia::inferenceserver

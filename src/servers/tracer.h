@@ -87,7 +87,8 @@ class Tracer {
 
   static void TraceActivity(
       TRTSERVER_Trace* trace, TRTSERVER_Trace_Activity activity,
-      uint64_t timestamp_ns, void* userp);
+      uint64_t timestamp_ns, TRTSERVER_Ensemble_Phase* ensemble_phase,
+      void* userp);
 
   void SetModel(const std::string& model_name, int64_t model_version)
   {
@@ -103,7 +104,8 @@ class Tracer {
   // will be used.
   void CaptureTimestamp(
       TRTSERVER_Trace_Level level, const std::string& name,
-      uint64_t timestamp_ns = 0);
+      uint64_t timestamp_ns = 0,
+      TRTSERVER_Ensemble_Phase* ensemble_phase = nullptr);
 
  private:
   std::shared_ptr<TraceManager> manager_;
