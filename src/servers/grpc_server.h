@@ -76,6 +76,7 @@ class GRPCServer {
 
   std::unique_ptr<grpc::ServerCompletionQueue> health_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> status_cq_;
+  std::unique_ptr<grpc::ServerCompletionQueue> repository_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> infer_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> stream_infer_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> modelcontrol_cq_;
@@ -86,6 +87,7 @@ class GRPCServer {
 
   std::unique_ptr<HandlerBase> health_handler_;
   std::unique_ptr<HandlerBase> status_handler_;
+  std::unique_ptr<HandlerBase> repository_handler_;
   std::unique_ptr<HandlerBase> infer_handler_;
   std::unique_ptr<HandlerBase> stream_infer_handler_;
   std::unique_ptr<HandlerBase> modelcontrol_handler_;

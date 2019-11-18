@@ -649,6 +649,112 @@ StatusHandler::Process(Handler::State* state, bool rpc_ok)
 }
 
 //
+// RepositoryHandler
+//
+class RepositoryHandler
+    : public Handler<
+          GRPCService::AsyncService,
+          grpc::ServerAsyncResponseWriter<RepositoryResponse>,
+          RepositoryRequest, RepositoryResponse> {
+ public:
+  RepositoryHandler(
+      const std::string& name,
+      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      GRPCService::AsyncService* service, grpc::ServerCompletionQueue* cq,
+      size_t max_state_bucket_count)
+      : Handler(name, trtserver, server_id, service, cq, max_state_bucket_count)
+  {
+  }
+
+ protected:
+  void StartNewRequest() override;
+  bool Process(State* state, bool rpc_ok) override;
+};
+
+void
+RepositoryHandler::StartNewRequest()
+{
+  auto context = std::make_shared<State::Context>(server_id_);
+  State* state = StateNew(context);
+  service_->RequestRepository(
+      state->context_->ctx_.get(), &state->request_,
+      state->context_->responder_.get(), cq_, cq_, state);
+
+  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
+                 << state->unique_id_;
+}
+
+bool
+RepositoryHandler::Process(Handler::State* state, bool rpc_ok)
+{
+  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
+                 << state->unique_id_ << " step " << state->step_;
+
+  // If RPC failed on a new request then the server is shutting down
+  // and so we should do nothing (including not registering for a new
+  // request). If RPC failed on a non-START step then there is nothing
+  // we can do since we one execute one step.
+  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
+  if (shutdown) {
+    state->step_ = Steps::FINISH;
+  }
+
+  const RepositoryRequest& request = state->request_;
+  RepositoryResponse& response = state->response_;
+
+  if (state->step_ == Steps::START) {
+    TRTSERVER_Error* err = nullptr;
+    switch (request.request_type_case()) {
+      case RepositoryRequest::RequestTypeCase::kIndex: {
+        TRTSERVER_Protobuf* repository_index_protobuf = nullptr;
+        err = TRTSERVER_ServerModelRepositoryIndex(
+            trtserver_.get(), &repository_index_protobuf);
+        if (err == nullptr) {
+          const char* serialized_buffer;
+          size_t serialized_byte_size;
+          err = TRTSERVER_ProtobufSerialize(
+              repository_index_protobuf, &serialized_buffer,
+              &serialized_byte_size);
+          if (err == nullptr) {
+            if (!response.mutable_index()->ParseFromArray(
+                    serialized_buffer, serialized_byte_size)) {
+              err = TRTSERVER_ErrorNew(
+                  TRTSERVER_ERROR_UNKNOWN, "failed to parse repository index");
+            }
+          }
+        }
+
+        TRTSERVER_ProtobufDelete(repository_index_protobuf);
+        break;
+      }
+      default:
+        err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_UNKNOWN, "request type is not specified");
+        break;
+    }
+
+    RequestStatusUtil::Create(
+        response.mutable_request_status(), err, state->unique_id_, server_id_);
+
+    TRTSERVER_ErrorDelete(err);
+
+    state->step_ = Steps::COMPLETE;
+    state->context_->responder_->Finish(response, grpc::Status::OK, state);
+  } else if (state->step_ == Steps::COMPLETE) {
+    state->step_ = Steps::FINISH;
+  }
+
+  // Only handle one model repository request at a time (to avoid having
+  // model repository request cause too much load on server),
+  // so register for next request only after this one finished.
+  if (!shutdown && (state->step_ == Steps::FINISH)) {
+    StartNewRequest();
+  }
+
+  return state->step_ != Steps::FINISH;
+}
+
+//
 // Infer utilities
 //
 TRTSERVER_Error*
@@ -1782,6 +1888,7 @@ GRPCServer::Start()
   grpc_builder_.RegisterService(&service_);
   health_cq_ = grpc_builder_.AddCompletionQueue();
   status_cq_ = grpc_builder_.AddCompletionQueue();
+  repository_cq_ = grpc_builder_.AddCompletionQueue();
   infer_cq_ = grpc_builder_.AddCompletionQueue();
   stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
   modelcontrol_cq_ = grpc_builder_.AddCompletionQueue();
@@ -1803,6 +1910,14 @@ GRPCServer::Start()
       2 /* max_state_bucket_count */);
   hstatus->Start(1 /* thread_cnt */);
   status_handler_.reset(hstatus);
+
+  // Handler for status requests. A single thread processes all of
+  // these requests.
+  RepositoryHandler* hrepository = new RepositoryHandler(
+      "RepositoryHandler", server_, server_id_, &service_, repository_cq_.get(),
+      2 /* max_state_bucket_count */);
+  hrepository->Start(1 /* thread_cnt */);
+  repository_handler_.reset(hrepository);
 
   // Handler for inference requests. 'infer_thread_cnt_' is not used
   // below due to thread-safety requirements and the way
@@ -1862,6 +1977,7 @@ GRPCServer::Stop()
 
   health_cq_->Shutdown();
   status_cq_->Shutdown();
+  repository_cq_->Shutdown();
   infer_cq_->Shutdown();
   stream_infer_cq_->Shutdown();
   modelcontrol_cq_->Shutdown();
@@ -1871,6 +1987,7 @@ GRPCServer::Stop()
   // threads to join since they are referencing completion queue, etc.
   dynamic_cast<HealthHandler*>(health_handler_.get())->Stop();
   dynamic_cast<StatusHandler*>(status_handler_.get())->Stop();
+  dynamic_cast<RepositoryHandler*>(repository_handler_.get())->Stop();
   dynamic_cast<InferHandler*>(infer_handler_.get())->Stop();
   dynamic_cast<StreamInferHandler*>(stream_infer_handler_.get())->Stop();
   dynamic_cast<ModelControlHandler*>(modelcontrol_handler_.get())->Stop();

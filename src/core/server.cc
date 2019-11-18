@@ -353,6 +353,18 @@ InferenceServer::GetStatus(
 }
 
 Status
+InferenceServer::GetModelRepositoryIndex(ModelRepositoryIndex* repository_index)
+{
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  return model_repository_manager_->GetModelRepositoryIndex(repository_index);
+}
+
+Status
 InferenceServer::LoadModel(const std::string& model_name)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {

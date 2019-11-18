@@ -942,6 +942,37 @@ ModelRepositoryManager::Create(
 }
 
 Status
+ModelRepositoryManager::GetModelRepositoryIndex(
+    ModelRepositoryIndex* repository_index)
+{
+  std::set<std::string> duplicated_models;
+  std::set<std::string> models;
+  for (const auto& repository_path : repository_paths_) {
+    std::set<std::string> subdirs;
+    RETURN_IF_ERROR(GetDirectorySubdirs(repository_path, &subdirs));
+
+    for (const auto& subdir : subdirs) {
+      if (!models.emplace(subdir).second) {
+        duplicated_models.insert(subdir);
+      }
+    }
+  }
+
+  // If the model is not unique, ignore it as the model can't be loaded anyway.
+  for (const auto& duplicated_model : duplicated_models) {
+    models.erase(duplicated_model);
+  }
+
+  repository_index->Clear();
+  for (const auto& model : models) {
+    auto entry = repository_index->add_models();
+    entry->set_name(model);
+  }
+
+  return Status::Success;
+}
+
+Status
 ModelRepositoryManager::PollAndUpdate()
 {
   if (!polling_enabled_) {
@@ -1319,7 +1350,7 @@ ModelRepositoryManager::Poll(
   // Otherwise, only poll the specified models
   if (models.empty()) {
     std::set<std::string> duplicated_models;
-    for (const auto repository_path : repository_paths_) {
+    for (const auto& repository_path : repository_paths_) {
       std::set<std::string> subdirs;
       Status status = GetDirectorySubdirs(repository_path, &subdirs);
       if (!status.IsOk()) {

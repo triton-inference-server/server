@@ -49,7 +49,9 @@ class ServerStatTimerScoped {
     MODEL_CONTROL,
     // Stat for shared memory control request. Duration from request
     // to response.
-    SHARED_MEMORY_CONTROL
+    SHARED_MEMORY_CONTROL,
+    // Stat for repository request. Duration from request to response.
+    REPOSITORY
   };
 
   // Start server timer for a given status 'kind'.
