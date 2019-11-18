@@ -28,6 +28,22 @@
 SIMPLE_CLIENT=../clients/simple_client
 TRACE_SUMMARY=../common/trace_summary.py
 
+REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
+DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
+ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
+MODELBASE=graphdef_int32_int32_int32
+
+MODELSDIR=`pwd`/models
+
 SERVER=/opt/tensorrtserver/bin/trtserver
 source ../common/util.sh
 
@@ -212,6 +228,52 @@ if [ `grep -c ^simple summary_9.log` != "2" ]; then
 fi
 
 set -e
+
+# Demonstrate trace for ensemble
+# set up "addsub" nested ensemble
+mv `pwd`/models/simple `pwd`/models/$MODELBASE && \
+    (cd `pwd`/models/$MODELBASE && \
+            sed -i "s/^name:.*/name: \"$MODELBASE\"/" config.pbtxt)
+
+# nested ensemble
+mkdir -p $MODELSDIR/fan_$MODELBASE/1 && \
+    cp $ENSEMBLEDIR/fan_$MODELBASE/config.pbtxt $MODELSDIR/fan_$MODELBASE/. && \
+        (cd $MODELSDIR/fan_$MODELBASE && \
+                sed -i "s/label_filename:.*//" config.pbtxt)
+
+mkdir -p $MODELSDIR/simple/1 && \
+    cp $ENSEMBLEDIR/fan_$MODELBASE/config.pbtxt $MODELSDIR/simple/. && \
+        (cd $MODELSDIR/simple && \
+                sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
+                sed -i "s/$MODELBASE/fan_$MODELBASE/" config.pbtxt && \
+                sed -i "s/label_filename:.*//" config.pbtxt)
+
+cp -r $ENSEMBLEDIR/nop_TYPE_INT32_-1 $MODELSDIR/. && \
+    mkdir -p $MODELSDIR/nop_TYPE_INT32_-1/1 && \
+    cp libidentity.so $MODELSDIR/nop_TYPE_INT32_-1/1/.
+
+# trace-rate == 1, trace-level=MAX
+SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_ensemble.log --trace-level=MAX --trace-rate=1 --model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_ensemble.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+$SIMPLE_CLIENT >> client_ensemble.log 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
