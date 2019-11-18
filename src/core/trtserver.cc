@@ -1190,6 +1190,25 @@ TRTSERVER_ServerModelStatus(
 }
 
 TRTSERVER_Error*
+TRTSERVER_ServerModelRepositoryIndex(
+    TRTSERVER_Server* server, TRTSERVER_Protobuf** repository_index)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::REPOSITORY);
+
+  ni::ModelRepositoryIndex model_repository_index;
+  RETURN_IF_STATUS_ERROR(
+      lserver->GetModelRepositoryIndex(&model_repository_index));
+
+  TrtServerProtobuf* protobuf = new TrtServerProtobuf(model_repository_index);
+  *repository_index = reinterpret_cast<TRTSERVER_Protobuf*>(protobuf);
+
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
 TRTSERVER_ServerLoadModel(TRTSERVER_Server* server, const char* model_name)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);

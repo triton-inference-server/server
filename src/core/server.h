@@ -82,6 +82,10 @@ class InferenceServer {
   // 'model_name' is empty, update with the status of all models.
   Status GetStatus(ServerStatus* server_status, const std::string& model_name);
 
+  // Update the ModelRepositoryIndex object with the index of the model
+  // repository.
+  Status GetModelRepositoryIndex(ModelRepositoryIndex* repository_index);
+
   // Load the corresponding model. Reload the model if it has been loaded.
   Status LoadModel(const std::string& model_name);
 

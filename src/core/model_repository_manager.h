@@ -130,6 +130,8 @@ class ModelRepositoryManager {
       const std::string& model_name, const int64_t model_version,
       std::shared_ptr<InferenceBackend>* backend);
 
+  Status GetModelRepositoryIndex(ModelRepositoryIndex* repository_index);
+
  private:
   struct ModelInfo;
   class BackendLifeCycle;

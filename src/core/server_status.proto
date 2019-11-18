@@ -113,6 +113,21 @@ message SharedMemoryControlRequestStats
 }
 
 //@@
+//@@.. cpp:var:: message RepositoryRequestStats
+//@@
+//@@   Statistics collected for Repository requests.
+//@@
+message RepositoryRequestStats
+{
+  //@@  .. cpp:var:: StatDuration success
+  //@@
+  //@@     Total time required to handle successful Repository requests, not
+  //@@     including HTTP or gRPC endpoint termination time.
+  //@@
+  StatDuration success = 1;
+}
+
+//@@
 //@@.. cpp:var:: message InferRequestStats
 //@@
 //@@   Statistics collected for Infer requests.
@@ -446,6 +461,12 @@ message ServerStatus
   //@@     Statistics for SharedMemoryControl requests.
   //@@
   SharedMemoryControlRequestStats shm_control_stats = 10;
+
+  //@@  .. cpp:var:: RepositoryRequestStats repository_stats
+  //@@
+  //@@     Statistics for Repository requests.
+  //@@
+  RepositoryRequestStats repository_stats = 11;
 }
 
 //@@
@@ -456,9 +477,39 @@ message ServerStatus
 message SharedMemoryStatus
 {
   //@@
-  //@@  .. cpp:var:: SharedMemoryRegion shared_memory_region
+  //@@  .. cpp:var:: SharedMemoryRegion shared_memory_region (repeated)
   //@@
   //@@     The list of active/registered shared memory regions.
   //@@
   repeated SharedMemoryRegion shared_memory_region = 2;
+}
+
+
+//@@
+//@@.. cpp:var:: message ModelRepositoryIndex
+//@@
+//@@   Index of the model repository monitored by the inference server.
+//@@
+message ModelRepositoryIndex
+{
+  //@@
+  //@@  .. cpp:var:: message ModelEntry
+  //@@
+  //@@     The basic information for a model.
+  //@@
+  message ModelEntry
+  {
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The model's name.
+    //@@
+    string name = 1;
+  }
+
+  //@@
+  //@@  .. cpp:var:: ModelEntry models (repeated)
+  //@@
+  //@@     The list of models in the model repository.
+  //@@
+  repeated ModelEntry models = 1;
 }

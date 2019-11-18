@@ -768,6 +768,15 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerModelStatus(
     TRTSERVER_Server* server, const char* model_name,
     TRTSERVER_Protobuf** status);
 
+/// Get the index for all unique models in the model repository  as a
+/// TRTSERVER_Protobuf object. The caller takes ownership of the object
+/// and must call TRTSERVER_ProtobufDelete to release the object.
+/// \param server The inference server object.
+/// \param repository_index Returns the model repository index protobuf.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerModelRepositoryIndex(
+    TRTSERVER_Server* server, TRTSERVER_Protobuf** repository_index);
+
 /// Load the requested model or reload the model if it is already
 /// loaded. The function does not return until the model is loaded or
 /// fails to load. Returned error indicates if model loaded
