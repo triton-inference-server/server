@@ -196,11 +196,13 @@ class SequenceBatchScheduler : public Scheduler {
     // CONTROL_SEQUENCE_CORRID control.
     std::string correlation_id_tensor_;
 
-    // For each slot the override entry that provides the correlation
-    // ID for that slot. Empty if model does not specify the
+    // For each slot the override map that provides the correlation ID
+    // for that slot. Empty if model does not specify the
     // CONTROL_SEQUENCE_CORRID control.
     std::vector<std::shared_ptr<InferRequestProvider::InputOverride>>
         slot_corrid_overrides_;
+    std::vector<std::shared_ptr<InferRequestProvider::InputOverrideMap>>
+        slot_corrid_overrides_maps_;
   };
 
  private:

@@ -687,12 +687,19 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
     }
 
     for (size_t b = 0; b < slot_correlation_ids_.size(); ++b) {
-      auto corrid_override = new InferRequestProvider::InputOverride();
-      corrid_override->dims_.Add(1);
-      corrid_override->datatype_ = correlation_id_datatype;
-      corrid_override->content_.resize(
-          GetDataTypeByteSize(correlation_id_datatype));
-      slot_corrid_overrides_.emplace_back(corrid_override);
+      slot_corrid_overrides_maps_.emplace_back(
+          new InferRequestProvider::InputOverrideMap());
+      std::shared_ptr<InferRequestProvider::InputOverrideMap>& ovr_map =
+          slot_corrid_overrides_maps_.back();
+      std::shared_ptr<InferRequestProvider::InputOverride>& ovr =
+          (*ovr_map)[correlation_id_tensor_];
+      ovr.reset(new InferRequestProvider::InputOverride());
+      ovr->dims_.Add(1);
+      ovr->datatype_ = correlation_id_datatype;
+      ovr->content_.resize(GetDataTypeByteSize(correlation_id_datatype));
+
+      slot_corrid_overrides_.emplace_back();
+      slot_corrid_overrides_.back() = ovr;
     }
   }
 
@@ -893,7 +900,7 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
               auto null_request_provider =
                   std::make_shared<NULLInferRequestProvider>(
                       null_request_header_);
-              null_request_provider->SetInputOverride(
+              null_request_provider->AddInputOverrides(
                   notready_input_overrides_);
 
               payloads->emplace_back(
@@ -910,29 +917,31 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
                     InferRequestHeader::FLAG_SEQUENCE_END)) ==
                   (InferRequestHeader::FLAG_SEQUENCE_START |
                    InferRequestHeader::FLAG_SEQUENCE_END)) {
-                request_provider->SetInputOverride(startend_input_overrides_);
+                request_provider->AddInputOverrides(startend_input_overrides_);
               } else if (
                   (request_header.flags() &
                    InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
-                request_provider->SetInputOverride(start_input_overrides_);
+                request_provider->AddInputOverrides(start_input_overrides_);
               } else if (
                   (request_header.flags() &
                    InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
-                request_provider->SetInputOverride(end_input_overrides_);
+                request_provider->AddInputOverrides(end_input_overrides_);
               } else {
-                request_provider->SetInputOverride(continue_input_overrides_);
+                request_provider->AddInputOverrides(continue_input_overrides_);
               }
 
               // Set correlation ID control tensor if requested by the
-              // model.
+              // model. This must be called after AddInputOverrides
+              // above since AddInputOverride simply adds to an
+              // existing map of overrides.
               if (!correlation_id_tensor_.empty()) {
                 uint8_t* corrid_p =
                     reinterpret_cast<uint8_t*>(&slot_correlation_ids_[slot]);
                 std::vector<uint8_t>& content =
                     slot_corrid_overrides_[slot]->content_;
                 content.assign(corrid_p, corrid_p + content.size());
-                request_provider->AddInputOverride(
-                    correlation_id_tensor_, slot_corrid_overrides_[slot]);
+                request_provider->AddInputOverrides(
+                    slot_corrid_overrides_maps_[slot]);
               }
 
               payloads->emplace_back(

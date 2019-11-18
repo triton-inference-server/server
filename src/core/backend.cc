@@ -149,7 +149,7 @@ InferenceBackend::SetConfiguredScheduler(
             model_name, version, sample.request_header_, sample.input_buffer_,
             &request_provider));
         RETURN_IF_ERROR(
-            request_provider->SetInputOverride(sample.input_override_));
+            request_provider->AddInputOverrides(sample.input_override_));
         payloads.emplace_back(nullptr, request_provider, nullptr, nullptr);
       }
 

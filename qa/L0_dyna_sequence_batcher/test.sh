@@ -85,6 +85,39 @@ for i in \
     wait $SERVER_PID
 done
 
+# Tests that require TRTSERVER_DELAY_SCHEDULER so that the
+# scheduler is delayed and requests can collect in the queue.
+for i in \
+    test_multi_sequence \
+             ; do
+    export TRTSERVER_BACKLOG_DELAY_SCHEDULER=0
+    export TRTSERVER_DELAY_SCHEDULER=11
+
+    SERVER_LOG="./$i.serverlog"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    echo "Test: $i" >>$CLIENT_LOG
+
+    set +e
+    python $BATCHER_TEST DynaSequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+        echo -e "\n***\n*** Test $i Failed\n***"
+        RET=1
+    fi
+    set -e
+
+    unset TRTSERVER_DELAY_SCHEDULER
+    unset TRTSERVER_BACKLOG_DELAY_SCHEDULER
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
+
 # python unittest seems to swallow ImportError and still return 0 exit
 # code. So need to explicitly check CLIENT_LOG to make sure we see
 # some running tests
