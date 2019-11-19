@@ -694,6 +694,59 @@ message ModelSequenceBatching
     repeated Control control = 2;
   }
 
+  //@@  .. cpp:var:: message StrategyDirect
+  //@@
+  //@@     The sequence batcher uses a specific, unique batch
+  //@@     slot for each sequence. All inference requests in a
+  //@@     sequence are directed to the same batch slot in the same
+  //@@     model instance over the lifetime of the sequence. This
+  //@@     is the default strategy.
+  //@@
+  message StrategyDirect {}
+
+  //@@  .. cpp:var:: message StrategyOldest
+  //@@
+  //@@     The sequence batcher maintains up to 'max_candidate_sequences'
+  //@@     candidate sequences. 'max_candidate_sequences' can be greater
+  //@@     than the model's 'max_batch_size'. For inferencing the batcher
+  //@@     chooses from the candidate sequences up to 'max_batch_size'
+  //@@     inference requests. Requests are chosen in an oldest-first
+  //@@     manner across all candidate sequences. A given sequence is
+  //@@     not guaranteed to be assigned to the same batch slot for
+  //@@     all inference requests of that sequence.
+  //@@
+  message StrategyOldest
+  {
+    //@@    .. cpp:var:: int32 max_candidate_sequences
+    //@@
+    //@@       Maximum number of candidate sequences that the batcher
+    //@@       maintains. Excess seqences are kept in an ordered backlog
+    //@@       and become candidates when existing candidate sequences
+    //@@       complete.
+    //@@
+    int32 max_candidate_sequences = 1;
+  }
+
+  //@@  .. cpp:var:: oneof strategy_choice
+  //@@
+  //@@     The strategy used by the sequence batcher. Default strategy
+  //@@     is 'direct'.
+  //@@
+  oneof strategy_choice
+  {
+    //@@    .. cpp:var:: StrategyDirect direct
+    //@@
+    //@@       StrategyDirect scheduling strategy.
+    //@@
+    StrategyDirect direct = 3;
+
+    //@@    .. cpp:var:: StrategyOldest oldest
+    //@@
+    //@@       StrategyOldest scheduling strategy.
+    //@@
+    StrategyOldest oldest = 4;
+  }
+
   //@@  .. cpp:var:: uint64 max_sequence_idle_microseconds
   //@@
   //@@     The maximum time, in microseconds, that a sequence is allowed to

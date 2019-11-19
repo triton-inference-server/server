@@ -245,9 +245,9 @@ InferRequestProvider::GetInputOverrideContent(
         *content = nullptr;
         *content_byte_size = 0;
       } else {
-        std::shared_ptr<InputOverride>& override = pr->second;
-        *content = reinterpret_cast<void*>(&(override->content_[0]));
-        *content_byte_size = override->content_.size();
+        const InputOverride& override = pr->second;
+        *content = reinterpret_cast<const void*>(&(override.content_[0]));
+        *content_byte_size = override.content_.size();
         overrides_consumed_.insert(name);
       }
 

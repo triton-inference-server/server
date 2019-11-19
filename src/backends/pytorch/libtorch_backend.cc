@@ -611,8 +611,7 @@ LibTorchBackend::Context::Run(
     for (const auto& pr : *ovr_map) {
       const std::string& name = pr.first;
       LOG_VERBOSE(1) << "Processing extra input: " << name;
-      const std::shared_ptr<InferRequestProvider::InputOverride>& override =
-          pr.second;
+      const InferRequestProvider::InputOverride& override = pr.second;
       try {
         int start_pos = name.find(deliminator);
         if (start_pos == -1) {
@@ -630,8 +629,8 @@ LibTorchBackend::Context::Run(
       }
       input_index_map_[name] = ip_index;
       RETURN_IF_ERROR(SetInputMetaData(
-          name, override->datatype_, override->dims_, total_batch_size,
-          payloads, &(input_meta_data[ip_index]), &cuda_copy));
+          name, override.datatype_, override.dims_, total_batch_size, payloads,
+          &(input_meta_data[ip_index]), &cuda_copy));
     }
   }
 #ifdef TRTIS_ENABLE_GPU

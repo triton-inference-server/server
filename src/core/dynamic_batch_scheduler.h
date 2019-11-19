@@ -45,9 +45,12 @@ class DynamicBatchScheduler : public Scheduler {
   // Create a scheduler to support a given number of runners and a run
   // function to call when a request is scheduled.
   static Status Create(
-      const ModelConfig& config, const uint32_t runner_cnt,
-      StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
-      StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler);
+      const uint32_t runner_cnt, const int nice, StandardInitFunc OnInit,
+      StandardWarmupFunc OnWarmup, StandardRunFunc OnSchedule,
+      const bool dynamic_batching_enabled, const bool enforce_equal_shape_batch,
+      const std::set<int32_t>& preferred_batch_sizes,
+      const uint64_t max_queue_delay_microseconds,
+      std::unique_ptr<Scheduler>* scheduler);
 
   ~DynamicBatchScheduler();
 
@@ -60,9 +63,11 @@ class DynamicBatchScheduler : public Scheduler {
 
  private:
   DynamicBatchScheduler(
-      const ModelConfig& config, const uint32_t runner_cnt,
-      StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
-      StandardRunFunc OnSchedule);
+      const uint32_t runner_cnt, StandardInitFunc OnInit,
+      StandardWarmupFunc OnWarmup, StandardRunFunc OnSchedule,
+      const bool dynamic_batching_enabled, const bool enforce_equal_shape_batch,
+      const std::set<int32_t>& preferred_batch_sizes,
+      const uint64_t max_queue_delay_microseconds);
   void SchedulerThread(
       const uint32_t runner_id, const int nice,
       const std::shared_ptr<std::atomic<bool>>& rthread_exit,
@@ -81,14 +86,14 @@ class DynamicBatchScheduler : public Scheduler {
   // execution.
   const StandardRunFunc OnSchedule_;
 
+  // True if dynamic batching is enabled.
+  const bool dynamic_batching_enabled_;
+
   // The number of scheduler threads.
   const uint32_t scheduler_thread_cnt_;
 
   // The number of scheduler threads currently idle.
   uint32_t idle_scheduler_thread_cnt_;
-
-  // True if dynamic batching is enabled.
-  bool dynamic_batching_enabled_;
 
   // Mutex and condvar protecting the scheduling queue.
   std::mutex mu_;
@@ -107,7 +112,7 @@ class DynamicBatchScheduler : public Scheduler {
   size_t pending_batch_size_;
   size_t pending_batch_queue_cnt_;
 
-  bool need_pending_shape_;
+  const bool enforce_equal_shape_batch_;
   std::unordered_map<std::string, DimsList> pending_batch_shapes_;
 };
 
