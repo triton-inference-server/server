@@ -41,8 +41,9 @@ namespace nvidia { namespace inferenceserver {
 Status
 SequenceBatchScheduler::Create(
     const ModelConfig& config, const uint32_t runner_cnt,
-    StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
-    StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler)
+    Scheduler::StandardInitFunc OnInit, Scheduler::StandardWarmupFunc OnWarmup,
+    Scheduler::StandardRunFunc OnSchedule,
+    std::unique_ptr<Scheduler>* scheduler)
 {
   std::unique_ptr<SequenceBatchScheduler> sched(new SequenceBatchScheduler());
 
@@ -86,10 +87,9 @@ SequenceBatchScheduler::Create(
   // requests.
   for (uint32_t c = 0; c < runner_cnt; ++c) {
     std::promise<bool> init_state;
-    std::shared_ptr<SequenceBatch> sb = std::make_shared<SequenceBatch>(
-        sched.get(), c, seq_slot_cnt, model_batch_size, config, OnInit,
-        OnWarmup, OnSchedule, start, end, startend, cont, notready,
-        &init_state);
+    std::shared_ptr<SequenceBatch> sb = std::make_shared<DirectSequenceBatch>(
+        sched.get(), c, seq_slot_cnt, config, OnInit, OnWarmup, OnSchedule,
+        start, end, startend, cont, notready, &init_state);
 
     if (init_state.get_future().get()) {
       sched->batchers_.push_back(sb);
@@ -636,12 +636,9 @@ SequenceBatchScheduler::ReaperThread(const int nice)
   LOG_VERBOSE(1) << "Stopping sequence-batch reaper thread...";
 }
 
-
-SequenceBatchScheduler::SequenceBatch::SequenceBatch(
+SequenceBatch::SequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
-    const size_t seq_slot_cnt, const size_t model_batch_size,
-    const ModelConfig& config, StandardInitFunc OnInit,
-    StandardWarmupFunc OnWarmup, StandardRunFunc OnSchedule,
+    const size_t seq_slot_cnt,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         start_input_overrides,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
@@ -651,23 +648,22 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         continue_input_overrides,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
-        notready_input_overrides,
-    std::promise<bool>* is_initialized)
-    : OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
-      base_(base), batcher_idx_(batcher_idx), seq_slot_cnt_(seq_slot_cnt),
-      scheduler_thread_exit_(false), scheduler_idle_(false),
-      queues_(seq_slot_cnt), seq_slot_correlation_ids_(seq_slot_cnt, 0),
-      max_active_seq_slot_(-1), start_input_overrides_(start_input_overrides),
+        notready_input_overrides)
+    : base_(base), batcher_idx_(batcher_idx), seq_slot_cnt_(seq_slot_cnt),
+      start_input_overrides_(start_input_overrides),
       end_input_overrides_(end_input_overrides),
       startend_input_overrides_(startend_input_overrides),
       continue_input_overrides_(continue_input_overrides),
       notready_input_overrides_(notready_input_overrides)
 {
+}
+
+bool
+SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
+{
   // If model wants CORRID control then get the name of the input
   // tensor and initialize the override structure for each sequence
-  // slot that is used to communicate the correlation ID. If error
-  // just exit now... that means the corresponding model instance will
-  // not have any runner and so will not get used for execution.
+  // slot that is used to communicate the correlation ID.
   DataType correlation_id_datatype;
   Status corrid_status = GetTypedSequenceControlProperties(
       config.sequence_batching(), config.name(),
@@ -677,8 +673,7 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
     LOG_ERROR << "Failed validating CORRID control for sequence-batch "
                  "scheduler thread "
               << batcher_idx_ << ": " << corrid_status.Message();
-    is_initialized->set_value(false);
-    return;
+    return false;
   }
 
   if (!correlation_id_tensor_.empty()) {
@@ -691,8 +686,7 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
                 << ModelSequenceBatching_Control_Kind_Name(
                        ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID)
                 << " for " << config.name();
-      is_initialized->set_value(false);
-      return;
+      return false;
     }
 
     for (size_t b = 0; b < seq_slot_cnt_; ++b) {
@@ -710,6 +704,42 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
     }
   }
 
+  return true;
+}
+
+DirectSequenceBatch::DirectSequenceBatch(
+    SequenceBatchScheduler* base, const uint32_t batcher_idx,
+    const size_t seq_slot_cnt, const ModelConfig& config,
+    Scheduler::StandardInitFunc OnInit, Scheduler::StandardWarmupFunc OnWarmup,
+    Scheduler::StandardRunFunc OnSchedule,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        start_input_overrides,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        end_input_overrides,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        startend_input_overrides,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        continue_input_overrides,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        notready_input_overrides,
+    std::promise<bool>* is_initialized)
+    : SequenceBatch(
+          base, batcher_idx, seq_slot_cnt, start_input_overrides,
+          end_input_overrides, startend_input_overrides,
+          continue_input_overrides, notready_input_overrides),
+      OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
+      scheduler_thread_exit_(false), scheduler_idle_(false),
+      queues_(seq_slot_cnt), seq_slot_correlation_ids_(seq_slot_cnt, 0),
+      max_active_seq_slot_(-1)
+{
+  // Initialize to handle CORRID control. If error just exit
+  // now... that means the corresponding model instance will not have
+  // any runner and so will not get used for execution.
+  if (!CreateCorrelationIDControl(config)) {
+    is_initialized->set_value(false);
+    return;
+  }
+
   // Create a scheduler thread associated with 'batcher_idx' that
   // executes the queued payloads.
   const int nice = GetCpuNiceLevel(config);
@@ -718,7 +748,7 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
   }));
 }
 
-SequenceBatchScheduler::SequenceBatch::~SequenceBatch()
+DirectSequenceBatch::~DirectSequenceBatch()
 {
   // Signal the scheduler thread to exit...
   {
@@ -743,7 +773,7 @@ SequenceBatchScheduler::SequenceBatch::~SequenceBatch()
 }
 
 void
-SequenceBatchScheduler::SequenceBatch::Enqueue(
+DirectSequenceBatch::Enqueue(
     const uint32_t seq_slot, const CorrelationID correlation_id,
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
@@ -785,7 +815,7 @@ SequenceBatchScheduler::SequenceBatch::Enqueue(
 }
 
 void
-SequenceBatchScheduler::SequenceBatch::SchedulerThread(
+DirectSequenceBatch::SchedulerThread(
     const int nice, std::promise<bool>* is_initialized)
 {
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
@@ -1090,5 +1120,6 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
   LOG_VERBOSE(1) << "Stopping sequence-batch scheduler thread " << batcher_idx_
                  << "...";
 }
+
 
 }}  // namespace nvidia::inferenceserver
