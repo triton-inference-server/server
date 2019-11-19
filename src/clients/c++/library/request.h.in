@@ -202,6 +202,41 @@ class ServerStatusContext {
 };
 
 //==============================================================================
+/// A ModelRepositoryContext object is used to query an inference server
+/// for model repository information, including information about the models
+/// within the model repository. Once created a ModelRepositoryContext object
+/// can be used repeatedly to get information from the server.
+/// A ModelRepositoryContext object can use either HTTP protocol or GRPC protocol
+/// depending on the Create function (ModelRepositoryHttpContext::Create or
+/// ModelRepositoryGrpcContext::Create). For example:
+///
+/// \code
+///   std::unique_ptr<ModelRepositoryContext> ctx;
+///   ModelRepositoryHttpContext::Create(&ctx, "localhost:8000");
+///   ModelRepositoryIndex index;
+///   ctx->GetModelRepositoryIndex(&index);
+///   ...
+///   ctx->GetModelRepositoryIndex(&index);
+///   ...
+/// \endcode
+///
+/// \note
+///   ModelRepositoryContext::Create methods are thread-safe.
+///   GetModelRepositoryIndex() is not thread-safe. For a given
+///   ModelRepositoryContext, calls to GetModelRepositoryIndex() must be
+///   serialized.
+///
+class ModelRepositoryContext {
+ public:
+  virtual ~ModelRepositoryContext() = 0;
+
+  /// Contact the inference server and get the index of the model repository.
+  /// \param index Returns the index of the model repository.
+  /// \return Error object indicating success or failure of the request.
+  virtual Error GetModelRepositoryIndex(ModelRepositoryIndex* index) = 0;
+};
+
+//==============================================================================
 /// An InferContext object is used to run inference on an inference
 /// server for a specific model. Once created an InferContext object
 /// can be used repeatedly to perform inference using the

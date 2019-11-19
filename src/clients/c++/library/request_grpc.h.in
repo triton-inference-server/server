@@ -84,6 +84,23 @@ class ServerStatusGrpcContext {
       const std::string& model_name, bool verbose = false);
 };
 
+/// ModelRepositoryGrpcContext is the GRPC instantiation of
+/// ModelRepositoryContext.
+///
+class ModelRepositoryGrpcContext {
+ public:
+  /// Create a context that returns information about the model repository of
+  /// an inference server using GRPC protocol.
+  /// \param ctx Returns a new ModelRepositoryGrpcContext object.
+  /// \param server_url The inference server name and port.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<ModelRepositoryContext>* ctx, const std::string& server_url,
+      bool verbose = false);
+};
+
 //==============================================================================
 /// ModelControlGrpcContext is the GRPC instantiation of ModelControlContext.
 ///

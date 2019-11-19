@@ -34,6 +34,7 @@ namespace nvidia { namespace inferenceserver { namespace client {
 
 ServerHealthContext::~ServerHealthContext() {}
 ServerStatusContext::~ServerStatusContext() {}
+ModelRepositoryContext::~ModelRepositoryContext() {}
 ModelControlContext::~ModelControlContext() {}
 SharedMemoryControlContext::~SharedMemoryControlContext() {}
 InferContext::Input::~Input() {}
