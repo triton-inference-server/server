@@ -1597,7 +1597,7 @@ class LifeCycleTest(unittest.TestCase):
                                     "expected status for model " + model_name)
                     for (k, v) in iteritems(ss.model_status[model_name].version_status):
                         self.assertEqual(v.ready_state, server_status.MODEL_READY)
-                        self.assertEqual(len(v.ready_state_reason.message), 0
+                        self.assertEqual(len(v.ready_state_reason.message), 0,
                             "expected empty message for successful load")
 
         except InferenceServerException as ex:
