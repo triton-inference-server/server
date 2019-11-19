@@ -60,9 +60,15 @@ SequenceBatchScheduler::Create(
   sched->max_sequence_idle_microseconds_ =
       config.sequence_batching().max_sequence_idle_microseconds();
 
-  // Get the batch size to allow for each runner. This is at least 1
-  // even if the model doesn't support batching.
-  size_t batch_size = std::max(1, config.max_batch_size());
+  // Get the number of candidate sequence slots to allow for each
+  // runner. This is at least 1 even if the model doesn't support
+  // batching.
+  const size_t model_batch_size = std::max(1, config.max_batch_size());
+  size_t seq_slot_cnt = model_batch_size;
+  if (config.sequence_batching().has_oldest()) {
+    seq_slot_cnt =
+        config.sequence_batching().oldest().max_candidate_sequences();
+  }
 
   // Based on the model configuration create input tensors for control
   // signals indicating sequence start, sequence continue, and
@@ -81,14 +87,17 @@ SequenceBatchScheduler::Create(
   for (uint32_t c = 0; c < runner_cnt; ++c) {
     std::promise<bool> init_state;
     std::shared_ptr<SequenceBatch> sb = std::make_shared<SequenceBatch>(
-        sched.get(), c, batch_size, config, OnInit, OnWarmup, OnSchedule, start,
-        end, startend, cont, notready, &init_state);
+        sched.get(), c, seq_slot_cnt, model_batch_size, config, OnInit,
+        OnWarmup, OnSchedule, start, end, startend, cont, notready,
+        &init_state);
 
     if (init_state.get_future().get()) {
       sched->batchers_.push_back(sb);
-      // All slots in the batch are initially ready for a new sequence.
-      for (size_t b = 0; b < batch_size; ++b) {
-        sched->ready_batch_slots_.push(SequenceBatchScheduler::BatchSlot(c, b));
+      // All sequence slots in the batcher are initially ready for a
+      // new sequence.
+      for (size_t b = 0; b < seq_slot_cnt; ++b) {
+        sched->ready_batcher_seq_slots_.push(
+            SequenceBatchScheduler::BatcherSequenceSlot(c, b));
       }
     }
   }
@@ -174,17 +183,15 @@ SequenceBatchScheduler::CreateControlTensors(
                ? reinterpret_cast<uint8_t*>(&int32_true_value)
                : reinterpret_cast<uint8_t*>(&fp32_true_value));
 
-      auto false_override =
-          std::make_shared<InferRequestProvider::InputOverride>();
-      false_override->content_.assign(false_p, false_p + sizeof(float));
-      false_override->dims_.Add(1);
-      false_override->datatype_ = tensor_datatype;
+      InferRequestProvider::InputOverride false_override;
+      false_override.content_.assign(false_p, false_p + sizeof(float));
+      false_override.dims_.Add(1);
+      false_override.datatype_ = tensor_datatype;
 
-      auto true_override =
-          std::make_shared<InferRequestProvider::InputOverride>();
-      true_override->content_.assign(true_p, true_p + sizeof(float));
-      true_override->dims_.Add(1);
-      true_override->datatype_ = tensor_datatype;
+      InferRequestProvider::InputOverride true_override;
+      true_override.content_.assign(true_p, true_p + sizeof(float));
+      true_override.dims_.Add(1);
+      true_override.datatype_ = tensor_datatype;
 
       (*start_input_overrides)
           ->insert(std::make_pair(tensor_name, true_override));
@@ -216,17 +223,15 @@ SequenceBatchScheduler::CreateControlTensors(
                ? reinterpret_cast<uint8_t*>(&int32_true_value)
                : reinterpret_cast<uint8_t*>(&fp32_true_value));
 
-      auto false_override =
-          std::make_shared<InferRequestProvider::InputOverride>();
-      false_override->content_.assign(false_p, false_p + sizeof(float));
-      false_override->dims_.Add(1);
-      false_override->datatype_ = tensor_datatype;
+      InferRequestProvider::InputOverride false_override;
+      false_override.content_.assign(false_p, false_p + sizeof(float));
+      false_override.dims_.Add(1);
+      false_override.datatype_ = tensor_datatype;
 
-      auto true_override =
-          std::make_shared<InferRequestProvider::InputOverride>();
-      true_override->content_.assign(true_p, true_p + sizeof(float));
-      true_override->dims_.Add(1);
-      true_override->datatype_ = tensor_datatype;
+      InferRequestProvider::InputOverride true_override;
+      true_override.content_.assign(true_p, true_p + sizeof(float));
+      true_override.dims_.Add(1);
+      true_override.datatype_ = tensor_datatype;
 
       (*start_input_overrides)
           ->insert(std::make_pair(tensor_name, false_override));
@@ -258,17 +263,15 @@ SequenceBatchScheduler::CreateControlTensors(
                ? reinterpret_cast<uint8_t*>(&int32_true_value)
                : reinterpret_cast<uint8_t*>(&fp32_true_value));
 
-      auto false_override =
-          std::make_shared<InferRequestProvider::InputOverride>();
-      false_override->content_.assign(false_p, false_p + sizeof(float));
-      false_override->dims_.Add(1);
-      false_override->datatype_ = tensor_datatype;
+      InferRequestProvider::InputOverride false_override;
+      false_override.content_.assign(false_p, false_p + sizeof(float));
+      false_override.dims_.Add(1);
+      false_override.datatype_ = tensor_datatype;
 
-      auto true_override =
-          std::make_shared<InferRequestProvider::InputOverride>();
-      true_override->content_.assign(true_p, true_p + sizeof(float));
-      true_override->dims_.Add(1);
-      true_override->datatype_ = tensor_datatype;
+      InferRequestProvider::InputOverride true_override;
+      true_override.content_.assign(true_p, true_p + sizeof(float));
+      true_override.dims_.Add(1);
+      true_override.datatype_ = tensor_datatype;
 
       (*start_input_overrides)
           ->insert(std::make_pair(tensor_name, true_override));
@@ -323,7 +326,7 @@ SequenceBatchScheduler::Enqueue(
     return;
   }
 
-  BatchSlot* target = nullptr;
+  BatcherSequenceSlot* target = nullptr;
 
   const bool seq_start =
       ((request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0);
@@ -332,15 +335,15 @@ SequenceBatchScheduler::Enqueue(
 
   std::unique_lock<std::mutex> lock(mu_);
 
-  auto sb_itr = sequence_to_batchslot_map_.find(correlation_id);
+  auto sb_itr = sequence_to_batcherseqslot_map_.find(correlation_id);
   auto bl_itr = sequence_to_backlog_map_.find(correlation_id);
 
   // If this request is not starting a new sequence its correlation ID
-  // should already be known with a target in either a slot or in the
-  // backlog. If it doesn't then the sequence wasn't started correctly
-  // or there has been a correlation ID conflict. In either case fail
-  // this request.
-  if (!seq_start && (sb_itr == sequence_to_batchslot_map_.end()) &&
+  // should already be known with a target in either a sequence slot
+  // or in the backlog. If it doesn't then the sequence wasn't started
+  // correctly or there has been a correlation ID conflict. In either
+  // case fail this request.
+  if (!seq_start && (sb_itr == sequence_to_batcherseqslot_map_.end()) &&
       (bl_itr == sequence_to_backlog_map_.end())) {
     OnComplete(Status(
         RequestStatusCode::INVALID_ARG,
@@ -354,7 +357,7 @@ SequenceBatchScheduler::Enqueue(
   // Record the timestamp of this request for the correlation ID. The
   // reaper thread will check to make sure that
   // max_sequence_idle_microseconds value is not exceed for any
-  // sequence, and if it is it will release the slot (if any)
+  // sequence, and if it is it will release the sequence slot (if any)
   // allocated to that sequence.
   {
     struct timespec now;
@@ -367,11 +370,11 @@ SequenceBatchScheduler::Enqueue(
   // already has an in-progress sequence then that previous sequence
   // did not end correctly, or there is a correlation ID conflict. In
   // this case we continue the new sequence (in either backlog or
-  // slot). It is ok for a backlog/slot to have multiple starts... as
-  // long as it has a single end. The previous sequence that was not
-  // correctly ended will have its existing requests handled and then
-  // the new sequence will start.
-  if (seq_start && ((sb_itr != sequence_to_batchslot_map_.end()) ||
+  // sequence slot). It is ok for a backlog/slot to have multiple
+  // starts... as long as it has a single end. The previous sequence
+  // that was not correctly ended will have its existing requests
+  // handled and then the new sequence will start.
+  if (seq_start && ((sb_itr != sequence_to_batcherseqslot_map_.end()) ||
                     (bl_itr != sequence_to_backlog_map_.end()))) {
     LOG_WARNING
         << "sequence " << correlation_id << " for model '"
@@ -381,7 +384,7 @@ SequenceBatchScheduler::Enqueue(
   }
 
   // This request already has an assigned slot...
-  if (sb_itr != sequence_to_batchslot_map_.end()) {
+  if (sb_itr != sequence_to_batcherseqslot_map_.end()) {
     target = &sb_itr->second;
   }
   // This request already has a queue in the backlog...
@@ -401,13 +404,13 @@ SequenceBatchScheduler::Enqueue(
     }
     return;
   }
-  // This request does not have an assigned backlog or slot. By the
-  // above checks it must be starting. If there is a free slot
-  // available then assign this sequence to that slot...
-  else if (!ready_batch_slots_.empty()) {
-    target = &sequence_to_batchslot_map_[correlation_id];
-    *target = ready_batch_slots_.top();
-    ready_batch_slots_.pop();
+  // This request does not have an assigned backlog or sequence
+  // slot. By the above checks it must be starting. If there is a free
+  // sequence slot available then assign this sequence to that slot...
+  else if (!ready_batcher_seq_slots_.empty()) {
+    target = &sequence_to_batcherseqslot_map_[correlation_id];
+    *target = ready_batcher_seq_slots_.top();
+    ready_batcher_seq_slots_.pop();
   }
   // Last option is to assign this request to the backlog...
   else {
@@ -428,35 +431,37 @@ SequenceBatchScheduler::Enqueue(
   // Need to grab the target contents before the erase below since
   // that can free it.
   const size_t batcher_idx = target->batcher_idx_;
-  const uint32_t slot = target->slot_;
+  const uint32_t seq_slot = target->seq_slot_;
 
-  // At this point the request has been assigned to a slot. If the
-  // sequence is ending then stop tracking the correlation.
+  // At this point the request has been assigned to a sequence
+  // slot. If the sequence is ending then stop tracking the
+  // correlation.
   if (seq_end) {
-    sequence_to_batchslot_map_.erase(correlation_id);
+    sequence_to_batcherseqslot_map_.erase(correlation_id);
   }
 
-  // Enqueue request into batcher and slot.  No need to hold the lock
-  // while enqueuing in a specific batcher.
+  // Enqueue request into batcher and sequence slot.  No need to hold
+  // the lock while enqueuing in a specific batcher.
   lock.unlock();
 
   LOG_VERBOSE(1) << "Enqueuing sequence inference request for model '"
                  << request_provider->ModelName() << "' into batcher "
-                 << batcher_idx << ", slot " << slot;
+                 << batcher_idx << ", sequence slot " << seq_slot;
 
   batchers_[batcher_idx]->Enqueue(
-      slot, correlation_id, stats, request_provider, response_provider,
+      seq_slot, correlation_id, stats, request_provider, response_provider,
       OnComplete);
 }
 
 bool
-SequenceBatchScheduler::ReleaseBatchSlot(
-    const BatchSlot& batch_slot, std::deque<Scheduler::Payload>* payloads)
+SequenceBatchScheduler::ReleaseSequenceSlot(
+    const BatcherSequenceSlot& batcher_seq_slot,
+    std::deque<Scheduler::Payload>* payloads)
 {
   std::unique_lock<std::mutex> lock(mu_);
 
   // If there is a backlogged sequence and it is requested, return it
-  // so that it can use the newly available slot.
+  // so that it can use the newly available sequence slot.
   if (!backlog_queues_.empty()) {
     auto& backlog = backlog_queues_.front();
     *payloads = std::move(*backlog);
@@ -468,8 +473,9 @@ SequenceBatchScheduler::ReleaseBatchSlot(
 
       // If the last queue entry is not an END request then the entire
       // sequence is not contained in the backlog. In that case must
-      // update backlog and batchslot maps so that future requests get
-      // directed to the batch slot instead of the backlog.
+      // update backlog and batcherseqslot maps so that future
+      // requests get directed to the batcher sequence-slot instead of
+      // the backlog.
       const bool seq_end =
           ((request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
            0);
@@ -477,29 +483,30 @@ SequenceBatchScheduler::ReleaseBatchSlot(
         // Since the correlation ID is being actively collected in the
         // backlog, there should not be any in-flight sequences with
         // that same correlation ID that have an assigned slot.
-        if (sequence_to_batchslot_map_.find(correlation_id) !=
-            sequence_to_batchslot_map_.end()) {
+        if (sequence_to_batcherseqslot_map_.find(correlation_id) !=
+            sequence_to_batcherseqslot_map_.end()) {
           LOG_ERROR << "internal: backlog sequence " << correlation_id
                     << " conflicts with in-flight sequence for model '"
                     << request_provider->ModelName() << "'";
         }
 
         sequence_to_backlog_map_.erase(correlation_id);
-        sequence_to_batchslot_map_[correlation_id] = batch_slot;
+        sequence_to_batcherseqslot_map_[correlation_id] = batcher_seq_slot;
       }
 
-      LOG_VERBOSE(1) << "Reusing slot in batcher " << batch_slot.batcher_idx_
-                     << ", slot " << batch_slot.slot_ << " for sequence "
+      LOG_VERBOSE(1) << "Reusing slot in batcher "
+                     << batcher_seq_slot.batcher_idx_ << ", slot "
+                     << batcher_seq_slot.seq_slot_ << " for sequence "
                      << correlation_id;
       return false;
     }
   }
 
   // There is no backlogged sequence so just release the batch slot
-  LOG_VERBOSE(1) << "Freeing slot in batcher " << batch_slot.batcher_idx_
-                 << ", slot " << batch_slot.slot_;
+  LOG_VERBOSE(1) << "Freeing slot in batcher " << batcher_seq_slot.batcher_idx_
+                 << ", slot " << batcher_seq_slot.seq_slot_;
 
-  ready_batch_slots_.push(batch_slot);
+  ready_batcher_seq_slots_.push(batcher_seq_slot);
   return true;
 }
 
@@ -571,35 +578,36 @@ SequenceBatchScheduler::ReaperThread(const int nice)
       LOG_VERBOSE(1) << "Max sequence idle exceeded for sequence "
                      << idle_correlation_id;
 
-      auto idle_sb_itr = sequence_to_batchslot_map_.find(idle_correlation_id);
+      auto idle_sb_itr =
+          sequence_to_batcherseqslot_map_.find(idle_correlation_id);
 
-      // If the idle correlation ID has an assigned slot, then release
-      // that assignment so it becomes available for another
-      // sequence. An assignment is released by enqueuing a payload
-      // with null providers and null completion callback. The
+      // If the idle correlation ID has an assigned sequence slot,
+      // then release that assignment so it becomes available for
+      // another sequence. An assignment is released by enqueuing a
+      // payload with null providers and null completion callback. The
       // scheduler thread will interpret the payload as meaning it
-      // should release the slot but otherwise do nothing with the
-      // payload.
-      if (idle_sb_itr != sequence_to_batchslot_map_.end()) {
+      // should release the sequence slot but otherwise do nothing
+      // with the payload.
+      if (idle_sb_itr != sequence_to_batcherseqslot_map_.end()) {
         // Need to grab the contents before the erase below since that
         // can free it.
         const size_t batcher_idx = idle_sb_itr->second.batcher_idx_;
-        const uint32_t slot = idle_sb_itr->second.slot_;
+        const uint32_t seq_slot = idle_sb_itr->second.seq_slot_;
 
         LOG_VERBOSE(1) << "reaper enqueuing force-end in batcher "
-                       << batcher_idx << ", slot " << slot << " for sequence "
-                       << idle_correlation_id;
+                       << batcher_idx << ", slot " << seq_slot
+                       << " for sequence " << idle_correlation_id;
 
 
-        sequence_to_batchslot_map_.erase(idle_correlation_id);
+        sequence_to_batcherseqslot_map_.erase(idle_correlation_id);
 
         batchers_[batcher_idx]->Enqueue(
-            slot, idle_correlation_id, nullptr, nullptr, nullptr, nullptr);
+            seq_slot, idle_correlation_id, nullptr, nullptr, nullptr, nullptr);
         cid_itr = correlation_id_timestamps_.erase(cid_itr);
       } else {
         // If the idle correlation ID is in the backlog, then just
-        // need to increase the timeout so that we revisit it again
-        // in the future to check if it is assigned to a slot.
+        // need to increase the timeout so that we revisit it again in
+        // the future to check if it is assigned to a sequence slot.
         auto idle_bl_itr = sequence_to_backlog_map_.find(idle_correlation_id);
         if (idle_bl_itr != sequence_to_backlog_map_.end()) {
           LOG_VERBOSE(1) << "reaper found idle sequence in backlog so "
@@ -631,7 +639,8 @@ SequenceBatchScheduler::ReaperThread(const int nice)
 
 SequenceBatchScheduler::SequenceBatch::SequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
-    const size_t batch_size, const ModelConfig& config, StandardInitFunc OnInit,
+    const size_t seq_slot_cnt, const size_t model_batch_size,
+    const ModelConfig& config, StandardInitFunc OnInit,
     StandardWarmupFunc OnWarmup, StandardRunFunc OnSchedule,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         start_input_overrides,
@@ -645,20 +654,20 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
         notready_input_overrides,
     std::promise<bool>* is_initialized)
     : OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
-      base_(base), batcher_idx_(batcher_idx), scheduler_thread_exit_(false),
-      scheduler_idle_(false), queues_(batch_size), max_active_slot_(-1),
-      slot_correlation_ids_(batch_size, 0),
-      start_input_overrides_(start_input_overrides),
+      base_(base), batcher_idx_(batcher_idx), seq_slot_cnt_(seq_slot_cnt),
+      scheduler_thread_exit_(false), scheduler_idle_(false),
+      queues_(seq_slot_cnt), seq_slot_correlation_ids_(seq_slot_cnt, 0),
+      max_active_seq_slot_(-1), start_input_overrides_(start_input_overrides),
       end_input_overrides_(end_input_overrides),
       startend_input_overrides_(startend_input_overrides),
       continue_input_overrides_(continue_input_overrides),
       notready_input_overrides_(notready_input_overrides)
 {
   // If model wants CORRID control then get the name of the input
-  // tensor and initialize the override structure for each slot that
-  // is used to communicate the correlation ID. If error just exit
-  // now... that means the corresponding model instance will not have
-  // any runner and so will not get used for execution.
+  // tensor and initialize the override structure for each sequence
+  // slot that is used to communicate the correlation ID. If error
+  // just exit now... that means the corresponding model instance will
+  // not have any runner and so will not get used for execution.
   DataType correlation_id_datatype;
   Status corrid_status = GetTypedSequenceControlProperties(
       config.sequence_batching(), config.name(),
@@ -686,20 +695,18 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
       return;
     }
 
-    for (size_t b = 0; b < slot_correlation_ids_.size(); ++b) {
-      slot_corrid_overrides_maps_.emplace_back(
+    for (size_t b = 0; b < seq_slot_cnt_; ++b) {
+      seq_slot_corrid_overrides_maps_.emplace_back(
           new InferRequestProvider::InputOverrideMap());
       std::shared_ptr<InferRequestProvider::InputOverrideMap>& ovr_map =
-          slot_corrid_overrides_maps_.back();
-      std::shared_ptr<InferRequestProvider::InputOverride>& ovr =
+          seq_slot_corrid_overrides_maps_.back();
+      InferRequestProvider::InputOverride& ovr =
           (*ovr_map)[correlation_id_tensor_];
-      ovr.reset(new InferRequestProvider::InputOverride());
-      ovr->dims_.Add(1);
-      ovr->datatype_ = correlation_id_datatype;
-      ovr->content_.resize(GetDataTypeByteSize(correlation_id_datatype));
+      ovr.dims_.Add(1);
+      ovr.datatype_ = correlation_id_datatype;
+      ovr.content_.resize(GetDataTypeByteSize(correlation_id_datatype));
 
-      slot_corrid_overrides_.emplace_back();
-      slot_corrid_overrides_.back() = ovr;
+      seq_slot_corrid_overrides_.push_back(&ovr);
     }
   }
 
@@ -737,7 +744,7 @@ SequenceBatchScheduler::SequenceBatch::~SequenceBatch()
 
 void
 SequenceBatchScheduler::SequenceBatch::Enqueue(
-    const uint32_t slot, const CorrelationID correlation_id,
+    const uint32_t seq_slot, const CorrelationID correlation_id,
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
@@ -754,16 +761,17 @@ SequenceBatchScheduler::SequenceBatch::Enqueue(
     // then grab a copy of the request header that is needed to create
     // NULL version request providers that can stand in as
     // representative when inference is issuing and there is no
-    // request available in one or more slots.
-    if ((max_active_slot_ == -1) && (request_provider != nullptr)) {
+    // request available in one or more sequence slots.
+    if ((max_active_seq_slot_ == -1) && (request_provider != nullptr)) {
       null_request_header_ = request_provider->RequestHeader();
     }
 
-    queues_[slot].emplace_back(
+    queues_[seq_slot].emplace_back(
         stats, request_provider, response_provider, OnComplete);
 
-    slot_correlation_ids_[slot] = correlation_id;
-    max_active_slot_ = std::max(max_active_slot_, static_cast<int32_t>(slot));
+    seq_slot_correlation_ids_[seq_slot] = correlation_id;
+    max_active_seq_slot_ =
+        std::max(max_active_seq_slot_, static_cast<int32_t>(seq_slot));
 
     // If runner is idle then wake it to service this request. We do
     // the actual wake outside of the lock to avoid having the woken
@@ -840,7 +848,7 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
     {
       std::unique_lock<std::mutex> lock(mu_);
 
-      bool adjust_max_active_slot = false;
+      bool adjust_max_active_seq_slot = false;
 
       if (delay_cnt > 0) {
         wait_microseconds = 10 * 1000;
@@ -858,23 +866,23 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
                  << " queued payloads, current total = " << total_size;
       } else {
         // Make sure there is at least one request that needs to be
-        // handled. Find the largest slot index that has a payload
-        // available...
-        int32_t max_slot = max_active_slot_;
-        while ((max_slot >= 0) && queues_[max_slot].empty()) {
-          max_slot--;
+        // handled. Find the largest sequence slot index that has a
+        // payload available...
+        int32_t max_seq_slot = max_active_seq_slot_;
+        while ((max_seq_slot >= 0) && queues_[max_seq_slot].empty()) {
+          max_seq_slot--;
         }
 
-        if (max_slot < 0) {
+        if (max_seq_slot < 0) {
           wait_microseconds = default_wait_microseconds;
         } else {
-          // Collect payloads from slot 0 to max_slot.
-          for (int32_t slot = 0; slot <= max_slot; ++slot) {
+          // Collect payloads from slot 0 to max_seq_slot.
+          for (int32_t seq_slot = 0; seq_slot <= max_seq_slot; ++seq_slot) {
             bool end_of_sequence = false;
             bool use_null_provider = false;
-            std::deque<Scheduler::Payload>& queue = queues_[slot];
+            std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
 
-            // If 'slot' doesn't have any requests then change the
+            // If 'seq_slot' doesn't have any requests then change the
             // request provider to send dummy/null input tensors for
             // this slot. We need this so that other payloads stay in
             // the correct slot.
@@ -883,11 +891,11 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
             } else {
               // If the payload has no request provider then the
               // sequence is being forcibly ended (e.g. because it has
-              // been idle to long). Use a null provider for the slot
-              // since there isn't an actual payload but also handle
-              // as if it were the end of the sequence.
-              Scheduler::Payload& slot_payload = queue.front();
-              if (slot_payload.request_provider_ == nullptr) {
+              // been idle to long). Use a null provider for the
+              // sequence slot since there isn't an actual payload but
+              // also handle as if it were the end of the sequence.
+              Scheduler::Payload& seq_slot_payload = queue.front();
+              if (seq_slot_payload.request_provider_ == nullptr) {
                 use_null_provider = true;
                 end_of_sequence = true;
                 queue.pop_front();
@@ -906,8 +914,8 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
               payloads->emplace_back(
                   nullptr, null_request_provider, nullptr, nullptr);
             } else {
-              Scheduler::Payload& slot_payload = queue.front();
-              const auto& request_provider = slot_payload.request_provider_;
+              Scheduler::Payload& seq_slot_payload = queue.front();
+              const auto& request_provider = seq_slot_payload.request_provider_;
               const auto& request_header = request_provider->RequestHeader();
 
               // Set the start, end, and ready control tensors
@@ -935,19 +943,19 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
               // above since AddInputOverride simply adds to an
               // existing map of overrides.
               if (!correlation_id_tensor_.empty()) {
-                uint8_t* corrid_p =
-                    reinterpret_cast<uint8_t*>(&slot_correlation_ids_[slot]);
+                uint8_t* corrid_p = reinterpret_cast<uint8_t*>(
+                    &seq_slot_correlation_ids_[seq_slot]);
                 std::vector<uint8_t>& content =
-                    slot_corrid_overrides_[slot]->content_;
+                    seq_slot_corrid_overrides_[seq_slot]->content_;
                 content.assign(corrid_p, corrid_p + content.size());
                 request_provider->AddInputOverrides(
-                    slot_corrid_overrides_maps_[slot]);
+                    seq_slot_corrid_overrides_maps_[seq_slot]);
               }
 
               payloads->emplace_back(
-                  slot_payload.stats_, request_provider,
-                  slot_payload.response_provider_,
-                  slot_payload.complete_function_);
+                  seq_slot_payload.stats_, request_provider,
+                  seq_slot_payload.response_provider_,
+                  seq_slot_payload.complete_function_);
 
               queue.pop_front();
 
@@ -958,32 +966,34 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
             }
 
             // If the sequence has ended then attempt to refill the
-            // slot with a sequence from the backlog. If there is no
-            // backlog show that the slot is no longer active, and if
-            // it is currently the maximum active slot note that we
-            // need to adjust max_active_slot_ once all slots are
-            // processed (we defer processing because multiple slots
-            // could have ending sequences).
+            // sequence slot with a sequence from the backlog. If
+            // there is no backlog show that the slot is no longer
+            // active, and if it is currently the maximum active slot
+            // note that we need to adjust 'max_active_seq_slot_' once
+            // all slots are processed (we defer processing because
+            // multiple slots could have ending sequences).
             if (end_of_sequence) {
               LOG_VERBOSE(1) << "Ending sequence in batcher " << batcher_idx_
-                             << ", slot " << slot;
+                             << ", slot " << seq_slot;
 
               // Should never be anything in a queue after the END
               // marker. If it happens that means we will clobber
               // that request if/when we swap in a backlog sequence
-              // in ReleaseBatchSlot below.
+              // in ReleaseSequenceSlot below.
               if (!queue.empty()) {
                 LOG_ERROR << "internal: unexpected requests after sequence "
                              "end in slot "
-                          << slot;
+                          << seq_slot;
               }
 
-              SequenceBatchScheduler::BatchSlot batch_slot(batcher_idx_, slot);
-              bool released = base_->ReleaseBatchSlot(batch_slot, &queue);
+              SequenceBatchScheduler::BatcherSequenceSlot batcher_seq_slot(
+                  batcher_idx_, seq_slot);
+              bool released =
+                  base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
               if (released) {
-                slot_correlation_ids_[slot] = 0;
-                if (slot == max_active_slot_) {
-                  adjust_max_active_slot = true;
+                seq_slot_correlation_ids_[seq_slot] = 0;
+                if (seq_slot == max_active_seq_slot_) {
+                  adjust_max_active_seq_slot = true;
                 }
               }
             }
@@ -992,11 +1002,12 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
       }
 
       // If one or more sequences ended, and one of them was in
-      // max_active_slot_, then need to find the new max_active_slot_.
-      if (adjust_max_active_slot) {
-        while ((max_active_slot_ >= 0) &&
-               (slot_correlation_ids_[max_active_slot_] == 0)) {
-          max_active_slot_--;
+      // 'max_active_seq_slot_', then need to find the new
+      // 'max_active_seq_slot_'.
+      if (adjust_max_active_seq_slot) {
+        while ((max_active_seq_slot_ >= 0) &&
+               (seq_slot_correlation_ids_[max_active_seq_slot_] == 0)) {
+          max_active_seq_slot_--;
         }
       }
 

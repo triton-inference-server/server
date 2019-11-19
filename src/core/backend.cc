@@ -168,9 +168,38 @@ InferenceBackend::SetConfiguredScheduler(
   if (config_.has_sequence_batching()) {
     RETURN_IF_ERROR(SequenceBatchScheduler::Create(
         config_, runner_cnt, OnInit, OnWarmup, OnRun, &scheduler));
-  } else {
+  } else if (config_.has_dynamic_batching()) {
+    std::set<int32_t> preferred_batch_sizes;
+    for (const auto size : config_.dynamic_batching().preferred_batch_size()) {
+      preferred_batch_sizes.insert(size);
+    }
+
+    // Need to enforce equal shape batches (i.e. non-ragged batches) if
+    // the model allows one or more variable-size input tensors. This is
+    // not needed is all input shapes are non-variable and so we don't
+    // enable it for efficiency reasons.
+    bool enforce_equal_shape_batch = false;
+    for (const auto input : config_.input()) {
+      if (GetElementCount(input) == -1) {
+        enforce_equal_shape_batch = true;
+        break;
+      }
+    }
+
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
-        config_, runner_cnt, OnInit, OnWarmup, OnRun, &scheduler));
+        runner_cnt, GetCpuNiceLevel(config_), OnInit, OnWarmup, OnRun,
+        true /* dynamic_batching_enabled */, enforce_equal_shape_batch,
+        preferred_batch_sizes,
+        config_.dynamic_batching().max_queue_delay_microseconds(), &scheduler));
+  } else {
+    // Use dynamic batch scheduler (with batching disabled) as the
+    // default scheduler.
+    RETURN_IF_ERROR(DynamicBatchScheduler::Create(
+        runner_cnt, GetCpuNiceLevel(config_), OnInit, OnWarmup, OnRun,
+        false /* dynamic_batching_enabled */,
+        false /* enforce_equal_shape_batch */,
+        std::set<int32_t>() /* preferred_batch_sizes */,
+        0 /* max_queue_delay_microseconds */, &scheduler));
   }
 
   return SetScheduler(std::move(scheduler));
@@ -327,21 +356,20 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
           batch_byte_size = element_count * sizeof(int32_t);
         }
 
-        auto value_override =
-            std::make_shared<InferRequestProvider::InputOverride>();
-        value_override->dims_ = input_meta.second.dims();
-        value_override->datatype_ = input_meta.second.data_type();
+        InferRequestProvider::InputOverride value_override;
+        value_override.dims_ = input_meta.second.dims();
+        value_override.datatype_ = input_meta.second.data_type();
         switch (input_meta.second.input_data_type_case()) {
           case ModelWarmup_Input::InputDataTypeCase::kZeroData:
-            value_override->content_.assign(
+            value_override.content_.assign(
                 zero_buffer, zero_buffer + batch_byte_size);
             break;
           case ModelWarmup_Input::InputDataTypeCase::kRandomData: {
             if (input_meta.second.data_type() == DataType::TYPE_STRING) {
-              value_override->content_.assign(
+              value_override.content_.assign(
                   zero_buffer, zero_buffer + batch_byte_size);
             } else {
-              value_override->content_.assign(
+              value_override.content_.assign(
                   random_buffer, random_buffer + batch_byte_size);
             }
             break;
@@ -365,7 +393,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
                       std::to_string(input_data.size()) + " bytes");
             }
 
-            value_override->content_.assign(
+            value_override.content_.assign(
                 input_data.data(), input_data.data() + input_data.size());
             break;
           }
@@ -375,8 +403,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
                 "warmup setting expects input '" + input_meta.first +
                     "' to have input_data_type set");
         }
-        warmup_data.input_override_->emplace(
-            input_meta.first, std::move(value_override));
+        warmup_data.input_override_->emplace(input_meta.first, value_override);
         continue;
       }
 
