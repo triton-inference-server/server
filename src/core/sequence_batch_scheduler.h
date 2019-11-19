@@ -42,6 +42,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
+class SequenceBatch;
+
 // Scheduler that implements batching across sequences of correlated
 // inferences.
 class SequenceBatchScheduler : public Scheduler {
@@ -99,116 +101,6 @@ class SequenceBatchScheduler : public Scheduler {
       std::shared_ptr<InferRequestProvider::InputOverrideMap>*
           notready_input_overrides);
 
-  // Queued requests for a model instance that will be sent through
-  // that instance together in a batch.
-  class SequenceBatch {
-   public:
-    SequenceBatch(
-        SequenceBatchScheduler* base, const uint32_t batcher_idx,
-        const size_t seq_slot_cnt, const size_t model_batch_size,
-        const ModelConfig& config, StandardInitFunc OnInit,
-        StandardWarmupFunc OnWarmup, StandardRunFunc OnSchedule,
-        const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
-            start_input_overrides,
-        const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
-            end_input_overrides,
-        const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
-            startend_input_overrides,
-        const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
-            continue_input_overrides,
-        const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
-            notready_input_overrides,
-        std::promise<bool>* is_initialized);
-    ~SequenceBatch();
-
-    // Enqueue a payload into the appropriate queue for the requested
-    // sequence slot.
-    void Enqueue(
-        const uint32_t seq_slot, const CorrelationID correlation_id,
-        const std::shared_ptr<ModelInferStats>& stats,
-        const std::shared_ptr<InferRequestProvider>& request_provider,
-        const std::shared_ptr<InferResponseProvider>& response_provider,
-        std::function<void(const Status&)> OnComplete);
-
-   private:
-    void SchedulerThread(const int nice, std::promise<bool>* is_initialized);
-
-    // Function the scheduler will call to initialize a runner.
-    const StandardInitFunc OnInit_;
-
-    // Function the scheduler will call to warmup a runner.
-    const StandardWarmupFunc OnWarmup_;
-
-    // Function to call to execute this batch of requests.
-    const StandardRunFunc OnSchedule_;
-
-    // The controlling scheduler.
-    SequenceBatchScheduler* const base_;
-
-    // The index of this batcher within the controlling scheduler.
-    const uint32_t batcher_idx_;
-
-    // The number of candidate sequence slots.
-    const size_t seq_slot_cnt_;
-
-    // The thread scheduling payloads queued in this batch.
-    std::unique_ptr<std::thread> scheduler_thread_;
-    bool scheduler_thread_exit_;
-    bool scheduler_idle_;
-
-    // Mutex protecting correlation queues, etc.
-    std::mutex mu_;
-    std::condition_variable cv_;
-
-    // The request header needed to create a null provider to use when
-    // an inference is issuing and there is no request available in a
-    // sequence slot.
-    InferRequestHeader null_request_header_;
-
-    // Queues holding inference requests. There are 'seq_slot_cnt'
-    // queues, one for each sequence slot where requests assigned to
-    // that slot are enqueued to wait for inferencing.
-    std::vector<std::deque<Scheduler::Payload>> queues_;
-
-    // Is each sequence slot active or not? A zero value indicates
-    // inactive, a non-zero value indicates active and is the
-    // correlation ID of the sequence active in the slot. An empty
-    // queue for a sequence slot does not mean it's inactive... it
-    // could just not have any requests pending at the moment.
-    std::vector<CorrelationID> seq_slot_correlation_ids_;
-
-    // The maximum active sequence slot. A value of -1 indicates that
-    // no slots are active in the backend.
-    int32_t max_active_seq_slot_;
-
-    // The control values, delivered as input tensors, that should be
-    // used when starting a sequence, continuing a sequence, ending a
-    // sequence, and showing that a sequence has not input available.
-    std::shared_ptr<InferRequestProvider::InputOverrideMap>
-        start_input_overrides_;
-    std::shared_ptr<InferRequestProvider::InputOverrideMap>
-        end_input_overrides_;
-    std::shared_ptr<InferRequestProvider::InputOverrideMap>
-        startend_input_overrides_;
-    std::shared_ptr<InferRequestProvider::InputOverrideMap>
-        continue_input_overrides_;
-    std::shared_ptr<InferRequestProvider::InputOverrideMap>
-        notready_input_overrides_;
-
-    // The name of the model input to which each sequence slot's
-    // correlation ID should be delivered. Empty if the model does not
-    // specify the CONTROL_SEQUENCE_CORRID control.
-    std::string correlation_id_tensor_;
-
-    // For each sequence slot the override map that provides the
-    // correlation ID for that slot. Empty if model does not specify
-    // the CONTROL_SEQUENCE_CORRID control.
-    std::vector<InferRequestProvider::InputOverride*>
-        seq_slot_corrid_overrides_;
-    std::vector<std::shared_ptr<InferRequestProvider::InputOverrideMap>>
-        seq_slot_corrid_overrides_maps_;
-  };
-
  private:
   struct BatcherSequenceSlotCompare {
     bool operator()(
@@ -263,6 +155,147 @@ class SequenceBatchScheduler : public Scheduler {
   // Used for debugging/testing.
   size_t backlog_delay_cnt_;
   std::vector<size_t> queue_request_cnts_;
+};
+
+// Base class for a scheduler that implements a particular scheduling
+// strategy for a model instance.
+class SequenceBatch {
+ public:
+  SequenceBatch(
+      SequenceBatchScheduler* base, const uint32_t batcher_idx,
+      const size_t seq_slot_cnt,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          start_input_overrides,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          end_input_overrides,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          startend_input_overrides,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          continue_input_overrides,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          notready_input_overrides);
+  virtual ~SequenceBatch() = default;
+
+  // Enqueue a payload into the appropriate queue for the requested
+  // sequence slot.
+  virtual void Enqueue(
+      const uint32_t seq_slot, const CorrelationID correlation_id,
+      const std::shared_ptr<ModelInferStats>& stats,
+      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const std::shared_ptr<InferResponseProvider>& response_provider,
+      std::function<void(const Status&)> OnComplete) = 0;
+
+ protected:
+  bool CreateCorrelationIDControl(const ModelConfig& config);
+
+  // The controlling scheduler.
+  SequenceBatchScheduler* const base_;
+
+  // The index of this batcher within the controlling scheduler.
+  const uint32_t batcher_idx_;
+
+  // The number of candidate sequence slots.
+  const size_t seq_slot_cnt_;
+
+  // The control values, delivered as input tensors, that should be
+  // used when starting a sequence, continuing a sequence, ending a
+  // sequence, and showing that a sequence has not input available.
+  std::shared_ptr<InferRequestProvider::InputOverrideMap>
+      start_input_overrides_;
+  std::shared_ptr<InferRequestProvider::InputOverrideMap> end_input_overrides_;
+  std::shared_ptr<InferRequestProvider::InputOverrideMap>
+      startend_input_overrides_;
+  std::shared_ptr<InferRequestProvider::InputOverrideMap>
+      continue_input_overrides_;
+  std::shared_ptr<InferRequestProvider::InputOverrideMap>
+      notready_input_overrides_;
+
+  // The name of the model input to which each sequence slot's
+  // correlation ID should be delivered. Empty if the model does not
+  // specify the CONTROL_SEQUENCE_CORRID control.
+  std::string correlation_id_tensor_;
+
+  // For each sequence slot the override map that provides the
+  // correlation ID for that slot. Empty if model does not specify
+  // the CONTROL_SEQUENCE_CORRID control.
+  std::vector<InferRequestProvider::InputOverride*> seq_slot_corrid_overrides_;
+  std::vector<std::shared_ptr<InferRequestProvider::InputOverrideMap>>
+      seq_slot_corrid_overrides_maps_;
+};
+
+// Scheduler that implements the Direct sequence scheduling strategy
+// for a model instance.
+class DirectSequenceBatch : public SequenceBatch {
+ public:
+  DirectSequenceBatch(
+      SequenceBatchScheduler* base, const uint32_t batcher_idx,
+      const size_t seq_slot_cnt, const ModelConfig& config,
+      Scheduler::StandardInitFunc OnInit,
+      Scheduler::StandardWarmupFunc OnWarmup,
+      Scheduler::StandardRunFunc OnSchedule,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          start_input_overrides,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          end_input_overrides,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          startend_input_overrides,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          continue_input_overrides,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          notready_input_overrides,
+      std::promise<bool>* is_initialized);
+  ~DirectSequenceBatch();
+
+  // Enqueue a payload into the appropriate queue for the requested
+  // sequence slot.
+  void Enqueue(
+      const uint32_t seq_slot, const CorrelationID correlation_id,
+      const std::shared_ptr<ModelInferStats>& stats,
+      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const std::shared_ptr<InferResponseProvider>& response_provider,
+      std::function<void(const Status&)> OnComplete) override;
+
+ private:
+  void SchedulerThread(const int nice, std::promise<bool>* is_initialized);
+
+  // Function the scheduler will call to initialize a runner.
+  const Scheduler::StandardInitFunc OnInit_;
+
+  // Function the scheduler will call to warmup a runner.
+  const Scheduler::StandardWarmupFunc OnWarmup_;
+
+  // Function to call to execute this batch of requests.
+  const Scheduler::StandardRunFunc OnSchedule_;
+
+  // The thread scheduling payloads queued in this batch.
+  std::unique_ptr<std::thread> scheduler_thread_;
+  bool scheduler_thread_exit_;
+  bool scheduler_idle_;
+
+  // Mutex protecting correlation queues, etc.
+  std::mutex mu_;
+  std::condition_variable cv_;
+
+  // The request header needed to create a null provider to use when
+  // an inference is issuing and there is no request available in a
+  // sequence slot.
+  InferRequestHeader null_request_header_;
+
+  // Queues holding inference requests. There are 'seq_slot_cnt'
+  // queues, one for each sequence slot where requests assigned to
+  // that slot are enqueued to wait for inferencing.
+  std::vector<std::deque<Scheduler::Payload>> queues_;
+
+  // Is each sequence slot active or not? A zero value indicates
+  // inactive, a non-zero value indicates active and is the
+  // correlation ID of the sequence active in the slot. An empty
+  // queue for a sequence slot does not mean it's inactive... it
+  // could just not have any requests pending at the moment.
+  std::vector<CorrelationID> seq_slot_correlation_ids_;
+
+  // The maximum active sequence slot. A value of -1 indicates that
+  // no slots are active in the backend.
+  int32_t max_active_seq_slot_;
 };
 
 }}  // namespace nvidia::inferenceserver
