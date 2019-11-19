@@ -46,10 +46,6 @@ RequestRateManager::Create(
 
   local_manager->threads_config_.reserve(max_threads);
 
-  RETURN_IF_ERROR(InitManagerInputs(
-      std::move(local_manager), string_length, string_data, zero_input,
-      data_directory, manager));
-
   return nic::Error::Success;
 }
 

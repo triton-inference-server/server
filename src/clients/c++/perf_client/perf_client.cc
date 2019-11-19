@@ -1036,7 +1036,7 @@ main(int argc, char** argv)
   std::unique_ptr<InferenceProfiler> profiler;
   err = ContextFactory::Create(
       url, protocol, http_headers, streaming, model_name, model_version,
-      &factory);
+      verbose, &factory);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;

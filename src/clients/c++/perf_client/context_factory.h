@@ -53,13 +53,15 @@ class ContextFactory {
   /// \param model_version The version of the model to use for inference,
   /// or -1 to indicate that the latest (i.e. highest version number)
   /// version should be used.
+  /// \param verbose Enables the verbose mode.
   /// \param factory Returns a new ContextFactory object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const std::string& url, const ProtocolType protocol,
       const std::map<std::string, std::string>& http_headers,
       const bool streaming, const std::string& model_name,
-      const int64_t model_version, std::shared_ptr<ContextFactory>* factory);
+      const int64_t model_version, const bool verbose,
+      std::shared_ptr<ContextFactory>* factory);
 
   /// Create a ServerStatusContext.
   /// \param ctx Returns a new ServerStatusContext object.
@@ -69,6 +71,11 @@ class ContextFactory {
   /// Create a InferContext.
   /// \param ctx Returns a new InferContext object.
   nic::Error CreateInferContext(std::unique_ptr<nic::InferContext>* ctx);
+
+  /// Create a Shared Memory Control Context.
+  /// \param ctx Returns a new SharedMemoryControlContext object.
+  nic::Error CreateSharedMemoryControlContext(
+      std::unique_ptr<nic::SharedMemoryControlContext>* ctx);
 
   /// \return The model name.
   const std::string& ModelName() const { return model_name_; }
@@ -87,10 +94,11 @@ class ContextFactory {
       const std::string& url, const ProtocolType protocol,
       const std::map<std::string, std::string>& http_headers,
       const bool streaming, const std::string& model_name,
-      const int64_t model_version)
+      const int64_t model_version, const bool verbose)
       : url_(url), protocol_(protocol), http_headers_(http_headers),
         streaming_(streaming), model_name_(model_name),
-        model_version_(model_version), current_correlation_id_(0)
+        model_version_(model_version), verbose_(verbose),
+        current_correlation_id_(0)
   {
   }
 
@@ -104,6 +112,7 @@ class ContextFactory {
   const bool streaming_;
   const std::string model_name_;
   const int64_t model_version_;
+  const bool verbose_;
 
   ModelSchedulerType scheduler_type_;
   ni::CorrelationID current_correlation_id_;
