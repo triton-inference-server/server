@@ -195,9 +195,10 @@ CompareDimsSupported(
 }
 
 Status
-MaximumDims(
+InitMaximumDims(
     const nvinfer1::Dims& max_profile_dims, const DimsList& dims,
-    std::vector<int64_t>* max_dims, const bool support_batching)
+    const bool support_batching, const int max_batch_size,
+    std::vector<int64_t>* max_dims, int* max_allowed_batch_size)
 {
   const int nonbatch_start_idx = (support_batching ? 1 : 0);
   if (max_profile_dims.nbDims != (dims.size() + nonbatch_start_idx)) {
@@ -208,7 +209,19 @@ MaximumDims(
   }
 
   if (support_batching) {
-    max_dims->emplace_back(max_profile_dims.d[0]);
+    if (*max_allowed_batch_size > max_profile_dims.d[0]) {
+      *max_allowed_batch_size = max_profile_dims.d[0];
+    }
+    if (*max_allowed_batch_size < max_batch_size) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected configuration maximum batch size " +
+              std::to_string(max_batch_size) + ", binding maximum is " +
+              std::to_string(*max_allowed_batch_size));
+    }
+    max_dims->emplace_back(max_batch_size);
+  } else {
+    *max_allowed_batch_size = 1;
   }
 
   for (int i = 0; i < dims.size(); ++i) {

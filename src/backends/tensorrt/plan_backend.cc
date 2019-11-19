@@ -513,16 +513,10 @@ PlanBackend::Context::InitializeInputBinding(
           "model config specifies invalid shape for input '" + input_name +
               "' for " + name_ + ". Error details: " + status.Message());
     }
-    RETURN_IF_ERROR(MaximumDims(
-        max_profile_dims, model_config_dims, &maximum_dims, support_batching));
-    if (support_batching) {
-      if (max_dynamic_batch_size_ > maximum_dims[0]) {
-        max_dynamic_batch_size_ = maximum_dims[0];
-      }
-    } else {
-      max_dynamic_batch_size_ = 1;
-    }
-    byte_size = GetByteSize(max_batch_size_, dt, maximum_dims);
+    RETURN_IF_ERROR(InitMaximumDims(
+        max_profile_dims, model_config_dims, support_batching, max_batch_size_,
+        &maximum_dims, &max_dynamic_batch_size_));
+    byte_size = GetByteSize(dt, maximum_dims);
     // Update the maximum dimension with respect to the allocated buffer
     DimVecToDims(maximum_dims, &max_dims_[index - binding_offset_]);
   }
@@ -703,7 +697,7 @@ PlanBackend::Context::InitializeConfigOutputBindings(
       const nvinfer1::Dims output_dim = context_->getBindingDimensions(index);
       std::vector<int64_t> dim_vec;
       DimsToDimVec(output_dim, &dim_vec);
-      byte_size = GetByteSize(max_batch_size_, dt, dim_vec);
+      byte_size = GetByteSize(dt, dim_vec);
     }
 
     // Allocate CUDA memory. We rely on buffers_ being non-nullptr to
