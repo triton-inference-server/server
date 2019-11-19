@@ -176,7 +176,7 @@ InferenceBackend::SetConfiguredScheduler(
 
     // Need to enforce equal shape batches (i.e. non-ragged batches) if
     // the model allows one or more variable-size input tensors. This is
-    // not needed is all input shapes are non-variable and so we don't
+    // not needed if all input shapes are non-variable and so we don't
     // enable it for efficiency reasons.
     bool enforce_equal_shape_batch = false;
     for (const auto input : config_.input()) {

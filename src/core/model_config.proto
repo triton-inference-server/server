@@ -725,6 +725,24 @@ message ModelSequenceBatching
     //@@       complete.
     //@@
     int32 max_candidate_sequences = 1;
+
+    //@@    .. cpp:var:: int32 preferred_batch_size (repeated)
+    //@@
+    //@@       Preferred batch sizes for dynamic batching of candidate
+    //@@       sequences. If a batch of one of these sizes can be formed
+    //@@       it will be executed immediately.  If not specified a
+    //@@       preferred batch size will be chosen automatically
+    //@@       based on model and GPU characteristics.
+    //@@
+    repeated int32 preferred_batch_size = 2;
+
+    //@@    .. cpp:var:: uint64 max_queue_delay_microseconds
+    //@@
+    //@@       The maximum time, in microseconds, a candidate request
+    //@@       will be delayed in the dynamic batch scheduling queue to
+    //@@       wait for additional requests for batching. Default is 0.
+    //@@
+    uint64 max_queue_delay_microseconds = 3;
   }
 
   //@@  .. cpp:var:: oneof strategy_choice

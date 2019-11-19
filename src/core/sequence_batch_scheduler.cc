@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "src/core/constants.h"
+#include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/provider.h"
@@ -79,7 +80,7 @@ SequenceBatchScheduler::Create(
   std::shared_ptr<InferRequestProvider::InputOverrideMap> startend;
   std::shared_ptr<InferRequestProvider::InputOverrideMap> cont;
   std::shared_ptr<InferRequestProvider::InputOverrideMap> notready;
-  RETURN_IF_ERROR(sched->CreateControlTensors(
+  RETURN_IF_ERROR(sched->CreateBooleanControlTensors(
       config, &start, &end, &startend, &cont, &notready));
 
   // Create one SequenceBatch object for each requested runner. The
@@ -87,9 +88,19 @@ SequenceBatchScheduler::Create(
   // requests.
   for (uint32_t c = 0; c < runner_cnt; ++c) {
     std::promise<bool> init_state;
-    std::shared_ptr<SequenceBatch> sb = std::make_shared<DirectSequenceBatch>(
-        sched.get(), c, seq_slot_cnt, config, OnInit, OnWarmup, OnSchedule,
-        start, end, startend, cont, notready, &init_state);
+    std::shared_ptr<SequenceBatch> sb;
+
+    // Create the SequenceBatch derivative that handles the requested
+    // scheduling strategy.
+    if (config.sequence_batching().has_oldest()) {
+      sb.reset(new OldestSequenceBatch(
+          sched.get(), c, seq_slot_cnt, config, OnInit, OnWarmup, OnSchedule,
+          start, end, startend, cont, notready, &init_state));
+    } else {
+      sb.reset(new DirectSequenceBatch(
+          sched.get(), c, seq_slot_cnt, config, OnInit, OnWarmup, OnSchedule,
+          start, end, startend, cont, notready, &init_state));
+    }
 
     if (init_state.get_future().get()) {
       sched->batchers_.push_back(sb);
@@ -135,7 +146,7 @@ SequenceBatchScheduler::~SequenceBatchScheduler()
 }
 
 Status
-SequenceBatchScheduler::CreateControlTensors(
+SequenceBatchScheduler::CreateBooleanControlTensors(
     const ModelConfig& config,
     std::shared_ptr<InferRequestProvider::InputOverrideMap>*
         start_input_overrides,
@@ -707,6 +718,43 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
   return true;
 }
 
+void
+SequenceBatch::SetControlTensors(
+    const InferRequestHeader& request_header,
+    const std::shared_ptr<InferRequestProvider>& request_provider,
+    const int32_t seq_slot, const CorrelationID corr_id)
+{
+  // Set the start, end, and ready control tensors
+  // appropriately...
+  if ((request_header.flags() & (InferRequestHeader::FLAG_SEQUENCE_START |
+                                 InferRequestHeader::FLAG_SEQUENCE_END)) ==
+      (InferRequestHeader::FLAG_SEQUENCE_START |
+       InferRequestHeader::FLAG_SEQUENCE_END)) {
+    request_provider->AddInputOverrides(startend_input_overrides_);
+  } else if (
+      (request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
+    request_provider->AddInputOverrides(start_input_overrides_);
+  } else if (
+      (request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+    request_provider->AddInputOverrides(end_input_overrides_);
+  } else {
+    request_provider->AddInputOverrides(continue_input_overrides_);
+  }
+
+  // Set correlation ID control tensor if requested by the
+  // model. This must be called after AddInputOverrides
+  // above since AddInputOverride simply adds to an
+  // existing map of overrides.
+  if (!correlation_id_tensor_.empty()) {
+    const uint8_t* corrid_p = reinterpret_cast<const uint8_t*>(&corr_id);
+    std::vector<uint8_t>& content =
+        seq_slot_corrid_overrides_[seq_slot]->content_;
+    content.assign(corrid_p, corrid_p + content.size());
+    request_provider->AddInputOverrides(
+        seq_slot_corrid_overrides_maps_[seq_slot]);
+  }
+}
+
 DirectSequenceBatch::DirectSequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
     const size_t seq_slot_cnt, const ModelConfig& config,
@@ -819,10 +867,10 @@ DirectSequenceBatch::SchedulerThread(
     const int nice, std::promise<bool>* is_initialized)
 {
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
-    LOG_VERBOSE(1) << "Starting sequence-batch scheduler thread "
+    LOG_VERBOSE(1) << "Starting Direct sequence-batch scheduler thread "
                    << batcher_idx_ << " at nice " << nice << "...";
   } else {
-    LOG_VERBOSE(1) << "Starting sequence-batch scheduler thread "
+    LOG_VERBOSE(1) << "Starting Direct sequence-batch scheduler thread "
                    << batcher_idx_ << " at default nice (requested nice "
                    << nice << " failed)...";
   }
@@ -837,8 +885,9 @@ DirectSequenceBatch::SchedulerThread(
     startup_status = OnWarmup_(batcher_idx_);
   }
   if (!startup_status.IsOk()) {
-    LOG_ERROR << "Initialization failed for sequence-batch scheduler thread "
-              << batcher_idx_ << ": " << startup_status.Message();
+    LOG_ERROR
+        << "Initialization failed for Direct sequence-batch scheduler thread "
+        << batcher_idx_ << ": " << startup_status.Message();
     is_initialized->set_value(false);
     return;
   } else {
@@ -948,39 +997,10 @@ DirectSequenceBatch::SchedulerThread(
               const auto& request_provider = seq_slot_payload.request_provider_;
               const auto& request_header = request_provider->RequestHeader();
 
-              // Set the start, end, and ready control tensors
-              // appropriately...
-              if ((request_header.flags() &
-                   (InferRequestHeader::FLAG_SEQUENCE_START |
-                    InferRequestHeader::FLAG_SEQUENCE_END)) ==
-                  (InferRequestHeader::FLAG_SEQUENCE_START |
-                   InferRequestHeader::FLAG_SEQUENCE_END)) {
-                request_provider->AddInputOverrides(startend_input_overrides_);
-              } else if (
-                  (request_header.flags() &
-                   InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
-                request_provider->AddInputOverrides(start_input_overrides_);
-              } else if (
-                  (request_header.flags() &
-                   InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
-                request_provider->AddInputOverrides(end_input_overrides_);
-              } else {
-                request_provider->AddInputOverrides(continue_input_overrides_);
-              }
-
-              // Set correlation ID control tensor if requested by the
-              // model. This must be called after AddInputOverrides
-              // above since AddInputOverride simply adds to an
-              // existing map of overrides.
-              if (!correlation_id_tensor_.empty()) {
-                uint8_t* corrid_p = reinterpret_cast<uint8_t*>(
-                    &seq_slot_correlation_ids_[seq_slot]);
-                std::vector<uint8_t>& content =
-                    seq_slot_corrid_overrides_[seq_slot]->content_;
-                content.assign(corrid_p, corrid_p + content.size());
-                request_provider->AddInputOverrides(
-                    seq_slot_corrid_overrides_maps_[seq_slot]);
-              }
+              // Set the control tensor values in the request provider.
+              SetControlTensors(
+                  request_header, request_provider, seq_slot,
+                  seq_slot_correlation_ids_[seq_slot]);
 
               payloads->emplace_back(
                   seq_slot_payload.stats_, request_provider,
@@ -1003,8 +1023,8 @@ DirectSequenceBatch::SchedulerThread(
             // all slots are processed (we defer processing because
             // multiple slots could have ending sequences).
             if (end_of_sequence) {
-              LOG_VERBOSE(1) << "Ending sequence in batcher " << batcher_idx_
-                             << ", slot " << seq_slot;
+              LOG_VERBOSE(1) << "Ending sequence in Direct batcher "
+                             << batcher_idx_ << ", slot " << seq_slot;
 
               // Should never be anything in a queue after the END
               // marker. If it happens that means we will clobber
@@ -1117,9 +1137,168 @@ DirectSequenceBatch::SchedulerThread(
     // this code is ok.
   }  // end runner loop
 
-  LOG_VERBOSE(1) << "Stopping sequence-batch scheduler thread " << batcher_idx_
-                 << "...";
+  LOG_VERBOSE(1) << "Stopping Direct sequence-batch scheduler thread "
+                 << batcher_idx_ << "...";
 }
 
+OldestSequenceBatch::OldestSequenceBatch(
+    SequenceBatchScheduler* base, const uint32_t batcher_idx,
+    const size_t seq_slot_cnt, const ModelConfig& config,
+    Scheduler::StandardInitFunc OnInit, Scheduler::StandardWarmupFunc OnWarmup,
+    Scheduler::StandardRunFunc OnSchedule,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        start_input_overrides,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        end_input_overrides,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        startend_input_overrides,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        continue_input_overrides,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        notready_input_overrides,
+    std::promise<bool>* is_initialized)
+    : SequenceBatch(
+          base, batcher_idx, seq_slot_cnt, start_input_overrides,
+          end_input_overrides, startend_input_overrides,
+          continue_input_overrides, notready_input_overrides),
+      in_flight_(seq_slot_cnt, false), queues_(seq_slot_cnt)
+{
+  // Initialize to handle CORRID control. If error just exit
+  // now... that means the corresponding model instance will not have
+  // any runner and so will not get used for execution.
+  if (!CreateCorrelationIDControl(config)) {
+    is_initialized->set_value(false);
+    return;
+  }
+
+  // Create a dynamic batcher use to batch together sequences for
+  // inference.
+  std::set<int32_t> preferred_batch_sizes;
+  for (const auto size :
+       config.sequence_batching().oldest().preferred_batch_size()) {
+    preferred_batch_sizes.insert(size);
+  }
+
+  Status status = DynamicBatchScheduler::Create(
+      1 /* runner_cnt */, GetCpuNiceLevel(config), OnInit, OnWarmup, OnSchedule,
+      true /* dynamic_batching_enabled */,
+      false /* enforce_equal_shape_batch */, preferred_batch_sizes,
+      config.sequence_batching().oldest().max_queue_delay_microseconds(),
+      &dynamic_batcher_);
+  if (!status.IsOk()) {
+    LOG_ERROR << "failed creating dynamic sequence batcher for OldestFirst "
+              << batcher_idx_ << ": " << status.Message();
+    is_initialized->set_value(false);
+    return;
+  }
+
+  is_initialized->set_value(true);
+}
+
+OldestSequenceBatch::~OldestSequenceBatch() {}
+
+void
+OldestSequenceBatch::CompleteAndNext(
+    const uint32_t seq_slot, std::function<void(const Status&)> OnComplete,
+    const Status& status)
+{
+  // If there is a completion function, call it to communicate the
+  // completion of the sequence's inference request.
+  if (OnComplete != nullptr) {
+    OnComplete(status);
+  }
+
+  std::lock_guard<std::mutex> lock(mu_);
+
+  bool release_seq_slot = false;
+  in_flight_[seq_slot] = false;
+
+  // If the next sequence inference is ready in the queue then enqueue
+  // it in the dynamic batcher now.
+  std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
+  if (!queue.empty()) {
+    Scheduler::Payload& payload = queue.front();
+    const auto& request_provider = payload.request_provider_;
+
+    // If the request provider is null then this inference request is
+    // from the reaper thread indicating a timed-out sequence. Mark
+    // that the sequence slot should be released but otherwise do
+    // nothing.
+    if (request_provider == nullptr) {
+      release_seq_slot = true;
+    } else {
+      const auto& request_header = request_provider->RequestHeader();
+
+      // After handling the last inference in a sequence we must
+      // release the sequence slot to make it available to another
+      // sequence.
+      if ((request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
+          0) {
+        release_seq_slot = true;
+      }
+
+      in_flight_[seq_slot] = true;
+
+      auto on_complete_fn = std::bind(
+          &OldestSequenceBatch::CompleteAndNext, this, seq_slot,
+          payload.complete_function_, std::placeholders::_1);
+      dynamic_batcher_->Enqueue(
+          payload.stats_, request_provider, payload.response_provider_,
+          on_complete_fn);
+    }
+
+    queue.pop_front();
+  }
+
+  // If releasing the sequence slot then the sequence queue should be
+  // empty and can assign it to a new sequence (from the backlog).
+  if (release_seq_slot) {
+    LOG_VERBOSE(1) << "Ending sequence in OldestFirst batcher " << batcher_idx_
+                   << ", slot " << seq_slot;
+
+    // Should never be anything in a queue after the END marker. If it
+    // happens that means we will clobber that request if/when we swap
+    // in a backlog sequence in ReleaseSequenceSlot below.
+    if (!queue.empty()) {
+      LOG_ERROR << "internal: unexpected requests after sequence end in slot "
+                << seq_slot;
+    }
+
+    SequenceBatchScheduler::BatcherSequenceSlot batcher_seq_slot(
+        batcher_idx_, seq_slot);
+    base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
+  }
+}
+
+void
+OldestSequenceBatch::Enqueue(
+    const uint32_t seq_slot, const CorrelationID correlation_id,
+    const std::shared_ptr<ModelInferStats>& stats,
+    const std::shared_ptr<InferRequestProvider>& request_provider,
+    const std::shared_ptr<InferResponseProvider>& response_provider,
+    std::function<void(const Status&)> OnComplete)
+{
+  // Add the appropriate control tensor values to the request.
+  if (request_provider != nullptr) {
+    SetControlTensors(
+        request_provider->RequestHeader(), request_provider, seq_slot,
+        correlation_id);
+  }
+
+  // Queue the new request... if there isn't already a request in
+  // flight then send one to the dynamic batcher immediately.
+  bool in_flight;
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+
+    std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
+    queue.emplace_back(stats, request_provider, response_provider, OnComplete);
+    in_flight = in_flight_[seq_slot];
+  }
+
+  if (!in_flight) {
+    CompleteAndNext(seq_slot, nullptr, Status::Success);
+  }
+}
 
 }}  // namespace nvidia::inferenceserver

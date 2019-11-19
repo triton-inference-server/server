@@ -88,7 +88,7 @@ class SequenceBatchScheduler : public Scheduler {
  private:
   void ReaperThread(const int nice);
 
-  Status CreateControlTensors(
+  Status CreateBooleanControlTensors(
       const ModelConfig& config,
       std::shared_ptr<InferRequestProvider::InputOverrideMap>*
           start_input_overrides,
@@ -187,6 +187,10 @@ class SequenceBatch {
 
  protected:
   bool CreateCorrelationIDControl(const ModelConfig& config);
+  void SetControlTensors(
+      const InferRequestHeader& request_header,
+      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const int32_t seq_slot, const CorrelationID corr_id);
 
   // The controlling scheduler.
   SequenceBatchScheduler* const base_;
@@ -296,6 +300,60 @@ class DirectSequenceBatch : public SequenceBatch {
   // The maximum active sequence slot. A value of -1 indicates that
   // no slots are active in the backend.
   int32_t max_active_seq_slot_;
+};
+
+// Scheduler that implements the oldest-first sequence scheduling
+// strategy for a model instance.
+class OldestSequenceBatch : public SequenceBatch {
+ public:
+  OldestSequenceBatch(
+      SequenceBatchScheduler* base, const uint32_t batcher_idx,
+      const size_t seq_slot_cnt, const ModelConfig& config,
+      Scheduler::StandardInitFunc OnInit,
+      Scheduler::StandardWarmupFunc OnWarmup,
+      Scheduler::StandardRunFunc OnSchedule,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          start_input_overrides,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          end_input_overrides,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          startend_input_overrides,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          continue_input_overrides,
+      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+          notready_input_overrides,
+      std::promise<bool>* is_initialized);
+  ~OldestSequenceBatch();
+
+  // Enqueue a payload into the appropriate queue for the requested
+  // sequence slot.
+  void Enqueue(
+      const uint32_t seq_slot, const CorrelationID correlation_id,
+      const std::shared_ptr<ModelInferStats>& stats,
+      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const std::shared_ptr<InferResponseProvider>& response_provider,
+      std::function<void(const Status&)> OnComplete) override;
+
+ private:
+  void CompleteAndNext(
+      const uint32_t seq_slot, std::function<void(const Status&)> OnComplete,
+      const Status& status);
+
+  // The dynamic batcher for this scheduler
+  std::unique_ptr<Scheduler> dynamic_batcher_;
+
+  // Mutex protecting queues, etc.
+  std::mutex mu_;
+
+  // For each sequence slot, true if there is a request for that
+  // sequence in-flight in the dynamic batcher. Used to ensure that at
+  // most one request from each sequence can be scheduled at a time.
+  std::vector<bool> in_flight_;
+
+  // Queues holding inference requests. There are 'seq_slot_cnt'
+  // queues, one for each sequence slot where requests assigned to
+  // that slot are enqueued to wait for inferencing.
+  std::vector<std::deque<Scheduler::Payload>> queues_;
 };
 
 }}  // namespace nvidia::inferenceserver

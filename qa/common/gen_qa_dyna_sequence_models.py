@@ -283,6 +283,11 @@ platform: "{}"
 max_batch_size: {}
 sequence_batching {{
   max_sequence_idle_microseconds: 5000000
+  oldest {{
+    max_candidate_sequences: 6
+    preferred_batch_size: [ 4 ]
+    max_queue_delay_microseconds: 0
+  }}
   control_input [
     {{
       name: "START"
@@ -411,6 +416,11 @@ platform: "caffe2_netdef"
 max_batch_size: {}
 sequence_batching {{
   max_sequence_idle_microseconds: 5000000
+  oldest {{
+    max_candidate_sequences: 6
+    preferred_batch_size: [ 4 ]
+    max_queue_delay_microseconds: 0
+  }}
   control_input [
     {{
       name: "START"
@@ -825,6 +835,11 @@ platform: "tensorrt_plan"
 max_batch_size: {}
 sequence_batching {{
   max_sequence_idle_microseconds: 5000000
+  oldest {{
+    max_candidate_sequences: 6
+    preferred_batch_size: [ 4 ]
+    max_queue_delay_microseconds: 0
+  }}
   control_input [
     {{
       name: "START"
@@ -981,6 +996,11 @@ platform: "onnxruntime_onnx"
 max_batch_size: {}
 sequence_batching {{
   max_sequence_idle_microseconds: 5000000
+  oldest {{
+    max_candidate_sequences: 6
+    preferred_batch_size: [ 4 ]
+    max_queue_delay_microseconds: 0
+  }}
   control_input [
     {{
       name: "START"
@@ -1106,6 +1126,11 @@ platform: "pytorch_libtorch"
 max_batch_size: {}
 sequence_batching {{
   max_sequence_idle_microseconds: 5000000
+  oldest {{
+    max_candidate_sequences: 6
+    preferred_batch_size: [ 4 ]
+    max_queue_delay_microseconds: 0
+  }}
   control_input [
     {{
       name: "START__1"
