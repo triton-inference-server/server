@@ -69,6 +69,16 @@ nic::Error* ServerStatusContextGetServerStatus(
     ServerStatusContextCtx* ctx, char** status, uint32_t* status_len);
 
 //==============================================================================
+// ModelRepositoryContext
+typedef struct ModelRepositoryContextCtx ModelRepositoryContextCtx;
+nic::Error* ModelRepositoryContextNew(
+    ModelRepositoryContextCtx** ctx, const char* url, int protocol_int,
+    const char** headers, int num_headers, bool verbose);
+void ModelRepositoryContextDelete(ModelRepositoryContextCtx* ctx);
+nic::Error* ModelRepositoryContextGetModelRepositoryIndex(
+    ModelRepositoryContextCtx* ctx, char** index, uint32_t* index_len);
+
+//==============================================================================
 // ModelControlContext
 typedef struct ModelControlContextCtx ModelControlContextCtx;
 nic::Error* ModelControlContextNew(

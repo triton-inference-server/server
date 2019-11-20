@@ -35,6 +35,7 @@ import pkg_resources
 import struct
 import threading
 import tensorrtserver.api.model_config_pb2
+from tensorrtserver.api.server_status_pb2 import ModelRepositoryIndex
 from tensorrtserver.api.server_status_pb2 import ServerStatus
 from tensorrtserver.api.server_status_pb2 import SharedMemoryStatus
 from tensorrtserver.api.api_pb2 import *
@@ -97,6 +98,16 @@ _crequest_status_ctx_del.argtypes = [c_void_p]
 _crequest_status_ctx_get = _crequest.ServerStatusContextGetServerStatus
 _crequest_status_ctx_get.restype = c_void_p
 _crequest_status_ctx_get.argtypes = [c_void_p, POINTER(c_char_p), POINTER(c_uint32)]
+
+_crequest_repository_ctx_new = _crequest.ModelRepositoryContextNew
+_crequest_repository_ctx_new.restype = c_void_p
+_crequest_repository_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int,
+                                         POINTER(c_char_p), c_int, c_bool]
+_crequest_repository_ctx_del = _crequest.ModelRepositoryContextDelete
+_crequest_repository_ctx_del.argtypes = [c_void_p]
+_crequest_repository_ctx_get = _crequest.ModelRepositoryContextGetModelRepositoryIndex
+_crequest_repository_ctx_get.restype = c_void_p
+_crequest_repository_ctx_get.argtypes = [c_void_p, POINTER(c_char_p), POINTER(c_uint32)]
 
 _crequest_model_control_ctx_new = _crequest.ModelControlContextNew
 _crequest_model_control_ctx_new.restype = c_void_p
@@ -566,6 +577,104 @@ class ServerStatusContext:
 
     def get_last_request_id(self):
         """Get the request ID of the most recent get_server_status() request.
+
+        Returns
+        -------
+        int
+            The request ID, or None if a request has not yet been made
+            or if the last request was not successful.
+
+        """
+        return self._last_request_id
+
+
+class ModelRepositoryContext:
+    """Performs a model repository request to an inference server.
+
+    A request can be made to get model repository information of the server
+
+    Parameters
+    ----------
+    url : str
+        The inference server URL, e.g. localhost:8000.
+
+    protocol : ProtocolType
+        The protocol used to communicate with the server.
+
+    verbose : bool
+        If True generate verbose output.
+
+    http_headers : list of strings
+        HTTP headers to send with request. Ignored for GRPC
+        protocol. Each header must be specified as "Header:Value".
+
+    """
+    def __init__(self, url, protocol, verbose=False, http_headers=[]):
+        self._last_request_id = 0
+        self._ctx = c_void_p()
+
+        if http_headers is None:
+            http_headers = list()
+
+        http_headers_arr = (c_char_p * len(http_headers))()
+        http_headers_arr[:] = http_headers
+
+        _raise_if_error(
+            c_void_p(
+                _crequest_repository_ctx_new(
+                    byref(self._ctx), url, int(protocol), http_headers_arr, len(http_headers), verbose)))
+
+    def __del__(self):
+        # when module is unloading may get called after
+        # _crequest_status_ctx_del has been released
+        if _crequest_repository_ctx_del is not None:
+            self.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def close(self):
+        """Close the context. Any future calls to get_model_repository_index()
+        will result in an Error.
+
+        """
+        _crequest_status_ctx_del(self._ctx)
+        self._ctx = None
+
+    def get_model_repository_index(self):
+        """Contact the inference server and get the index of the model repository.
+
+        Returns
+        -------
+        ModelRepositoryIndex
+            The ModelRepositoryIndex protobuf containing the index.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to get index.
+
+        """
+        self._last_request_id = None
+        if self._ctx is None:
+            _raise_error("ModelRepositoryContext is closed")
+
+        cindex = c_char_p()
+        cindex_len = c_uint32()
+        self._last_request_id = _raise_if_error(
+            c_void_p(_crequest_repository_ctx_get(
+                self._ctx, byref(cindex), byref(cindex_len))))
+        index_buf = cast(cindex, POINTER(c_byte * cindex_len.value))[0]
+
+        index = ModelRepositoryIndex()
+        index.ParseFromString(index_buf)
+        return index
+
+    def get_last_request_id(self):
+        """Get the request ID of the most recent get_model_repository_index() request.
 
         Returns
         -------

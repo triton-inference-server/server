@@ -229,6 +229,80 @@ ServerStatusGrpcContext::Create(
 
 //==============================================================================
 
+class ModelRepositoryGrpcContextImpl : public ModelRepositoryContext {
+ public:
+  ModelRepositoryGrpcContextImpl(const std::string& url, bool verbose);
+  ModelRepositoryGrpcContextImpl(
+      const std::string& url, const std::string& model_name, bool verbose);
+  Error GetModelRepositoryIndex(ModelRepositoryIndex* index) override;
+
+ private:
+  // GRPC end point.
+  std::unique_ptr<GRPCService::Stub> stub_;
+
+  // Enable verbose output
+  const bool verbose_;
+};
+
+ModelRepositoryGrpcContextImpl::ModelRepositoryGrpcContextImpl(
+    const std::string& url, bool verbose)
+    : stub_(GRPCService::NewStub(GetChannel(url))), verbose_(verbose)
+{
+}
+
+Error
+ModelRepositoryGrpcContextImpl::GetModelRepositoryIndex(
+    ModelRepositoryIndex* index)
+{
+  index->Clear();
+
+  Error grpc_status;
+
+  RepositoryRequest request;
+  RepositoryResponse response;
+  grpc::ClientContext context;
+
+  request.set_index(true);
+  grpc::Status status = stub_->Repository(&context, request, &response);
+  if (status.ok()) {
+    if (response.response_type_case() ==
+        RepositoryResponse::ResponseTypeCase::kIndex) {
+      index->Swap(response.mutable_index());
+      grpc_status = Error(response.request_status());
+    } else {
+      grpc_status = Error(
+          RequestStatusCode::INTERNAL,
+          "GRPC response returns wrong type: " +
+              std::to_string(response.response_type_case()) + "; expected: " +
+              std::to_string(RepositoryResponse::ResponseTypeCase::kIndex));
+    }
+  } else {
+    // Something wrong with the GRPC conncection
+    grpc_status = Error(
+        RequestStatusCode::INTERNAL,
+        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
+            status.error_message());
+  }
+
+  // Log server status if request is SUCCESS and verbose is true.
+  if (grpc_status.IsOk() && verbose_) {
+    std::cout << index->DebugString() << std::endl;
+  }
+  return grpc_status;
+}
+
+Error
+ModelRepositoryGrpcContext::Create(
+    std::unique_ptr<ModelRepositoryContext>* ctx, const std::string& server_url,
+    bool verbose)
+{
+  ctx->reset(static_cast<ModelRepositoryContext*>(
+      new ModelRepositoryGrpcContextImpl(server_url, verbose)));
+  return Error::Success;
+}
+
+//==============================================================================
+
 class ModelControlGrpcContextImpl : public ModelControlContext {
  public:
   ModelControlGrpcContextImpl(const std::string& url, bool verbose);

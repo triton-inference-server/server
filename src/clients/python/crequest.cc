@@ -260,6 +260,73 @@ ServerStatusContextGetServerStatus(
 }
 
 //==============================================================================
+struct ModelRepositoryContextCtx {
+  std::unique_ptr<nic::ModelRepositoryContext> ctx;
+  std::string index_buf;
+};
+
+nic::Error*
+ModelRepositoryContextNew(
+    ModelRepositoryContextCtx** ctx, const char* url, int protocol_int,
+    const char** headers, int num_headers, bool verbose)
+{
+  nic::Error err;
+  ProtocolType protocol;
+  err = ParseProtocol(&protocol, protocol_int);
+  if (err.IsOk()) {
+    ModelRepositoryContextCtx* lctx = new ModelRepositoryContextCtx;
+    if (protocol == ProtocolType::HTTP) {
+      std::map<std::string, std::string> http_headers;
+      err = ParseHttpHeaders(&http_headers, headers, num_headers);
+      if (err.IsOk()) {
+        err = nic::ModelRepositoryHttpContext::Create(
+            &(lctx->ctx), std::string(url), http_headers, verbose);
+      }
+    } else {
+      err = nic::ModelRepositoryGrpcContext::Create(
+          &(lctx->ctx), std::string(url), verbose);
+    }
+    if (err.IsOk()) {
+      *ctx = lctx;
+      return nullptr;
+    }
+
+    delete lctx;
+  }
+
+  *ctx = nullptr;
+  return new nic::Error(err);
+}
+
+void
+ModelRepositoryContextDelete(ModelRepositoryContextCtx* ctx)
+{
+  delete ctx;
+}
+
+nic::Error*
+ModelRepositoryContextGetModelRepositoryIndex(
+    ModelRepositoryContextCtx* ctx, char** index, uint32_t* index_len)
+{
+  ctx->index_buf.clear();
+
+  ni::ModelRepositoryIndex repository_index;
+  nic::Error err = ctx->ctx->GetModelRepositoryIndex(&repository_index);
+  if (err.IsOk()) {
+    if (repository_index.SerializeToString(&ctx->index_buf)) {
+      *index = &ctx->index_buf[0];
+      *index_len = ctx->index_buf.size();
+    } else {
+      err = nic::Error(
+          ni::RequestStatusCode::INTERNAL,
+          "failed to parse model repository index");
+    }
+  }
+
+  return new nic::Error(err);
+}
+
+//==============================================================================
 struct ModelControlContextCtx {
   std::unique_ptr<nic::ModelControlContext> ctx;
 };
