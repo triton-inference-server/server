@@ -107,6 +107,9 @@ class Context : public CustomInstance {
       RegisterError("unable to get buffer for output tensor values");
   const int kTimesteps =
       RegisterError("unable to execute more than one timestep at a time");
+  const int kMultipleCorrID = RegisterError(
+      "Execute() called with batch containing multiple inferences requests for "
+      "the same Correlation ID");
 };
 
 Context::Context(
@@ -267,6 +270,8 @@ Context::Execute(
     std::this_thread::sleep_for(std::chrono::milliseconds(execute_delay_ms_));
   }
 
+  std::set<uint64_t> seen_corrids;
+
   for (uint32_t pidx = 0; pidx < payload_cnt; ++pidx) {
     CustomPayload& payload = payloads[pidx];
     if (payload.batch_size != 1) {
@@ -324,6 +329,15 @@ Context::Execute(
     const int32_t ready = *reinterpret_cast<int32_t*>(&ready_buffer[0]);
     const uint64_t corrid = *reinterpret_cast<int32_t*>(&corrid_buffer[0]);
     const int32_t input = *reinterpret_cast<int32_t*>(&input_buffer[0]);
+
+    // Sequence batcher should never send us a batch of payloads where
+    // a given correlation ID occurs more that once. Check that here
+    // and fail if it happens.
+    if (seen_corrids.find(corrid) != seen_corrids.end()) {
+      payload.error_code = kMultipleCorrID;
+      continue;
+    }
+    seen_corrids.insert(corrid);
 
     // Update the accumulator value based on START/END/READY/CORRID
     // and calculate the output value.

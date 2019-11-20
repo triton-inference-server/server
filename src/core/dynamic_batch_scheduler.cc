@@ -240,6 +240,9 @@ DynamicBatchScheduler::SchedulerThread(
         if (queue_.size() >= delay_cnt) {
           delay_cnt = 0;
         }
+        LOG_INFO << "Delaying scheduler thread " << runner_id << " until "
+                 << delay_cnt
+                 << " queued payloads, current total = " << queue_.size();
       } else if (queue_.empty()) {
         wait_microseconds = default_wait_microseconds;
       } else if (dynamic_batching_enabled_) {

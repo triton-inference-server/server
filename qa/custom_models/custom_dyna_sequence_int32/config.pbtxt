@@ -30,6 +30,11 @@ max_batch_size: 8
 default_model_filename: "libdyna_sequence.so"
 sequence_batching {
   max_sequence_idle_microseconds: 5000000
+  oldest {
+    max_candidate_sequences: 6
+    preferred_batch_size: [ 4 ]
+    max_queue_delay_microseconds: 0
+  }
   control_input [
     {
       name: "START"
