@@ -435,6 +435,199 @@ ServerStatusHttpContext::Create(
 
 //==============================================================================
 
+class ModelRepositoryHttpContextImpl : public ModelRepositoryContext {
+ public:
+  ModelRepositoryHttpContextImpl(const std::string& url, bool verbose);
+  ModelRepositoryHttpContextImpl(
+      const std::string& url, const std::map<std::string, std::string>& headers,
+      bool verbose);
+
+  Error GetModelRepositoryIndex(ModelRepositoryIndex* index) override;
+
+ private:
+  static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
+  static size_t ResponseHandler(void*, size_t, size_t, void*);
+
+  // URL for model repository endpoint on inference server.
+  const std::string url_;
+
+  // Custom HTTP headers
+  const std::map<std::string, std::string> headers_;
+
+  // Enable verbose output
+  const bool verbose_;
+
+  // RequestStatus received in server response
+  RequestStatus request_status_;
+
+  // Serialized ModelRepository response from server.
+  std::string response_;
+};
+
+ModelRepositoryHttpContextImpl::ModelRepositoryHttpContextImpl(
+    const std::string& url, bool verbose)
+    : url_(url + "/" + kModelRepositoryRESTEndpoint), verbose_(verbose)
+{
+}
+
+ModelRepositoryHttpContextImpl::ModelRepositoryHttpContextImpl(
+    const std::string& url, const std::map<std::string, std::string>& headers,
+    bool verbose)
+    : url_(url + "/" + kModelRepositoryRESTEndpoint), headers_(headers),
+      verbose_(verbose)
+{
+}
+
+Error
+ModelRepositoryHttpContextImpl::GetModelRepositoryIndex(
+    ModelRepositoryIndex* index)
+{
+  index->Clear();
+  request_status_.Clear();
+  response_.clear();
+
+  if (!curl_global.Status().IsOk()) {
+    return curl_global.Status();
+  }
+
+  CURL* curl = curl_easy_init();
+  if (!curl) {
+    return Error(
+        RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
+  }
+
+  // Request binary representation of the status.
+  std::string full_url = url_ + "/index" + "?format=binary";
+  curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+  if (verbose_) {
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  }
+
+  // Response headers handled by ResponseHeaderHandler()
+  curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, ResponseHeaderHandler);
+  curl_easy_setopt(curl, CURLOPT_HEADERDATA, this);
+
+  // Response data handled by ResponseHandler()
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ResponseHandler);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, this);
+
+  // Add custom headers...
+  struct curl_slist* header_list = nullptr;
+  for (const auto& pr : headers_) {
+    std::string hdr = pr.first + ": " + pr.second;
+    header_list = curl_slist_append(header_list, hdr.c_str());
+  }
+
+  if (header_list != nullptr) {
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_list);
+  }
+
+  CURLcode res = curl_easy_perform(curl);
+  if (res != CURLE_OK) {
+    curl_slist_free_all(header_list);
+    curl_easy_cleanup(curl);
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "HTTP client failed: " + std::string(curl_easy_strerror(res)));
+  }
+
+  // Must use long with curl_easy_getinfo
+  long http_code;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+  curl_slist_free_all(header_list);
+  curl_easy_cleanup(curl);
+
+  // Should have a request status, if not then create an error status.
+  if (request_status_.code() == RequestStatusCode::INVALID) {
+    request_status_.Clear();
+    request_status_.set_code(RequestStatusCode::INTERNAL);
+    request_status_.set_msg("status request did not return status");
+  }
+
+  // If request has failing HTTP status or the request's explicit
+  // status is not SUCCESS, then signal an error.
+  if ((http_code != 200) ||
+      (request_status_.code() != RequestStatusCode::SUCCESS)) {
+    return Error(request_status_);
+  }
+
+  // Parse the response as a ModelConfigList...
+  if (!index->ParseFromString(response_)) {
+    return Error(RequestStatusCode::INTERNAL, "failed to parse server status");
+  }
+
+  if (verbose_) {
+    std::cout << index->DebugString() << std::endl;
+  }
+
+  return Error(request_status_);
+}
+
+size_t
+ModelRepositoryHttpContextImpl::ResponseHeaderHandler(
+    void* contents, size_t size, size_t nmemb, void* userp)
+{
+  ModelRepositoryHttpContextImpl* ctx =
+      reinterpret_cast<ModelRepositoryHttpContextImpl*>(userp);
+
+  char* buf = reinterpret_cast<char*>(contents);
+  size_t byte_size = size * nmemb;
+
+  size_t idx = strlen(kStatusHTTPHeader);
+  if ((idx < byte_size) && !strncasecmp(buf, kStatusHTTPHeader, idx)) {
+    while ((idx < byte_size) && (buf[idx] != ':')) {
+      ++idx;
+    }
+
+    if (idx < byte_size) {
+      std::string hdr(buf + idx + 1, byte_size - idx - 1);
+
+      if (!google::protobuf::TextFormat::ParseFromString(
+              hdr, &ctx->request_status_)) {
+        ctx->request_status_.Clear();
+      }
+    }
+  }
+
+  return byte_size;
+}
+
+size_t
+ModelRepositoryHttpContextImpl::ResponseHandler(
+    void* contents, size_t size, size_t nmemb, void* userp)
+{
+  ModelRepositoryHttpContextImpl* ctx =
+      reinterpret_cast<ModelRepositoryHttpContextImpl*>(userp);
+  uint8_t* buf = reinterpret_cast<uint8_t*>(contents);
+  size_t result_bytes = size * nmemb;
+  std::copy(buf, buf + result_bytes, std::back_inserter(ctx->response_));
+  return result_bytes;
+}
+
+Error
+ModelRepositoryHttpContext::Create(
+    std::unique_ptr<ModelRepositoryContext>* ctx, const std::string& server_url,
+    bool verbose)
+{
+  ctx->reset(static_cast<ModelRepositoryContext*>(
+      new ModelRepositoryHttpContextImpl(server_url, verbose)));
+  return Error::Success;
+}
+
+Error
+ModelRepositoryHttpContext::Create(
+    std::unique_ptr<ModelRepositoryContext>* ctx, const std::string& server_url,
+    const std::map<std::string, std::string>& headers, bool verbose)
+{
+  ctx->reset(static_cast<ModelRepositoryContext*>(
+      new ModelRepositoryHttpContextImpl(server_url, headers, verbose)));
+  return Error::Success;
+}
+
+//==============================================================================
+
 class ModelControlHttpContextImpl : public ModelControlContext {
  public:
   ModelControlHttpContextImpl(

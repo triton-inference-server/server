@@ -178,7 +178,7 @@ class LifeCycleTest(unittest.TestCase):
                                 "expected status for model " + model_name)
                 for (k, v) in iteritems(ss.model_status[model_name].version_status):
                     self.assertEqual(v.ready_state, server_status.MODEL_UNAVAILABLE)
-                    self.assertNotEqual(len(v.ready_state_reason.message),
+                    self.assertNotEqual(len(v.ready_state_reason.message), 0,
                         "expected non-empty message for load failure")
 
                 hctx = ServerHealthContext(pair[0], pair[1], True)
@@ -1562,6 +1562,69 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertTrue(False, "unexpected error {}".format(ex))
         
         self._infer_unaffected_models(loaded_models, model_shape)
+
+    def test_model_repository_index(self):
+        # use model control EXPLIT and --load-model to load a subset of models
+        # in model repository
+        input_size = 16
+        tensor_shape = (input_size,)
+        model_bases = ["graphdef", "savedmodel", "simple_savedmodel"]
+
+        # Sanity check on loaded models
+        # 3 models should be loaded:
+        #     simple_savedmodel_float32_float32_float32
+        #     savedmodel_float32_float32_float32
+        #     graphdef_float32_float32_float32
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                hctx = ServerHealthContext(pair[0], pair[1], True)
+                self.assertTrue(hctx.is_ready())
+                self.assertTrue(hctx.is_live())
+
+                ctx = ServerStatusContext(pair[0], pair[1], verbose=True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+                uptime = ss.uptime_ns
+                self.assertGreater(uptime, 0)
+                self.assertEqual(len(ss.model_status), 3)
+
+                for model_base in model_bases:
+                    model_name = tu.get_model_name(model_base, np.float32, np.float32, np.float32)
+                    
+                    self.assertTrue(model_name in ss.model_status,
+                                    "expected status for model " + model_name)
+                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
+                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
+                        self.assertEqual(len(v.ready_state_reason.message), 0,
+                            "expected empty message for successful load")
+
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Check model repository index
+        # 4 models should be shown:
+        #     simple_savedmodel_float32_float32_float32
+        #     simple_graphdef_float32_float32_float32
+        #     savedmodel_float32_float32_float32
+        #     graphdef_float32_float32_float32
+        model_bases.append("simple_graphdef")
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                ctx = ModelRepositoryContext(pair[0], pair[1], True)
+                index = ctx.get_model_repository_index()
+                self.assertEqual(len(index.models), 4)
+                model_names = []
+                for model_base in model_bases:
+                    model_names.append(tu.get_model_name(model_base, np.float32, np.float32, np.float32))
+
+                for model_info in index.models:
+                    self.assertTrue(model_info.name in model_names,
+                                    "unexpected index for model " + model_info.name)
+
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
 if __name__ == '__main__':
     unittest.main()

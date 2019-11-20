@@ -127,6 +127,37 @@ class ServerStatusHttpContext {
 };
 
 //==============================================================================
+/// ModelRepositoryHttpContext is the HTTP instantiation of
+/// ModelRepositoryContext.
+///
+class ModelRepositoryHttpContext {
+ public:
+  /// Create a context that returns information about the model repository of
+  /// an inference server using HTTP protocol.
+  /// \param ctx Returns a new ModelRepositoryHttpContext object.
+  /// \param server_url The inference server name and port.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<ModelRepositoryContext>* ctx, const std::string& server_url,
+      bool verbose = false);
+
+  /// Create a context that returns information about the model repository of
+  /// an inference server using HTTP protocol with custom headers.
+  /// \param ctx Returns a new ModelRepositoryHttpContext object.
+  /// \param server_url The inference server name and port.
+  /// \param headers Map of HTTP headers to use with the status
+  /// request. The map key/value indicates the header name/value.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<ModelRepositoryContext>* ctx, const std::string& server_url,
+      const std::map<std::string, std::string>& headers, bool verbose = false);
+};
+
+//==============================================================================
 /// ModelControlHttpContext is the HTTP instantiation of ModelControlContext.
 ///
 class ModelControlHttpContext {
