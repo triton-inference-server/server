@@ -400,9 +400,9 @@ SequenceBatchScheduler::Enqueue(
   }
   // This request already has a queue in the backlog...
   else if (bl_itr != sequence_to_backlog_map_.end()) {
-    LOG_VERBOSE(1)
-        << "Enqueuing sequence inference request into backlog for model '"
-        << request_provider->ModelName();
+    LOG_VERBOSE(1) << "Enqueuing CORRID " << correlation_id
+                   << " into existing backlog: "
+                   << request_provider->ModelName();
 
     bl_itr->second->emplace_back(
         stats, request_provider, response_provider, OnComplete);
@@ -425,9 +425,8 @@ SequenceBatchScheduler::Enqueue(
   }
   // Last option is to assign this request to the backlog...
   else {
-    LOG_VERBOSE(1)
-        << "Enqueuing sequence inference request into new backlog for model '"
-        << request_provider->ModelName();
+    LOG_VERBOSE(1) << "Enqueuing CORRID " << correlation_id
+                   << " into new backlog: " << request_provider->ModelName();
 
     auto backlog = std::make_shared<std::deque<Scheduler::Payload>>();
     backlog_queues_.push_back(backlog);
@@ -451,13 +450,13 @@ SequenceBatchScheduler::Enqueue(
     sequence_to_batcherseqslot_map_.erase(correlation_id);
   }
 
-  // Enqueue request into batcher and sequence slot.  No need to hold
-  // the lock while enqueuing in a specific batcher.
+  // Enqueue request into batcher and sequence slot.  Don't hold the
+  // lock while enqueuing in a specific batcher.
   lock.unlock();
 
-  LOG_VERBOSE(1) << "Enqueuing sequence inference request for model '"
-                 << request_provider->ModelName() << "' into batcher "
-                 << batcher_idx << ", sequence slot " << seq_slot;
+  LOG_VERBOSE(1) << "Enqueuing CORRID " << correlation_id << " into batcher "
+                 << batcher_idx << ", sequence slot " << seq_slot << ": "
+                 << request_provider->ModelName();
 
   batchers_[batcher_idx]->Enqueue(
       seq_slot, correlation_id, stats, request_provider, response_provider,
@@ -505,10 +504,10 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
         sequence_to_batcherseqslot_map_[correlation_id] = batcher_seq_slot;
       }
 
-      LOG_VERBOSE(1) << "Reusing slot in batcher "
+      LOG_VERBOSE(1) << "CORRID " << correlation_id << " reusing batcher "
                      << batcher_seq_slot.batcher_idx_ << ", slot "
-                     << batcher_seq_slot.seq_slot_ << " for sequence "
-                     << correlation_id;
+                     << batcher_seq_slot.seq_slot_ << ": "
+                     << request_provider->ModelName();
       return false;
     }
   }
@@ -566,79 +565,86 @@ SequenceBatchScheduler::ReaperThread(const int nice)
   const uint64_t backlog_idle_wait_microseconds = 50 * 1000;
 
   while (!reaper_thread_exit_) {
-    std::unique_lock<std::mutex> lock(mu_);
-
     uint64_t wait_microseconds = max_sequence_idle_microseconds_;
+    BatcherSequenceSlotMap force_end_sequences;
 
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    uint64_t now_us = TIMESPEC_TO_NANOS(now) / 1000;
+    {
+      std::unique_lock<std::mutex> lock(mu_);
 
-    for (auto cid_itr = correlation_id_timestamps_.cbegin();
-         cid_itr != correlation_id_timestamps_.cend();) {
-      int64_t remaining_microseconds =
-          (int64_t)max_sequence_idle_microseconds_ - (now_us - cid_itr->second);
-      if (remaining_microseconds > 0) {
-        wait_microseconds =
-            std::min(wait_microseconds, (uint64_t)remaining_microseconds + 1);
-        ++cid_itr;
-        continue;
-      }
+      struct timespec now;
+      clock_gettime(CLOCK_MONOTONIC, &now);
+      uint64_t now_us = TIMESPEC_TO_NANOS(now) / 1000;
 
-      const CorrelationID idle_correlation_id = cid_itr->first;
-      LOG_VERBOSE(1) << "Max sequence idle exceeded for sequence "
-                     << idle_correlation_id;
-
-      auto idle_sb_itr =
-          sequence_to_batcherseqslot_map_.find(idle_correlation_id);
-
-      // If the idle correlation ID has an assigned sequence slot,
-      // then release that assignment so it becomes available for
-      // another sequence. An assignment is released by enqueuing a
-      // payload with null providers and null completion callback. The
-      // scheduler thread will interpret the payload as meaning it
-      // should release the sequence slot but otherwise do nothing
-      // with the payload.
-      if (idle_sb_itr != sequence_to_batcherseqslot_map_.end()) {
-        // Need to grab the contents before the erase below since that
-        // can free it.
-        const size_t batcher_idx = idle_sb_itr->second.batcher_idx_;
-        const uint32_t seq_slot = idle_sb_itr->second.seq_slot_;
-
-        LOG_VERBOSE(1) << "reaper enqueuing force-end in batcher "
-                       << batcher_idx << ", slot " << seq_slot
-                       << " for sequence " << idle_correlation_id;
-
-
-        sequence_to_batcherseqslot_map_.erase(idle_correlation_id);
-
-        batchers_[batcher_idx]->Enqueue(
-            seq_slot, idle_correlation_id, nullptr, nullptr, nullptr, nullptr);
-        cid_itr = correlation_id_timestamps_.erase(cid_itr);
-      } else {
-        // If the idle correlation ID is in the backlog, then just
-        // need to increase the timeout so that we revisit it again in
-        // the future to check if it is assigned to a sequence slot.
-        auto idle_bl_itr = sequence_to_backlog_map_.find(idle_correlation_id);
-        if (idle_bl_itr != sequence_to_backlog_map_.end()) {
-          LOG_VERBOSE(1) << "reaper found idle sequence in backlog so "
-                            "extending timeout for sequence "
-                         << idle_correlation_id;
+      for (auto cid_itr = correlation_id_timestamps_.cbegin();
+           cid_itr != correlation_id_timestamps_.cend();) {
+        int64_t remaining_microseconds =
+            (int64_t)max_sequence_idle_microseconds_ -
+            (now_us - cid_itr->second);
+        if (remaining_microseconds > 0) {
           wait_microseconds =
-              std::min(wait_microseconds, backlog_idle_wait_microseconds);
+              std::min(wait_microseconds, (uint64_t)remaining_microseconds + 1);
           ++cid_itr;
-        } else {
-          LOG_VERBOSE(1) << "ignoring stale idle for sequence "
-                         << idle_correlation_id;
+          continue;
+        }
+
+        const CorrelationID idle_correlation_id = cid_itr->first;
+        LOG_VERBOSE(1) << "Reaper: CORRID " << idle_correlation_id
+                       << ": max sequence idle exceeded";
+
+        auto idle_sb_itr =
+            sequence_to_batcherseqslot_map_.find(idle_correlation_id);
+
+        // If the idle correlation ID has an assigned sequence slot,
+        // then release that assignment so it becomes available for
+        // another sequence. Release is done by enqueuing and must be
+        // done outside the lock, so just collect needed info here.
+        if (idle_sb_itr != sequence_to_batcherseqslot_map_.end()) {
+          force_end_sequences[idle_correlation_id] = idle_sb_itr->second;
+
+          sequence_to_batcherseqslot_map_.erase(idle_correlation_id);
           cid_itr = correlation_id_timestamps_.erase(cid_itr);
+        } else {
+          // If the idle correlation ID is in the backlog, then just
+          // need to increase the timeout so that we revisit it again in
+          // the future to check if it is assigned to a sequence slot.
+          auto idle_bl_itr = sequence_to_backlog_map_.find(idle_correlation_id);
+          if (idle_bl_itr != sequence_to_backlog_map_.end()) {
+            LOG_VERBOSE(1) << "Reaper: found idle CORRID "
+                           << idle_correlation_id;
+            wait_microseconds =
+                std::min(wait_microseconds, backlog_idle_wait_microseconds);
+            ++cid_itr;
+          } else {
+            LOG_VERBOSE(1) << "Reaper: ignoring stale idle CORRID "
+                           << idle_correlation_id;
+            cid_itr = correlation_id_timestamps_.erase(cid_itr);
+          }
         }
       }
     }
 
+    // Enqueue force-ends outside of the lock.
+    for (const auto& pr : force_end_sequences) {
+      const CorrelationID idle_correlation_id = pr.first;
+      const size_t batcher_idx = pr.second.batcher_idx_;
+      const uint32_t seq_slot = pr.second.seq_slot_;
+
+      LOG_VERBOSE(1) << "Reaper: force-ending CORRID " << idle_correlation_id
+                     << " in batcher " << batcher_idx << ", slot " << seq_slot;
+
+      // An slot assignment is released by enqueuing a payload with
+      // null providers and null completion callback. The scheduler
+      // thread will interpret the payload as meaning it should
+      // release the sequence slot but otherwise do nothing with the
+      // payload.
+      batchers_[batcher_idx]->Enqueue(
+          seq_slot, idle_correlation_id, nullptr, nullptr, nullptr, nullptr);
+    }
+
     // Wait until the next idle timeout needs to be checked
     if (wait_microseconds > 0) {
-      LOG_VERBOSE(1) << "Sequence-batch reaper sleeping for "
-                     << wait_microseconds << "us...";
+      std::unique_lock<std::mutex> lock(mu_);
+      LOG_VERBOSE(1) << "Reaper: sleeping for " << wait_microseconds << "us...";
       std::chrono::microseconds wait_timeout(wait_microseconds);
       reaper_cv_.wait_for(lock, wait_timeout);
     }
@@ -1023,8 +1029,10 @@ DirectSequenceBatch::SchedulerThread(
             // all slots are processed (we defer processing because
             // multiple slots could have ending sequences).
             if (end_of_sequence) {
-              LOG_VERBOSE(1) << "Ending sequence in Direct batcher "
-                             << batcher_idx_ << ", slot " << seq_slot;
+              LOG_VERBOSE(1)
+                  << "End sequence CORRID "
+                  << seq_slot_correlation_ids_[seq_slot] << " in batcher "
+                  << batcher_idx_ << ", slot " << seq_slot;
 
               // Should never be anything in a queue after the END
               // marker. If it happens that means we will clobber
@@ -1210,63 +1218,101 @@ OldestSequenceBatch::CompleteAndNext(
 
   std::lock_guard<std::mutex> lock(mu_);
 
-  bool release_seq_slot = false;
-  in_flight_[seq_slot] = false;
-
-  // If the next sequence inference is ready in the queue then enqueue
-  // it in the dynamic batcher now.
+  // We may enqueue 1 or more pending inferences triggered by the
+  // completion. If the sequence has a pending inference then it needs
+  // to be send to dynamic batcher since the "previous" inference just
+  // completed. If this next inference ends up being the end of the
+  // sequence (either from the END flag or because the sequence is
+  // being force-ended) then we try to fill the now-free sequence slot
+  // from the backlog and then send the first inference from that
+  // sequence to the dynamic batcher...
   std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
-  if (!queue.empty()) {
-    Scheduler::Payload& payload = queue.front();
-    const auto& request_provider = payload.request_provider_;
+  bool retry = true;
+  while (retry) {
+    retry = false;
 
-    // If the request provider is null then this inference request is
-    // from the reaper thread indicating a timed-out sequence. Mark
-    // that the sequence slot should be released but otherwise do
-    // nothing.
-    if (request_provider == nullptr) {
-      release_seq_slot = true;
-    } else {
-      const auto& request_header = request_provider->RequestHeader();
+    bool release_seq_slot = false;
+    in_flight_[seq_slot] = false;
 
-      // After handling the last inference in a sequence we must
-      // release the sequence slot to make it available to another
-      // sequence.
-      if ((request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
-          0) {
+    // If the next sequence inference is ready in the queue then enqueue
+    // it in the dynamic batcher now.
+    if (!queue.empty()) {
+      Scheduler::Payload& payload = queue.front();
+      const auto& request_provider = payload.request_provider_;
+
+      // If the request provider is null then this inference request is
+      // from the reaper thread indicating a timed-out sequence. Mark
+      // that the sequence slot should be released but otherwise do
+      // nothing.
+      if (request_provider == nullptr) {
+        LOG_VERBOSE(1) << "force-end sequence in batcher " << batcher_idx_
+                       << ", slot " << seq_slot;
         release_seq_slot = true;
+      } else {
+        const auto& request_header = request_provider->RequestHeader();
+        const CorrelationID correlation_id = request_header.correlation_id();
+
+        // After handling the last inference in a sequence we must
+        // release the sequence slot to make it available to another
+        // sequence.
+        if ((request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
+            0) {
+          LOG_VERBOSE(1) << "end sequence CORRID " << correlation_id
+                         << " in batcher " << batcher_idx_ << ", slot "
+                         << seq_slot;
+          release_seq_slot = true;
+        }
+
+        // Add the appropriate control tensor values to the request.
+        SetControlTensors(
+            request_header, request_provider, seq_slot, correlation_id);
+
+        LOG_VERBOSE(1) << "issue to dynamic batcher CORRID " << correlation_id
+                       << " in batcher " << batcher_idx_ << ", slot "
+                       << seq_slot;
+        in_flight_[seq_slot] = true;
+
+        auto on_complete_fn = std::bind(
+            &OldestSequenceBatch::CompleteAndNext, this, seq_slot,
+            payload.complete_function_, std::placeholders::_1);
+        dynamic_batcher_->Enqueue(
+            payload.stats_, request_provider, payload.response_provider_,
+            on_complete_fn);
       }
 
-      in_flight_[seq_slot] = true;
-
-      auto on_complete_fn = std::bind(
-          &OldestSequenceBatch::CompleteAndNext, this, seq_slot,
-          payload.complete_function_, std::placeholders::_1);
-      dynamic_batcher_->Enqueue(
-          payload.stats_, request_provider, payload.response_provider_,
-          on_complete_fn);
+      queue.pop_front();
     }
 
-    queue.pop_front();
-  }
+    // If releasing the sequence slot then the sequence queue should be
+    // empty and we can now assign a new sequence to the queue (from the
+    // backlog).
+    if (release_seq_slot) {
+      // Should never be anything in a queue after the END marker. If it
+      // happens that means we will clobber that request if/when we swap
+      // in a backlog sequence in ReleaseSequenceSlot below.
+      if (!queue.empty()) {
+        LOG_ERROR << "internal: unexpected requests after sequence end in slot "
+                  << seq_slot;
+      }
 
-  // If releasing the sequence slot then the sequence queue should be
-  // empty and can assign it to a new sequence (from the backlog).
-  if (release_seq_slot) {
-    LOG_VERBOSE(1) << "Ending sequence in OldestFirst batcher " << batcher_idx_
-                   << ", slot " << seq_slot;
+      SequenceBatchScheduler::BatcherSequenceSlot batcher_seq_slot(
+          batcher_idx_, seq_slot);
+      const bool released =
+          base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
+      if (!released) {
+        LOG_VERBOSE(1) << "Enqueued new sequence containing " << queue.size()
+                       << " requests into OldestFirst batcher " << batcher_idx_
+                       << ", slot " << seq_slot;
 
-    // Should never be anything in a queue after the END marker. If it
-    // happens that means we will clobber that request if/when we swap
-    // in a backlog sequence in ReleaseSequenceSlot below.
-    if (!queue.empty()) {
-      LOG_ERROR << "internal: unexpected requests after sequence end in slot "
-                << seq_slot;
+        // If an inference is already in-flight in the dynamic batcher
+        // in this sequence slot then can't process the new queue
+        // inferences right now, because the in-flight request is
+        // using slot resources like the CORRID override map.
+        if (!in_flight_[seq_slot]) {
+          retry = true;
+        }
+      }
     }
-
-    SequenceBatchScheduler::BatcherSequenceSlot batcher_seq_slot(
-        batcher_idx_, seq_slot);
-    base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
   }
 }
 
@@ -1278,13 +1324,6 @@ OldestSequenceBatch::Enqueue(
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(const Status&)> OnComplete)
 {
-  // Add the appropriate control tensor values to the request.
-  if (request_provider != nullptr) {
-    SetControlTensors(
-        request_provider->RequestHeader(), request_provider, seq_slot,
-        correlation_id);
-  }
-
   // Queue the new request... if there isn't already a request in
   // flight then send one to the dynamic batcher immediately.
   bool in_flight;
