@@ -87,8 +87,13 @@ class Tracer {
 
   static void TraceActivity(
       TRTSERVER_Trace* trace, TRTSERVER_Trace_Activity activity,
-      uint64_t timestamp_ns, TRTSERVER_Ensemble_Phase* ensemble_phase,
-      void* userp);
+      uint64_t timestamp_ns, void* userp);
+
+  static void* CreateDerivedTracer(
+      TRTSERVER_Trace* trace,
+      TRTSERVER_Trace_Derived_Model_Info* derived_model_info, void* userp);
+
+  static void ReleaseDerivedTracer(TRTSERVER_Trace* trace, void* userp);
 
   void SetModel(const std::string& model_name, int64_t model_version)
   {
@@ -104,8 +109,7 @@ class Tracer {
   // will be used.
   void CaptureTimestamp(
       TRTSERVER_Trace_Level level, const std::string& name,
-      uint64_t timestamp_ns = 0,
-      TRTSERVER_Ensemble_Phase* ensemble_phase = nullptr);
+      uint64_t timestamp_ns = 0);
 
  private:
   std::shared_ptr<TraceManager> manager_;
@@ -114,12 +118,13 @@ class Tracer {
   std::string model_name_;
   int64_t model_version_;
 
+  int64_t id_;
+  int64_t parent_id_;
+
   std::stringstream tout_;
   uint32_t timestamp_cnt_;
 
   TRTSERVER_Trace* trace_;
-
-  std::mutex mtx_;
 };
 
 }}  // namespace nvidia::inferenceserver

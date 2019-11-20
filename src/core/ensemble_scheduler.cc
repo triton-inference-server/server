@@ -730,7 +730,7 @@ EnsembleContext::ScheduleSteps(
 
     // Passing trace-related objects down
     infer_stats->SetTrace(context->stats_->GetTrace());
-    infer_stats->InitEnsemblePhase(context->stats_->GetEnsemblePhase());
+    infer_stats->InitDerivedModelInfo(context->stats_->GetDerivedModelInfo());
 
     context->is_->InferAsync(
         step->backend_, step->request_provider_, step->response_provider_,

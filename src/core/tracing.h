@@ -41,9 +41,11 @@ class Trace {
  public:
   static Status Create(
       TRTSERVER_Trace_Level level, TRTSERVER_TraceActivityFn_t activity_fn,
+      TRTSERVER_TracePushFn_t push_fn, TRTSERVER_TracePopFn_t pop_fn,
       void* activity_userp, std::unique_ptr<Trace>* trace)
   {
-    trace->reset(new Trace(level, activity_fn, activity_userp));
+    trace->reset(
+        new Trace(level, activity_fn, push_fn, pop_fn, activity_userp));
     return Status::Success;
   }
 
@@ -54,14 +56,17 @@ class Trace {
  private:
   Trace(
       TRTSERVER_Trace_Level level, TRTSERVER_TraceActivityFn_t activity_fn,
+      TRTSERVER_TracePushFn_t push_fn, TRTSERVER_TracePopFn_t pop_fn,
       void* activity_userp)
-      : level_(level), activity_fn_(activity_fn),
-        activity_userp_(activity_userp), id_(0)
+      : level_(level), activity_fn_(activity_fn), push_fn_(push_fn),
+        pop_fn_(pop_fn), activity_userp_(activity_userp), id_(0)
   {
   }
 
   const TRTSERVER_Trace_Level level_;
   TRTSERVER_TraceActivityFn_t activity_fn_;
+  TRTSERVER_TracePushFn_t push_fn_;
+  TRTSERVER_TracePopFn_t pop_fn_;
   void* activity_userp_;
   std::atomic<int64_t> id_;
 };

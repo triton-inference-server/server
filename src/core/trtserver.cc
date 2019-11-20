@@ -681,12 +681,13 @@ TRTSERVER_MetricsFormatted(
 TRTSERVER_Error*
 TRTSERVER_TraceNew(
     TRTSERVER_Trace** trace, TRTSERVER_Trace_Level level,
-    TRTSERVER_TraceActivityFn_t activity_fn, void* activity_userp)
+    TRTSERVER_TraceActivityFn_t activity_fn, TRTSERVER_TracePushFn_t push_fn,
+    TRTSERVER_TracePopFn_t pop_fn, void* activity_userp)
 {
 #ifdef TRTIS_ENABLE_TRACING
   std::unique_ptr<ni::Trace> ltrace;
-  RETURN_IF_STATUS_ERROR(
-      ni::Trace::Create(level, activity_fn, activity_userp, &ltrace));
+  RETURN_IF_STATUS_ERROR(ni::Trace::Create(
+      level, activity_fn, push_fn, pop_fn, activity_userp, &ltrace));
   *trace = reinterpret_cast<TRTSERVER_Trace*>(ltrace.release());
   return nullptr;  // Success
 #else

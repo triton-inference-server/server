@@ -349,24 +349,39 @@ typedef enum trtserver_traceactivity_enum {
   TRTSERVER_TRACE_REQUEST_END
 } TRTSERVER_Trace_Activity;
 
-// [TODO] should this be generalized? Say for regular model, the struct can
-// be supplied with { parent_id_ = -1; phased_id_ = 0; model_name_ = name;}
-typedef struct trtserver_ensemble_phase_struct {
-  int64_t parent_id_;
-  int64_t phase_id_;
+typedef struct trtserver_tracederivedmodelinfo_struct {
   const char* model_name_;
-} TRTSERVER_Ensemble_Phase;
+  int64_t version_;
+  int64_t id_;
+  int64_t parent_id_;
+} TRTSERVER_Trace_Derived_Model_Info;
 
 /// Type for trace activity callback function. This callback function
-/// is used to report activity occurring during a traced request. If a request
-/// for ensemble model is traced, the same type of activties may be reported
-/// repeatedly, in such case, 'ensemble_phase' will be set to provide additional
-/// context. The 'userp' data is the same as what is supplied in the call to
+/// is used to report activity occurring during a traced request. The
+/// 'userp' data is the same as what is supplied in the call to
 /// TRTSERVER_TraceNew.
 typedef void (*TRTSERVER_TraceActivityFn_t)(
     TRTSERVER_Trace* trace, TRTSERVER_Trace_Activity activity,
-    uint64_t timestamp_ns, TRTSERVER_Ensemble_Phase* ensemble_phase,
-    void* userp);
+    uint64_t timestamp_ns, void* userp);
+
+/// Type for trace push callback function. This callback function
+/// is used when a model execution is initiated from within the traced request,
+/// i.e. when a request to an ensemble model is being traced. In such case, the
+/// activities of the derived model execution will also be traced, and to
+/// distinguish the activities of different model executions, this callback
+/// function is used to return an identifier for a derived model execution. The
+/// activities of the derived model execution will be report using
+/// TRTSERVER_TraceActivityFn_t, but the identifier will be used as 'userp'.
+/// The 'userp' data is the same as what is supplied in the call to
+/// TRTSERVER_TraceNew.
+typedef void* (*TRTSERVER_TracePushFn_t)(
+    TRTSERVER_Trace* trace,
+    TRTSERVER_Trace_Derived_Model_Info* derived_model_info, void* userp);
+
+/// Type for trace pop callback function. This callback function
+/// is used to release an identifier returned from TRTSERVER_TracePushFn_t
+/// when the corresponding derived model execution is finished.
+typedef void (*TRTSERVER_TracePopFn_t)(TRTSERVER_Trace* trace, void* userp);
 
 /// Create a new trace object. The caller takes ownership of the
 /// TRTSERVER_Trace object and must call TRTSERVER_TraceDelete to
@@ -375,12 +390,16 @@ typedef void (*TRTSERVER_TraceActivityFn_t)(
 /// \param level The tracing level.
 /// \param activity_fn The callback function where activity for the
 /// trace is reported.
+/// \param push_fn The callback function where an identifier is generated
+/// for a derived model execution.
+/// \param pop_fn The callback function where an identifier is released.
 /// \param activity_userp User-provided pointer that is delivered to
 /// the activity function.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceNew(
     TRTSERVER_Trace** trace, TRTSERVER_Trace_Level level,
-    TRTSERVER_TraceActivityFn_t activity_fn, void* activity_userp);
+    TRTSERVER_TraceActivityFn_t activity_fn, TRTSERVER_TracePushFn_t push_fn,
+    TRTSERVER_TracePopFn_t pop_fn, void* activity_userp);
 
 /// Delete a trace object.
 /// \param trace The trace object.

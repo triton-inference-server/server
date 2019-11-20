@@ -115,7 +115,8 @@ TraceManager::SampleTrace()
 
   TRTSERVER_Trace* trace = nullptr;
   TRTSERVER_Error* err = TRTSERVER_TraceNew(
-      &trace, level_, Tracer::TraceActivity, tracer /* userp */);
+      &trace, level_, Tracer::TraceActivity, Tracer::CreateDerivedTracer,
+      Tracer::ReleaseDerivedTracer, tracer /* userp */);
   if (err != nullptr) {
     delete tracer;
 
@@ -151,7 +152,8 @@ TraceManager::WriteTrace(const std::stringstream& ss)
 
 Tracer::Tracer(
     const std::shared_ptr<TraceManager>& manager, TRTSERVER_Trace_Level level)
-    : manager_(manager), level_(level), model_version_(-1), timestamp_cnt_(0)
+    : manager_(manager), level_(level), model_version_(-1), id_(-1),
+      parent_id_(-1), timestamp_cnt_(0)
 {
   tout_ << "{ \"timestamps\": [";
 }
@@ -159,7 +161,15 @@ Tracer::Tracer(
 Tracer::~Tracer()
 {
   tout_ << "], \"model_name\": \"" << model_name_
-        << "\", \"model_version\": " << model_version_ << " }";
+        << "\", \"model_version\": " << model_version_;
+  if (id_ != -1) {
+    tout_ << ", \"id\":" << id_;
+  }
+  if (parent_id_ != -1) {
+    tout_ << ", \"parent_id\":" << parent_id_;
+  }
+  tout_ << " }";
+
   manager_->WriteTrace(tout_);
 
   LOG_IF_ERR(TRTSERVER_TraceDelete(trace_), "deleting trace");
@@ -167,12 +177,8 @@ Tracer::~Tracer()
 
 void
 Tracer::CaptureTimestamp(
-    TRTSERVER_Trace_Level level, const std::string& name, uint64_t timestamp_ns,
-    TRTSERVER_Ensemble_Phase* ensemble_phase)
+    TRTSERVER_Trace_Level level, const std::string& name, uint64_t timestamp_ns)
 {
-  // In the case of tracing an ensemble, it is possible to access a trace object
-  // concurrently
-  std::lock_guard<std::mutex> lk(mtx_);
   if (level <= level_) {
     if (timestamp_ns == 0) {
       struct timespec ts;
@@ -184,13 +190,7 @@ Tracer::CaptureTimestamp(
       tout_ << ",";
     }
 
-    tout_ << "{\"name\":\"" << name << "\", \"ns\":" << timestamp_ns;
-    if (ensemble_phase != nullptr) {
-      tout_ << ", \"model_name\":\"" << ensemble_phase->model_name_
-            << "\", \"phase_id\":" << ensemble_phase->phase_id_
-            << ", \"parent_id\":" << ensemble_phase->parent_id_;
-    }
-    tout_ << "}";
+    tout_ << "{\"name\":\"" << name << "\", \"ns\":" << timestamp_ns << "}";
     timestamp_cnt_++;
   }
 }
@@ -198,8 +198,7 @@ Tracer::CaptureTimestamp(
 void
 Tracer::TraceActivity(
     TRTSERVER_Trace* trace, TRTSERVER_Trace_Activity activity,
-    uint64_t timestamp_ns, TRTSERVER_Ensemble_Phase* ensemble_phase,
-    void* userp)
+    uint64_t timestamp_ns, void* userp)
 {
   Tracer* tracer = reinterpret_cast<Tracer*>(userp);
 
@@ -228,8 +227,30 @@ Tracer::TraceActivity(
       break;
   }
 
-  tracer->CaptureTimestamp(
-      tracer->level_, activity_name, timestamp_ns, ensemble_phase);
+  tracer->CaptureTimestamp(tracer->level_, activity_name, timestamp_ns);
+}
+
+void*
+Tracer::CreateDerivedTracer(
+    TRTSERVER_Trace* trace,
+    TRTSERVER_Trace_Derived_Model_Info* derived_model_info, void* userp)
+{
+  Tracer* tracer = reinterpret_cast<Tracer*>(userp);
+  // Initialize derived tracer (not setting trace as the derived tracer is not
+  // responsible for deleting TRTSERVER_Trace object)
+  Tracer* derived_tracer = new Tracer(tracer->manager_, tracer->level_);
+  derived_tracer->SetModel(
+      derived_model_info->model_name_, derived_model_info->version_);
+  derived_tracer->id_ = derived_model_info->id_;
+  derived_tracer->parent_id_ = derived_model_info->parent_id_;
+  return derived_tracer;
+}
+
+void
+Tracer::ReleaseDerivedTracer(TRTSERVER_Trace* trace, void* userp)
+{
+  Tracer* tracer = reinterpret_cast<Tracer*>(userp);
+  delete tracer;
 }
 
 }}  // namespace nvidia::inferenceserver

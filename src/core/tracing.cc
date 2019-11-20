@@ -35,7 +35,13 @@ namespace nvidia { namespace inferenceserver {
 void
 Trace::Report(const ModelInferStats* infer_stats)
 {
-  auto ensemble_phase = infer_stats->GetEnsemblePhase();
+  auto derived_info = infer_stats->GetDerivedModelInfo();
+  auto userp = activity_userp_;
+  if (derived_info != nullptr) {
+    userp = push_fn_(
+        reinterpret_cast<TRTSERVER_Trace*>(this), derived_info,
+        activity_userp_);
+  }
   // InferStats that is not captured should not be reported (i.e. ensemble
   // only have valid timestamp for request start and end)
   uint64_t timestamp = 0;
@@ -45,37 +51,35 @@ Trace::Report(const ModelInferStats* infer_stats)
     if (timestamp != 0) {
       activity_fn_(
           reinterpret_cast<TRTSERVER_Trace*>(this),
-          TRTSERVER_TRACE_REQUEST_START, timestamp, ensemble_phase,
-          activity_userp_);
+          TRTSERVER_TRACE_REQUEST_START, timestamp, userp);
     }
     timestamp = TIMESPEC_TO_NANOS(
         infer_stats->Timestamp(ModelInferStats::TimestampKind::kQueueStart));
     if (timestamp != 0) {
       activity_fn_(
           reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_QUEUE_START,
-          timestamp, ensemble_phase, activity_userp_);
+          timestamp, userp);
     }
     timestamp = TIMESPEC_TO_NANOS(
         infer_stats->Timestamp(ModelInferStats::TimestampKind::kComputeStart));
     if (timestamp != 0) {
       activity_fn_(
           reinterpret_cast<TRTSERVER_Trace*>(this),
-          TRTSERVER_TRACE_COMPUTE_START, timestamp, ensemble_phase,
-          activity_userp_);
+          TRTSERVER_TRACE_COMPUTE_START, timestamp, userp);
     }
     timestamp = TIMESPEC_TO_NANOS(
         infer_stats->Timestamp(ModelInferStats::TimestampKind::kComputeEnd));
     if (timestamp != 0) {
       activity_fn_(
           reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_COMPUTE_END,
-          timestamp, ensemble_phase, activity_userp_);
+          timestamp, userp);
     }
     timestamp = TIMESPEC_TO_NANOS(
         infer_stats->Timestamp(ModelInferStats::TimestampKind::kRequestEnd));
     if (timestamp != 0) {
       activity_fn_(
           reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_REQUEST_END,
-          timestamp, ensemble_phase, activity_userp_);
+          timestamp, userp);
     }
   }
 
@@ -85,17 +89,19 @@ Trace::Report(const ModelInferStats* infer_stats)
     if (timestamp != 0) {
       activity_fn_(
           reinterpret_cast<TRTSERVER_Trace*>(this),
-          TRTSERVER_TRACE_COMPUTE_INPUT_END, timestamp, ensemble_phase,
-          activity_userp_);
+          TRTSERVER_TRACE_COMPUTE_INPUT_END, timestamp, userp);
     }
     timestamp = TIMESPEC_TO_NANOS(infer_stats->Timestamp(
         ModelInferStats::TimestampKind::kComputeOutputStart));
     if (timestamp != 0) {
       activity_fn_(
           reinterpret_cast<TRTSERVER_Trace*>(this),
-          TRTSERVER_TRACE_COMPUTE_OUTPUT_START, timestamp, ensemble_phase,
-          activity_userp_);
+          TRTSERVER_TRACE_COMPUTE_OUTPUT_START, timestamp, userp);
     }
+  }
+
+  if (derived_info != nullptr) {
+    pop_fn_(reinterpret_cast<TRTSERVER_Trace*>(this), userp);
   }
 }
 
