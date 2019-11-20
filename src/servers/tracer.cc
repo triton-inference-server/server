@@ -153,7 +153,7 @@ TraceManager::WriteTrace(const std::stringstream& ss)
 Tracer::Tracer(
     const std::shared_ptr<TraceManager>& manager, TRTSERVER_Trace_Level level)
     : manager_(manager), level_(level), model_version_(-1), id_(-1),
-      parent_id_(-1), timestamp_cnt_(0)
+      parent_id_(-1), timestamp_cnt_(0), trace_(nullptr)
 {
   tout_ << "{ \"timestamps\": [";
 }
@@ -172,7 +172,9 @@ Tracer::~Tracer()
 
   manager_->WriteTrace(tout_);
 
-  LOG_IF_ERR(TRTSERVER_TraceDelete(trace_), "deleting trace");
+  if (trace_ != nullptr) {
+    LOG_IF_ERR(TRTSERVER_TraceDelete(trace_), "deleting trace");
+  }
 }
 
 void
