@@ -516,9 +516,11 @@ CustomBackend::Context::GetNextInput(
       // the data is ready.
       cudaStreamSynchronize(stream_);
     }
+
     return (err == cudaSuccess);
   }
 #endif  // TRTIS_ENABLE_GPU
+
   return ok;
 }
 
@@ -535,6 +537,11 @@ CustomBackend::Context::GetNextInput(
   Status status = payload->request_provider_->GetNextInputContent(
       name, content, content_byte_size, &src_memory_type, memory_type_id);
   *memory_type = ToCustomMemoryType(src_memory_type);
+
+  if (!status.IsOk()) {
+    LOG_VERBOSE(1) << status.AsString();
+  }
+
   return status.IsOk();
 }
 
@@ -561,6 +568,7 @@ CustomBackend::Context::GetOutput(
     *content = internal_ptr;
   }
 #endif  // TRTIS_ENABLE_GPU
+
   return ok;
 }
 
@@ -601,6 +609,10 @@ CustomBackend::Context::GetOutput(
     // Update memory type with actual memory type
     *memory_type = ToCustomMemoryType(actual_memory_type);
     *memory_type_id = actual_memory_type_id;
+
+    if (!status.IsOk()) {
+      LOG_VERBOSE(1) << status.AsString();
+    }
 
     return status.IsOk();
   }

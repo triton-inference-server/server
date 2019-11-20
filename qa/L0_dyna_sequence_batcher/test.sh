@@ -85,13 +85,22 @@ for i in \
     wait $SERVER_PID
 done
 
-# Tests that require TRTSERVER_DELAY_SCHEDULER so that the
-# scheduler is delayed and requests can collect in the queue.
+# Tests that require max_queue_delay_microseconds to be non-zero so
+# that batching is delayed until a full preferred batch is available.
+for m in `ls models`; do
+    (cd models/$m && \
+            sed -i "s/max_candidate_sequences:.*/max_candidate_sequences:4/" config.pbtxt && \
+            sed -i "s/max_queue_delay_microseconds:.*/max_queue_delay_microseconds:5000000/" config.pbtxt)
+done
+
 for i in \
     test_multi_sequence \
-             ; do
-    export TRTSERVER_BACKLOG_DELAY_SCHEDULER=0
-    export TRTSERVER_DELAY_SCHEDULER=11
+        test_multi_parallel_sequence \
+        test_backlog \
+        test_backlog_fill \
+        test_backlog_fill_no_end \
+        test_backlog_sequence_timeout \
+    ; do
 
     SERVER_LOG="./$i.serverlog"
     run_server
@@ -112,8 +121,6 @@ for i in \
     fi
     set -e
 
-    unset TRTSERVER_DELAY_SCHEDULER
-    unset TRTSERVER_BACKLOG_DELAY_SCHEDULER
     kill $SERVER_PID
     wait $SERVER_PID
 done
