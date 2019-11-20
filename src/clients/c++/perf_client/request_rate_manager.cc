@@ -46,6 +46,16 @@ RequestRateManager::Create(
 
   local_manager->threads_config_.reserve(max_threads);
 
+  RETURN_IF_ERROR(local_manager->InitManagerInputs(
+      string_length, string_data, zero_input, data_directory));
+
+  if (local_manager->shared_memory_type_ !=
+      SharedMemoryType::NO_SHARED_MEMORY) {
+    RETURN_IF_ERROR(local_manager->InitSharedMemory());
+  }
+
+  *manager = std::move(local_manager);
+
   return nic::Error::Success;
 }
 
@@ -173,7 +183,11 @@ RequestRateManager::Infer(
   thread_stat->contexts_stat_.emplace_back();
 
   std::unique_ptr<nic::InferContext::Options> options(nullptr);
-  thread_stat->status_ = PrepareInfer(&(ctx->ctx_), &options);
+  if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
+    thread_stat->status_ = PrepareInfer(&(ctx->ctx_), &options);
+  } else if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
+    thread_stat->status_ = PrepareSharedMemoryInfer(&(ctx->ctx_), &options);
+  }
   if (!thread_stat->status_.IsOk()) {
     return;
   }

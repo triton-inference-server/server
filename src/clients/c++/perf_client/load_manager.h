@@ -33,7 +33,7 @@
 
 class LoadManager {
  public:
-  ~LoadManager();
+  virtual ~LoadManager();
 
   /// Check if the load manager is working as expected.
   /// \return Error object indicating success or failure.
@@ -82,25 +82,35 @@ class LoadManager {
       const std::shared_ptr<ContextFactory>& factory);
 
   /// Helper funtion to retrieve the input data for the inferences
-  /// \param local_manager The current manager object under construction.
   /// \param string_length The length of the random strings to be generated
   /// for string inputs.
   /// \param string_data The string to be used as string inputs for model.
   /// \param zero_input Whether to use zero for model inputs.
   /// \param data_directory The path to the directory containing the input data
   /// in binary or text files.
-  /// \param manager Returns the final manager object with inputs initialized
   /// \return Error object indicating success or failure.
-  static nic::Error InitManagerInputs(
-      std::unique_ptr<LoadManager> local_manager, const size_t string_length,
-      const std::string& string_data, const bool zero_input,
-      const std::string& data_directory, std::unique_ptr<LoadManager>* manager);
+  nic::Error InitManagerInputs(
+      const size_t string_length, const std::string& string_data,
+      const bool zero_input, const std::string& data_directory);
 
+  /// Helper function to allocate and prepare shared memory.
+  /// from shared memory.
+  /// \return Error object indicating success or failure.
+  nic::Error InitSharedMemory();
 
   /// Helper function to prepare the InferContext for sending inference request.
   /// \param ctx Returns a new InferContext.
   /// \param options Returns the options used by 'ctx'.
   nic::Error PrepareInfer(
+      std::unique_ptr<nic::InferContext>* ctx,
+      std::unique_ptr<nic::InferContext::Options>* options);
+
+  /// Helper function to prepare the InferContext for sending inference request
+  /// in shared memory.
+  /// \param ctx Returns a new InferContext.
+  /// \param options
+  /// Returns the options used by 'ctx'.
+  nic::Error PrepareSharedMemoryInfer(
       std::unique_ptr<nic::InferContext>* ctx,
       std::unique_ptr<nic::InferContext::Options>* options);
 
@@ -133,6 +143,12 @@ class LoadManager {
   // Placeholder for generated string data, which will be used for all string
   // inputs
   std::vector<std::string> input_string_buf_;
+
+  std::unique_ptr<nic::SharedMemoryControlContext> shared_memory_ctx_;
+  // Map from shared memory key to its allocated size
+  std::unordered_map<std::string, size_t> io_shm_size_;
+  // Map from shared memory key to its starting address
+  std::unordered_map<std::string, uint8_t*> shared_memory_regions_;
 
   struct ThreadStat {
     ThreadStat() : status_(ni::RequestStatusCode::SUCCESS) {}
