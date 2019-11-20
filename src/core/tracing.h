@@ -59,7 +59,7 @@ class Trace {
       TRTSERVER_TracePushFn_t push_fn, TRTSERVER_TracePopFn_t pop_fn,
       void* activity_userp)
       : level_(level), activity_fn_(activity_fn), push_fn_(push_fn),
-        pop_fn_(pop_fn), activity_userp_(activity_userp), id_(0)
+        pop_fn_(pop_fn), activity_userp_(activity_userp)
   {
   }
 
@@ -68,7 +68,9 @@ class Trace {
   TRTSERVER_TracePushFn_t push_fn_;
   TRTSERVER_TracePopFn_t pop_fn_;
   void* activity_userp_;
-  std::atomic<int64_t> id_;
+
+  // Declare static so that IDs are unique even across traces
+  static std::atomic<int64_t> id_;
 };
 
 }}  // namespace nvidia::inferenceserver

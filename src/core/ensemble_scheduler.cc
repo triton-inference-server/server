@@ -313,6 +313,13 @@ EnsembleContext::EnsembleContext(
   } else {
     allocator_.reset(allocator);
   }
+
+  // If there is no derived model info associated with the ensemble request,
+  // it will be the first and should initialize a model info for itself so that
+  // the sequential model execution will know the parent.
+  if (stats_->GetDerivedModelInfo() == nullptr) {
+    stats_->InitDerivedModelInfo(nullptr);
+  }
 }
 
 TRTSERVER_Error*

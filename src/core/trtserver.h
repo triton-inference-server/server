@@ -349,6 +349,9 @@ typedef enum trtserver_traceactivity_enum {
   TRTSERVER_TRACE_REQUEST_END
 } TRTSERVER_Trace_Activity;
 
+/// Model information that distinguishes different model executions within
+/// a request to an ensemble model. 'parent_id_' == -1 indicates that this is
+/// the top level of the executions.
 typedef struct trtserver_tracederivedmodelinfo_struct {
   const char* model_name_;
   int64_t version_;
@@ -372,6 +375,8 @@ typedef void (*TRTSERVER_TraceActivityFn_t)(
 /// function is used to return an identifier for a derived model execution. The
 /// activities of the derived model execution will be report using
 /// TRTSERVER_TraceActivityFn_t, but the identifier will be used as 'userp'.
+/// Note that in the case of ensemble, this function will also be called with
+/// the ensemble model's information to provide the top level model ID.
 /// The 'userp' data is the same as what is supplied in the call to
 /// TRTSERVER_TraceNew.
 typedef void* (*TRTSERVER_TracePushFn_t)(

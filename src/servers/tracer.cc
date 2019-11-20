@@ -238,13 +238,16 @@ Tracer::CreateDerivedTracer(
     TRTSERVER_Trace_Derived_Model_Info* derived_model_info, void* userp)
 {
   Tracer* tracer = reinterpret_cast<Tracer*>(userp);
-  // Initialize derived tracer (not setting trace as the derived tracer is not
-  // responsible for deleting TRTSERVER_Trace object)
-  Tracer* derived_tracer = new Tracer(tracer->manager_, tracer->level_);
-  derived_tracer->SetModel(
-      derived_model_info->model_name_, derived_model_info->version_);
+  Tracer* derived_tracer = tracer;
+  // Initialize derived tracer if the model info is not referring to
+  // the ensemble model itself. Otherwise just keep track of the id.
+  if (derived_model_info->parent_id_ != -1) {
+    derived_tracer = new Tracer(tracer->manager_, tracer->level_);
+    derived_tracer->parent_id_ = derived_model_info->parent_id_;
+    derived_tracer->SetModel(
+        derived_model_info->model_name_, derived_model_info->version_);
+  }
   derived_tracer->id_ = derived_model_info->id_;
-  derived_tracer->parent_id_ = derived_model_info->parent_id_;
   return derived_tracer;
 }
 
@@ -252,7 +255,9 @@ void
 Tracer::ReleaseDerivedTracer(TRTSERVER_Trace* trace, void* userp)
 {
   Tracer* tracer = reinterpret_cast<Tracer*>(userp);
-  delete tracer;
+  if (tracer->parent_id_ != -1) {
+    delete tracer;
+  }
 }
 
 }}  // namespace nvidia::inferenceserver

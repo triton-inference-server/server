@@ -32,6 +32,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
+std::atomic<int64_t> Trace::id_(0);
+
 void
 Trace::Report(const ModelInferStats* infer_stats)
 {
