@@ -42,13 +42,8 @@ class KFServingHTTPServer {
       const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
           trace_manager,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
-      const std::map<int32_t, std::vector<std::string>>& port_map,
-      const int thread_cnt,
-      std::vector<std::unique_ptr<KFServingHTTPServer>>* http_servers);
-
-  static TRTSERVER_Error* CreateMetricsServer(
-      const std::shared_ptr<TRTSERVER_Server>& server, int32_t port,
-      int thread_cnt, std::unique_ptr<KFServingHTTPServer>* metrics_server);
+      const int32_t port_, const int thread_cnt,
+      std::unique_ptr<KFServingHTTPServer>* http_server);
 
   virtual ~KFServingHTTPServer() = default;
 

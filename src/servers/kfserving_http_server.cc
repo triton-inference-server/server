@@ -93,7 +93,8 @@ KFServingHTTPServerImpl::Start()
   }
 
   return TRTSERVER_ErrorNew(
-      TRTSERVER_ERROR_ALREADY_EXISTS, "KFServing HTTP server is already running.");
+      TRTSERVER_ERROR_ALREADY_EXISTS,
+      "KFServing HTTP server is already running.");
 }
 
 TRTSERVER_Error*
@@ -142,12 +143,7 @@ class KFServingHTTPAPIServer : public KFServingHTTPServerImpl {
       : KFServingHTTPServerImpl(port, thread_cnt), server_(server),
         trace_manager_(trace_manager), smb_manager_(smb_manager),
         allocator_(nullptr),
-        api_regex_(
-            R"(/api/(health|infer|status|sharedmemorycontrol)(.*))"),
-        health_regex_(R"(/(live|ready))"),
-        infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
-        sharedmemorycontrol_regex_(
-            R"(/(register|cudaregister|unregister|status)(.*))"),
+        api_regex_(R"(/v1/models/([^(/|:)]+)(:predict|/metadata)?)")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -161,7 +157,7 @@ class KFServingHTTPAPIServer : public KFServingHTTPServerImpl {
         "creating response allocator");
   }
 
-  ~HTTPAPIServer()
+  ~KFServingHTTPAPIServer()
   {
     LOG_IF_ERR(
         TRTSERVER_ResponseAllocatorDelete(allocator_),
@@ -221,8 +217,6 @@ class KFServingHTTPAPIServer : public KFServingHTTPServerImpl {
   void HandleHealth(evhtp_request_t* req, const std::string& health_uri);
   void HandleInfer(evhtp_request_t* req, const std::string& infer_uri);
   void HandleStatus(evhtp_request_t* req, const std::string& status_uri);
-  void HandleSharedMemoryControl(
-      evhtp_request_t* req, const std::string& sharedmemorycontrol_uri);
 
 #if TRTIS_ENABLE_GPU
   TRTSERVER_Error* EVBufferToCudaHandle(
@@ -251,16 +245,10 @@ class KFServingHTTPAPIServer : public KFServingHTTPServerImpl {
   TRTSERVER_ResponseAllocator* allocator_;
 
   re2::RE2 api_regex_;
-  re2::RE2 health_regex_;
-  re2::RE2 infer_regex_;
-  re2::RE2 status_regex_;
-  re2::RE2 modelcontrol_regex_;
-  re2::RE2 sharedmemorycontrol_regex_;
-  re2::RE2 repository_regex_;
 };
 
 TRTSERVER_Error*
-HTTPAPIServer::ResponseAlloc(
+KFServingHTTPAPIServer::ResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
     int64_t preferred_memory_type_id, void* userp, void** buffer,
@@ -353,7 +341,7 @@ HTTPAPIServer::ResponseAlloc(
 }
 
 TRTSERVER_Error*
-HTTPAPIServer::ResponseRelease(
+KFServingHTTPAPIServer::ResponseRelease(
     TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
     size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
 {
@@ -366,32 +354,27 @@ HTTPAPIServer::ResponseRelease(
 }
 
 void
-HTTPAPIServer::Handle(evhtp_request_t* req)
+KFServingHTTPAPIServer::Handle(evhtp_request_t* req)
 {
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
 
-  std::string endpoint, rest;
+  std::string model_name, rest;
   if (RE2::FullMatch(
-          std::string(req->uri->path->full), api_regex_, &endpoint, &rest)) {
+          std::string(req->uri->path->full), api_regex_, &model_name, &rest)) {
     // status
-    if (endpoint == "status") {
-      HandleStatus(req, rest);
+    if (rest == "/metadata") {
+      HandleStatus(req, model_name);
       return;
     }
     // health
-    if (endpoint == "health") {
-      HandleHealth(req, rest);
+    if ((rest == "") && (model_name != "metadata")) {
+      HandleHealth(req, model_name);
       return;
     }
     // infer
-    if (endpoint == "infer") {
-      HandleInfer(req, rest);
-      return;
-    }
-    // sharedmemorycontrol
-    if (endpoint == "sharedmemorycontrol") {
-      HandleSharedMemoryControl(req, rest);
+    if (rest == ":predict") {
+      HandleInfer(req, model_name);
       return;
     }
   }
@@ -402,32 +385,24 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
 }
 
 void
-HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& health_uri)
+KFServingHTTPAPIServer::HandleHealth(
+    evhtp_request_t* req, const std::string& model_name)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
   }
 
-  std::string mode;
-  if ((health_uri.empty()) ||
-      (!RE2::FullMatch(health_uri, health_regex_, &mode))) {
+  if (model_name.empty()) {
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
   }
 
   TRTSERVER_Error* err = nullptr;
   bool health = false;
-
-  if (mode == "live") {
-    err = TRTSERVER_ServerIsLive(server_.get(), &health);
-  } else if (mode == "ready") {
-    err = TRTSERVER_ServerIsReady(server_.get(), &health);
-  } else {
-    err = TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_UNKNOWN,
-        std::string("unknown health mode '" + mode + "'").c_str());
-  }
+  // ready mode
+  // TODO implement on model name level
+  err = TRTSERVER_ServerIsReady(server_.get(), &health);
 
   RequestStatus request_status;
   RequestStatusUtil::Create(
@@ -446,27 +421,22 @@ HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& health_uri)
 }
 
 void
-KFServingHTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
+KFServingHTTPAPIServer::HandleStatus(
+    evhtp_request_t* req, const std::string& model_name)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
   }
 
-  std::string model_name;
-  if (!status_uri.empty()) {
-    if (!RE2::FullMatch(status_uri, status_regex_, &model_name)) {
-      evhtp_send_reply(req, EVHTP_RES_BADREQ);
-      return;
-    }
+  if (model_name.empty()) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
   }
 
   TRTSERVER_Protobuf* server_status_protobuf = nullptr;
-  TRTSERVER_Error* err =
-      (model_name.empty())
-          ? TRTSERVER_ServerStatus(server_.get(), &server_status_protobuf)
-          : TRTSERVER_ServerModelStatus(
-                server_.get(), model_name.c_str(), &server_status_protobuf);
+  TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
+      server_.get(), model_name.c_str(), &server_status_protobuf);
   if (err == nullptr) {
     const char* status_buffer;
     size_t status_byte_size;
@@ -558,176 +528,6 @@ KFServingHTTPAPIServer::EVBufferToCudaHandle(
   return nullptr;  // success
 }
 #endif  // TRTIS_ENABLE_GPU
-
-void
-KFServingHTTPAPIServer::HandleSharedMemoryControl(
-    evhtp_request_t* req, const std::string& sharedmemorycontrol_uri)
-{
-  if (sharedmemorycontrol_uri == "/status") {
-    if (req->method != htp_method_GET) {
-      evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-      return;
-    }
-  } else {
-    if (req->method != htp_method_POST) {
-      evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-      return;
-    }
-  }
-
-  re2::RE2 register_regex_(R"(/([^/]+)/(/[^/]+)/([0-9]+)/([0-9]+))");
-  re2::RE2 cudaregister_regex_(R"(/([^/]+)/([0-9]+)/([0-9]+))");
-  re2::RE2 unregister_regex_(R"(/([^/]+))");
-
-  std::string action_type_str, remaining, name, shm_key;
-  std::string offset_str, byte_size_str, device_id_str;
-  if ((sharedmemorycontrol_uri.empty()) ||
-      (!RE2::FullMatch(
-          sharedmemorycontrol_uri, sharedmemorycontrol_regex_, &action_type_str,
-          &remaining))) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  } else {
-    if (remaining.empty()) {
-      if (action_type_str != "status") {
-        evhtp_send_reply(req, EVHTP_RES_BADREQ);
-        return;
-      }
-    } else {
-      if (action_type_str == "register" &&
-          (!RE2::FullMatch(
-              remaining, register_regex_, &name, &shm_key, &offset_str,
-              &byte_size_str))) {
-        evhtp_send_reply(req, EVHTP_RES_BADREQ);
-        return;
-      } else if (
-          action_type_str == "cudaregister" &&
-          (!RE2::FullMatch(
-              remaining, cudaregister_regex_, &name, &byte_size_str,
-              &device_id_str))) {
-        evhtp_send_reply(req, EVHTP_RES_BADREQ);
-        return;
-      } else if (action_type_str == "unregister") {
-        if ((remaining != "all") &&
-            (!RE2::FullMatch(remaining, unregister_regex_, &name))) {
-          evhtp_send_reply(req, EVHTP_RES_BADREQ);
-          return;
-        }
-      }
-    }
-  }
-
-  size_t offset = std::atoll(offset_str.c_str());
-  size_t byte_size = std::atoll(byte_size_str.c_str());
-
-  TRTSERVER_Error* err = nullptr;
-  TRTSERVER_SharedMemoryBlock* smb = nullptr;
-
-  if (action_type_str == "register") {
-    err = smb_manager_->CpuCreate(
-        &smb, name.c_str(), shm_key.c_str(), offset, byte_size);
-    if (err == nullptr) {
-      err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
-    }
-  } else if (action_type_str == "cudaregister") {
-#if TRTIS_ENABLE_GPU
-    int device_id = std::atoll(device_id_str.c_str());
-
-    // Get cuda ipc handle from raw bytes in http body
-    cudaIpcMemHandle_t* cuda_shm_handle;
-    err = EVBufferToCudaHandle(req->buffer_in, &cuda_shm_handle);
-    if (err == nullptr) {
-      err = smb_manager_->GpuCreate(
-          &smb, name.c_str(), cuda_shm_handle, byte_size, device_id);
-      if (err == nullptr) {
-        err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
-      }
-    }
-#else
-    err = TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "failed to register CUDA shared memory region: '" + name +
-            "', GPUs not supported")
-            .c_str());
-#endif  // TRTIS_ENABLE_GPU
-  } else if ((action_type_str == "unregister") && (remaining == "all")) {
-    err = smb_manager_->Clear();
-    if (err == nullptr) {
-      err = TRTSERVER_ServerUnregisterAllSharedMemory(server_.get());
-    }
-  } else if (action_type_str == "unregister") {
-    err = smb_manager_->Remove(&smb, name.c_str());
-    if ((err == nullptr) && (smb != nullptr)) {
-      err = TRTSERVER_ServerUnregisterSharedMemory(server_.get(), smb);
-      TRTSERVER_Error* del_err = TRTSERVER_SharedMemoryBlockDelete(smb);
-      if (del_err != nullptr) {
-        LOG_ERROR << "failed to delete shared memory block: "
-                  << TRTSERVER_ErrorMessage(del_err);
-      }
-    }
-  } else if (action_type_str == "status") {
-    TRTSERVER_Protobuf* shm_status_protobuf = nullptr;
-    TRTSERVER_Error* err =
-        TRTSERVER_ServerSharedMemoryStatus(server_.get(), &shm_status_protobuf);
-    if (err == nullptr) {
-      const char* status_buffer;
-      size_t status_byte_size;
-      err = TRTSERVER_ProtobufSerialize(
-          shm_status_protobuf, &status_buffer, &status_byte_size);
-      if (err == nullptr) {
-        std::string format;
-        const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
-        if (format_c_str != NULL) {
-          format = std::string(format_c_str);
-        } else {
-          format = "text";
-        }
-
-        if (format == "binary") {
-          evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
-          evhtp_headers_add_header(
-              req->headers_out,
-              evhtp_header_new(
-                  "Content-Type", "application/octet-stream", 1, 1));
-        } else {
-          SharedMemoryStatus shm_status;
-          if (!shm_status.ParseFromArray(status_buffer, status_byte_size)) {
-            err = TRTSERVER_ErrorNew(
-                TRTSERVER_ERROR_UNKNOWN,
-                "failed to parse shared memory status");
-          } else {
-            std::string shm_status_str = shm_status.DebugString();
-            evbuffer_add(
-                req->buffer_out, shm_status_str.c_str(), shm_status_str.size());
-          }
-        }
-      }
-    }
-    TRTSERVER_ProtobufDelete(shm_status_protobuf);
-  } else {
-    err = TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_UNKNOWN,
-        std::string("unknown action type '" + action_type_str + "'").c_str());
-  }
-
-  RequestStatus request_status;
-  RequestStatusUtil::Create(
-      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
-      server_id_);
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (request_status.code() == RequestStatusCode::SUCCESS)
-               ? EVHTP_RES_OK
-               : EVHTP_RES_BADREQ);
-
-  TRTSERVER_ErrorDelete(err);
-}
 
 TRTSERVER_Error*
 KFServingHTTPAPIServer::EVBufferToInput(
@@ -868,17 +668,17 @@ KFServingHTTPAPIServer::EVBufferToInput(
 }
 
 void
-KFServingHTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
+KFServingHTTPAPIServer::HandleInfer(
+    evhtp_request_t* req, const std::string& model_name)
 {
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
   }
 
-  std::string model_name, model_version_str;
-  if ((infer_uri.empty()) ||
-      (!RE2::FullMatch(
-          infer_uri, infer_regex_, &model_name, &model_version_str))) {
+  // Assume -1 for now
+  std::string model_version_str = "-1";
+  if (model_name.empty()) {
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
   }
@@ -1001,7 +801,7 @@ void
 KFServingHTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
   KFServingHTTPAPIServer::InferRequest* infer_request =
-      KFServingreinterpret_cast<HTTPAPIServer::InferRequest*>(arg);
+      reinterpret_cast<KFServingHTTPAPIServer::InferRequest*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_OK);
@@ -1025,7 +825,7 @@ void
 KFServingHTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
   KFServingHTTPAPIServer::InferRequest* infer_request =
-      KFServingreinterpret_cast<HTTPAPIServer::InferRequest*>(arg);
+      reinterpret_cast<KFServingHTTPAPIServer::InferRequest*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_BADREQ);
@@ -1062,7 +862,7 @@ KFServingHTTPAPIServer::InferRequest::InferComplete(
     TRTSERVER_InferenceResponse* response, void* userp)
 {
   KFServingHTTPAPIServer::InferRequest* infer_request =
-      KFServingreinterpret_cast<HTTPAPIServer::InferRequest*>(userp);
+      reinterpret_cast<KFServingHTTPAPIServer::InferRequest*>(userp);
   if (infer_request->FinalizeResponse(response) == EVHTP_RES_OK) {
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
@@ -1159,37 +959,15 @@ TRTSERVER_Error*
 KFServingHTTPServer::CreateAPIServer(
     const std::shared_ptr<TRTSERVER_Server>& server,
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
-    const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
-    int32_t port_, int thread_cnt,
-    std::vector<std::unique_ptr<KFServingHTTPServer>>* kfserving_http_servers)
+    const std::shared_ptr<SharedMemoryBlockManager>& smb_manager, int32_t port_,
+    int thread_cnt, std::unique_ptr<KFServingHTTPServer>* kfserving_http_server)
 {
-  kfserving_http_servers->clear();
   std::string addr = "0.0.0.0:" + std::to_string(port_);
-  LOG_INFO << "Starting HTTPService at " << addr;
-  kfserving_http_servers->emplace_back(new KFServingHTTPAPIServer(
-      server, trace_manager, smb_manager, port_,
-      thread_cnt));
+  LOG_INFO << "Starting KFServingHTTPService at " << addr;
+  kfserving_http_server->reset(new KFServingHTTPAPIServer(
+      server, trace_manager, smb_manager, port_, thread_cnt));
 
   return nullptr;
-}
-
-TRTSERVER_Error*
-KFServingHTTPServer::CreateMetricsServer(
-    const std::shared_ptr<TRTSERVER_Server>& server, const int32_t port,
-    const int thread_cnt, std::unique_ptr<KFServingHTTPServer>* metrics_server)
-{
-  std::string addr = "0.0.0.0:" + std::to_string(port);
-  LOG_INFO << "Starting Metrics Service at " << addr;
-
-#ifndef TRTIS_ENABLE_METRICS
-  return TRTSERVER_ErrorNew(
-      TRTSERVER_ERROR_UNAVAILABLE, "Metrics support is disabled");
-#endif  // !TRTIS_ENABLE_METRICS
-
-#ifdef TRTIS_ENABLE_METRICS
-  metrics_server->reset(new HTTPMetricsServer(server, port, thread_cnt));
-  return nullptr;
-#endif  // TRTIS_ENABLE_METRICS
 }
 
 }}  // namespace nvidia::inferenceserver
