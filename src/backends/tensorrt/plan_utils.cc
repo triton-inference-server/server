@@ -197,7 +197,8 @@ CompareDimsSupported(
 Status
 MaximumDims(
     const nvinfer1::Dims& max_profile_dims, const DimsList& dims,
-    std::vector<int64_t>* max_dims, const bool support_batching)
+    const bool support_batching, const int max_batch_size,
+    std::vector<int64_t>* max_dims)
 {
   const int nonbatch_start_idx = (support_batching ? 1 : 0);
   if (max_profile_dims.nbDims != (dims.size() + nonbatch_start_idx)) {
@@ -208,7 +209,7 @@ MaximumDims(
   }
 
   if (support_batching) {
-    max_dims->emplace_back(max_profile_dims.d[0]);
+    max_dims->emplace_back(max_batch_size);
   }
 
   for (int i = 0; i < dims.size(); ++i) {
