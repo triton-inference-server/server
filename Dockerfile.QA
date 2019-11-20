@@ -156,6 +156,8 @@ RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_pinned_memory/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_io/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_warmup/. && \
     mkdir -p qa/L0_infer_shm && \
     cp -r qa/L0_infer/. qa/L0_infer_shm && \
     mkdir -p qa/L0_infer_cudashm && \
