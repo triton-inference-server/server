@@ -80,8 +80,9 @@ Status ValidateControlDimsDynamic(
     const nvinfer1::Dims& dims, const bool support_batching);
 
 Status MaximumDims(
-    const nvinfer1::Dims& max_dims, const DimsList& dims,
-    std::vector<int64_t>* normalized_dims, const bool support_batching);
+    const nvinfer1::Dims& max_profile_dims, const DimsList& dims,
+    const bool support_batching, const int max_batch_size,
+    std::vector<int64_t>* maximum_dims);
 
 void DimsToDimVec(const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims);
 
