@@ -116,6 +116,55 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
 endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 
 #
+# kfserving http endpoint
+#
+set(KFSERVING_HTTP_ENDPOINT_OBJECTS "")
+set(KFSERVING_HTTP_ENDPOINT_LIBRARIES "")
+
+if(${TRTIS_ENABLE_KFSERVING})
+  find_package(libevhtp CONFIG REQUIRED)
+  message(STATUS "Using libevhtp ${libevhtp_VERSION}")
+
+  set(
+    KFSERVING_HTTP_ENDPOINT_SRCS
+    kfserving_http_server.cc
+  )
+
+  set(
+    KFSERVING_HTTP_ENDPOINT_HDRS
+    kfserving_http_server.h
+  )
+
+  add_library(
+    kfserving-http-endpoint-library EXCLUDE_FROM_ALL OBJECT
+    ${KFSERVING_HTTP_ENDPOINT_SRCS} ${KFSERVING_HTTP_ENDPOINT_HDRS}
+  )
+
+  if(${TRTIS_ENABLE_GPU})
+    target_include_directories(kfserving-http-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
+  endif() # TRTIS_ENABLE_GPU
+
+  add_dependencies(kfserving-http-endpoint-library proto-library)
+  target_include_directories(
+    kfserving-http-endpoint-library
+    PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
+  )
+
+  set(
+    KFSERVING_HTTP_ENDPOINT_OBJECTS
+    $<TARGET_OBJECTS:kfserving-http-endpoint-library>
+    $<TARGET_OBJECTS:proto-library>
+  )
+  set(
+    KFSERVING_HTTP_ENDPOINT_LIBRARIES
+    PRIVATE ${LIBEVENT_LIBRARIES}
+    PRIVATE libevhtp::evhtp
+    PRIVATE protobuf::libprotobuf
+    PRIVATE -lre2
+  )
+endif() # TRTIS_ENABLE_KFSERVING
+
+#
 # tracing
 #
 set(TRACING_OBJECTS "")

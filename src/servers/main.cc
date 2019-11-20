@@ -56,6 +56,10 @@ static_assert(
 #include "src/servers/grpc_server.h"
 #endif  // TRTIS_ENABLE_GRPC
 
+#ifdef TRTIS_ENABLE_KFSERVING
+#include "src/servers/kfserving_http_server.h"
+#endif  // TRTIS_ENABLE_KFSERVING
+
 namespace {
 
 // Exit mutex and cv used to signal the main thread that it should
@@ -92,6 +96,16 @@ bool allow_grpc_ = true;
 int32_t grpc_port_ = 8001;
 #endif  // TRTIS_ENABLE_GRPC
 
+#ifdef TRTIS_ENABLE_KFSERVING
+std::vector<std::unique_ptr<nvidia::inferenceserver::KFServingHTTPServer>>
+    kfserving_http_services_;
+bool allow_kfserving_http_ = true;
+int32_t kfserving_http_port_ = 8003;
+int32_t kfserving_http_health_port_ = -1;
+std::vector<int32_t> kfserving_http_ports_;
+// std::vector<std::string> endpoint_names = {"status",    "health", "infer"};
+#endif  // TRTIS_ENABLE_KFSERVING
+
 #ifdef TRTIS_ENABLE_METRICS
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
 bool allow_metrics_ = true;
@@ -125,6 +139,11 @@ int grpc_infer_allocation_pool_size_ = 0;
 int http_thread_cnt_ = 8;
 #endif  // TRTIS_ENABLE_HTTP
 
+#ifdef TRTIS_ENABLE_KFSERVING
+// The number of threads to initialize for the KFServing HTTP front-end.
+int kfserving_http_thread_cnt_ = 8;
+#endif  // TRTIS_ENABLE_KFSERVING
+
 // Command-line options
 enum OptionId {
   OPTION_HELP = 1000,
@@ -150,6 +169,11 @@ enum OptionId {
   OPTION_GRPC_STREAM_INFER_THREAD_COUNT,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
 #endif  // TRTIS_ENABLE_GRPC
+#ifdef TRTIS_ENABLE_KFSERVING
+  OPTION_ALLOW_KFSERVING,
+  OPTION_KFSERVING_PORT,
+  OPTION_KFSERVING_THREAD_COUNT,
+#endif  // TRTIS_ENABLE_KFSERVING
 #ifdef TRTIS_ENABLE_METRICS
   OPTION_ALLOW_METRICS,
   OPTION_ALLOW_GPU_METRICS,
@@ -234,6 +258,14 @@ std::vector<Option> options_{
     {OPTION_HTTP_THREAD_COUNT, "http-thread-count",
      "Number of threads handling HTTP requests."},
 #endif  // TRTIS_ENABLE_HTTP
+#ifdef TRTIS_ENABLE_KFSERVING
+    {OPTION_ALLOW_KFSERVING, "allow-kfserving",
+     "Allow the server to listen for KFServing HTTP requests."},
+    {OPTION_KFSERVING_PORT, "kfserving-port",
+     "The port for the server to listen on for KFServing HTTP requests."},
+    {OPTION_KFSERVING_THREAD_COUNT, "kfserving-thread-count",
+     "Number of threads handling HTTP requests."},
+#endif  // TRTIS_ENABLE_KFSERVING
 #ifdef TRTIS_ENABLE_GRPC
     {OPTION_ALLOW_GRPC, "allow-grpc",
      "Allow the server to listen for GRPC requests."},
@@ -356,6 +388,27 @@ CheckPortCollision()
   }
 #endif  // TRTIS_ENABLE_HTTP && TRTIS_ENABLE_GRPC
 
+# if defined(TRTIS_ENABLE_HTTP) && defined(TRTIS_ENABLE_KFSERVING)
+  // Check if HTTP and KFServing have shared ports
+  if ((std::find(http_ports_.begin(), http_ports_.end(), kfserving_http_port_) !=
+       http_ports_.end()) &&
+      (kfserving_http_port_ != -1) && allow_http_ && allow_kfserving_http_) {
+    LOG_ERROR << "The server cannot listen to HTTP requests "
+              << "and KFServing requests at the same port";
+    return true;
+  }
+#endif  // TRTIS_ENABLE_HTTP && TRTIS_ENABLE_KFSERVING
+
+# if defined(TRTIS_ENABLE_KFSERVING) && defined(TRTIS_ENABLE_GRPC)
+  // Check if KFServing and GRPC have shared ports
+  if ((grpc_port_ == kfserving_http_port_) && (grpc_port_ != -1) && allow_grpc_ &&
+      allow_kfserving_http_) {
+    LOG_ERROR << "The server cannot listen to GRPC requests "
+              << "and KFServing requests at the same port";
+    return true;
+  }
+#endif  // TRTIS_ENABLE_KFSERVING && TRTIS_ENABLE_GRPC
+
 #if defined(TRTIS_ENABLE_GRPC) && defined(TRTIS_ENABLE_METRICS)
   // Check if Metric and GRPC have shared ports
   if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1) && allow_grpc_ &&
@@ -436,6 +489,29 @@ StartHttpService(
 }
 #endif  // TRTIS_ENABLE_HTTP
 
+#ifdef TRTIS_ENABLE_KFSERVING
+TRTSERVER_Error*
+StartKFServingHttpService(
+    std::unique_ptr<nvidia::inferenceserver::KFServingHTTPServer>* service,
+    const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
+    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>&
+        smb_manager)
+{
+  TRTSERVER_Error* err = nvidia::inferenceserver::KFServingHTTPServer::CreateAPIServer(
+      server, trace_manager, smb_manager, kfserving_http_port_, kfserving_http_thread_cnt_, services);
+  if (err == nullptr) {
+    err = (*service)->Start();
+  }
+
+  if (err != nullptr) {
+    service->reset();
+  }
+
+  return err;
+}
+#endif  // TRTIS_ENABLE_KFSERVING
+
 #ifdef TRTIS_ENABLE_METRICS
 TRTSERVER_Error*
 StartMetricsService(
@@ -505,6 +581,20 @@ StartEndpoints(
     }
   }
 #endif  // TRTIS_ENABLE_HTTP
+
+#ifdef TRTIS_ENABLE_KFSERVING
+  // Enable KFServing HTTP endpoints if requested...
+  if (allow_kfserving_http_  && (kfserving_http_port_ != -1)) {
+    TRTSERVER_Error* err = StartKFServingHttpService(
+        &kfserving_http_services_, server, trace_manager, smb_manager);
+    if (err != nullptr) {
+      LOG_ERROR << "Failed to start KFServing HTTP service: "
+                << TRTSERVER_ErrorMessage(err);
+      TRTSERVER_ErrorDelete(err);
+      return false;
+    }
+  }
+#endif  // TRTIS_ENABLE_KFSERVING
 
 #ifdef TRTIS_ENABLE_METRICS
   // Enable metrics endpoint if requested...
