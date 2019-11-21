@@ -1778,6 +1778,9 @@ ModelRepositoryManager::VersionsToLoad(
   RETURN_IF_ERROR(GetDirectorySubdirs(model_path, &subdirs));
   std::set<int64_t, std::greater<int64_t>> existing_versions;
   for (const auto& subdir : subdirs) {
+    if (subdir == kWarmupDataFolder) {
+      continue;
+    }
     if ((subdir.length() > 1) && (subdir.front() == '0')) {
       LOG_WARNING << "ignore version directory '" << subdir
                   << "' which contains leading zeros in its directory name";
