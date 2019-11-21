@@ -187,7 +187,7 @@ for model_trial in v 0 1 2 4; do
     # Tests that require TRTSERVER_DELAY_SCHEDULER so that the
     # scheduler is delayed and requests can collect in the queue.
     for i in \
-        test_backlog_fill \
+            test_backlog_fill \
             test_backlog_fill_no_end \
             test_backlog_same_correlation_id \
             test_backlog_same_correlation_id_no_end \
