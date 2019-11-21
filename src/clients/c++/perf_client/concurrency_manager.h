@@ -44,7 +44,7 @@
 ///
 class ConcurrencyManager : public LoadManager {
  public:
-  ~ConcurrencyManager() = default;
+  ~ConcurrencyManager();
 
   /// Create a concurrency manager that is responsible to maintain specified
   /// load on inference server.

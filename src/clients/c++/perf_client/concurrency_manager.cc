@@ -26,6 +26,25 @@
 
 #include "src/clients/c++/perf_client/concurrency_manager.h"
 
+ConcurrencyManager::~ConcurrencyManager()
+{
+  early_exit = true;
+  // wake up all threads
+  wake_signal_.notify_all();
+
+  size_t cnt = 0;
+  for (auto& thread : threads_) {
+    thread.join();
+    if (!threads_stat_[cnt]->status_.IsOk()) {
+      std::cerr << "Thread [" << cnt
+                << "] had error: " << (threads_stat_[cnt]->status_)
+                << std::endl;
+    }
+    cnt++;
+  }
+}
+
+
 nic::Error
 ConcurrencyManager::Create(
     const bool async, const int32_t batch_size, const size_t max_threads,

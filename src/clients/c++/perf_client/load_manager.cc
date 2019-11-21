@@ -81,21 +81,6 @@ SerializeStringTensor(
 
 LoadManager::~LoadManager()
 {
-  early_exit = true;
-  // wake up all threads
-  wake_signal_.notify_all();
-
-  size_t cnt = 0;
-  for (auto& thread : threads_) {
-    thread.join();
-    if (!threads_stat_[cnt]->status_.IsOk()) {
-      std::cerr << "Thread [" << cnt
-                << "] had error: " << (threads_stat_[cnt]->status_)
-                << std::endl;
-    }
-    cnt++;
-  }
-
   nic::Error err;
   if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
     err = shared_memory_ctx_->UnregisterAllSharedMemory();
@@ -274,7 +259,8 @@ LoadManager::InitManagerInputs(
             "input '" + input->Name() +
                 "' has variable-size shape and the shape to be used is "
                 "not specified, unable to create input values for "
-                "model '" + ctx->ModelName() + "'");
+                "model '" +
+                ctx->ModelName() + "'");
       }
     }
 
@@ -604,6 +590,12 @@ LoadManager::PrepareSharedMemoryInfer(
   for (const auto& input : (*ctx)->Inputs()) {
     RETURN_IF_ERROR(
         input->SetSharedMemory(input->Name(), 0, io_shm_size_[input->Name()]));
+    if (input->Shape().empty()) {
+      auto it = input_shapes_.find(input->Name());
+      if (it != input_shapes_.end()) {
+        input->SetShape(it->second);
+      }
+    }
   }
 
   return nic::Error::Success;

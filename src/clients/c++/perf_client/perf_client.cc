@@ -244,7 +244,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-b <batch size>" << std::endl;
   std::cerr << "\t--input-data <\"zero\"|\"random\"|<path>>" << std::endl;
   std::cerr << "\t--shared-memory <\"system\"|\"cuda\"|\"none\">" << std::endl;
-  std::cerr << "\t--output-shm-size" << std::endl;
+  std::cerr << "\t--output-shm-size <size in bytes>" << std::endl;
   std::cerr << "\t--shape <name:shape>" << std::endl;
   std::cerr << "\t--sequence-length <length>" << std::endl;
   std::cerr << "\t--string-length <length>" << std::endl;
@@ -459,9 +459,13 @@ Usage(char** argv, const std::string& msg = std::string())
 
   std::cerr
       << FormatMessage(
-             " --output-shm-size: Sets the size of shared memory to allocate "
-             "for output tensors. This value should be large enough to hold "
-             "the output from the model. Default size is 100KB.",
+             " --output-shm-size: Is used to compute the size of shared "
+             "memory to allocate for output tensors when output tensors "
+             "are string type or variable. This value should be large "
+             "enough to hold largest of the output tensors. The client "
+             "will use this value, alongwith batchsize and total number "
+             "of model outputs to find the total shared memory to allocate "
+             "for the current execution. Default size is 100KB.",
              18)
       << std::endl;
 

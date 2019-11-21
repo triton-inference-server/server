@@ -53,7 +53,7 @@
 ///
 class RequestRateManager : public LoadManager {
  public:
-  ~RequestRateManager() = default;
+  ~RequestRateManager();
 
   /// Create an object of realistic load manager that is responsible to maintain
   /// specified load on inference server.
