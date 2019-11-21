@@ -51,12 +51,15 @@ rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
 
+# Test for fixed-size data type
 # Use the addsub models as example.
 rm -fr models && \
     mkdir models && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_float16_float16_float16 models/. && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/graphdef_sequence_float32 models/.
 
+# random / zero data
+#
 # Provide warmup instruction (batch size 1) in model config
 (cd models/graphdef_float16_float16_float16 && \
     echo 'model_warmup [{' >> config.pbtxt && \
@@ -80,6 +83,8 @@ rm -fr models && \
     echo '    }' >> config.pbtxt && \
     echo '}]' >> config.pbtxt )
 
+# zero data
+#
 # Instruction for sequence model (batch size 8), need to specify control tensor
 (cd models/graphdef_sequence_float32 && \
     echo 'model_warmup [{' >> config.pbtxt && \
@@ -136,6 +141,8 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# user provided data
+#
 # Show effect of warmup by using a TF model with TF-TRT optimization which is
 # known to be slow on first inference.
 # Note: model can be obatined via the fetching script in docs/example
@@ -181,7 +188,7 @@ set +e
 
 grep "is running warmup sample 'image sample'" $SERVER_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected warmup for stateless model\n***"
+    echo -e "\n***\n*** Failed. Expected warmup for image model\n***"
     RET=1
 fi
 
@@ -203,6 +210,125 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# Test for variable-size data type (string)
+# Use the addsub model for user-provided example
+rm -fr models && \
+    mkdir models && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/graphdef_sequence_object models/.
+
+# Use the identity model for zero and random data to avoid assumption on string
+# value (i.e. addsub assumes inputs are integer string)
+cp -r ../custom_models/custom_zero_1_float32 models/custom_zero_1_object && \
+    mkdir -p models/custom_zero_1_object/1 && \
+    cp `pwd`/libidentity.so models/custom_zero_1_object/1/. && \
+    (cd models/custom_zero_1_object && \
+            echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
+            echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt && \
+            sed -i "s/custom_zero_1_float32/custom_zero_1_object/" config.pbtxt && \
+            sed -i "s/max_batch_size: 1/max_batch_size: 8/" config.pbtxt && \
+            sed -i "s/TYPE_FP32/TYPE_STRING/" config.pbtxt && \
+            sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt)
+
+# random and zero data (two samples)
+#
+# Provide warmup instruction (batch size 1) in model config
+(cd models/custom_zero_1_object && \
+    echo 'model_warmup [' >> config.pbtxt && \
+    echo '{' >> config.pbtxt && \
+    echo '    name : "zero string stateless"' >> config.pbtxt && \
+    echo '    batch_size: 1' >> config.pbtxt && \
+    echo '    inputs {' >> config.pbtxt && \
+    echo '        key: "INPUT0"' >> config.pbtxt && \
+    echo '        value: {' >> config.pbtxt && \
+    echo '            data_type: TYPE_STRING' >> config.pbtxt && \
+    echo '            dims: 16' >> config.pbtxt && \
+    echo '            zero_data: true' >> config.pbtxt && \
+    echo '        }' >> config.pbtxt && \
+    echo '    }' >> config.pbtxt && \
+    echo '},' >> config.pbtxt && \
+    echo '{' >> config.pbtxt && \
+    echo '    name : "random string stateless"' >> config.pbtxt && \
+    echo '    batch_size: 1' >> config.pbtxt && \
+    echo '    inputs {' >> config.pbtxt && \
+    echo '        key: "INPUT0"' >> config.pbtxt && \
+    echo '        value: {' >> config.pbtxt && \
+    echo '            data_type: TYPE_STRING' >> config.pbtxt && \
+    echo '            dims: 16' >> config.pbtxt && \
+    echo '            random_data: true' >> config.pbtxt && \
+    echo '        }' >> config.pbtxt && \
+    echo '    }' >> config.pbtxt && \
+    echo '}' >> config.pbtxt && \
+    echo ']' >> config.pbtxt )
+
+# user provided data
+#
+# Instruction for sequence model (batch size 8), need to specify control tensor
+(cd models/graphdef_sequence_object && \
+    echo 'model_warmup [{' >> config.pbtxt && \
+    echo '    name : "string statefull"' >> config.pbtxt && \
+    echo '    batch_size: 8' >> config.pbtxt && \
+    echo '    inputs {' >> config.pbtxt && \
+    echo '        key: "INPUT"' >> config.pbtxt && \
+    echo '        value: {' >> config.pbtxt && \
+    echo '            data_type: TYPE_STRING' >> config.pbtxt && \
+    echo '            dims: 1' >> config.pbtxt && \
+    echo '            input_data_file: "raw_string_data"' >> config.pbtxt && \
+    echo '        }' >> config.pbtxt && \
+    echo '    }' >> config.pbtxt && \
+    echo '    inputs {' >> config.pbtxt && \
+    echo '        key: "START"' >> config.pbtxt && \
+    echo '        value: {' >> config.pbtxt && \
+    echo '            data_type: TYPE_INT32' >> config.pbtxt && \
+    echo '            dims: 1' >> config.pbtxt && \
+    echo '            zero_data: true' >> config.pbtxt && \
+    echo '        }' >> config.pbtxt && \
+    echo '    }' >> config.pbtxt && \
+    echo '    inputs {' >> config.pbtxt && \
+    echo '        key: "READY"' >> config.pbtxt && \
+    echo '        value: {' >> config.pbtxt && \
+    echo '            data_type: TYPE_INT32' >> config.pbtxt && \
+    echo '            dims: 1' >> config.pbtxt && \
+    echo '            zero_data: true' >> config.pbtxt && \
+    echo '        }' >> config.pbtxt && \
+    echo '    }' >> config.pbtxt && \
+    echo '}]' >> config.pbtxt )
+
+# Prepare string data (one element that is "233")
+mkdir -p models/graphdef_sequence_object/warmup && \
+    (cd models/graphdef_sequence_object/warmup && \
+            echo -n -e '\x00\x00\x00\x03\x32\x33\x33' > raw_string_data)
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+grep "is running warmup sample 'zero string stateless'" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected warmup for zero string stateless model\n***"
+    RET=1
+fi
+grep "is running warmup sample 'random string stateless'" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected warmup for random string stateless model\n***"
+    RET=1
+fi
+grep "is running warmup sample 'string statefull'" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected warmup for string stateful model\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
