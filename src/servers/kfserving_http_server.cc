@@ -114,7 +114,7 @@ KFServingHTTPServerImpl::Stop()
   }
 
   return TRTSERVER_ErrorNew(
-      TRTSERVER_ERROR_UNAVAILABLE, "HTTP server is not running.");
+      TRTSERVER_ERROR_UNAVAILABLE, "KFServing HTTP server is not running.");
 }
 
 void
@@ -173,12 +173,12 @@ class KFServingHTTPAPIServer : public KFServingHTTPServerImpl {
   // Class object associated to evhtp thread, requests received are bounded
   // with the thread that accepts it. Need to keep track of that and let the
   // corresponding thread send back the reply
-  class InferRequest {
+  class InferRequestClass {
    public:
-    InferRequest(
+    InferRequestClass(
         evhtp_request_t* req, uint64_t request_id, const char* server_id,
         uint64_t unique_id);
-    ~InferRequest() = default;
+    ~InferRequestClass() = default;
 
     evhtp_request_t* EvHtpRequest() const { return req_; }
 
@@ -214,15 +214,15 @@ class KFServingHTTPAPIServer : public KFServingHTTPServerImpl {
       int64_t memory_type_id);
 
   void Handle(evhtp_request_t* req) override;
-  void HandleHealth(evhtp_request_t* req, const std::string& health_uri);
-  void HandleInfer(evhtp_request_t* req, const std::string& infer_uri);
-  void HandleStatus(evhtp_request_t* req, const std::string& status_uri);
+  void HandleHealth(evhtp_request_t* req, const std::string& model_name);
+  void HandleInfer(evhtp_request_t* req, const std::string& model_name);
+  void HandleStatus(evhtp_request_t* req, const std::string& model_name);
 
 #if TRTIS_ENABLE_GPU
   TRTSERVER_Error* EVBufferToCudaHandle(
       evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle);
 #endif  // TRTIS_ENABLE_GPU
-  TRTSERVER_Error* Base64BufferToInput(
+  TRTSERVER_Error* EVBufferToInput(
       const std::string& model_name, const InferRequestHeader& request_header,
       evbuffer* input_buffer,
       TRTSERVER_InferenceRequestProvider* request_provider,
@@ -290,7 +290,7 @@ KFServingHTTPAPIServer::ResponseAlloc(
       // Can't allocate for any memory type other than CPU.
       if (preferred_memory_type != TRTSERVER_MEMORY_CPU) {
         LOG_VERBOSE(1)
-            << "HTTP: unable to provide '" << tensor_name
+            << "KFServing HTTP: unable to provide '" << tensor_name
             << "' in TRTSERVER_MEMORY_GPU, will use type TRTSERVER_MEMORY_CPU";
         *actual_memory_type = TRTSERVER_MEMORY_CPU;
         *actual_memory_type_id = 0;
@@ -334,7 +334,7 @@ KFServingHTTPAPIServer::ResponseAlloc(
     }
   }
 
-  LOG_VERBOSE(1) << "HTTP allocation: '" << tensor_name
+  LOG_VERBOSE(1) << "KFServing HTTP allocation: '" << tensor_name
                  << "', size: " << byte_size << ", addr: " << *buffer;
 
   return nullptr;  // Success
@@ -345,7 +345,7 @@ KFServingHTTPAPIServer::ResponseRelease(
     TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
     size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
 {
-  LOG_VERBOSE(1) << "HTTP release: "
+  LOG_VERBOSE(1) << "KFServing HTTP release: "
                  << "size " << byte_size << ", addr " << buffer;
 
   // Don't do anything when releasing a buffer since ResponseAlloc
@@ -356,12 +356,15 @@ KFServingHTTPAPIServer::ResponseRelease(
 void
 KFServingHTTPAPIServer::Handle(evhtp_request_t* req)
 {
-  LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
+  LOG_VERBOSE(1) << "KFServing HTTP request: " << req->method << " "
                  << req->uri->path->full;
 
   std::string model_name, rest;
   if (RE2::FullMatch(
           std::string(req->uri->path->full), api_regex_, &model_name, &rest)) {
+    // TODO Try to verify that model name is valid
+    LOG_VERBOSE(1) << "model_name: " << model_name << ", rest: " << rest;
+
     // status
     if (rest == "/metadata") {
       HandleStatus(req, model_name);
@@ -379,8 +382,9 @@ KFServingHTTPAPIServer::Handle(evhtp_request_t* req)
     }
   }
 
-  LOG_VERBOSE(1) << "HTTP error: " << req->method << " " << req->uri->path->full
-                 << " - " << static_cast<int>(EVHTP_RES_BADREQ);
+  LOG_VERBOSE(1) << "KFServing HTTP error: " << req->method << " "
+                 << req->uri->path->full << " - "
+                 << static_cast<int>(EVHTP_RES_BADREQ);
   evhtp_send_reply(req, EVHTP_RES_BADREQ);
 }
 
@@ -492,45 +496,8 @@ KFServingHTTPAPIServer::HandleStatus(
   TRTSERVER_ErrorDelete(err);
 }
 
-#if TRTIS_ENABLE_GPU
 TRTSERVER_Error*
-KFServingHTTPAPIServer::EVBufferToCudaHandle(
-    evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle)
-{
-  // Extract serialzied cuda IPC handle from HTTP body and store in
-  // 'cuda_shm_handle'.
-  struct evbuffer_iovec* v = nullptr;
-  *cuda_shm_handle = nullptr;
-  size_t byte_size = sizeof(cudaIpcMemHandle_t);
-
-  int n = evbuffer_peek(handle_buffer, -1, NULL, NULL, 0);
-  if (n > 0) {
-    v = static_cast<struct evbuffer_iovec*>(
-        alloca(sizeof(struct evbuffer_iovec) * n));
-    if (evbuffer_peek(handle_buffer, -1, NULL, v, n) != n) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INTERNAL, "unexpected error getting input buffers ");
-    }
-  }
-
-  if (byte_size != v[0].iov_len) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "unexpected size for CUDA shared-memory handle, expecting " +
-            std::to_string(byte_size) + " bytes")
-            .c_str());
-  }
-
-  // Deserialize the cuda IPC handle
-  *cuda_shm_handle = reinterpret_cast<cudaIpcMemHandle_t*>(v[0].iov_base);
-
-  return nullptr;  // success
-}
-#endif  // TRTIS_ENABLE_GPU
-
-TRTSERVER_Error*
-KFServingHTTPAPIServer::Base64BufferToInput(
+KFServingHTTPAPIServer::EVBufferToInput(
     const std::string& model_name, const InferRequestHeader& request_header,
     evbuffer* input_buffer,
     TRTSERVER_InferenceRequestProvider* request_provider,
@@ -539,33 +506,24 @@ KFServingHTTPAPIServer::Base64BufferToInput(
         std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
         output_shm_map)
 {
-  // Extract individual input data from HTTP body and register in
-  // 'request_provider'. The input data from HTTP body is not
-  // necessarily contiguous so may need to register multiple input
-  // "blocks" for a given input.
-  //
-  // Get the addr and size of each chunk of input data from the
-  // evbuffer.
-  struct evbuffer_iovec* v = nullptr;
-  int v_idx = 0;
+  // Extract input data from HTTP body and register in
+  // 'request_provider'.
+  size_t buffer_length = evbuffer_get_length(input_buffer);
+  char* request_buffer = (char*)malloc(sizeof(char) * buffer_length);
+  memset(request_buffer, 0, buffer_length);
+  evbuffer_copyout(input_buffer, request_buffer, buffer_length);
 
-  int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
-  if (n > 0) {
-    v = static_cast<struct evbuffer_iovec*>(
-        alloca(sizeof(struct evbuffer_iovec) * n));
-    if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INTERNAL, "unexpected error getting input buffers ");
-    }
-  }
-  // Use FromBase64 to convert a Base64 encoded string to ByteString
-  // TODO encode serialized string in base64 (on Client side)
-  // std::string base_decoded = base64_decode(std::string(base, base_size));
-  // InferRequest infer_request;
-  // infer_request.ParseFromString(base_decoded);
+  // TODO MessageToJsonString to convert message to string (bytes encoded in
+  // Base64) on Client side)
+  // Use JsonStringToMessage to convert a json string (bytes encoded in Base64)
+  // to message
+  InferRequest request;
+  ::google::protobuf::util::JsonStringToMessage(
+      std::string(request_buffer, buffer_length), &request);
 
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
+  size_t idx = 0;
   for (const auto& io : request_header.input()) {
     uint64_t byte_size = 0;
     RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
@@ -607,44 +565,26 @@ KFServingHTTPAPIServer::Base64BufferToInput(
             request_provider, io.name().c_str(), base, byte_size, memory_type,
             memory_type_id));
       } else {
-        while ((byte_size > 0) && (v_idx < n)) {
-          char* base = static_cast<char*>(v[v_idx].iov_base);
-          size_t base_size;
-          if (v[v_idx].iov_len > byte_size) {
-            base_size = byte_size;
-            v[v_idx].iov_base = static_cast<void*>(base + byte_size);
-            v[v_idx].iov_len -= byte_size;
-            byte_size = 0;
-          } else {
-            base_size = v[v_idx].iov_len;
-            byte_size -= v[v_idx].iov_len;
-            v_idx++;
-          }
+        const std::string& raw = request.raw_input(idx++);
+        const void* base = raw.c_str();
+        size_t request_byte_size = raw.size();
 
-          RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-              request_provider, io.name().c_str(), base, base_size,
-              TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
-        }
-
-        if (byte_size != 0) {
+        if (byte_size != request_byte_size) {
           return TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_INVALID_ARG,
               std::string(
-                  "unexpected size for input '" + io.name() + "', expecting " +
-                  std::to_string(byte_size) + " bytes for model '" +
-                  model_name + "'")
+                  "unexpected size " + std::to_string(request_byte_size) +
+                  " for input '" + io.name() + "', expecting " +
+                  std::to_string(byte_size) + " for model '" +
+                  request.model_name() + "'")
                   .c_str());
         }
+
+        RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
+            request_provider, io.name().c_str(), base, byte_size,
+            TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
       }
     }
-  }
-
-  if (v_idx != n) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "unexpected additional input data for model '" + model_name + "'")
-            .c_str());
   }
 
   // Initialize System Memory for Output if it uses shared memory
@@ -737,12 +677,12 @@ KFServingHTTPAPIServer::HandleInfer(
       request_header_serialized.c_str(), request_header_serialized.size());
   if (err == nullptr) {
     EVBufferPair* response_pair(new EVBufferPair());
-    err = Base64BufferToInput(
+    err = EVBufferToInput(
         model_name, request_header, req->buffer_in, request_provider,
         response_pair->second);
     if (err == nullptr) {
-      InferRequest* infer_request =
-          new InferRequest(req, request_header.id(), server_id_, unique_id);
+      InferRequestClass* infer_request = new InferRequestClass(
+          req, request_header.id(), server_id_, unique_id);
 
       response_pair->first = req->buffer_out;
       infer_request->response_pair_.reset(response_pair);
@@ -759,7 +699,8 @@ KFServingHTTPAPIServer::HandleInfer(
 
       err = TRTSERVER_ServerInferAsync(
           server_.get(), trace, request_provider, allocator_,
-          reinterpret_cast<void*>(response_pair), InferRequest::InferComplete,
+          reinterpret_cast<void*>(response_pair),
+          InferRequestClass::InferComplete,
           reinterpret_cast<void*>(infer_request));
       if (err != nullptr) {
         delete infer_request;
@@ -805,8 +746,8 @@ KFServingHTTPAPIServer::HandleInfer(
 void
 KFServingHTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
-  KFServingHTTPAPIServer::InferRequest* infer_request =
-      reinterpret_cast<KFServingHTTPAPIServer::InferRequest*>(arg);
+  KFServingHTTPAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<KFServingHTTPAPIServer::InferRequestClass*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_OK);
@@ -829,8 +770,8 @@ KFServingHTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 void
 KFServingHTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
-  KFServingHTTPAPIServer::InferRequest* infer_request =
-      reinterpret_cast<KFServingHTTPAPIServer::InferRequest*>(arg);
+  KFServingHTTPAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<KFServingHTTPAPIServer::InferRequestClass*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_BADREQ);
@@ -850,7 +791,7 @@ KFServingHTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   delete infer_request;
 }
 
-KFServingHTTPAPIServer::InferRequest::InferRequest(
+KFServingHTTPAPIServer::InferRequestClass::InferRequestClass(
     evhtp_request_t* req, uint64_t request_id, const char* server_id,
     uint64_t unique_id)
     : req_(req), request_id_(request_id), server_id_(server_id),
@@ -862,12 +803,12 @@ KFServingHTTPAPIServer::InferRequest::InferRequest(
 }
 
 void
-KFServingHTTPAPIServer::InferRequest::InferComplete(
+KFServingHTTPAPIServer::InferRequestClass::InferComplete(
     TRTSERVER_Server* server, TRTSERVER_Trace* trace,
     TRTSERVER_InferenceResponse* response, void* userp)
 {
-  KFServingHTTPAPIServer::InferRequest* infer_request =
-      reinterpret_cast<KFServingHTTPAPIServer::InferRequest*>(userp);
+  KFServingHTTPAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<KFServingHTTPAPIServer::InferRequestClass*>(userp);
   if (infer_request->FinalizeResponse(response) == EVHTP_RES_OK) {
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
@@ -881,7 +822,7 @@ KFServingHTTPAPIServer::InferRequest::InferComplete(
 }
 
 evhtp_res
-KFServingHTTPAPIServer::InferRequest::FinalizeResponse(
+KFServingHTTPAPIServer::InferRequestClass::FinalizeResponse(
     TRTSERVER_InferenceResponse* response)
 {
   InferResponseHeader response_header;
