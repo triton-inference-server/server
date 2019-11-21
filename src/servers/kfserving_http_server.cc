@@ -222,7 +222,7 @@ class KFServingHTTPAPIServer : public KFServingHTTPServerImpl {
   TRTSERVER_Error* EVBufferToCudaHandle(
       evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle);
 #endif  // TRTIS_ENABLE_GPU
-  TRTSERVER_Error* EVBufferToInput(
+  TRTSERVER_Error* Base64BufferToInput(
       const std::string& model_name, const InferRequestHeader& request_header,
       evbuffer* input_buffer,
       TRTSERVER_InferenceRequestProvider* request_provider,
@@ -530,7 +530,7 @@ KFServingHTTPAPIServer::EVBufferToCudaHandle(
 #endif  // TRTIS_ENABLE_GPU
 
 TRTSERVER_Error*
-KFServingHTTPAPIServer::EVBufferToInput(
+KFServingHTTPAPIServer::Base64BufferToInput(
     const std::string& model_name, const InferRequestHeader& request_header,
     evbuffer* input_buffer,
     TRTSERVER_InferenceRequestProvider* request_provider,
@@ -558,6 +558,11 @@ KFServingHTTPAPIServer::EVBufferToInput(
           TRTSERVER_ERROR_INTERNAL, "unexpected error getting input buffers ");
     }
   }
+  // Use FromBase64 to convert a Base64 encoded string to ByteString
+  // TODO encode serialized string in base64 (on Client side)
+  // std::string base_decoded = base64_decode(std::string(base, base_size));
+  // InferRequest infer_request;
+  // infer_request.ParseFromString(base_decoded);
 
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
@@ -732,7 +737,7 @@ KFServingHTTPAPIServer::HandleInfer(
       request_header_serialized.c_str(), request_header_serialized.size());
   if (err == nullptr) {
     EVBufferPair* response_pair(new EVBufferPair());
-    err = EVBufferToInput(
+    err = Base64BufferToInput(
         model_name, request_header, req->buffer_in, request_provider,
         response_pair->second);
     if (err == nullptr) {
