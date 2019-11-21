@@ -27,7 +27,39 @@
 #include "src/clients/c++/perf_client/load_manager.h"
 #include "src/core/model_config.h"
 
+#if TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+
+#define RETURN_IF_CUDA_ERR(FUNC)                               \
+  {                                                            \
+    const cudaError_t result = FUNC;                           \
+    if (result != cudaSuccess) {                               \
+      return nic::Error(                                       \
+          ni::RequestStatusCode::INTERNAL,                     \
+          "CUDA exception (line " + std::to_string(__LINE__) + \
+              "): " + cudaGetErrorName(result) + " (" +        \
+              cudaGetErrorString(result) + ")");               \
+    }                                                          \
+  }
+
+#endif  // TRTIS_ENABLE_GPU
+
 namespace {
+
+#if TRTIS_ENABLE_GPU
+nic::Error
+CreateCUDAIPCHandle(
+    cudaIpcMemHandle_t* cuda_handle, void* input_d_ptr, int device_id = 0)
+{
+  // Set the GPU device to the desired GPU
+  RETURN_IF_CUDA_ERR(cudaSetDevice(device_id));
+
+  //  Create IPC handle for data on the gpu
+  RETURN_IF_CUDA_ERR(cudaIpcGetMemHandle(cuda_handle, input_d_ptr));
+
+  return nic::Error::Success;
+}
+#endif  // TRTIS_ENABLE_GPU
 
 void
 SerializeStringTensor(
@@ -65,7 +97,7 @@ LoadManager::~LoadManager()
   }
 
   nic::Error err;
-  if (shared_memory_type_ != SharedMemoryType::NO_SHARED_MEMORY) {
+  if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
     err = shared_memory_ctx_->UnregisterAllSharedMemory();
     if (!err.IsOk()) {
       std::cerr << "Unable to unregister all shared memory regions"
@@ -84,6 +116,23 @@ LoadManager::~LoadManager()
                   << std::endl;
       }
     }
+  } else if (shared_memory_type_ == SharedMemoryType::CUDA_SHARED_MEMORY) {
+#if TRTIS_ENABLE_GPU
+    err = shared_memory_ctx_->UnregisterAllSharedMemory();
+    if (!err.IsOk()) {
+      std::cerr << "Unable to unregister all shared memory regions"
+                << std::endl;
+    }
+
+    for (auto region : shared_memory_regions_) {
+      cudaError_t cuda_err = cudaFree(region.second);
+      if (cuda_err != cudaSuccess) {
+        std::cerr << "Unable to free cuda shared memory for " << region.first
+                  << ": Starting: " << static_cast<void*>(region.second)
+                  << ", size: " << io_shm_size_[region.first] << std::endl;
+      }
+    }
+#endif  // TRTIS_ENABLE_GPU
   }
 }
 
@@ -110,7 +159,8 @@ nic::Error
 LoadManager::SwapTimestamps(TimestampVector& new_timestamps)
 {
   TimestampVector total_timestamp;
-  // Gather request timestamps with proper locking from all the worker threads
+  // Gather request timestamps with proper locking from all the worker
+  // threads
   for (auto& thread_stat : threads_stat_) {
     std::lock_guard<std::mutex> lock(thread_stat->mu_);
     total_timestamp.insert(
@@ -222,9 +272,9 @@ LoadManager::InitManagerInputs(
         return nic::Error(
             ni::RequestStatusCode::INVALID_ARG,
             "input '" + input->Name() +
-                "' has variable-size shape and the shape to be used is not "
-                "specified, unable to create input values for model '" +
-                ctx->ModelName() + "'");
+                "' has variable-size shape and the shape to be used is "
+                "not specified, unable to create input values for "
+                "model '" + ctx->ModelName() + "'");
       }
     }
 
@@ -311,29 +361,43 @@ LoadManager::InitSharedMemory()
 
   // Allocate the shared memory for outputs
   for (const auto& output : ctx->Outputs()) {
-    int shm_fd_op;
-    uint8_t* output_shm;
-    std::string shm_key("/" + output->Name());
     int64_t batch1_bytesize = ctx->ByteSize(output->Dims(), output->DType());
     if (batch1_bytesize < 0) {
       batch1_bytesize = output_shm_size_;
     }
+    uint8_t* output_shm_ptr;
     size_t alloc_size = batch1_bytesize * batch_size_;
-    RETURN_IF_ERROR(CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_op));
-    RETURN_IF_ERROR(
-        MapSharedMemory(shm_fd_op, 0, alloc_size, (void**)&output_shm));
+    if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
+      std::string shm_key("/" + output->Name());
+      int shm_fd_op;
+      RETURN_IF_ERROR(
+          CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_op));
+      RETURN_IF_ERROR(
+          MapSharedMemory(shm_fd_op, 0, alloc_size, (void**)&output_shm_ptr));
 
-    io_shm_size_[output->Name()] = alloc_size;
-    shared_memory_regions_[output->Name()] = output_shm;
+      io_shm_size_[output->Name()] = alloc_size;
+      shared_memory_regions_[output->Name()] = output_shm_ptr;
 
-    // shared_memory_ctx_->UnregisterSharedMemory(output->Name());
-    err = shared_memory_ctx_->RegisterSharedMemory(
-        output->Name(), shm_key, 0, alloc_size);
-    if (!err.IsOk()) {
-      std::cerr << "unable to register shared memory output region for "
-                << output->Name() << ". Details: " << err.Message()
-                << std::endl;
-      return err;
+      RETURN_IF_ERROR(shared_memory_ctx_->RegisterSharedMemory(
+          output->Name(), shm_key, 0, alloc_size));
+    } else {
+#if TRTIS_ENABLE_GPU
+      cudaError_t cuda_err = cudaMalloc((void**)&output_shm_ptr, alloc_size);
+      if (cuda_err != cudaSuccess) {
+        return nic::Error(
+            ni::RequestStatusCode::INTERNAL,
+            "unable to allocate memory of " + std::to_string(alloc_size) +
+                "bytes on gpu for output " + output->Name());
+      }
+      io_shm_size_[output->Name()] = alloc_size;
+      shared_memory_regions_[output->Name()] = output_shm_ptr;
+
+      cudaIpcMemHandle_t cuda_handle;
+      RETURN_IF_ERROR(CreateCUDAIPCHandle(&cuda_handle, (void*)output_shm_ptr));
+      // Using GPU with device id 0
+      RETURN_IF_ERROR(shared_memory_ctx_->RegisterCudaSharedMemory(
+          output->Name(), cuda_handle, alloc_size, 0));
+#endif  // TRTIS_ENABLE_GPU
     }
   }
 
@@ -433,27 +497,65 @@ LoadManager::InitSharedMemory()
     }
 
     // create the shared memory region for the input
-    int shm_fd_ip;
-    uint8_t* data_addr;
+    uint8_t* input_shm_ptr;
     size_t alloc_size = batch1_bytesize * batch_size_;
-    std::string shm_key("/" + input->Name());
-    RETURN_IF_ERROR(CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_ip));
-    RETURN_IF_ERROR(
-        MapSharedMemory(shm_fd_ip, 0, alloc_size, (void**)&data_addr));
-    io_shm_size_[input->Name()] = alloc_size;
-    shared_memory_regions_[input->Name()] = data_addr;
 
-    // Populate the region with data
-    size_t count = 0;
-    while (count < batch_size_) {
-      memcpy(data_addr + (count * batch1_bytesize), data, batch1_bytesize);
-      count++;
+    if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
+      std::string shm_key("/" + input->Name());
+      int shm_fd_ip;
+      RETURN_IF_ERROR(
+          CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_ip));
+      RETURN_IF_ERROR(
+          MapSharedMemory(shm_fd_ip, 0, alloc_size, (void**)&input_shm_ptr));
+      io_shm_size_[input->Name()] = alloc_size;
+      shared_memory_regions_[input->Name()] = input_shm_ptr;
+
+      // Populate the region with data
+      size_t count = 0;
+      while (count < batch_size_) {
+        memcpy(
+            input_shm_ptr + (count * batch1_bytesize), data, batch1_bytesize);
+        count++;
+      }
+
+      // Register the region with TRTIS
+      RETURN_IF_ERROR(shared_memory_ctx_->RegisterSharedMemory(
+          input->Name(), shm_key, 0, alloc_size));
+    } else {
+#if TRTIS_ENABLE_GPU
+      cudaError_t cuda_err = cudaMalloc((void**)&input_shm_ptr, alloc_size);
+      if (cuda_err != cudaSuccess) {
+        return nic::Error(
+            ni::RequestStatusCode::INTERNAL,
+            "unable to allocate memory of " + std::to_string(alloc_size) +
+                "bytes on gpu for input " + input->Name());
+      }
+
+      io_shm_size_[input->Name()] = alloc_size;
+      shared_memory_regions_[input->Name()] = input_shm_ptr;
+
+      // Populate the region with data
+      size_t count = 0;
+      while (count < batch_size_) {
+        cudaError_t cuda_err = cudaMemcpy(
+            (void*)(input_shm_ptr + (count * batch1_bytesize)), (void*)data,
+            batch1_bytesize, cudaMemcpyHostToDevice);
+        if (cuda_err != cudaSuccess) {
+          return nic::Error(
+              ni::RequestStatusCode::INTERNAL,
+              "Failed to copy data to cuda shared memory for " + input->Name());
+        }
+        count++;
+      }
+
+      cudaIpcMemHandle_t cuda_handle;
+      RETURN_IF_ERROR(CreateCUDAIPCHandle(&cuda_handle, (void*)input_shm_ptr));
+
+      // Register the region with TRTIS
+      RETURN_IF_ERROR(shared_memory_ctx_->RegisterCudaSharedMemory(
+          input->Name(), cuda_handle, alloc_size, 0));
+#endif  // TRTIS_ENABLE_GPU
     }
-
-    // Register the region with TRTIS
-    // shared_memory_ctx_->UnregisterSharedMemory(input->Name());
-    RETURN_IF_ERROR(shared_memory_ctx_->RegisterSharedMemory(
-        input->Name(), shm_key, 0, alloc_size));
   }
   return nic::Error::Success;
 }

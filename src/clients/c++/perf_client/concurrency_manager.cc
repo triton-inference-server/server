@@ -161,8 +161,7 @@ ConcurrencyManager::Infer(
       thread_stat->contexts_stat_.emplace_back();
       if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
         thread_stat->status_ = PrepareInfer(&(ctxs.back()->ctx_), &options);
-      } else if (
-          shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
+      } else {
         thread_stat->status_ =
             PrepareSharedMemoryInfer(&(ctxs.back()->ctx_), &options);
       }
