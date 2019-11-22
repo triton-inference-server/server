@@ -266,6 +266,13 @@ message ModelVersionStatus
   //@@     an individual inference.
   //@@
   uint64 model_inference_count = 4;
+
+  //@@  .. cpp:var:: uint64 last_inference_timestamp_milliseconds
+  //@@
+  //@@     The timestamp of the last inference request made for this model,
+  //@@     given as milliseconds since the epoch.
+  //@@
+  uint64 last_inference_timestamp_milliseconds = 6;
 }
 
 //@@

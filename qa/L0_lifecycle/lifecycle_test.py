@@ -53,7 +53,7 @@ class LifeCycleTest(unittest.TestCase):
                                     "expected status for model " + model_name)
                     for (k, v) in iteritems(ss.model_status[model_name].version_status):
                         self.assertEqual(v.ready_state, server_status.MODEL_READY)
-                        
+
                     iu.infer_exact(self, base_name, tensor_shape, 1,
                                    np.float32, np.float32, np.float32,
                                    model_version=1)
@@ -148,7 +148,7 @@ class LifeCycleTest(unittest.TestCase):
                                     "expected status for model " + model_name)
                     for (k, v) in iteritems(ss.model_status[model_name].version_status):
                         self.assertEqual(v.ready_state, server_status.MODEL_READY)
-                        
+
                     iu.infer_exact(self, base_name, tensor_shape, 1,
                                    np.float32, np.float32, np.float32,
                                    model_version=1)
@@ -211,7 +211,7 @@ class LifeCycleTest(unittest.TestCase):
                                     "expected status for model " + model_name)
                     for (k, v) in iteritems(ss.model_status[model_name].version_status):
                         self.assertEqual(v.ready_state, server_status.MODEL_READY)
-                        
+
                     iu.infer_exact(self, base_name, tensor_shape, 1,
                                    np.float32, np.float32, np.float32,
                                    model_version=1)
@@ -264,7 +264,7 @@ class LifeCycleTest(unittest.TestCase):
                                     "expected status for model " + model_name)
                     for (k, v) in iteritems(ss.model_status[model_name].version_status):
                         self.assertEqual(v.ready_state, server_status.MODEL_READY)
-                        
+
                     iu.infer_exact(self, base_name, tensor_shape, 1,
                                    np.float32, np.float32, np.float32,
                                    model_version=1)
@@ -404,6 +404,7 @@ class LifeCycleTest(unittest.TestCase):
 
         # Make sure savedmodel has execution stats in the status.
         expected_exec_cnt = 0
+        expected_last_timestamp = 0
         try:
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
@@ -421,7 +422,9 @@ class LifeCycleTest(unittest.TestCase):
                 version_status = ss.model_status[savedmodel_name].version_status[3]
                 self.assertEqual(version_status.ready_state, server_status.MODEL_READY)
                 self.assertGreater(version_status.model_execution_count, 0)
+                self.assertGreater(version_status.last_inference_timestamp_milliseconds, 0)
                 expected_exec_cnt = version_status.model_execution_count
+                expected_last_timestamp = version_status.last_inference_timestamp_milliseconds
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -449,6 +452,8 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertEqual(version_status.ready_state_reason.message, "unloaded",
                                 "expected message \"unloaded\" for unloaded model version")
                 self.assertEqual(version_status.model_execution_count, expected_exec_cnt)
+                self.assertEqual(version_status.last_inference_timestamp_milliseconds,
+                                 expected_last_timestamp)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -629,6 +634,7 @@ class LifeCycleTest(unittest.TestCase):
 
         # Make sure version 1 has execution stats in the status.
         expected_exec_cnt = 0
+        expected_last_timestamp = 0
         try:
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
@@ -646,7 +652,9 @@ class LifeCycleTest(unittest.TestCase):
                 version_status = ss.model_status[graphdef_name].version_status[1]
                 self.assertEqual(version_status.ready_state, server_status.MODEL_READY)
                 self.assertGreater(version_status.model_execution_count, 0)
+                self.assertGreater(version_status.last_inference_timestamp_milliseconds, 0)
                 expected_exec_cnt = version_status.model_execution_count
+                expected_last_timestamp = version_status.last_inference_timestamp_milliseconds
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -671,6 +679,8 @@ class LifeCycleTest(unittest.TestCase):
                 version_status = ss.model_status[graphdef_name].version_status[1]
                 self.assertEqual(version_status.ready_state, server_status.MODEL_UNAVAILABLE)
                 self.assertEqual(version_status.model_execution_count, expected_exec_cnt)
+                self.assertEqual(version_status.last_inference_timestamp_milliseconds,
+                                 expected_last_timestamp)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -708,8 +718,11 @@ class LifeCycleTest(unittest.TestCase):
                     self.assertEqual(v.ready_state, server_status.MODEL_READY)
                     if k == 1:
                         self.assertEqual(v.model_execution_count, expected_exec_cnt)
+                        self.assertEqual(v.last_inference_timestamp_milliseconds,
+                                         expected_last_timestamp)
                     else:
                         self.assertEqual(v.model_execution_count, 0)
+                        self.assertEqual(v.last_inference_timestamp_milliseconds, 0)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1062,7 +1075,7 @@ class LifeCycleTest(unittest.TestCase):
                             model_version=version)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
-        
+
         self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
 
     def test_multiple_model_repository_control(self):
@@ -1155,7 +1168,7 @@ class LifeCycleTest(unittest.TestCase):
 
         self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
 
-        # Remove the savedmodel from the first model repository and load agian, 
+        # Remove the savedmodel from the first model repository and load again,
         # the model from the second model repository should be loaded properly
         shutil.rmtree("models/" + model_name)
         try:
@@ -1188,7 +1201,7 @@ class LifeCycleTest(unittest.TestCase):
                             model_version=version)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
-        
+
         self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
 
     def test_model_control(self):
@@ -1366,7 +1379,7 @@ class LifeCycleTest(unittest.TestCase):
                                             "expected status for version 1 of model " + model)
                             self.assertEqual(ss.model_status[model].version_status[1].ready_state,
                                             server_status.MODEL_UNAVAILABLE)
-                        
+
                         self.assertTrue(3 in ss.model_status[model].version_status,
                                         "expected status for version 3 of model " + model)
                         model_status = server_status.MODEL_UNAVAILABLE if ensemble_prefix in model \
@@ -1401,7 +1414,7 @@ class LifeCycleTest(unittest.TestCase):
                     self.assertGreater(ex.request_id(), 0)
                     self.assertTrue(
                         ex.message().startswith("no status available for unknown model"))
-        
+
         # And loaded models work properly
         self._infer_unaffected_models(loaded_models + [model_base], model_shape)
 
@@ -1560,7 +1573,7 @@ class LifeCycleTest(unittest.TestCase):
                                     model_status)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
-        
+
         self._infer_unaffected_models(loaded_models, model_shape)
 
     def test_model_repository_index(self):
@@ -1592,7 +1605,7 @@ class LifeCycleTest(unittest.TestCase):
 
                 for model_base in model_bases:
                     model_name = tu.get_model_name(model_base, np.float32, np.float32, np.float32)
-                    
+
                     self.assertTrue(model_name in ss.model_status,
                                     "expected status for model " + model_name)
                     for (k, v) in iteritems(ss.model_status[model_name].version_status):

@@ -213,13 +213,15 @@ class ServerStatusManager {
   // Add durations to Infer stats for a failed inference request.
   void UpdateFailedInferStats(
       const std::string& model_name, const int64_t model_version,
-      size_t batch_size, uint64_t request_duration_ns);
+      size_t batch_size, uint64_t last_timestamp_ms,
+      uint64_t request_duration_ns);
 
   // Add durations to Infer stats for a successful inference request.
   void UpdateSuccessInferStats(
       const std::string& model_name, const int64_t model_version,
-      size_t batch_size, uint32_t execution_cnt, uint64_t request_duration_ns,
-      uint64_t queue_duration_ns, uint64_t compute_duration_ns);
+      size_t batch_size, uint32_t execution_cnt, uint64_t last_timestamp_ms,
+      uint64_t request_duration_ns, uint64_t queue_duration_ns,
+      uint64_t compute_duration_ns);
 
  private:
   mutable std::mutex mu_;

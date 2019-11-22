@@ -203,7 +203,7 @@ ServerStatusManager::UpdateServerStat(
 void
 ServerStatusManager::UpdateFailedInferStats(
     const std::string& model_name, const int64_t model_version,
-    size_t batch_size, uint64_t request_duration_ns)
+    size_t batch_size, uint64_t last_timestamp_ms, uint64_t request_duration_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
 
@@ -220,12 +220,18 @@ ServerStatusManager::UpdateFailedInferStats(
     auto mvs_itr = mvs.find(model_version);
     if (mvs_itr == mvs.end()) {
       ModelVersionStatus& version_status = mvs[model_version];
+      version_status.set_last_inference_timestamp_milliseconds(
+          last_timestamp_ms);
       InferRequestStats& stats =
           (*version_status.mutable_infer_stats())[batch_size];
       stats.mutable_failed()->set_count(1);
       stats.mutable_failed()->set_total_time_ns(request_duration_ns);
     } else {
       ModelVersionStatus& version_status = mvs_itr->second;
+      if (last_timestamp_ms > 0) {
+        version_status.set_last_inference_timestamp_milliseconds(
+            last_timestamp_ms);
+      }
       auto& is = *version_status.mutable_infer_stats();
       auto is_itr = is.find(batch_size);
       if (is_itr == is.end()) {
@@ -245,8 +251,9 @@ ServerStatusManager::UpdateFailedInferStats(
 void
 ServerStatusManager::UpdateSuccessInferStats(
     const std::string& model_name, const int64_t model_version,
-    size_t batch_size, uint32_t execution_cnt, uint64_t request_duration_ns,
-    uint64_t queue_duration_ns, uint64_t compute_duration_ns)
+    size_t batch_size, uint32_t execution_cnt, uint64_t last_timestamp_ms,
+    uint64_t request_duration_ns, uint64_t queue_duration_ns,
+    uint64_t compute_duration_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
 
@@ -267,6 +274,8 @@ ServerStatusManager::UpdateSuccessInferStats(
       ModelVersionStatus& version_status = mvs[model_version];
       version_status.set_model_inference_count(batch_size);
       version_status.set_model_execution_count(execution_cnt);
+      version_status.set_last_inference_timestamp_milliseconds(
+          last_timestamp_ms);
       new_stats = &((*version_status.mutable_infer_stats())[batch_size]);
     } else {
       ModelVersionStatus& version_status = mvs_itr->second;
@@ -274,6 +283,10 @@ ServerStatusManager::UpdateSuccessInferStats(
           version_status.model_inference_count() + batch_size);
       version_status.set_model_execution_count(
           version_status.model_execution_count() + execution_cnt);
+      if (last_timestamp_ms > 0) {
+        version_status.set_last_inference_timestamp_milliseconds(
+            last_timestamp_ms);
+      }
 
       auto& is = *version_status.mutable_infer_stats();
       auto is_itr = is.find(batch_size);
@@ -333,12 +346,15 @@ ModelInferStats::Report()
                                     ? metric_reporter_->ModelVersion()
                                     : requested_model_version_;
 
-  uint64_t request_duration_ns =
+  const uint64_t request_duration_ns =
       Duration(TimestampKind::kRequestStart, TimestampKind::kRequestEnd);
+  const uint64_t last_timestamp_ms =
+      TIMESPEC_TO_MILLIS(Timestamp(TimestampKind::kRequestStart));
 
   if (failed_) {
     status_manager_->UpdateFailedInferStats(
-        model_name_, model_version, batch_size_, request_duration_ns);
+        model_name_, model_version, batch_size_, last_timestamp_ms,
+        request_duration_ns);
 #ifdef TRTIS_ENABLE_METRICS
     if (metric_reporter_ != nullptr) {
       metric_reporter_->MetricInferenceFailure(gpu_device_).Increment();
@@ -354,7 +370,8 @@ ModelInferStats::Report()
 
     status_manager_->UpdateSuccessInferStats(
         model_name_, model_version, batch_size_, execution_count_,
-        request_duration_ns, queue_duration_ns, compute_duration_ns);
+        last_timestamp_ms, request_duration_ns, queue_duration_ns,
+        compute_duration_ns);
 
 #ifdef TRTIS_ENABLE_METRICS
     if (metric_reporter_ != nullptr) {
