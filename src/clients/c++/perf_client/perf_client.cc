@@ -451,21 +451,22 @@ Usage(char** argv, const std::string& msg = std::string())
                    18)
             << std::endl;
   std::cerr << FormatMessage(
-                   " --shared-memory <\"system\"|\"cuda\"|\"none\">: Selects "
-                   "the type of the shared memory to use for input data. "
-                   "Default is none.",
+                   " --shared-memory <\"system\"|\"cuda\"|\"none\">: Specifies "
+                   "the type of the shared memory to use for input and output "
+                   "data. Default is none.",
                    18)
             << std::endl;
 
   std::cerr
       << FormatMessage(
-             " --output-shm-size: Is used to compute the size of shared "
-             "memory to allocate for output tensors when output tensors "
-             "are string type or variable. This value should be large "
-             "enough to hold largest of the output tensors. The client "
-             "will use this value, alongwith batchsize and total number "
-             "of model outputs to find the total shared memory to allocate "
-             "for the current execution. Default size is 100KB.",
+             " --output-shm-size: The size in bytes of the shared memory "
+             "region to allocate per output tensor. Only needed when one or "
+             "more of the outputs are of string type and/or variable shape. "
+             "The value should be larger than the size of the largest output "
+             "tensor the model is expected to return. The client will use the "
+             "following formula to calculate the total shared memory to "
+             "allocate: output_shm_size * number_of_outputs * batch_size. "
+             "Defaults to 100KB.",
              18)
       << std::endl;
 

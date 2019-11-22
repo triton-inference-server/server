@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "src/clients/c++/perf_client/load_manager.h"
+#include "src/clients/c++/examples/shm_utils.h"
 #include "src/core/model_config.h"
 
 #if TRTIS_ENABLE_GPU
@@ -82,42 +83,47 @@ SerializeStringTensor(
 LoadManager::~LoadManager()
 {
   nic::Error err;
-  if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
+  if (shared_memory_ctx_ != nullptr) {
     err = shared_memory_ctx_->UnregisterAllSharedMemory();
     if (!err.IsOk()) {
       std::cerr << "Unable to unregister all shared memory regions"
                 << std::endl;
     }
-    for (auto region : shared_memory_regions_) {
-      err = UnmapSharedMemory(region.second, io_shm_size_[region.first]);
-      if (!err.IsOk()) {
-        std::cerr << "Unable to unmap shared memory with key (" << region.first
-                  << "): Starting: " << static_cast<void*>(region.second)
-                  << ", size: " << io_shm_size_[region.first] << std::endl;
+    if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
+      for (auto region : shared_memory_regions_) {
+        err = nic::UnmapSharedMemory(
+            shared_memory_regions_[region.first].first,
+            shared_memory_regions_[region.first].second);
+        if (!err.IsOk()) {
+          std::cerr << "Unable to unmap shared memory with key ("
+                    << region.first << "): Starting: "
+                    << static_cast<void*>(
+                           shared_memory_regions_[region.first].first)
+                    << ", size: " << shared_memory_regions_[region.first].second
+                    << std::endl;
+        }
+        err = nic::UnlinkSharedMemoryRegion(region.first);
+        if (!err.IsOk()) {
+          std::cerr << "Unable to unlink shared memory with key: "
+                    << region.first << std::endl;
+        }
       }
-      err = UnlinkSharedMemoryRegion(region.first);
-      if (!err.IsOk()) {
-        std::cerr << "Unable to unlink shared memory with key: " << region.first
-                  << std::endl;
-      }
-    }
-  } else if (shared_memory_type_ == SharedMemoryType::CUDA_SHARED_MEMORY) {
+    } else if (shared_memory_type_ == SharedMemoryType::CUDA_SHARED_MEMORY) {
 #if TRTIS_ENABLE_GPU
-    err = shared_memory_ctx_->UnregisterAllSharedMemory();
-    if (!err.IsOk()) {
-      std::cerr << "Unable to unregister all shared memory regions"
-                << std::endl;
-    }
-
-    for (auto region : shared_memory_regions_) {
-      cudaError_t cuda_err = cudaFree(region.second);
-      if (cuda_err != cudaSuccess) {
-        std::cerr << "Unable to free cuda shared memory for " << region.first
-                  << ": Starting: " << static_cast<void*>(region.second)
-                  << ", size: " << io_shm_size_[region.first] << std::endl;
+      for (auto region : shared_memory_regions_) {
+        cudaError_t cuda_err =
+            cudaFree(shared_memory_regions_[region.first].first);
+        if (cuda_err != cudaSuccess) {
+          std::cerr << "Unable to free cuda shared memory for " << region.first
+                    << ": Starting: "
+                    << static_cast<void*>(
+                           shared_memory_regions_[region.first].first)
+                    << ", size: " << shared_memory_regions_[region.first].second
+                    << std::endl;
+        }
       }
-    }
 #endif  // TRTIS_ENABLE_GPU
+    }
   }
 }
 
@@ -342,6 +348,10 @@ LoadManager::InitSharedMemory()
 
   RETURN_IF_ERROR(
       factory_->CreateSharedMemoryControlContext(&shared_memory_ctx_));
+
+  // Calling this function for the clean start
+  shared_memory_ctx_->UnregisterAllSharedMemory();
+
   std::unique_ptr<nic::InferContext> ctx;
   RETURN_IF_ERROR(factory_->CreateInferContext(&ctx));
 
@@ -357,12 +367,12 @@ LoadManager::InitSharedMemory()
       std::string shm_key("/" + output->Name());
       int shm_fd_op;
       RETURN_IF_ERROR(
-          CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_op));
-      RETURN_IF_ERROR(
-          MapSharedMemory(shm_fd_op, 0, alloc_size, (void**)&output_shm_ptr));
+          nic::CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_op));
+      RETURN_IF_ERROR(nic::MapSharedMemory(
+          shm_fd_op, 0, alloc_size, (void**)&output_shm_ptr));
 
-      io_shm_size_[output->Name()] = alloc_size;
-      shared_memory_regions_[output->Name()] = output_shm_ptr;
+      shared_memory_regions_[output->Name()] =
+          std::pair<uint8_t*, size_t>(output_shm_ptr, alloc_size);
 
       RETURN_IF_ERROR(shared_memory_ctx_->RegisterSharedMemory(
           output->Name(), shm_key, 0, alloc_size));
@@ -375,8 +385,8 @@ LoadManager::InitSharedMemory()
             "unable to allocate memory of " + std::to_string(alloc_size) +
                 "bytes on gpu for output " + output->Name());
       }
-      io_shm_size_[output->Name()] = alloc_size;
-      shared_memory_regions_[output->Name()] = output_shm_ptr;
+      shared_memory_regions_[output->Name()] =
+          std::pair<uint8_t*, size_t>(output_shm_ptr, alloc_size);
 
       cudaIpcMemHandle_t cuda_handle;
       RETURN_IF_ERROR(CreateCUDAIPCHandle(&cuda_handle, (void*)output_shm_ptr));
@@ -387,6 +397,7 @@ LoadManager::InitSharedMemory()
     }
   }
 
+  // Set the provided shape for variable shape tensor
   for (const auto& input : ctx->Inputs()) {
     if (input->Shape().empty()) {
       auto it = input_shapes_.find(input->Name());
@@ -394,92 +405,21 @@ LoadManager::InitSharedMemory()
         input->SetShape(it->second);
       }
     }
+  }
+
+  for (const auto& input : ctx->Inputs()) {
     std::vector<char> serialized_data;
-    const uint8_t* data;
+    const uint8_t* data_ptr;
     size_t batch1_bytesize;
     if (input->DType() != ni::DataType::TYPE_STRING) {
+      RETURN_IF_ERROR(GetInputData(input, &data_ptr));
       batch1_bytesize = (size_t)input->ByteSize();
-      // if available, use provided data instead
-      auto it = input_data_.find(input->Name());
-      if (it != input_data_.end()) {
-        if (batch1_bytesize != it->second.size()) {
-          return nic::Error(
-              ni::RequestStatusCode::INVALID_ARG,
-              "input '" + input->Name() + "' requires " +
-                  std::to_string(batch1_bytesize) +
-                  " bytes for each batch, but provided data has " +
-                  std::to_string(it->second.size()) + " bytes");
-        }
-        data = (const uint8_t*)&(it->second)[0];
-      } else if (input_buf_.size() != 0) {
-        if (batch1_bytesize > input_buf_.size()) {
-          return nic::Error(
-              ni::RequestStatusCode::INTERNAL,
-              "input '" + input->Name() + "' requires " +
-                  std::to_string(batch1_bytesize) +
-                  " bytes for each batch, but generated data has " +
-                  std::to_string(input_buf_.size()) + " bytes");
-        }
-        data = &input_buf_[0];
-      } else {
-        return nic::Error(
-            ni::RequestStatusCode::INVALID_ARG,
-            "unable to find data for input '" + input->Name() + "'.");
-      }
     } else {
-      size_t batch1_num_strings = 1;
-      if (!input->Shape().empty()) {
-        for (const auto dim : input->Shape()) {
-          batch1_num_strings *= dim;
-        }
-      } else {
-        for (const auto dim : input->Dims()) {
-          batch1_num_strings *= dim;
-        }
-      }
-
-      bool used_new_allocation = false;
-      std::vector<std::string>* string_data;
-
-      // if available, use provided data instead
-      auto it = input_string_data_.find(input->Name());
-      if (it != input_string_data_.end()) {
-        if (it->second.size() != batch1_num_strings) {
-          return nic::Error(
-              ni::RequestStatusCode::INVALID_ARG,
-              "input '" + input->Name() + "' requires " +
-                  std::to_string(batch1_num_strings) +
-                  " strings for each batch, but provided data has " +
-                  std::to_string(it->second.size()) + " strings.");
-        }
-        string_data = &it->second;
-      } else if (input_string_buf_.size() != 0) {
-        if (batch1_num_strings > input_string_buf_.size()) {
-          return nic::Error(
-              ni::RequestStatusCode::INTERNAL,
-              "input '" + input->Name() + "' requires " +
-                  std::to_string(batch1_num_strings) +
-                  " strings for each batch, but generated data has " +
-                  std::to_string(input_string_buf_.size()) + " strings.");
-        } else {
-          used_new_allocation = true;
-          string_data = new std::vector<std::string>(
-              input_string_buf_.begin(),
-              input_string_buf_.begin() + batch1_num_strings);
-        }
-      } else {
-        return nic::Error(
-            ni::RequestStatusCode::INVALID_ARG,
-            "unable to find data for input '" + input->Name() + "'.");
-      }
-
+      std::shared_ptr<std::vector<std::string>> string_data;
+      RETURN_IF_ERROR(GetInputData(input, &string_data));
       SerializeStringTensor(*string_data, &serialized_data);
       batch1_bytesize = serialized_data.size();
-      data = (uint8_t*)&serialized_data[0];
-
-      if (used_new_allocation) {
-        delete string_data;
-      }
+      data_ptr = (uint8_t*)&serialized_data[0];
     }
 
     // create the shared memory region for the input
@@ -490,17 +430,18 @@ LoadManager::InitSharedMemory()
       std::string shm_key("/" + input->Name());
       int shm_fd_ip;
       RETURN_IF_ERROR(
-          CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_ip));
-      RETURN_IF_ERROR(
-          MapSharedMemory(shm_fd_ip, 0, alloc_size, (void**)&input_shm_ptr));
-      io_shm_size_[input->Name()] = alloc_size;
-      shared_memory_regions_[input->Name()] = input_shm_ptr;
+          nic::CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_ip));
+      RETURN_IF_ERROR(nic::MapSharedMemory(
+          shm_fd_ip, 0, alloc_size, (void**)&input_shm_ptr));
+      shared_memory_regions_[input->Name()] =
+          std::pair<uint8_t*, size_t>(input_shm_ptr, alloc_size);
 
       // Populate the region with data
       size_t count = 0;
       while (count < batch_size_) {
         memcpy(
-            input_shm_ptr + (count * batch1_bytesize), data, batch1_bytesize);
+            input_shm_ptr + (count * batch1_bytesize), data_ptr,
+            batch1_bytesize);
         count++;
       }
 
@@ -517,14 +458,14 @@ LoadManager::InitSharedMemory()
                 "bytes on gpu for input " + input->Name());
       }
 
-      io_shm_size_[input->Name()] = alloc_size;
-      shared_memory_regions_[input->Name()] = input_shm_ptr;
+      shared_memory_regions_[input->Name()] =
+          std::pair<uint8_t*, size_t>(input_shm_ptr, alloc_size);
 
       // Populate the region with data
       size_t count = 0;
       while (count < batch_size_) {
         cudaError_t cuda_err = cudaMemcpy(
-            (void*)(input_shm_ptr + (count * batch1_bytesize)), (void*)data,
+            (void*)(input_shm_ptr + (count * batch1_bytesize)), (void*)data_ptr,
             batch1_bytesize, cudaMemcpyHostToDevice);
         if (cuda_err != cudaSuccess) {
           return nic::Error(
@@ -543,61 +484,6 @@ LoadManager::InitSharedMemory()
 #endif  // TRTIS_ENABLE_GPU
     }
   }
-  return nic::Error::Success;
-}
-
-nic::Error
-LoadManager::PrepareSharedMemoryInfer(
-    std::unique_ptr<nic::InferContext>* ctx,
-    std::unique_ptr<nic::InferContext::Options>* options)
-{
-  nic::Error err;
-  RETURN_IF_ERROR(factory_->CreateInferContext(ctx));
-
-  uint64_t max_batch_size = (*ctx)->MaxBatchSize();
-
-  // Model specifying maximum batch size of 0 indicates that batching
-  // is not supported and so the input tensors do not expect a "N"
-  // dimension (and 'batch_size' should be 1 so that only a single
-  // image instance is inferred at a time).
-  if (max_batch_size == 0) {
-    if (batch_size_ != 1) {
-      return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "expecting batch size 1 for model '" + (*ctx)->ModelName() +
-              "' which does not support batching");
-    }
-  } else if (batch_size_ > max_batch_size) {
-    return nic::Error(
-        ni::RequestStatusCode::INVALID_ARG,
-        "expecting batch size <= " + std::to_string(max_batch_size) +
-            " for model '" + (*ctx)->ModelName() + "'");
-  }
-
-  // Only set options if it has not been created, otherwise,
-  // assuming that the options for this model has been created previously
-  if (*options == nullptr) {
-    RETURN_IF_ERROR(nic::InferContext::Options::Create(options));
-    (*options)->SetBatchSize(batch_size_);
-    for (const auto& output : (*ctx)->Outputs()) {
-      (*options)->AddSharedMemoryResult(
-          output, output->Name(), 0, output_shm_size_);
-    }
-  }
-
-  RETURN_IF_ERROR((*ctx)->SetRunOptions(*(*options)));
-
-  for (const auto& input : (*ctx)->Inputs()) {
-    RETURN_IF_ERROR(
-        input->SetSharedMemory(input->Name(), 0, io_shm_size_[input->Name()]));
-    if (input->Shape().empty()) {
-      auto it = input_shapes_.find(input->Name());
-      if (it != input_shapes_.end()) {
-        input->SetShape(it->second);
-      }
-    }
-  }
-
   return nic::Error::Success;
 }
 
@@ -658,95 +544,164 @@ LoadManager::PrepareInfer(
     RETURN_IF_ERROR(input->Reset());
 
     if (input->DType() != ni::DataType::TYPE_STRING) {
+      const uint8_t* data_ptr;
+      RETURN_IF_ERROR(GetInputData(input, &data_ptr));
       size_t batch1_size = (size_t)input->ByteSize();
-      const uint8_t* data;
-      // if available, use provided data instead
-      auto it = input_data_.find(input->Name());
-      if (it != input_data_.end()) {
-        if (batch1_size != it->second.size()) {
-          return nic::Error(
-              ni::RequestStatusCode::INVALID_ARG,
-              "input '" + input->Name() + "' requires " +
-                  std::to_string(batch1_size) +
-                  " bytes for each batch, but provided data has " +
-                  std::to_string(it->second.size()) + " bytes");
-        }
-        data = (const uint8_t*)&(it->second)[0];
-      } else if (input_buf_.size() != 0) {
-        if (batch1_size > input_buf_.size()) {
-          return nic::Error(
-              ni::RequestStatusCode::INTERNAL,
-              "input '" + input->Name() + "' requires " +
-                  std::to_string(batch1_size) +
-                  " bytes for each batch, but generated data has " +
-                  std::to_string(input_buf_.size()) + " bytes");
-        } else {
-          data = &input_buf_[0];
-        }
-      } else {
-        return nic::Error(
-            ni::RequestStatusCode::INVALID_ARG,
-            "unable to find data for input '" + input->Name() + "'.");
-      }
-
       for (size_t i = 0; i < batch_size_; ++i) {
-        RETURN_IF_ERROR(input->SetRaw(data, batch1_size));
+        RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_size));
       }
     } else {
-      size_t batch1_num_strings = 1;
-      if (!input->Shape().empty()) {
-        for (const auto dim : input->Shape()) {
-          batch1_num_strings *= dim;
-        }
-      } else {
-        for (const auto dim : input->Dims()) {
-          batch1_num_strings *= dim;
-        }
-      }
-
-      bool used_new_allocation = false;
-      std::vector<std::string>* data;
-
-      // if available, use provided data instead
-      auto it = input_string_data_.find(input->Name());
-      if (it != input_string_data_.end()) {
-        if (it->second.size() != batch1_num_strings) {
-          return nic::Error(
-              ni::RequestStatusCode::INVALID_ARG,
-              "input '" + input->Name() + "' requires " +
-                  std::to_string(batch1_num_strings) +
-                  " strings for each batch, but provided data has " +
-                  std::to_string(it->second.size()) + " strings.");
-        }
-        data = &it->second;
-      } else if (input_string_buf_.size() != 0) {
-        if (batch1_num_strings > input_string_buf_.size()) {
-          return nic::Error(
-              ni::RequestStatusCode::INTERNAL,
-              "input '" + input->Name() + "' requires " +
-                  std::to_string(batch1_num_strings) +
-                  " strings for each batch, but generated data has " +
-                  std::to_string(input_string_buf_.size()) + " strings.");
-        } else {
-          used_new_allocation = true;
-          data = new std::vector<std::string>(
-              input_string_buf_.begin(),
-              input_string_buf_.begin() + batch1_num_strings);
-        }
-      } else {
-        return nic::Error(
-            ni::RequestStatusCode::INVALID_ARG,
-            "unable to find data for input '" + input->Name() + "'.");
-      }
+      std::shared_ptr<std::vector<std::string>> data;
+      RETURN_IF_ERROR(GetInputData(input, &data));
       for (size_t i = 0; i < batch_size_; ++i) {
         RETURN_IF_ERROR(input->SetFromString(*data));
-      }
-      if (used_new_allocation) {
-        delete data;
       }
     }
   }
 
+  return nic::Error::Success;
+}
+
+nic::Error
+LoadManager::PrepareSharedMemoryInfer(
+    std::unique_ptr<nic::InferContext>* ctx,
+    std::unique_ptr<nic::InferContext::Options>* options)
+{
+  nic::Error err;
+  RETURN_IF_ERROR(factory_->CreateInferContext(ctx));
+
+  uint64_t max_batch_size = (*ctx)->MaxBatchSize();
+
+  // Model specifying maximum batch size of 0 indicates that batching
+  // is not supported and so the input tensors do not expect a "N"
+  // dimension (and 'batch_size' should be 1 so that only a single
+  // image instance is inferred at a time).
+  if (max_batch_size == 0) {
+    if (batch_size_ != 1) {
+      return nic::Error(
+          ni::RequestStatusCode::INVALID_ARG,
+          "expecting batch size 1 for model '" + (*ctx)->ModelName() +
+              "' which does not support batching");
+    }
+  } else if (batch_size_ > max_batch_size) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "expecting batch size <= " + std::to_string(max_batch_size) +
+            " for model '" + (*ctx)->ModelName() + "'");
+  }
+
+  // Only set options if it has not been created, otherwise,
+  // assuming that the options for this model has been created previously
+  if (*options == nullptr) {
+    RETURN_IF_ERROR(nic::InferContext::Options::Create(options));
+    (*options)->SetBatchSize(batch_size_);
+    for (const auto& output : (*ctx)->Outputs()) {
+      (*options)->AddSharedMemoryResult(
+          output, output->Name(), 0, output_shm_size_);
+    }
+  }
+
+  RETURN_IF_ERROR((*ctx)->SetRunOptions(*(*options)));
+
+  for (const auto& input : (*ctx)->Inputs()) {
+    RETURN_IF_ERROR(input->SetSharedMemory(
+        input->Name(), 0, shared_memory_regions_[input->Name()].second));
+    if (input->Shape().empty()) {
+      auto it = input_shapes_.find(input->Name());
+      if (it != input_shapes_.end()) {
+        input->SetShape(it->second);
+      }
+    }
+  }
+
+  return nic::Error::Success;
+}
+
+nic::Error
+LoadManager::GetInputData(
+    std::shared_ptr<nic::InferContext::Input> input, const uint8_t** data)
+{
+  size_t batch1_size = (size_t)input->ByteSize();
+
+  // if available, use provided data instead
+  auto it = input_data_.find(input->Name());
+  if (it != input_data_.end()) {
+    if (batch1_size != it->second.size()) {
+      return nic::Error(
+          ni::RequestStatusCode::INVALID_ARG,
+          "input '" + input->Name() + "' requires " +
+              std::to_string(batch1_size) +
+              " bytes for each batch, but provided data has " +
+              std::to_string(it->second.size()) + " bytes");
+    }
+    *data = (const uint8_t*)&(it->second)[0];
+  } else if (input_buf_.size() != 0) {
+    if (batch1_size > input_buf_.size()) {
+      return nic::Error(
+          ni::RequestStatusCode::INTERNAL,
+          "input '" + input->Name() + "' requires " +
+              std::to_string(batch1_size) +
+              " bytes for each batch, but generated data has " +
+              std::to_string(input_buf_.size()) + " bytes");
+    }
+    *data = &input_buf_[0];
+  } else {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "unable to find data for input '" + input->Name() + "'.");
+  }
+  return nic::Error::Success;
+}
+
+nic::Error
+LoadManager::GetInputData(
+    std::shared_ptr<nic::InferContext::Input> input,
+    std::shared_ptr<std::vector<std::string>>* data)
+{
+  // Get the number of strings required in the input.
+  size_t batch1_num_strings = 1;
+  if (!input->Shape().empty()) {
+    for (const auto dim : input->Shape()) {
+      batch1_num_strings *= dim;
+    }
+  } else {
+    for (const auto dim : input->Dims()) {
+      batch1_num_strings *= dim;
+    }
+  }
+
+  // if available, use provided data instead
+  auto it = input_string_data_.find(input->Name());
+  if (it != input_string_data_.end()) {
+    if (it->second.size() != batch1_num_strings) {
+      return nic::Error(
+          ni::RequestStatusCode::INVALID_ARG,
+          "input '" + input->Name() + "' requires " +
+              std::to_string(batch1_num_strings) +
+              " strings for each batch, but provided data has " +
+              std::to_string(it->second.size()) + " strings.");
+    }
+    // Using empty deleter to prevent deleting the data read from the file
+    // stream
+    data->reset(&it->second, [](std::vector<std::string>*) {});
+  } else if (input_string_buf_.size() != 0) {
+    if (batch1_num_strings > input_string_buf_.size()) {
+      return nic::Error(
+          ni::RequestStatusCode::INTERNAL,
+          "input '" + input->Name() + "' requires " +
+              std::to_string(batch1_num_strings) +
+              " strings for each batch, but generated data has " +
+              std::to_string(input_string_buf_.size()) + " strings.");
+    } else {
+      data->reset(new std::vector<std::string>(
+          input_string_buf_.begin(),
+          input_string_buf_.begin() + batch1_num_strings));
+    }
+  } else {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "unable to find data for input '" + input->Name() + "'.");
+  }
   return nic::Error::Success;
 }
 

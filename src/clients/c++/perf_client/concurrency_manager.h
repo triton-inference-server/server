@@ -59,8 +59,8 @@ class ConcurrencyManager : public LoadManager {
   /// \param data_directory The path to the directory containing the data to
   /// use for input tensors.
   /// \param shared_memory_type The type of shared memory to use for inputs.
-  /// \param output_shm_size The size of the shared memory to allocate for the
-  /// output.
+  /// \param output_shm_size The size in bytes of the shared memory to
+  /// allocate for the output.
   /// \param factory The ContextFactory object used to create
   /// InferContext.
   /// \param manager Returns a new ConcurrencyManager object.

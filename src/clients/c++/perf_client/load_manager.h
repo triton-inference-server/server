@@ -120,6 +120,21 @@ class LoadManager {
   /// \return random sequence length
   size_t GetRandomLength(double offset_ratio);
 
+ private:
+  /// Helper function to access data for the specified input
+  /// \param input The target string input
+  /// Returns the shared pointer to the string data
+  nic::Error GetInputData(
+      std::shared_ptr<nic::InferContext::Input> input,
+      std::shared_ptr<std::vector<std::string>>* data);
+
+  /// Helper function to access data for the specified input
+  /// \param input The target input
+  /// Returns the pointer to the memory holding data
+  nic::Error GetInputData(
+      std::shared_ptr<nic::InferContext::Input> input, const uint8_t** data);
+
+ protected:
   bool async_;
   // User provided input shape
   std::unordered_map<std::string, std::vector<int64_t>> input_shapes_;
@@ -145,10 +160,10 @@ class LoadManager {
   std::vector<std::string> input_string_buf_;
 
   std::unique_ptr<nic::SharedMemoryControlContext> shared_memory_ctx_;
-  // Map from shared memory key to its allocated size
-  std::unordered_map<std::string, size_t> io_shm_size_;
-  // Map from shared memory key to its starting address
-  std::unordered_map<std::string, uint8_t*> shared_memory_regions_;
+
+  // Map from shared memory key to its starting address and size
+  std::unordered_map<std::string, std::pair<uint8_t*, size_t>>
+      shared_memory_regions_;
 
   struct ThreadStat {
     ThreadStat() : status_(ni::RequestStatusCode::SUCCESS) {}
