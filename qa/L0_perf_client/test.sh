@@ -90,7 +90,7 @@ fi
 # Sanity check on measurements are not all zero
 set +e
 
-# Testing with combinations of string input and shared memory types
+# Testing simple configurations with different shared memory types
 for SHARED_MEMORY_TYPE in none system cuda; do
     $PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 \
 --shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1

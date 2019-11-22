@@ -120,19 +120,16 @@ class LoadManager {
   /// \return random sequence length
   size_t GetRandomLength(double offset_ratio);
 
- private:
-  /// Helper function to access data for the specified input
-  /// \param input The target string input
-  /// Returns the shared pointer to the string data
-  nic::Error GetInputData(
-      std::shared_ptr<nic::InferContext::Input> input,
-      std::shared_ptr<std::vector<std::string>>* data);
+  /// Stops all the worker threads generating the request load.
+  void StopWorkerThreads();
 
+ private:
   /// Helper function to access data for the specified input
   /// \param input The target input
   /// Returns the pointer to the memory holding data
   nic::Error GetInputData(
-      std::shared_ptr<nic::InferContext::Input> input, const uint8_t** data);
+      std::shared_ptr<nic::InferContext::Input> input, const uint8_t** data,
+      size_t* batch1_size);
 
  protected:
   bool async_;
@@ -150,14 +147,11 @@ class LoadManager {
 
   // User provided input data, it will be preferred over synthetic data
   std::unordered_map<std::string, std::vector<char>> input_data_;
-  std::unordered_map<std::string, std::vector<std::string>> input_string_data_;
+  std::unordered_map<std::string, std::vector<char>> input_string_data_;
 
   // Placeholder for generated input data, which will be used for all inputs
   // except string
   std::vector<uint8_t> input_buf_;
-  // Placeholder for generated string data, which will be used for all string
-  // inputs
-  std::vector<std::string> input_string_buf_;
 
   std::unique_ptr<nic::SharedMemoryControlContext> shared_memory_ctx_;
 

@@ -28,20 +28,9 @@
 
 ConcurrencyManager::~ConcurrencyManager()
 {
-  early_exit = true;
-  // wake up all threads
-  wake_signal_.notify_all();
-
-  size_t cnt = 0;
-  for (auto& thread : threads_) {
-    thread.join();
-    if (!threads_stat_[cnt]->status_.IsOk()) {
-      std::cerr << "Thread [" << cnt
-                << "] had error: " << (threads_stat_[cnt]->status_)
-                << std::endl;
-    }
-    cnt++;
-  }
+  // The destruction of derived class should wait for all the request generator
+  // threads to finish
+  StopWorkerThreads();
 }
 
 

@@ -244,7 +244,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-b <batch size>" << std::endl;
   std::cerr << "\t--input-data <\"zero\"|\"random\"|<path>>" << std::endl;
   std::cerr << "\t--shared-memory <\"system\"|\"cuda\"|\"none\">" << std::endl;
-  std::cerr << "\t--output-shm-size <size in bytes>" << std::endl;
+  std::cerr << "\t--output-shared-memory-size <size in bytes>" << std::endl;
   std::cerr << "\t--shape <name:shape>" << std::endl;
   std::cerr << "\t--sequence-length <length>" << std::endl;
   std::cerr << "\t--string-length <length>" << std::endl;
@@ -459,13 +459,13 @@ Usage(char** argv, const std::string& msg = std::string())
 
   std::cerr
       << FormatMessage(
-             " --output-shm-size: The size in bytes of the shared memory "
-             "region to allocate per output tensor. Only needed when one or "
-             "more of the outputs are of string type and/or variable shape. "
-             "The value should be larger than the size of the largest output "
-             "tensor the model is expected to return. The client will use the "
-             "following formula to calculate the total shared memory to "
-             "allocate: output_shm_size * number_of_outputs * batch_size. "
+             " --output-shared-memory-size: The size in bytes of the shared "
+             "memory region to allocate per output tensor. Only needed when "
+             "one or more of the outputs are of string type and/or variable "
+             "shape. The value should be larger than the size of the largest "
+             "output tensor the model is expected to return. The client will "
+             "use the following formula to calculate the total shared memory "
+             "to allocate: output_shm_size * number_of_outputs * batch_size. "
              "Defaults to 100KB.",
              18)
       << std::endl;
@@ -1028,9 +1028,12 @@ main(int argc, char** argv)
         // As only one synchronous request can be generated from a thread at a
         // time, to maintain the requested concurrency, that many threads need
         // to be generated.
-        std::cerr << "WARNING: Overriding max_threads specification to ensure "
-                     "requested concurrency range."
-                  << std::endl;
+        if (max_threads_specified) {
+          std::cerr
+              << "WARNING: Overriding max_threads specification to ensure "
+                 "requested concurrency range."
+              << std::endl;
+        }
         max_threads = std::max(
             concurrency_range[SEARCH_RANGE::kSTART],
             concurrency_range[SEARCH_RANGE::kEND]);
