@@ -362,9 +362,6 @@ KFServingHTTPAPIServer::Handle(evhtp_request_t* req)
   std::string model_name, rest;
   if (RE2::FullMatch(
           std::string(req->uri->path->full), api_regex_, &model_name, &rest)) {
-    // TODO Try to verify that model name is valid
-    LOG_VERBOSE(1) << "model_name: " << model_name << ", rest: " << rest;
-
     // status
     if (rest == "/metadata") {
       HandleStatus(req, model_name);
@@ -402,12 +399,42 @@ KFServingHTTPAPIServer::HandleHealth(
     return;
   }
 
-  TRTSERVER_Error* err = nullptr;
-  bool health = false;
-  // ready mode
-  // TODO implement on model name level
-  err = TRTSERVER_ServerIsReady(server_.get(), &health);
+  bool ready = true;
+  TRTSERVER_Protobuf* server_status_protobuf = nullptr;
+  TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
+      server_.get(), model_name.c_str(), &server_status_protobuf);
+  if (err == nullptr) {
+    const char* status_buffer;
+    size_t status_byte_size;
+    err = TRTSERVER_ProtobufSerialize(
+        server_status_protobuf, &status_buffer, &status_byte_size);
+    if (err == nullptr) {
+      ServerStatus server_status;
+      if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
+        err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
+        if (err == nullptr) {
+          const auto& itr = server_status.model_status().find(model_name);
+          if (itr == server_status.model_status().end()) {
+            err = TRTSERVER_ErrorNew(
+                TRTSERVER_ERROR_INTERNAL,
+                std::string("unable to find health of \"" + model_name + "\"")
+                    .c_str());
+          } else {
+            auto model_versions = itr->second.version_status();
+            for (auto mit = model_versions.begin(); mit != model_versions.end();
+                 ++mit) {
+              if (mit->second.ready_state() == ModelReadyState::MODEL_READY) {
+                ready = false;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 
+  TRTSERVER_ProtobufDelete(server_status_protobuf);
   RequestStatus request_status;
   RequestStatusUtil::Create(
       &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
@@ -419,7 +446,7 @@ KFServingHTTPAPIServer::HandleHealth(
           kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
 
   evhtp_send_reply(
-      req, (health && (err == nullptr)) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
+      req, (ready && (err == nullptr)) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
 
   TRTSERVER_ErrorDelete(err);
 }
@@ -515,8 +542,8 @@ KFServingHTTPAPIServer::EVBufferToInput(
 
   // TODO MessageToJsonString to convert message to string (bytes encoded in
   // Base64) on Client side)
-  // Use JsonStringToMessage to convert a json string (bytes encoded in Base64)
-  // to message
+  // Use JsonStringToMessage to convert a json string (bytes encoded in
+  // Base64) to message
   InferRequest request;
   ::google::protobuf::util::JsonStringToMessage(
       std::string(request_buffer, buffer_length), &request);
