@@ -617,7 +617,7 @@ main(int argc, char** argv)
                                          {"request-distribution", 1, 0, 19},
                                          {"request-intervals", 1, 0, 20},
                                          {"shared-memory", 1, 0, 21},
-                                         {"output-shm-size", 1, 0, 22},
+                                         {"output-shared-memory-size", 1, 0, 22},
                                          {0, 0, 0, 0}};
 
   // Parse commandline...

@@ -626,7 +626,6 @@ LoadManager::GetInputData(
     if (it != input_data_.end()) {
       *data = (const uint8_t*)&(it->second)[0];
     } else if (input_buf_.size() != 0) {
-      // using shared memory buffer
       *batch1_size = (size_t)input->ByteSize();
       *data = &input_buf_[0];
     } else {
