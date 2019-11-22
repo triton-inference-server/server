@@ -231,16 +231,12 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                         output_info = InferContext.ResultFormat.RAW
 
                     start_ms = int(round(time.time() * 1000))
-                    if "libtorch" not in trial:
-                        results = ctx.run(
-                            { "INPUT" : input_info }, { "OUTPUT" : output_info},
-                            batch_size=batch_size, flags=flags)
-                        OUTPUT = "OUTPUT"
-                    else:
-                        results = ctx.run(
-                            { "INPUT__0" : input_info }, { "OUTPUT__0" : output_info},
-                            batch_size=batch_size, flags=flags)
-                        OUTPUT = "OUTPUT__0"
+                    INPUT = "INPUT__0" if trial.startswith("libtorch") else "INPUT"
+                    OUTPUT = "OUTPUT__0" if trial.startswith("libtorch") else "OUTPUT"
+
+                    results = ctx.run(
+                        { INPUT : input_info }, { OUTPUT : output_info},
+                        batch_size=batch_size, flags=flags)
 
                     end_ms = int(round(time.time() * 1000))
 
@@ -361,16 +357,12 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                     if pre_delay_ms is not None:
                         time.sleep(pre_delay_ms / 1000.0)
 
-                    if "libtorch" not in trial:
-                        ctx.async_run(partial(completion_callback, user_data),
-                            { 'INPUT' :input_info }, { 'OUTPUT' :output_info },
-                               batch_size=batch_size, flags=flags)
-                        OUTPUT = "OUTPUT"
-                    else:
-                        ctx.async_run(partial(completion_callback, user_data),
-                            { 'INPUT__0' :input_info }, { 'OUTPUT__0' :output_info },
-                               batch_size=batch_size, flags=flags)
-                        OUTPUT = "OUTPUT__0"
+                    INPUT = "INPUT__0" if trial.startswith("libtorch") else "INPUT"
+                    OUTPUT = "OUTPUT__0" if trial.startswith("libtorch") else "OUTPUT"
+
+                    ctx.async_run(partial(completion_callback, user_data),
+                        { INPUT :input_info }, { OUTPUT :output_info },
+                        batch_size=batch_size, flags=flags)
                     sent_count+=1
 
                 # Wait for the results in the order sent
