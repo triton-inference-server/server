@@ -718,11 +718,11 @@ class LifeCycleTest(unittest.TestCase):
                     self.assertEqual(v.ready_state, server_status.MODEL_READY)
                     if k == 1:
                         self.assertEqual(v.model_execution_count, expected_exec_cnt)
-                        self.assertEqual(version_status.last_inference_timestamp_milliseconds,
+                        self.assertEqual(v.last_inference_timestamp_milliseconds,
                                          expected_last_timestamp)
                     else:
                         self.assertEqual(v.model_execution_count, 0)
-                        self.assertEqual(version_status.last_inference_timestamp_milliseconds, 0)
+                        self.assertEqual(v.last_inference_timestamp_milliseconds, 0)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
