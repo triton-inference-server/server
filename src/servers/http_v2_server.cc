@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servers/kfserving_http_server.h"
+#include "src/servers/http_server.h"
 
 #include <event2/buffer.h>
 #include <evhtp/evhtp.h>
@@ -34,6 +34,7 @@
 #include <thread>
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
+#include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
@@ -45,14 +46,14 @@
 namespace nvidia { namespace inferenceserver {
 
 // Generic HTTP server using evhtp
-class KFServingHTTPServerImpl : public KFServingHTTPServer {
+class HTTPServerImpl : public HTTPServer {
  public:
-  explicit KFServingHTTPServerImpl(const int32_t port, const int thread_cnt)
+  explicit HTTPServerImpl(const int32_t port, const int thread_cnt)
       : port_(port), thread_cnt_(thread_cnt)
   {
   }
 
-  virtual ~KFServingHTTPServerImpl() { Stop(); }
+  virtual ~HTTPServerImpl() { Stop(); }
 
   static void Dispatch(evhtp_request_t* req, void* arg);
 
@@ -75,13 +76,13 @@ class KFServingHTTPServerImpl : public KFServingHTTPServer {
 };
 
 TRTSERVER_Error*
-KFServingHTTPServerImpl::Start()
+HTTPServerImpl::Start()
 {
   if (!worker_.joinable()) {
     evbase_ = event_base_new();
     htp_ = evhtp_new(evbase_, NULL);
     evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_NODELAY);
-    evhtp_set_gencb(htp_, KFServingHTTPServerImpl::Dispatch, this);
+    evhtp_set_gencb(htp_, HTTPServerImpl::Dispatch, this);
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
     evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024);
     // Set listening event for breaking event loop
@@ -98,7 +99,7 @@ KFServingHTTPServerImpl::Start()
 }
 
 TRTSERVER_Error*
-KFServingHTTPServerImpl::Stop()
+HTTPServerImpl::Stop()
 {
   if (worker_.joinable()) {
     // Notify event loop to break via fd write
@@ -118,32 +119,32 @@ KFServingHTTPServerImpl::Stop()
 }
 
 void
-KFServingHTTPServerImpl::StopCallback(int sock, short events, void* arg)
+HTTPServerImpl::StopCallback(int sock, short events, void* arg)
 {
   struct event_base* base = (struct event_base*)arg;
   event_base_loopbreak(base);
 }
 
 void
-KFServingHTTPServerImpl::Dispatch(evhtp_request_t* req, void* arg)
+HTTPServerImpl::Dispatch(evhtp_request_t* req, void* arg)
 {
-  (static_cast<KFServingHTTPServerImpl*>(arg))->Handle(req);
+  (static_cast<HTTPServerImpl*>(arg))->Handle(req);
 }
 
 
 // Handle HTTP requests to inference server APIs
-class KFServingHTTPAPIServer : public KFServingHTTPServerImpl {
+class HTTPAPIServer : public HTTPServerImpl {
  public:
-  explicit KFServingHTTPAPIServer(
+  explicit HTTPAPIServer(
       const std::shared_ptr<TRTSERVER_Server>& server,
       const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
           trace_manager,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
-      const int32_t port, const int thread_cnt)
-      : KFServingHTTPServerImpl(port, thread_cnt), server_(server),
+      const std::vector<std::string>& endpoints, const int32_t port,
+      const int thread_cnt)
+      : HTTPServerImpl(port, thread_cnt), server_(server),
         trace_manager_(trace_manager), smb_manager_(smb_manager),
-        allocator_(nullptr),
-        api_regex_(R"(/v1/models/([^(/|:)]+)(:predict|/metadata)?)")
+        allocator_(nullptr), api_regex_(R"(/v1/models/([^(/|:)]+)(:predict)?)")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -157,7 +158,7 @@ class KFServingHTTPAPIServer : public KFServingHTTPServerImpl {
         "creating response allocator");
   }
 
-  ~KFServingHTTPAPIServer()
+  ~HTTPAPIServer()
   {
     LOG_IF_ERR(
         TRTSERVER_ResponseAllocatorDelete(allocator_),
@@ -216,7 +217,6 @@ class KFServingHTTPAPIServer : public KFServingHTTPServerImpl {
   void Handle(evhtp_request_t* req) override;
   void HandleHealth(evhtp_request_t* req, const std::string& model_name);
   void HandleInfer(evhtp_request_t* req, const std::string& model_name);
-  void HandleStatus(evhtp_request_t* req, const std::string& model_name);
 
 #if TRTIS_ENABLE_GPU
   TRTSERVER_Error* EVBufferToCudaHandle(
@@ -248,7 +248,7 @@ class KFServingHTTPAPIServer : public KFServingHTTPServerImpl {
 };
 
 TRTSERVER_Error*
-KFServingHTTPAPIServer::ResponseAlloc(
+HTTPAPIServer::ResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
     int64_t preferred_memory_type_id, void* userp, void** buffer,
@@ -341,7 +341,7 @@ KFServingHTTPAPIServer::ResponseAlloc(
 }
 
 TRTSERVER_Error*
-KFServingHTTPAPIServer::ResponseRelease(
+HTTPAPIServer::ResponseRelease(
     TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
     size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
 {
@@ -354,7 +354,7 @@ KFServingHTTPAPIServer::ResponseRelease(
 }
 
 void
-KFServingHTTPAPIServer::Handle(evhtp_request_t* req)
+HTTPAPIServer::Handle(evhtp_request_t* req)
 {
   LOG_VERBOSE(1) << "KFServing HTTP request: " << req->method << " "
                  << req->uri->path->full;
@@ -362,13 +362,9 @@ KFServingHTTPAPIServer::Handle(evhtp_request_t* req)
   std::string model_name, rest;
   if (RE2::FullMatch(
           std::string(req->uri->path->full), api_regex_, &model_name, &rest)) {
-    // status
-    if (rest == "/metadata") {
-      HandleStatus(req, model_name);
-      return;
-    }
+    LOG_VERBOSE(1) << "model_name: " << model_name << ", rest: " << rest;
     // health
-    if ((rest == "") && (model_name != "metadata")) {
+    if (rest == "") {
       HandleHealth(req, model_name);
       return;
     }
@@ -386,8 +382,7 @@ KFServingHTTPAPIServer::Handle(evhtp_request_t* req)
 }
 
 void
-KFServingHTTPAPIServer::HandleHealth(
-    evhtp_request_t* req, const std::string& model_name)
+HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& model_name)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -399,7 +394,7 @@ KFServingHTTPAPIServer::HandleHealth(
     return;
   }
 
-  bool ready = true;
+  bool ready = false;
   TRTSERVER_Protobuf* server_status_protobuf = nullptr;
   TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
       server_.get(), model_name.c_str(), &server_status_protobuf);
@@ -413,21 +408,20 @@ KFServingHTTPAPIServer::HandleHealth(
       if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
         err = TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
-        if (err == nullptr) {
-          const auto& itr = server_status.model_status().find(model_name);
-          if (itr == server_status.model_status().end()) {
-            err = TRTSERVER_ErrorNew(
-                TRTSERVER_ERROR_INTERNAL,
-                std::string("unable to find health of \"" + model_name + "\"")
-                    .c_str());
-          } else {
-            auto model_versions = itr->second.version_status();
-            for (auto mit = model_versions.begin(); mit != model_versions.end();
-                 ++mit) {
-              if (mit->second.ready_state() == ModelReadyState::MODEL_READY) {
-                ready = false;
-              }
-            }
+      } else {
+        const auto& itr = server_status.model_status().find(model_name);
+        if (itr == server_status.model_status().end()) {
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INTERNAL,
+              std::string("unable to find health of \"" + model_name + "\"")
+                  .c_str());
+        } else {
+          auto model_versions = itr->second.version_status();
+          for (auto mit = model_versions.begin(); mit != model_versions.end();
+               ++mit) {
+            ready = (mit->second.ready_state() == ModelReadyState::MODEL_READY)
+                        ? true
+                        : false;
           }
         }
       }
@@ -451,80 +445,8 @@ KFServingHTTPAPIServer::HandleHealth(
   TRTSERVER_ErrorDelete(err);
 }
 
-void
-KFServingHTTPAPIServer::HandleStatus(
-    evhtp_request_t* req, const std::string& model_name)
-{
-  if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  if (model_name.empty()) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  }
-
-  TRTSERVER_Protobuf* server_status_protobuf = nullptr;
-  TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
-      server_.get(), model_name.c_str(), &server_status_protobuf);
-  if (err == nullptr) {
-    const char* status_buffer;
-    size_t status_byte_size;
-    err = TRTSERVER_ProtobufSerialize(
-        server_status_protobuf, &status_buffer, &status_byte_size);
-    if (err == nullptr) {
-      // Request text or binary format for status?
-      std::string format;
-      const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
-      if (format_c_str != NULL) {
-        format = std::string(format_c_str);
-      } else {
-        format = "text";
-      }
-
-      if (format == "binary") {
-        evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
-        evhtp_headers_add_header(
-            req->headers_out,
-            evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
-      } else {
-        ServerStatus server_status;
-        if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
-        } else {
-          std::string server_status_str = server_status.DebugString();
-          evbuffer_add(
-              req->buffer_out, server_status_str.c_str(),
-              server_status_str.size());
-        }
-      }
-    }
-  }
-
-  TRTSERVER_ProtobufDelete(server_status_protobuf);
-
-  RequestStatus request_status;
-  RequestStatusUtil::Create(
-      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
-      server_id_);
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (request_status.code() == RequestStatusCode::SUCCESS)
-               ? EVHTP_RES_OK
-               : EVHTP_RES_BADREQ);
-
-  TRTSERVER_ErrorDelete(err);
-}
-
 TRTSERVER_Error*
-KFServingHTTPAPIServer::EVBufferToInput(
+HTTPAPIServer::EVBufferToInput(
     const std::string& model_name, const InferRequestHeader& request_header,
     evbuffer* input_buffer,
     TRTSERVER_InferenceRequestProvider* request_provider,
@@ -540,10 +462,8 @@ KFServingHTTPAPIServer::EVBufferToInput(
   memset(request_buffer, 0, buffer_length);
   evbuffer_copyout(input_buffer, request_buffer, buffer_length);
 
-  // TODO MessageToJsonString to convert message to string (bytes encoded in
-  // Base64) on Client side)
   // Use JsonStringToMessage to convert a json string (bytes encoded in
-  // Base64) to message
+  // Base64) to a message
   InferRequest request;
   ::google::protobuf::util::JsonStringToMessage(
       std::string(request_buffer, buffer_length), &request);
@@ -640,8 +560,7 @@ KFServingHTTPAPIServer::EVBufferToInput(
 }
 
 void
-KFServingHTTPAPIServer::HandleInfer(
-    evhtp_request_t* req, const std::string& model_name)
+HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& model_name)
 {
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -771,10 +690,10 @@ KFServingHTTPAPIServer::HandleInfer(
 }
 
 void
-KFServingHTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
+HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
-  KFServingHTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<KFServingHTTPAPIServer::InferRequestClass*>(arg);
+  HTTPAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_OK);
@@ -795,10 +714,10 @@ KFServingHTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 }
 
 void
-KFServingHTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
+HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
-  KFServingHTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<KFServingHTTPAPIServer::InferRequestClass*>(arg);
+  HTTPAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_BADREQ);
@@ -818,7 +737,7 @@ KFServingHTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   delete infer_request;
 }
 
-KFServingHTTPAPIServer::InferRequestClass::InferRequestClass(
+HTTPAPIServer::InferRequestClass::InferRequestClass(
     evhtp_request_t* req, uint64_t request_id, const char* server_id,
     uint64_t unique_id)
     : req_(req), request_id_(request_id), server_id_(server_id),
@@ -830,12 +749,12 @@ KFServingHTTPAPIServer::InferRequestClass::InferRequestClass(
 }
 
 void
-KFServingHTTPAPIServer::InferRequestClass::InferComplete(
+HTTPAPIServer::InferRequestClass::InferComplete(
     TRTSERVER_Server* server, TRTSERVER_Trace* trace,
     TRTSERVER_InferenceResponse* response, void* userp)
 {
-  KFServingHTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<KFServingHTTPAPIServer::InferRequestClass*>(userp);
+  HTTPAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(userp);
   if (infer_request->FinalizeResponse(response) == EVHTP_RES_OK) {
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
@@ -849,7 +768,7 @@ KFServingHTTPAPIServer::InferRequestClass::InferComplete(
 }
 
 evhtp_res
-KFServingHTTPAPIServer::InferRequestClass::FinalizeResponse(
+HTTPAPIServer::InferRequestClass::FinalizeResponse(
     TRTSERVER_InferenceResponse* response)
 {
   InferResponseHeader response_header;
@@ -929,16 +848,27 @@ KFServingHTTPAPIServer::InferRequestClass::FinalizeResponse(
 }
 
 TRTSERVER_Error*
-KFServingHTTPServer::CreateAPIServer(
+HTTPServer::CreateAPIServer(
     const std::shared_ptr<TRTSERVER_Server>& server,
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
-    const std::shared_ptr<SharedMemoryBlockManager>& smb_manager, int32_t port_,
-    int thread_cnt, std::unique_ptr<KFServingHTTPServer>* kfserving_http_server)
+    const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
+    const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
+    std::vector<std::unique_ptr<HTTPServer>>* http_servers)
 {
-  std::string addr = "0.0.0.0:" + std::to_string(port_);
-  LOG_INFO << "Starting KFServingHTTPService at " << addr;
-  kfserving_http_server->reset(new KFServingHTTPAPIServer(
-      server, trace_manager, smb_manager, port_, thread_cnt));
+  if (port_map.empty()) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        "HTTP V2 is enabled but none of the service endpoints have a valid "
+        "port assignment");
+  }
+  http_servers->clear();
+  for (auto const& ep_map : port_map) {
+    std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
+    LOG_INFO << "Starting HTTPV2Service at " << addr;
+    http_servers->emplace_back(new HTTPAPIServer(
+        server, trace_manager, smb_manager, ep_map.second, ep_map.first,
+        thread_cnt));
+  }
 
   return nullptr;
 }

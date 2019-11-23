@@ -76,10 +76,17 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
   find_package(libevhtp CONFIG REQUIRED)
   message(STATUS "Using libevhtp ${libevhtp_VERSION}")
 
-  set(
-    HTTP_ENDPOINT_SRCS
-    http_server.cc
-  )
+  if(${TRTIS_ENABLE_HTTP_V2})
+    set(
+      HTTP_ENDPOINT_SRCS
+      http_v2_server.cc
+    )
+  else()
+    set(
+      HTTP_ENDPOINT_SRCS
+      http_server.cc
+    )
+  endif() # TRTIS_ENABLE_HTTP_V2
 
   set(
     HTTP_ENDPOINT_HDRS
@@ -114,55 +121,6 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
     PRIVATE -lre2
   )
 endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
-
-#
-# kfserving http endpoint
-#
-set(KFSERVING_HTTP_ENDPOINT_OBJECTS "")
-set(KFSERVING_HTTP_ENDPOINT_LIBRARIES "")
-
-if(${TRTIS_ENABLE_KFSERVING})
-  find_package(libevhtp CONFIG REQUIRED)
-  message(STATUS "Using libevhtp ${libevhtp_VERSION}")
-
-  set(
-    KFSERVING_HTTP_ENDPOINT_SRCS
-    kfserving_http_server.cc
-  )
-
-  set(
-    KFSERVING_HTTP_ENDPOINT_HDRS
-    kfserving_http_server.h
-  )
-
-  add_library(
-    kfserving-http-endpoint-library EXCLUDE_FROM_ALL OBJECT
-    ${KFSERVING_HTTP_ENDPOINT_SRCS} ${KFSERVING_HTTP_ENDPOINT_HDRS}
-  )
-
-  if(${TRTIS_ENABLE_GPU})
-    target_include_directories(kfserving-http-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
-  endif() # TRTIS_ENABLE_GPU
-
-  add_dependencies(kfserving-http-endpoint-library proto-library)
-  target_include_directories(
-    kfserving-http-endpoint-library
-    PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
-  )
-
-  set(
-    KFSERVING_HTTP_ENDPOINT_OBJECTS
-    $<TARGET_OBJECTS:kfserving-http-endpoint-library>
-    $<TARGET_OBJECTS:proto-library>
-  )
-  set(
-    KFSERVING_HTTP_ENDPOINT_LIBRARIES
-    PRIVATE ${LIBEVENT_LIBRARIES}
-    PRIVATE libevhtp::evhtp
-    PRIVATE protobuf::libprotobuf
-    PRIVATE -lre2
-  )
-endif() # TRTIS_ENABLE_KFSERVING
 
 #
 # tracing
@@ -220,7 +178,6 @@ add_executable(
   ${TRTSERVER_HDRS}
   ${HTTP_ENDPOINT_OBJECTS}
   ${GRPC_ENDPOINT_OBJECTS}
-  ${KFSERVING_HTTP_ENDPOINT_OBJECTS}
   ${TRACING_OBJECTS}
 )
 set_property(TARGET main PROPERTY OUTPUT_NAME trtserver)
@@ -231,7 +188,6 @@ target_link_libraries(
   main
   ${HTTP_ENDPOINT_LIBRARIES}
   ${GRPC_ENDPOINT_LIBRARIES}
-  ${KFSERVING_HTTP_ENDPOINT_LIBRARIES}
   ${TRACING_LIBRARIES}
   PRIVATE trtserver
 )
