@@ -338,18 +338,24 @@ ServerStatTimerScoped::~ServerStatTimerScoped()
 }
 
 void
-ModelInferStats::InitDerivedModelInfo(
-    TRTSERVER_Trace_Derived_Model_Info* parent)
+ModelInferStats::NewTrace(TRTSERVER_Trace* parent)
 {
 #ifdef TRTIS_ENABLE_TRACING
-  if (trace_ != nullptr) {
-    derived_model_info_.reset(new TRTSERVER_Trace_Derived_Model_Info);
-    Trace* ltrace = reinterpret_cast<Trace*>(trace_);
-    // Get an ID that is unique in respect to the trace
-    derived_model_info_->id_ = ltrace->NextId();
-    derived_model_info_->model_name_ = model_name_.c_str();
-    derived_model_info_->version_ = requested_model_version_;
-    derived_model_info_->parent_id_ = (parent != nullptr) ? parent->id_ : -1;
+  if (trace_manager_ != nullptr) {
+    auto ltrace_manager = reinterpret_cast<OpaqueTraceManager*>(trace_manager_);
+    TRTSERVER_Trace* trace = nullptr;
+    ltrace_manager->create_fn_(
+        &trace, model_name_.c_str(), requested_model_version_,
+        ltrace_manager->userp_);
+    if (trace != nullptr) {
+      auto ltrace = reinterpret_cast<Trace*>(trace);
+      ltrace->SetModelName(model_name_);
+      ltrace->SetModelVersion(requested_model_version_);
+      if (parent != nullptr) {
+        ltrace->SetParentId(reinterpret_cast<Trace*>(parent)->Id());
+      }
+      trace_ = trace;
+    }
   }
 #endif  // TRTIS_ENABLE_TRACING
 }
@@ -359,8 +365,11 @@ ModelInferStats::Report()
 {
 #ifdef TRTIS_ENABLE_TRACING
   if (trace_ != nullptr) {
-    Trace* ltrace = reinterpret_cast<Trace*>(trace_);
+    auto ltrace = reinterpret_cast<Trace*>(trace_);
     ltrace->Report(this);
+    // Inform that the trace object is done and can be released
+    auto ltrace_manager = reinterpret_cast<OpaqueTraceManager*>(trace_manager_);
+    ltrace_manager->release_fn_(trace_);
   }
 #endif  // TRTIS_ENABLE_TRACING
 

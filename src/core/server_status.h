@@ -103,7 +103,7 @@ class ModelInferStats {
         requested_model_version_(-1), batch_size_(0), gpu_device_(-1),
         failed_(false), execution_count_(0),
         timestamps_((size_t)TimestampKind::COUNT__), extra_queue_duration_(0),
-        extra_compute_duration_(0), trace_(nullptr)
+        extra_compute_duration_(0), trace_manager_(nullptr), trace_(nullptr)
   {
     memset(&timestamps_[0], 0, sizeof(struct timespec) * timestamps_.size());
   }
@@ -136,23 +136,23 @@ class ModelInferStats {
   // the batched requests will count the execution).
   void SetModelExecutionCount(uint32_t count) { execution_count_ = count; }
 
-  // Set the trace object if the inference will be traced.
-  void SetTrace(TRTSERVER_Trace* trace) { trace_ = trace; }
+  // Set the trace manager associated with the inference.
+  void SetTraceManager(TRTSERVER_TraceManager* tm) { trace_manager_ = tm; }
 
-  // Get the trace object related to the inference.
+  // Get the trace manager associated with the inference.
+  TRTSERVER_TraceManager* GetTraceManager() { return trace_manager_; }
+
+  // Create a trace object associated to the inference.
+  // Optional 'parent' can be provided if the trace object has a parent.
+  // Model name, model version, and trace manager should be set before calling
+  // this function. And each ModelInferStats instance should not call this
+  // function more than once.
+  void NewTrace(TRTSERVER_Trace* parent = nullptr);
+
+  // Get the trace object associated to the inference.
+  // Return nullptr if the inference will not be traced or if NewTrace()
+  // has not been called.
   TRTSERVER_Trace* GetTrace() { return trace_; }
-
-  // Initialize the information of a model execution derived from request to
-  // an ensemble model, which will be used for tracing.
-  // This function Has no effect if not being traced.
-  void InitDerivedModelInfo(TRTSERVER_Trace_Derived_Model_Info* parent);
-
-  // Get the derived model information struct. nullptr will be returned if
-  // InitDerivedModelInfo() hasn't been called.
-  TRTSERVER_Trace_Derived_Model_Info* GetDerivedModelInfo() const
-  {
-    return derived_model_info_.get();
-  }
 
   // Get the timestamp for a kind.
   const struct timespec& Timestamp(TimestampKind kind) const
@@ -194,8 +194,11 @@ class ModelInferStats {
   uint64_t extra_queue_duration_;
   uint64_t extra_compute_duration_;
 
+  // not own
+  TRTSERVER_TraceManager* trace_manager_;
+
+  // not own
   TRTSERVER_Trace* trace_;
-  std::unique_ptr<TRTSERVER_Trace_Derived_Model_Info> derived_model_info_;
 };
 
 // Manage access and updates to server status information.

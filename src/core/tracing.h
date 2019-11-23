@@ -27,6 +27,8 @@
 
 #ifdef TRTIS_ENABLE_TRACING
 
+#include <atomic>
+#include <memory>
 #include <vector>
 #include "src/core/server_status.h"
 #include "src/core/status.h"
@@ -35,42 +37,61 @@
 namespace nvidia { namespace inferenceserver {
 
 //
+// A light-weight structure to store user-provided trace manager.
+//
+struct OpaqueTraceManager {
+  TRTSERVER_TraceManagerCreateTraceFn_t create_fn_;
+  TRTSERVER_TraceManagerReleaseTraceFn_t release_fn_;
+  void* userp_;
+};
+
+//
 // A trace.
 //
 class Trace {
  public:
   static Status Create(
       TRTSERVER_Trace_Level level, TRTSERVER_TraceActivityFn_t activity_fn,
-      TRTSERVER_TracePushFn_t push_fn, TRTSERVER_TracePopFn_t pop_fn,
       void* activity_userp, std::unique_ptr<Trace>* trace)
   {
-    trace->reset(
-        new Trace(level, activity_fn, push_fn, pop_fn, activity_userp));
+    trace->reset(new Trace(level, activity_fn, activity_userp));
     return Status::Success;
   }
 
-  int64_t NextId() { return ++id_; }
+  void SetModelName(const std::string& n) { model_name_ = n; }
+  void SetModelVersion(int64_t v) { model_version_ = v; }
+  void SetParentId(int64_t pid) { parent_id_ = pid; }
+
+  void* ActivityUserp() { return activity_userp_; }
+  const char* ModelName() { return model_name_.c_str(); }
+  int64_t ModelVersion() { return model_version_; }
+  int64_t Id() { return id_; }
+  int64_t ParentId() { return parent_id_; }
 
   void Report(const ModelInferStats* infer_stats);
 
  private:
   Trace(
       TRTSERVER_Trace_Level level, TRTSERVER_TraceActivityFn_t activity_fn,
-      TRTSERVER_TracePushFn_t push_fn, TRTSERVER_TracePopFn_t pop_fn,
       void* activity_userp)
-      : level_(level), activity_fn_(activity_fn), push_fn_(push_fn),
-        pop_fn_(pop_fn), activity_userp_(activity_userp)
+      : level_(level), activity_fn_(activity_fn),
+        activity_userp_(activity_userp), id_(next_id_++), parent_id_(-1)
   {
   }
 
   const TRTSERVER_Trace_Level level_;
   TRTSERVER_TraceActivityFn_t activity_fn_;
-  TRTSERVER_TracePushFn_t push_fn_;
-  TRTSERVER_TracePopFn_t pop_fn_;
   void* activity_userp_;
 
-  // Declare static so that IDs are unique even across traces
-  static std::atomic<int64_t> id_;
+  std::string model_name_;
+  int64_t model_version_;
+
+  // unique id will be assigned when the trace object is being created
+  int64_t id_;
+  int64_t parent_id_;
+
+  // Maintain next id statically so that trace id is unique even across traces
+  static std::atomic<int64_t> next_id_;
 };
 
 }}  // namespace nvidia::inferenceserver

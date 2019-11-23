@@ -313,13 +313,6 @@ EnsembleContext::EnsembleContext(
   } else {
     allocator_.reset(allocator);
   }
-
-  // If there is no derived model info associated with the ensemble request,
-  // it will be the first and should initialize a model info for itself so that
-  // the sequential model execution will know the parent.
-  if (stats_->GetDerivedModelInfo() == nullptr) {
-    stats_->InitDerivedModelInfo(nullptr);
-  }
 }
 
 TRTSERVER_Error*
@@ -736,8 +729,8 @@ EnsembleContext::ScheduleSteps(
     infer_stats->SetFailed(true);
 
     // Passing trace-related objects down
-    infer_stats->SetTrace(context->stats_->GetTrace());
-    infer_stats->InitDerivedModelInfo(context->stats_->GetDerivedModelInfo());
+    infer_stats->SetTraceManager(context->stats_->GetTraceManager());
+    infer_stats->NewTrace(context->stats_->GetTrace());
 
     context->is_->InferAsync(
         step->backend_, step->request_provider_, step->response_provider_,
