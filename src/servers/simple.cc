@@ -529,8 +529,8 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       TRTSERVER_ServerInferAsync(
-          server.get(), nullptr /* trace */, request_provider, allocator,
-          nullptr /* response_allocator_userp */, InferComplete,
+          server.get(), nullptr /* trace_manager */, request_provider,
+          allocator, nullptr /* response_allocator_userp */, InferComplete,
           reinterpret_cast<void*>(p)),
       "running inference");
 

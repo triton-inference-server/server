@@ -203,8 +203,8 @@ class HandlerState {
       }
 
 #ifdef TRTIS_ENABLE_TRACING
-      if (state->tracer_ != nullptr) {
-        state->tracer_->CaptureTimestamp(
+      if (state->trace_meta_data_ != nullptr) {
+        state->trace_meta_data_->tracer_->CaptureTimestamp(
             TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
       }
 #endif  // TRTIS_ENABLE_TRACING
@@ -291,7 +291,7 @@ class HandlerState {
   Steps step_;
 
 #ifdef TRTIS_ENABLE_TRACING
-  std::unique_ptr<Tracer> tracer_;
+  std::unique_ptr<TraceMetaData> trace_meta_data_;
 #endif  // TRTIS_ENABLE_TRACING
 
   RequestType request_;
@@ -997,9 +997,9 @@ InferHandler::StartNewRequest()
 
 #ifdef TRTIS_ENABLE_TRACING
   if (trace_manager_ != nullptr) {
-    state->tracer_.reset(trace_manager_->SampleTrace());
-    if (state->tracer_ != nullptr) {
-      state->tracer_->CaptureTimestamp(
+    state->trace_meta_data_.reset(trace_manager_->SampleTrace());
+    if (state->trace_meta_data_ != nullptr) {
+      state->trace_meta_data_->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
     }
   }
@@ -1039,9 +1039,10 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
 
   if (state->step_ == Steps::START) {
 #ifdef TRTIS_ENABLE_TRACING
-    if (state->tracer_ != nullptr) {
-      state->tracer_->SetModel(request.model_name(), request.model_version());
-      state->tracer_->CaptureTimestamp(
+    if (state->trace_meta_data_ != nullptr) {
+      state->trace_meta_data_->tracer_->SetModel(
+          request.model_name(), request.model_version());
+      state->trace_meta_data_->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
     }
 #endif  // TRTIS_ENABLE_TRACING
@@ -1074,18 +1075,20 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
               trtserver_, smb_manager_, request.meta_data(), response,
               &state->alloc_payload_);
           if (err == nullptr) {
-            // Get the trace object to use for this request. If
+            // Provide the trace manager object to use for this request, if
             // nullptr then no tracing will be performed.
-            TRTSERVER_Trace* trace = nullptr;
+            TRTSERVER_TraceManager* trace_manager = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
-            if (state->tracer_ != nullptr) {
-              trace = state->tracer_->ServerTrace();
+            if (state->trace_meta_data_ != nullptr) {
+              TRTSERVER_TraceManagerNew(
+                  &trace_manager, TraceManager::CreateTrace,
+                  TraceManager::ReleaseTrace, state->trace_meta_data_.get());
             }
 #endif  // TRTIS_ENABLE_TRACING
 
             state->step_ = ISSUED;
             err = TRTSERVER_ServerInferAsync(
-                trtserver_.get(), trace, request_provider, allocator_,
+                trtserver_.get(), trace_manager, request_provider, allocator_,
                 &state->alloc_payload_ /* response_allocator_userp */,
                 InferComplete, reinterpret_cast<void*>(state));
           }
@@ -1116,8 +1119,8 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
       response.mutable_meta_data()->set_id(request.meta_data().id());
 
 #ifdef TRTIS_ENABLE_TRACING
-      if (state->tracer_ != nullptr) {
-        state->tracer_->CaptureTimestamp(
+      if (state->trace_meta_data_ != nullptr) {
+        state->trace_meta_data_->tracer_->CaptureTimestamp(
             TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
       }
 #endif  // TRTIS_ENABLE_TRACING
@@ -1127,8 +1130,8 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
     }
   } else if (state->step_ == Steps::COMPLETE) {
 #ifdef TRTIS_ENABLE_TRACING
-    if (state->tracer_ != nullptr) {
-      state->tracer_->CaptureTimestamp(
+    if (state->trace_meta_data_ != nullptr) {
+      state->trace_meta_data_->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "grpc send end");
     }
 #endif  // TRTIS_ENABLE_TRACING
@@ -1207,8 +1210,8 @@ InferHandler::InferComplete(
   response.mutable_meta_data()->set_id(request.meta_data().id());
 
 #ifdef TRTIS_ENABLE_TRACING
-  if (state->tracer_ != nullptr) {
-    state->tracer_->CaptureTimestamp(
+  if (state->trace_meta_data_ != nullptr) {
+    state->trace_meta_data_->tracer_->CaptureTimestamp(
         TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -1268,9 +1271,9 @@ StreamInferHandler::StartNewRequest()
 
 #ifdef TRTIS_ENABLE_TRACING
   if (trace_manager_ != nullptr) {
-    state->tracer_.reset(trace_manager_->SampleTrace());
-    if (state->tracer_ != nullptr) {
-      state->tracer_->CaptureTimestamp(
+    state->trace_meta_data_.reset(trace_manager_->SampleTrace());
+    if (state->trace_meta_data_ != nullptr) {
+      state->trace_meta_data_->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
     }
   }
@@ -1315,10 +1318,10 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
   } else if (state->step_ == Steps::READ) {
 #ifdef TRTIS_ENABLE_TRACING
-    if (state->tracer_ != nullptr) {
-      state->tracer_->SetModel(
+    if (state->trace_meta_data_ != nullptr) {
+      state->trace_meta_data_->tracer_->SetModel(
           state->request_.model_name(), state->request_.model_version());
-      state->tracer_->CaptureTimestamp(
+      state->trace_meta_data_->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
     }
 #endif  // TRTIS_ENABLE_TRACING
@@ -1379,18 +1382,20 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
               trtserver_, smb_manager_, request.meta_data(), response,
               &state->alloc_payload_);
           if (err == nullptr) {
-            // Get the trace object to use for this request. If
+            // Provide the trace manager object to use for this request, if
             // nullptr then no tracing will be performed.
-            TRTSERVER_Trace* trace = nullptr;
+            TRTSERVER_TraceManager* trace_manager = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
-            if (state->tracer_ != nullptr) {
-              trace = state->tracer_->ServerTrace();
+            if (state->trace_meta_data_ != nullptr) {
+              TRTSERVER_TraceManagerNew(
+                  &trace_manager, TraceManager::CreateTrace,
+                  TraceManager::ReleaseTrace, state->trace_meta_data_.get());
             }
 #endif  // TRTIS_ENABLE_TRACING
 
             state->step_ = ISSUED;
             err = TRTSERVER_ServerInferAsync(
-                trtserver_.get(), trace, request_provider, allocator_,
+                trtserver_.get(), trace_manager, request_provider, allocator_,
                 &state->alloc_payload_ /* response_allocator_userp */,
                 StreamInferComplete, reinterpret_cast<void*>(state));
           }
@@ -1435,9 +1440,9 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // Capture a timestamp for the time when we start waiting for this
     // next request to read.
     if (trace_manager_ != nullptr) {
-      next_read_state->tracer_.reset(trace_manager_->SampleTrace());
-      if (next_read_state->tracer_ != nullptr) {
-        next_read_state->tracer_->CaptureTimestamp(
+      next_read_state->trace_meta_data_.reset(trace_manager_->SampleTrace());
+      if (next_read_state->trace_meta_data_ != nullptr) {
+        next_read_state->trace_meta_data_->tracer_->CaptureTimestamp(
             TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
       }
     }
@@ -1448,8 +1453,8 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
   } else if (state->step_ == Steps::WRITTEN) {
 #ifdef TRTIS_ENABLE_TRACING
-    if (state->tracer_ != nullptr) {
-      state->tracer_->CaptureTimestamp(
+    if (state->trace_meta_data_ != nullptr) {
+      state->trace_meta_data_->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "grpc send end");
     }
 #endif  // TRTIS_ENABLE_TRACING

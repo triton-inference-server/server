@@ -253,7 +253,7 @@ class HTTPAPIServer : public HTTPServerImpl {
     evhtp_res FinalizeResponse(TRTSERVER_InferenceResponse* response);
 
 #ifdef TRTIS_ENABLE_TRACING
-    std::unique_ptr<Tracer> tracer_;
+    std::unique_ptr<TraceMetaData> trace_meta_data_;
 #endif  // TRTIS_ENABLE_TRACING
 
     std::unique_ptr<EVBufferPair> response_pair_;
@@ -1115,15 +1115,15 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
 #ifdef TRTIS_ENABLE_TRACING
   // Timestamps from evhtp are capture in 'req'. We record here since
   // this is the first place where we have a tracer.
-  std::unique_ptr<Tracer> tracer;
+  std::unique_ptr<TraceMetaData> trace_meta_data;
   if (trace_manager_ != nullptr) {
-    tracer.reset(trace_manager_->SampleTrace());
-    if (tracer != nullptr) {
-      tracer->SetModel(model_name, model_version);
-      tracer->CaptureTimestamp(
+    trace_meta_data.reset(trace_manager_->SampleTrace());
+    if (trace_meta_data != nullptr) {
+      trace_meta_data->tracer_->SetModel(model_name, model_version);
+      trace_meta_data->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "http recv start",
           TIMESPEC_TO_NANOS(req->recv_start_ts));
-      tracer->CaptureTimestamp(
+      trace_meta_data->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "http recv end",
           TIMESPEC_TO_NANOS(req->recv_end_ts));
     }
@@ -1166,18 +1166,20 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
       response_pair->first = req->buffer_out;
       infer_request->response_pair_.reset(response_pair);
 
-      // Get the trace object to use for this request. If nullptr then
-      // no tracing will be performed.
-      TRTSERVER_Trace* trace = nullptr;
+      // Provide the trace manager object to use for this request, if nullptr
+      // then no tracing will be performed.
+      TRTSERVER_TraceManager* trace_manager = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
-      if (tracer != nullptr) {
-        infer_request->tracer_ = std::move(tracer);
-        trace = infer_request->tracer_->ServerTrace();
+      if (trace_meta_data != nullptr) {
+        infer_request->trace_meta_data_ = std::move(trace_meta_data);
+        TRTSERVER_TraceManagerNew(
+            &trace_manager, TraceManager::CreateTrace,
+            TraceManager::ReleaseTrace, infer_request->trace_meta_data_.get());
       }
 #endif  // TRTIS_ENABLE_TRACING
 
       err = TRTSERVER_ServerInferAsync(
-          server_.get(), trace, request_provider, allocator_,
+          server_.get(), trace_manager, request_provider, allocator_,
           reinterpret_cast<void*>(response_pair), InferRequest::InferComplete,
           reinterpret_cast<void*>(infer_request));
       if (err != nullptr) {
@@ -1232,11 +1234,11 @@ HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
   evhtp_request_resume(request);
 
 #ifdef TRTIS_ENABLE_TRACING
-  if (infer_request->tracer_ != nullptr) {
-    infer_request->tracer_->CaptureTimestamp(
+  if (infer_request->trace_meta_data_ != nullptr) {
+    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
         TRTSERVER_TRACE_LEVEL_MIN, "http send start",
         TIMESPEC_TO_NANOS(request->send_start_ts));
-    infer_request->tracer_->CaptureTimestamp(
+    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
         TRTSERVER_TRACE_LEVEL_MIN, "http send end",
         TIMESPEC_TO_NANOS(request->send_end_ts));
   }
@@ -1256,11 +1258,11 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   evhtp_request_resume(request);
 
 #ifdef TRTIS_ENABLE_TRACING
-  if (infer_request->tracer_ != nullptr) {
-    infer_request->tracer_->CaptureTimestamp(
+  if (infer_request->trace_meta_data_->tracer_ != nullptr) {
+    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
         TRTSERVER_TRACE_LEVEL_MIN, "http send start",
         TIMESPEC_TO_NANOS(request->send_start_ts));
-    infer_request->tracer_->CaptureTimestamp(
+    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
         TRTSERVER_TRACE_LEVEL_MIN, "http send end",
         TIMESPEC_TO_NANOS(request->send_end_ts));
   }
