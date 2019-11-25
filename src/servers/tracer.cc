@@ -103,7 +103,7 @@ TraceManager::SetRate(uint32_t rate)
   return nullptr;  // success
 }
 
-Tracer*
+TraceMetaData*
 TraceManager::SampleTrace()
 {
   uint64_t s = sample_.fetch_add(1);
@@ -111,25 +111,94 @@ TraceManager::SampleTrace()
     return nullptr;
   }
 
-  Tracer* tracer = new Tracer(shared_from_this(), level_);
+  auto trace_meta_data = new TraceMetaData;
+  trace_meta_data->manager_ = this;
+  trace_meta_data->trace_set_ = false;
 
-  TRTSERVER_Trace* trace = nullptr;
+  // An outermost tracer object that also in charge of collecting timestamps
+  // in server frontend, it will not bind to a particular TRTSERVER_Trace as
+  // it lives longer than the trace.
+  trace_meta_data->tracer_.reset(new Tracer(shared_from_this(), level_));
+  return trace_meta_data;
+}
+
+void
+TraceManager::CreateTrace(
+    TRTSERVER_Trace** trace, const char* model_name, int64_t version,
+    void* userp)
+{
+  // 'userp' should be not be nullptr if the request should be traced
+  if (userp == nullptr) {
+    *trace = nullptr;
+    return;
+  }
+
+  auto lmeta_data = reinterpret_cast<TraceMetaData*>(userp);
+
+  if (lmeta_data->trace_set_.exchange(true)) {
+    // If true has been stored, this is not the first trace to be created
+    lmeta_data->manager_->NewTrace(trace);
+  } else {
+    // Otherwise, just link the trace with the tracer in meta data.
+    // Note that SetServerTrace() is not called to hint that the tracer
+    // should not share the same lifetime as the trace.
+    TRTSERVER_Error* err = TRTSERVER_TraceNew(
+        trace, lmeta_data->manager_->level_, Tracer::TraceActivity,
+        lmeta_data->tracer_.get() /* userp */);
+    if (err != nullptr) {
+      LOG_ERROR << "error creating trace: " << TRTSERVER_ErrorCodeString(err)
+                << " - " << TRTSERVER_ErrorMessage(err);
+      TRTSERVER_ErrorDelete(err);
+    }
+  }
+}
+
+void
+TraceManager::NewTrace(TRTSERVER_Trace** trace)
+{
+  auto tracer = new Tracer(shared_from_this(), level_);
   TRTSERVER_Error* err = TRTSERVER_TraceNew(
-      &trace, level_, Tracer::TraceActivity, Tracer::CreateDerivedTracer,
-      Tracer::ReleaseDerivedTracer, tracer /* userp */);
+      trace, level_, Tracer::TraceActivity, (void*)tracer /* userp */);
   if (err != nullptr) {
     delete tracer;
 
     LOG_ERROR << "error creating trace: " << TRTSERVER_ErrorCodeString(err)
               << " - " << TRTSERVER_ErrorMessage(err);
     TRTSERVER_ErrorDelete(err);
-
-    return nullptr;
+  } else {
+    tracer->SetServerTrace(*trace);
   }
+}
 
-  tracer->SetServerTrace(trace);
+void
+TraceManager::ReleaseTrace(TRTSERVER_Trace* trace)
+{
+  if (trace != nullptr) {
+    Tracer* tracer = nullptr;
+    LOG_IF_ERR(
+        TRTSERVER_TraceUserp(trace, (void**)&tracer),
+        "getting associated tracer");
+    // Gather trace info
+    const char* model_name;
+    int64_t model_version, id, parent_id;
+    LOG_IF_ERR(
+        TRTSERVER_TraceModelName(trace, &model_name), "getting model name");
+    LOG_IF_ERR(
+        TRTSERVER_TraceModelVersion(trace, &model_version),
+        "getting model version");
+    LOG_IF_ERR(TRTSERVER_TraceId(trace, &id), "getting trace id");
+    LOG_IF_ERR(
+        TRTSERVER_TraceParentId(trace, &parent_id), "getting trace parent id");
+    tracer->SetModel(model_name, model_version);
+    tracer->SetId(id, parent_id);
 
-  return tracer;
+    if (tracer->ServerTrace() != nullptr) {
+      delete tracer;
+    } else {
+      // If the tracer is not tied with a trace, then only delete the trace.
+      LOG_IF_ERR(TRTSERVER_TraceDelete(trace), "deleting trace");
+    }
+  }
 }
 
 void
@@ -230,34 +299,6 @@ Tracer::TraceActivity(
   }
 
   tracer->CaptureTimestamp(tracer->level_, activity_name, timestamp_ns);
-}
-
-void*
-Tracer::CreateDerivedTracer(
-    TRTSERVER_Trace* trace,
-    TRTSERVER_Trace_Derived_Model_Info* derived_model_info, void* userp)
-{
-  Tracer* tracer = reinterpret_cast<Tracer*>(userp);
-  Tracer* derived_tracer = tracer;
-  // Initialize derived tracer if the model info is not referring to
-  // the ensemble model itself. Otherwise just keep track of the id.
-  if (derived_model_info->parent_id_ != -1) {
-    derived_tracer = new Tracer(tracer->manager_, tracer->level_);
-    derived_tracer->parent_id_ = derived_model_info->parent_id_;
-    derived_tracer->SetModel(
-        derived_model_info->model_name_, derived_model_info->version_);
-  }
-  derived_tracer->id_ = derived_model_info->id_;
-  return derived_tracer;
-}
-
-void
-Tracer::ReleaseDerivedTracer(TRTSERVER_Trace* trace, void* userp)
-{
-  Tracer* tracer = reinterpret_cast<Tracer*>(userp);
-  if (tracer->parent_id_ != -1) {
-    delete tracer;
-  }
 }
 
 }}  // namespace nvidia::inferenceserver

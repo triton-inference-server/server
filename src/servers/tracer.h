@@ -36,6 +36,14 @@
 namespace nvidia { namespace inferenceserver {
 
 class Tracer;
+class TraceManager;
+
+struct TraceMetaData {
+  // just a pointer to the manager, 'tracer_' objects hold it's shared pointer.
+  TraceManager* manager_;
+  std::atomic<bool> trace_set_;
+  std::unique_ptr<Tracer> tracer_;
+};
 
 //
 // Manager for tracing to a file.
@@ -56,13 +64,24 @@ class TraceManager : public std::enable_shared_from_this<TraceManager> {
   // Return a trace object that should be used to collected trace
   // activities for an inference request. Return nullptr if no tracing
   // should occur.
-  Tracer* SampleTrace();
+  TraceMetaData* SampleTrace();
+
+  // Create a trace object that should be used to collected trace
+  // activities for the inference request. Return nullptr if no tracing
+  // should occur.
+  static void CreateTrace(
+      TRTSERVER_Trace** trace, const char* model_name, int64_t version,
+      void* userp);
+
+  static void ReleaseTrace(TRTSERVER_Trace* trace);
 
   // Write to the trace file.
   void WriteTrace(const std::stringstream& ss);
 
  private:
   TraceManager(std::unique_ptr<std::ofstream> trace_file);
+
+  void NewTrace(TRTSERVER_Trace** trace);
 
   std::mutex mu_;
   std::unique_ptr<std::ofstream> trace_file_;
@@ -89,16 +108,16 @@ class Tracer {
       TRTSERVER_Trace* trace, TRTSERVER_Trace_Activity activity,
       uint64_t timestamp_ns, void* userp);
 
-  static void* CreateDerivedTracer(
-      TRTSERVER_Trace* trace,
-      TRTSERVER_Trace_Derived_Model_Info* derived_model_info, void* userp);
-
-  static void ReleaseDerivedTracer(TRTSERVER_Trace* trace, void* userp);
-
   void SetModel(const std::string& model_name, int64_t model_version)
   {
     model_name_ = model_name;
     model_version_ = model_version;
+  }
+
+  void SetId(int64_t id, int64_t parent_id)
+  {
+    id_ = id;
+    parent_id_ = parent_id;
   }
 
   void SetServerTrace(TRTSERVER_Trace* trace) { trace_ = trace; }
