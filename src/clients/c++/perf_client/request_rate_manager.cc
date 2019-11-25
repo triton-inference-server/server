@@ -26,6 +26,13 @@
 
 #include "src/clients/c++/perf_client/request_rate_manager.h"
 
+RequestRateManager::~RequestRateManager()
+{
+  // The destruction of derived class should wait for all the request generator
+  // threads to finish
+  StopWorkerThreads();
+}
+
 nic::Error
 RequestRateManager::Create(
     const bool async, const uint64_t measurement_window_ms,
@@ -35,19 +42,26 @@ RequestRateManager::Create(
     const std::string& string_data, const bool zero_input,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     const std::string& data_directory,
+    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<RequestRateManager> local_manager(new RequestRateManager(
       async, input_shapes, request_distribution, batch_size,
       measurement_window_ms, max_threads, num_of_sequences, sequence_length,
-      factory));
+      shared_memory_type, output_shm_size, factory));
 
   local_manager->threads_config_.reserve(max_threads);
 
-  RETURN_IF_ERROR(InitManagerInputs(
-      std::move(local_manager), string_length, string_data, zero_input,
-      data_directory, manager));
+  RETURN_IF_ERROR(local_manager->InitManagerInputs(
+      string_length, string_data, zero_input, data_directory));
+
+  if (local_manager->shared_memory_type_ !=
+      SharedMemoryType::NO_SHARED_MEMORY) {
+    RETURN_IF_ERROR(local_manager->InitSharedMemory());
+  }
+
+  *manager = std::move(local_manager);
 
   return nic::Error::Success;
 }
@@ -58,21 +72,14 @@ RequestRateManager::RequestRateManager(
     Distribution request_distribution, int32_t batch_size,
     const uint64_t measurement_window_ms, const size_t max_threads,
     const uint32_t num_of_sequences, const size_t sequence_length,
+    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory)
-    : request_distribution_(request_distribution), execute_(false),
+    : LoadManager(
+          async, input_shapes, batch_size, max_threads, sequence_length,
+          shared_memory_type, output_shm_size, factory),
+      request_distribution_(request_distribution), execute_(false),
       next_corr_id_(1)
 {
-  async_ = async;
-  batch_size_ = batch_size;
-  max_threads_ = max_threads;
-  sequence_length_ = sequence_length;
-  factory_ = factory;
-  input_shapes_ = input_shapes;
-
-  on_sequence_model_ =
-      ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
-       (factory_->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE));
-
   if (on_sequence_model_) {
     for (uint64_t i = 0; i < num_of_sequences; i++) {
       sequence_stat_.emplace_back(new SequenceStat(next_corr_id_++));
@@ -183,7 +190,11 @@ RequestRateManager::Infer(
   thread_stat->contexts_stat_.emplace_back();
 
   std::unique_ptr<nic::InferContext::Options> options(nullptr);
-  thread_stat->status_ = PrepareInfer(&(ctx->ctx_), &options);
+  if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
+    thread_stat->status_ = PrepareInfer(&(ctx->ctx_), &options);
+  } else {
+    thread_stat->status_ = PrepareSharedMemoryInfer(&(ctx->ctx_), &options);
+  }
   if (!thread_stat->status_.IsOk()) {
     return;
   }

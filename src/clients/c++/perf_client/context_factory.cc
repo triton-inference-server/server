@@ -31,10 +31,12 @@ ContextFactory::Create(
     const std::string& url, const ProtocolType protocol,
     const std::map<std::string, std::string>& http_headers,
     const bool streaming, const std::string& model_name,
-    const int64_t model_version, std::shared_ptr<ContextFactory>* factory)
+    const int64_t model_version, const bool verbose,
+    std::shared_ptr<ContextFactory>* factory)
 {
   factory->reset(new ContextFactory(
-      url, protocol, http_headers, streaming, model_name, model_version));
+      url, protocol, http_headers, streaming, model_name, model_version,
+      verbose));
 
   ni::ServerStatus server_status;
   std::unique_ptr<nic::ServerStatusContext> ctx;
@@ -127,6 +129,21 @@ ContextFactory::CreateInferContext(std::unique_ptr<nic::InferContext>* ctx)
   } else {
     err = nic::InferGrpcContext::Create(
         ctx, correlation_id, url_, model_name_, model_version_, false);
+  }
+  return err;
+}
+
+
+nic::Error
+ContextFactory::CreateSharedMemoryControlContext(
+    std::unique_ptr<nic::SharedMemoryControlContext>* ctx)
+{
+  nic::Error err;
+  if (protocol_ == ProtocolType::HTTP) {
+    err = nic::SharedMemoryControlHttpContext::Create(
+        ctx, url_, http_headers_, verbose_);
+  } else {
+    err = nic::SharedMemoryControlGrpcContext::Create(ctx, url_, verbose_);
   }
   return err;
 }

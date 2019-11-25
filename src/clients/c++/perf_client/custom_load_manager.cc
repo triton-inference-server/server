@@ -35,19 +35,26 @@ CustomLoadManager::Create(
     const std::string& string_data, const bool zero_input,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     const std::string& data_directory,
+    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<CustomLoadManager> local_manager(new CustomLoadManager(
       async, input_shapes, request_intervals_file, batch_size,
       measurement_window_ms, max_threads, num_of_sequences, sequence_length,
-      factory));
+      shared_memory_type, output_shm_size, factory));
 
   local_manager->threads_config_.reserve(max_threads);
 
-  RETURN_IF_ERROR(InitManagerInputs(
-      std::move(local_manager), string_length, string_data, zero_input,
-      data_directory, manager));
+  RETURN_IF_ERROR(local_manager->InitManagerInputs(
+      string_length, string_data, zero_input, data_directory));
+
+  if (local_manager->shared_memory_type_ !=
+      SharedMemoryType::NO_SHARED_MEMORY) {
+    RETURN_IF_ERROR(local_manager->InitSharedMemory());
+  }
+
+  *manager = std::move(local_manager);
 
   return nic::Error::Success;
 }
@@ -58,11 +65,12 @@ CustomLoadManager::CustomLoadManager(
     const std::string& request_intervals_file, int32_t batch_size,
     const uint64_t measurement_window_ms, const size_t max_threads,
     const uint32_t num_of_sequences, const size_t sequence_length,
+    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory)
     : RequestRateManager(
           async, input_shapes, Distribution::CUSTOM, batch_size,
           measurement_window_ms, max_threads, num_of_sequences, sequence_length,
-          factory),
+          shared_memory_type, output_shm_size, factory),
       request_intervals_file_(request_intervals_file)
 {
 }
