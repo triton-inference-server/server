@@ -33,7 +33,7 @@
 
 class LoadManager {
  public:
-  ~LoadManager();
+  virtual ~LoadManager();
 
   /// Check if the load manager is working as expected.
   /// \return Error object indicating success or failure.
@@ -73,26 +73,44 @@ class LoadManager {
 
 
  protected:
+  LoadManager(
+      const bool async,
+      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
+      const int32_t batch_size, const size_t max_threads,
+      const size_t sequence_length, const SharedMemoryType shared_memory_type,
+      const size_t output_shm_size,
+      const std::shared_ptr<ContextFactory>& factory);
+
   /// Helper funtion to retrieve the input data for the inferences
-  /// \param local_manager The current manager object under construction.
   /// \param string_length The length of the random strings to be generated
   /// for string inputs.
   /// \param string_data The string to be used as string inputs for model.
   /// \param zero_input Whether to use zero for model inputs.
   /// \param data_directory The path to the directory containing the input data
   /// in binary or text files.
-  /// \param manager Returns the final manager object with inputs initialized
   /// \return Error object indicating success or failure.
-  static nic::Error InitManagerInputs(
-      std::unique_ptr<LoadManager> local_manager, const size_t string_length,
-      const std::string& string_data, const bool zero_input,
-      const std::string& data_directory, std::unique_ptr<LoadManager>* manager);
+  nic::Error InitManagerInputs(
+      const size_t string_length, const std::string& string_data,
+      const bool zero_input, const std::string& data_directory);
 
+  /// Helper function to allocate and prepare shared memory.
+  /// from shared memory.
+  /// \return Error object indicating success or failure.
+  nic::Error InitSharedMemory();
 
   /// Helper function to prepare the InferContext for sending inference request.
   /// \param ctx Returns a new InferContext.
   /// \param options Returns the options used by 'ctx'.
   nic::Error PrepareInfer(
+      std::unique_ptr<nic::InferContext>* ctx,
+      std::unique_ptr<nic::InferContext::Options>* options);
+
+  /// Helper function to prepare the InferContext for sending inference request
+  /// in shared memory.
+  /// \param ctx Returns a new InferContext.
+  /// \param options
+  /// Returns the options used by 'ctx'.
+  nic::Error PrepareSharedMemoryInfer(
       std::unique_ptr<nic::InferContext>* ctx,
       std::unique_ptr<nic::InferContext::Options>* options);
 
@@ -102,28 +120,44 @@ class LoadManager {
   /// \return random sequence length
   size_t GetRandomLength(double offset_ratio);
 
+  /// Stops all the worker threads generating the request load.
+  void StopWorkerThreads();
+
+ private:
+  /// Helper function to access data for the specified input
+  /// \param input The target input
+  /// Returns the pointer to the memory holding data
+  nic::Error GetInputData(
+      std::shared_ptr<nic::InferContext::Input> input, const uint8_t** data,
+      size_t* batch1_size);
+
+ protected:
   bool async_;
+  // User provided input shape
+  std::unordered_map<std::string, std::vector<int64_t>> input_shapes_;
   size_t batch_size_;
   size_t max_threads_;
 
   size_t sequence_length_;
+  SharedMemoryType shared_memory_type_;
+  size_t output_shm_size_;
   bool on_sequence_model_;
 
   std::shared_ptr<ContextFactory> factory_;
 
-  // User provided input shape
-  std::unordered_map<std::string, std::vector<int64_t>> input_shapes_;
-
   // User provided input data, it will be preferred over synthetic data
   std::unordered_map<std::string, std::vector<char>> input_data_;
-  std::unordered_map<std::string, std::vector<std::string>> input_string_data_;
+  std::unordered_map<std::string, std::vector<char>> input_string_data_;
 
   // Placeholder for generated input data, which will be used for all inputs
   // except string
   std::vector<uint8_t> input_buf_;
-  // Placeholder for generated string data, which will be used for all string
-  // inputs
-  std::vector<std::string> input_string_buf_;
+
+  std::unique_ptr<nic::SharedMemoryControlContext> shared_memory_ctx_;
+
+  // Map from shared memory key to its starting address and size
+  std::unordered_map<std::string, std::pair<uint8_t*, size_t>>
+      shared_memory_regions_;
 
   struct ThreadStat {
     ThreadStat() : status_(ni::RequestStatusCode::SUCCESS) {}

@@ -41,6 +41,7 @@ set(
   concurrency_manager.cc
   request_rate_manager.cc
   custom_load_manager.cc
+  ../examples/shm_utils.cc
 )
 
 set(
@@ -52,6 +53,7 @@ set(
   concurrency_manager.h
   request_rate_manager.h
   custom_load_manager.h
+  ../examples/shm_utils.h
 )
 
 add_executable(perf_client
@@ -60,6 +62,14 @@ target_link_libraries(
   perf_client
   PRIVATE TRTIS::request_static
 )
+
+# If gpu is enabled then compile with CUDA dependencies
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(perf_client PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_link_libraries(perf_client PRIVATE ${CUDA_LIBRARIES})
+endif()
+
+
 install(
   TARGETS perf_client
   RUNTIME DESTINATION bin

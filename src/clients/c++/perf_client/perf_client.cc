@@ -243,6 +243,8 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "II. INPUT DATA OPTIONS: " << std::endl;
   std::cerr << "\t-b <batch size>" << std::endl;
   std::cerr << "\t--input-data <\"zero\"|\"random\"|<path>>" << std::endl;
+  std::cerr << "\t--shared-memory <\"system\"|\"cuda\"|\"none\">" << std::endl;
+  std::cerr << "\t--output-shared-memory-size <size in bytes>" << std::endl;
   std::cerr << "\t--shape <name:shape>" << std::endl;
   std::cerr << "\t--sequence-length <length>" << std::endl;
   std::cerr << "\t--string-length <length>" << std::endl;
@@ -449,6 +451,26 @@ Usage(char** argv, const std::string& msg = std::string())
                    18)
             << std::endl;
   std::cerr << FormatMessage(
+                   " --shared-memory <\"system\"|\"cuda\"|\"none\">: Specifies "
+                   "the type of the shared memory to use for input and output "
+                   "data. Default is none.",
+                   18)
+            << std::endl;
+
+  std::cerr
+      << FormatMessage(
+             " --output-shared-memory-size: The size in bytes of the shared "
+             "memory region to allocate per output tensor. Only needed when "
+             "one or more of the outputs are of string type and/or variable "
+             "shape. The value should be larger than the size of the largest "
+             "output tensor the model is expected to return. The client will "
+             "use the following formula to calculate the total shared memory "
+             "to allocate: output_shm_size * number_of_outputs * batch_size. "
+             "Defaults to 100KB.",
+             18)
+      << std::endl;
+
+  std::cerr << FormatMessage(
                    " --shape: The shape used for the specified input. The "
                    "argument must be specified as 'name:shape' where the shape "
                    "is a comma-separated list for dimension sizes, for example "
@@ -545,6 +567,8 @@ main(int argc, char** argv)
   std::string filename("");
   ProtocolType protocol = ProtocolType::HTTP;
   std::map<std::string, std::string> http_headers;
+  SharedMemoryType shared_memory_type = SharedMemoryType::NO_SHARED_MEMORY;
+  size_t output_shm_size = 100 * 1024;
   std::unordered_map<std::string, std::vector<int64_t>> input_shapes;
   size_t string_length = 128;
   std::string string_data;
@@ -592,6 +616,8 @@ main(int argc, char** argv)
                                          {"binary-search", 0, 0, 18},
                                          {"request-distribution", 1, 0, 19},
                                          {"request-intervals", 1, 0, 20},
+                                         {"shared-memory", 1, 0, 21},
+                                         {"output-shared-memory-size", 1, 0, 22},
                                          {0, 0, 0, 0}};
 
   // Parse commandline...
@@ -770,13 +796,33 @@ main(int argc, char** argv)
         } else if (arg.compare("constant") == 0) {
           request_distribution = Distribution::CONSTANT;
         } else {
-          Usage(argv, "unsupported input data provided " + std::string(optarg));
+          Usage(
+              argv, "unsupported request distribution provided " +
+                        std::string(optarg));
         }
         break;
       }
       case 20:
         using_custom_intervals = true;
         request_intervals_file = optarg;
+        break;
+      case 21: {
+        std::string arg = optarg;
+        if (arg.compare("system") == 0) {
+          shared_memory_type = SharedMemoryType::SYSTEM_SHARED_MEMORY;
+        } else if (arg.compare("cuda") == 0) {
+#if TRTIS_ENABLE_GPU
+          shared_memory_type = SharedMemoryType::CUDA_SHARED_MEMORY;
+#else
+          Usage(
+              argv,
+              "cuda shared memory is not supported when TRTIS_ENABLE_GPU=0");
+#endif  // TRTIS_ENABLE_GPU
+        }
+        break;
+      }
+      case 22:
+        output_shm_size = std::atoi(optarg);
         break;
       case 'v':
         verbose = true;
@@ -982,9 +1028,12 @@ main(int argc, char** argv)
         // As only one synchronous request can be generated from a thread at a
         // time, to maintain the requested concurrency, that many threads need
         // to be generated.
-        std::cerr << "WARNING: Overriding max_threads specification to ensure "
-                     "requested concurrency range."
-                  << std::endl;
+        if (max_threads_specified) {
+          std::cerr
+              << "WARNING: Overriding max_threads specification to ensure "
+                 "requested concurrency range."
+              << std::endl;
+        }
         max_threads = std::max(
             concurrency_range[SEARCH_RANGE::kSTART],
             concurrency_range[SEARCH_RANGE::kEND]);
@@ -1001,7 +1050,7 @@ main(int argc, char** argv)
   std::unique_ptr<InferenceProfiler> profiler;
   err = ContextFactory::Create(
       url, protocol, http_headers, streaming, model_name, model_version,
-      &factory);
+      verbose, &factory);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
@@ -1032,21 +1081,21 @@ main(int argc, char** argv)
     err = ConcurrencyManager::Create(
         async, batch_size, max_threads, max_concurrency, sequence_length,
         string_length, string_data, zero_input, input_shapes, data_directory,
-        factory, &manager);
+        shared_memory_type, output_shm_size, factory, &manager);
 
   } else if (using_request_rate_range) {
     err = RequestRateManager::Create(
         async, measurement_window_ms, request_distribution, batch_size,
         max_threads, num_of_sequences, sequence_length, string_length,
-        string_data, zero_input, input_shapes, data_directory, factory,
-        &manager);
+        string_data, zero_input, input_shapes, data_directory,
+        shared_memory_type, output_shm_size, factory, &manager);
 
   } else {
     err = CustomLoadManager::Create(
         async, measurement_window_ms, request_intervals_file, batch_size,
         max_threads, num_of_sequences, sequence_length, string_length,
-        string_data, zero_input, input_shapes, data_directory, factory,
-        &manager);
+        string_data, zero_input, input_shapes, data_directory,
+        shared_memory_type, output_shm_size, factory, &manager);
   }
 
   if (!err.IsOk()) {

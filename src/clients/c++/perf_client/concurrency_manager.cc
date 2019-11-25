@@ -26,6 +26,14 @@
 
 #include "src/clients/c++/perf_client/concurrency_manager.h"
 
+ConcurrencyManager::~ConcurrencyManager()
+{
+  // The destruction of derived class should wait for all the request generator
+  // threads to finish
+  StopWorkerThreads();
+}
+
+
 nic::Error
 ConcurrencyManager::Create(
     const bool async, const int32_t batch_size, const size_t max_threads,
@@ -34,18 +42,25 @@ ConcurrencyManager::Create(
     const bool zero_input,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     const std::string& data_directory,
+    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<ConcurrencyManager> local_manager(new ConcurrencyManager(
       async, input_shapes, batch_size, max_threads, max_concurrency,
-      sequence_length, factory));
+      sequence_length, shared_memory_type, output_shm_size, factory));
 
   local_manager->threads_config_.reserve(max_threads);
 
-  RETURN_IF_ERROR(InitManagerInputs(
-      std::move(local_manager), string_length, string_data, zero_input,
-      data_directory, manager));
+  RETURN_IF_ERROR(local_manager->InitManagerInputs(
+      string_length, string_data, zero_input, data_directory));
+
+  if (local_manager->shared_memory_type_ !=
+      SharedMemoryType::NO_SHARED_MEMORY) {
+    RETURN_IF_ERROR(local_manager->InitSharedMemory());
+  }
+
+  *manager = std::move(local_manager);
 
   return nic::Error::Success;
 }
@@ -55,19 +70,13 @@ ConcurrencyManager::ConcurrencyManager(
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     const int32_t batch_size, const size_t max_threads,
     const size_t max_concurrency, const size_t sequence_length,
+    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory)
-    : max_concurrency_(max_concurrency)
+    : LoadManager(
+          async, input_shapes, batch_size, max_threads, sequence_length,
+          shared_memory_type, output_shm_size, factory),
+      max_concurrency_(max_concurrency)
 {
-  async_ = async;
-  batch_size_ = batch_size;
-  max_threads_ = max_threads;
-  sequence_length_ = sequence_length;
-  factory_ = factory;
-  input_shapes_ = input_shapes;
-
-  on_sequence_model_ =
-      ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
-       (factory_->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE));
 }
 
 nic::Error
@@ -158,7 +167,12 @@ ConcurrencyManager::Infer(
     while (active_ctx_cnt > ctxs.size()) {
       ctxs.emplace_back(new InferContextMetaData());
       thread_stat->contexts_stat_.emplace_back();
-      thread_stat->status_ = PrepareInfer(&(ctxs.back()->ctx_), &options);
+      if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
+        thread_stat->status_ = PrepareInfer(&(ctxs.back()->ctx_), &options);
+      } else {
+        thread_stat->status_ =
+            PrepareSharedMemoryInfer(&(ctxs.back()->ctx_), &options);
+      }
       if (!thread_stat->status_.IsOk()) {
         return;
       }
