@@ -341,7 +341,8 @@ PlanBackend::CreateExecutionContext(
         RequestStatusCode::INVALID_ARG,
         "unexpected configuration maximum batch size " +
             std::to_string(Config().max_batch_size()) + " for '" + Name() +
-            "' profile [" + profile_name + "], model maximum is " +
+            "' profile [" + std::to_string(profile_index) +
+            "], model maximum is " +
             std::to_string(context->max_dynamic_batch_size_));
   }
   RETURN_IF_ERROR(context->InitializeConfigOutputBindings(
@@ -387,7 +388,7 @@ PlanBackend::CreateExecutionContext(
   if (context->is_dynamic_) {
     LOG_INFO << "Created instance " << instance_name << " on GPU " << gpu_device
              << " (" << cc << ") with stream priority " << cuda_stream_priority
-             << " and optimization profile " << profile_name;
+             << " and optimization profile " << std::to_string(profile_index);
   } else {
     LOG_INFO << "Created instance " << instance_name << " on GPU " << gpu_device
              << " (" << cc << ") with stream priority " << cuda_stream_priority;
