@@ -26,12 +26,12 @@
 
 #define DLL_EXPORTING
 
-#include "src/clients/c++/library/request_kfserving_http.h"
+#include "src/clients/c++/library/request_http.h"
 
 #include <curl/curl.h>
 #include <google/protobuf/text_format.h>
-#include "src/core/grpc_service.grpc.pb.h"
 #include "src/clients/c++/library/request_common.h"
+#include "src/core/grpc_service.grpc.pb.h"
 
 // MSVC equivalent of POSIX call
 #ifdef _MSC_VER
@@ -40,10 +40,9 @@
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
-class KFServingHttpRequestImpl;
-class InferKFServingHttpContextImpl;
-using ResponseHandlerUserP =
-    std::pair<InferKFServingHttpContextImpl*, KFServingHttpRequestImpl*>;
+class HttpRequestImpl;
+class InferHttpContextImpl;
+using ResponseHandlerUserP = std::pair<InferHttpContextImpl*, HttpRequestImpl*>;
 
 namespace {
 
@@ -437,13 +436,13 @@ ServerStatusHttpContext::Create(
 
 //==============================================================================
 
-class KFServingHttpRequestImpl : public RequestImpl {
+class HttpRequestImpl : public RequestImpl {
  public:
-  KFServingHttpRequestImpl(
+  HttpRequestImpl(
       const uint64_t id,
       const std::vector<std::shared_ptr<InferContext::Input>> inputs,
       InferContext::OnCompleteFn callback = nullptr);
-  ~KFServingHttpRequestImpl();
+  ~HttpRequestImpl();
 
   // Initialize the request for HTTP transfer. */
   Error InitializeRequest();
@@ -454,7 +453,7 @@ class KFServingHttpRequestImpl : public RequestImpl {
 
   // Create a result object for this request.
   Error CreateResult(
-      const InferKFServingHttpContextImpl& ctx,
+      const InferHttpContextImpl& ctx,
       const InferResponseHeader::Output& output, const size_t batch_size);
 
   // Copy into the context 'size' bytes of result data from
@@ -465,7 +464,7 @@ class KFServingHttpRequestImpl : public RequestImpl {
   Error GetResults(InferContext::ResultMap* results);
 
  private:
-  friend class InferKFServingHttpContextImpl;
+  friend class InferHttpContextImpl;
 
   // Pointer to easy handle that is processing the request
   CURL* easy_handle_;
@@ -511,12 +510,12 @@ class KFServingHttpRequestImpl : public RequestImpl {
 
 //==============================================================================
 
-class InferKFServingHttpContextImpl : public InferContextImpl {
+class InferHttpContextImpl : public InferContextImpl {
  public:
-  InferKFServingHttpContextImpl(
+  InferHttpContextImpl(
       const std::string&, const std::map<std::string, std::string>&,
       const std::string&, int64_t, CorrelationID, bool);
-  virtual ~InferKFServingHttpContextImpl();
+  virtual ~InferHttpContextImpl();
 
   Error InitHttp(const std::string& server_url);
 
@@ -552,7 +551,7 @@ class InferKFServingHttpContextImpl : public InferContextImpl {
 
 //==============================================================================
 
-KFServingHttpRequestImpl::KFServingHttpRequestImpl(
+HttpRequestImpl::HttpRequestImpl(
     const uint64_t id,
     const std::vector<std::shared_ptr<InferContext::Input>> inputs,
     InferContext::OnCompleteFn callback)
@@ -565,7 +564,7 @@ KFServingHttpRequestImpl::KFServingHttpRequestImpl(
   }
 }
 
-KFServingHttpRequestImpl::~KFServingHttpRequestImpl()
+HttpRequestImpl::~HttpRequestImpl()
 {
   if (header_list_ != nullptr) {
     curl_slist_free_all(header_list_);
@@ -578,7 +577,7 @@ KFServingHttpRequestImpl::~KFServingHttpRequestImpl()
 }
 
 Error
-KFServingHttpRequestImpl::InitializeRequest()
+HttpRequestImpl::InitializeRequest()
 {
   if (easy_handle_ != nullptr) {
     curl_easy_reset(easy_handle_);
@@ -602,8 +601,7 @@ KFServingHttpRequestImpl::InitializeRequest()
 }
 
 Error
-KFServingHttpRequestImpl::GetNextInput(
-    uint8_t* buf, size_t size, size_t* input_bytes)
+HttpRequestImpl::GetNextInput(uint8_t* buf, size_t size, size_t* input_bytes)
 {
   *input_bytes = 0;
 
@@ -636,7 +634,7 @@ KFServingHttpRequestImpl::GetNextInput(
 }
 
 Error
-KFServingHttpRequestImpl::SetNextRawResult(
+HttpRequestImpl::SetNextRawResult(
     const uint8_t* buf, size_t size, size_t* result_bytes)
 {
   *result_bytes = 0;
@@ -674,8 +672,8 @@ KFServingHttpRequestImpl::SetNextRawResult(
 }
 
 Error
-KFServingHttpRequestImpl::CreateResult(
-    const InferKFServingHttpContextImpl& ctx, const InferResponseHeader::Output& output,
+HttpRequestImpl::CreateResult(
+    const InferHttpContextImpl& ctx, const InferResponseHeader::Output& output,
     const size_t batch_size)
 {
   std::shared_ptr<InferContext::Output> infer_output;
@@ -702,7 +700,7 @@ KFServingHttpRequestImpl::CreateResult(
 }
 
 Error
-KFServingHttpRequestImpl::GetResults(InferContext::ResultMap* results)
+HttpRequestImpl::GetResults(InferContext::ResultMap* results)
 {
   InferResponseHeader infer_response;
 
@@ -764,7 +762,7 @@ KFServingHttpRequestImpl::GetResults(InferContext::ResultMap* results)
 
 //==============================================================================
 
-InferKFServingHttpContextImpl::InferKFServingHttpContextImpl(
+InferHttpContextImpl::InferHttpContextImpl(
     const std::string& server_url,
     const std::map<std::string, std::string>& headers,
     const std::string& model_name, int64_t model_version,
@@ -780,7 +778,7 @@ InferKFServingHttpContextImpl::InferKFServingHttpContextImpl(
   }
 }
 
-InferKFServingHttpContextImpl::~InferKFServingHttpContextImpl()
+InferHttpContextImpl::~InferHttpContextImpl()
 {
   exiting_ = true;
   // thread not joinable if AsyncRun() is not called
@@ -793,9 +791,9 @@ InferKFServingHttpContextImpl::~InferKFServingHttpContextImpl()
   if (multi_handle_ != nullptr) {
     for (auto& request : ongoing_async_requests_) {
       CURL* easy_handle =
-          std::static_pointer_cast<KFServingHttpRequestImpl>(request.second)
+          std::static_pointer_cast<HttpRequestImpl>(request.second)
               ->easy_handle_;
-      // Just remove, easy_cleanup will be done in ~KFServingHttpRequestImpl()
+      // Just remove, easy_cleanup will be done in ~HttpRequestImpl()
       curl_multi_remove_handle(multi_handle_, easy_handle);
     }
     curl_multi_cleanup(multi_handle_);
@@ -803,7 +801,7 @@ InferKFServingHttpContextImpl::~InferKFServingHttpContextImpl()
 }
 
 Error
-InferKFServingHttpContextImpl::InitHttp(const std::string& server_url)
+InferHttpContextImpl::InitHttp(const std::string& server_url)
 {
   // Don't let user override the request header.
   if (headers_.find(kInferRequestHTTPHeader) != headers_.end()) {
@@ -820,8 +818,8 @@ InferKFServingHttpContextImpl::InitHttp(const std::string& server_url)
     err = Init(std::move(sctx));
     if (err.IsOk()) {
       // Create request context for synchronous request.
-      sync_request_.reset(static_cast<InferContext::Request*>(
-          new KFServingHttpRequestImpl(0, inputs_)));
+      sync_request_.reset(
+          static_cast<InferContext::Request*>(new HttpRequestImpl(0, inputs_)));
     }
   }
 
@@ -829,10 +827,10 @@ InferKFServingHttpContextImpl::InitHttp(const std::string& server_url)
 }
 
 Error
-InferKFServingHttpContextImpl::Run(ResultMap* results)
+InferHttpContextImpl::Run(ResultMap* results)
 {
-  std::shared_ptr<KFServingHttpRequestImpl> sync_request =
-      std::static_pointer_cast<KFServingHttpRequestImpl>(sync_request_);
+  std::shared_ptr<HttpRequestImpl> sync_request =
+      std::static_pointer_cast<HttpRequestImpl>(sync_request_);
 
   sync_request->Timer().Reset();
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
@@ -870,7 +868,7 @@ InferKFServingHttpContextImpl::Run(ResultMap* results)
 }
 
 Error
-InferKFServingHttpContextImpl::AsyncRun(InferContext::OnCompleteFn callback)
+InferHttpContextImpl::AsyncRun(InferContext::OnCompleteFn callback)
 {
   if (callback == nullptr) {
     return Error(
@@ -883,7 +881,7 @@ InferKFServingHttpContextImpl::AsyncRun(InferContext::OnCompleteFn callback)
         RequestStatusCode::INTERNAL,
         "failed to start HTTP asynchronous client");
   } else if (!worker_.joinable()) {
-    worker_ = std::thread(&InferKFServingHttpContextImpl::AsyncTransfer, this);
+    worker_ = std::thread(&InferHttpContextImpl::AsyncTransfer, this);
   }
 
   // Make a copy of the current inputs
@@ -893,8 +891,8 @@ InferKFServingHttpContextImpl::AsyncRun(InferContext::OnCompleteFn callback)
     inputs.emplace_back(std::make_shared<InputImpl>(*input));
   }
 
-  KFServingHttpRequestImpl* http_request_ptr = new KFServingHttpRequestImpl(
-      0 /* temp id */, inputs, std::move(callback));
+  HttpRequestImpl* http_request_ptr =
+      new HttpRequestImpl(0 /* temp id */, inputs, std::move(callback));
   async_request.reset(static_cast<Request*>(http_request_ptr));
 
   if (!http_request_ptr->easy_handle_) {
@@ -937,21 +935,20 @@ InferKFServingHttpContextImpl::AsyncRun(InferContext::OnCompleteFn callback)
 }
 
 Error
-InferKFServingHttpContextImpl::GetAsyncRunResults(
+InferHttpContextImpl::GetAsyncRunResults(
     const std::shared_ptr<Request>& async_request, ResultMap* results)
 {
-  std::shared_ptr<KFServingHttpRequestImpl> http_request =
-      std::static_pointer_cast<KFServingHttpRequestImpl>(async_request);
+  std::shared_ptr<HttpRequestImpl> http_request =
+      std::static_pointer_cast<HttpRequestImpl>(async_request);
 
   return http_request->GetResults(results);
 }
 
 size_t
-InferKFServingHttpContextImpl::RequestProvider(
+InferHttpContextImpl::RequestProvider(
     void* contents, size_t size, size_t nmemb, void* userp)
 {
-  KFServingHttpRequestImpl* request =
-      reinterpret_cast<KFServingHttpRequestImpl*>(userp);
+  HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(userp);
 
   size_t input_bytes = 0;
   Error err = request->GetNextInput(
@@ -965,14 +962,13 @@ InferKFServingHttpContextImpl::RequestProvider(
 }
 
 size_t
-InferKFServingHttpContextImpl::ResponseHeaderHandler(
+InferHttpContextImpl::ResponseHeaderHandler(
     void* contents, size_t size, size_t nmemb, void* userp)
 {
   ResponseHandlerUserP* pr = reinterpret_cast<ResponseHandlerUserP*>(userp);
-  InferKFServingHttpContextImpl* ctx =
-      reinterpret_cast<InferKFServingHttpContextImpl*>(pr->first);
-  KFServingHttpRequestImpl* request =
-      reinterpret_cast<KFServingHttpRequestImpl*>(pr->second);
+  InferHttpContextImpl* ctx =
+      reinterpret_cast<InferHttpContextImpl*>(pr->first);
+  HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(pr->second);
 
   char* buf = reinterpret_cast<char*>(contents);
   size_t byte_size = size * nmemb;
@@ -1022,11 +1018,10 @@ InferKFServingHttpContextImpl::ResponseHeaderHandler(
 }
 
 size_t
-InferKFServingHttpContextImpl::ResponseHandler(
+InferHttpContextImpl::ResponseHandler(
     void* contents, size_t size, size_t nmemb, void* userp)
 {
-  KFServingHttpRequestImpl* request =
-      reinterpret_cast<KFServingHttpRequestImpl*>(userp);
+  HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(userp);
   size_t result_bytes = 0;
 
   if (request->Timer().Timestamp(RequestTimers::Kind::RECV_START) == 0) {
@@ -1048,10 +1043,10 @@ InferKFServingHttpContextImpl::ResponseHandler(
 }
 
 Error
-InferKFServingHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
+InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
 {
-  std::shared_ptr<KFServingHttpRequestImpl> http_request =
-      std::static_pointer_cast<KFServingHttpRequestImpl>(request);
+  std::shared_ptr<HttpRequestImpl> http_request =
+      std::static_pointer_cast<HttpRequestImpl>(request);
 
   http_request->InitializeRequest();
 
@@ -1170,7 +1165,7 @@ InferKFServingHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& reques
 }
 
 void
-InferKFServingHttpContextImpl::AsyncTransfer()
+InferHttpContextImpl::AsyncTransfer()
 {
   int place_holder = 0;
   CURLMsg* msg = nullptr;
@@ -1204,9 +1199,8 @@ InferKFServingHttpContextImpl::AsyncTransfer()
       request_list.emplace_back(itr->second);
       ongoing_async_requests_.erase(identifier);
       curl_multi_remove_handle(multi_handle_, msg->easy_handle);
-      std::shared_ptr<KFServingHttpRequestImpl> http_request =
-          std::static_pointer_cast<KFServingHttpRequestImpl>(
-              request_list.back());
+      std::shared_ptr<HttpRequestImpl> http_request =
+          std::static_pointer_cast<HttpRequestImpl>(request_list.back());
 
       if (msg->msg != CURLMSG_DONE) {
         // Something wrong happened.
@@ -1224,8 +1218,8 @@ InferKFServingHttpContextImpl::AsyncTransfer()
     lock.unlock();
 
     for (auto& request : request_list) {
-      std::shared_ptr<KFServingHttpRequestImpl> http_request =
-          std::static_pointer_cast<KFServingHttpRequestImpl>(request);
+      std::shared_ptr<HttpRequestImpl> http_request =
+          std::static_pointer_cast<HttpRequestImpl>(request);
       http_request->callback_(this, request);
     }
   } while (!exiting_);
@@ -1272,7 +1266,7 @@ InferHttpContext::Create(
     const std::map<std::string, std::string>& headers,
     const std::string& model_name, int64_t model_version, bool verbose)
 {
-  InferKFServingHttpContextImpl* ctx_ptr = new InferKFServingHttpContextImpl(
+  InferHttpContextImpl* ctx_ptr = new InferHttpContextImpl(
       server_url, headers, model_name, model_version, correlation_id, verbose);
   ctx->reset(static_cast<InferContext*>(ctx_ptr));
 

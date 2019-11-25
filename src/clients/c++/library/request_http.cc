@@ -32,6 +32,10 @@
 #include <google/protobuf/text_format.h>
 #include "src/clients/c++/library/request_common.h"
 
+#ifdef TRTIS_ENABLE_HTTP_V2
+#include "src/core/grpc_service.grpc.pb.h"
+#endif
+
 // MSVC equivalent of POSIX call
 #ifdef _MSC_VER
 #define strncasecmp _strnicmp
@@ -87,6 +91,7 @@ class ServerHealthHttpContextImpl : public ServerHealthContext {
       const std::string& url, const std::map<std::string, std::string>& headers,
       bool verbose);
 
+  Error GetModelReady(bool* ready, std::string model_name) override;
   Error GetReady(bool* ready) override;
   Error GetLive(bool* live) override;
 
@@ -1436,7 +1441,11 @@ InferHttpContextImpl::InferHttpContextImpl(
 {
   // Process url for HTTP request
   // URL doesn't contain the version portion if using the latest version.
+#ifdef TRTIS_ENABLE_HTTP_V2
   url_ = server_url + "/" + kInferRESTEndpoint + "/" + model_name;
+#else
+  url_ = server_url + "/" + kHttpV2RESTEndpoint + "/" + model_name;
+#endif
   if (model_version >= 0) {
     url_ += "/" + std::to_string(model_version);
   }
@@ -1615,8 +1624,32 @@ InferHttpContextImpl::RequestProvider(
   HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(userp);
 
   size_t input_bytes = 0;
+#ifdef TRTIS_ENABLE_HTTP_V2
+  InferRequest request;
+  size_t input_pos_idx = 0;
+  while (input_pos_idx < inputs_.size()) {
+    InputImpl* io = reinterpret_cast<InputImpl*>(inputs_[input_pos_idx].get());
+    // Append all batches of one input together (skip if using shared
+    // memory)
+    if (!io->IsSharedMemory()) {
+      std::string* new_input = request.add_raw_input();
+      for (size_t batch_idx = 0; batch_idx < batch_size_; batch_idx++) {
+        const uint8_t* data_ptr;
+        size_t data_byte_size;
+        io->GetRaw(batch_idx, &data_ptr, &data_byte_size);
+        new_input->append(
+            reinterpret_cast<const char*>(data_ptr), data_byte_size);
+      }
+    }
+    input_pos_idx++;
+  }
+  string request_str;
+  ::google::protobuf::util::MessageToJsonString(request, &request_str);
+  input_bytes = request_str.length();
+#else
   Error err = request->GetNextInput(
       reinterpret_cast<uint8_t*>(contents), size * nmemb, &input_bytes);
+#endif
   if (!err.IsOk()) {
     std::cerr << "RequestProvider: " << err << std::endl;
     return CURL_READFUNC_ABORT;

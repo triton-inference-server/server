@@ -39,6 +39,7 @@ constexpr char kHealthRESTEndpoint[] = "api/health";
 constexpr char kModelControlRESTEndpoint[] = "api/modelcontrol";
 constexpr char kSharedMemoryControlRESTEndpoint[] = "api/sharedmemorycontrol";
 constexpr char kModelRepositoryRESTEndpoint[] = "api/repository";
+constexpr char kHttpV2RESTEndpoint[] = "v1/models";
 
 #ifdef TRTIS_ENABLE_TENSORFLOW
 constexpr char kTensorFlowGraphDefPlatform[] = "tensorflow_graphdef";
