@@ -443,10 +443,9 @@ typedef void (*TRTSERVER_TraceManagerCreateTraceFn_t)(
     void* userp);
 
 /// Type for trace release callback function. This callback function
-/// is used to release a trace object created from
-/// TRTSERVER_TraceManagerCreateTraceFn_t, and the callback function will be
-/// invoked when the corresponding model execution is completed.
-/// The user should call TRTSERVER_TraceDelete if 'trace' is not nullptr.
+/// is invoked when the model execution being traced is completed. By this point,
+/// It is the user's responsiblity to delete 'trace' object created from
+/// TRTSERVER_TraceManagerCreateTraceFn_t by calling TRTSERVER_TraceDelete.
 typedef void (*TRTSERVER_TraceManagerReleaseTraceFn_t)(TRTSERVER_Trace* trace);
 
 /// Create a new trace manager object.
@@ -454,8 +453,8 @@ typedef void (*TRTSERVER_TraceManagerReleaseTraceFn_t)(TRTSERVER_Trace* trace);
 /// \param create_fn The function to call to create trace object for a request.
 /// \param release_fn The function to call when the request associated with a
 /// trace object is complete.
-/// \param userp User-provided pointer that is delivered to the creation
-/// function.
+/// \param userp User-provided pointer that is delivered to the trace 
+/// creation function.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceManagerNew(
     TRTSERVER_TraceManager** trace_manager,

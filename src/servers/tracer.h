@@ -61,13 +61,13 @@ class TraceManager : public std::enable_shared_from_this<TraceManager> {
   TRTSERVER_Error* SetLevel(TRTSERVER_Trace_Level level);
   TRTSERVER_Error* SetRate(uint32_t rate);
 
-  // Return a trace object that should be used to collected trace
+  // Return a trace meta data object that should be used to collected trace
   // activities for an inference request. Return nullptr if no tracing
   // should occur.
   TraceMetaData* SampleTrace();
 
   // Create a trace object that should be used to collected trace
-  // activities for the inference request. Return nullptr if no tracing
+  // activities for the model execution. Return nullptr if no tracing
   // should occur.
   static void CreateTrace(
       TRTSERVER_Trace** trace, const char* model_name, int64_t version,
@@ -81,6 +81,7 @@ class TraceManager : public std::enable_shared_from_this<TraceManager> {
  private:
   TraceManager(std::unique_ptr<std::ofstream> trace_file);
 
+  // Helper function to create a new trace object.
   void NewTrace(TRTSERVER_Trace** trace);
 
   std::mutex mu_;
