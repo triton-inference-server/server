@@ -107,8 +107,8 @@ for PROTOCOL in $PROTOCOLS; do
 
         set -e
 
-        echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
-        echo -e "\"s_benchmark_name\":\"custom\"," >> ${NAME}.tjson
+        echo -e "[{\"s_benchmark_kind\":\"benchmark_perf_custom\"," >> ${NAME}.tjson
+        echo -e "\"s_benchmark_name\":\"${API}\"," >> ${NAME}.tjson
         echo -e "\"s_protocol\":\"${PROTOCOL}\"," >> ${NAME}.tjson
         echo -e "\"s_framework\":\"custom\"," >> ${NAME}.tjson
         echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
