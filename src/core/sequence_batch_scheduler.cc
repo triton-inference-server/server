@@ -1188,8 +1188,8 @@ OldestSequenceBatch::OldestSequenceBatch(
   }
 
   Status status = DynamicBatchScheduler::Create(
-      1 /* runner_cnt */, GetCpuNiceLevel(config), OnInit, OnWarmup, OnSchedule,
-      true /* dynamic_batching_enabled */,
+      batcher_idx_, 1 /* runner_cnt */, GetCpuNiceLevel(config), OnInit,
+      OnWarmup, OnSchedule, true /* dynamic_batching_enabled */,
       false /* enforce_equal_shape_batch */, preferred_batch_sizes,
       config.sequence_batching().oldest().max_queue_delay_microseconds(),
       &dynamic_batcher_);
