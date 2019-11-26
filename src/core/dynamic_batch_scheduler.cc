@@ -40,9 +40,10 @@
 namespace nvidia { namespace inferenceserver {
 
 DynamicBatchScheduler::DynamicBatchScheduler(
-    const uint32_t runner_cnt, StandardInitFunc OnInit,
-    StandardWarmupFunc OnWarmup, StandardRunFunc OnSchedule,
-    const bool dynamic_batching_enabled, const bool enforce_equal_shape_batch,
+    const uint32_t runner_id_start, const uint32_t runner_cnt,
+    StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
+    StandardRunFunc OnSchedule, const bool dynamic_batching_enabled,
+    const bool enforce_equal_shape_batch,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds)
     : OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
@@ -62,28 +63,31 @@ DynamicBatchScheduler::DynamicBatchScheduler(
 
 Status
 DynamicBatchScheduler::Create(
-    const uint32_t runner_cnt, const int nice, StandardInitFunc OnInit,
-    StandardWarmupFunc OnWarmup, StandardRunFunc OnSchedule,
-    const bool dynamic_batching_enabled, const bool enforce_equal_shape_batch,
+    const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
+    StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
+    StandardRunFunc OnSchedule, const bool dynamic_batching_enabled,
+    const bool enforce_equal_shape_batch,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds,
     std::unique_ptr<Scheduler>* scheduler)
 {
   DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
-      runner_cnt, OnInit, OnWarmup, OnSchedule, dynamic_batching_enabled,
-      enforce_equal_shape_batch, preferred_batch_sizes,
-      max_queue_delay_microseconds);
+      runner_id_start, runner_cnt, OnInit, OnWarmup, OnSchedule,
+      dynamic_batching_enabled, enforce_equal_shape_batch,
+      preferred_batch_sizes, max_queue_delay_microseconds);
   std::unique_ptr<DynamicBatchScheduler> sched(dyna_sched);
 
   // Create one scheduler thread for each requested runner. Associate
   // each scheduler thread with a runner.
   for (uint32_t c = 0; c < sched->scheduler_thread_cnt_; ++c) {
+    const uint32_t runner_id = runner_id_start + c;
     std::promise<bool> init_state;
     auto thread_exit = std::make_shared<std::atomic<bool>>(false);
     sched->scheduler_threads_exit_.emplace_back(thread_exit);
-    sched->scheduler_threads_.emplace_back(
-        new std::thread([dyna_sched, c, nice, thread_exit, &init_state]() {
-          dyna_sched->SchedulerThread(c, nice, thread_exit, &init_state);
+    sched->scheduler_threads_.emplace_back(new std::thread(
+        [dyna_sched, runner_id, nice, thread_exit, &init_state]() {
+          dyna_sched->SchedulerThread(
+              runner_id, nice, thread_exit, &init_state);
         }));
     if (!init_state.get_future().get()) {
       if (sched->scheduler_threads_.back()->joinable()) {
