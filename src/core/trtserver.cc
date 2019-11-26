@@ -1456,9 +1456,6 @@ TRTSERVER_ServerInferAsync(
   infer_stats->SetFailed(true);
   infer_stats->SetTraceManager(trace_manager);
   infer_stats->NewTrace();
-  // [TODO] is this necessary?
-  TRTSERVER_Trace* trace =
-      reinterpret_cast<TRTSERVER_Trace*>(infer_stats->GetTrace());
 
   std::shared_ptr<ni::InferRequestProvider> infer_request_provider;
   RETURN_IF_STATUS_ERROR(ni::InferRequestProvider::Create(
@@ -1478,7 +1475,7 @@ TRTSERVER_ServerInferAsync(
   lserver->InferAsync(
       lprovider->Backend(), infer_request_provider, infer_response_provider,
       infer_stats,
-      [infer_stats, trace, infer_response_provider, server, complete_fn,
+      [infer_stats, trace_manager, infer_response_provider, server, complete_fn,
        complete_userp](const ni::Status& status) mutable {
         infer_stats->SetFailed(!status.IsOk());
         if (!status.IsOk()) {
@@ -1498,7 +1495,7 @@ TRTSERVER_ServerInferAsync(
         TrtServerResponse* response =
             new TrtServerResponse(status, infer_response_provider);
         complete_fn(
-            server, trace,
+            server, trace_manager,
             reinterpret_cast<TRTSERVER_InferenceResponse*>(response),
             complete_userp);
       });

@@ -981,7 +981,7 @@ class InferHandler : public Handler<
 
  private:
   static void InferComplete(
-      TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+      TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
       TRTSERVER_InferenceResponse* response, void* userp);
 
   std::shared_ptr<TraceManager> trace_manager_;
@@ -1145,7 +1145,7 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
 
 void
 InferHandler::InferComplete(
-    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER_InferenceResponse* trtserver_response, void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
@@ -1200,8 +1200,8 @@ InferHandler::InferComplete(
       response.mutable_request_status(), response_status, state->unique_id_,
       state->context_->server_id_);
 
-  // Don't need to explicitly delete 'trace'. It will be deleted by
-  // the Tracer object in 'state'.
+  // Don't need to explicitly delete 'trace_manager'. It will be deleted by
+  // the TraceMetaData object in 'state'.
   LOG_IF_ERR(
       TRTSERVER_InferenceResponseDelete(trtserver_response),
       "deleting GRPC response");
@@ -1254,7 +1254,7 @@ class StreamInferHandler
 
  private:
   static void StreamInferComplete(
-      TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+      TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
       TRTSERVER_InferenceResponse* response, void* userp);
 
   std::shared_ptr<TraceManager> trace_manager_;
@@ -1509,7 +1509,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
 void
 StreamInferHandler::StreamInferComplete(
-    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER_InferenceResponse* trtserver_response, void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
@@ -1565,8 +1565,8 @@ StreamInferHandler::StreamInferComplete(
       response.mutable_request_status(), response_status, state->unique_id_,
       state->context_->server_id_);
 
-  // Don't need to explicitly delete 'trace'. It will be deleted by
-  // the Tracer object in 'state'.
+  // Don't need to explicitly delete 'trace_manager'. It will be deleted by
+  // the TraceMetaData object in 'state'.
   LOG_IF_ERR(
       TRTSERVER_InferenceResponseDelete(trtserver_response),
       "deleting GRPC response");

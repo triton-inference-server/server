@@ -191,7 +191,7 @@ ResponseRelease(
 
 void
 InferComplete(
-    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER_InferenceResponse* response, void* userp)
 {
   std::promise<TRTSERVER_InferenceResponse*>* p =
@@ -199,7 +199,7 @@ InferComplete(
   p->set_value(response);
   delete p;
 
-  TRTSERVER_TraceDelete(trace);
+  TRTSERVER_TraceManagerDelete(trace_manager);
 }
 
 TRTSERVER_Error*

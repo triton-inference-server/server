@@ -248,7 +248,7 @@ class HTTPAPIServer : public HTTPServerImpl {
     evhtp_request_t* EvHtpRequest() const { return req_; }
 
     static void InferComplete(
-        TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+        TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
         TRTSERVER_InferenceResponse* response, void* userp);
     evhtp_res FinalizeResponse(TRTSERVER_InferenceResponse* response);
 
@@ -1284,7 +1284,7 @@ HTTPAPIServer::InferRequest::InferRequest(
 
 void
 HTTPAPIServer::InferRequest::InferComplete(
-    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER_InferenceResponse* response, void* userp)
 {
   HTTPAPIServer::InferRequest* infer_request =
@@ -1295,8 +1295,8 @@ HTTPAPIServer::InferRequest::InferComplete(
     evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
   }
 
-  // Don't need to explicitly delete 'trace'. It will be deleted by
-  // the Tracer object in 'infer_request'.
+  // Don't need to explicitly delete 'trace_manager'. It will be deleted by
+  // the TraceMetaData object in 'infer_request'.
   LOG_IF_ERR(
       TRTSERVER_InferenceResponseDelete(response), "deleting HTTP response");
 }

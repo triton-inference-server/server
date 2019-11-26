@@ -951,16 +951,16 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerMetrics(
     TRTSERVER_Server* server, TRTSERVER_Metrics** metrics);
 
 /// Type for inference completion callback function. If non-nullptr,
-/// the 'trace' object is the trace associated with the request that
-/// is completing. The callback function takes ownership of the
-/// TRTSERVER_Trace object and must call TRTSERVER_TraceDelete to
+/// the 'trace_manager' object is the trace manager associated with the request
+/// that is completing. The callback function takes ownership of the
+/// TRTSERVER_TraceManager object and must call TRTSERVER_TraceManagerDelete to
 /// release the object. The callback function takes ownership of the
 /// TRTSERVER_InferenceResponse object and must call
 /// TRTSERVER_InferenceResponseDelete to release the object. The
 /// 'userp' data is the same as what is supplied in the call to
 /// TRTSERVER_ServerInferAsync.
 typedef void (*TRTSERVER_InferenceCompleteFn_t)(
-    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER_InferenceResponse* response, void* userp);
 
 /// Perform inference using the meta-data and inputs supplied by the
