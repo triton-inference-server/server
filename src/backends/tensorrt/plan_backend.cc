@@ -272,8 +272,8 @@ PlanBackend::CreateExecutionContext(
     if (!context->context_->setOptimizationProfile(profile_index)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "Can not set the specified optimization profile " +
-              std::to_string(profile_index) + " for " + Name() +
+          "Can not set the specified optimization profile " + profile_name +
+              "[" + std::to_string(profile_index) + "] for " + Name() +
               ". Expected optimization profile index range 0-" +
               std::to_string(
                   context->engine_->getNbOptimizationProfiles() - 1));
@@ -341,7 +341,7 @@ PlanBackend::CreateExecutionContext(
         RequestStatusCode::INVALID_ARG,
         "unexpected configuration maximum batch size " +
             std::to_string(Config().max_batch_size()) + " for '" + Name() +
-            "' profile [" + std::to_string(profile_index) +
+            "' profile " + profile_name + " [" + std::to_string(profile_index) +
             "], model maximum is " +
             std::to_string(context->max_dynamic_batch_size_));
   }
