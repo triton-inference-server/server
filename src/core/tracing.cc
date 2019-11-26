@@ -32,50 +32,67 @@
 
 namespace nvidia { namespace inferenceserver {
 
+std::atomic<int64_t> Trace::next_id_(0);
+
 void
-Trace::Report(const std::shared_ptr<ModelInferStats>& infer_stats)
+Trace::Report(const ModelInferStats* infer_stats)
 {
+  // InferStats that is not captured should not be reported (i.e. ensemble
+  // only have valid timestamp for request start and end)
+  uint64_t timestamp = 0;
   if (level_ != TRTSERVER_TRACE_LEVEL_DISABLED) {
-    activity_fn_(
-        reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_REQUEST_START,
-        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
-            ModelInferStats::TimestampKind::kRequestStart)),
-        activity_userp_);
-    activity_fn_(
-        reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_QUEUE_START,
-        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
-            ModelInferStats::TimestampKind::kQueueStart)),
-        activity_userp_);
-    activity_fn_(
-        reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_COMPUTE_START,
-        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
-            ModelInferStats::TimestampKind::kComputeStart)),
-        activity_userp_);
-    activity_fn_(
-        reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_COMPUTE_END,
-        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
-            ModelInferStats::TimestampKind::kComputeEnd)),
-        activity_userp_);
-    activity_fn_(
-        reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_REQUEST_END,
-        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
-            ModelInferStats::TimestampKind::kRequestEnd)),
-        activity_userp_);
+    timestamp = TIMESPEC_TO_NANOS(
+        infer_stats->Timestamp(ModelInferStats::TimestampKind::kRequestStart));
+    if (timestamp != 0) {
+      activity_fn_(
+          reinterpret_cast<TRTSERVER_Trace*>(this),
+          TRTSERVER_TRACE_REQUEST_START, timestamp, activity_userp_);
+    }
+    timestamp = TIMESPEC_TO_NANOS(
+        infer_stats->Timestamp(ModelInferStats::TimestampKind::kQueueStart));
+    if (timestamp != 0) {
+      activity_fn_(
+          reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_QUEUE_START,
+          timestamp, activity_userp_);
+    }
+    timestamp = TIMESPEC_TO_NANOS(
+        infer_stats->Timestamp(ModelInferStats::TimestampKind::kComputeStart));
+    if (timestamp != 0) {
+      activity_fn_(
+          reinterpret_cast<TRTSERVER_Trace*>(this),
+          TRTSERVER_TRACE_COMPUTE_START, timestamp, activity_userp_);
+    }
+    timestamp = TIMESPEC_TO_NANOS(
+        infer_stats->Timestamp(ModelInferStats::TimestampKind::kComputeEnd));
+    if (timestamp != 0) {
+      activity_fn_(
+          reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_COMPUTE_END,
+          timestamp, activity_userp_);
+    }
+    timestamp = TIMESPEC_TO_NANOS(
+        infer_stats->Timestamp(ModelInferStats::TimestampKind::kRequestEnd));
+    if (timestamp != 0) {
+      activity_fn_(
+          reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_REQUEST_END,
+          timestamp, activity_userp_);
+    }
   }
 
   if (level_ == TRTSERVER_TRACE_LEVEL_MAX) {
-    activity_fn_(
-        reinterpret_cast<TRTSERVER_Trace*>(this),
-        TRTSERVER_TRACE_COMPUTE_INPUT_END,
-        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
-            ModelInferStats::TimestampKind::kComputeInputEnd)),
-        activity_userp_);
-    activity_fn_(
-        reinterpret_cast<TRTSERVER_Trace*>(this),
-        TRTSERVER_TRACE_COMPUTE_OUTPUT_START,
-        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
-            ModelInferStats::TimestampKind::kComputeOutputStart)),
-        activity_userp_);
+    timestamp = TIMESPEC_TO_NANOS(infer_stats->Timestamp(
+        ModelInferStats::TimestampKind::kComputeInputEnd));
+    if (timestamp != 0) {
+      activity_fn_(
+          reinterpret_cast<TRTSERVER_Trace*>(this),
+          TRTSERVER_TRACE_COMPUTE_INPUT_END, timestamp, activity_userp_);
+    }
+    timestamp = TIMESPEC_TO_NANOS(infer_stats->Timestamp(
+        ModelInferStats::TimestampKind::kComputeOutputStart));
+    if (timestamp != 0) {
+      activity_fn_(
+          reinterpret_cast<TRTSERVER_Trace*>(this),
+          TRTSERVER_TRACE_COMPUTE_OUTPUT_START, timestamp, activity_userp_);
+    }
   }
 }
 

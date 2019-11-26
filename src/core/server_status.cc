@@ -32,6 +32,7 @@
 #include "src/core/metric_model_reporter.h"
 #include "src/core/metrics.h"
 #include "src/core/provider.h"
+#include "src/core/tracing.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -337,8 +338,42 @@ ServerStatTimerScoped::~ServerStatTimerScoped()
 }
 
 void
+ModelInferStats::NewTrace(TRTSERVER_Trace* parent)
+{
+#ifdef TRTIS_ENABLE_TRACING
+  if (trace_manager_ != nullptr) {
+    auto ltrace_manager = reinterpret_cast<OpaqueTraceManager*>(trace_manager_);
+    TRTSERVER_Trace* trace = nullptr;
+    ltrace_manager->create_fn_(
+        &trace, model_name_.c_str(), requested_model_version_,
+        ltrace_manager->userp_);
+    if (trace != nullptr) {
+      auto ltrace = reinterpret_cast<Trace*>(trace);
+      ltrace->SetModelName(model_name_);
+      ltrace->SetModelVersion(requested_model_version_);
+      if (parent != nullptr) {
+        ltrace->SetParentId(reinterpret_cast<Trace*>(parent)->Id());
+      }
+      trace_ = trace;
+    }
+  }
+#endif  // TRTIS_ENABLE_TRACING
+}
+
+void
 ModelInferStats::Report()
 {
+#ifdef TRTIS_ENABLE_TRACING
+  if (trace_ != nullptr) {
+    auto ltrace = reinterpret_cast<Trace*>(trace_);
+    ltrace->Report(this);
+    // Inform that the trace object is done and can be released
+    auto ltrace_manager = reinterpret_cast<OpaqueTraceManager*>(trace_manager_);
+    ltrace_manager->release_fn_(
+        trace_, ltrace->ActivityUserp(), ltrace_manager->userp_);
+  }
+#endif  // TRTIS_ENABLE_TRACING
+
   // If the inference request failed before a backend could be
   // determined, there will be no metrics reporter.. so just use the
   // version directly from the inference request.

@@ -193,7 +193,7 @@ ResponseRelease(
 
 void
 InferComplete(
-    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER_InferenceResponse* response, void* userp)
 {
   std::promise<TRTSERVER_InferenceResponse*>* p =
@@ -201,7 +201,7 @@ InferComplete(
   p->set_value(response);
   delete p;
 
-  TRTSERVER_TraceDelete(trace);
+  TRTSERVER_TraceManagerDelete(trace_manager);
 }
 
 TRTSERVER_Error*
@@ -529,8 +529,8 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       TRTSERVER_ServerInferAsync(
-          server.get(), nullptr /* trace */, request_provider, allocator,
-          nullptr /* response_allocator_userp */, InferComplete,
+          server.get(), nullptr /* trace_manager */, request_provider,
+          allocator, nullptr /* response_allocator_userp */, InferComplete,
           reinterpret_cast<void*>(p)),
       "running inference");
 
