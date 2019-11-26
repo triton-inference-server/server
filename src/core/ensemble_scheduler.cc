@@ -34,6 +34,7 @@
 #include "src/core/provider_utils.h"
 #include "src/core/server.h"
 #include "src/core/server_status.h"
+#include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -726,6 +727,10 @@ EnsembleContext::ScheduleSteps(
     infer_stats->SetBatchSize(
         step->request_provider_->RequestHeader().batch_size());
     infer_stats->SetFailed(true);
+
+    // Passing trace-related objects down
+    infer_stats->SetTraceManager(context->stats_->GetTraceManager());
+    infer_stats->NewTrace(context->stats_->GetTrace());
 
     context->is_->InferAsync(
         step->backend_, step->request_provider_, step->response_provider_,

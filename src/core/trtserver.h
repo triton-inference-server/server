@@ -59,6 +59,7 @@ struct TRTSERVER_Server;
 struct TRTSERVER_ServerOptions;
 struct TRTSERVER_SharedMemoryBlock;
 struct TRTSERVER_Trace;
+struct TRTSERVER_TraceManager;
 
 /// Types of memory recognized by TRTSERVER.
 typedef enum trtserver_memorytype_enum {
@@ -375,6 +376,94 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceNew(
 /// \param trace The trace object.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceDelete(TRTSERVER_Trace* trace);
+
+/// Get the name of the model being traced. The caller
+/// does not own the returned string and must not modify or delete
+/// it. The lifetime of the returned string extends only as long as
+/// 'trace' and must not be accessed once 'trace' is deleted.
+/// This method is only guaranteed to correctly return the 'model_name' in the
+/// invocation of TRTSERVER_TraceManagerReleaseTraceFn_t
+/// \param trace The trace object.
+/// \param model_name Returns the name of the model being traced.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceModelName(
+    TRTSERVER_Trace* trace, const char** model_name);
+
+/// Get the version of the model being traced.
+/// This method is only guaranteed to correctly return the 'model_version' in
+/// the invocation of TRTSERVER_TraceManagerReleaseTraceFn_t
+/// \param trace The trace object.
+/// \param model_version Returns the version of the model being traced.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceModelVersion(
+    TRTSERVER_Trace* trace, int64_t* model_version);
+
+/// Get the id of the trace object. Each trace object created during execution
+/// of the inference server has a unique id.
+/// \param trace The trace object.
+/// \param id Returns the id of the trace object.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceId(
+    TRTSERVER_Trace* trace, int64_t* id);
+
+/// Get the parent id of the trace object. The parent id will be set if the
+/// trace object is created from within another traced request, and the parent
+/// id will be set to the id of the trace object associated with that
+/// traced request.
+/// This method is only guaranteed to correctly return the 'parent_id' in
+/// the invocation of TRTSERVER_TraceManagerReleaseTraceFn_t
+/// \param trace The trace object.
+/// \param parent_id Returns the parent id of the trace object. -1 indicates
+/// that the trace object has no parent.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceParentId(
+    TRTSERVER_Trace* trace, int64_t* parent_id);
+
+/// TRTSERVER_TraceManager
+///
+/// Object representing a manager for initiating traces.
+///
+
+/// Type for trace creation callback function. This callback function
+/// is used when a model execution is initiated within the request, if the
+/// request is to be traced. The user should call TRTSERVER_TraceNew and return
+/// the new trace object if the user decides to trace the model execution.
+/// Otherwise, the user should set 'trace' == nullptr.
+/// The 'userp' data is the same as 'userp' supplied in the call to
+/// TRTSERVER_TraceManagerNew.
+typedef void (*TRTSERVER_TraceManagerCreateTraceFn_t)(
+    TRTSERVER_Trace** trace, const char* model_name, int64_t version,
+    void* userp);
+
+/// Type for trace release callback function. This callback function
+/// is invoked when the model execution being traced is completed. By this
+/// point, it is the user's responsiblity to delete 'trace' object created from
+/// TRTSERVER_TraceManagerCreateTraceFn_t by calling TRTSERVER_TraceDelete.
+/// The 'activity_userp' data is the same as 'activity_userp' supplied in the
+/// call to TRTSERVER_TraceNew.
+/// The 'userp' data is the same as 'userp' supplied in the call to
+/// TRTSERVER_TraceManagerNew.
+typedef void (*TRTSERVER_TraceManagerReleaseTraceFn_t)(
+    TRTSERVER_Trace* trace, void* activity_userp, void* userp);
+
+/// Create a new trace manager object.
+/// \param trace_manager Returns the new trace manager object.
+/// \param create_fn The function to call to create trace object for a request.
+/// \param release_fn The function to call when the request associated with a
+/// trace object is complete.
+/// \param userp User-provided pointer that is delivered to the trace
+/// creation and release function.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceManagerNew(
+    TRTSERVER_TraceManager** trace_manager,
+    TRTSERVER_TraceManagerCreateTraceFn_t create_fn,
+    TRTSERVER_TraceManagerReleaseTraceFn_t release_fn, void* userp);
+
+/// Delete a trace manager.
+/// \param trace_manager The trace manager object.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceManagerDelete(
+    TRTSERVER_TraceManager* trace_manager);
 
 /// TRTSERVER_InferenceRequestProvider
 ///
@@ -862,16 +951,16 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerMetrics(
     TRTSERVER_Server* server, TRTSERVER_Metrics** metrics);
 
 /// Type for inference completion callback function. If non-nullptr,
-/// the 'trace' object is the trace associated with the request that
-/// is completing. The callback function takes ownership of the
-/// TRTSERVER_Trace object and must call TRTSERVER_TraceDelete to
+/// the 'trace_manager' object is the trace manager associated with the request
+/// that is completing. The callback function takes ownership of the
+/// TRTSERVER_TraceManager object and must call TRTSERVER_TraceManagerDelete to
 /// release the object. The callback function takes ownership of the
 /// TRTSERVER_InferenceResponse object and must call
 /// TRTSERVER_InferenceResponseDelete to release the object. The
 /// 'userp' data is the same as what is supplied in the call to
 /// TRTSERVER_ServerInferAsync.
 typedef void (*TRTSERVER_InferenceCompleteFn_t)(
-    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER_InferenceResponse* response, void* userp);
 
 /// Perform inference using the meta-data and inputs supplied by the
@@ -880,8 +969,8 @@ typedef void (*TRTSERVER_InferenceCompleteFn_t)(
 /// TRTSERVER_InferenceRequestProviderDelete once this function
 /// returns.
 /// \param server The inference server object.
-/// \param trace The trace object for this request, or nullptr if no
-/// tracing.
+/// \param trace_manager The trace manager object for this request, or nullptr
+/// if no tracing.
 /// \param request_provider The request provider for the request.
 /// \param response_allocator The TRTSERVER_ResponseAllocator to use
 /// to allocate buffers to hold inference results.
@@ -893,7 +982,7 @@ typedef void (*TRTSERVER_InferenceCompleteFn_t)(
 /// the completion function.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerInferAsync(
-    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER_InferenceRequestProvider* request_provider,
     TRTSERVER_ResponseAllocator* response_allocator,
     void* response_allocator_userp, TRTSERVER_InferenceCompleteFn_t complete_fn,

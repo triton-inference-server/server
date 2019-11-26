@@ -27,12 +27,23 @@
 
 #ifdef TRTIS_ENABLE_TRACING
 
+#include <atomic>
+#include <memory>
 #include <vector>
 #include "src/core/server_status.h"
 #include "src/core/status.h"
 #include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
+
+//
+// A light-weight structure to store user-provided trace manager.
+//
+struct OpaqueTraceManager {
+  TRTSERVER_TraceManagerCreateTraceFn_t create_fn_;
+  TRTSERVER_TraceManagerReleaseTraceFn_t release_fn_;
+  void* userp_;
+};
 
 //
 // A trace.
@@ -47,20 +58,40 @@ class Trace {
     return Status::Success;
   }
 
-  void Report(const std::shared_ptr<ModelInferStats>& infer_stats);
+  void SetModelName(const std::string& n) { model_name_ = n; }
+  void SetModelVersion(int64_t v) { model_version_ = v; }
+  void SetParentId(int64_t pid) { parent_id_ = pid; }
+
+  void* ActivityUserp() const { return activity_userp_; }
+  const char* ModelName() const { return model_name_.c_str(); }
+  int64_t ModelVersion() const { return model_version_; }
+  int64_t Id() const { return id_; }
+  int64_t ParentId() const { return parent_id_; }
+
+  void Report(const ModelInferStats* infer_stats);
 
  private:
   Trace(
       TRTSERVER_Trace_Level level, TRTSERVER_TraceActivityFn_t activity_fn,
       void* activity_userp)
       : level_(level), activity_fn_(activity_fn),
-        activity_userp_(activity_userp)
+        activity_userp_(activity_userp), id_(next_id_++), parent_id_(-1)
   {
   }
 
   const TRTSERVER_Trace_Level level_;
   TRTSERVER_TraceActivityFn_t activity_fn_;
   void* activity_userp_;
+
+  std::string model_name_;
+  int64_t model_version_;
+
+  // unique id will be assigned when the trace object is being created
+  int64_t id_;
+  int64_t parent_id_;
+
+  // Maintain next id statically so that trace id is unique even across traces
+  static std::atomic<int64_t> next_id_;
 };
 
 }}  // namespace nvidia::inferenceserver

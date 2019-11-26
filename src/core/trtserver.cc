@@ -709,6 +709,94 @@ TRTSERVER_TraceDelete(TRTSERVER_Trace* trace)
 #endif  // TRTIS_ENABLE_TRACING
 }
 
+TRTSERVER_Error*
+TRTSERVER_TraceModelName(TRTSERVER_Trace* trace, const char** model_name)
+{
+#ifdef TRTIS_ENABLE_TRACING
+  ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
+  *model_name = ltrace->ModelName();
+  return nullptr;  // Success
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+#endif  // TRTIS_ENABLE_TRACING
+}
+
+TRTSERVER_Error*
+TRTSERVER_TraceModelVersion(TRTSERVER_Trace* trace, int64_t* model_version)
+{
+#ifdef TRTIS_ENABLE_TRACING
+  ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
+  *model_version = ltrace->ModelVersion();
+  return nullptr;  // Success
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+#endif  // TRTIS_ENABLE_TRACING
+}
+
+TRTSERVER_Error*
+TRTSERVER_TraceId(TRTSERVER_Trace* trace, int64_t* id)
+{
+#ifdef TRTIS_ENABLE_TRACING
+  ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
+  *id = ltrace->Id();
+  return nullptr;  // Success
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+#endif  // TRTIS_ENABLE_TRACING
+}
+
+TRTSERVER_Error*
+TRTSERVER_TraceParentId(TRTSERVER_Trace* trace, int64_t* parent_id)
+{
+#ifdef TRTIS_ENABLE_TRACING
+  ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
+  *parent_id = ltrace->ParentId();
+  return nullptr;  // Success
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+#endif  // TRTIS_ENABLE_TRACING
+}
+
+TRTSERVER_Error*
+TRTSERVER_TraceManagerNew(
+    TRTSERVER_TraceManager** trace_manager,
+    TRTSERVER_TraceManagerCreateTraceFn_t create_fn,
+    TRTSERVER_TraceManagerReleaseTraceFn_t release_fn, void* userp)
+{
+#ifdef TRTIS_ENABLE_TRACING
+  std::unique_ptr<ni::OpaqueTraceManager> ltrace_manager(
+      new ni::OpaqueTraceManager);
+  ltrace_manager->create_fn_ = create_fn;
+  ltrace_manager->release_fn_ = release_fn;
+  ltrace_manager->userp_ = userp;
+  *trace_manager =
+      reinterpret_cast<TRTSERVER_TraceManager*>(ltrace_manager.release());
+  return nullptr;  // Success
+#else
+  *trace_manager = nullptr;
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+#endif  // TRTIS_ENABLE_TRACING
+}
+
+TRTSERVER_Error*
+TRTSERVER_TraceManagerDelete(TRTSERVER_TraceManager* trace_manager)
+{
+#ifdef TRTIS_ENABLE_TRACING
+  ni::OpaqueTraceManager* ltrace_manager =
+      reinterpret_cast<ni::OpaqueTraceManager*>(trace_manager);
+  delete ltrace_manager;
+  return nullptr;  // Success
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+#endif  // TRTIS_ENABLE_TRACING
+}
+
 //
 // TRTSERVER_InferenceRequestProvider
 //
@@ -1344,7 +1432,7 @@ TRTSERVER_ServerMetrics(TRTSERVER_Server* server, TRTSERVER_Metrics** metrics)
 
 TRTSERVER_Error*
 TRTSERVER_ServerInferAsync(
-    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER_InferenceRequestProvider* request_provider,
     TRTSERVER_ResponseAllocator* response_allocator,
     void* response_allocator_userp, TRTSERVER_InferenceCompleteFn_t complete_fn,
@@ -1366,6 +1454,8 @@ TRTSERVER_ServerInferAsync(
   infer_stats->SetMetricReporter(lprovider->Backend()->MetricReporter());
   infer_stats->SetBatchSize(request_header->batch_size());
   infer_stats->SetFailed(true);
+  infer_stats->SetTraceManager(trace_manager);
+  infer_stats->NewTrace();
 
   std::shared_ptr<ni::InferRequestProvider> infer_request_provider;
   RETURN_IF_STATUS_ERROR(ni::InferRequestProvider::Create(
@@ -1385,7 +1475,7 @@ TRTSERVER_ServerInferAsync(
   lserver->InferAsync(
       lprovider->Backend(), infer_request_provider, infer_response_provider,
       infer_stats,
-      [infer_stats, trace, infer_response_provider, server, complete_fn,
+      [infer_stats, trace_manager, infer_response_provider, server, complete_fn,
        complete_userp](const ni::Status& status) mutable {
         infer_stats->SetFailed(!status.IsOk());
         if (!status.IsOk()) {
@@ -1394,13 +1484,6 @@ TRTSERVER_ServerInferAsync(
 
         infer_stats->CaptureTimestamp(
             ni::ModelInferStats::TimestampKind::kRequestEnd);
-
-#ifdef TRTIS_ENABLE_TRACING
-        if (trace != nullptr) {
-          ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
-          ltrace->Report(infer_stats);
-        }
-#endif  // TRTIS_ENABLE_TRACING
 
         // We must explicitly update the inference stats before
         // sending the response... otherwise it is possible that the
@@ -1412,7 +1495,7 @@ TRTSERVER_ServerInferAsync(
         TrtServerResponse* response =
             new TrtServerResponse(status, infer_response_provider);
         complete_fn(
-            server, trace,
+            server, trace_manager,
             reinterpret_cast<TRTSERVER_InferenceResponse*>(response),
             complete_userp);
       });

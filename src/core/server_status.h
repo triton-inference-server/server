@@ -103,7 +103,7 @@ class ModelInferStats {
         requested_model_version_(-1), batch_size_(0), gpu_device_(-1),
         failed_(false), execution_count_(0),
         timestamps_((size_t)TimestampKind::COUNT__), extra_queue_duration_(0),
-        extra_compute_duration_(0)
+        extra_compute_duration_(0), trace_manager_(nullptr), trace_(nullptr)
   {
     memset(&timestamps_[0], 0, sizeof(struct timespec) * timestamps_.size());
   }
@@ -135,6 +135,24 @@ class ModelInferStats {
   // batched with another request (in dynamic batch case only one of
   // the batched requests will count the execution).
   void SetModelExecutionCount(uint32_t count) { execution_count_ = count; }
+
+  // Set the trace manager associated with the inference.
+  void SetTraceManager(TRTSERVER_TraceManager* tm) { trace_manager_ = tm; }
+
+  // Get the trace manager associated with the inference.
+  TRTSERVER_TraceManager* GetTraceManager() const { return trace_manager_; }
+
+  // Create a trace object associated to the inference.
+  // Optional 'parent' can be provided if the trace object has a parent.
+  // Model name, model version, and trace manager should be set before calling
+  // this function. And each ModelInferStats instance should not call this
+  // function more than once.
+  void NewTrace(TRTSERVER_Trace* parent = nullptr);
+
+  // Get the trace object associated to the inference.
+  // Return nullptr if the inference will not be traced or if NewTrace()
+  // has not been called.
+  TRTSERVER_Trace* GetTrace() const { return trace_; }
 
   // Get the timestamp for a kind.
   const struct timespec& Timestamp(TimestampKind kind) const
@@ -175,6 +193,14 @@ class ModelInferStats {
 
   uint64_t extra_queue_duration_;
   uint64_t extra_compute_duration_;
+
+  // The trace manager associated with these stats. This object is not owned by
+  // this ModelInferStats object and so is not destroyed by this object.
+  TRTSERVER_TraceManager* trace_manager_;
+
+  // The trace associated with these stats. This object is not owned by
+  // this ModelInferStats object and so is not destroyed by this object.
+  TRTSERVER_Trace* trace_;
 };
 
 // Manage access and updates to server status information.
