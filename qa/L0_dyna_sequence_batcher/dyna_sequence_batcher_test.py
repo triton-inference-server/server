@@ -43,7 +43,13 @@ from tensorrtserver.api import *
 _test_system_shared_memory = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 _test_cuda_shared_memory = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
 
+_no_batching = (int(os.environ.get('NO_BATCHING', 0)) == 1)
+
 _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan", "onnx", "libtorch")
+if _no_batching:
+    _trials += ("savedmodel_nobatch", "graphdef_nobatch", "netdef_nobatch",
+                "plan_nobatch", "onnx_nobatch", "libtorch_nobatch")
+
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
 
@@ -56,7 +62,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         # couldn't implement the full accumulator. See
         # qa/common/gen_qa_dyna_sequence_models.py for more
         # information.
-        if "custom" not in trial:
+        if ((("nobatch" not in trial) and ("custom" not in trial)) or
+            ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial) or
+            ("onnx" in trial))  or ("libtorch" in trial):
             expected_result = value
             if flag_str is not None:
                 if "start" in flag_str:

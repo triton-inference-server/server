@@ -58,6 +58,7 @@ cp -r ../custom_models/custom_dyna_sequence_int32 models/.
 # reset (which is used to make sure the correct batch size was used
 # for execution). Test everything with fixed-tensor-size models and
 # variable-tensor-size models.
+export NO_BATCHING=1
 for i in \
         test_simple_sequence \
         test_length1_sequence \
@@ -93,6 +94,7 @@ for m in `ls models`; do
             sed -i "s/max_queue_delay_microseconds:.*/max_queue_delay_microseconds:5000000/" config.pbtxt)
 done
 
+export NO_BATCHING=0
 for i in \
     test_multi_sequence \
         test_multi_parallel_sequence \
