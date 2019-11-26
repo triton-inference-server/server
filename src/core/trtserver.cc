@@ -710,19 +710,6 @@ TRTSERVER_TraceDelete(TRTSERVER_Trace* trace)
 }
 
 TRTSERVER_Error*
-TRTSERVER_TraceUserp(TRTSERVER_Trace* trace, void** userp)
-{
-#ifdef TRTIS_ENABLE_TRACING
-  ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
-  *userp = ltrace->ActivityUserp();
-  return nullptr;  // Success
-#else
-  return TRTSERVER_ErrorNew(
-      TRTSERVER_ERROR_UNSUPPORTED, "tracing not supported");
-#endif  // TRTIS_ENABLE_TRACING
-}
-
-TRTSERVER_Error*
 TRTSERVER_TraceModelName(TRTSERVER_Trace* trace, const char** model_name)
 {
 #ifdef TRTIS_ENABLE_TRACING

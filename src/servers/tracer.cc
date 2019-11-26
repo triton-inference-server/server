@@ -171,13 +171,10 @@ TraceManager::NewTrace(TRTSERVER_Trace** trace)
 }
 
 void
-TraceManager::ReleaseTrace(TRTSERVER_Trace* trace)
+TraceManager::ReleaseTrace(
+    TRTSERVER_Trace* trace, void* activity_userp, void* userp)
 {
   if (trace != nullptr) {
-    Tracer* tracer = nullptr;
-    LOG_IF_ERR(
-        TRTSERVER_TraceUserp(trace, (void**)&tracer),
-        "getting associated tracer");
     // Gather trace info
     const char* model_name;
     int64_t model_version, id, parent_id;
@@ -189,6 +186,8 @@ TraceManager::ReleaseTrace(TRTSERVER_Trace* trace)
     LOG_IF_ERR(TRTSERVER_TraceId(trace, &id), "getting trace id");
     LOG_IF_ERR(
         TRTSERVER_TraceParentId(trace, &parent_id), "getting trace parent id");
+
+    auto tracer = reinterpret_cast<Tracer*>(activity_userp);
     tracer->SetModel(model_name, model_version);
     tracer->SetId(id, parent_id);
 

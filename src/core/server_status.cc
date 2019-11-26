@@ -369,7 +369,8 @@ ModelInferStats::Report()
     ltrace->Report(this);
     // Inform that the trace object is done and can be released
     auto ltrace_manager = reinterpret_cast<OpaqueTraceManager*>(trace_manager_);
-    ltrace_manager->release_fn_(trace_);
+    ltrace_manager->release_fn_(
+        trace_, ltrace->ActivityUserp(), ltrace_manager->userp_);
   }
 #endif  // TRTIS_ENABLE_TRACING
 

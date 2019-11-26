@@ -73,7 +73,8 @@ class TraceManager : public std::enable_shared_from_this<TraceManager> {
       TRTSERVER_Trace** trace, const char* model_name, int64_t version,
       void* userp);
 
-  static void ReleaseTrace(TRTSERVER_Trace* trace);
+  static void ReleaseTrace(
+      TRTSERVER_Trace* trace, void* activity_userp, void* userp);
 
   // Write to the trace file.
   void WriteTrace(const std::stringstream& ss);

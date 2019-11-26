@@ -62,11 +62,11 @@ class Trace {
   void SetModelVersion(int64_t v) { model_version_ = v; }
   void SetParentId(int64_t pid) { parent_id_ = pid; }
 
-  void* ActivityUserp() { return activity_userp_; }
-  const char* ModelName() { return model_name_.c_str(); }
-  int64_t ModelVersion() { return model_version_; }
-  int64_t Id() { return id_; }
-  int64_t ParentId() { return parent_id_; }
+  void* ActivityUserp() const { return activity_userp_; }
+  const char* ModelName() const { return model_name_.c_str(); }
+  int64_t ModelVersion() const { return model_version_; }
+  int64_t Id() const { return id_; }
+  int64_t ParentId() const { return parent_id_; }
 
   void Report(const ModelInferStats* infer_stats);
 

@@ -140,7 +140,7 @@ class ModelInferStats {
   void SetTraceManager(TRTSERVER_TraceManager* tm) { trace_manager_ = tm; }
 
   // Get the trace manager associated with the inference.
-  TRTSERVER_TraceManager* GetTraceManager() { return trace_manager_; }
+  TRTSERVER_TraceManager* GetTraceManager() const { return trace_manager_; }
 
   // Create a trace object associated to the inference.
   // Optional 'parent' can be provided if the trace object has a parent.
@@ -152,7 +152,7 @@ class ModelInferStats {
   // Get the trace object associated to the inference.
   // Return nullptr if the inference will not be traced or if NewTrace()
   // has not been called.
-  TRTSERVER_Trace* GetTrace() { return trace_; }
+  TRTSERVER_Trace* GetTrace() const { return trace_; }
 
   // Get the timestamp for a kind.
   const struct timespec& Timestamp(TimestampKind kind) const
@@ -194,10 +194,12 @@ class ModelInferStats {
   uint64_t extra_queue_duration_;
   uint64_t extra_compute_duration_;
 
-  // not own
+  // The trace manager associated with these stats. This object is not owned by
+  // this ModelInferStats object and so is not destroyed by this object.
   TRTSERVER_TraceManager* trace_manager_;
 
-  // not own
+  // The trace associated with these stats. This object is not owned by
+  // this ModelInferStats object and so is not destroyed by this object.
   TRTSERVER_Trace* trace_;
 };
 

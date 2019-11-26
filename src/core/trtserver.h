@@ -377,20 +377,12 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceNew(
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceDelete(TRTSERVER_Trace* trace);
 
-/// Get the activity userp of the trace object, which is supplied in the call to
-/// TRTSERVER_TraceNew.
-/// \param trace The trace object.
-/// \param userp Returns the activity userp of the trace object.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceUserp(
-    TRTSERVER_Trace* trace, void** userp);
-
 /// Get the name of the model being traced. The caller
 /// does not own the returned string and must not modify or delete
 /// it. The lifetime of the returned string extends only as long as
 /// 'trace' and must not be accessed once 'trace' is deleted.
-/// 'model_name' is guaranteed to be valid at invocation of
-/// TRTSERVER_TraceManagerReleaseTraceFn_t
+/// This method is only guaranteed to correctly return the 'model_name' in the
+/// invocation of TRTSERVER_TraceManagerReleaseTraceFn_t
 /// \param trace The trace object.
 /// \param model_name Returns the name of the model being traced.
 /// \return a TRTSERVER_Error indicating success or failure.
@@ -398,15 +390,16 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceModelName(
     TRTSERVER_Trace* trace, const char** model_name);
 
 /// Get the version of the model being traced.
-/// 'model_version' is guaranteed to be valid at invocation of
-/// TRTSERVER_TraceManagerReleaseTraceFn_t
+/// This method is only guaranteed to correctly return the 'model_version' in
+/// the invocation of TRTSERVER_TraceManagerReleaseTraceFn_t
 /// \param trace The trace object.
 /// \param model_version Returns the version of the model being traced.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceModelVersion(
     TRTSERVER_Trace* trace, int64_t* model_version);
 
-/// Get the id of the trace object.
+/// Get the id of the trace object. Each trace object created during execution
+/// of the inference server has a unique id.
 /// \param trace The trace object.
 /// \param id Returns the id of the trace object.
 /// \return a TRTSERVER_Error indicating success or failure.
@@ -417,8 +410,8 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceId(
 /// trace object is created from within another traced request, and the parent
 /// id will be set to the id of the trace object associated with that
 /// traced request.
-/// 'parent_id' is guaranteed to be valid at invocation of
-/// TRTSERVER_TraceManagerReleaseTraceFn_t
+/// This method is only guaranteed to correctly return the 'parent_id' in
+/// the invocation of TRTSERVER_TraceManagerReleaseTraceFn_t
 /// \param trace The trace object.
 /// \param parent_id Returns the parent id of the trace object. -1 indicates
 /// that the trace object has no parent.
@@ -443,18 +436,23 @@ typedef void (*TRTSERVER_TraceManagerCreateTraceFn_t)(
     void* userp);
 
 /// Type for trace release callback function. This callback function
-/// is invoked when the model execution being traced is completed. By this point,
-/// It is the user's responsiblity to delete 'trace' object created from
+/// is invoked when the model execution being traced is completed. By this
+/// point, it is the user's responsiblity to delete 'trace' object created from
 /// TRTSERVER_TraceManagerCreateTraceFn_t by calling TRTSERVER_TraceDelete.
-typedef void (*TRTSERVER_TraceManagerReleaseTraceFn_t)(TRTSERVER_Trace* trace);
+/// The 'activity_userp' data is the same as 'activity_userp' supplied in the
+/// call to TRTSERVER_TraceNew.
+/// The 'userp' data is the same as 'userp' supplied in the call to
+/// TRTSERVER_TraceManagerNew.
+typedef void (*TRTSERVER_TraceManagerReleaseTraceFn_t)(
+    TRTSERVER_Trace* trace, void* activity_userp, void* userp);
 
 /// Create a new trace manager object.
 /// \param trace_manager Returns the new trace manager object.
 /// \param create_fn The function to call to create trace object for a request.
 /// \param release_fn The function to call when the request associated with a
 /// trace object is complete.
-/// \param userp User-provided pointer that is delivered to the trace 
-/// creation function.
+/// \param userp User-provided pointer that is delivered to the trace
+/// creation and release function.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceManagerNew(
     TRTSERVER_TraceManager** trace_manager,
