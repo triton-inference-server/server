@@ -1258,7 +1258,7 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   evhtp_request_resume(request);
 
 #ifdef TRTIS_ENABLE_TRACING
-  if (infer_request->trace_meta_data_->tracer_ != nullptr) {
+  if (infer_request->trace_meta_data_ != nullptr) {
     infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
         TRTSERVER_TRACE_LEVEL_MIN, "http send start",
         TIMESPEC_TO_NANOS(request->send_start_ts));
