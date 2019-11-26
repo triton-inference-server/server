@@ -81,9 +81,13 @@ bool allow_http_ = true;
 int32_t http_port_ = 8000;
 int32_t http_health_port_ = -1;
 std::vector<int32_t> http_ports_;
+#ifdef TRTIS_ENABLE_HTTP_V2
+std::vector<std::string> endpoint_names = {"health", "infer"};
+#else
 std::vector<std::string> endpoint_names = {
     "status",    "health", "infer", "modelcontrol", "sharedmemorycontrol",
     "repository"};
+#endif  // TRTIS_ENABLE_HTTP_V2
 #endif  // TRTIS_ENABLE_HTTP
 
 #ifdef TRTIS_ENABLE_GRPC
@@ -1025,8 +1029,12 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #ifdef TRTIS_ENABLE_HTTP
   http_port_ = http_port;
   http_health_port_ = http_health_port;
+#ifdef TRTIS_ENABLE_HTTP_V2
+  http_ports_ = {http_health_port_, http_port_};
+#else
   http_ports_ = {http_port_, http_health_port_, http_port_,
                  http_port_, http_port_,        http_port_};
+#endif  // TRTIS_ENABLE_HTTP_v2
   http_thread_cnt_ = http_thread_cnt;
 #endif  // TRTIS_ENABLE_HTTP
 

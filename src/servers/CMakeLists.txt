@@ -76,10 +76,17 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
   find_package(libevhtp CONFIG REQUIRED)
   message(STATUS "Using libevhtp ${libevhtp_VERSION}")
 
-  set(
-    HTTP_ENDPOINT_SRCS
-    http_server.cc
-  )
+  if(${TRTIS_ENABLE_HTTP_V2})
+    set(
+      HTTP_ENDPOINT_SRCS
+      http_v2_server.cc
+    )
+  else()
+    set(
+      HTTP_ENDPOINT_SRCS
+      http_server.cc
+    )
+  endif() # TRTIS_ENABLE_HTTP_V2
 
   set(
     HTTP_ENDPOINT_HDRS
@@ -106,6 +113,13 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
     $<TARGET_OBJECTS:http-endpoint-library>
     $<TARGET_OBJECTS:proto-library>
   )
+  if(${TRTIS_ENABLE_HTTP_V2})
+    set(
+      HTTP_ENDPOINT_OBJECTS 
+      ${HTTP_ENDPOINT_OBJECTS} 
+      $<TARGET_OBJECTS:grpc-library>
+    )
+  endif() # TRTIS_ENABLE_HTTP_V2
   set(
     HTTP_ENDPOINT_LIBRARIES
     PRIVATE ${LIBEVENT_LIBRARIES}
@@ -113,6 +127,14 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
     PRIVATE protobuf::libprotobuf
     PRIVATE -lre2
   )
+  if(${TRTIS_ENABLE_HTTP_V2})
+    set(
+      HTTP_ENDPOINT_LIBRARIES 
+      ${HTTP_ENDPOINT_LIBRARIES} 
+      PRIVATE gRPC::grpc++
+      PRIVATE gRPC::grpc
+    )
+  endif() # TRTIS_ENABLE_HTTP_V2
 endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 
 #
