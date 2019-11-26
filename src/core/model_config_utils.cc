@@ -478,8 +478,7 @@ ValidateModelConfig(
   }
 
   // If dynamic batching is specified make sure the preferred batch
-  // sizes are positive and don't exceed maximum batch size. Make sure
-  // the max delay is non-negative.
+  // sizes are positive and don't exceed maximum batch size.
   if (config.has_dynamic_batching()) {
     for (const auto size : config.dynamic_batching().preferred_batch_size()) {
       if (size <= 0) {
@@ -544,6 +543,27 @@ ValidateModelConfig(
                 " for " + config.name() +
                 ". Allowed data types are TYPE_UINT64, TYPE_INT64, TYPE_UINT32 "
                 "and TYPE_INT32");
+      }
+    }
+
+    // If oldest-first strategy is enabled make sure the preferred
+    // batch sizes are positive and don't exceed maximum batch size.
+    if (config.sequence_batching().has_oldest()) {
+      for (const auto size :
+           config.sequence_batching().oldest().preferred_batch_size()) {
+        if (size <= 0) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "sequence batching preferred batch size must be positive for " +
+                  config.name());
+        }
+        if (size > config.max_batch_size()) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "sequence batching preferred batch size must be <= max batch "
+              "size for " +
+                  config.name());
+        }
       }
     }
   }
