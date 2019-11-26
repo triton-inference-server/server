@@ -45,9 +45,10 @@ class DynamicBatchScheduler : public Scheduler {
   // Create a scheduler to support a given number of runners and a run
   // function to call when a request is scheduled.
   static Status Create(
-      const uint32_t runner_cnt, const int nice, StandardInitFunc OnInit,
-      StandardWarmupFunc OnWarmup, StandardRunFunc OnSchedule,
-      const bool dynamic_batching_enabled, const bool enforce_equal_shape_batch,
+      const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
+      StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
+      StandardRunFunc OnSchedule, const bool dynamic_batching_enabled,
+      const bool enforce_equal_shape_batch,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds,
       std::unique_ptr<Scheduler>* scheduler);
@@ -63,9 +64,10 @@ class DynamicBatchScheduler : public Scheduler {
 
  private:
   DynamicBatchScheduler(
-      const uint32_t runner_cnt, StandardInitFunc OnInit,
-      StandardWarmupFunc OnWarmup, StandardRunFunc OnSchedule,
-      const bool dynamic_batching_enabled, const bool enforce_equal_shape_batch,
+      const uint32_t runner_id_start, const uint32_t runner_cnt,
+      StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
+      StandardRunFunc OnSchedule, const bool dynamic_batching_enabled,
+      const bool enforce_equal_shape_batch,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds);
   void SchedulerThread(
