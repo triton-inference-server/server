@@ -90,7 +90,8 @@ for PROTOCOL in $PROTOCOLS; do
           EXTRA_ARGS="-i grpc"
         fi
         if [[ $API = "async" ]]; then
-          # Using 
+          # Using a single context for maintaining the concurrency in async case, similar to
+          # simple_perf client.
           EXTRA_ARGS="${EXTRA_ARGS} -a --max-threads=1"
         fi
 
