@@ -144,7 +144,8 @@ class HTTPAPIServer : public HTTPServerImpl {
       const int thread_cnt)
       : HTTPServerImpl(port, thread_cnt), server_(server),
         trace_manager_(trace_manager), smb_manager_(smb_manager),
-        allocator_(nullptr), api_regex_(R"(/v1/models/([^(/|:)]+)(:predict)?)")
+        allocator_(nullptr),
+        api_regex_(R"(/v1/models/([^(/|:)]+)(:predict|/metadata)?)")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -216,6 +217,7 @@ class HTTPAPIServer : public HTTPServerImpl {
 
   void Handle(evhtp_request_t* req) override;
   void HandleHealth(evhtp_request_t* req, const std::string& model_name);
+  void HandleStatus(evhtp_request_t* req, const std::string& model_name);
   void HandleInfer(evhtp_request_t* req, const std::string& model_name);
 
 #if TRTIS_ENABLE_GPU
@@ -362,7 +364,11 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
   std::string model_name, rest;
   if (RE2::FullMatch(
           std::string(req->uri->path->full), api_regex_, &model_name, &rest)) {
-    LOG_VERBOSE(1) << "model_name: " << model_name << ", rest: " << rest;
+    // status
+    if (rest == "/metadata") {
+      HandleStatus(req, model_name);
+      return;
+    }
     // health
     if (rest == "") {
       HandleHealth(req, model_name);
@@ -441,6 +447,79 @@ HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& model_name)
 
   evhtp_send_reply(
       req, (ready && (err == nullptr)) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
+
+  TRTSERVER_ErrorDelete(err);
+}
+void
+HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& model_name)
+{
+  if (req->method != htp_method_GET) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  if (model_name.empty()) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+
+  TRTSERVER_Protobuf* server_status_protobuf = nullptr;
+  TRTSERVER_Error* err =
+      (model_name.empty())
+          ? TRTSERVER_ServerStatus(server_.get(), &server_status_protobuf)
+          : TRTSERVER_ServerModelStatus(
+                server_.get(), model_name.c_str(), &server_status_protobuf);
+  if (err == nullptr) {
+    const char* status_buffer;
+    size_t status_byte_size;
+    err = TRTSERVER_ProtobufSerialize(
+        server_status_protobuf, &status_buffer, &status_byte_size);
+    if (err == nullptr) {
+      // Request text or binary format for status?
+      std::string format;
+      const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
+      if (format_c_str != NULL) {
+        format = std::string(format_c_str);
+      } else {
+        format = "text";
+      }
+
+      if (format == "binary") {
+        evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
+        evhtp_headers_add_header(
+            req->headers_out,
+            evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
+      } else {
+        ServerStatus server_status;
+        if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
+        } else {
+          std::string server_status_str = server_status.DebugString();
+          evbuffer_add(
+              req->buffer_out, server_status_str.c_str(),
+              server_status_str.size());
+        }
+      }
+    }
+  }
+
+  TRTSERVER_ProtobufDelete(server_status_protobuf);
+
+  RequestStatus request_status;
+  RequestStatusUtil::Create(
+      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
+      server_id_);
+
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(
+          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
+
+  evhtp_send_reply(
+      req, (request_status.code() == RequestStatusCode::SUCCESS)
+               ? EVHTP_RES_OK
+               : EVHTP_RES_BADREQ);
 
   TRTSERVER_ErrorDelete(err);
 }

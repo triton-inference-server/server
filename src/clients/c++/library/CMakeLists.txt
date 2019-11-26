@@ -51,6 +51,10 @@ configure_file(request.h.in request.h @ONLY)
 configure_file(request_grpc.h.in request_grpc.h @ONLY)
 configure_file(request_http.h.in request_http.h @ONLY)
 
+if(${TRTIS_ENABLE_HTTP_V2})
+  add_definitions(-DTRTIS_ENABLE_HTTP_V2=1)
+endif() # TRTIS_ENABLE_HTTP_V2
+
 # librequest object build
 set(
   REQUEST_SRCS

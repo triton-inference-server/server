@@ -1034,7 +1034,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #else
   http_ports_ = {http_port_, http_health_port_, http_port_,
                  http_port_, http_port_,        http_port_};
-#endif  // TRTIS_ENABLE_HTTP_v2
+#endif  // TRTIS_ENABLE_HTTP_V2
   http_thread_cnt_ = http_thread_cnt;
 #endif  // TRTIS_ENABLE_HTTP
 

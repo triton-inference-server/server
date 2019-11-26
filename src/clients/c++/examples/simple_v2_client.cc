@@ -27,7 +27,6 @@
 #include <unistd.h>
 #include <iostream>
 #include <string>
-#include "src/clients/c++/library/request_grpc.h"
 #include "src/clients/c++/library/request_http.h"
 
 namespace ni = nvidia::inferenceserver;
@@ -74,7 +73,7 @@ main(int argc, char** argv)
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vi:u:H:")) != -1) {
+  while ((opt = getopt(argc, argv, "vu:H:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
