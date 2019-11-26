@@ -388,7 +388,8 @@ PlanBackend::CreateExecutionContext(
   if (context->is_dynamic_) {
     LOG_INFO << "Created instance " << instance_name << " on GPU " << gpu_device
              << " (" << cc << ") with stream priority " << cuda_stream_priority
-             << " and optimization profile " << std::to_string(profile_index);
+             << " and optimization profile " << profile_name << "["
+             << std::to_string(profile_index) << "]";
   } else {
     LOG_INFO << "Created instance " << instance_name << " on GPU " << gpu_device
              << " (" << cc << ") with stream priority " << cuda_stream_priority;
