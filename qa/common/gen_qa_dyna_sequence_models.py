@@ -283,11 +283,7 @@ platform: "{}"
 max_batch_size: {}
 sequence_batching {{
   max_sequence_idle_microseconds: 5000000
-  oldest {{
-    max_candidate_sequences: 6
-    preferred_batch_size: [ 4 ]
-    max_queue_delay_microseconds: 0
-  }}
+  {}
   control_input [
     {{
       name: "START"
@@ -349,6 +345,7 @@ instance_group [
 '''.format(model_name,
            "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
            max_batch,
+           "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}" if max_batch > 0 else "",
            "fp32" if dtype == np.float32 else "int32",
            "fp32" if dtype == np.float32 else "int32",
            "fp32" if dtype == np.float32 else "int32",
@@ -416,11 +413,7 @@ platform: "caffe2_netdef"
 max_batch_size: {}
 sequence_batching {{
   max_sequence_idle_microseconds: 5000000
-  oldest {{
-    max_candidate_sequences: 6
-    preferred_batch_size: [ 4 ]
-    max_queue_delay_microseconds: 0
-  }}
+  {}
   control_input [
     {{
       name: "START"
@@ -480,6 +473,7 @@ instance_group [
   }}
 ]
 '''.format(model_name, max_batch,
+           "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}" if max_batch > 0 else "",
            "int32" if dtype == np.int32 else "fp32",
            "int32" if dtype == np.int32 else "fp32",
            "int32" if dtype == np.int32 else "fp32",
@@ -835,11 +829,7 @@ platform: "tensorrt_plan"
 max_batch_size: {}
 sequence_batching {{
   max_sequence_idle_microseconds: 5000000
-  oldest {{
-    max_candidate_sequences: 6
-    preferred_batch_size: [ 4 ]
-    max_queue_delay_microseconds: 0
-  }}
+  {}
   control_input [
     {{
       name: "START"
@@ -899,6 +889,7 @@ instance_group [
   }}
 ]
 '''.format(model_name, max_batch,
+           "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}" if max_batch > 0 else "",
            "int32" if dtype == np.int32 else "fp32",
            "int32" if dtype == np.int32 else "fp32",
            "int32" if dtype == np.int32 else "fp32",
@@ -996,11 +987,7 @@ platform: "onnxruntime_onnx"
 max_batch_size: {}
 sequence_batching {{
   max_sequence_idle_microseconds: 5000000
-  oldest {{
-    max_candidate_sequences: 6
-    preferred_batch_size: [ 4 ]
-    max_queue_delay_microseconds: 0
-  }}
+  {}
   control_input [
     {{
       name: "START"
@@ -1060,6 +1047,7 @@ instance_group [
   }}
 ]
 '''.format(model_name, max_batch,
+           "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}" if max_batch > 0 else "",
            np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
            np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
            type="fp32" if dtype == np.float32 else "int32")
@@ -1126,11 +1114,7 @@ platform: "pytorch_libtorch"
 max_batch_size: {}
 sequence_batching {{
   max_sequence_idle_microseconds: 5000000
-  oldest {{
-    max_candidate_sequences: 6
-    preferred_batch_size: [ 4 ]
-    max_queue_delay_microseconds: 0
-  }}
+  {}
   control_input [
     {{
       name: "START__1"
@@ -1190,6 +1174,7 @@ instance_group [
   }}
 ]
 '''.format(model_name, max_batch,
+           "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}" if max_batch > 0 else "",
            "int32" if dtype == np.int32 else "fp32",
            "int32" if dtype == np.int32 else "fp32",
            "int32" if dtype == np.int32 else "fp32",
