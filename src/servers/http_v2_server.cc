@@ -226,7 +226,7 @@ class HTTPAPIServer : public HTTPServerImpl {
 #endif  // TRTIS_ENABLE_GPU
   TRTSERVER_Error* EVBufferToInput(
       const std::string& model_name, const InferRequestHeader& request_header,
-      evbuffer* input_buffer,
+      const InferRequest& request,
       TRTSERVER_InferenceRequestProvider* request_provider,
       std::unordered_map<
           std::string,
@@ -527,7 +527,7 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& model_name)
 TRTSERVER_Error*
 HTTPAPIServer::EVBufferToInput(
     const std::string& model_name, const InferRequestHeader& request_header,
-    evbuffer* input_buffer,
+    const InferRequest& request,
     TRTSERVER_InferenceRequestProvider* request_provider,
     std::unordered_map<
         std::string,
@@ -536,17 +536,6 @@ HTTPAPIServer::EVBufferToInput(
 {
   // Extract input data from HTTP body and register in
   // 'request_provider'.
-  size_t buffer_length = evbuffer_get_length(input_buffer);
-  char* request_buffer = (char*)malloc(sizeof(char) * buffer_length);
-  memset(request_buffer, 0, buffer_length);
-  evbuffer_copyout(input_buffer, request_buffer, buffer_length);
-
-  // Use JsonStringToMessage to convert a json string (bytes encoded in
-  // Base64) to a message
-  InferRequest request;
-  ::google::protobuf::util::JsonStringToMessage(
-      std::string(request_buffer, buffer_length), &request);
-
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
   size_t idx = 0;
@@ -691,6 +680,19 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& model_name)
     return;
   }
 
+  // Convert the json string to protobuf message
+  InferRequest* request(new InferRequest());
+  size_t buffer_length = evbuffer_get_length(req->buffer_in);
+  char* request_buffer = (char*)malloc(sizeof(char) * buffer_length);
+  evbuffer_copyout(req->buffer_in, request_buffer, buffer_length);
+  std::string json_request_string = std::string(request_buffer, buffer_length);
+  if (google::protobuf::util::JsonStringToMessage(
+          json_request_string, request) != google::protobuf::util::Status::OK) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+  free(request_buffer);
+
   uint64_t unique_id = RequestStatusUtil::NextUniqueRequestId();
 
   // Create the inference request provider which provides all the
@@ -702,7 +704,7 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& model_name)
   if (err == nullptr) {
     EVBufferPair* response_pair(new EVBufferPair());
     err = EVBufferToInput(
-        model_name, request_header, req->buffer_in, request_provider,
+        model_name, request_header, *request, request_provider,
         response_pair->second);
     if (err == nullptr) {
       InferRequestClass* infer_request = new InferRequestClass(
