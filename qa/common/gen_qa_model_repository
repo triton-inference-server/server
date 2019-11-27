@@ -48,7 +48,7 @@
 ##
 ############################################################################
 
-TRTIS_VERSION=19.10
+TRTIS_VERSION=19.11
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRTIS_VERSION-py3}
 TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRTIS_VERSION-py3}
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRTIS_VERSION-py3}
