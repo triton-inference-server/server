@@ -200,18 +200,18 @@ AutoFillPlanImpl::Init(ModelConfig* config)
       // no supported profiles
       max_batch_size_ = 0;
     } else {
+      // [TODO] revisit this
       std::set<int> config_profiles;
       // Verify all the profiles in the instance groups are supported or not
       bool supports_batching = true;
       for (const auto& group : config->instance_group()) {
-        if (!group.profile().empty()) {
-          const int profile_idx = GetProfileIndex(group.profile());
+        for (const auto& profile : group.profile()) {
+          const int profile_idx = GetProfileIndex(profile);
           if (profile_idx < 0 || profile_idx >= num_profiles) {
             return Status(
                 RequestStatusCode::INTERNAL,
                 "unable to autofill for '" + model_name_ +
-                    "', configuration specified invalid profile " +
-                    group.profile() +
+                    "', configuration specified invalid profile " + profile +
                     " . Number of profiles supported by TensorRT engine: " +
                     std::to_string(num_profiles));
           }
