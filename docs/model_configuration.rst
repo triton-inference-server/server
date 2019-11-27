@@ -508,9 +508,9 @@ model using the :cpp:var:`ModelSequenceBatching
 <nvidia::inferenceserver::ModelSequenceBatching>` settings in the
 model configuration. These settings control the sequence timeout as
 well as configuring how the inference server will send control signals
-to the model indicating sequence start and ready. See
-:ref:`section-models-and-schedulers` for more information and
-examples.
+to the model indicating sequence start, end, ready and
+correlation ID. See :ref:`section-models-and-schedulers` for more
+information and examples.
 
 The size of generated batches can be examined in aggregate using Count
 metrics, see :ref:`section-metrics`. Inference server verbose logging

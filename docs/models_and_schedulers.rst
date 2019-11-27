@@ -83,10 +83,11 @@ start.
 The :ref:`sequence batcher <section-sequence-batcher>` must be used
 for these stateful models. As explained below, the sequence batcher
 ensures that all inference requests in a sequence get routed to the
-same model instance (and batch slot) so that the model can maintain
-state correctly. The sequence batcher also communicates with the model
-to indicate when a sequence is starting and when a sequence has a
-inference request ready for execution.
+same model instance so that the model can maintain state
+correctly. The sequence batcher also communicates with the model to
+indicate when a sequence is starting, when a sequence is ending, when
+a sequence has a inference request ready for execution, and the
+correlation ID of the sequence.
 
 As explained in :ref:`section-client-api-stateful-models`, when making
 inference requests for a stateful model, the client application must
@@ -95,14 +96,136 @@ must also mark the start and end of the sequence. The correlation ID
 allows the inference server to identify that the requests belong to
 the same sequence.
 
-As a running example, assume a TensorRT stateful model that has the
-following model configuration::
+Control Inputs
+^^^^^^^^^^^^^^
 
-  name: "stateful_model"
+For a stateful model to operate correctly with the sequence batcher,
+the model must typically accept one or more *control* input tensors
+that the inference server uses to communicate with the model. The
+:cpp:var:`nvidia::inferenceserver::ModelSequenceBatching::Control`
+section of the sequence batcher configuration indicates how the model
+exposes the tensors that the sequence batcher should use for these
+controls. All controls are optional. Below is portion of a model
+configuration that shows an example configuration for all the
+available control signals::
+
+  sequence_batching {
+    control_input [
+      {
+        name: "START"
+        control [
+          {
+            kind: CONTROL_SEQUENCE_START
+            fp32_false_true: [ 0, 1 ]
+          }
+        ]
+      },
+      {
+        name: "END"
+        control [
+          {
+            kind: CONTROL_SEQUENCE_END
+            fp32_false_true: [ 0, 1 ]
+          }
+        ]
+      },
+      {
+        name: "READY"
+        control [
+          {
+            kind: CONTROL_SEQUENCE_READY
+            fp32_false_true: [ 0, 1 ]
+          }
+        ]
+      },
+      {
+        name: "CORRID"
+        control [
+          {
+            kind: CONTROL_SEQUENCE_CORRID
+            data_type: TYPE_UINT64
+          }
+        ]
+      }
+    ]
+  }
+
+* **Start**: The start input tensor is specified using
+  CONTROL_SEQUENCE_START in the configuration. The example
+  configuration indicates that the model has an input tensor called
+  START with a 32-bit floating point data-type. The sequence batcher
+  will define this tensor when executing an inference on the
+  model. The START tensor must be 1-dimensional with size equal to the
+  batch-size. Each element in the tensor indicates if the sequence in
+  the corresponding batch slot is starting or not. In the example
+  configuration, fp32_false_true indicates that a sequence start is
+  indicated by tensor element equal to 1, and non-start is indicated
+  by tensor element equal to 0.
+
+* **End**: The end input tensor is specified using
+  CONTROL_SEQUENCE_END in the configuration. The example configuration
+  indicates that the model has an input tensor called END with a
+  32-bit floating point data-type. The sequence batcher will define
+  this tensor when executing an inference on the model. The END tensor
+  must be 1-dimensional with size equal to the batch-size. Each
+  element in the tensor indicates if the sequence in the corresponding
+  batch slot is ending or not. In the example configuration,
+  fp32_false_true indicates that a sequence end is indicated by tensor
+  element equal to 1, and non-end is indicated by tensor element equal
+  to 0.
+
+* **Ready**: The ready input tensor is specified using
+  CONTROL_SEQUENCE_READY in the configuration. The example
+  configuration indicates that the model has an input tensor called
+  READY with a 32-bit floating point data-type. The sequence batcher
+  will define this tensor when executing an inference on the
+  model. The READY tensor must be 1-dimensional with size equal to the
+  batch-size. Each element in the tensor indicates if the sequence in
+  the corresponding batch slot has an inference request ready for
+  inference. In the example configuration, fp32_false_true indicates
+  that a sequence ready is indicated by tensor element equal to 1, and
+  non-start is indicated by tensor element equal to 0.
+
+* **Correlation ID**: The correlation ID input tensor is specified
+  using CONTROL_SEQUENCE_CORRID in the configuration. The example
+  configuration indicates that the model has an input tensor called
+  CORRID with a unsigned 64-bit integer data-type. The sequence
+  batcher will define this tensor when executing an inference on the
+  model. The CORRID tensor must be 1-dimensional with size equal to
+  the batch-size. Each element in the tensor indicates the correlation
+  ID of the sequence in the corresponding batch slot.
+
+Scheduling Strategies
+^^^^^^^^^^^^^^^^^^^^^
+
+The sequence batcher can employ one of two scheduling strategies when
+deciding how to batch the sequences that are routed to the same model
+instance. These strategies are :ref:`section-sequence-batcher-direct`
+and :ref:`section-sequence-batcher-oldest`.
+
+.. _section-sequence-batcher-direct:
+
+Direct
+~~~~~~
+
+With the Direct scheduling strategy the sequence batcher ensures not
+only that all inference requests in a sequence are routed to the same
+model instance, but also that each sequence is routed to a dedicated
+batch slot within the model instance. This strategy is required when
+the model maintains state for each batch slot, and is expecting all
+inference requests for a given sequence to be routed to the same slot
+so that the state is correctly updated.
+
+As an example of the sequence batcher using the Direct scheduling
+strategy, assume a TensorRT stateful model that has the following
+model configuration::
+
+  name: "direct_stateful_model"
   platform: "tensorrt_plan"
   max_batch_size: 2
   sequence_batching {
     max_sequence_idle_microseconds: 5000000
+    direct { }
     control_input [
       {
         name: "START"
@@ -145,11 +268,14 @@ following model configuration::
   ]
 
 The sequence_batching section indicates that the model should use the
-sequence batcher. The instance_group indicates two instances of the
-model should be instantiated and max_batch_size indicates that each of
-those instances should perform batch-size 2 inferences. The following
-figure shows a representation of the sequence batcher and the
-inference resources specified by this configuration.
+sequence batcher and the Direct scheduling strategy. In this example
+the model only requires a *start* and *ready* control input from the
+sequence batcher so only those controls are listed. The instance_group
+indicates two instances of the model should be instantiated and
+max_batch_size indicates that each of those instances should perform
+batch-size 2 inferences. The following figure shows a representation
+of the sequence batcher and the inference resources specified by this
+configuration.
 
 .. image:: images/sequence_example0.png
 
@@ -159,74 +285,46 @@ the same slot so that the state is correctly updated. For this example
 that means that the inference server can simultaneously perform
 inference for up to four sequences.
 
-The sequence batcher:
+Using the Direct scheduling strategy, the sequence batcher:
 
 * Recognizes when an inference request starts a new sequence and
-  allocates a slot for that sequence. If no slot is available for the
-  new sequence, the server places the inference request in a backlog.
+  allocates a batch slot for that sequence. If no batch slot is
+  available for the new sequence, the server places the inference
+  request in a backlog.
 
 * Recognizes when an inference request is part of a sequence that has
-  an allocated slot and routes the request to that slot.
+  an allocated batch slot and routes the request to that slot.
 
 * Recognizes when an inference request is part of a sequence that is
   in the backlog and places the request in the backlog.
 
 * Recognizes when the last inference request in a sequence has been
-  completed. The slot occupied by that sequence is immediately
+  completed. The batch slot occupied by that sequence is immediately
   reallocated to a sequence in the backlog, or freed for a future
   sequence if there is no backlog.
 
 The following figure shows how multiple sequences are scheduled onto
-the model instances. On the left the figure shows several sequences of
-requests arriving at the inference server. Each sequence could be made
-up of any number of inference requests and those individual inference
-requests could arrive in any order relative to inference requests in
-other sequences, except that the execution order shown on the right
-assumes that the first inference request of sequence 0 arrives before
-any inference request in sequences 1-5, the first inference request of
-sequence 1 arrives before any inference request in sequences 2-5, etc.
+the model instances using the Direct scheduling strategy. On the left
+the figure shows several sequences of requests arriving at the
+inference server. Each sequence could be made up of any number of
+inference requests and those individual inference requests could
+arrive in any order relative to inference requests in other sequences,
+except that the execution order shown on the right assumes that the
+first inference request of sequence 0 arrives before any inference
+request in sequences 1-5, the first inference request of sequence 1
+arrives before any inference request in sequences 2-5, etc.
 
 The right of the figure shows how the inference request sequences are
 scheduled onto the model instances over time.
 
 .. image:: images/sequence_example1.png
 
-For a stateful model to configure the sequence batcher, the model must
-accept two input tensors that the inference server uses to communicate
-with the model. The control_input section of the sequence batcher
-configuration indicates how the model exposes the tensors.
-
-* **Start**: The start input tensor is specified using
-  CONTROL_SEQUENCE_START in the configuration. The example
-  configuration indicates that the model has an input tensor called
-  START with a 32-bit floating point data-type. The inference server
-  will define this tensor when executing an inference on the
-  model. The tensor provided by the inference server will be
-  1-dimensional with size equal to the batch-size. Each element in the
-  tensor indicates if the sequence in the corresponding slot is
-  starting or not. In the example configuration, fp32_false_true
-  indicates that a sequence start is indicated by tensor element equal
-  to 1, and non-start is indicated by tensor element equal to 0.
-
-* **Ready**: The ready input tensor is specified using
-  CONTROL_SEQUENCE_READY in the configuration. The example
-  configuration indicates that the model has an input tensor called
-  READY with a 32-bit floating point data-type. The inference server
-  will define this tensor when executing an inference on the
-  model. The tensor provided by the inference server will be
-  1-dimensional with size equal to the batch-size. Each element in the
-  tensor indicates if the sequence in the corresponding slot has an
-  inference request ready for inference. In the example configuration,
-  fp32_false_true indicates that a sequence ready is indicated by
-  tensor element equal to 1, and non-start is indicated by tensor
-  element equal to 0.
-
-The following figure shows the inference server uses the control input
+The following figure shows the sequence batcher uses the control input
 tensors to communicate with the model. The figure shows two sequences
-assigned to the two slots in a model instance. Inference requests for
-each sequence arrive over time. The START and READY rows show the
-input tensor values used for each execution of the model. Over time
-the following happens:
+assigned to the two batch slots in a model instance. Inference
+requests for each sequence arrive over time. The START and READY rows
+show the input tensor values used for each execution of the
+model. Over time the following happens:
 
 * The first request arrives for the sequence in slot0. Assuming the
   model instance is not already executing an inference, the sequence
@@ -238,13 +336,13 @@ the following happens:
   available in slot1 so the READY tensor shows only slot0 as ready.
 
 * After the inference completes the sequence scheduler sees that there
-  are no requests available in any slot and so the model instance sits
-  idle.
+  are no requests available in any batch slot and so the model
+  instance sits idle.
 
 * Next, two inference requests arrive close together in time so that
   the sequence scheduler sees them both available in their respective
-  slots. The scheduler immediately schedules the model instance to
-  perform a batch-size 2 inference and uses START and READY to show
+  batch slots. The scheduler immediately schedules the model instance
+  to perform a batch-size 2 inference and uses START and READY to show
   that both slots have an inference request avaiable but that only
   slot1 is the start of a new sequence.
 
@@ -252,6 +350,127 @@ the following happens:
   requests.
 
 .. image:: images/sequence_example2.png
+
+.. _section-sequence-batcher-oldest:
+
+Oldest
+~~~~~~
+
+With the Oldest scheduling strategy the sequence batcher ensures that
+all inference requests in a sequence are routed to the same model
+instance and then uses the :ref:`dynamic batcher
+<section-dynamic-batcher>` to batch together multiple inferences from
+different sequences into a batch that inferences together.  With this
+strategy the model must typically use the CONTROL_SEQUENCE_CORRID
+control so that it knows which sequence each inference request in the
+batch belongs to. The CONTROL_SEQUENCE_READY control is typically not
+needed because all inferences in the batch will always be ready for
+inference.
+
+As an example of the sequence batcher using the Oldest scheduling
+strategy, assume a Custom stateful model that has the following model
+configuration::
+
+  name: "oldest_stateful_model"
+  platform: "custom"
+  max_batch_size: 2
+  sequence_batching {
+    max_sequence_idle_microseconds: 5000000
+    oldest
+      {
+        max_candidate_sequences: 4
+        preferred_batch_size: [ 2 ]
+      }
+    control_input [
+      {
+        name: "START"
+        control [
+          {
+            kind: CONTROL_SEQUENCE_START
+            fp32_false_true: [ 0, 1 ]
+          }
+        ]
+      },
+      {
+        name: "END"
+        control [
+          {
+            kind: CONTROL_SEQUENCE_END
+            fp32_false_true: [ 0, 1 ]
+          }
+        ]
+      },
+      {
+        name: "CORRID"
+        control [
+          {
+            kind: CONTROL_SEQUENCE_CORRID
+            data_type: TYPE_UINT64
+          }
+        ]
+      }
+    ]
+  }
+  input [
+    {
+      name: "INPUT"
+      data_type: TYPE_FP32
+      dims: [ 100, 100 ]
+    }
+  ]
+  output [
+    {
+      name: "OUTPUT"
+      data_type: TYPE_FP32
+      dims: [ 10 ]
+    }
+  ]
+
+The sequence_batching section indicates that the model should use the
+sequence batcher and the Oldest scheduling strategy. The Oldest
+strategy is configured so that the sequence batcher maintains up to 4
+active candidate sequences from which it prefers to form dynamic
+batches of size 2. In this example the model requires a *start*,
+*end*, and *correlation ID* control input from the sequence
+batcher. The following figure shows a representation of the sequence
+batcher and the inference resources specified by this configuration.
+
+.. image:: images/dyna_sequence_example0.png
+
+Using the Oldest scheduling strategy, the sequence batcher:
+
+* Recognizes when an inference request starts a new sequence and
+  attempts to find a model instance that has room for a candidate
+  sequence. If no model instance has room for a new candidate
+  sequence, the server places the inference request in a backlog.
+
+* Recognizes when an inference request is part of a sequence that is
+  already a candidate sequence in some model instance and routes the
+  request to that model instance.
+
+* Recognizes when an inference request is part of a sequence that is
+  in the backlog and places the request in the backlog.
+
+* Recognizes when the last inference request in a sequence has been
+  completed. The model instance immediately removes a sequence from
+  the backlog and makes it a candidate sequence in the model instance,
+  or records that the model instance can handle a future sequence if
+  there is no backlog.
+
+The following figure shows how multiple sequences are scheduled onto
+the model instance specified by the above example configuration. On
+the left the figure shows four sequences of requests arriving at the
+inference server. Each sequence is composed of multiple inference
+requests as shown in the figure. The center of the figure shows how
+the inference request sequences are batched onto the model instance
+over time, assuming that the inference requests for each sequence
+arrive at the same rate with sequence A arriving just before B, which
+arrives just before C, etc. The Oldest strategy forms a dynamic batch
+from the oldest requests but never includes more than one request from
+a given sequence in a batch (for example, the last two inferences in
+sequence D are not batched together).
+
+.. image:: images/dyna_sequence_example1.png
 
 .. _section-ensemble-models:
 
