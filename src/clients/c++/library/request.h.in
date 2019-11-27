@@ -147,8 +147,8 @@ class DECLSPEC Error {
 ///
 /// \note
 ///   ServerHealthContext::Create methods are thread-safe.
-///   GetReady(), GetModelReady() and GetLive() are not thread-safe. For a given
-///   ServerHealthContext, calls to GetReady(), GetModelReady() and GetLive()
+///   GetReady() and GetLive() are not thread-safe. For a given
+///   ServerHealthContext, calls to GetReady() and GetLive()
 ///   must be serialized.
 ///
 class ServerHealthContext {
@@ -159,11 +159,6 @@ class ServerHealthContext {
   /// \param ready Returns the readiness state of the server.
   /// \return Error object indicating success or failure of the request.
   virtual Error GetReady(bool* ready) = 0;
-  
-  /// Contact the inference server and get readiness state of a specific model.
-  /// \param ready Returns the readiness state of the model in the server.
-  /// \return Error object indicating success or failure of the request.
-  virtual Error GetModelReady(bool* ready, std::string model_name) = 0;
 
   /// Contact the inference server and get liveness state.
   /// \param ready Returns the liveness state of the server.

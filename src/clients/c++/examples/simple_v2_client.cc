@@ -112,16 +112,6 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  bool ready;
-  err = health_ctx->GetModelReady(&ready, model_name);
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to get server readiness: " << err << std::endl;
-    exit(1);
-  }
-
-  std::cout << "Health for model " << model_name << ":" << std::endl;
-  std::cout << "Ready: " << ready << std::endl;
-
   // Create the inference context for the model.
   std::unique_ptr<nic::InferContext> infer_ctx;
   err = nic::InferHttpContext::Create(

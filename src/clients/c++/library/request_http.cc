@@ -92,7 +92,6 @@ class ServerHealthHttpContextImpl : public ServerHealthContext {
       bool verbose);
 
   Error GetReady(bool* ready) override;
-  Error GetModelReady(bool* ready, std::string model_name) override;
   Error GetLive(bool* live) override;
 
  private:
@@ -180,16 +179,6 @@ ServerHealthHttpContextImpl::GetHealth(const std::string& url, bool* health)
   *health = (http_code == 200) ? true : false;
 
   return Error::Success;
-}
-
-Error
-ServerHealthHttpContextImpl::GetModelReady(bool* ready, std::string model_name)
-{
-#if TRTIS_ENABLE_HTTP_V2
-  return GetHealth(url_ + "/" + model_name, ready);
-#else
-  return Error(RequestStatusCode::INVALID_ARG, "Only valid for HTTP V2");
-#endif
 }
 
 Error

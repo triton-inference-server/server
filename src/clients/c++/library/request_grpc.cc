@@ -73,7 +73,6 @@ class ServerHealthGrpcContextImpl : public ServerHealthContext {
   ServerHealthGrpcContextImpl(const std::string& url, bool verbose);
 
   Error GetReady(bool* ready) override;
-  Error GetModelReady(bool* ready, std::string model_name) override;
   Error GetLive(bool* live) override;
 
  private:
@@ -119,12 +118,6 @@ ServerHealthGrpcContextImpl::GetHealth(const std::string& mode, bool* health)
   }
 
   return err;
-}
-
-Error
-ServerHealthGrpcContextImpl::GetModelReady(bool* ready, std::string model_name)
-{
-  return Error(RequestStatusCode::INVALID_ARG, "Only valid for HTTP V2");
 }
 
 Error
