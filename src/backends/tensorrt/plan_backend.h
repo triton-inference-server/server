@@ -143,7 +143,7 @@ class PlanBackend : public InferenceBackend {
     // The maximum possible size of the TensorRT tensor and the corresponding
     // allocated GPU buffer across all optimization
     // profile. The array sizes are equal to Context::num_expected_bindings_
-    std::vector<int64_t> byte_sizes_;
+    std::vector<uint64_t> byte_sizes_;
     std::vector<void*> buffers_;
 
     // The pointer to the CUDA buffer for each binding index of the TensorRT

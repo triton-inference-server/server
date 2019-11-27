@@ -679,15 +679,17 @@ ValidateModelConfig(
                 "specifies profile field which is only supported for "
                 "TensorRT models");
       } else if (!group.profile().empty()) {
-        char* end_ptr;
-        long profile_index = strtol(group.profile().c_str(), &end_ptr, 10);
-        if (*end_ptr != '\0' || profile_index < 0) {
-          return Status(
-              RequestStatusCode::INVALID_ARG,
-              "instance group " + group.name() + " of model " + config.name() +
-                  " and platform " + config.platform() +
-                  " specifies invalid profile " + group.profile() +
-                  ". The field should contain a non-negative integer.");
+        for (const auto& profile : group.profile()) {
+          char* end_ptr;
+          long profile_index = strtol(profile.c_str(), &end_ptr, 10);
+          if (*end_ptr != '\0' || profile_index < 0) {
+            return Status(
+                RequestStatusCode::INVALID_ARG,
+                "instance group " + group.name() + " of model " +
+                    config.name() + " and platform " + config.platform() +
+                    " specifies invalid profile " + profile +
+                    ". The field should contain a non-negative integer.");
+          }
         }
       }
     }
