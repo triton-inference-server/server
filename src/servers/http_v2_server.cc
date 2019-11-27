@@ -184,7 +184,7 @@ class HTTPAPIServer : public HTTPServerImpl {
     evhtp_request_t* EvHtpRequest() const { return req_; }
 
     static void InferComplete(
-        TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+        TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
         TRTSERVER_InferenceResponse* response, void* userp);
     evhtp_res FinalizeResponse(TRTSERVER_InferenceResponse* response);
 
