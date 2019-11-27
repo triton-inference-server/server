@@ -194,7 +194,8 @@ LoadManager::LoadManager(
     : async_(async), input_shapes_(input_shapes), batch_size_(batch_size),
       max_threads_(max_threads), sequence_length_(sequence_length),
       shared_memory_type_(shared_memory_type),
-      output_shm_size_(output_shm_size), factory_(factory)
+      output_shm_size_(output_shm_size), factory_(factory),
+      num_of_data_subdir_(0)
 {
   on_sequence_model_ =
       ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
@@ -212,7 +213,6 @@ LoadManager::InitManagerInputs(
   size_t max_input_byte_size = 0;
 
   for (const auto& input : ctx->Inputs()) {
-    size_t batch1_num_strings = 1;
     // Validate user provided shape
     if (!input_shapes_.empty()) {
       auto it = input_shapes_.find(input->Name());
@@ -267,56 +267,42 @@ LoadManager::InitManagerInputs(
                 "model '" +
                 ctx->ModelName() + "'");
       }
-
-      // Get the number of strings needed for this input batch-1
-      batch1_num_strings = 1;
-      if (!input->Shape().empty()) {
-        for (const auto dim : input->Shape()) {
-          batch1_num_strings *= dim;
-        }
-      } else {
-        for (const auto dim : input->Dims()) {
-          batch1_num_strings *= dim;
-        }
-      }
     }
 
     // Read provided data
     if (!data_directory.empty()) {
-      if (input->DType() != ni::DataType::TYPE_STRING) {
-        const auto file_path = data_directory + "/" + input->Name();
-        auto it = input_data_.emplace(input->Name(), std::vector<char>()).first;
-        RETURN_IF_ERROR(ReadFile(file_path, &it->second));
-        size_t batch1_size = input->ByteSize();
-        if (batch1_size != it->second.size()) {
-          return nic::Error(
-              ni::RequestStatusCode::INVALID_ARG,
-              "input '" + input->Name() + "' requires " +
-                  std::to_string(batch1_size) +
-                  " bytes for each batch, but provided data has " +
-                  std::to_string(it->second.size()) + " bytes");
-        }
+      std::set<std::string> sub_dirs;
+      GetSubDirs(data_directory, &sub_dirs);
+      if (sub_dirs.empty()) {
+        RETURN_IF_ERROR(ReadDataFromDir(input, data_directory));
       } else {
-        const auto file_path = data_directory + "/" + input->Name();
-        std::vector<std::string> input_string_data;
-        RETURN_IF_ERROR(ReadTextFile(file_path, &input_string_data));
-        if (input_string_data.size() != batch1_num_strings) {
-          return nic::Error(
-              ni::RequestStatusCode::INVALID_ARG,
-              "input '" + input->Name() + "' requires " +
-                  std::to_string(batch1_num_strings) +
-                  " strings for each batch, but provided data has " +
-                  std::to_string(input_string_data.size()) + " strings.");
+        int index = 0;
+        while (true) {
+          std::string target_dir(std::to_string(index));
+          // Validate the sub data directory entries
+          if (sub_dirs.find(target_dir) == sub_dirs.end()) {
+            if (index == 0) {
+              return nic::Error(
+                  ni::RequestStatusCode::INVALID_ARG,
+                  "The data directory must contain a sub-directory named '0'.");
+            } else {
+              // Read only the contiguous indices
+              break;
+            }
+          }
+          RETURN_IF_ERROR(
+              ReadDataFromDir(input, data_directory + '/' + target_dir, index));
+          index++;
         }
-        auto it = input_string_data_.emplace(input->Name(), std::vector<char>())
-                      .first;
-        SerializeStringTensor(input_string_data, &it->second);
+        num_of_data_subdir_ = index;
       }
     } else {
       if (input->DType() != ni::DataType::TYPE_STRING) {
         max_input_byte_size =
             std::max(max_input_byte_size, (size_t)input->ByteSize());
       } else {
+        // Get the number of strings needed for this input batch-1
+        size_t batch1_num_strings = GetElementCount(input);
         // Generate string input and store it into map
         std::vector<std::string> input_string_data;
         input_string_data.resize(batch1_num_strings);
@@ -329,7 +315,8 @@ LoadManager::InitManagerInputs(
             input_string_data[i] = GetRandomString(string_length);
           }
         }
-        auto it = input_string_data_.emplace(input->Name(), std::vector<char>())
+        auto it = input_string_data_[0]
+                      .emplace(input->Name(), std::vector<char>())
                       .first;
         SerializeStringTensor(input_string_data, &it->second);
       }
@@ -422,73 +409,81 @@ LoadManager::InitSharedMemory()
     }
   }
 
-  for (const auto& input : ctx->Inputs()) {
-    const uint8_t* data_ptr;
-    size_t batch1_bytesize;
-    RETURN_IF_ERROR(GetInputData(input, &data_ptr, &batch1_bytesize));
+  int index = 0;
+  do {
+    for (const auto& input : ctx->Inputs()) {
+      const uint8_t* data_ptr;
+      size_t batch1_bytesize;
+      RETURN_IF_ERROR(GetInputData(input, &data_ptr, &batch1_bytesize, index));
+      std::string region_name(input->Name() + '_' + std::to_string(index));
 
-    // create the shared memory region for the input
-    uint8_t* input_shm_ptr;
-    size_t alloc_size = batch1_bytesize * batch_size_;
+      // create the shared memory region for the input
+      uint8_t* input_shm_ptr;
+      size_t alloc_size = batch1_bytesize * batch_size_;
 
-    if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
-      std::string shm_key("/" + input->Name());
-      int shm_fd_ip;
-      RETURN_IF_ERROR(
-          nic::CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_ip));
-      RETURN_IF_ERROR(nic::MapSharedMemory(
-          shm_fd_ip, 0, alloc_size, (void**)&input_shm_ptr));
-      shared_memory_regions_[input->Name()] =
-          std::pair<uint8_t*, size_t>(input_shm_ptr, alloc_size);
+      if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
+        std::string shm_key("/" + region_name);
+        int shm_fd_ip;
+        RETURN_IF_ERROR(
+            nic::CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_ip));
+        RETURN_IF_ERROR(nic::MapSharedMemory(
+            shm_fd_ip, 0, alloc_size, (void**)&input_shm_ptr));
 
-      // Populate the region with data
-      size_t count = 0;
-      while (count < batch_size_) {
-        memcpy(
-            input_shm_ptr + (count * batch1_bytesize), data_ptr,
-            batch1_bytesize);
-        count++;
-      }
+        shared_memory_regions_[region_name] =
+            std::pair<uint8_t*, size_t>(input_shm_ptr, alloc_size);
 
-      // Register the region with TRTIS
-      RETURN_IF_ERROR(shared_memory_ctx_->RegisterSharedMemory(
-          input->Name(), shm_key, 0, alloc_size));
-    } else {
+        // Populate the region with data
+        size_t count = 0;
+        while (count < batch_size_) {
+          memcpy(
+              input_shm_ptr + (count * batch1_bytesize), data_ptr,
+              batch1_bytesize);
+          count++;
+        }
+
+        // Register the region with TRTIS
+        RETURN_IF_ERROR(shared_memory_ctx_->RegisterSharedMemory(
+            region_name, shm_key, 0, alloc_size));
+      } else {
 #if TRTIS_ENABLE_GPU
-      cudaError_t cuda_err = cudaMalloc((void**)&input_shm_ptr, alloc_size);
-      if (cuda_err != cudaSuccess) {
-        return nic::Error(
-            ni::RequestStatusCode::INTERNAL,
-            "unable to allocate memory of " + std::to_string(alloc_size) +
-                "bytes on gpu for input " + input->Name());
-      }
-
-      shared_memory_regions_[input->Name()] =
-          std::pair<uint8_t*, size_t>(input_shm_ptr, alloc_size);
-
-      // Populate the region with data
-      size_t count = 0;
-      while (count < batch_size_) {
-        cudaError_t cuda_err = cudaMemcpy(
-            (void*)(input_shm_ptr + (count * batch1_bytesize)), (void*)data_ptr,
-            batch1_bytesize, cudaMemcpyHostToDevice);
+        cudaError_t cuda_err = cudaMalloc((void**)&input_shm_ptr, alloc_size);
         if (cuda_err != cudaSuccess) {
           return nic::Error(
               ni::RequestStatusCode::INTERNAL,
-              "Failed to copy data to cuda shared memory for " + input->Name());
+              "unable to allocate memory of " + std::to_string(alloc_size) +
+                  "bytes on gpu for input " + input->Name());
         }
-        count++;
-      }
 
-      cudaIpcMemHandle_t cuda_handle;
-      RETURN_IF_ERROR(CreateCUDAIPCHandle(&cuda_handle, (void*)input_shm_ptr));
+        shared_memory_regions_[region_name] =
+            std::pair<uint8_t*, size_t>(input_shm_ptr, alloc_size);
 
-      // Register the region with TRTIS
-      RETURN_IF_ERROR(shared_memory_ctx_->RegisterCudaSharedMemory(
-          input->Name(), cuda_handle, alloc_size, 0));
+        // Populate the region with data
+        size_t count = 0;
+        while (count < batch_size_) {
+          cudaError_t cuda_err = cudaMemcpy(
+              (void*)(input_shm_ptr + (count * batch1_bytesize)),
+              (void*)data_ptr, batch1_bytesize, cudaMemcpyHostToDevice);
+          if (cuda_err != cudaSuccess) {
+            return nic::Error(
+                ni::RequestStatusCode::INTERNAL,
+                "Failed to copy data to cuda shared memory for " +
+                    input->Name());
+          }
+          count++;
+        }
+
+        cudaIpcMemHandle_t cuda_handle;
+        RETURN_IF_ERROR(
+            CreateCUDAIPCHandle(&cuda_handle, (void*)input_shm_ptr));
+
+        // Register the region with TRTIS
+        RETURN_IF_ERROR(shared_memory_ctx_->RegisterCudaSharedMemory(
+            region_name, cuda_handle, alloc_size, 0));
 #endif  // TRTIS_ENABLE_GPU
+      }
     }
-  }
+    index++;
+  } while (index < num_of_data_subdir_);
   return nic::Error::Success;
 }
 
@@ -544,18 +539,8 @@ LoadManager::PrepareInfer(
     }
   }
 
-  // Initialize inputs
-  for (const auto& input : (*ctx)->Inputs()) {
-    RETURN_IF_ERROR(input->Reset());
-
-    const uint8_t* data_ptr;
-    size_t batch1_bytesize;
-    RETURN_IF_ERROR(GetInputData(input, &data_ptr, &batch1_bytesize));
-
-    for (size_t i = 0; i < batch_size_; ++i) {
-      RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
-    }
-  }
+  // Initialize the inputs with first entry
+  RETURN_IF_ERROR(SetInputs((*ctx)->Inputs(), 0));
 
   return nic::Error::Success;
 }
@@ -601,9 +586,8 @@ LoadManager::PrepareSharedMemoryInfer(
 
   RETURN_IF_ERROR((*ctx)->SetRunOptions(*(*options)));
 
+  // Set the provided shape for variable shape tensor
   for (const auto& input : (*ctx)->Inputs()) {
-    RETURN_IF_ERROR(input->SetSharedMemory(
-        input->Name(), 0, shared_memory_regions_[input->Name()].second));
     if (input->Shape().empty()) {
       auto it = input_shapes_.find(input->Name());
       if (it != input_shapes_.end()) {
@@ -612,18 +596,132 @@ LoadManager::PrepareSharedMemoryInfer(
     }
   }
 
+  // Initialize the inputs with first entry
+  RETURN_IF_ERROR(SetInputsSharedMemory((*ctx)->Inputs(), 0));
+
+  return nic::Error::Success;
+}
+
+nic::Error
+LoadManager::UpdateInputs(
+    const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+    int& next_sub_dir_index_, bool* is_start, bool* is_end)
+{
+  *is_start = false;
+  *is_end = false;
+  if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
+    // Initialize the inputs with first entry
+    RETURN_IF_ERROR(SetInputs(inputs, next_sub_dir_index_));
+  } else {
+    // Initialize the inputs with first entry
+    RETURN_IF_ERROR(SetInputsSharedMemory(inputs, next_sub_dir_index_));
+  }
+
+  next_sub_dir_index_++;
+  // Update the flags
+  if (on_sequence_model_) {
+    if (next_sub_dir_index_ == 1) {
+      *is_start = true;
+    }
+    if (next_sub_dir_index_ == num_of_data_subdir_) {
+      *is_end = true;
+    }
+  }
+
+  // Reset the current running index
+  if (next_sub_dir_index_ == num_of_data_subdir_) {
+    next_sub_dir_index_ = 0;
+  }
+
+  return nic::Error::Success;
+}
+
+nic::Error
+LoadManager::ReadDataFromDir(
+    std::shared_ptr<nic::InferContext::Input> input,
+    const std::string& data_directory, const int index)
+{
+  if (input->DType() != ni::DataType::TYPE_STRING) {
+    const auto file_path = data_directory + "/" + input->Name();
+    auto it =
+        input_data_[index].emplace(input->Name(), std::vector<char>()).first;
+    RETURN_IF_ERROR(ReadFile(file_path, &it->second));
+    size_t batch1_size = input->ByteSize();
+    if (batch1_size != it->second.size()) {
+      return nic::Error(
+          ni::RequestStatusCode::INVALID_ARG,
+          "input '" + input->Name() + "' requires " +
+              std::to_string(batch1_size) +
+              " bytes for each batch, but provided data has " +
+              std::to_string(it->second.size()) + " bytes");
+    }
+  } else {
+    const auto file_path = data_directory + "/" + input->Name();
+    std::vector<std::string> input_string_data;
+    RETURN_IF_ERROR(ReadTextFile(file_path, &input_string_data));
+    // Get the number of strings needed for this input batch-1
+    size_t batch1_num_strings = GetElementCount(input);
+    if (input_string_data.size() != batch1_num_strings) {
+      return nic::Error(
+          ni::RequestStatusCode::INVALID_ARG,
+          "input '" + input->Name() + "' requires " +
+              std::to_string(batch1_num_strings) +
+              " strings for each batch, but provided data has " +
+              std::to_string(input_string_data.size()) + " strings.");
+    }
+    auto it = input_string_data_[index]
+                  .emplace(input->Name(), std::vector<char>())
+                  .first;
+    SerializeStringTensor(input_string_data, &it->second);
+  }
+  return nic::Error::Success;
+}
+
+
+nic::Error
+LoadManager::SetInputs(
+    const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+    const int index)
+{
+  for (const auto& input : inputs) {
+    RETURN_IF_ERROR(input->Reset());
+
+    const uint8_t* data_ptr;
+    size_t batch1_bytesize;
+    RETURN_IF_ERROR(GetInputData(input, &data_ptr, &batch1_bytesize, index));
+
+    for (size_t i = 0; i < batch_size_; ++i) {
+      RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
+    }
+  }
+  return nic::Error::Success;
+}
+
+nic::Error
+LoadManager::SetInputsSharedMemory(
+    const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+    const int index)
+{
+  for (const auto& input : inputs) {
+    RETURN_IF_ERROR(input->Reset());
+
+    std::string region_name(input->Name() + '_' + std::to_string(index));
+
+    RETURN_IF_ERROR(input->SetSharedMemory(
+        region_name, 0, shared_memory_regions_[region_name].second));
+  }
   return nic::Error::Success;
 }
 
 nic::Error
 LoadManager::GetInputData(
     std::shared_ptr<nic::InferContext::Input> input, const uint8_t** data,
-    size_t* batch1_size)
+    size_t* batch1_size, const int index)
 {
   if (input->DType() != ni::DataType::TYPE_STRING) {
     // if available, use provided data instead
-    auto it = input_data_.find(input->Name());
-    if (it != input_data_.end()) {
+    auto it = input_data_[index].find(input->Name());
+    if (it != input_data_[index].end()) {
       *data = (const uint8_t*)&(it->second)[0];
     } else if (input_buf_.size() != 0) {
       *batch1_size = (size_t)input->ByteSize();
@@ -635,8 +733,8 @@ LoadManager::GetInputData(
     }
   } else {
     std::vector<char>* string_data;
-    auto it = input_string_data_.find(input->Name());
-    if (it != input_string_data_.end()) {
+    auto it = input_string_data_[index].find(input->Name());
+    if (it != input_string_data_[index].end()) {
       string_data = &it->second;
       *batch1_size = string_data->size();
       *data = (const uint8_t*)&it->second[0];

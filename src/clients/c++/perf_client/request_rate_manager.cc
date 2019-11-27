@@ -217,6 +217,17 @@ RequestRateManager::Infer(
 
     uint32_t seq_id = 0, flags = 0;
 
+    bool is_start;
+    bool is_end;
+    // Update the data if required
+    if (num_of_data_subdir_ != 0) {
+      thread_stat->status_ = UpdateInputs(
+          ctx->ctx_->Inputs(), ctx->sub_dir_index_, &is_start, &is_end);
+      if (!thread_stat->status_.IsOk()) {
+        return;
+      }
+    }
+
     // Sleep if required
     std::chrono::steady_clock::time_point now =
         std::chrono::steady_clock::now();
@@ -249,7 +260,12 @@ RequestRateManager::Infer(
       std::lock_guard<std::mutex> guard(sequence_stat_[seq_id]->mtx_);
       if (sequence_stat_[seq_id]->remaining_queries_ == 0) {
         flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;
-        size_t new_length = GetRandomLength(0.2);
+        size_t new_length;
+        if (num_of_data_subdir_ == 0) {
+          new_length = GetRandomLength(0.2);
+        } else {
+          new_length = num_of_data_subdir_;
+        }
         sequence_stat_[seq_id]->remaining_queries_ =
             new_length == 0 ? 1 : new_length;
         sequence_stat_[seq_id]->corr_id_ = next_corr_id_++;

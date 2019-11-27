@@ -63,12 +63,13 @@ class LoadManager {
   }
 
   struct InferContextMetaData {
-    InferContextMetaData() : inflight_request_cnt_(0) {}
+    InferContextMetaData() : inflight_request_cnt_(0), sub_dir_index_(0) {}
     InferContextMetaData(InferContextMetaData&&) = delete;
     InferContextMetaData(const InferContextMetaData&) = delete;
 
     std::unique_ptr<nic::InferContext> ctx_;
     std::atomic<size_t> inflight_request_cnt_;
+    int sub_dir_index_;
   };
 
 
@@ -123,13 +124,46 @@ class LoadManager {
   /// Stops all the worker threads generating the request load.
   void StopWorkerThreads();
 
+  /// Updates the input data for the next infrence request
+  /// \param inputs A vector of shared pointers to the model inputs
+  /// \param next_sub_dir_index_ The index to the next sub-directory to use for
+  /// input data. \param is_start Whether the data is a start of a sequence
+  /// \param is_end Whether or not the data is the end of sequence
+  nic::Error UpdateInputs(
+      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+      int& next_sub_dir_index_, bool* is_start, bool* is_end);
+
  private:
   /// Helper function to access data for the specified input
   /// \param input The target input
   /// Returns the pointer to the memory holding data
   nic::Error GetInputData(
       std::shared_ptr<nic::InferContext::Input> input, const uint8_t** data,
-      size_t* batch1_size);
+      size_t* batch1_size, const int index = 0);
+
+  /// Reads the input data from the specified data directory
+  /// \param input The input for which the data is to be read
+  /// \param data_directory The path to the directory containing the data
+  /// \param index The index to allocate for the read data
+  nic::Error ReadDataFromDir(
+      std::shared_ptr<nic::InferContext::Input> input,
+      const std::string& data_directory, const int index = 0);
+
+  /// Sets the input with the data from the specified index
+  /// \param inputs A vector of shared pointers to the model inputs whose data
+  /// will be set
+  /// \param index The index to the data to use for the inputs
+  nic::Error SetInputs(
+      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+      const int index);
+
+  /// Sets the input in the shared memory with the data from the specified index
+  /// \param inputs A vector of shared pointers to the model inputs whose data
+  /// will be set.
+  /// \param index The index to the data to use for the inputs
+  nic::Error SetInputsSharedMemory(
+      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+      const int index);
 
  protected:
   bool async_;
@@ -146,8 +180,9 @@ class LoadManager {
   std::shared_ptr<ContextFactory> factory_;
 
   // User provided input data, it will be preferred over synthetic data
-  std::unordered_map<std::string, std::vector<char>> input_data_;
-  std::unordered_map<std::string, std::vector<char>> input_string_data_;
+  std::map<int, std::unordered_map<std::string, std::vector<char>>> input_data_;
+  std::map<int, std::unordered_map<std::string, std::vector<char>>>
+      input_string_data_;
 
   // Placeholder for generated input data, which will be used for all inputs
   // except string
@@ -183,4 +218,6 @@ class LoadManager {
   // Use condition variable to pause/continue worker threads
   std::condition_variable wake_signal_;
   std::mutex wake_mutex_;
+
+  int num_of_data_subdir_;
 };

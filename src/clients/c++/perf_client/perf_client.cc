@@ -438,18 +438,38 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << std::setw(9) << std::left
             << " -b: " << FormatMessage("Batch size for each request sent.", 9)
             << std::endl;
-  std::cerr << FormatMessage(
-                   " --input-data: Select the type of data that will be used "
-                   "for input in inference requests. The available "
-                   "options are \"zero\", \"random\" or path to a directory. "
-                   "If the option is path to a directory then the directory "
-                   "must contain a binary file for each input, named the same "
-                   "as the input. Each file must contain the data required for "
-                   "that input for a batch-1 request. Each file should contain "
-                   "the raw binary representation of the input in row-major "
-                   "order. Default is \"random\".",
-                   18)
-            << std::endl;
+  std::cerr
+      << FormatMessage(
+             " --input-data: Select the type of data that will be used "
+             "for input in inference requests. The available "
+             "options are \"zero\", \"random\", path to a directory. If the "
+             "option is path to a directory then the directory must either "
+             "contain a binary/text file for each non-string/string input "
+             "respectively, named the same as the input, or contain multiple "
+             "such sub-directories containing these binary/text files. Each "
+             "file must contain the data required for that input for a batch-1 "
+             "request. Each binary file should contain the raw binary "
+             "representation of the input in row-major order for non-string "
+             "inputs. The text file should contain all strings needed by "
+             "batch-1, each in a new line, listed in row-major order. If the "
+             "specified path to a directory contains subdirectories with data "
+             "then they should be named as integers in contiguous increasing "
+             "order starting from \'0\', such as \'0\', \'1\', \'2\', \'3\'... "
+             ". The client will pick up the data in a round-about fashion from "
+             "these data-directories for successive inerence requests "
+             "(\'0\'->\'1\'-> \'2\'-> \'3\'->\'0\'->...). In case of sequence "
+             "model, the inference request with data described in \'0\' will "
+             "be "
+             "marked as a start of the sequence and the data corresponding to "
+             "the "
+             "end of the series will be marked as an end of the sequence. "
+             "Hence, "
+             "in this case the length of the sequences client will generate "
+             "will "
+             "be equal to the number of sub-directories. Default is "
+             "\"random\".",
+             18)
+      << std::endl;
   std::cerr << FormatMessage(
                    " --shared-memory <\"system\"|\"cuda\"|\"none\">: Specifies "
                    "the type of the shared memory to use for input and output "

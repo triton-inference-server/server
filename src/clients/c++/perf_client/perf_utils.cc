@@ -45,6 +45,22 @@ ParseProtocol(const std::string& str)
   return ProtocolType::UNKNOWN;
 }
 
+size_t
+GetElementCount(std::shared_ptr<nic::InferContext::Input> input)
+{
+  size_t count = 1;
+  if (!input->Shape().empty()) {
+    for (const auto dim : input->Shape()) {
+      count *= dim;
+    }
+  } else {
+    for (const auto dim : input->Dims()) {
+      count *= dim;
+    }
+  }
+  return count;
+}
+
 nic::Error
 ReadFile(const std::string& path, std::vector<char>* contents)
 {
@@ -137,6 +153,31 @@ IsDirectory(const std::string& path)
   } else {
     return false;
   }
+}
+
+void
+GetSubDirs(const std::string& dir, std::set<std::string>* sub_dir)
+{
+  DIR* dirp = opendir(dir.c_str());
+  struct dirent* dp;
+  while ((dp = readdir(dirp)) != NULL) {
+    if (IsDirectory(dir + "/" + dp->d_name) &&
+        IsValidDataSubDirName(dp->d_name)) {
+      sub_dir->insert(dp->d_name);
+    }
+  }
+  closedir(dirp);
+}
+
+bool
+IsValidDataSubDirName(const std::string& dir_name)
+{
+  if (dir_name.empty()) {
+    return false;
+  }
+  char* p;
+  strtol(dir_name.c_str(), &p, 10);
+  return (*p == 0);
 }
 
 std::string

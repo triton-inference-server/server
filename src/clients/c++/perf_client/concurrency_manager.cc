@@ -186,18 +186,39 @@ ConcurrencyManager::Infer(
       // for sequence model, only starts new sequence
       // when the previous one is done
       if (on_sequence_model_) {
-        num_reqs =
-            ctxs[idx]->inflight_request_cnt_ == 0 ? GetRandomLength(0.2) : 0;
+        if (num_of_data_subdir_ == 0) {
+          num_reqs =
+              ctxs[idx]->inflight_request_cnt_ == 0 ? GetRandomLength(0.2) : 0;
+        } else {
+          num_reqs =
+              ctxs[idx]->inflight_request_cnt_ == 0 ? num_of_data_subdir_ : 0;
+        }
       }
 
       auto& request_cnt = ctxs[idx]->inflight_request_cnt_;
       while (request_cnt < num_reqs) {
         uint32_t flags = 0;
+        bool is_start;
+        bool is_end;
+        // Update the data if required
+        if (num_of_data_subdir_ != 0) {
+          thread_stat->status_ = UpdateInputs(
+              ctxs[idx]->ctx_->Inputs(), ctxs[idx]->sub_dir_index_, &is_start,
+              &is_end);
+          if (!thread_stat->status_.IsOk()) {
+            return;
+          }
+        } else {
+          if (on_sequence_model_) {
+            is_start = (request_cnt == 0);
+            is_end = (request_cnt == (num_reqs - 1));
+          }
+        }
         if (on_sequence_model_) {
-          if (request_cnt == 0) {
+          if (is_start) {
             flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;
           }
-          if (request_cnt == (num_reqs - 1)) {
+          if (is_end) {
             flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
           }
           options->SetFlag(

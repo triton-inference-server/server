@@ -25,6 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <dirent.h>
+#include <sys/types.h>
 #include <time.h>
 #include <fstream>
 #include <iomanip>
@@ -88,6 +90,13 @@ ProtocolType ParseProtocol(const std::string& str);
 //  read operation.
 nic::Error ReadFile(const std::string& path, std::vector<char>* contents);
 
+// Returns the number of elements in the specified input tensor. The SetShape()
+// for the specified input shpuld have been called before invoking this
+// function.
+// \param input pointer to the input tensor
+// \returns the number of elements in the tensor
+size_t GetElementCount(std::shared_ptr<nic::InferContext::Input> input);
+
 // Reads the string from file specified by path into vector of strings
 // \param path The complete path to the file to be read
 // \param contents The string vector that will contain the data read
@@ -107,6 +116,16 @@ nic::Error ReadTimeIntervalsFile(
 
 // To check whether the path points to a valid system directory
 bool IsDirectory(const std::string& path);
+
+// Returns the valid data sub-directory present in the specified directory
+// \param dir source directory path
+// \param sub_dir returns the set containing data sub-directory.
+void GetSubDirs(const std::string& dir, std::set<std::string>* sub_dir);
+
+// Checks whether the dir_name is a valid data sub-directory name
+// \param dir_name The name of the directory
+// \returns True if the direname is for a valid data sub-directory.
+bool IsValidDataSubDirName(const std::string& dir_name);
 
 // Generates a random string of specified length using characters specified in
 // character_set.
