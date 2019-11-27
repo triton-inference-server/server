@@ -865,10 +865,14 @@ PlanBackend::Context::Run(
             name_ + "', max allowed is " + std::to_string(max_batch_size_));
   }
 
+  auto citr = GetMostOptimizedProfile(total_batch_size, input_request_header);
+
+  int binding_offset = citr->first * num_expected_bindings_;
+
   // For each input, concatenate input values from each payload into
   // the corresponding binding.
   for (int bindex = 0; bindex < num_expected_bindings_; ++bindex) {
-    if (!engine_->bindingIsInput(binding_offset_ + bindex)) {
+    if (!engine_->bindingIsInput(binding_offset + bindex)) {
       continue;
     }
 
@@ -892,7 +896,7 @@ PlanBackend::Context::Run(
       }
 
       DataType dt = ConvertTrtTypeToDataType(
-          engine_->getBindingDataType(binding_offset_ + bindex));
+          engine_->getBindingDataType(binding_offset + bindex));
 
       batch1_byte_size = GetByteSize(dt, shape);
       if (max_batch_size_ != 0) {
@@ -917,7 +921,7 @@ PlanBackend::Context::Run(
 
     SetInputBuffer(
         name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_GPU, gpu_device_,
-        static_cast<char*>(buffers_[binding_offset_ + bindex]));
+        static_cast<char*>(buffers_[bindex]));
 
     // Set the binding dimension so that output dimensions can be obtained
     if (is_dynamic_) {
@@ -929,14 +933,16 @@ PlanBackend::Context::Run(
                 " for input '" + name + "' for " + name_ + ".");
       }
       Status status = ValidateDimension(
-          this_dim, min_dims_[bindex], max_dims_[bindex], false);
+          this_dim, citr->second.min_dims_[bindex],
+          citr->second.max_dims_[bindex], false);
       if (!status.IsOk()) {
         return Status(
             RequestStatusCode::INTERNAL,
             "request specifies invalid shape for input '" + name + "' for " +
                 name_ + ". Error details: " + status.Message());
       }
-      if (!context_->setBindingDimensions(binding_offset_ + bindex, this_dim)) {
+      if (!citr->second.context_->setBindingDimensions(
+              binding_offset + bindex, this_dim)) {
         return Status(
             RequestStatusCode::INTERNAL,
             "trt failed to set binding dimension to " +
@@ -967,19 +973,20 @@ PlanBackend::Context::Run(
     }
   } else {
     if (is_dynamic_) {
-      if (!context_->allInputDimensionsSpecified()) {
+      if (!citr->second.context_->allInputDimensionsSpecified()) {
         return Status(
             RequestStatusCode::INTERNAL,
             "failed to specify the dimensions of all input bindings");
       }
-      if (!context_->enqueueV2(buffers_, stream_, nullptr)) {
+      if (!citr->second.context_->enqueueV2(buffers_, stream_, nullptr)) {
         cudaStreamSynchronize(stream_);
         return Status(
             RequestStatusCode::INTERNAL,
             "unable to enqueue for inference " + name_);
       }
     } else {
-      if (!context_->enqueue(total_batch_size, buffers_, stream_, nullptr)) {
+      if (!citr->second.context_->enqueue(
+              total_batch_size, buffers_, stream_, nullptr)) {
         cudaStreamSynchronize(stream_);
         return Status(
             RequestStatusCode::INTERNAL,
@@ -999,7 +1006,7 @@ PlanBackend::Context::Run(
   // actual model output and then copy that output from the GPU
   bool cuda_copy = false;
   for (int bindex = 0; bindex < num_expected_bindings_; ++bindex) {
-    if (engine_->bindingIsInput(binding_offset_ + bindex)) {
+    if (engine_->bindingIsInput(binding_offset + bindex)) {
       continue;
     }
 
@@ -1007,9 +1014,9 @@ PlanBackend::Context::Run(
 
     nvinfer1::Dims dims;
     if (is_dynamic_) {
-      dims = context_->getBindingDimensions(binding_offset_ + bindex);
+      dims = context_->getBindingDimensions(binding_offset + bindex);
     } else {
-      dims = engine_->getBindingDimensions(binding_offset_ + bindex);
+      dims = engine_->getBindingDimensions(binding_offset + bindex);
     }
 
     std::vector<int64_t> shape;
@@ -1023,7 +1030,7 @@ PlanBackend::Context::Run(
     }
 
     DataType dt = ConvertTrtTypeToDataType(
-        engine_->getBindingDataType(binding_offset_ + bindex));
+        engine_->getBindingDataType(binding_offset + bindex));
 
     size_t batch1_byte_size = GetByteSize(dt, shape);
     if (max_batch_size_ != NO_BATCHING) {
@@ -1041,7 +1048,7 @@ PlanBackend::Context::Run(
 
     cuda_copy |= SetFixedSizeOutputBuffer(
         name, batch1_byte_size,
-        static_cast<char*>(buffers_[binding_offset_ + bindex]), shape,
+        static_cast<char*>(buffers_[binding_offset + bindex]), shape,
         TRTSERVER_MEMORY_GPU /* src_memory_type */, gpu_device_, payloads);
   }
 
@@ -1050,6 +1057,46 @@ PlanBackend::Context::Run(
     cudaStreamSynchronize(stream_);
   }
   return Status::Success;
+}
+
+std::map<int, PlanBackend::Context::OptimizationProfileContext>::iterator
+PlanBackend::Context::GetMostOptimizedProfile(
+    size_t total_batch_size,
+    const std::shared_ptr<InferRequestProvider>& input_request_provider)
+{
+  // Returns the TensorRT context that uses profile with shortest Manhattan
+  // distance in terms of input dimensions
+  // [TODO] traverse it with more efficient data structure (i.e. K-D tree)
+  auto ret_it = trt_contexts_.begin();
+  if (trt_contexts_.size() != 1) {
+    int64_t shortest_distance = LLONG_MAX;
+    for (auto cit = trt_contexts_.begin(); cit != trt_contexts.end(); cit++) {
+      int64_t current_distance = 0;
+      for (const auto& input : input_request_provider->input()) {
+        int io_index = engine_->getBindingIndex(input.name().c_str());
+        auto status = ValidateDimension(
+            input.dims(), cit->second.min_dims_[io_index],
+            cit->second.max_dims_[io_index], true);
+        if (!status.IsOk()) {
+          current_distance = LLONG_MAX;
+          break;
+        } else {
+          const auto& opt_dims = cit->second.opt_dims_[io_index];
+          current_distance += std::abs(opt_dims.d[0] - total_batch_size);
+          for (int idx = 1; idx < opt_dims.nbDims; idx++) {
+            current_distance += std::abs(opt_dims.d[idx] - input.dims(idx - 1));
+          }
+        }
+      }
+
+      if (current_distance < shortest_distance) {
+        ret_it = cit;
+        shortest_distance = current_distance;
+      }
+    }
+  }
+
+  return ret_it;
 }
 
 std::ostream&

@@ -114,6 +114,10 @@ class PlanBackend : public InferenceBackend {
       std::vector<nvinfer1::Dims> opt_dims_;
     };
 
+    std::map<int, OptimizationProfileContext>::iterator GetMostOptimizedProfile(
+        size_t total_batch_size,
+        const std::shared_ptr<InferRequestProvider>& input_request_provider);
+
     // TensorRT components for the model
     nvinfer1::IRuntime* runtime_;
     nvinfer1::ICudaEngine* engine_;
