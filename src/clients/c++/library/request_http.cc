@@ -228,10 +228,12 @@ ServerHealthHttpContext::Create(
 
 class ServerStatusHttpContextImpl : public ServerStatusContext {
  public:
+#ifndef TRTIS_ENABLE_HTTP_V2
   ServerStatusHttpContextImpl(const std::string& url, bool verbose);
   ServerStatusHttpContextImpl(
       const std::string& url, const std::map<std::string, std::string>& headers,
       bool verbose);
+#endif
   ServerStatusHttpContextImpl(
       const std::string& url, const std::string& model_name, bool verbose);
   ServerStatusHttpContextImpl(
@@ -260,28 +262,21 @@ class ServerStatusHttpContextImpl : public ServerStatusContext {
   std::string response_;
 };
 
+#ifndef TRTIS_ENABLE_HTTP_V2
 ServerStatusHttpContextImpl::ServerStatusHttpContextImpl(
     const std::string& url, bool verbose)
-#if TRTIS_ENABLE_HTTP_V2
-    : url_(url + "/" + kHttpV2RESTEndpoint), verbose_(verbose)
-#else
     : url_(url + "/" + kStatusRESTEndpoint), verbose_(verbose)
-#endif
 {
 }
 
 ServerStatusHttpContextImpl::ServerStatusHttpContextImpl(
     const std::string& url, const std::map<std::string, std::string>& headers,
     bool verbose)
-#if TRTIS_ENABLE_HTTP_V2
-    : url_(url + "/" + kHttpV2RESTEndpoint), headers_(headers),
-      verbose_(verbose)
-#else
     : url_(url + "/" + kStatusRESTEndpoint), headers_(headers),
       verbose_(verbose)
-#endif
 {
 }
+#endif
 
 ServerStatusHttpContextImpl::ServerStatusHttpContextImpl(
     const std::string& url, const std::string& model_name, bool verbose)
@@ -440,9 +435,13 @@ ServerStatusHttpContext::Create(
     std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
     bool verbose)
 {
+#if TRTIS_ENABLE_HTTP_V2
+  return Error(RequestStatusCode::INVALID_ARG, "Not valid for HTTP V2");
+#else
   ctx->reset(static_cast<ServerStatusContext*>(
       new ServerStatusHttpContextImpl(server_url, verbose)));
   return Error::Success;
+#endif
 }
 
 Error
@@ -450,9 +449,13 @@ ServerStatusHttpContext::Create(
     std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
     const std::map<std::string, std::string>& headers, bool verbose)
 {
+#if TRTIS_ENABLE_HTTP_V2
+  return Error(RequestStatusCode::INVALID_ARG, "Not valid for HTTP V2");
+#else
   ctx->reset(static_cast<ServerStatusContext*>(
       new ServerStatusHttpContextImpl(server_url, headers, verbose)));
   return Error::Success;
+#endif
 }
 
 Error
@@ -1255,8 +1258,10 @@ class InferHttpContextImpl : public InferContextImpl {
   // Serialized InferRequestHeader
   std::string infer_request_str_;
 
+#if TRTIS_ENABLE_HTTP_V2
   // Serialized InferRequest
   std::string request_body_str_;
+#endif
 };
 
 //==============================================================================
