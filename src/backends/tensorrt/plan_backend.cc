@@ -1059,7 +1059,7 @@ PlanBackend::Context::Run(
   return Status::Success;
 }
 
-std::map<int, PlanBackend::Context::OptimizationProfileContext>::iterator
+std::map<int, PlanBackend::Context::TensorRTContext>::iterator
 PlanBackend::Context::GetMostOptimizedProfile(
     size_t total_batch_size,
     const std::shared_ptr<InferRequestProvider>& input_request_provider)
