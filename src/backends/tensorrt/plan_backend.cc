@@ -41,13 +41,11 @@
 namespace nvidia { namespace inferenceserver {
 
 PlanBackend::Context::Context(
-    const std::string& name, const int gpu_device, const int max_batch_size,
-    const int profile_index)
+    const std::string& name, const int gpu_device, const int max_batch_size)
     : BackendContext(name, gpu_device, max_batch_size), runtime_(nullptr),
-      engine_(nullptr), context_(nullptr), is_dynamic_(false),
-      profile_index_(profile_index), min_dims_(nullptr), max_dims_(nullptr),
-      max_dynamic_batch_size_(INT_MAX), total_bindings_(0),
-      num_expected_bindings_(0), byte_sizes_(nullptr), buffers_(nullptr)
+      engine_(nullptr), is_dynamic_(false), max_dynamic_batch_size_(INT_MAX),
+      total_bindings_(0), num_expected_bindings_(0), byte_sizes_(nullptr),
+      buffers_(nullptr)
 {
   stream_ = nullptr;
 }
@@ -56,34 +54,14 @@ PlanBackend::Context::~Context()
 {
   LOG_VERBOSE(1) << "~PlanBackend::Context ";
 
-  if (byte_sizes_ != nullptr) {
-    delete[] byte_sizes_;
-    byte_sizes_ = nullptr;
-  }
-
-  if (min_dims_ != nullptr) {
-    delete[] min_dims_;
-    min_dims_ = nullptr;
-  }
-
-  if (max_dims_ != nullptr) {
-    delete[] max_dims_;
-    max_dims_ = nullptr;
-  }
-
-  if (buffers_ != nullptr) {
-    for (int i = 0; i < total_bindings_; ++i) {
-      if (buffers_[i] != nullptr) {
-        cudaError_t err = cudaFree(buffers_[i]);
-        if (err != cudaSuccess) {
-          LOG_ERROR << "Failed to free cuda memory for '" << name_
-                    << "': " << cudaGetErrorString(err);
-        }
+  for (auto buffer : buffers_) {
+    if (buffer != nullptr) {
+      cudaError_t err = cudaFree(buffer);
+      if (err != cudaSuccess) {
+        LOG_ERROR << "Failed to free cuda memory for '" << name_
+                  << "': " << cudaGetErrorString(err);
       }
     }
-
-    delete[] buffers_;
-    buffers_ = nullptr;
   }
 
   for (const auto& pr : cuda_graph_execs_) {
@@ -112,9 +90,11 @@ PlanBackend::Context::~Context()
     stream_ = nullptr;
   }
 
-  if (context_ != nullptr) {
-    context_->destroy();
-    context_ = nullptr;
+  for (auto& trt_context : trt_contexts_) {
+    if (trt_context.second.context_ != nullptr) {
+      trt_context.second.context_->destroy();
+      trt_context.second.context_ = nullptr;
+    }
   }
   if (engine_ != nullptr) {
     engine_->destroy();
@@ -158,9 +138,9 @@ PlanBackend::CreateExecutionContexts(
                                           std::to_string(c) + "_gpu" +
                                           std::to_string(gpu_device);
 
-        const std::string profile_name = group.profile();
+        const auto& profile_names = group.profile();
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, gpu_device, models, profile_name));
+            instance_name, gpu_device, models, profile_names));
         total_context_cnt++;
       }
     }
@@ -182,24 +162,72 @@ PlanBackend::CreateExecutionContexts(
   return Status::Success;
 }
 
-void
-PlanBackend::Context::InitProfile()
+Status
+PlanBackend::Context::InitOptimizationProfiles(
+    const ::google::protobuf::RepeatedPtrField<std::string>& profile_names)
 {
-  const int total_profiles = engine_->getNbOptimizationProfiles();
   total_bindings_ = engine_->getNbBindings();
+  const int total_profiles = engine_->getNbOptimizationProfiles();
+
+  // TRT sets the optimization profile index to be 0 implicitly with the first
+  // context creation. As currently TRTIS supports one context per engine,
+  // in order to set the specified profile_index, another context is created
+  // and the previous context is destroyed.
+  auto default_trt_context = engine_->createExecutionContext();
+  if (default_trt_context == nullptr) {
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to create TensorRT context");
+  }
+
+  // No optimization profile is set for this TensorRT plan
   if (total_profiles == 0) {
     num_expected_bindings_ = total_bindings_;
+    trt_contexts_.emplace(
+        0, TensorRTContext("default", num_expected_bindings_));
+    trt_contexts_.back()->context_ = default_trt_context;
+    default_trt_context = nullptr;
   } else {
     num_expected_bindings_ = total_bindings_ / total_profiles;
+    // Create one TRT context for each specified profile
+    for (const auto& profile_name : profile_names) {
+      auto profile_index = GetProfileIndex(profile_name);
+      trt_contexts_.emplace(
+          profile_index, TensorRTContext(profile_name, num_expected_bindings_));
+      auto& trt_context = trt_contexts_.back();
+      if (profile_index == 0) {
+        trt_context->context_ = default_trt_context;
+        default_trt_context = nullptr;
+      } else {
+        trt_context->context_ = engine_->createExecutionContext();
+        if (trt_context->context_ == nullptr) {
+          return Status(
+              RequestStatusCode::INTERNAL, "unable to create TensorRT context");
+        }
+        if (!trt_context->context_->setOptimizationProfile(profile_index)) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "Can not set the specified optimization profile " + profile_name +
+              "[" + std::to_string(profile_index) + "] for " + name_ +
+              ". Expected optimization profile index range 0-" +
+              std::to_string(engine_->getNbOptimizationProfiles() - 1));
+        }
+      }
+    }
+
+    // profile 0 is not specified
+    if (default_trt_context != nullptr) {
+      default_trt_context->destory();
+    }
   }
-  binding_offset_ = profile_index_ * num_expected_bindings_;
+
+  return Status::Success;
 }
 
 Status
 PlanBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     const std::unordered_map<std::string, std::vector<char>>& models,
-    const std::string profile_name)
+    const ::google::protobuf::RepeatedPtrField<std::string>& profile_names)
 {
   cudaError_t cuerr;
 
@@ -235,9 +263,7 @@ PlanBackend::CreateExecutionContext(
   const int mbs = (Config().max_batch_size() <= 0) ? Context::NO_BATCHING
                                                    : Config().max_batch_size();
 
-  const int profile_index = GetProfileIndex(profile_name);
-  contexts_.emplace_back(
-      new Context(instance_name, gpu_device, mbs, profile_index));
+  contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   Context* context = static_cast<Context*>(contexts_.back().get());
 
   // Set the device before generating engine and context.
@@ -251,37 +277,7 @@ PlanBackend::CreateExecutionContext(
   RETURN_IF_ERROR(
       LoadPlan(mn_itr->second, &context->runtime_, &context->engine_));
 
-  // Now the TRT execution context
-  context->context_ = context->engine_->createExecutionContext();
-  if (context->context_ == nullptr) {
-    return Status(
-        RequestStatusCode::INTERNAL, "unable to create TensorRT context");
-  }
-
-  // TRT sets the optimization profile index to be 0 implicitly with the first
-  // context creation. As currently TRTIS supports one context per engine,
-  // in order to set the specified profile_index, another context is created
-  // and the previous context is destroyed.
-  if (profile_index != 0) {
-    auto first_context = context->context_;
-    context->context_ = context->engine_->createExecutionContext();
-    if (context->context_ == nullptr) {
-      return Status(
-          RequestStatusCode::INTERNAL, "unable to create TensorRT context");
-    }
-    if (!context->context_->setOptimizationProfile(profile_index)) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "Can not set the specified optimization profile " + profile_name +
-              "[" + std::to_string(profile_index) + "] for " + Name() +
-              ". Expected optimization profile index range 0-" +
-              std::to_string(
-                  context->engine_->getNbOptimizationProfiles() - 1));
-    }
-    first_context->destroy();
-  }
-
-  context->InitProfile();
+  RETURN_IF_ERROR(context->InitOptimizationProfiles(profile_names));
 
   // Collect all the expected input and allowed output tensor names
   // and validate that the model configuration specifies only those.
@@ -307,10 +303,9 @@ PlanBackend::CreateExecutionContext(
   // Initialize the inputs and outputs. Make sure the model matches
   // what is in the configuration. Allocate memory for the maximum
   // possible batch size: min(engine maximum, config maximum)
-  context->byte_sizes_ = new uint64_t[context->num_expected_bindings_];
-  context->min_dims_ = new nvinfer1::Dims[context->num_expected_bindings_];
-  context->max_dims_ = new nvinfer1::Dims[context->num_expected_bindings_];
-  context->buffers_ = new void*[context->total_bindings_]();  // init to nullptr
+  context->byte_sizes_ =
+      std::vector<int64_t>(context->num_expected_bindings_, 0);
+  context->buffers_ = std::vector<void*>(context->total_bindings_, nullptr);
 
   const bool support_batching = (mbs != Context::NO_BATCHING);
 
@@ -318,10 +313,12 @@ PlanBackend::CreateExecutionContext(
       Config().input(), support_batching));
   RETURN_IF_ERROR(context->InitializeSequenceControlInputBindings(
       Config(), support_batching));
-  if (!context->context_->allInputDimensionsSpecified()) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "failed to specify the dimensions of all input bindings");
+  for (const auto& trt_context : context->trt_contexts_) {
+    if (!trt_context.first->context_->allInputDimensionsSpecified()) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to specify the dimensions of all input bindings");
+    }
   }
 
   // As we have visited all the input bindings at this point, if any of the
@@ -337,6 +334,8 @@ PlanBackend::CreateExecutionContext(
   } else if (
       context->is_dynamic_ &&
       (context->max_batch_size_ > context->max_dynamic_batch_size_)) {
+    // [TODO] this validation may be redundant
+    // [TODO] FIXME error message no longer accurate
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unexpected configuration maximum batch size " +
@@ -345,12 +344,13 @@ PlanBackend::CreateExecutionContext(
             "], model maximum is " +
             std::to_string(context->max_dynamic_batch_size_));
   }
+
   RETURN_IF_ERROR(context->InitializeConfigOutputBindings(
       Config().output(), support_batching));
 
   // Make sure every index is initialized.
   for (int i = 0; i < context->num_expected_bindings_; ++i) {
-    if (context->buffers_[context->binding_offset_ + i] == nullptr) {
+    if (context->buffers_[i] == nullptr) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "expected configuration for " +
@@ -437,117 +437,141 @@ PlanBackend::Context::InitializeInputBinding(
     const DimsList& model_config_dims, const bool support_batching,
     const bool is_control)
 {
-  int index = binding_offset_ + engine_->getBindingIndex(input_name.c_str());
-  if (index < 0) {
-    return Status(
-        RequestStatusCode::NOT_FOUND,
-        "input '" + input_name + "' not found for " + name_);
-  }
+  // the maximum byte sizes across all profiles
+  int64_t max_byte_size = 0;
+  int io_index = engine_->getBindingIndex(input_name.c_str());
+  for (auto& trt_context : trt_contexts_) {
+    auto& profile_index = trt_context.first;
+    auto& context = trt_context.second;
+    int binding_index = num_expected_bindings_ * profile_index + io_index;
+    if (io_index < 0) {
+      return Status(
+          RequestStatusCode::NOT_FOUND,
+          "input '" + input_name + "' not found for " + name_);
+    }
 
-  if (buffers_[index] != nullptr) {
-    return Status(
-        RequestStatusCode::INVALID_ARG, "input '" + input_name +
-                                            "' has already appeared as an " +
-                                            "input or output for " + name_);
-  }
+    if (buffers_[io_index] != nullptr) {
+      return Status(
+          RequestStatusCode::INVALID_ARG, "input '" + input_name +
+                                              "' has already appeared as an " +
+                                              "input or output for " + name_);
+    }
 
-  if (!engine_->bindingIsInput(index)) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "input '" + input_name + "' is expected to be an output in model for " +
-            name_);
-  }
-
-  DataType dt = ConvertTrtTypeToDataType(engine_->getBindingDataType(index));
-  if (dt != input_datatype) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "unexpected datatype " + DataType_Name(dt) + " for input '" +
-            input_name + "', expecting " + DataType_Name(input_datatype) +
-            " for " + name_);
-  }
-
-  MemoryFormat fmt = ConvertTrtFmtToFmt(engine_->getBindingFormat(index));
-  if (fmt != MemoryFormat::LINEAR) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "unexpected tensor format " + MemoryFormat_Name(fmt) + " for input '" +
-            input_name +
-            "'. Only LINEAR memory format is supported at present.");
-  }
-
-  nvinfer1::Dims engine_dims = engine_->getBindingDimensions(index);
-  // Detect whether dynamic or not
-  if (ContainsWildcard(engine_dims)) {
-    is_dynamic_ = true;
-  }
-
-  if (!(is_control && is_dynamic_)) {
-    RETURN_IF_ERROR(CompareDimsSupported(
-        name_, input_name, engine_dims, model_config_dims, support_batching,
-        is_dynamic_));
-  } else {
-    Status status = ValidateControlDimsDynamic(engine_dims, support_batching);
-    if (!status.IsOk()) {
+    if (!engine_->bindingIsInput(binding_index)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "unexpected dimensions " + DimsDebugString(engine_dims) +
-              " for control input '" + input_name + "' for " + name_ +
-              ". Error details: " + status.Message());
+          "input '" + input_name +
+              "' is expected to be an output in model for " + name_);
     }
-  }
 
-  int64_t byte_size;
-  std::vector<int64_t> maximum_dims;
-  if (!is_dynamic_) {
-    byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
-  } else {
-    nvinfer1::Dims max_profile_dims = engine_->getProfileDimensions(
-        index, profile_index_, nvinfer1::OptProfileSelector::kMAX);
-    min_dims_[index - binding_offset_] = engine_->getProfileDimensions(
-        index, profile_index_, nvinfer1::OptProfileSelector::kMIN);
-    Status status = ValidateDimension(
-        model_config_dims, min_dims_[index - binding_offset_], max_profile_dims,
-        support_batching);
-    if (!status.IsOk()) {
+    DataType dt =
+        ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
+    if (dt != input_datatype) {
       return Status(
-          RequestStatusCode::INTERNAL,
-          "model config specifies invalid shape for input '" + input_name +
-              "' for " + name_ + ". Error details: " + status.Message());
+          RequestStatusCode::INVALID_ARG,
+          "unexpected datatype " + DataType_Name(dt) + " for input '" +
+              input_name + "', expecting " + DataType_Name(input_datatype) +
+              " for " + name_);
     }
-    RETURN_IF_ERROR(MaximumDims(
-        max_profile_dims, model_config_dims, support_batching, max_batch_size_,
-        &maximum_dims));
-    if (support_batching) {
-      if (max_dynamic_batch_size_ > max_profile_dims.d[0]) {
-        max_dynamic_batch_size_ = max_profile_dims.d[0];
-      }
-      if (max_dynamic_batch_size_ < max_batch_size_) {
+
+    MemoryFormat fmt =
+        ConvertTrtFmtToFmt(engine_->getBindingFormat(binding_index));
+    if (fmt != MemoryFormat::LINEAR) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected tensor format " + MemoryFormat_Name(fmt) +
+              " for input '" + input_name +
+              "'. Only LINEAR memory format is supported at present.");
+    }
+
+    nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
+    // Detect whether dynamic or not
+    if (ContainsWildcard(engine_dims)) {
+      is_dynamic_ = true;
+    }
+
+    if (!(is_control && is_dynamic_)) {
+      RETURN_IF_ERROR(CompareDimsSupported(
+          name_, input_name, engine_dims, model_config_dims, support_batching,
+          is_dynamic_));
+    } else {
+      Status status = ValidateControlDimsDynamic(engine_dims, support_batching);
+      if (!status.IsOk()) {
         return Status(
             RequestStatusCode::INVALID_ARG,
-            "unexpected configuration maximum batch size " +
-                std::to_string(max_batch_size_) + " for " + name_ +
-                ", binding " + input_name + " maximum is " +
-                std::to_string(max_dynamic_batch_size_));
+            "unexpected dimensions " + DimsDebugString(engine_dims) +
+                " for control input '" + input_name + "' for " + name_ +
+                ". Error details: " + status.Message());
       }
-    } else {
-      max_dynamic_batch_size_ = 1;
     }
-    byte_size = GetByteSize(dt, maximum_dims);
-    // Update the maximum dimension with respect to the allocated buffer
-    DimVecToDims(maximum_dims, &max_dims_[index - binding_offset_]);
-  }
-  if (byte_size == -1) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to calculate size for input '" + input_name + " for " + name_);
+
+    int64_t byte_size = 0;
+    std::vector<int64_t> maximum_dims;
+    if (!is_dynamic_) {
+      byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
+    } else {
+      context->max_dims[io_index] = engine_->getProfileDimensions(
+          binding_index, profile_index, nvinfer1::OptProfileSelector::kMAX);
+      context->min_dims[io_index] = engine_->getProfileDimensions(
+          binding_index, profile_index, nvinfer1::OptProfileSelector::kMIN);
+      context->opt_dims[io_index] = engine_->getProfileDimensions(
+          binding_index, profile_index, nvinfer1::OptProfileSelector::kOPT);
+
+      Status status = ValidateDimension(
+          model_config_dims, context->min_dims[io_index],
+          context->max_dims[io_index], support_batching);
+      if (!status.IsOk()) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "model config specifies invalid shape for input '" + input_name +
+                "' for " + name_ + ". Error details: " + status.Message());
+      }
+      RETURN_IF_ERROR(MaximumDims(
+          context->max_dims[io_index], model_config_dims, support_batching,
+          max_batch_size_, &maximum_dims));
+      // [TODO] rework on validation logic (can be done in ValidateDimension())
+      if (support_batching) {
+        if (max_dynamic_batch_size_ > context->max_dims[io_index].d[0]) {
+          max_dynamic_batch_size_ = context->max_dims[io_index].d[0];
+        }
+        if (max_dynamic_batch_size_ < max_batch_size_) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "unexpected configuration maximum batch size " +
+                  std::to_string(max_batch_size_) + " for " + name_ +
+                  ", binding " + input_name + " maximum is " +
+                  std::to_string(max_dynamic_batch_size_));
+        }
+      } else {
+        max_dynamic_batch_size_ = 1;
+      }
+      byte_size = GetByteSize(dt, maximum_dims);
+      // Update the maximum dimension with respect to the allocated buffer
+      DimVecToDims(maximum_dims, &context->max_dims[io_index]);
+
+      if (!context_->setBindingDimensions(
+              binding_index, context->max_dims[io_index])) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "trt failed to set binding dimension to " +
+                DimsDebugString(context->max_dims[io_index]) + " for input '" +
+                input_name + "' for " + name_);
+      }
+    }
+
+    if (byte_size == -1) {
+      return Status(
+          RequestStatusCode::INTERNAL, "unable to calculate size for input '" +
+                                           input_name + " for " + name_);
+    }
+    max_byte_size = std::max(max_byte_size, byte_size);
   }
 
-  // Allocate CUDA memory. We rely on buffers_ being non-nullptr to
+  // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
   // indicate that the buffer has been correctly initalized so even
   // for zero-sized tensors always allocate something.
   void* buffer;
-  cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, byte_size));
+  cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
   if (err != cudaSuccess) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to allocate memory for input '" +
@@ -555,24 +579,13 @@ PlanBackend::Context::InitializeInputBinding(
                                          cudaGetErrorString(err));
   }
 
-  byte_sizes_[index - binding_offset_] = byte_size;
-  buffers_[index] = buffer;
+  byte_sizes_[io_index] = max_byte_size;
+  buffers_[io_index] = buffer;
 
-  if (is_dynamic_) {
-    nvinfer1::Dims input_dim;
-    if (!DimVecToDims(maximum_dims, &input_dim)) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "failed to create dims object for " + DimsListToString(maximum_dims) +
-              " for input '" + input_name + "' for " + name_ + ".");
-    }
-    if (!context_->setBindingDimensions(index, input_dim)) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "trt failed to set binding dimension to " +
-              DimsDebugString(input_dim) + " for input '" + input_name +
-              "' for " + name_);
-    }
+  // Set buffer bindings of all optimization profile since buffer is allocated
+  for (auto& trt_context : trt_contexts_) {
+    auto binding_index = num_expected_bindings_ * trt_context.first + io_index;
+    buffer_bindings_[binding_index] = buffers_[io_index];
   }
 
   return Status::Success;
@@ -654,74 +667,86 @@ PlanBackend::Context::InitializeConfigOutputBindings(
     const bool support_batching)
 {
   for (const auto& io : ios) {
-    int index = binding_offset_ + engine_->getBindingIndex(io.name().c_str());
-    if (index < 0) {
-      return Status(
-          RequestStatusCode::NOT_FOUND,
-          "output '" + io.name() + "' not found for " + name_);
-    }
+    // the maximum byte sizes across all profiles
+    int64_t max_byte_size = 0;
+    int io_index = engine_->getBindingIndex(input_name.c_str());
+    for (auto& trt_context : trt_contexts_) {
+      auto& profile_index = trt_context.first;
+      auto& context = trt_context.second;
+      int binding_index = num_expected_bindings_ * profile_index + io_index;
+      if (binding_index < 0) {
+        return Status(
+            RequestStatusCode::NOT_FOUND,
+            "output '" + io.name() + "' not found for " + name_);
+      }
 
-    if (buffers_[index] != nullptr) {
-      return Status(
-          RequestStatusCode::INVALID_ARG, "output '" + io.name() +
-                                              "' has already appeared as an " +
-                                              "input or output for " + name_);
-    }
+      if (buffers_[io_index] != nullptr) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "output '" + io.name() + "' has already appeared as an " +
+                "input or output for " + name_);
+      }
 
-    if (engine_->bindingIsInput(index)) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "output '" + io.name() +
-              "' is expected to be an input in model for " + name_);
-    }
+      if (engine_->bindingIsInput(binding_index)) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "output '" + io.name() +
+                "' is expected to be an input in model for " + name_);
+      }
 
-    DataType dt = ConvertTrtTypeToDataType(engine_->getBindingDataType(index));
-    if (dt != io.data_type()) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unexpected datatype " + DataType_Name(dt) +
-              " for inference output '" + io.name() + "', expecting " +
-              DataType_Name(io.data_type()) + " for " + name_);
-    }
+      DataType dt =
+          ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
+      if (dt != io.data_type()) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected datatype " + DataType_Name(dt) +
+                " for inference output '" + io.name() + "', expecting " +
+                DataType_Name(io.data_type()) + " for " + name_);
+      }
 
-    MemoryFormat fmt = ConvertTrtFmtToFmt(engine_->getBindingFormat(index));
-    if (fmt != MemoryFormat::LINEAR) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unexpected tensor format " + MemoryFormat_Name(fmt) +
-              " for output '" + io.name() +
-              "'. Only LINEAR memory format is supported at present.");
-    }
+      MemoryFormat fmt =
+          ConvertTrtFmtToFmt(engine_->getBindingFormat(binding_index));
+      if (fmt != MemoryFormat::LINEAR) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected tensor format " + MemoryFormat_Name(fmt) +
+                " for output '" + io.name() +
+                "'. Only LINEAR memory format is supported at present.");
+      }
 
-    const DimsList& model_config_dims =
-        (io.has_reshape()) ? io.reshape().shape() : io.dims();
+      const DimsList& model_config_dims =
+          (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
-    nvinfer1::Dims engine_dims = engine_->getBindingDimensions(index);
-    RETURN_IF_ERROR(CompareDimsSupported(
-        name_, io.name(), engine_dims, model_config_dims, support_batching,
-        is_dynamic_));
+      nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
+      RETURN_IF_ERROR(CompareDimsSupported(
+          name_, io.name(), engine_dims, model_config_dims, support_batching,
+          is_dynamic_));
 
-    int64_t byte_size;
-    if (!is_dynamic_) {
-      byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
+      int64_t byte_size;
+      if (!is_dynamic_) {
+        byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
+      } else {
+        const nvinfer1::Dims output_dim =
+            context_->getBindingDimensions(binding_index);
+        std::vector<int64_t> dim_vec;
+        DimsToDimVec(output_dim, &dim_vec);
+        byte_size = GetByteSize(dt, dim_vec);
+      }
+
       if (byte_size == -1) {
         return Status(
             RequestStatusCode::INTERNAL,
             "unable to calculate size for output '" + io.name() + " for " +
                 name_);
       }
-    } else {
-      const nvinfer1::Dims output_dim = context_->getBindingDimensions(index);
-      std::vector<int64_t> dim_vec;
-      DimsToDimVec(output_dim, &dim_vec);
-      byte_size = GetByteSize(dt, dim_vec);
+      max_byte_size = std::max(max_byte_size, byte_size);
     }
 
-    // Allocate CUDA memory. We rely on buffers_ being non-nullptr to
+    // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
     // indicate that the buffer has been correctly initalized so even
     // for zero-sized tensors always allocate something.
     void* buffer;
-    cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, byte_size));
+    cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
     if (err != cudaSuccess) {
       return Status(
           RequestStatusCode::INTERNAL,
@@ -729,8 +754,15 @@ PlanBackend::Context::InitializeConfigOutputBindings(
               name_ + ": " + std::string(cudaGetErrorString(err)));
     }
 
-    byte_sizes_[index - binding_offset_] = byte_size;
-    buffers_[index] = buffer;
+    byte_sizes_[io_index] = max_byte_size;
+    buffers_[io_index] = buffer;
+
+    // Set buffer bindings of all optimization profile since buffer is allocated
+    for (auto& trt_context : trt_contexts_) {
+      auto binding_index =
+          num_expected_bindings_ * trt_context.first + io_index;
+      buffer_bindings_[binding_index] = buffers_[io_index];
+    }
   }
 
   return Status::Success;
