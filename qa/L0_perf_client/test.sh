@@ -25,6 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+set -x
+
 REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
@@ -42,6 +44,9 @@ PERF_CLIENT=../clients/perf_client
 
 DATADIR=`pwd`/models
 TESTDATADIR=`pwd`/test_data
+MULTITESTDATADIR=`pwd`/multi_test_data
+SEQTESTDATADIR=`pwd`/seq_test_data
+SEQMULTITESTDATADIR=`pwd`/seq_multi_test_data
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-repository=$DATADIR
@@ -49,7 +54,7 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 rm -f $SERVER_LOG $CLIENT_LOG
-rm -rf $DATADIR $TESTDATADIR
+rm -rf $DATADIR $TESTDATADIR $MULTITESTDATADIR $SEQTESTDATADIR $SEQMULTITESTDATADIR
 
 mkdir -p $DATADIR
 # Copy fixed-shape models
@@ -63,8 +68,8 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphde
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphdef_int32_int32_float32 $DATADIR/
 
 # Copying ensemble including a sequential model
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/savedmodel_sequence_float32 $DATADIR
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_sequence_model_repository/simple_savedmodel_sequence_float32 $DATADIR
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/savedmodel_sequence_object $DATADIR
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_sequence_model_repository/simple_savedmodel_sequence_object $DATADIR
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_sequence_model_repository/nop_TYPE_FP32_-1 $DATADIR
 
 mkdir $DATADIR/nop_TYPE_FP32_-1/1
@@ -76,6 +81,19 @@ for INPUT in INPUT0 INPUT1; do
     for i in {1..16}; do
         echo '1' >> $TESTDATADIR/${INPUT}
     done
+done
+
+mkdir -p $MULTITESTDATADIR
+for i in {0..10}; do
+    cp -r $TESTDATADIR $MULTITESTDATADIR/$i
+done
+
+mkdir -p $SEQTESTDATADIR
+echo '1' >> $SEQTESTDATADIR/INPUT
+
+mkdir -p $SEQMULTITESTDATADIR
+for i in {0..10}; do
+    cp -r $SEQTESTDATADIR $SEQMULTITESTDATADIR/$i
 done
 
 RET=0
@@ -228,10 +246,40 @@ for SHARED_MEMORY_TYPE in none system cuda; do
         RET=1
     fi
 done
+# Testing with combinations of file inputs and shared memory types
+for SHARED_MEMORY_TYPE in none system cuda; do
+    $PERF_CLIENT -v -i grpc -m graphdef_object_object_object --input-data=$MULTITESTDATADIR -p2000 \
+--shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+done
 
 # Testing with combinations of variable inputs and shared memory types
 for SHARED_MEMORY_TYPE in none system cuda; do
     $PERF_CLIENT -v -i grpc -m graphdef_object_int32_int32 --input-data=$TESTDATADIR \
+--shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 --shared-memory=$SHARED_MEMORY_TYPE \
+>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+done
+for SHARED_MEMORY_TYPE in none system cuda; do
+    $PERF_CLIENT -v -i grpc -m graphdef_object_int32_int32 --input-data=$MULTITESTDATADIR \
 --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 --shared-memory=$SHARED_MEMORY_TYPE \
 >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
@@ -261,7 +309,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
 fi
 
 # Testing with ensemble and sequential model variants
-$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_float32 -p 2000 -t5 --streaming \
+$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_object --input-data=$SEQTESTDATADIR -p 2000 -t5 --streaming \
 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -274,7 +322,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
-$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_float32 -p 2000 -t5 --sync \
+$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_object --input-data=$SEQMULTITESTDATADIR -p 2000 -t5 --sync \
 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -286,7 +334,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-$PERF_CLIENT -v -m  simple_savedmodel_sequence_float32 -p 2000 -t5 --sync \
+$PERF_CLIENT -v -m  simple_savedmodel_sequence_object --input-data=$SEQMULTITESTDATADIR --shared-memory system -p 2000 -t5 --sync \
 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -299,7 +347,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
-$PERF_CLIENT -v -m  simple_savedmodel_sequence_float32 -p 1000 --request-rate-range 100:200:50 --sync \
+$PERF_CLIENT -v -m  simple_savedmodel_sequence_object --string-data=1 -p 1000 --request-rate-range 100:200:50 --sync \
 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
