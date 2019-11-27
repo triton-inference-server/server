@@ -1559,12 +1559,17 @@ InferHttpContextImpl::Run(ResultMap* results)
   }
 
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
+
+  // Set SEND_END when content length is 0 (because CURLOPT_READFUNCTION will
+  // not be called) or if using HTTP V2. In that case, we can't measure SEND_END
+  // properly (send ends after sending request header).
+#if TRTIS_ENABLE_HTTP_V2
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
+#else
   if (sync_request->total_input_byte_size_ == 0) {
-    // Set SEND_END here because CURLOPT_READFUNCTION will not be called if
-    // content length is 0. In that case, we can't measure SEND_END properly
-    // (send ends after sending request header).
     sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
   }
+#endif
 
   // During this call SEND_END (except in above case), RECV_START, and
   // RECV_END will be set.
@@ -1574,8 +1579,11 @@ InferHttpContextImpl::Run(ResultMap* results)
 
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
 
-  if (!UpdateStat(sync_request->Timer()).IsOk()) {
-    std::cerr << "Failed to update context stat: " << err << std::endl;
+  if (err.IsOk()) {
+    err = UpdateStat(sync_request->Timer());
+    if (!err.IsOk()) {
+      std::cerr << "Failed to update context stat: " << err << std::endl;
+    }
   }
 
   return err;
