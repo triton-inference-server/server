@@ -998,7 +998,7 @@ output [
 ]
 instance_group [
   {{
-      profile:"{}"
+      profile: ["{}"]
   }}
 ]
 '''.format(model_name, max_batch, version_policy_str,
