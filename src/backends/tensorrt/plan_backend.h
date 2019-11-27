@@ -47,7 +47,7 @@ class PlanBackend : public InferenceBackend {
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
       const std::unordered_map<std::string, std::vector<char>>& models,
-      const std::string profile_index);
+      const ::google::protobuf::RepeatedPtrField<std::string>& profile_names);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(PlanBackend);
@@ -56,8 +56,8 @@ class PlanBackend : public InferenceBackend {
   // For each model instance there is a context.
   struct Context : BackendContext {
     Context(
-        const std::string& name, const int gpu_device, const int max_batch_size,
-        const int profile_index);
+        const std::string& name, const int gpu_device,
+        const int max_batch_size);
     ~Context();
 
     DISALLOW_MOVE(Context);
@@ -82,46 +82,71 @@ class PlanBackend : public InferenceBackend {
         const bool support_batching);
     bool BuildCudaGraph(const int batch_size);
 
-    void InitProfile();
+    Status InitOptimizationProfiles(
+        const ::google::protobuf::RepeatedPtrField<std::string>& profile_names);
 
     // See BackendContext::Run()
     Status Run(
         const InferenceBackend* base,
         std::vector<Scheduler::Payload>* payloads) override;
 
+    // [TODO] are all fields needed?
+    // A struct to hold TensorRT execution context and its meta data, a backend
+    // context can have multiple of this struct if multiple optimization
+    // profiles is specified.
+    struct TensorRTContext {
+      TensorRTContext(const std::string& profile_name, int binding_cnts)
+          : profile_name_(profile_name), context_(nullptr),
+            min_dims_(binding_cnts), max_dims_(binding_cnts),
+            opt_dims_(binding_cnts)
+      {
+      }
+      std::string profile_name_;
+      nvinfer1::IExecutionContext* context_;
+
+      // Min Dimensions per bindings
+      std::vector<nvinfer1::Dims> min_dims_;
+
+      // Max Dimensions per bindings
+      std::vector<nvinfer1::Dims> max_dims_;
+
+      // Optimized Dimensions per bindings
+      std::vector<nvinfer1::Dims> opt_dims_;
+    };
+
     // TensorRT components for the model
     nvinfer1::IRuntime* runtime_;
     nvinfer1::ICudaEngine* engine_;
-    nvinfer1::IExecutionContext* context_;
+
+    // Map from profile index to the corresponding TensorRT context. Use map
+    // to ensure each profile index is mapped to exactly one TensorRT context.
+    std::map<int, OptimizationProfileContext> trt_contexts_;
 
     // Is set true if the loaded model has one or more dynamic shaped inputs
     bool is_dynamic_;
-    // The configured optimization profile index
-    int profile_index_;
-    // Offset used for addressing bindings from the configured optmization
-    // profile
-    int binding_offset_;
-    // Min Dimensions per bindings
-    nvinfer1::Dims* min_dims_;
-    // Max Dimensions per bindings
-    nvinfer1::Dims* max_dims_;
 
     // Stores the minimum of the maximum possible value of the first dimension
     int max_dynamic_batch_size_;
 
     // The total number of bindings
     int total_bindings_;
+
     // The number of expected bindings to the model. In case of dynamic shapes,
     // it is the number of expected bindings to the configured optimization
     // profile.
     int num_expected_bindings_;
 
-    // For each binding index of the TensorRT engine, the size of the
-    // corresponding tensor and pointer to the CUDA buffer for the
-    // tensor. These are arrays with size equal to
-    // Context::num_expected_bindings_
-    uint64_t* byte_sizes_;
-    void** buffers_;
+    // The maximum possible size of the TensorRT tensor and the corresponding
+    // allocated GPU buffer across all optimization
+    // profile. The array sizes are equal to Context::num_expected_bindings_
+    std::vector<int64_t> byte_sizes_;
+    std::vector<void*> buffers_;
+
+    // The pointer to the CUDA buffer for each binding index of the TensorRT
+    // engine. This is used to match the TensorRT context execution declaration
+    // while minimizing memory allocation.
+    // The array size is equal to Context::total_bindings_
+    std::vector<void*> buffer_bindings_;
 
     // The CUDA graphs captured for the model for different
     // batch-sizes.
