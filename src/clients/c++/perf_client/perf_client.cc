@@ -441,8 +441,8 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr
       << FormatMessage(
              " --input-data: Select the type of data that will be used "
-             "for input in inference requests. The available "
-             "options are \"zero\", \"random\", path to a directory. If the "
+             "for input in inference requests. The available options are "
+             "\"zero\", \"random\", path to a directory. If the "
              "option is path to a directory then the directory must either "
              "contain a binary/text file for each non-string/string input "
              "respectively, named the same as the input, or contain multiple "
@@ -453,21 +453,17 @@ Usage(char** argv, const std::string& msg = std::string())
              "inputs. The text file should contain all strings needed by "
              "batch-1, each in a new line, listed in row-major order. If the "
              "specified path to a directory contains subdirectories with data "
-             "then they should be named as integers in contiguous increasing "
+             "then they should be named as integers in continuous increasing "
              "order starting from \'0\', such as \'0\', \'1\', \'2\', \'3\'... "
              ". The client will pick up the data in a round-about fashion from "
              "these data-directories for successive inerence requests "
              "(\'0\'->\'1\'-> \'2\'-> \'3\'->\'0\'->...). In case of sequence "
              "model, the inference request with data described in \'0\' will "
-             "be "
-             "marked as a start of the sequence and the data corresponding to "
-             "the "
-             "end of the series will be marked as an end of the sequence. "
-             "Hence, "
-             "in this case the length of the sequences client will generate "
-             "will "
-             "be equal to the number of sub-directories. Default is "
-             "\"random\".",
+             "be marked as a start of the sequence and the data corresponding "
+             "to the end of the series will be marked as an end of the "
+             "sequence. Hence, in this case the length of the sequences client "
+             "will generate will be equal to the number of sub-directories. "
+             "Default is \"random\".",
              18)
       << std::endl;
   std::cerr << FormatMessage(

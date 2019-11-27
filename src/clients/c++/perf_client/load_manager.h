@@ -127,7 +127,8 @@ class LoadManager {
   /// Updates the input data for the next infrence request
   /// \param inputs A vector of shared pointers to the model inputs
   /// \param next_sub_dir_index_ The index to the next sub-directory to use for
-  /// input data. \param is_start Whether the data is a start of a sequence
+  /// input data.
+  /// \param is_start Whether the data is a start of a sequence
   /// \param is_end Whether or not the data is the end of sequence
   nic::Error UpdateInputs(
       const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
