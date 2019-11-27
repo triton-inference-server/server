@@ -114,7 +114,7 @@ class PlanBackend : public InferenceBackend {
       std::vector<nvinfer1::Dims> opt_dims_;
     };
 
-    std::map<int, OptimizationProfileContext>::iterator GetMostOptimizedProfile(
+    std::map<int, TensorRTContext>::iterator GetMostOptimizedProfile(
         size_t total_batch_size,
         const std::shared_ptr<InferRequestProvider>& input_request_provider);
 
@@ -124,7 +124,7 @@ class PlanBackend : public InferenceBackend {
 
     // Map from profile index to the corresponding TensorRT context. Use map
     // to ensure each profile index is mapped to exactly one TensorRT context.
-    std::map<int, OptimizationProfileContext> trt_contexts_;
+    std::map<int, TensorRTContext> trt_contexts_;
 
     // Is set true if the loaded model has one or more dynamic shaped inputs
     bool is_dynamic_;
