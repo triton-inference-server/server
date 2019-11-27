@@ -1254,6 +1254,9 @@ class InferHttpContextImpl : public InferContextImpl {
 
   // Serialized InferRequestHeader
   std::string infer_request_str_;
+
+  // Serialized InferRequest
+  std::string request_body_str_;
 };
 
 //==============================================================================
@@ -1785,7 +1788,7 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
   curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, buffer_byte_size);
 
   // request data provided by RequestProvider()
-#if !TRTIS_ENABLE_HTTP_V2
+#ifndef TRTIS_ENABLE_HTTP_V2
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, RequestProvider);
   curl_easy_setopt(curl, CURLOPT_READDATA, http_request.get());
 #endif
@@ -1853,10 +1856,11 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
     input_pos_idx++;
   }
 
-  std::string request_str;
-  ::google::protobuf::util::MessageToJsonString(infer_request, &request_str);
-  http_request->total_input_byte_size_ = request_str.length();
-  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request_str.c_str());
+  request_body_str_.clear();
+  ::google::protobuf::util::MessageToJsonString(
+      infer_request, &request_body_str_);
+  http_request->total_input_byte_size_ = request_body_str_.length();
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request_body_str_.c_str());
 #endif
 
   const curl_off_t post_byte_size = http_request->total_input_byte_size_;
@@ -1868,10 +1872,7 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
                        infer_request_.ShortDebugString();
   struct curl_slist* list = nullptr;
   list = curl_slist_append(list, "Expect:");
-#if TRTIS_ENABLE_HTTP_V2
-  list = curl_slist_append(list, "Content-Type: application/json");
-  list = curl_slist_append(list, "charsets: utf-8");
-#else
+#ifndef TRTIS_ENABLE_HTTP_V2
   list = curl_slist_append(list, "Content-Type: application/octet-stream");
 #endif
   list = curl_slist_append(list, infer_request_str_.c_str());

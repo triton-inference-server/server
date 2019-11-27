@@ -601,8 +601,7 @@ HTTPAPIServer::EVBufferToInput(
               std::string(
                   "unexpected size " + std::to_string(request_byte_size) +
                   " for input '" + io.name() + "', expecting " +
-                  std::to_string(byte_size) + " for model '" +
-                  request.model_name() + "'")
+                  std::to_string(byte_size) + " for model '" + model_name + "'")
                   .c_str());
         }
 
