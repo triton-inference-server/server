@@ -791,7 +791,7 @@ PlanBackend::Context::BuildCudaGraph(const int batch_size)
     captured = false;
   } else {
     auto context = trt_contexts_.begin()->second.context_;
-    if (!context->enqueue(batch_size, buffers_.data(), stream_, nullptr)) {
+    if (!context->enqueue(batch_size, buffer_bindings_.data(), stream_, nullptr)) {
       LOG_WARNING << "unable to record CUDA graph for " << name_;
       captured = false;
     }
@@ -980,6 +980,9 @@ PlanBackend::Context::Run(
               cudaGetErrorString(err));
     }
   } else {
+    LOG_VERBOSE(1) << "Context with profile " << citr->second.profile_name_
+                   << "[" << std::to_string(citr->first)
+                   << "] is being executed for " << name_;
     if (is_dynamic_) {
       if (!citr->second.context_->allInputDimensionsSpecified()) {
         return Status(
@@ -987,7 +990,7 @@ PlanBackend::Context::Run(
             "failed to specify the dimensions of all input bindings");
       }
       if (!citr->second.context_->enqueueV2(
-              buffers_.data(), stream_, nullptr)) {
+              buffer_bindings_.data(), stream_, nullptr)) {
         cudaStreamSynchronize(stream_);
         return Status(
             RequestStatusCode::INTERNAL,
@@ -995,7 +998,7 @@ PlanBackend::Context::Run(
       }
     } else {
       if (!citr->second.context_->enqueue(
-              total_batch_size, buffers_.data(), stream_, nullptr)) {
+              total_batch_size, buffer_bindings_.data(), stream_, nullptr)) {
         cudaStreamSynchronize(stream_);
         return Status(
             RequestStatusCode::INTERNAL,
@@ -1058,7 +1061,7 @@ PlanBackend::Context::Run(
 
     cuda_copy |= SetFixedSizeOutputBuffer(
         name, batch1_byte_size,
-        static_cast<char*>(buffers_[binding_offset + bindex]), shape,
+        static_cast<char*>(buffers_[bindex]), shape,
         TRTSERVER_MEMORY_GPU /* src_memory_type */, gpu_device_, payloads);
   }
 
@@ -1107,6 +1110,10 @@ PlanBackend::Context::GetMostOptimizedProfile(
       }
     }
   }
+
+  LOG_VERBOSE(1) << "Optimization profile " << ret_it->second.profile_name_
+                 << "[" << std::to_string(ret_it->first) << "] is selected for "
+                 << name_;
 
   return ret_it;
 }
