@@ -55,21 +55,21 @@ RET=0
     cp -r trtis/install/lib /opt/tensorrtserver/. && \
     cp -r trtis/install/include /opt/tensorrtserver/include/trtserver)
 if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** HTTP V2 Server Build Passed\n***"
+else
+    echo -e "\n***\n*** HTTP V2 Server Build Failed\n***"
     RET=1
-    echo -e "\n***\n*** HTTP V2 Passed\n***"
 fi
 
 # Install client dependencies
 (apt-get update && \
+    ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime && \
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get install -y tzdata && \
+    dpkg-reconfigure --frontend noninteractive tzdata && \
     apt-get install -y --no-install-recommends \
-        software-properties-common \
-        autoconf \
-        automake \
-        build-essential \
         libopencv-dev \
         libopencv-core-dev \
-        libssl-dev \
-        libtool \
         pkg-config \
         python3 \
         python3-pip \
@@ -84,6 +84,12 @@ fi
         -DTRTIS_ENABLE_METRICS=OFF \
         -DTRTIS_ENABLE_HTTP_V2=ON && \
     make -j16 trtis-clients)
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** HTTP V2 Client Build Passed\n***"
+else
+    echo -e "\n***\n*** HTTP V2 Client Build Failed\n***"
+    RET=1
+fi
 
 DATADIR=`pwd`/models
 SERVER=/opt/tensorrtserver/bin/trtserver
@@ -104,7 +110,7 @@ if [ $? -ne 0 ]; then
 fi
 
 if [ `grep -c "localhost:8000" client_c++.log` != "2" ]; then
-    echo -e "\n***\n*** Failed. Expected 1 Host: localhost:8000 header for C++ client\n***"
+    echo -e "\n***\n*** Failed. Expected 2 Host: localhost:8000 header for C++ client\n***"
     RET=1
 fi
 
