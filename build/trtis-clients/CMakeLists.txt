@@ -61,6 +61,13 @@ endif() # TRTIS_ENABLE_GPU
 endif() # NOT WIN32
 
 #
+# HTTP V2
+#
+if(${TRTIS_ENABLE_HTTP_V2})
+  add_definitions(-DTRTIS_ENABLE_HTTP_V2=1)
+endif() # TRTIS_ENABLE_HTTP_V2
+
+#
 # Protobuf
 #
 set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
