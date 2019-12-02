@@ -194,7 +194,7 @@ Input Data
 ^^^^^^^^^^
 
 Use the -\\-help option to see complete documentation for all input
-data options.  By default perf\_client sends random data to all the
+data options. By default perf\_client sends random data to all the
 inputs of your model. You can select a different input data mode with
 the -\\-input-data option:
 
@@ -215,6 +215,17 @@ has shape [ 3, N, M ], where N and M are variable-size dimensions, to
 tell perf\_client to send batch-size 4 requests of shape [ 3, 224, 224 ]::
 
   $ perf_client -m mymodel -b 4 --shape IMAGE:3,224,224
+
+Shared Memory
+^^^^^^^^^^^^^
+
+By default perf\_client sends input tensor data and receives output
+tensor data over the network. You can instead instruct perf\_client to
+use system shared memory or CUDA shared memory to communicate tensor
+data. By using these options you can model the performance that you
+can achieve by using shared memory in your application. Use
+-\\-shared-memory=system to use system (CPU) shared memory or
+-\\-shared-memory=cuda to use CUDA shared memory.
 
 Communication Protocol
 ^^^^^^^^^^^^^^^^^^^^^^
