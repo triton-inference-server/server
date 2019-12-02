@@ -122,6 +122,24 @@ install(
   DESTINATION src
 )
 
+if(${TRTIS_ENABLE_HTTP_V2})
+#
+# simple_v2_client
+#
+add_executable(
+  simple_v2_client
+  simple_v2_client.cc
+)
+target_link_libraries(
+  simple_v2_client
+  PRIVATE TRTIS::request_static
+)
+install(
+  TARGETS simple_v2_client
+  RUNTIME DESTINATION bin
+)
+endif() # TRTIS_ENABLE_HTTP_V2
+
 #
 # simple_shm_client
 #

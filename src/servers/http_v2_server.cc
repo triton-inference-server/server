@@ -144,7 +144,8 @@ class HTTPAPIServer : public HTTPServerImpl {
       const int thread_cnt)
       : HTTPServerImpl(port, thread_cnt), server_(server),
         trace_manager_(trace_manager), smb_manager_(smb_manager),
-        allocator_(nullptr), api_regex_(R"(/v1/models/([^(/|:)]+)(:predict)?)")
+        allocator_(nullptr),
+        api_regex_(R"(/v1/models/([^(/|:)]+)(:predict|/metadata)?)")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -165,11 +166,12 @@ class HTTPAPIServer : public HTTPServerImpl {
         "deleting response allocator");
   }
 
-  using EVBufferPair = std::pair<
+  using EVBufferTuple = std::tuple<
       evbuffer*,
       std::unordered_map<
           std::string,
-          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>>;
+          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>,
+      InferRequest>;
 
   // Class object associated to evhtp thread, requests received are bounded
   // with the thread that accepts it. Need to keep track of that and let the
@@ -192,7 +194,7 @@ class HTTPAPIServer : public HTTPServerImpl {
     std::unique_ptr<TraceMetaData> trace_meta_data_;
 #endif  // TRTIS_ENABLE_TRACING
 
-    std::unique_ptr<EVBufferPair> response_pair_;
+    std::unique_ptr<EVBufferTuple> response_tuple_;
 
    private:
     evhtp_request_t* req_;
@@ -216,6 +218,7 @@ class HTTPAPIServer : public HTTPServerImpl {
 
   void Handle(evhtp_request_t* req) override;
   void HandleHealth(evhtp_request_t* req, const std::string& model_name);
+  void HandleStatus(evhtp_request_t* req, const std::string& model_name);
   void HandleInfer(evhtp_request_t* req, const std::string& model_name);
 
 #if TRTIS_ENABLE_GPU
@@ -224,7 +227,7 @@ class HTTPAPIServer : public HTTPServerImpl {
 #endif  // TRTIS_ENABLE_GPU
   TRTSERVER_Error* EVBufferToInput(
       const std::string& model_name, const InferRequestHeader& request_header,
-      evbuffer* input_buffer,
+      const InferRequest& request,
       TRTSERVER_InferenceRequestProvider* request_provider,
       std::unordered_map<
           std::string,
@@ -255,12 +258,13 @@ HTTPAPIServer::ResponseAlloc(
     void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
-  auto userp_pair = reinterpret_cast<EVBufferPair*>(userp);
-  evbuffer* evhttp_buffer = reinterpret_cast<evbuffer*>(userp_pair->first);
+  auto userp_tuple = reinterpret_cast<EVBufferTuple*>(userp);
+  evbuffer* evhttp_buffer =
+      reinterpret_cast<evbuffer*>(std::get<0>(*userp_tuple));
   const std::unordered_map<
       std::string,
       std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
-      output_shm_map = userp_pair->second;
+      output_shm_map = std::get<1>(*userp_tuple);
 
   *buffer = nullptr;
   *buffer_userp = nullptr;
@@ -362,7 +366,11 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
   std::string model_name, rest;
   if (RE2::FullMatch(
           std::string(req->uri->path->full), api_regex_, &model_name, &rest)) {
-    LOG_VERBOSE(1) << "model_name: " << model_name << ", rest: " << rest;
+    // status
+    if (rest == "/metadata") {
+      HandleStatus(req, model_name);
+      return;
+    }
     // health
     if (rest == "") {
       HandleHealth(req, model_name);
@@ -444,11 +452,84 @@ HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& model_name)
 
   TRTSERVER_ErrorDelete(err);
 }
+void
+HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& model_name)
+{
+  if (req->method != htp_method_GET) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  if (model_name.empty()) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+
+  TRTSERVER_Protobuf* server_status_protobuf = nullptr;
+  TRTSERVER_Error* err =
+      (model_name.empty())
+          ? TRTSERVER_ServerStatus(server_.get(), &server_status_protobuf)
+          : TRTSERVER_ServerModelStatus(
+                server_.get(), model_name.c_str(), &server_status_protobuf);
+  if (err == nullptr) {
+    const char* status_buffer;
+    size_t status_byte_size;
+    err = TRTSERVER_ProtobufSerialize(
+        server_status_protobuf, &status_buffer, &status_byte_size);
+    if (err == nullptr) {
+      // Request text or binary format for status?
+      std::string format;
+      const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
+      if (format_c_str != NULL) {
+        format = std::string(format_c_str);
+      } else {
+        format = "text";
+      }
+
+      if (format == "binary") {
+        evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
+        evhtp_headers_add_header(
+            req->headers_out,
+            evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
+      } else {
+        ServerStatus server_status;
+        if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
+        } else {
+          std::string server_status_str = server_status.DebugString();
+          evbuffer_add(
+              req->buffer_out, server_status_str.c_str(),
+              server_status_str.size());
+        }
+      }
+    }
+  }
+
+  TRTSERVER_ProtobufDelete(server_status_protobuf);
+
+  RequestStatus request_status;
+  RequestStatusUtil::Create(
+      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
+      server_id_);
+
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(
+          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
+
+  evhtp_send_reply(
+      req, (request_status.code() == RequestStatusCode::SUCCESS)
+               ? EVHTP_RES_OK
+               : EVHTP_RES_BADREQ);
+
+  TRTSERVER_ErrorDelete(err);
+}
 
 TRTSERVER_Error*
 HTTPAPIServer::EVBufferToInput(
     const std::string& model_name, const InferRequestHeader& request_header,
-    evbuffer* input_buffer,
+    const InferRequest& request,
     TRTSERVER_InferenceRequestProvider* request_provider,
     std::unordered_map<
         std::string,
@@ -457,17 +538,6 @@ HTTPAPIServer::EVBufferToInput(
 {
   // Extract input data from HTTP body and register in
   // 'request_provider'.
-  size_t buffer_length = evbuffer_get_length(input_buffer);
-  char* request_buffer = (char*)malloc(sizeof(char) * buffer_length);
-  memset(request_buffer, 0, buffer_length);
-  evbuffer_copyout(input_buffer, request_buffer, buffer_length);
-
-  // Use JsonStringToMessage to convert a json string (bytes encoded in
-  // Base64) to a message
-  InferRequest request;
-  ::google::protobuf::util::JsonStringToMessage(
-      std::string(request_buffer, buffer_length), &request);
-
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
   size_t idx = 0;
@@ -522,8 +592,7 @@ HTTPAPIServer::EVBufferToInput(
               std::string(
                   "unexpected size " + std::to_string(request_byte_size) +
                   " for input '" + io.name() + "', expecting " +
-                  std::to_string(byte_size) + " for model '" +
-                  request.model_name() + "'")
+                  std::to_string(byte_size) + " for model '" + model_name + "'")
                   .c_str());
         }
 
@@ -613,6 +682,20 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& model_name)
     return;
   }
 
+  // Convert the json string to protobuf message
+  EVBufferTuple* response_tuple(new EVBufferTuple());
+  size_t buffer_length = evbuffer_get_length(req->buffer_in);
+  char* request_buffer = (char*)malloc(sizeof(char) * buffer_length);
+  evbuffer_copyout(req->buffer_in, request_buffer, buffer_length);
+  std::string json_request_string = std::string(request_buffer, buffer_length);
+  if (google::protobuf::util::JsonStringToMessage(
+          json_request_string, &std::get<2>(*response_tuple)) !=
+      google::protobuf::util::Status::OK) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+  free(request_buffer);
+
   uint64_t unique_id = RequestStatusUtil::NextUniqueRequestId();
 
   // Create the inference request provider which provides all the
@@ -622,16 +705,15 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& model_name)
       &request_provider, server_.get(), model_name.c_str(), model_version,
       request_header_serialized.c_str(), request_header_serialized.size());
   if (err == nullptr) {
-    EVBufferPair* response_pair(new EVBufferPair());
     err = EVBufferToInput(
-        model_name, request_header, req->buffer_in, request_provider,
-        response_pair->second);
+        model_name, request_header, std::get<2>(*response_tuple),
+        request_provider, std::get<1>(*response_tuple));
     if (err == nullptr) {
       InferRequestClass* infer_request = new InferRequestClass(
           req, request_header.id(), server_id_, unique_id);
 
-      response_pair->first = req->buffer_out;
-      infer_request->response_pair_.reset(response_pair);
+      std::get<0>(*response_tuple) = req->buffer_out;
+      infer_request->response_tuple_.reset(response_tuple);
 
       // Provide the trace manager object to use for this request, if nullptr
       // then no tracing will be performed.
@@ -647,7 +729,7 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& model_name)
 
       err = TRTSERVER_ServerInferAsync(
           server_.get(), trace_manager, request_provider, allocator_,
-          reinterpret_cast<void*>(response_pair),
+          reinterpret_cast<void*>(response_tuple),
           InferRequestClass::InferComplete,
           reinterpret_cast<void*>(infer_request));
       if (err != nullptr) {

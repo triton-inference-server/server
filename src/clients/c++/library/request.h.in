@@ -148,8 +148,8 @@ class DECLSPEC Error {
 /// \note
 ///   ServerHealthContext::Create methods are thread-safe.
 ///   GetReady() and GetLive() are not thread-safe. For a given
-///   ServerHealthContext, calls to GetReady() and GetLive() must be
-///   serialized.
+///   ServerHealthContext, calls to GetReady() and GetLive()
+///   must be serialized.
 ///
 class ServerHealthContext {
  public:
