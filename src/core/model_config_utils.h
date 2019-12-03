@@ -175,4 +175,11 @@ Status CheckGPUCompatibility(const int gpu_id);
 Status GetSupportedGPUs(std::set<int>& supported_gpus);
 #endif
 
+/// Obtain the 'profile_index' of the 'profile_name'.
+/// \param profile_name The name of the profile.
+/// \param profile_index Return the index of the profile.
+/// \return The error status. A non-OK status indicates failure on getting the
+/// value.
+Status GetProfileIndex(const std::string& profile_name, int* profile_index);
+
 }}  // namespace nvidia::inferenceserver

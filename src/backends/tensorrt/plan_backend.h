@@ -92,7 +92,6 @@ class PlanBackend : public InferenceBackend {
         const InferenceBackend* base,
         std::vector<Scheduler::Payload>* payloads) override;
 
-    // [TODO] move CUDA graph here
     // A struct to hold TensorRT execution context and its meta data, a backend
     // context can have multiple of this struct if multiple optimization
     // profiles is specified.
