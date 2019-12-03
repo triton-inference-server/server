@@ -59,8 +59,6 @@ DataType ConvertTrtTypeToDataType(nvinfer1::DataType trt_type);
 std::pair<bool, nvinfer1::DataType> ConvertDataTypeToTrtType(
     const DataType& dtype);
 
-int GetProfileIndex(const std::string profile_name);
-
 bool CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims);
 
 Status ValidateDimension(

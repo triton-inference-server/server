@@ -112,20 +112,6 @@ ConvertDataTypeToTrtType(const DataType& dtype)
   return std::make_pair(true, trt_type);
 }
 
-int
-GetProfileIndex(const std::string profile_name)
-{
-  if (profile_name.empty()) {
-    // if no optimization profile is given then be default
-    // TRTIS selects the first optimization profile for execution.
-    return 0;
-  } else {
-    // TRT doesn't support optimization profile names as of now,
-    // the profile is hence expected to be index itself.
-    return stoi(profile_name);
-  }
-}
-
 bool
 CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims)
 {

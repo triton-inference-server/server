@@ -138,9 +138,8 @@ PlanBackend::CreateExecutionContexts(
                                           std::to_string(c) + "_gpu" +
                                           std::to_string(gpu_device);
 
-        const auto& profile_names = group.profile();
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, gpu_device, models, profile_names));
+            instance_name, gpu_device, models, group.profile()));
         total_context_cnt++;
       }
     }
@@ -196,22 +195,28 @@ PlanBackend::Context::InitOptimizationProfiles(
   } else {
     // Create one TRT context for each specified profile
     for (const auto& profile_name : profile_names) {
-      auto profile_index = GetProfileIndex(profile_name);
-      auto it = trt_contexts_
-                    .emplace(
-                        profile_index,
-                        TensorRTContext(profile_name, num_expected_bindings_))
-                    .first;
+      int profile_index = 0;
+      RETURN_IF_ERROR(GetProfileIndex(profile_name, &profile_index));
+      auto res = trt_contexts_.emplace(
+          profile_index, TensorRTContext(profile_name, num_expected_bindings_));
+      if (!res.second) {
+        LOG_WARNING << profile_name << " maps to profile index "
+                    << profile_index << " which has been mapped by "
+                    << res.first->second.profile_name_
+                    << ", existing optimization profile will be reused";
+        continue;
+      }
       if (profile_index == 0) {
-        it->second.context_ = default_trt_context;
+        res.first->second.context_ = default_trt_context;
         default_trt_context = nullptr;
       } else {
-        it->second.context_ = engine_->createExecutionContext();
-        if (it->second.context_ == nullptr) {
+        res.first->second.context_ = engine_->createExecutionContext();
+        if (res.first->second.context_ == nullptr) {
           return Status(
               RequestStatusCode::INTERNAL, "unable to create TensorRT context");
         }
-        if (!it->second.context_->setOptimizationProfile(profile_index)) {
+        if (!res.first->second.context_->setOptimizationProfile(
+                profile_index)) {
           return Status(
               RequestStatusCode::INVALID_ARG,
               "Can not set the specified optimization profile " + profile_name +

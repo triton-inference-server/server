@@ -680,15 +680,16 @@ ValidateModelConfig(
                 "TensorRT models");
       } else if (!group.profile().empty()) {
         for (const auto& profile : group.profile()) {
-          char* end_ptr;
-          long profile_index = strtol(profile.c_str(), &end_ptr, 10);
-          if (*end_ptr != '\0' || profile_index < 0) {
+          int profile_index;
+          RETURN_IF_ERROR(GetProfileIndex(profile, &profile_index));
+          if (profile_index < 0) {
             return Status(
                 RequestStatusCode::INVALID_ARG,
                 "instance group " + group.name() + " of model " +
                     config.name() + " and platform " + config.platform() +
                     " specifies invalid profile " + profile +
-                    ". The field should contain a non-negative integer.");
+                    ". The field should contain the string representation of a "
+                    "non-negative integer.");
           }
         }
       }
@@ -1166,4 +1167,24 @@ GetSupportedGPUs(std::set<int>& supported_gpus)
 }
 
 #endif
+
+Status
+GetProfileIndex(const std::string& profile_name, int* profile_index)
+{
+  if (profile_name.empty()) {
+    return Status(
+        RequestStatusCode::INVALID_ARG, "profile name must not be empty");
+  } else {
+    try {
+      *profile_index = stoi(profile_name);
+    }
+    catch (const std::invalid_argument& ia) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to parse '" + profile_name + "': " + ia.what());
+    }
+    return Status::Success;
+  }
+}
+
 }}  // namespace nvidia::inferenceserver
