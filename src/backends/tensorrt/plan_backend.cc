@@ -43,8 +43,8 @@ namespace nvidia { namespace inferenceserver {
 PlanBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : BackendContext(name, gpu_device, max_batch_size), runtime_(nullptr),
-      engine_(nullptr), is_dynamic_(false), max_dynamic_batch_size_(INT_MAX),
-      total_bindings_(0), num_expected_bindings_(0)
+      engine_(nullptr), is_dynamic_(false), total_bindings_(0),
+      num_expected_bindings_(0)
 {
   stream_ = nullptr;
 }
@@ -538,24 +538,6 @@ PlanBackend::Context::InitializeInputBinding(
       RETURN_IF_ERROR(MaximumDims(
           context.max_dims_[io_index], model_config_dims, support_batching,
           max_batch_size_, &maximum_dims));
-      // [TODO] rework on validation logic (batch size checking can be done in
-      // ValidateDimension()?)
-      if (support_batching) {
-        if (max_dynamic_batch_size_ > context.max_dims_[io_index].d[0]) {
-          max_dynamic_batch_size_ = context.max_dims_[io_index].d[0];
-        }
-        if (max_dynamic_batch_size_ < max_batch_size_) {
-          return Status(
-              RequestStatusCode::INVALID_ARG,
-              "unexpected configuration maximum batch size " +
-                  std::to_string(max_batch_size_) + " for " + name_ +
-                  "' profile " + context.profile_name_ + " [" +
-                  std::to_string(profile_index) + "], binding " + input_name +
-                  " maximum is " + std::to_string(max_dynamic_batch_size_));
-        }
-      } else {
-        max_dynamic_batch_size_ = 1;
-      }
       byte_size = GetByteSize(dt, maximum_dims);
       // Update the maximum dimension with respect to the allocated buffer
       DimVecToDims(maximum_dims, &context.max_dims_[io_index]);
@@ -924,22 +906,6 @@ PlanBackend::Context::Run(
       batch1_byte_size = byte_sizes_[bindex] / std::max(1, max_batch_size_);
     }
 
-    // Visit the payloads in order and copy the input tensors to
-    // GPU. Skip payloads that had errors since they are not included
-    // in the dynamic batch.
-    std::vector<size_t> expected_byte_sizes;
-    for (auto& payload : *payloads) {
-      const InferRequestHeader& request_header =
-          payload.request_provider_->RequestHeader();
-      expected_byte_sizes.push_back(
-          request_header.batch_size() * batch1_byte_size);
-    }
-
-    SetInputBuffer(
-        name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_GPU, gpu_device_,
-        static_cast<char*>(buffers_[bindex]));
-
-    // [TODO] move check before setting buffer
     // Set the binding dimension so that output dimensions can be obtained
     if (is_dynamic_) {
       nvinfer1::Dims this_dim;
@@ -967,6 +933,21 @@ PlanBackend::Context::Run(
                 name_);
       }
     }
+
+    // Visit the payloads in order and copy the input tensors to
+    // GPU. Skip payloads that had errors since they are not included
+    // in the dynamic batch.
+    std::vector<size_t> expected_byte_sizes;
+    for (auto& payload : *payloads) {
+      const InferRequestHeader& request_header =
+          payload.request_provider_->RequestHeader();
+      expected_byte_sizes.push_back(
+          request_header.batch_size() * batch1_byte_size);
+    }
+
+    SetInputBuffer(
+        name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_GPU, gpu_device_,
+        static_cast<char*>(buffers_[bindex]));
   }
 
   for (auto& payload : *payloads) {
@@ -1088,9 +1069,6 @@ PlanBackend::Context::GetMostOptimizedProfile(
   // Returns the TensorRT context that uses profile with shortest Manhattan
   // distance in terms of input dimensions
   // [TODO] traverse it with more efficient data structure (i.e. K-D tree)
-
-  // [TODO] revisit this. Currently make sure a TRT context will be returned,
-  // but it may not be in range
   auto ret_it = trt_contexts_.begin();
   if (trt_contexts_.size() != 1) {
     int64_t shortest_distance = LLONG_MAX;
