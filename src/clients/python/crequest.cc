@@ -455,7 +455,7 @@ SharedMemoryControlContextRegister(
   return new nic::Error(err);
 }
 
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
 nic::Error*
 SharedMemoryControlContextCudaRegister(
     SharedMemoryControlContextCtx* ctx, void* cuda_shm_handle)
@@ -527,7 +527,7 @@ SharedMemoryControlContextGetSharedMemoryHandle(
   SharedMemoryHandle* handle =
       reinterpret_cast<SharedMemoryHandle*>(shm_handle);
   if (handle->shm_key_ == "") {
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
     char* tmp_addr = new char[handle->byte_size_];
     cudaError_t err = cudaMemcpy(
         tmp_addr, handle->base_addr_, handle->byte_size_,
@@ -550,7 +550,7 @@ SharedMemoryControlContextGetSharedMemoryHandle(
   return nullptr;
 }
 
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
 nic::Error*
 SharedMemoryControlContextGetCudaSharedMemoryHandle(
     void* cuda_shm_handle, void** shm_addr, size_t* byte_size, int* device_id)
@@ -752,7 +752,7 @@ InferContextOptionsAddSharedMemory(
   return new nic::Error(err);
 }
 
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
 nic::Error*
 InferContextOptionsAddCudaSharedMemory(
     InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,

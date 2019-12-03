@@ -52,7 +52,7 @@
 #include "src/core/server_status.pb.h"
 #endif
 
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #else
 struct cudaIpcMemHandle_t{};

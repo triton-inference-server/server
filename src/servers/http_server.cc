@@ -289,7 +289,7 @@ class HTTPAPIServer : public HTTPServerImpl {
   void HandleSharedMemoryControl(
       evhtp_request_t* req, const std::string& sharedmemorycontrol_uri);
 
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
   TRTSERVER_Error* EVBufferToCudaHandle(
       evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle);
 #endif  // TRTIS_ENABLE_GPU
@@ -746,7 +746,7 @@ HTTPAPIServer::HandleModelControl(
   TRTSERVER_ErrorDelete(err);
 }
 
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
 TRTSERVER_Error*
 HTTPAPIServer::EVBufferToCudaHandle(
     evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle)
@@ -854,7 +854,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
       err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
     }
   } else if (action_type_str == "cudaregister") {
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
     int device_id = std::atoll(device_id_str.c_str());
 
     // Get cuda ipc handle from raw bytes in http body
