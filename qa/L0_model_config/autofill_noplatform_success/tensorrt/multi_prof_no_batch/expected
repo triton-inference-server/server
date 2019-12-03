@@ -34,13 +34,13 @@ instance_group {
   count: 1
   gpus: 0
   kind: KIND_GPU
-  profile: ["4"]
+  profile: "4"
 }
 instance_group {
   name: "multi_prof_no_batch_1"
   count: 1
   gpus: 0
   kind: KIND_GPU
-  profile: ["5"]
+  profile: "5"
 }
 default_model_filename: "model.plan"
