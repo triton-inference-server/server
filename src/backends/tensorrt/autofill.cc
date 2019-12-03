@@ -34,6 +34,7 @@
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
+#include "src/core/model_config_utils.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -200,13 +201,13 @@ AutoFillPlanImpl::Init(ModelConfig* config)
       // no supported profiles
       max_batch_size_ = 0;
     } else {
-      // [TODO] revisit this
       std::set<int> config_profiles;
       // Verify all the profiles in the instance groups are supported or not
       bool supports_batching = true;
       for (const auto& group : config->instance_group()) {
         for (const auto& profile : group.profile()) {
-          const int profile_idx = GetProfileIndex(profile);
+          int profile_idx;
+          RETURN_IF_ERROR(GetProfileIndex(profile, &profile_idx));
           if (profile_idx < 0 || profile_idx >= num_profiles) {
             return Status(
                 RequestStatusCode::INTERNAL,
