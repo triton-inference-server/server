@@ -60,7 +60,7 @@ SharedMemoryBlockManager::CpuCreate(
   return nullptr;  // success
 }
 
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
 TRTSERVER_Error*
 SharedMemoryBlockManager::GpuCreate(
     TRTSERVER_SharedMemoryBlock** smb, const std::string& name,

@@ -436,7 +436,7 @@ SharedMemoryControlGrpcContextImpl::RegisterCudaSharedMemory(
     const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
     size_t byte_size, int device_id)
 {
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
   SharedMemoryControlRequest request;
   SharedMemoryControlResponse response;
   grpc::ClientContext context;

@@ -54,7 +54,7 @@ class SharedMemoryBlockManager {
       TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
       const std::string& shm_key, const size_t offset, const size_t byte_size);
 
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
   /// Add a shared memory block representing shared memory in CUDA
   /// (GPU) memory to the manager. Return TRTSERVER_ERROR_ALREADY_EXISTS
   /// if a shared memory block of the same name already exists in the manager.

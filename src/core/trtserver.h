@@ -43,7 +43,7 @@ extern "C" {
 #define TRTSERVER_EXPORT
 #endif
 
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #else
 typedef void cudaIpcMemHandle_t;
