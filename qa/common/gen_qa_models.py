@@ -728,8 +728,15 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
             profile[i].set_shape("INPUT1", min_shape, opt_shape, max_shape)
         else:
             bs = [ max_batch - i if max_batch > i else 1]
-            profile[i].set_shape("INPUT0", [1] + min_shape, bs + opt_shape, bs + max_shape)
-            profile[i].set_shape("INPUT1", [1] + min_shape, bs + opt_shape, bs + max_shape)
+            # Hardcoded 'max_shape[0] += 1' in default profile for
+            # L0_trt_dynamic_shape, to differentiate whether default profile
+            # is used if no profile is specified
+            max_shape_override = max_shape
+            if i == 0 and (min_dim == 1 and max_dim ==32):
+              max_shape_override[0] += 1
+            
+            profile[i].set_shape("INPUT0", [1] + min_shape, bs + opt_shape, [max_batch] + max_shape_override)
+            profile[i].set_shape("INPUT1", [1] + min_shape, bs + opt_shape, [max_batch] + max_shape_override)
         config.add_optimization_profile(profile[i])
     # some profiles with non-one min shape for first dim to test autofiller
     for i in range(2):
@@ -738,8 +745,8 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
             profile[i + 4].set_shape("INPUT0", min_shape, opt_shape, max_shape)
             profile[i + 4].set_shape("INPUT1", min_shape, opt_shape, max_shape)
         else:
-            profile[i + 4].set_shape("INPUT0", [2 + i] + min_shape, [max_batch] + opt_shape, [max_batch] + max_shape)
-            profile[i + 4].set_shape("INPUT1", [2 + i] + min_shape, [max_batch] + opt_shape, [max_batch] + max_shape)
+            profile[i + 4].set_shape("INPUT0", [7 + i] + min_shape, [max_batch] + opt_shape, [max_batch] + max_shape)
+            profile[i + 4].set_shape("INPUT1", [7 + i] + min_shape, [max_batch] + opt_shape, [max_batch] + max_shape)
         config.add_optimization_profile(profile[i + 4])
     # Will repeat another profile with same min and max shapes as the first profile to test non-zero profile
     # for infer_variable test.
