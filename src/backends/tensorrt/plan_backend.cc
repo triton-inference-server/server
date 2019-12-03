@@ -63,23 +63,30 @@ PlanBackend::Context::~Context()
     }
   }
 
-  for (const auto& pr : cuda_graph_execs_) {
-    cudaError_t err = cudaGraphExecDestroy(pr.second);
-    if (err != cudaSuccess) {
-      LOG_ERROR << "Failed to destroy cuda graph exec: "
-                << cudaGetErrorString(err);
+  for (auto& trt_context : trt_contexts_) {
+    for (const auto& pr : trt_context.second.cuda_graph_execs_) {
+      cudaError_t err = cudaGraphExecDestroy(pr.second);
+      if (err != cudaSuccess) {
+        LOG_ERROR << "Failed to destroy cuda graph exec: "
+                  << cudaGetErrorString(err);
+      }
     }
-  }
-  cuda_graph_execs_.clear();
+    trt_context.second.cuda_graph_execs_.clear();
 
-  for (const auto& pr : cuda_graphs_) {
-    cudaError_t err = cudaGraphDestroy(pr.second);
-    if (err != cudaSuccess) {
-      LOG_ERROR << "Failed to destroy cuda graph exec: "
-                << cudaGetErrorString(err);
+    for (const auto& pr : trt_context.second.cuda_graphs_) {
+      cudaError_t err = cudaGraphDestroy(pr.second);
+      if (err != cudaSuccess) {
+        LOG_ERROR << "Failed to destroy cuda graph exec: "
+                  << cudaGetErrorString(err);
+      }
+    }
+    trt_context.second.cuda_graphs_.clear();
+
+    if (trt_context.second.context_ != nullptr) {
+      trt_context.second.context_->destroy();
+      trt_context.second.context_ = nullptr;
     }
   }
-  cuda_graphs_.clear();
 
   if (stream_ != nullptr) {
     cudaError_t err = cudaStreamDestroy(stream_);
@@ -89,12 +96,6 @@ PlanBackend::Context::~Context()
     stream_ = nullptr;
   }
 
-  for (auto& trt_context : trt_contexts_) {
-    if (trt_context.second.context_ != nullptr) {
-      trt_context.second.context_->destroy();
-      trt_context.second.context_ = nullptr;
-    }
-  }
   if (engine_ != nullptr) {
     engine_->destroy();
     engine_ = nullptr;
@@ -371,11 +372,16 @@ PlanBackend::CreateExecutionContext(
 #ifdef TRTIS_ENABLE_CUDA_GRAPH
   const bool use_cuda_graphs = Config().optimization().cuda().graphs();
   if (use_cuda_graphs) {
-    if (context->BuildCudaGraph(1)) {
-      for (int bs : std::vector<int>{2, 3, 4, 6, 8, 12, 16}) {
-        if (bs <= Config().max_batch_size()) {
-          if (!context->BuildCudaGraph(bs)) {
-            break;
+    // CUDA graph will be captured for every TRT contexts as CUDA graph is
+    // merely capturing GPU activities for a given execution. And the
+    // executions might be different for different optimization profiles
+    for (auto& trt_context : context->trt_contexts_) {
+      if (context->BuildCudaGraph(&(trt_context.second), 1)) {
+        for (int bs : std::vector<int>{2, 3, 4, 6, 8, 12, 16}) {
+          if (bs <= Config().max_batch_size()) {
+            if (!context->BuildCudaGraph(&(trt_context.second), bs)) {
+              break;
+            }
           }
         }
       }
@@ -776,11 +782,10 @@ PlanBackend::Context::InitializeConfigOutputBindings(
 // CUDA 10.1 starts to support CUDA graphs.
 #ifdef TRTIS_ENABLE_CUDA_GRAPH
 bool
-PlanBackend::Context::BuildCudaGraph(const int batch_size)
+PlanBackend::Context::BuildCudaGraph(
+    TensorRTContext* trt_context, const int batch_size)
 {
-  // [TODO] FIXME Should every TRT contexts have its own CUDA graphs?
-  // Currently we just construct CUDA graphs for first TRT context and use
-  // that context regardless.
+  // [DLIS-947] Need extra care for dynamic shape
   bool captured = true;
   cudaError_t cuerr;
 
@@ -791,7 +796,7 @@ PlanBackend::Context::BuildCudaGraph(const int batch_size)
               << cudaGetErrorString(cuerr);
     captured = false;
   } else {
-    auto context = trt_contexts_.begin()->second.context_;
+    auto context = trt_context->context_;
     if (!context->enqueue(
             batch_size, buffer_bindings_.data(), stream_, nullptr)) {
       LOG_WARNING << "unable to record CUDA graph for " << name_;
@@ -813,8 +818,9 @@ PlanBackend::Context::BuildCudaGraph(const int batch_size)
                   << cudaGetErrorString(cuerr);
         captured = false;
       } else {
-        cuda_graphs_.insert(std::make_pair(batch_size, graph));
-        cuda_graph_execs_.insert(std::make_pair(batch_size, graph_exec));
+        trt_context->cuda_graphs_.insert(std::make_pair(batch_size, graph));
+        trt_context->cuda_graph_execs_.insert(
+            std::make_pair(batch_size, graph_exec));
       }
     }
   }
@@ -972,8 +978,8 @@ PlanBackend::Context::Run(
 
   // Async execute the inference using a CUDA graph if available for
   // the batch-size, otherwise execution normally.
-  auto itr = cuda_graph_execs_.find(total_batch_size);
-  if (itr != cuda_graph_execs_.end()) {
+  auto itr = citr->second.cuda_graph_execs_.find(total_batch_size);
+  if (itr != citr->second.cuda_graph_execs_.end()) {
     cudaError_t err = cudaGraphLaunch(itr->second, stream_);
     if (err != cudaSuccess) {
       cudaStreamSynchronize(stream_);
@@ -1093,6 +1099,11 @@ PlanBackend::Context::GetMostOptimizedProfile(
       for (const auto& input :
            input_request_provider->RequestHeader().input()) {
         int io_index = engine_->getBindingIndex(input.name().c_str());
+        nvinfer1::Dims engine_dims = engine_->getBindingDimensions(io_index);
+        // If the input has no dynamic shape, then skip it as distance will be 0
+        if (!ContainsWildcard(engine_dims)) {
+          continue;
+        }
         auto status = ValidateDimension(
             input.dims(), cit->second.min_dims_[io_index],
             cit->second.max_dims_[io_index], true);
