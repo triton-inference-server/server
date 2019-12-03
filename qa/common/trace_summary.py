@@ -48,6 +48,8 @@ def summarize(protocol, traces):
     # map from (model_name, model_version) to map of span->total time
     model_span_map = dict()
 
+    # Order traces by id to be more intuitive if 'show_trace'
+    traces = sorted(traces, key=lambda t: t.get('id', -1))
     for trace in traces:
         timestamps = dict()
         for ts in trace["timestamps"]:
@@ -83,10 +85,14 @@ def summarize(protocol, traces):
 
             add_span(model_span_map[key], timestamps,
                      "request handler", "request handler start", "request handler end")
-            add_span(model_span_map[key], timestamps,
-                     "queue", "queue start", "compute start")
-            add_span(model_span_map[key], timestamps,
-                     "compute", "compute start", "compute end")
+            
+            # The tags below will be missing for ensemble model
+            if ("queue start" in timestamps) and ("compute start" in timestamps):
+                add_span(model_span_map[key], timestamps,
+                        "queue", "queue start", "compute start")
+            if ("compute start" in timestamps) and ("compute end" in timestamps):
+                add_span(model_span_map[key], timestamps,
+                        "compute", "compute start", "compute end")
             if ("compute input end" in timestamps) and ("compute output start" in timestamps):
                 add_span(model_span_map[key], timestamps,
                          "compute input", "compute start", "compute input end")
@@ -96,7 +102,10 @@ def summarize(protocol, traces):
                          "compute output", "compute output start", "compute end")
 
             if FLAGS.show_trace:
-                print("{} ({}):".format(trace["model_name"], trace["model_version"]));
+                print("{} ({}):".format(trace["model_name"], trace["model_version"]))
+                print("\tid: {}".format(trace["id"]))
+                if "parent_id" in trace:
+                    print("\tparent id: {}".format(trace["parent_id"]))
                 ordered_timestamps = list()
                 for ts in trace["timestamps"]:
                     ordered_timestamps.append((ts["name"], ts["ns"]))
@@ -140,14 +149,15 @@ def summarize(protocol, traces):
 
         print("\tHandler (avg): {}us".format(
             model_span_map[key]["request handler"] / (cnt * 1000)))
-        print("\t\tOverhead (avg): {}us".format(
-            (model_span_map[key]["request handler"] -
-             model_span_map[key]["queue"] -
-             model_span_map[key]["compute"]) / (cnt * 1000)))
-        print("\t\tQueue (avg): {}us".format(
-            model_span_map[key]["queue"] / (cnt * 1000)))
-        print("\t\tCompute (avg): {}us".format(
-            model_span_map[key]["compute"] / (cnt * 1000)))
+        if ("queue" in model_span_map[key]) and "compute" in model_span_map[key]:
+            print("\t\tOverhead (avg): {}us".format(
+                (model_span_map[key]["request handler"] -
+                model_span_map[key]["queue"] -
+                model_span_map[key]["compute"]) / (cnt * 1000)))
+            print("\t\tQueue (avg): {}us".format(
+                model_span_map[key]["queue"] / (cnt * 1000)))
+            print("\t\tCompute (avg): {}us".format(
+                model_span_map[key]["compute"] / (cnt * 1000)))
         if ("compute input" in model_span_map[key]) and "compute output" in model_span_map[key]:
             print("\t\t\tInput (avg): {}us".format(
                 model_span_map[key]["compute input"] / (cnt * 1000)))
