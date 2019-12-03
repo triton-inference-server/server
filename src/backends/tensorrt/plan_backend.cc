@@ -532,7 +532,8 @@ PlanBackend::Context::InitializeInputBinding(
       RETURN_IF_ERROR(MaximumDims(
           context.max_dims_[io_index], model_config_dims, support_batching,
           max_batch_size_, &maximum_dims));
-      // [TODO] rework on validation logic (can be done in ValidateDimension())
+      // [TODO] rework on validation logic (batch size checking can be done in
+      // ValidateDimension()?)
       if (support_batching) {
         if (max_dynamic_batch_size_ > context.max_dims_[io_index].d[0]) {
           max_dynamic_batch_size_ = context.max_dims_[io_index].d[0];
@@ -791,7 +792,8 @@ PlanBackend::Context::BuildCudaGraph(const int batch_size)
     captured = false;
   } else {
     auto context = trt_contexts_.begin()->second.context_;
-    if (!context->enqueue(batch_size, buffer_bindings_.data(), stream_, nullptr)) {
+    if (!context->enqueue(
+            batch_size, buffer_bindings_.data(), stream_, nullptr)) {
       LOG_WARNING << "unable to record CUDA graph for " << name_;
       captured = false;
     }
@@ -931,6 +933,7 @@ PlanBackend::Context::Run(
         name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_GPU, gpu_device_,
         static_cast<char*>(buffers_[bindex]));
 
+    // [TODO] move check before setting buffer
     // Set the binding dimension so that output dimensions can be obtained
     if (is_dynamic_) {
       nvinfer1::Dims this_dim;
@@ -981,7 +984,7 @@ PlanBackend::Context::Run(
     }
   } else {
     LOG_VERBOSE(1) << "Context with profile " << citr->second.profile_name_
-                   << "[" << std::to_string(citr->first)
+                   << " [" << std::to_string(citr->first)
                    << "] is being executed for " << name_;
     if (is_dynamic_) {
       if (!citr->second.context_->allInputDimensionsSpecified()) {
@@ -1060,8 +1063,7 @@ PlanBackend::Context::Run(
     }
 
     cuda_copy |= SetFixedSizeOutputBuffer(
-        name, batch1_byte_size,
-        static_cast<char*>(buffers_[bindex]), shape,
+        name, batch1_byte_size, static_cast<char*>(buffers_[bindex]), shape,
         TRTSERVER_MEMORY_GPU /* src_memory_type */, gpu_device_, payloads);
   }
 
@@ -1080,6 +1082,9 @@ PlanBackend::Context::GetMostOptimizedProfile(
   // Returns the TensorRT context that uses profile with shortest Manhattan
   // distance in terms of input dimensions
   // [TODO] traverse it with more efficient data structure (i.e. K-D tree)
+
+  // [TODO] revisit this. Currently make sure a TRT context will be returned,
+  // but it may not be in range
   auto ret_it = trt_contexts_.begin();
   if (trt_contexts_.size() != 1) {
     int64_t shortest_distance = LLONG_MAX;
@@ -1091,7 +1096,12 @@ PlanBackend::Context::GetMostOptimizedProfile(
         auto status = ValidateDimension(
             input.dims(), cit->second.min_dims_[io_index],
             cit->second.max_dims_[io_index], true);
-        if (!status.IsOk()) {
+        bool valid_bs =
+            (((int64_t)total_batch_size >=
+              cit->second.min_dims_[io_index].d[0]) &&
+             ((int64_t)total_batch_size <=
+              cit->second.max_dims_[io_index].d[0]));
+        if (!status.IsOk() || !valid_bs) {
           current_distance = LLONG_MAX;
           break;
         } else {
@@ -1112,8 +1122,8 @@ PlanBackend::Context::GetMostOptimizedProfile(
   }
 
   LOG_VERBOSE(1) << "Optimization profile " << ret_it->second.profile_name_
-                 << "[" << std::to_string(ret_it->first) << "] is selected for "
-                 << name_;
+                 << " [" << std::to_string(ret_it->first)
+                 << "] is selected for " << name_;
 
   return ret_it;
 }
