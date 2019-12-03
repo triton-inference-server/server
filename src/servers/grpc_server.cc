@@ -1740,7 +1740,7 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
         }
       } else if (request.register_().has_cuda_shared_memory()) {
         // cuda shared memory
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
         const std::string& raw_handle =
             request.register_().cuda_shared_memory().raw_handle();
         char* handle_base = const_cast<char*>(raw_handle.c_str());

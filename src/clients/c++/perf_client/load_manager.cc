@@ -28,7 +28,7 @@
 #include "src/clients/c++/examples/shm_utils.h"
 #include "src/core/model_config.h"
 
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
 
 #define RETURN_IF_CUDA_ERR(FUNC)                               \
@@ -47,7 +47,7 @@
 
 namespace {
 
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
 nic::Error
 CreateCUDAIPCHandle(
     cudaIpcMemHandle_t* cuda_handle, void* input_d_ptr, int device_id = 0)
@@ -109,7 +109,7 @@ LoadManager::~LoadManager()
         }
       }
     } else if (shared_memory_type_ == SharedMemoryType::CUDA_SHARED_MEMORY) {
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
       for (auto region : shared_memory_regions_) {
         cudaError_t cuda_err =
             cudaFree(shared_memory_regions_[region.first].first);
@@ -392,7 +392,7 @@ LoadManager::InitSharedMemory()
       RETURN_IF_ERROR(shared_memory_ctx_->RegisterSharedMemory(
           output->Name(), shm_key, 0, alloc_size));
     } else {
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
       cudaError_t cuda_err = cudaMalloc((void**)&output_shm_ptr, alloc_size);
       if (cuda_err != cudaSuccess) {
         return nic::Error(
@@ -454,7 +454,7 @@ LoadManager::InitSharedMemory()
       RETURN_IF_ERROR(shared_memory_ctx_->RegisterSharedMemory(
           input->Name(), shm_key, 0, alloc_size));
     } else {
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
       cudaError_t cuda_err = cudaMalloc((void**)&input_shm_ptr, alloc_size);
       if (cuda_err != cudaSuccess) {
         return nic::Error(

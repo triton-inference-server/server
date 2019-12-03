@@ -221,7 +221,7 @@ class HTTPAPIServer : public HTTPServerImpl {
   void HandleStatus(evhtp_request_t* req, const std::string& model_name);
   void HandleInfer(evhtp_request_t* req, const std::string& model_name);
 
-#if TRTIS_ENABLE_GPU
+#ifdef TRTIS_ENABLE_GPU
   TRTSERVER_Error* EVBufferToCudaHandle(
       evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle);
 #endif  // TRTIS_ENABLE_GPU
