@@ -209,6 +209,13 @@ MaximumDims(
   }
 
   if (support_batching) {
+    if (max_batch_size > max_profile_dims.d[0]) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected configuration maximum batch size " +
+              std::to_string(max_batch_size) + " binding maximum is " +
+              std::to_string(max_profile_dims.d[0]));
+    }
     max_dims->emplace_back(max_batch_size);
   }
 

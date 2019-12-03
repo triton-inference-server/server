@@ -136,9 +136,6 @@ class PlanBackend : public InferenceBackend {
     // Is set true if the loaded model has one or more dynamic shaped inputs
     bool is_dynamic_;
 
-    // Stores the minimum of the maximum possible value of the first dimension
-    int max_dynamic_batch_size_;
-
     // The total number of bindings
     int total_bindings_;
 
