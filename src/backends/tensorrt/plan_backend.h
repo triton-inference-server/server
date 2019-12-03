@@ -63,6 +63,8 @@ class PlanBackend : public InferenceBackend {
     DISALLOW_MOVE(Context);
     DISALLOW_COPY_AND_ASSIGN(Context);
 
+    struct TensorRTContext;
+
     Status ValidateInputs(
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
     Status ValidateOutputs(
@@ -80,7 +82,7 @@ class PlanBackend : public InferenceBackend {
     Status InitializeConfigOutputBindings(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios,
         const bool support_batching);
-    bool BuildCudaGraph(const int batch_size);
+    bool BuildCudaGraph(TensorRTContext* trt_context, const int batch_size);
 
     Status InitOptimizationProfiles(
         const ::google::protobuf::RepeatedPtrField<std::string>& profile_names);
@@ -90,7 +92,7 @@ class PlanBackend : public InferenceBackend {
         const InferenceBackend* base,
         std::vector<Scheduler::Payload>* payloads) override;
 
-    // [TODO] are all fields needed?
+    // [TODO] move CUDA graph here
     // A struct to hold TensorRT execution context and its meta data, a backend
     // context can have multiple of this struct if multiple optimization
     // profiles is specified.
@@ -103,6 +105,11 @@ class PlanBackend : public InferenceBackend {
       }
       std::string profile_name_;
       nvinfer1::IExecutionContext* context_;
+
+      // The CUDA graphs captured for the model for different
+      // batch-sizes.
+      std::unordered_map<int, cudaGraph_t> cuda_graphs_;
+      std::unordered_map<int, cudaGraphExec_t> cuda_graph_execs_;
 
       // Min Dimensions per bindings
       std::vector<nvinfer1::Dims> min_dims_;
@@ -151,11 +158,6 @@ class PlanBackend : public InferenceBackend {
     // while minimizing memory allocation.
     // The array size is equal to Context::total_bindings_
     std::vector<void*> buffer_bindings_;
-
-    // The CUDA graphs captured for the model for different
-    // batch-sizes.
-    std::unordered_map<int, cudaGraph_t> cuda_graphs_;
-    std::unordered_map<int, cudaGraphExec_t> cuda_graph_execs_;
   };
 };
 
