@@ -96,6 +96,8 @@ SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
 
+# Cannot use run_server since it repeatedly curls the (old) HTTP health endpoint to know
+# when the server is ready. This endpoint does not exist in the HTTP V2 server.
 run_server_nowait
 sleep 5
 if [ "$SERVER_PID" == "0" ]; then
