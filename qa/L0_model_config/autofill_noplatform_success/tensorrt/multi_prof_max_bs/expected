@@ -31,20 +31,20 @@ instance_group {
   count: 1
   gpus: 0
   kind: KIND_GPU
-  profile: ["0"]
+  profile: "0"
 }
 instance_group {
   name: "multi_prof_max_bs_1"
   count: 1
   gpus: 0
   kind: KIND_GPU
-  profile: ["1"]
+  profile: "1"
 }
 instance_group {
   name: "multi_prof_max_bs_2"
   count: 1
   gpus: 0
   kind: KIND_GPU
-  profile: ["2"]
+  profile: "2"
 }
 default_model_filename: "model.plan"
