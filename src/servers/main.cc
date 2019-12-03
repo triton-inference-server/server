@@ -121,7 +121,7 @@ int grpc_stream_infer_thread_cnt_ = 1;
 // remain allocated for reuse. As long as the number of in-flight
 // requests doesn't exceed this value there will be no
 // allocation/deallocation of request/response objects.
-int grpc_infer_allocation_pool_size_ = 0;
+int grpc_infer_allocation_pool_size_ = 8;
 #endif  // TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_HTTP
