@@ -45,7 +45,7 @@ RET=0
         -DTRTIS_ENABLE_ONNXRUNTIME=OFF \
         -DTRTIS_ENABLE_ONNXRUNTIME_OPENVINO=OFF \
         -DTRTIS_ENABLE_PYTORCH=OFF \
-        -DTRTIS_ENABLE_GPU=ON \
+        -DTRTIS_ENABLE_GPU=OFF \
         -DTRTIS_ENABLE_GRPC=OFF \
         -DTRTIS_ENABLE_HTTP=ON \
         -DTRTIS_ENABLE_HTTP_V2=ON \
@@ -82,6 +82,7 @@ fi
     cmake -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install \
         -DTRTIS_ENABLE_METRICS=OFF \
+        -DTRTIS_ENABLE_GPU=OFF \
         -DTRTIS_ENABLE_HTTP_V2=ON && \
     make -j16 trtis-clients)
 if [ $? -eq 0 ]; then
@@ -91,6 +92,8 @@ else
     RET=1
 fi
 
+(mkdir models && \
+    cp -r /workspace/docs/examples/model_repository/simple models/.)
 DATADIR=`pwd`/models
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS="--model-repository=$DATADIR"
