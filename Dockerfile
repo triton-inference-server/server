@@ -90,7 +90,7 @@ RUN cd pytorch && \
     USE_DISTRIBUTED=0 USE_NCCL=0 \
     USE_OPENCV=0 USE_LEVELDB=0 USE_LMDB=0 USE_REDIS=0 \
     BUILD_TEST=0 \
-    pip install --no-cache-dir -v .
+    pip install --no-cache-dir --disable-pip-version-check -v .
 
 ############################################################################
 ## Onnx Runtime stage: Build Onnx Runtime on CUDA 10, CUDNN 7
