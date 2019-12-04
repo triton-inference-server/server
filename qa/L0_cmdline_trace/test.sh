@@ -42,16 +42,18 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
 MODELBASE=graphdef_int32_int32_int32
 
-MODELSDIR=`pwd`/models
+MODELSDIR=`pwd`/trace_models
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 source ../common/util.sh
 
 rm -f *.log
+rm -fr $MODELSDIR && cp -r models $MODELSDIR
+
 RET=0
 
 # trace-level=OFF make sure no tracing
-SERVER_ARGS="--trace-file=trace_off.log --trace-level=OFF --trace-rate=1 --model-repository=`pwd`/models"
+SERVER_ARGS="--trace-file=trace_off.log --trace-level=OFF --trace-rate=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -89,7 +91,7 @@ fi
 set -e
 
 # trace-rate == 1, trace-level=MIN make sure every request is traced
-SERVER_ARGS="--trace-file=trace_1.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/models"
+SERVER_ARGS="--trace-file=trace_1.log --trace-level=MIN --trace-rate=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_1.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -136,7 +138,7 @@ fi
 set -e
 
 # trace-rate == 6, trace-level=MIN
-SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_6.log --trace-level=MIN --trace-rate=6 --model-repository=`pwd`/models"
+SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_6.log --trace-level=MIN --trace-rate=6 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_6.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -183,7 +185,7 @@ fi
 set -e
 
 # trace-rate == 9, trace-level=MAX
-SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_9.log --trace-level=MAX --trace-rate=9 --model-repository=`pwd`/models"
+SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_9.log --trace-level=MAX --trace-rate=9 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_9.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -231,8 +233,9 @@ set -e
 
 # Demonstrate trace for ensemble
 # set up "addsub" nested ensemble
-mv `pwd`/models/simple `pwd`/models/$MODELBASE && \
-    (cd `pwd`/models/$MODELBASE && \
+rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \
+    cp -r `pwd`/models/simple $MODELSDIR/$MODELBASE && \
+    (cd $MODELSDIR/$MODELBASE && \
             sed -i "s/^name:.*/name: \"$MODELBASE\"/" config.pbtxt)
 
 # nested ensemble
@@ -253,7 +256,7 @@ cp -r $ENSEMBLEDIR/nop_TYPE_INT32_-1 $MODELSDIR/. && \
     cp libidentity.so $MODELSDIR/nop_TYPE_INT32_-1/1/.
 
 # trace-rate == 1, trace-level=MAX
-SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_ensemble.log --trace-level=MAX --trace-rate=1 --model-repository=`pwd`/models"
+SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_ensemble.log --trace-level=MAX --trace-rate=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_ensemble.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
