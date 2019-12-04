@@ -98,12 +98,12 @@ wait $SERVER_PID
 
 # plan_float32_float32_float32 models with dynamic shapes has 6 profiles
 # min, opt, max, idx
-# [1, 1], [8, 16], [8, 33], 0 (*)
-# [1, 1], [7, 16], [8, 32], 1
-# [1, 1], [6, 16], [8, 32], 2
-# [1, 1], [5, 16], [8, 32], 3
-# [7, 1], [8, 16], [8, 32], 4 (*)
-# [8, 1], [8, 16], [8, 32], 5 (*)
+# [1, 1], [1, 16], [8, 33], 0 (*)
+# [1, 1], [2, 16], [7, 32], 1
+# [1, 1], [3, 16], [6, 32], 2
+# [1, 1], [4, 16], [5, 32], 3
+# [5, 1], [6, 16], [8, 32], 4 (*)
+# [6, 1], [6, 16], [8, 32], 5 (*)
 # [1, 1], [1, 16], [8, 32], 6
 rm -rf ${DATADIR} && rm -f config.pbtxt && mkdir -p ${DATADIR}
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_float32_float32_float32 ${DATADIR}/
@@ -163,7 +163,7 @@ wait $SERVER_PID
 # Note that this test needs to check server log for which OP is used
 #
 # finding OP that best fit the input shape:
-#     load OP 0, 1, 2, 3, send [7 16] and 1 should be used
+#     load OP 0, 1, 2, 3, send [4 16] and 3 should be used
 SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1"
 CLIENT_LOG="./test_select_optimization_profile.client.best.log"
 SERVER_LOG="./test_select_optimization_profile.inference_server.best.log"
@@ -186,9 +186,9 @@ fi
 set -e
 
 set +e
-grep "Context with profile 1 \[1\] is being executed for " test_select_optimization_profile.inference_server.best.log
+grep "Context with profile 3 \[3\] is being executed for " test_select_optimization_profile.inference_server.best.log
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected profile 1 is used\n***"
+    echo -e "\n***\n*** Failed. Expected profile 3 is used\n***"
     RET=1
 fi
 set -e
@@ -197,12 +197,12 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # finding OP that best fit the input shape while the input shape is allowed:
-#     load OP 3, 5, send [7 16] and 3 should be used
-#     (OP 5 is the best in terms of OPT dims, but it requires min dims [8, 1])
+#     load OP 0, 5, send [4 16] and 0 should be used
+#     (OP 5 is the best in terms of OPT dims, but it requires min dims [6, 1])
 CLIENT_LOG="./test_select_optimization_profile.client.allow.log"
 SERVER_LOG="./test_select_optimization_profile.inference_server.allow.log"
 cp config.pbtxt ${DATADIR}/plan_float32_float32_float32/config.pbtxt && \
-sed -i "s/profile:.*/profile: [\"3\", \"5\"]/" ${DATADIR}/plan_float32_float32_float32/config.pbtxt
+sed -i "s/profile:.*/profile: [\"0\", \"5\"]/" ${DATADIR}/plan_float32_float32_float32/config.pbtxt
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -220,9 +220,9 @@ fi
 set -e
 
 set +e
-grep "Context with profile 3 \[3\] is being executed for " test_select_optimization_profile.inference_server.allow.log
+grep "Context with profile 0 \[0\] is being executed for " test_select_optimization_profile.inference_server.allow.log
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected profile 3 is used\n***"
+    echo -e "\n***\n*** Failed. Expected profile 0 is used\n***"
     RET=1
 fi
 set -e
