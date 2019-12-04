@@ -53,7 +53,7 @@ class TrtDynamicShapeTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
-              "The shape of dimension 0 is expected to be in range from 8 to 8, Got: 1" in ex.message())
+              "The shape of dimension 0 is expected to be in range from 6 to 8, Got: 1" in ex.message())
 
         try:
             iu.infer_exact(self, self.model_name_, tensor_shape, 8,
