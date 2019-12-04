@@ -94,8 +94,7 @@ HTTPServerImpl::Start()
   }
 
   return TRTSERVER_ErrorNew(
-      TRTSERVER_ERROR_ALREADY_EXISTS,
-      "KFServing HTTP server is already running.");
+      TRTSERVER_ERROR_ALREADY_EXISTS, "HTTP V2 server is already running.");
 }
 
 TRTSERVER_Error*
@@ -115,7 +114,7 @@ HTTPServerImpl::Stop()
   }
 
   return TRTSERVER_ErrorNew(
-      TRTSERVER_ERROR_UNAVAILABLE, "KFServing HTTP server is not running.");
+      TRTSERVER_ERROR_UNAVAILABLE, "HTTP V2 server is not running.");
 }
 
 void
@@ -294,7 +293,7 @@ HTTPAPIServer::ResponseAlloc(
       // Can't allocate for any memory type other than CPU.
       if (preferred_memory_type != TRTSERVER_MEMORY_CPU) {
         LOG_VERBOSE(1)
-            << "KFServing HTTP: unable to provide '" << tensor_name
+            << "HTTP V2: unable to provide '" << tensor_name
             << "' in TRTSERVER_MEMORY_GPU, will use type TRTSERVER_MEMORY_CPU";
         *actual_memory_type = TRTSERVER_MEMORY_CPU;
         *actual_memory_type_id = 0;
@@ -338,7 +337,7 @@ HTTPAPIServer::ResponseAlloc(
     }
   }
 
-  LOG_VERBOSE(1) << "KFServing HTTP allocation: '" << tensor_name
+  LOG_VERBOSE(1) << "HTTP V2 allocation: '" << tensor_name
                  << "', size: " << byte_size << ", addr: " << *buffer;
 
   return nullptr;  // Success
@@ -349,7 +348,7 @@ HTTPAPIServer::ResponseRelease(
     TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
     size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
 {
-  LOG_VERBOSE(1) << "KFServing HTTP release: "
+  LOG_VERBOSE(1) << "HTTP V2 release: "
                  << "size " << byte_size << ", addr " << buffer;
 
   // Don't do anything when releasing a buffer since ResponseAlloc
@@ -360,7 +359,7 @@ HTTPAPIServer::ResponseRelease(
 void
 HTTPAPIServer::Handle(evhtp_request_t* req)
 {
-  LOG_VERBOSE(1) << "KFServing HTTP request: " << req->method << " "
+  LOG_VERBOSE(1) << "HTTP V2 request: " << req->method << " "
                  << req->uri->path->full;
 
   std::string model_name, rest;
@@ -383,7 +382,7 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
     }
   }
 
-  LOG_VERBOSE(1) << "KFServing HTTP error: " << req->method << " "
+  LOG_VERBOSE(1) << "HTTP V2 error: " << req->method << " "
                  << req->uri->path->full << " - "
                  << static_cast<int>(EVHTP_RES_BADREQ);
   evhtp_send_reply(req, EVHTP_RES_BADREQ);
