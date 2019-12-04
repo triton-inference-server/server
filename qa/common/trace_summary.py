@@ -42,7 +42,7 @@ def add_span(span_map, timestamps, span_name, ts_start, ts_end):
         span_map[span_name] = 0
     span_map[span_name] += timestamps[ts_end] - timestamps[ts_start]
 
-def summarize(traces):
+def summarize(protocol, traces):
     # map from (model_name, model_version) to # of traces
     model_count_map = dict()
     # map from (model_name, model_version) to map of span->total time
@@ -52,6 +52,12 @@ def summarize(traces):
         timestamps = dict()
         for ts in trace["timestamps"]:
             timestamps[ts["name"]] = ts["ns"]
+
+        # Skip the trace if is it not for the requested protocol
+        if (protocol == "http") and ("http recv start" not in timestamps):
+            continue
+        if (protocol == "grpc") and ("grpc wait/read start" not in timestamps):
+            continue
 
         if ("request handler start" in timestamps) and ("request handler end" in timestamps):
             key = (trace["model_name"], trace["model_version"])
@@ -165,5 +171,8 @@ if __name__ == '__main__':
         if FLAGS.verbose:
             print(json.dumps(trace_data, sort_keys=True, indent=2))
 
+        # Must summarize HTTP and GRPC separately since they have
+        # different ways of accumulating time.
         print("File: {}".format(f.name))
-        summarize(trace_data)
+        summarize("http", trace_data)
+        summarize("grpc", trace_data)

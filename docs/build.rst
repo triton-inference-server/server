@@ -304,6 +304,10 @@ These additional options may be specified:
   :ref:`Prometheus metrics<section-metrics>` on an HTTP endpoint. Use
   -DTRTIS_ENABLE_METRICS=OFF to disable.
 
+* **TRTIS_ENABLE_TRACING**: By default the inference server does not
+  enable detailed :ref:`tracing of individual inference requests
+  <section-trace>`. Use -DTRTIS_ENABLE_TRACING=ON to enable.
+
 * **TRTIS_ENABLE_GCS**: Use -DTRTIS_ENABLE_GCS=ON to enable the
   inference server to read model repositories from Google Cloud
   Storage.

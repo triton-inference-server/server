@@ -316,3 +316,4 @@ performance improvement.
 
 
 .. include:: perf_client.rst
+.. include:: trace.rst
