@@ -278,6 +278,25 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+set +e
+
+$TRACE_SUMMARY -t trace_ensemble.log > summary_ensemble.log
+
+if [ `grep -c "compute input end" summary_ensemble.log` != "7" ]; then
+    cat summary_9.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_ensemble.log` != "1" ]; then
+    cat summary_9.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
