@@ -89,6 +89,11 @@ extern Logger gLogger_;
 #define LOG_ENABLE_ERROR(E)                     \
   nvidia::inferenceserver::gLogger_.SetEnabled( \
       nvidia::inferenceserver::LogMessage::Level::kERROR, (E))
+#define LOG_SET_VERBOSE(L)                           \
+  nvidia::inferenceserver::gLogger_.SetVerboseLevel( \
+      static_cast<uint32_t>(std::max(0, (L))))
+
+#ifdef TRTIS_ENABLE_LOGGING
 
 #define LOG_INFO_IS_ON                         \
   nvidia::inferenceserver::gLogger_.IsEnabled( \
@@ -99,34 +104,37 @@ extern Logger gLogger_;
 #define LOG_ERROR_IS_ON                        \
   nvidia::inferenceserver::gLogger_.IsEnabled( \
       nvidia::inferenceserver::LogMessage::Level::kERROR)
-
-#define LOG_INFO                                              \
-  if (nvidia::inferenceserver::gLogger_.IsEnabled(            \
-          nvidia::inferenceserver::LogMessage::Level::kINFO)) \
-  nvidia::inferenceserver::LogMessage(                        \
-      (char*)__FILE__, __LINE__,                              \
-      nvidia::inferenceserver::LogMessage::Level::kINFO)      \
-      .stream()
-#define LOG_WARNING                                              \
-  if (nvidia::inferenceserver::gLogger_.IsEnabled(               \
-          nvidia::inferenceserver::LogMessage::Level::kWARNING)) \
-  nvidia::inferenceserver::LogMessage(                           \
-      (char*)__FILE__, __LINE__,                                 \
-      nvidia::inferenceserver::LogMessage::Level::kWARNING)      \
-      .stream()
-#define LOG_ERROR                                              \
-  if (nvidia::inferenceserver::gLogger_.IsEnabled(             \
-          nvidia::inferenceserver::LogMessage::Level::kERROR)) \
-  nvidia::inferenceserver::LogMessage(                         \
-      (char*)__FILE__, __LINE__,                               \
-      nvidia::inferenceserver::LogMessage::Level::kERROR)      \
-      .stream()
-
-#define LOG_SET_VERBOSE(L)                           \
-  nvidia::inferenceserver::gLogger_.SetVerboseLevel( \
-      static_cast<uint32_t>(std::max(0, (L))))
 #define LOG_VERBOSE_IS_ON(L) \
   (nvidia::inferenceserver::gLogger_.VerboseLevel() >= (L))
+
+#else
+
+// If logging is disabled, define macro to be false to avoid further evaluation
+#define LOG_INFO_IS_ON false
+#define LOG_WARNING_IS_ON false
+#define LOG_ERROR_IS_ON false
+#define LOG_VERBOSE_IS_ON(L) false
+
+#endif  // TRTIS_ENABLE_LOGGING
+
+#define LOG_INFO                                         \
+  if (LOG_INFO_IS_ON)                                    \
+  nvidia::inferenceserver::LogMessage(                   \
+      (char*)__FILE__, __LINE__,                         \
+      nvidia::inferenceserver::LogMessage::Level::kINFO) \
+      .stream()
+#define LOG_WARNING                                         \
+  if (LOG_WARNING_IS_ON)                                    \
+  nvidia::inferenceserver::LogMessage(                      \
+      (char*)__FILE__, __LINE__,                            \
+      nvidia::inferenceserver::LogMessage::Level::kWARNING) \
+      .stream()
+#define LOG_ERROR                                         \
+  if (LOG_ERROR_IS_ON)                                    \
+  nvidia::inferenceserver::LogMessage(                    \
+      (char*)__FILE__, __LINE__,                          \
+      nvidia::inferenceserver::LogMessage::Level::kERROR) \
+      .stream()
 #define LOG_VERBOSE(L)                                   \
   if (LOG_VERBOSE_IS_ON(L))                              \
   nvidia::inferenceserver::LogMessage(                   \

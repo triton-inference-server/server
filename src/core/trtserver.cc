@@ -1045,27 +1045,42 @@ TRTSERVER_ServerOptionsSetExitTimeout(
 TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetLogInfo(TRTSERVER_ServerOptions* options, bool log)
 {
+#ifdef TRTIS_ENABLE_LOGGING
   // Logging is global for now...
   LOG_ENABLE_INFO(log);
   return nullptr;  // Success
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "logging not supported");
+#endif  // TRTIS_ENABLE_LOGGING
 }
 
 // Enable or disable warning level logging.
 TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetLogWarn(TRTSERVER_ServerOptions* options, bool log)
 {
+#ifdef TRTIS_ENABLE_LOGGING
   // Logging is global for now...
   LOG_ENABLE_WARNING(log);
   return nullptr;  // Success
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "logging not supported");
+#endif  // TRTIS_ENABLE_LOGGING
 }
 
 // Enable or disable error level logging.
 TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetLogError(TRTSERVER_ServerOptions* options, bool log)
 {
+#ifdef TRTIS_ENABLE_LOGGING
   // Logging is global for now...
   LOG_ENABLE_ERROR(log);
   return nullptr;  // Success
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "logging not supported");
+#endif  // TRTIS_ENABLE_LOGGING
 }
 
 // Set verbose logging level. Level zero disables verbose logging.
@@ -1073,8 +1088,13 @@ TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetLogVerbose(
     TRTSERVER_ServerOptions* options, int level)
 {
+#ifdef TRTIS_ENABLE_LOGGING
   // Logging is global for now...
   LOG_SET_VERBOSE(level);
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "logging not supported");
+#endif             // TRTIS_ENABLE_LOGGING
   return nullptr;  // Success
 }
 

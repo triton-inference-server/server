@@ -132,10 +132,12 @@ int http_thread_cnt_ = 8;
 // Command-line options
 enum OptionId {
   OPTION_HELP = 1000,
+#ifdef TRTIS_ENABLE_LOGGING
   OPTION_LOG_VERBOSE,
   OPTION_LOG_INFO,
   OPTION_LOG_WARNING,
   OPTION_LOG_ERROR,
+#endif  // TRTIS_ENABLE_LOGGING
   OPTION_ID,
   OPTION_MODEL_REPOSITORY,
   OPTION_EXIT_ON_ERROR,
@@ -198,12 +200,14 @@ struct Option {
 
 std::vector<Option> options_{
     {OPTION_HELP, "help", "Print usage", false},
+#ifdef TRTIS_ENABLE_LOGGING
     {OPTION_LOG_VERBOSE, "log-verbose",
      "Set verbose logging level. Zero (0) disables verbose logging and values "
      ">= 1 enable verbose logging"},
     {OPTION_LOG_INFO, "log-info", "Enable/disable info-level logging"},
     {OPTION_LOG_WARNING, "log-warning", "Enable/disable warning-level logging"},
     {OPTION_LOG_ERROR, "log-error", "Enable/disable error-level logging"},
+#endif  // TRTIS_ENABLE_LOGGING
     {OPTION_ID, "id", "Identifier for this server"},
     {OPTION_MODEL_REPOSITORY, "model-store",
      "Path to model repository directory. It may be specified multiple times "
@@ -820,10 +824,12 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   bool control_mode_set = false;
   TRTSERVER_Model_Control_Mode control_mode = TRTSERVER_MODEL_CONTROL_POLL;
 
+#ifdef TRTIS_ENABLE_LOGGING
   bool log_info = true;
   bool log_warn = true;
   bool log_error = true;
   int32_t log_verbose = 0;
+#endif  // TRTIS_ENABLE_LOGGING
 
   std::vector<struct option> long_options;
   for (const auto& o : options_) {
@@ -838,7 +844,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       case '?':
         LOG_ERROR << Usage();
         return false;
-
+#ifdef TRTIS_ENABLE_LOGGING
       case OPTION_LOG_VERBOSE:
         log_verbose = ParseIntBoolOption(optarg);
         break;
@@ -851,6 +857,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       case OPTION_LOG_ERROR:
         log_error = ParseBoolOption(optarg);
         break;
+#endif  // TRTIS_ENABLE_LOGGING
 
       case OPTION_ID:
         server_id = optarg;
@@ -989,10 +996,12 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
     return false;
   }
 
+#ifdef TRTIS_ENABLE_LOGGING
   LOG_ENABLE_INFO(log_info);
   LOG_ENABLE_WARNING(log_warn);
   LOG_ENABLE_ERROR(log_error);
   LOG_SET_VERBOSE(log_verbose);
+#endif  // TRTIS_ENABLE_LOGGING
 
   repository_poll_secs_ =
       (allow_poll_model_repository) ? std::max(0, repository_poll_secs) : 0;
@@ -1097,6 +1106,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
           server_options, std::max(0, exit_timeout_secs)),
       "setting exit timeout");
 
+#ifdef TRTIS_ENABLE_LOGGING
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetLogInfo(server_options, log_info),
       "setting log info enable");
@@ -1109,6 +1119,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetLogVerbose(server_options, log_verbose),
       "setting log verbose level");
+#endif  // TRTIS_ENABLE_LOGGING
 
 #ifdef TRTIS_ENABLE_METRICS
   FAIL_IF_ERR(
