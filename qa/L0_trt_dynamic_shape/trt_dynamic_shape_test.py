@@ -82,7 +82,7 @@ class TrtDynamicShapeTest(unittest.TestCase):
 
     def test_select_optimization_profile(self):
         # Different profile has different optimized input shape
-        batch_size = 7
+        batch_size = 4
         tensor_shape = (16,)
         try:
             iu.infer_exact(self, self.model_name_, tensor_shape, batch_size,
