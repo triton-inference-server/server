@@ -48,16 +48,36 @@ def summarize(protocol, traces):
     # map from (model_name, model_version) to map of span->total time
     model_span_map = dict()
 
+    # Order traces by id to be more intuitive if 'show_trace'
+    traces = sorted(traces, key=lambda t: t.get('id', -1))
+
+    # Filter the trace that is not for the requested protocol
+    match_protocol_id_set = set()
+    filtered_traces = []
     for trace in traces:
+        if "id" not in trace:
+            continue
+        # Trace without a parent must contain protocol timestamps
+        if "parent_id" not in trace:
+            if protocol == "http":
+                str_to_match = "http recv start"
+            elif protocol == "grpc":
+                str_to_match = "grpc wait/read start"
+            else:
+                continue
+            for ts in trace["timestamps"]:
+                if str_to_match in ts["name"]:
+                    match_protocol_id_set.add(trace["id"])
+                    filtered_traces.append(trace)
+        # Otherwise need to check whether parent is filtered
+        elif trace["parent_id"] in match_protocol_id_set:
+            match_protocol_id_set.add(trace["id"])
+            filtered_traces.append(trace)
+
+    for trace in filtered_traces:
         timestamps = dict()
         for ts in trace["timestamps"]:
             timestamps[ts["name"]] = ts["ns"]
-
-        # Skip the trace if is it not for the requested protocol
-        if (protocol == "http") and ("http recv start" not in timestamps):
-            continue
-        if (protocol == "grpc") and ("grpc wait/read start" not in timestamps):
-            continue
 
         if ("request handler start" in timestamps) and ("request handler end" in timestamps):
             key = (trace["model_name"], trace["model_version"])
@@ -83,10 +103,14 @@ def summarize(protocol, traces):
 
             add_span(model_span_map[key], timestamps,
                      "request handler", "request handler start", "request handler end")
-            add_span(model_span_map[key], timestamps,
-                     "queue", "queue start", "compute start")
-            add_span(model_span_map[key], timestamps,
-                     "compute", "compute start", "compute end")
+            
+            # The tags below will be missing for ensemble model
+            if ("queue start" in timestamps) and ("compute start" in timestamps):
+                add_span(model_span_map[key], timestamps,
+                        "queue", "queue start", "compute start")
+            if ("compute start" in timestamps) and ("compute end" in timestamps):
+                add_span(model_span_map[key], timestamps,
+                        "compute", "compute start", "compute end")
             if ("compute input end" in timestamps) and ("compute output start" in timestamps):
                 add_span(model_span_map[key], timestamps,
                          "compute input", "compute start", "compute input end")
@@ -96,7 +120,10 @@ def summarize(protocol, traces):
                          "compute output", "compute output start", "compute end")
 
             if FLAGS.show_trace:
-                print("{} ({}):".format(trace["model_name"], trace["model_version"]));
+                print("{} ({}):".format(trace["model_name"], trace["model_version"]))
+                print("\tid: {}".format(trace["id"]))
+                if "parent_id" in trace:
+                    print("\tparent id: {}".format(trace["parent_id"]))
                 ordered_timestamps = list()
                 for ts in trace["timestamps"]:
                     ordered_timestamps.append((ts["name"], ts["ns"]))
@@ -140,14 +167,15 @@ def summarize(protocol, traces):
 
         print("\tHandler (avg): {}us".format(
             model_span_map[key]["request handler"] / (cnt * 1000)))
-        print("\t\tOverhead (avg): {}us".format(
-            (model_span_map[key]["request handler"] -
-             model_span_map[key]["queue"] -
-             model_span_map[key]["compute"]) / (cnt * 1000)))
-        print("\t\tQueue (avg): {}us".format(
-            model_span_map[key]["queue"] / (cnt * 1000)))
-        print("\t\tCompute (avg): {}us".format(
-            model_span_map[key]["compute"] / (cnt * 1000)))
+        if ("queue" in model_span_map[key]) and "compute" in model_span_map[key]:
+            print("\t\tOverhead (avg): {}us".format(
+                (model_span_map[key]["request handler"] -
+                model_span_map[key]["queue"] -
+                model_span_map[key]["compute"]) / (cnt * 1000)))
+            print("\t\tQueue (avg): {}us".format(
+                model_span_map[key]["queue"] / (cnt * 1000)))
+            print("\t\tCompute (avg): {}us".format(
+                model_span_map[key]["compute"] / (cnt * 1000)))
         if ("compute input" in model_span_map[key]) and "compute output" in model_span_map[key]:
             print("\t\t\tInput (avg): {}us".format(
                 model_span_map[key]["compute input"] / (cnt * 1000)))
