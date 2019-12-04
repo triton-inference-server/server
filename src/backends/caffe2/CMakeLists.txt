@@ -29,9 +29,11 @@ cmake_minimum_required (VERSION 3.5)
 #
 # NetDef backend
 #
-# netdef_backend_c2.cc is copied into and built along with Caffe2 to
-# ensure that it uses the same protobuf as Caffe2, so not included in
-# these sources.
+# netdef_backend_c2.[cc,h] are also in the PyTorch container build so
+# that the Caffe2 build includes their functionality (and also ensures
+# that they are built with the same protobuf as Caffe2). So
+# netdef_backend_c2.cc is not included in the inference server build
+# and so does not appear below.
 #
 set(
   NETDEF_SRCS
