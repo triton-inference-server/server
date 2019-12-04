@@ -50,16 +50,34 @@ def summarize(protocol, traces):
 
     # Order traces by id to be more intuitive if 'show_trace'
     traces = sorted(traces, key=lambda t: t.get('id', -1))
+
+    # Filter the trace that is not for the requested protocol
+    match_protocol_id_set = set()
+    filtered_traces = []
     for trace in traces:
+        if "id" not in trace:
+            continue
+        # Trace without a parent must contain protocol timestamps
+        if "parent_id" not in trace:
+            if protocol == "http":
+                str_to_match = "http recv start"
+            elif protocol == "grpc":
+                str_to_match = "grpc wait/read start"
+            else:
+                continue
+            for ts in trace["timestamps"]:
+                if str_to_match in ts["name"]:
+                    match_protocol_id_set.add(trace["id"])
+                    filtered_traces.append(trace)
+        # Otherwise need to check whether parent is filtered
+        elif trace["parent_id"] in match_protocol_id_set:
+            match_protocol_id_set.add(trace["id"])
+            filtered_traces.append(trace)
+
+    for trace in filtered_traces:
         timestamps = dict()
         for ts in trace["timestamps"]:
             timestamps[ts["name"]] = ts["ns"]
-
-        # Skip the trace if is it not for the requested protocol
-        if (protocol == "http") and ("http recv start" not in timestamps):
-            continue
-        if (protocol == "grpc") and ("grpc wait/read start" not in timestamps):
-            continue
 
         if ("request handler start" in timestamps) and ("request handler end" in timestamps):
             key = (trace["model_name"], trace["model_version"])
