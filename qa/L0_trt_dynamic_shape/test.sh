@@ -167,8 +167,9 @@ wait $SERVER_PID
 SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1"
 CLIENT_LOG="./test_select_optimization_profile.client.best.log"
 SERVER_LOG="./test_select_optimization_profile.inference_server.best.log"
-cp config.pbtxt ${DATADIR}/plan_float32_float32_float32/config.pbtxt && \
-sed -i "s/profile:.*/profile: [\"0\", \"1\", \"2\", \"3\"]/" ${DATADIR}/plan_float32_float32_float32/config.pbtxt
+(cp config.pbtxt ${DATADIR}/plan_float32_float32_float32/config.pbtxt && \
+        sed -i "s/max_batch_size:.*/max_batch_size: 5/" ${DATADIR}/plan_float32_float32_float32/config.pbtxt && \
+        sed -i "s/profile:.*/profile: [\"0\", \"1\", \"2\", \"3\"]/" ${DATADIR}/plan_float32_float32_float32/config.pbtxt)
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
