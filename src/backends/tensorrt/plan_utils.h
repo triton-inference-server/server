@@ -41,7 +41,7 @@ enum class MemoryFormat {
   // Four wide channel vectorized row major format.
   CHW4,
   // Eight channel format where C is padded to a multiple of 8.
-  HCW8,
+  HWC8,
   // Sixteen wide channel vectorized row major format.
   CHW16,
   // Thirty-two wide channel vectorized row major format.
@@ -53,6 +53,7 @@ enum class MemoryFormat {
 MemoryFormat ConvertTrtFmtToFmt(nvinfer1::TensorFormat trt_fmt);
 
 const std::string MemoryFormat_Name(MemoryFormat fmt);
+int MemoryFormat_VectorSize(MemoryFormat fmt);
 
 DataType ConvertTrtTypeToDataType(nvinfer1::DataType trt_type);
 
@@ -72,7 +73,8 @@ Status ValidateDimension(
 Status CompareDimsSupported(
     const std::string& model_name, const std::string& tensor_name,
     const nvinfer1::Dims& model_dims, const DimsList& dims,
-    const bool supports_batching, const bool is_dynamic);
+    const bool supports_batching, const bool is_dynamic,
+    const MemoryFormat fmt);
 
 Status ValidateControlDimsDynamic(
     const nvinfer1::Dims& dims, const bool support_batching);

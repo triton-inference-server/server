@@ -56,7 +56,7 @@ ConvertTrtFmtToFmt(nvinfer1::TensorFormat trt_fmt)
     case nvinfer1::TensorFormat::kCHW4:
       return MemoryFormat::CHW4;
     case nvinfer1::TensorFormat::kHWC8:
-      return MemoryFormat::HCW8;
+      return MemoryFormat::HWC8;
     case nvinfer1::TensorFormat::kCHW16:
       return MemoryFormat::CHW16;
     case nvinfer1::TensorFormat::kCHW32:
@@ -76,8 +76,8 @@ MemoryFormat_Name(MemoryFormat fmt)
       return "CHW2";
     case MemoryFormat::CHW4:
       return "CHW4";
-    case MemoryFormat::HCW8:
-      return "HCW8";
+    case MemoryFormat::HWC8:
+      return "HWC8";
     case MemoryFormat::CHW16:
       return "CHW16";
     case MemoryFormat::CHW32:
@@ -87,6 +87,36 @@ MemoryFormat_Name(MemoryFormat fmt)
   }
 
   return "INVALID";
+}
+
+int
+MemoryFormat_VectorSize(MemoryFormat fmt)
+{
+  unsigned int vector_size = 1;
+  switch(fmt) {
+    case MemoryFormat::LINEAR:
+      vector_size = 1;
+      break;
+    case MemoryFormat::CHW2:
+      vector_size = 2;
+      break;
+    case MemoryFormat::CHW4:
+      vector_size = 4;
+      break;
+    case MemoryFormat::HWC8:
+      vector_size = 8;
+      break;
+    case MemoryFormat::CHW16:
+      vector_size = 16;
+      break;
+    case MemoryFormat::CHW32:
+      vector_size = 32;
+      break;
+    default:
+      vector_size = 1; // In the default case, assume LINEAR
+      break;
+  }
+  return vector_size;
 }
 
 std::pair<bool, nvinfer1::DataType>
@@ -132,7 +162,8 @@ Status
 CompareDimsSupported(
     const std::string& model_name, const std::string& binding_name,
     const nvinfer1::Dims& model_dims, const DimsList& dims,
-    const bool supports_batching, const bool is_dynamic)
+    const bool supports_batching, const bool is_dynamic,
+    const MemoryFormat fmt)
 {
   // If the model configuration expects batching support in the model,
   // then the first dimension must be -1.
@@ -164,6 +195,15 @@ CompareDimsSupported(
     int64_t model_dim = model_dims.d[i + nonbatch_start_idx];
     if (model_dim == -1) {
       continue;
+    }
+
+    // Pad channel dimension if necessary.
+    if (i == dims.size() - 3) {
+      int vector_size = MemoryFormat_VectorSize(fmt);
+      if (vector_size > 1)
+      {
+        model_dim = model_dim + vector_size - ((model_dim + vector_size) % vector_size);
+      }
     }
 
     if (model_dim != dims[i]) {
