@@ -336,7 +336,7 @@ SignalHandler(int signum)
 {
   // Don't need a mutex here since signals should be disabled while in
   // the handler.
-  LOG_INFO << "Interrupt signal (" << signum << ") received.";
+  std::cout << "Interrupt signal (" << signum << ") received." << std::endl;
 
   // Do nothing if already exiting...
   if (exiting_)
@@ -358,8 +358,8 @@ CheckPortCollision()
   if ((std::find(http_ports_.begin(), http_ports_.end(), grpc_port_) !=
        http_ports_.end()) &&
       (grpc_port_ != -1) && allow_http_ && allow_grpc_) {
-    LOG_ERROR << "The server cannot listen to HTTP requests "
-              << "and GRPC requests at the same port";
+    std::cerr << "The server cannot listen to HTTP requests "
+              << "and GRPC requests at the same port" << std::endl;
     return true;
   }
 #endif  // TRTIS_ENABLE_HTTP && TRTIS_ENABLE_GRPC
@@ -368,8 +368,8 @@ CheckPortCollision()
   // Check if Metric and GRPC have shared ports
   if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1) && allow_grpc_ &&
       allow_metrics_) {
-    LOG_ERROR << "The server cannot provide metrics on same port used for "
-              << "GRPC requests";
+    std::cerr << "The server cannot provide metrics on same port used for "
+              << "GRPC requests" << std::endl;
     return true;
   }
 #endif  // TRTIS_ENABLE_GRPC && TRTIS_ENABLE_METRICS
@@ -379,8 +379,8 @@ CheckPortCollision()
   if ((std::find(http_ports_.begin(), http_ports_.end(), metrics_port_) !=
        http_ports_.end()) &&
       (metrics_port_ != -1) && allow_http_ && allow_metrics_) {
-    LOG_ERROR << "The server cannot provide metrics on same port used for "
-              << "HTTP requests";
+    std::cerr << "The server cannot provide metrics on same port used for "
+              << "HTTP requests" << std::endl;
     return true;
   }
 #endif  // TRTIS_ENABLE_HTTP && TRTIS_ENABLE_METRICS
@@ -471,11 +471,9 @@ StartEndpoints(
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>&
         smb_manager)
 {
-  if (LOG_INFO_IS_ON) {
-    const char* id;
-    FAIL_IF_ERR(TRTSERVER_ServerId(server.get(), &id), "getting server ID");
-    LOG_INFO << "Starting endpoints, '" << id << "' listening on";
-  }
+  const char* id;
+  FAIL_IF_ERR(TRTSERVER_ServerId(server.get(), &id), "getting server ID");
+  std::cout << "Starting endpoints, '" << id << "' listening on" << std::endl;
 
 #ifdef TRTIS_ENABLE_GRPC
   // Enable GRPC endpoints if requested...
@@ -483,9 +481,7 @@ StartEndpoints(
     TRTSERVER_Error* err =
         StartGrpcService(&grpc_service_, server, trace_manager, smb_manager);
     if (err != nullptr) {
-      LOG_ERROR << "Failed to start GRPC service: "
-                << TRTSERVER_ErrorMessage(err);
-      TRTSERVER_ErrorDelete(err);
+      LOG_IF_ERR(err, "failed to start GRPC service");
       return false;
     }
   }
@@ -506,9 +502,7 @@ StartEndpoints(
     TRTSERVER_Error* err = StartHttpService(
         &http_services_, server, trace_manager, smb_manager, port_map);
     if (err != nullptr) {
-      LOG_ERROR << "Failed to start HTTP service: "
-                << TRTSERVER_ErrorMessage(err);
-      TRTSERVER_ErrorDelete(err);
+      LOG_IF_ERR(err, "failed to start HTTP service");
       return false;
     }
   }
@@ -519,9 +513,7 @@ StartEndpoints(
   if (metrics_port_ != -1) {
     TRTSERVER_Error* err = StartMetricsService(&metrics_service_, server);
     if (err != nullptr) {
-      LOG_ERROR << "Failed to start Metrics service: "
-                << TRTSERVER_ErrorMessage(err);
-      TRTSERVER_ErrorDelete(err);
+      LOG_IF_ERR(err, "failed to start Metrics service");
       return false;
     }
   }
@@ -540,9 +532,7 @@ StopEndpoints()
     if (http_eps != nullptr) {
       TRTSERVER_Error* err = http_eps->Stop();
       if (err != nullptr) {
-        LOG_ERROR << "Failed to stop HTTP service: "
-                  << TRTSERVER_ErrorMessage(err);
-        TRTSERVER_ErrorDelete(err);
+        LOG_IF_ERR(err, "failed to stop HTTP service");
         ret = false;
       }
     }
@@ -555,9 +545,7 @@ StopEndpoints()
   if (grpc_service_) {
     TRTSERVER_Error* err = grpc_service_->Stop();
     if (err != nullptr) {
-      LOG_ERROR << "Failed to stop GRPC service: "
-                << TRTSERVER_ErrorMessage(err);
-      TRTSERVER_ErrorDelete(err);
+      LOG_IF_ERR(err, "failed to stop GRPC service");
       ret = false;
     }
 
@@ -569,9 +557,7 @@ StopEndpoints()
   if (metrics_service_) {
     TRTSERVER_Error* err = metrics_service_->Stop();
     if (err != nullptr) {
-      LOG_ERROR << "Failed to stop Metrics service: "
-                << TRTSERVER_ErrorMessage(err);
-      TRTSERVER_ErrorDelete(err);
+      LOG_IF_ERR(err, "failed to stop Metrics service");
       ret = false;
     }
 
@@ -605,8 +591,7 @@ StartTracing(
   }
 
   if (err != nullptr) {
-    LOG_ERROR << "Failed to configure tracing: " << TRTSERVER_ErrorMessage(err);
-    TRTSERVER_ErrorDelete(err);
+    LOG_IF_ERR(err, "failed to configure tracing");
     trace_manager->reset();
     return false;
   }
@@ -650,8 +635,8 @@ ParseBoolOption(std::string arg)
     return false;
   }
 
-  LOG_ERROR << "invalid value for bool option: " << arg;
-  LOG_ERROR << Usage();
+  std::cerr << "invalid value for bool option: " << arg << std::endl;
+  std::cerr << Usage() << std::endl;
   exit(1);
 }
 
@@ -673,6 +658,9 @@ ParseFloatOption(const std::string arg)
   return std::stof(arg);
 }
 
+// Condition here merely to avoid compilation error, this function will
+// be defined but not used otherwise.
+#ifdef TRTIS_ENABLE_LOGGING
 int
 ParseIntBoolOption(std::string arg)
 {
@@ -689,6 +677,7 @@ ParseIntBoolOption(std::string arg)
 
   return ParseIntOption(arg);
 }
+#endif  // TRTIS_ENABLE_LOGGING
 
 #ifdef TRTIS_ENABLE_TRACING
 TRTSERVER_Trace_Level
@@ -708,8 +697,8 @@ ParseTraceLevelOption(std::string arg)
     return TRTSERVER_TRACE_LEVEL_MAX;
   }
 
-  LOG_ERROR << "invalid value for trace level option: " << arg;
-  LOG_ERROR << Usage();
+  std::cerr << "invalid value for trace level option: " << arg << std::endl;
+  std::cerr << Usage() << std::endl;
   exit(1);
 }
 #endif  // TRTIS_ENABLE_TRACING
@@ -728,12 +717,12 @@ ParseVGPUOption(const std::string arg)
 
   // Check for 2 semicolons
   if ((delim_gpu < 0) || (delim_num_vgpus < 0)) {
-    LOG_ERROR << "Cannot add virtual devices due to incorrect number of inputs."
+    std::cerr << "Cannot add virtual devices due to incorrect number of inputs."
                  "--tf-add-vgpu argument requires format <physical "
                  "GPU>;<number of virtual GPUs>;<memory limit per VGPU in "
                  "megabytes>. "
-              << "Found: " << arg;
-    LOG_ERROR << Usage();
+              << "Found: " << arg << std::endl;
+    std::cerr << Usage() << std::endl;
     exit(1);
   }
 
@@ -745,12 +734,12 @@ ParseVGPUOption(const std::string arg)
   // Ensure that options are non-empty otherwise calling stoi/stof will throw an
   // exception
   if (gpu_string.empty() || vgpu_string.empty() || mem_limit_string.empty()) {
-    LOG_ERROR << "Cannot add virtual devices due to empty inputs."
+    std::cerr << "Cannot add virtual devices due to empty inputs."
                  "--tf-add-vgpu argument requires format <physical "
                  "GPU>;<number of virtual GPUs>;<memory limit per VGPU in "
                  "megabytes>. "
-              << "Found: " << arg;
-    LOG_ERROR << Usage();
+              << "Found: " << arg << std::endl;
+    std::cerr << Usage() << std::endl;
     exit(1);
   }
 
@@ -759,18 +748,18 @@ ParseVGPUOption(const std::string arg)
   uint64_t mem_limit = std::stoi(mem_limit_string);
 
   if (gpu_device < 0) {
-    LOG_ERROR << "Cannot add virtual devices. Physical GPU device index must "
+    std::cerr << "Cannot add virtual devices. Physical GPU device index must "
                  "be >= 0. "
-              << "Found: " << gpu_string;
-    LOG_ERROR << Usage();
+              << "Found: " << gpu_string << std::endl;
+    std::cerr << Usage() << std::endl;
     exit(1);
   }
 
   if (num_vgpus_on_device <= 0) {
-    LOG_ERROR
+    std::cerr
         << "Cannot add virtual devices. Number of virtual GPUs must be > 0. "
-        << "Found: " << vgpu_string;
-    LOG_ERROR << Usage();
+        << "Found: " << vgpu_string << std::endl;
+    std::cerr << Usage() << std::endl;
     exit(1);
   }
 
@@ -842,7 +831,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
     switch (flag) {
       case OPTION_HELP:
       case '?':
-        LOG_ERROR << Usage();
+        std::cerr << Usage() << std::endl;
         return false;
 #ifdef TRTIS_ENABLE_LOGGING
       case OPTION_LOG_VERBOSE:
@@ -959,8 +948,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
         } else if (mode_str == "explicit") {
           control_mode = TRTSERVER_MODEL_CONTROL_EXPLICIT;
         } else {
-          LOG_ERROR << "invalid argument for --model-control-mode";
-          LOG_ERROR << Usage();
+          std::cerr << "invalid argument for --model-control-mode" << std::endl;
+          std::cerr << Usage() << std::endl;
           return false;
         }
         control_mode_set = true;
@@ -991,32 +980,26 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   }
 
   if (optind < argc) {
-    LOG_ERROR << "Unexpected argument: " << argv[optind];
-    LOG_ERROR << Usage();
+    std::cerr << "Unexpected argument: " << argv[optind] << std::endl;
+    std::cerr << Usage() << std::endl;
     return false;
   }
-
-#ifdef TRTIS_ENABLE_LOGGING
-  LOG_ENABLE_INFO(log_info);
-  LOG_ENABLE_WARNING(log_warn);
-  LOG_ENABLE_ERROR(log_error);
-  LOG_SET_VERBOSE(log_verbose);
-#endif  // TRTIS_ENABLE_LOGGING
 
   repository_poll_secs_ =
       (allow_poll_model_repository) ? std::max(0, repository_poll_secs) : 0;
 
   if (control_mode_set && deprecated_control_mode_set) {
-    LOG_ERROR << "--allow-model-control or --allow-poll-model-repository "
-              << "can not be specified if --model-control-mode is specified";
-    LOG_ERROR << Usage();
+    std::cerr << "--allow-model-control or --allow-poll-model-repository "
+              << "can not be specified if --model-control-mode is specified"
+              << std::endl;
+    std::cerr << Usage() << std::endl;
   }
 
   if (!control_mode_set) {
     if (allow_model_control && allow_poll_model_repository) {
-      LOG_ERROR << "--allow-model-control and --allow-poll-model-repository "
-                << "can not be both set to true";
-      LOG_ERROR << Usage();
+      std::cerr << "--allow-model-control and --allow-poll-model-repository "
+                << "can not be both set to true" << std::endl;
+      std::cerr << Usage() << std::endl;
       return false;
     }
 

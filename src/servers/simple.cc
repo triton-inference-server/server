@@ -47,22 +47,12 @@ namespace {
 bool use_gpu_memory = false;
 
 #ifdef TRTIS_ENABLE_GPU
-#define FAIL_IF_CUDA_ERR(X, MSG)                                          \
-  do {                                                                    \
-    cudaError_t err = (X);                                                \
-    if (err != cudaSuccess) {                                             \
-      LOG_ERROR << "error: " << (MSG) << ": " << cudaGetErrorString(err); \
-      exit(1);                                                            \
-    }                                                                     \
-  } while (false)
-
-
 static auto gpu_data_deleter = [](void* data) {
   if (data != nullptr) {
     auto err = cudaFree(data);
     if (err != cudaSuccess) {
-      LOG_ERROR << "error: failed to cudaFree " << data << ": "
-                << cudaGetErrorString(err);
+      std::cerr << "error: failed to cudaFree " << data << ": "
+                << cudaGetErrorString(err) << std::endl;
     }
   }
 };
@@ -72,13 +62,13 @@ void
 Usage(char** argv, const std::string& msg = std::string())
 {
   if (!msg.empty()) {
-    LOG_ERROR << msg;
+    std::cerr << msg << std::endl;
   }
 
-  LOG_ERROR << "Usage: " << argv[0] << " [options]";
-  LOG_ERROR << "\t-g Use GPU memory for input and output tensors";
-  LOG_ERROR << "\t-v Enable verbose logging";
-  LOG_ERROR << "\t-r [model repository absolute path]";
+  std::cerr << "Usage: " << argv[0] << " [options]" << std::endl;
+  std::cerr << "\t-g Use GPU memory for input and output tensors" << std::endl;
+  std::cerr << "\t-v Enable verbose logging" << std::endl;
+  std::cerr << "\t-r [model repository absolute path]" << std::endl;
 
   exit(1);
 }
@@ -110,8 +100,8 @@ ResponseAlloc(
   if (byte_size == 0) {
     *buffer = nullptr;
     *buffer_userp = nullptr;
-    LOG_INFO << "allocated " << byte_size << " bytes for result tensor "
-             << tensor_name;
+    std::cout << "allocated " << byte_size << " bytes for result tensor "
+              << tensor_name << std::endl;
   } else {
     void* allocated_ptr = nullptr;
     if (!use_gpu_memory || (preferred_memory_type == TRTSERVER_MEMORY_CPU)) {
@@ -145,9 +135,9 @@ ResponseAlloc(
     if (allocated_ptr != nullptr) {
       *buffer = allocated_ptr;
       *buffer_userp = new std::string(tensor_name);
-      LOG_INFO << "allocated " << byte_size << " bytes in "
-               << MemoryTypeString(*actual_memory_type) << " for result tensor "
-               << tensor_name;
+      std::cout << "allocated " << byte_size << " bytes in "
+                << MemoryTypeString(*actual_memory_type)
+                << " for result tensor " << tensor_name << std::endl;
     }
   }
 
@@ -166,9 +156,9 @@ ResponseRelease(
     name = new std::string("<unknown>");
   }
 
-  LOG_INFO << "Releasing buffer " << buffer << " of size " << byte_size
-           << " in " << MemoryTypeString(memory_type) << " for result '"
-           << *name << "'";
+  std::cout << "Releasing buffer " << buffer << " of size " << byte_size
+            << " in " << MemoryTypeString(memory_type) << " for result '"
+            << *name << "'" << std::endl;
   if (memory_type == TRTSERVER_MEMORY_CPU) {
     free(buffer);
 #ifdef TRTIS_ENABLE_GPU
@@ -178,12 +168,13 @@ ResponseRelease(
       err = cudaFree(buffer);
     }
     if (err != cudaSuccess) {
-      LOG_ERROR << "error: failed to cudaFree " << buffer << ": "
-                << cudaGetErrorString(err);
+      std::cerr << "error: failed to cudaFree " << buffer << ": "
+                << cudaGetErrorString(err) << std::endl;
     }
 #endif  // TRTIS_ENABLE_GPU
   } else {
-    LOG_ERROR << "error: unexpected buffer allocated in GPU memory";
+    std::cerr << "error: unexpected buffer allocated in GPU memory"
+              << std::endl;
   }
 
   delete name;
@@ -265,10 +256,10 @@ CompareResult(
     const void* output1)
 {
   for (size_t i = 0; i < 16; ++i) {
-    LOG_INFO << ((T*)input0)[i] << " + " << ((T*)input1)[i] << " = "
-             << ((T*)output0)[i];
-    LOG_INFO << ((T*)input0)[i] << " - " << ((T*)input1)[i] << " = "
-             << ((T*)output1)[i];
+    std::cout << ((T*)input0)[i] << " + " << ((T*)input1)[i] << " = "
+              << ((T*)output0)[i] << std::endl;
+    std::cout << ((T*)input0)[i] << " - " << ((T*)input1)[i] << " = "
+              << ((T*)output1)[i] << std::endl;
 
     if ((((T*)input0)[i] + ((T*)input1)[i]) != ((T*)output0)[i]) {
       FAIL("incorrect sum in " + output0_name);
@@ -345,7 +336,8 @@ main(int argc, char** argv)
     FAIL_IF_ERR(
         TRTSERVER_ServerIsReady(server.get(), &ready),
         "unable to get server readiness");
-    LOG_INFO << "Server Health: live " << live << ", ready " << ready;
+    std::cout << "Server Health: live " << live << ", ready " << ready
+              << std::endl;
     if (live && ready) {
       break;
     }
@@ -375,8 +367,8 @@ main(int argc, char** argv)
       FAIL("error: failed to parse server status");
     }
 
-    LOG_INFO << "Server Status:";
-    LOG_INFO << server_status.DebugString();
+    std::cout << "Server Status:" << std::endl;
+    std::cout << server_status.DebugString() << std::endl;
 
     FAIL_IF_ERR(
         TRTSERVER_ProtobufDelete(server_status_protobuf),
@@ -413,8 +405,9 @@ main(int argc, char** argv)
       FAIL("unable to find version 1 status for model 'simple'");
     }
 
-    LOG_INFO << "'simple' model is "
-             << ni::ModelReadyState_Name(vitr->second.ready_state());
+    std::cout << "'simple' model is "
+              << ni::ModelReadyState_Name(vitr->second.ready_state())
+              << std::endl;
     if (vitr->second.ready_state() == ni::ModelReadyState::MODEL_READY) {
       FAIL_IF_ERR(
           ParseModelConfig(itr->second.config(), &is_int, &is_torch_model),
@@ -561,8 +554,8 @@ main(int argc, char** argv)
       FAIL("error: failed to parse response header");
     }
 
-    LOG_INFO << "Model \"simple\" response header:";
-    LOG_INFO << response_header.DebugString();
+    std::cout << "Model \"simple\" response header:" << std::endl;
+    std::cout << response_header.DebugString() << std::endl;
 
     FAIL_IF_ERR(
         TRTSERVER_ProtobufDelete(response_protobuf),
@@ -629,9 +622,9 @@ main(int argc, char** argv)
   std::vector<char> output0_data(output0_byte_size);
   std::vector<char> output1_data(output1_byte_size);
   if (output0_memory_type == TRTSERVER_MEMORY_CPU) {
-    LOG_INFO << "OUTPUT0 are stored in CPU memory";
+    std::cout << "OUTPUT0 are stored in CPU memory" << std::endl;
   } else {
-    LOG_INFO << "OUTPUT0 are stored in GPU memory";
+    std::cout << "OUTPUT0 are stored in GPU memory" << std::endl;
     FAIL_IF_CUDA_ERR(
         cudaMemcpy(
             &output0_data[0], output0_content, output0_byte_size,
@@ -641,9 +634,9 @@ main(int argc, char** argv)
   }
 
   if (output1_memory_type == TRTSERVER_MEMORY_CPU) {
-    LOG_INFO << "OUTPUT1 are stored in CPU memory";
+    std::cout << "OUTPUT1 are stored in CPU memory" << std::endl;
   } else {
-    LOG_INFO << "OUTPUT1 are stored in GPU memory";
+    std::cout << "OUTPUT1 are stored in GPU memory" << std::endl;
     FAIL_IF_CUDA_ERR(
         cudaMemcpy(
             &output1_data[0], output1_content, output1_byte_size,
