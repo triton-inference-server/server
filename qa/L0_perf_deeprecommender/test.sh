@@ -191,7 +191,7 @@ rm -fr tensorrt_models && mkdir tensorrt_models
 
 $TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
-         --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
+         --batch=${DYNAMIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
 
 # Create the TFTRT plan from TF
