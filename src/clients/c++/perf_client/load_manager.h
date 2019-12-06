@@ -204,7 +204,7 @@ class LoadManager {
     // The status of the worker thread
     nic::Error status_;
     // The statistics of the InferContext
-    std::vector<nic::InferContext::Stat> contexts_stat_;
+    nic::InferContext::Stat context_stat_;
     //  The concurrency level that the worker should produce
     size_t concurrency_;
     // A vector of request timestamps <start_time, end_time>
@@ -213,6 +213,20 @@ class LoadManager {
     // A lock to protect thread data
     std::mutex mu_;
   };
+
+  struct SequenceStat {
+    SequenceStat(uint64_t corr_id)
+        : corr_id_(corr_id), data_stream_id_(0), remaining_queries_(0)
+    {
+    }
+    uint64_t corr_id_;
+    uint64_t data_stream_id_;
+    size_t remaining_queries_;
+    std::mutex mtx_;
+  };
+
+  std::vector<std::shared_ptr<SequenceStat>> sequence_stat_;
+  ni::CorrelationID next_corr_id_;
 
   // Worker threads that loads the server with inferences
   std::vector<std::thread> threads_;

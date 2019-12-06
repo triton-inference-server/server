@@ -77,8 +77,7 @@ RequestRateManager::RequestRateManager(
     : LoadManager(
           async, input_shapes, batch_size, max_threads, sequence_length,
           shared_memory_type, output_shm_size, factory),
-      request_distribution_(request_distribution), execute_(false),
-      next_corr_id_(1)
+      request_distribution_(request_distribution), execute_(false)
 {
   if (on_sequence_model_) {
     for (uint64_t i = 0; i < num_of_sequences; i++) {
@@ -187,8 +186,6 @@ RequestRateManager::Infer(
 {
   std::shared_ptr<InferContextMetaData> ctx(new InferContextMetaData());
 
-  thread_stat->contexts_stat_.emplace_back();
-
   std::unique_ptr<nic::InferContext::Options> options(nullptr);
   if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
     thread_stat->status_ = PrepareInfer(&(ctx->ctx_), &options);
@@ -242,7 +239,6 @@ RequestRateManager::Infer(
       int step_id =
           (thread_config->non_sequence_step_id_ % max_non_sequence_step_id_) *
           batch_size_;
-      std::cout << "Debig: " << max_non_sequence_step_id_ << std::endl;
       thread_config->non_sequence_step_id_ += max_threads_;
       thread_stat->status_ = UpdateInputs(ctx->ctx_->Inputs(), 0, step_id);
       if (!thread_stat->status_.IsOk()) {
@@ -365,7 +361,7 @@ RequestRateManager::Request(
             std::lock_guard<std::mutex> lock(thread_stat->mu_);
             thread_stat->request_timestamps_.emplace_back(
                 std::make_tuple(start_time, end_time_async, flags, delayed));
-            context->ctx_->GetStat(&(thread_stat->contexts_stat_[0]));
+            context->ctx_->GetStat(&(thread_stat->context_stat_));
           }
           context->inflight_request_cnt_--;
         });
@@ -387,7 +383,7 @@ RequestRateManager::Request(
       std::lock_guard<std::mutex> lock(thread_stat->mu_);
       thread_stat->request_timestamps_.emplace_back(
           std::make_tuple(start_time, end_time_sync, flags, delayed));
-      context->ctx_->GetStat(&(thread_stat->contexts_stat_[0]));
+      context->ctx_->GetStat(&(thread_stat->context_stat_));
     }
   }
 }

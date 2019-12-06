@@ -116,17 +116,6 @@ class RequestRateManager : public LoadManager {
     int non_sequence_step_id_;
   };
 
-  struct SequenceStat {
-    SequenceStat(uint64_t corr_id)
-        : corr_id_(corr_id), data_stream_id_(0), remaining_queries_(0)
-    {
-    }
-    uint64_t corr_id_;
-    uint64_t data_stream_id_;
-    size_t remaining_queries_;
-    std::mutex mtx_;
-  };
-
   RequestRateManager(
       const bool async,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
@@ -172,7 +161,4 @@ class RequestRateManager : public LoadManager {
   std::vector<std::chrono::nanoseconds> schedule_;
   std::chrono::steady_clock::time_point start_time_;
   bool execute_;
-
-  std::vector<std::shared_ptr<SequenceStat>> sequence_stat_;
-  uint64_t next_corr_id_;
 };

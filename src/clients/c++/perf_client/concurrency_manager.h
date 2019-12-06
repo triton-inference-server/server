@@ -92,10 +92,18 @@ class ConcurrencyManager : public LoadManager {
       const std::shared_ptr<ContextFactory>& factory);
 
   struct ThreadConfig {
-    ThreadConfig() : concurrency_(0) {}
+    ThreadConfig(size_t thread_id)
+        : thread_id_(thread_id), concurrency_(0),
+          non_sequence_step_id_(thread_id)
+    {
+    }
 
-    //  The concurrency level that the worker should produce
+    // ID of corresponding worker thread
+    size_t thread_id_;
+    // The concurrency level that the worker should produce
     size_t concurrency_;
+    // Step ID for the non-sequence model
+    size_t non_sequence_step_id_;
   };
 
   /// Function for worker that sends inference requests.
@@ -104,6 +112,8 @@ class ConcurrencyManager : public LoadManager {
   void Infer(
       std::shared_ptr<ThreadStat> thread_stat,
       std::shared_ptr<ThreadConfig> thread_config);
+
+  size_t active_threads_;
 
   size_t max_concurrency_;
   std::vector<std::shared_ptr<ThreadConfig>> threads_config_;

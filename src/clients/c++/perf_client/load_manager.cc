@@ -152,20 +152,18 @@ LoadManager::SwapTimestamps(TimestampVector& new_timestamps)
 }
 
 nic::Error
-LoadManager::GetAccumulatedContextStat(nic::InferContext::Stat* contexts_stat)
+LoadManager::GetAccumulatedContextStat(nic::InferContext::Stat* context_stat)
 {
   for (auto& thread_stat : threads_stat_) {
     std::lock_guard<std::mutex> lock(thread_stat->mu_);
-    for (auto& context_stat : thread_stat->contexts_stat_) {
-      contexts_stat->completed_request_count +=
-          context_stat.completed_request_count;
-      contexts_stat->cumulative_total_request_time_ns +=
-          context_stat.cumulative_total_request_time_ns;
-      contexts_stat->cumulative_send_time_ns +=
-          context_stat.cumulative_send_time_ns;
-      contexts_stat->cumulative_receive_time_ns +=
-          context_stat.cumulative_receive_time_ns;
-    }
+    context_stat->completed_request_count +=
+        thread_stat->context_stat_.completed_request_count;
+    context_stat->cumulative_total_request_time_ns +=
+        thread_stat->context_stat_.cumulative_total_request_time_ns;
+    context_stat->cumulative_send_time_ns +=
+        thread_stat->context_stat_.cumulative_send_time_ns;
+    context_stat->cumulative_receive_time_ns +=
+        thread_stat->context_stat_.cumulative_receive_time_ns;
   }
   return nic::Error::Success;
 }
@@ -182,7 +180,7 @@ LoadManager::LoadManager(
       max_threads_(max_threads), sequence_length_(sequence_length),
       shared_memory_type_(shared_memory_type),
       output_shm_size_(output_shm_size), factory_(factory),
-      using_json_data_(false), json_data_stream_cnt_(0)
+      using_json_data_(false), json_data_stream_cnt_(0), next_corr_id_(1)
 {
   on_sequence_model_ =
       ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
@@ -856,9 +854,6 @@ LoadManager::UpdateInputs(
     RETURN_IF_ERROR(SetInputsSharedMemory(inputs, step_index, stream_index));
   }
 
-  std::cout << "Updated the input to stream " << stream_index << std::endl;
-  std::cout << "Updated the input to step " << step_index << std::endl;
-
   return nic::Error::Success;
 }
 
@@ -908,7 +903,6 @@ LoadManager::SetInputsSharedMemory(
   }
   return nic::Error::Success;
 }
-
 
 size_t
 LoadManager::GetRandomLength(double offset_ratio)
