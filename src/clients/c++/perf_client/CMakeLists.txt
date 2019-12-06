@@ -58,6 +58,9 @@ set(
 
 add_executable(perf_client
   ${PERF_CLIENT_SRCS} ${PERF_CLIENT_HDRS})
+target_include_directories(
+  perf_client
+  PRIVATE ${Rapidjson_INCLUDE_DIRS})
 target_link_libraries(
   perf_client
   PRIVATE TRTIS::request_static

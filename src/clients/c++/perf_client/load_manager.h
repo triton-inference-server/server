@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <fstream>
 #include "src/clients/c++/perf_client/context_factory.h"
 #include "src/clients/c++/perf_client/perf_utils.h"
 
@@ -86,12 +87,12 @@ class LoadManager {
   /// for string inputs.
   /// \param string_data The string to be used as string inputs for model.
   /// \param zero_input Whether to use zero for model inputs.
-  /// \param data_directory The path to the directory containing the input data
+  /// \param user_data The path to the directory containing the input data
   /// in binary or text files.
   /// \return Error object indicating success or failure.
   nic::Error InitManagerInputs(
       const size_t string_length, const std::string& string_data,
-      const bool zero_input, const std::string& data_directory);
+      const bool zero_input, const std::string& user_data);
 
   /// Helper function to allocate and prepare shared memory.
   /// from shared memory.
@@ -114,6 +115,10 @@ class LoadManager {
       std::unique_ptr<nic::InferContext>* ctx,
       std::unique_ptr<nic::InferContext::Options>* options);
 
+  nic::Error UpdateInputs(
+      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+      int stream_index, int step_index);
+
   /// Generate random sequence length based on 'offset_ratio' and
   /// 'sequence_length_'. (1 +/- 'offset_ratio') * 'sequence_length_'
   /// \param offset_ratio The offset ratio of the generated length
@@ -129,7 +134,38 @@ class LoadManager {
   /// Returns the pointer to the memory holding data
   nic::Error GetInputData(
       std::shared_ptr<nic::InferContext::Input> input, const uint8_t** data,
-      size_t* batch1_size);
+      size_t* batch1_size, const int step_id = 0, const int sequence_id = 0);
+
+  /// Reads the input data from the specified data directory
+  /// \param input The input for which the data is to be read
+  /// \param data_directory The path to the directory containing the data
+  /// \param index The index to allocate for the read data
+  nic::Error ReadDataFromDir(
+      std::vector<std::shared_ptr<nic::InferContext::Input>> inputs,
+      const std::string& data_directory);
+
+  /// Reads the input data from the specified json file
+  /// \param input The input for which the data is to be read
+  /// \param data_directory The path to the directory containing the data
+  /// \param index The index to allocate for the read data
+  nic::Error ReadDataFromJSON(
+      std::vector<std::shared_ptr<nic::InferContext::Input>> inputs,
+      const std::string& data_directory);
+
+  /// Generates the input data for specified input
+  /// \param input The target input
+  nic::Error GenerateData(
+      std::vector<std::shared_ptr<nic::InferContext::Input>> inputs,
+      const bool zero_input, const size_t string_length,
+      const std::string& string_data);
+
+  nic::Error SetInputs(
+      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+      const int step_index, const int stream_index);
+
+  nic::Error SetInputsSharedMemory(
+      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+      const int step_index, const int stream_index);
 
  protected:
   bool async_;
@@ -145,9 +181,12 @@ class LoadManager {
 
   std::shared_ptr<ContextFactory> factory_;
 
+  bool using_json_data_;
+  int json_data_stream_cnt_;
+  std::vector<int> json_step_num_;
+
   // User provided input data, it will be preferred over synthetic data
   std::unordered_map<std::string, std::vector<char>> input_data_;
-  std::unordered_map<std::string, std::vector<char>> input_string_data_;
 
   // Placeholder for generated input data, which will be used for all inputs
   // except string
@@ -183,4 +222,6 @@ class LoadManager {
   // Use condition variable to pause/continue worker threads
   std::condition_variable wake_signal_;
   std::mutex wake_mutex_;
+
+  uint32_t max_non_sequence_step_id_;
 };

@@ -41,8 +41,8 @@ RequestRateManager::Create(
     const size_t sequence_length, const size_t string_length,
     const std::string& string_data, const bool zero_input,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-    const std::string& data_directory,
-    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
+    const std::string& user_data, const SharedMemoryType shared_memory_type,
+    const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
@@ -54,7 +54,7 @@ RequestRateManager::Create(
   local_manager->threads_config_.reserve(max_threads);
 
   RETURN_IF_ERROR(local_manager->InitManagerInputs(
-      string_length, string_data, zero_input, data_directory));
+      string_length, string_data, zero_input, user_data));
 
   if (local_manager->shared_memory_type_ !=
       SharedMemoryType::NO_SHARED_MEMORY) {
@@ -237,6 +237,19 @@ RequestRateManager::Infer(
       std::this_thread::sleep_for(wait_time);
     }
 
+    // Update the inputs if required
+    if (using_json_data_ && (!on_sequence_model_)) {
+      int step_id =
+          (thread_config->non_sequence_step_id_ % max_non_sequence_step_id_) *
+          batch_size_;
+      std::cout << "Debig: " << max_non_sequence_step_id_ << std::endl;
+      thread_config->non_sequence_step_id_ += max_threads_;
+      thread_stat->status_ = UpdateInputs(ctx->ctx_->Inputs(), 0, step_id);
+      if (!thread_stat->status_.IsOk()) {
+        return;
+      }
+    }
+
     struct timespec start_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
 
@@ -249,10 +262,17 @@ RequestRateManager::Infer(
       std::lock_guard<std::mutex> guard(sequence_stat_[seq_id]->mtx_);
       if (sequence_stat_[seq_id]->remaining_queries_ == 0) {
         flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;
-        size_t new_length = GetRandomLength(0.2);
-        sequence_stat_[seq_id]->remaining_queries_ =
-            new_length == 0 ? 1 : new_length;
         sequence_stat_[seq_id]->corr_id_ = next_corr_id_++;
+        if (!using_json_data_) {
+          size_t new_length = GetRandomLength(0.2);
+          sequence_stat_[seq_id]->remaining_queries_ =
+              new_length == 0 ? 1 : new_length;
+        } else {
+          sequence_stat_[seq_id]->data_stream_id_ =
+              sequence_stat_[seq_id]->corr_id_ % json_data_stream_cnt_;
+          sequence_stat_[seq_id]->remaining_queries_ =
+              json_step_num_[sequence_stat_[seq_id]->data_stream_id_];
+        }
       }
       if (sequence_stat_[seq_id]->remaining_queries_ == 1) {
         flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
@@ -267,6 +287,19 @@ RequestRateManager::Infer(
       // Override the correlation ID.
       options->SetCorrelationId(sequence_stat_[seq_id]->corr_id_);
       ctx->ctx_->SetRunOptions(*options);
+
+      // Update the inputs if required
+      if (using_json_data_) {
+        int step_id = json_step_num_[sequence_stat_[seq_id]->data_stream_id_] -
+                      sequence_stat_[seq_id]->remaining_queries_;
+        thread_stat->status_ = UpdateInputs(
+            ctx->ctx_->Inputs(), sequence_stat_[seq_id]->data_stream_id_,
+            step_id);
+        if (!thread_stat->status_.IsOk()) {
+          return;
+        }
+      }
+
       Request(ctx, flags, delayed, start_time, thread_stat);
       sequence_stat_[seq_id]->remaining_queries_--;
     } else {

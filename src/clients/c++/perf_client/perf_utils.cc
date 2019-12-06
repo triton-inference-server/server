@@ -139,6 +139,250 @@ IsDirectory(const std::string& path)
   }
 }
 
+bool
+IsFile(const std::string& complete_path)
+{
+  struct stat s;
+  if (stat(complete_path.c_str(), &s) == 0 && (s.st_mode & S_IFREG)) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+size_t
+GetElementCount(std::shared_ptr<nic::InferContext::Input> input)
+{
+  size_t count = 1;
+  if (!input->Shape().empty()) {
+    for (const auto dim : input->Shape()) {
+      count *= dim;
+    }
+  } else {
+    for (const auto dim : input->Dims()) {
+      count *= dim;
+    }
+  }
+  return count;
+}
+
+void
+SerializeStringTensor(
+    std::vector<std::string> string_tensor, std::vector<char>* serialized_data)
+{
+  std::string serialized = "";
+  for (auto s : string_tensor) {
+    uint32_t len = s.size();
+    serialized.append(reinterpret_cast<const char*>(&len), sizeof(uint32_t));
+    serialized.append(s);
+  }
+
+  std::copy(
+      serialized.begin(), serialized.end(),
+      std::back_inserter(*serialized_data));
+}
+
+
+nic::Error
+SerializeExplicitTensor(
+    const rapidjson::Value& tensor, ni::DataType dt,
+    std::vector<char>* decoded_data)
+{
+  if (dt == ni::DataType::TYPE_STRING) {
+    std::string serialized = "";
+    for (const auto& value : tensor.GetArray()) {
+      if (!value.IsString()) {
+        return nic::Error(
+            ni::RequestStatusCode::INVALID_ARG,
+            "unable to find string data in json");
+      }
+      std::string element(value.GetString());
+      uint32_t len = element.size();
+      serialized.append(reinterpret_cast<const char*>(&len), sizeof(uint32_t));
+      serialized.append(element);
+    }
+    std::copy(
+        serialized.begin(), serialized.end(),
+        std::back_inserter(*decoded_data));
+  } else {
+    for (const auto& value : tensor.GetArray()) {
+      if (dt == ni::DataType::TYPE_BOOL) {
+        if (!value.IsBool()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "unable to find bool data in json");
+        }
+        bool element(value.GetBool());
+        const char* src = reinterpret_cast<const char*>(&element);
+        decoded_data->insert(decoded_data->end(), src, src + sizeof(bool));
+      } else if (dt == ni::DataType::TYPE_UINT8) {
+        if (!value.IsUint()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "unable to find uint8_t data in json");
+        }
+        uint8_t element(static_cast<uint8_t>(value.GetUint()));
+        const char* src = reinterpret_cast<const char*>(&element);
+        decoded_data->insert(decoded_data->end(), src, src + sizeof(uint8_t));
+      } else if (dt == ni::DataType::TYPE_INT8) {
+        if (!value.IsInt()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "unable to find int8_t data in json");
+        }
+        int8_t element(static_cast<int8_t>(value.GetInt()));
+        const char* src = reinterpret_cast<const char*>(&element);
+        decoded_data->insert(decoded_data->end(), src, src + sizeof(int8_t));
+      } else if (dt == ni::DataType::TYPE_UINT16) {
+        if (!value.IsUint()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "unable to find uint16_t data in json");
+        }
+        uint16_t element(static_cast<uint16_t>(value.GetUint()));
+        const char* src = reinterpret_cast<const char*>(&element);
+        decoded_data->insert(decoded_data->end(), src, src + sizeof(uint16_t));
+      } else if (dt == ni::DataType::TYPE_INT16) {
+        if (!value.IsInt()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "unable to find int16_t data in json");
+        }
+        int16_t element(static_cast<int16_t>(value.GetInt()));
+        const char* src = reinterpret_cast<const char*>(&element);
+        decoded_data->insert(decoded_data->end(), src, src + sizeof(int16_t));
+      } else if (dt == ni::DataType::TYPE_FP16) {
+        return nic::Error(
+            ni::RequestStatusCode::INVALID_ARG,
+            "Can not use explicit tensor description for fp16 datatype");
+      } else if (dt == ni::DataType::TYPE_UINT32) {
+        if (!value.IsUint()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "unable to find uint32_t data in json");
+        }
+        uint32_t element(value.GetUint());
+        const char* src = reinterpret_cast<const char*>(&element);
+        decoded_data->insert(decoded_data->end(), src, src + sizeof(uint32_t));
+      } else if (dt == ni::DataType::TYPE_INT32) {
+        if (!value.IsInt()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "unable to find int32_t data in json");
+        }
+        int32_t element(value.GetInt());
+        const char* src = reinterpret_cast<const char*>(&element);
+        decoded_data->insert(decoded_data->end(), src, src + sizeof(int32_t));
+      } else if (dt == ni::DataType::TYPE_FP32) {
+        if (!value.IsDouble()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "unable to find float data in json");
+        }
+        float element(value.GetFloat());
+        const char* src = reinterpret_cast<const char*>(&element);
+        decoded_data->insert(decoded_data->end(), src, src + sizeof(float));
+      } else if (dt == ni::DataType::TYPE_UINT64) {
+        if (!value.IsUint64()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "unable to find uint64_t data in json");
+        }
+        uint64_t element(value.GetUint64());
+        const char* src = reinterpret_cast<const char*>(&element);
+        decoded_data->insert(decoded_data->end(), src, src + sizeof(uint64_t));
+      } else if (dt == ni::DataType::TYPE_INT64) {
+        if (!value.IsInt64()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "unable to find int64_t data in json");
+        }
+        int64_t element(value.GetInt64());
+        const char* src = reinterpret_cast<const char*>(&element);
+        decoded_data->insert(decoded_data->end(), src, src + sizeof(int64_t));
+      } else if (dt == ni::DataType::TYPE_FP64) {
+        if (!value.IsDouble()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "unable to find fp64 data in json");
+        }
+        double element(value.GetDouble());
+        const char* src = reinterpret_cast<const char*>(&element);
+        decoded_data->insert(decoded_data->end(), src, src + sizeof(double));
+      }
+    }
+  }
+  return nic::Error::Success;
+}
+
+
+nic::Error
+DecodeFromBase64(
+    const std::string& encoded_data, std::vector<char>* decoded_data)
+{
+  const char padding_character = '=';
+
+  if (encoded_data.length() % 4) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG, "Invalid base64 format");
+  }
+
+  std::size_t padding{};
+
+  if (encoded_data.length()) {
+    if (encoded_data[encoded_data.length() - 1] == padding_character)
+      padding++;
+    if (encoded_data[encoded_data.length() - 2] == padding_character)
+      padding++;
+  }
+
+  decoded_data->reserve(((encoded_data.length() / 4) * 3) - padding);
+
+  std::uint32_t temp{};
+  auto it = encoded_data.begin();
+
+  while (it < encoded_data.end()) {
+    for (std::size_t i = 0; i < 4; ++i) {
+      temp <<= 6;
+      if (*it >= 0x41 && *it <= 0x5A)
+        temp |= *it - 0x41;
+      else if (*it >= 0x61 && *it <= 0x7A)
+        temp |= *it - 0x47;
+      else if (*it >= 0x30 && *it <= 0x39)
+        temp |= *it + 0x04;
+      else if (*it == 0x2B)
+        temp |= 0x3E;
+      else if (*it == 0x2F)
+        temp |= 0x3F;
+      else if (*it == padding_character) {
+        switch (encoded_data.end() - it) {
+          case 1:
+            decoded_data->push_back((temp >> 16) & 0x000000FF);
+            decoded_data->push_back((temp >> 8) & 0x000000FF);
+            return nic::Error::Success;
+          case 2:
+            decoded_data->push_back((temp >> 10) & 0x000000FF);
+            return nic::Error::Success;
+          default:
+            return nic::Error(
+                ni::RequestStatusCode::INVALID_ARG,
+                "Invalid padding in base64");
+        }
+      } else
+        return nic::Error(
+            ni::RequestStatusCode::INVALID_ARG, "Invalid character in base64");
+
+      ++it;
+    }
+
+    decoded_data->push_back((temp >> 16) & 0x000000FF);
+    decoded_data->push_back((temp >> 8) & 0x000000FF);
+    decoded_data->push_back((temp)&0x000000FF);
+  }
+
+  return nic::Error::Success;
+}
+
 std::string
 GetRandomString(const int string_length)
 {

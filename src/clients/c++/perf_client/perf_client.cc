@@ -572,7 +572,7 @@ main(int argc, char** argv)
   std::unordered_map<std::string, std::vector<int64_t>> input_shapes;
   size_t string_length = 128;
   std::string string_data;
-  std::string data_directory("");
+  std::string user_data("");
   bool zero_input = false;
   int32_t concurrent_request_count = 1;
   size_t max_concurrency = 0;
@@ -641,7 +641,7 @@ main(int argc, char** argv)
         percentile = std::atoi(optarg);
         break;
       case 4:
-        data_directory = optarg;
+        user_data = optarg;
         break;
       case 5: {
         std::string arg = optarg;
@@ -723,8 +723,8 @@ main(int argc, char** argv)
       case 11: {
         std::string arg = optarg;
         // Check whether the argument is a directory
-        if (IsDirectory(arg)) {
-          data_directory = optarg;
+        if (IsDirectory(arg) || IsFile(arg)) {
+          user_data = optarg;
         } else if (arg.compare("zero") == 0) {
           zero_input = true;
         } else if (arg.compare("random") == 0) {
@@ -928,7 +928,7 @@ main(int argc, char** argv)
   if (percentile != -1 && (percentile > 99 || percentile < 1)) {
     Usage(argv, "percentile must be -1 for not reporting or in range (0, 100)");
   }
-  if (zero_input && !data_directory.empty()) {
+  if (zero_input && !user_data.empty()) {
     Usage(argv, "zero input can't be set when data directory is provided");
   }
   if (async && forced_sync) {
@@ -1081,22 +1081,22 @@ main(int argc, char** argv)
 
     err = ConcurrencyManager::Create(
         async, batch_size, max_threads, max_concurrency, sequence_length,
-        string_length, string_data, zero_input, input_shapes, data_directory,
+        string_length, string_data, zero_input, input_shapes, user_data,
         shared_memory_type, output_shm_size, factory, &manager);
 
   } else if (using_request_rate_range) {
     err = RequestRateManager::Create(
         async, measurement_window_ms, request_distribution, batch_size,
         max_threads, num_of_sequences, sequence_length, string_length,
-        string_data, zero_input, input_shapes, data_directory,
-        shared_memory_type, output_shm_size, factory, &manager);
+        string_data, zero_input, input_shapes, user_data, shared_memory_type,
+        output_shm_size, factory, &manager);
 
   } else {
     err = CustomLoadManager::Create(
         async, measurement_window_ms, request_intervals_file, batch_size,
         max_threads, num_of_sequences, sequence_length, string_length,
-        string_data, zero_input, input_shapes, data_directory,
-        shared_memory_type, output_shm_size, factory, &manager);
+        string_data, zero_input, input_shapes, user_data, shared_memory_type,
+        output_shm_size, factory, &manager);
   }
 
   if (!err.IsOk()) {

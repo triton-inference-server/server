@@ -99,6 +99,20 @@ if (OPENSSL_ROOT_DIR)
 endif()
 
 #
+# Get the rapidJSON
+#
+ExternalProject_Add(rapidjson-repo
+  PREFIX rapidjson-repo
+  GIT_REPOSITORY "https://github.com/Tencent/rapidjson.git"
+  GIT_TAG "v1.1.0"
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/rapidjson-repo/src/rapidjson"
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ""
+  INSTALL_COMMAND ""
+  TEST_COMMAND ""
+)
+
+#
 # Get the protobuf and grpc source
 #
 ExternalProject_Add(grpc-repo
@@ -388,6 +402,7 @@ ExternalProject_Add(trtis-clients
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
+    -DRapidjson_INCLUDE_DIRS:PATH=${CMAKE_CURRENT_BINARY_DIR}/rapidjson-repo/src/rapidjson/include/
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
     ${_CMAKE_TRTIS_DIR}
     -DTRTIS_ENABLE_METRICS:BOOL=OFF
@@ -396,7 +411,7 @@ ExternalProject_Add(trtis-clients
     -DTRTIS_ENABLE_GPU:BOOL=${TRTIS_ENABLE_GPU}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_CLIENTS_INSTALL_PREFIX}
     -DTRTIS_VERSION:STRING=${TRTIS_VERSION}
-  DEPENDS curl protobuf grpc
+  DEPENDS curl protobuf grpc rapidjson-repo
 )
 
 #

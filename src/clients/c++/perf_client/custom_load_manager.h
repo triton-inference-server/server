@@ -50,7 +50,7 @@ class CustomLoadManager : public RequestRateManager {
   /// \param sequence_length The base length of each sequence.
   /// \param zero_input Whether to fill the input tensors with zero.
   /// \param input_shapes The shape of the input tensors.
-  /// \param data_directory The path to the directory containing the data to
+  /// \param user_data The path to the directory containing the data to
   /// use for input tensors.
   /// \param shared_memory_type The type of shared memory to use for inputs.
   /// \param output_shm_size The size of the shared memory to allocate for the
@@ -66,8 +66,8 @@ class CustomLoadManager : public RequestRateManager {
       const size_t sequence_length, const size_t string_length,
       const std::string& string_data, const bool zero_input,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      const std::string& data_directory,
-      const SharedMemoryType shared_memory_type, const size_t output_shm_size,
+      const std::string& user_data, const SharedMemoryType shared_memory_type,
+      const size_t output_shm_size,
       const std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
 
