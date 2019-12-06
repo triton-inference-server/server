@@ -50,20 +50,15 @@ INSTANCE_CNT=1
 
 # Copy TF Model
 rm -fr tfmodels && mkdir -p tfmodels && \
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/. && \
-    (cd tfmodels/deeprecommender_graphdef && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
-        echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
+    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/.
 
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
     cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tensorrt_models/deeprecommender_plan && \
     (cd tensorrt_models/deeprecommender_plan && \
         sed -i "s/^name:.*/name: \"deeprecommender_plan\"/" config.pbtxt && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
         sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
-        sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt && \
-        echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
+        sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
 
 $TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
@@ -75,13 +70,11 @@ rm -fr tftrt_models && mkdir tftrt_models
     cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tftrt_models/deeprecommender_graphdef_trt && \
     (cd tftrt_models/deeprecommender_graphdef_trt && \
         sed -i "s/^name:.*/name: \"deeprecommender_graphdef_trt\"/" config.pbtxt && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
         echo "optimization { execution_accelerators {" >> config.pbtxt
         echo "gpu_execution_accelerator : [ {" >> config.pbtxt
         echo "name : \"tensorrt\" " >> config.pbtxt
         echo "} ]" >> config.pbtxt
-        echo "}}" >> config.pbtxt
-        echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
+        echo "}}" >> config.pbtxt)
 
 # Tests with each model
 for FRAMEWORK in graphdef plan graphdef_trt; do
@@ -112,20 +105,15 @@ INSTANCE_CNT=2
 
 # Copy TF Model
 rm -fr models && mkdir -p models && \
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/. && \
-    (cd tfmodels/deeprecommender_graphdef && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
-        echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
+    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/.
 
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
     cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tensorrt_models/deeprecommender_plan && \
     (cd tensorrt_models/deeprecommender_plan && \
         sed -i "s/^name:.*/name: \"deeprecommender_plan\"/" config.pbtxt && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
         sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
-        sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt && \
-        echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
+        sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
 
 $TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
@@ -137,13 +125,11 @@ rm -fr tftrt_models && mkdir tftrt_models
     cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tftrt_models/deeprecommender_graphdef_trt && \
     (cd tftrt_models/deeprecommender_graphdef_trt && \
         sed -i "s/^name:.*/name: \"deeprecommender_graphdef_trt\"/" config.pbtxt && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
         echo "optimization { execution_accelerators {" >> config.pbtxt
         echo "gpu_execution_accelerator : [ {" >> config.pbtxt
         echo "name : \"tensorrt\" " >> config.pbtxt
         echo "} ]" >> config.pbtxt
-        echo "}}" >> config.pbtxt
-        echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
+        echo "}}" >> config.pbtxt)
 
 # Tests with each model
 for FRAMEWORK in graphdef plan graphdef_trt; do
@@ -174,20 +160,15 @@ INSTANCE_CNT=2
 
 # Copy TF Model
 rm -fr models && mkdir -p models && \
-    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/. && \
-    (cd tfmodels/deeprecommender_graphdef && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
-        echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
+    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/.
 
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
     cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tensorrt_models/deeprecommender_plan && \
     (cd tensorrt_models/deeprecommender_plan && \
         sed -i "s/^name:.*/name: \"deeprecommender_plan\"/" config.pbtxt && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
         sed -i "s/tensorflow_graphdef/tensorrt_plan/" config.pbtxt && \
-        sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt && \
-        echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
+        sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt)
 
 $TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
@@ -199,13 +180,11 @@ rm -fr tftrt_models && mkdir tftrt_models
     cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tftrt_models/deeprecommender_graphdef_trt && \
     (cd tftrt_models/deeprecommender_graphdef_trt && \
         sed -i "s/^name:.*/name: \"deeprecommender_graphdef_trt\"/" config.pbtxt && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
         echo "optimization { execution_accelerators {" >> config.pbtxt
         echo "gpu_execution_accelerator : [ {" >> config.pbtxt
         echo "name : \"tensorrt\" " >> config.pbtxt
         echo "} ]" >> config.pbtxt
-        echo "}}" >> config.pbtxt
-        echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
+        echo "}}" >> config.pbtxt)
 
 # Tests with each model
 for FRAMEWORK in graphdef plan graphdef_trt; do
