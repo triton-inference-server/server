@@ -79,7 +79,9 @@ class ServerStatTimerScoped {
   struct timespec start_;
 };
 
-// Stats collector for an inference request.
+// Stats collector for an inference request. If TRTIS_ENABLE_INFER_STATS is not
+// defined, it will only records timestamps that may be used by other objects
+// along the inference pipeline (i.e. scheduler)
 class ModelInferStats {
  public:
   enum class TimestampKind {
@@ -93,6 +95,7 @@ class ModelInferStats {
     COUNT__
   };
 
+#ifdef TRTIS_ENABLE_INFER_STATS
  public:
   // Start model-specific timer for 'model_name' and a given status
   // 'kind'.
@@ -201,6 +204,32 @@ class ModelInferStats {
   // The trace associated with these stats. This object is not owned by
   // this ModelInferStats object and so is not destroyed by this object.
   TRTSERVER_Trace* trace_;
+#else
+ public:
+  // Start model-specific timer for 'model_name' and a given status
+  // 'kind'.
+  ModelInferStats() : timestamps_((size_t)TimestampKind::COUNT__)
+  {
+    memset(&timestamps_[0], 0, sizeof(struct timespec) * timestamps_.size());
+  }
+
+  // Get the timestamp for a kind.
+  const struct timespec& Timestamp(TimestampKind kind) const
+  {
+    return timestamps_[(size_t)kind];
+  }
+
+  // Set a timestamp to the current time. Return the timestamp.
+  const struct timespec& CaptureTimestamp(TimestampKind kind)
+  {
+    struct timespec& ts = timestamps_[(size_t)kind];
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts;
+  }
+
+ private:
+  std::vector<struct timespec> timestamps_;
+#endif  // TRTIS_ENABLE_INFER_STATS
 };
 
 // Manage access and updates to server status information.

@@ -1466,6 +1466,7 @@ TRTSERVER_ServerInferAsync(
 
   ni::InferRequestHeader* request_header = lprovider->InferRequestHeader();
 
+#ifdef TRTIS_ENABLE_INFER_STATS
   auto infer_stats = std::make_shared<ni::ModelInferStats>(
       lserver->StatusManager(), lprovider->ModelName());
   infer_stats->CaptureTimestamp(
@@ -1476,6 +1477,9 @@ TRTSERVER_ServerInferAsync(
   infer_stats->SetFailed(true);
   infer_stats->SetTraceManager(trace_manager);
   infer_stats->NewTrace();
+#else
+  auto infer_stats = std::make_shared<ni::ModelInferStats>();
+#endif  // TRTIS_ENABLE_INFER_STATS
 
   std::shared_ptr<ni::InferRequestProvider> infer_request_provider;
   RETURN_IF_STATUS_ERROR(ni::InferRequestProvider::Create(
@@ -1497,11 +1501,12 @@ TRTSERVER_ServerInferAsync(
       infer_stats,
       [infer_stats, trace_manager, infer_response_provider, server, complete_fn,
        complete_userp](const ni::Status& status) mutable {
-        infer_stats->SetFailed(!status.IsOk());
         if (!status.IsOk()) {
           LOG_VERBOSE(1) << "Infer failed: " << status.Message();
         }
 
+#ifdef TRTIS_ENABLE_INFER_STATS
+        infer_stats->SetFailed(!status.IsOk());
         infer_stats->CaptureTimestamp(
             ni::ModelInferStats::TimestampKind::kRequestEnd);
 
@@ -1511,6 +1516,7 @@ TRTSERVER_ServerInferAsync(
         // is received but before they've been updated for the request
         // (this is especially important for testing).
         infer_stats->Report();
+#endif  // TRTIS_ENABLE_INFER_STATS
 
         TrtServerResponse* response =
             new TrtServerResponse(status, infer_response_provider);
