@@ -35,33 +35,33 @@
 
 namespace nvidia { namespace inferenceserver {
 
-#define FAIL(MSG)                    \
-  do {                               \
-    std::cerr << "error: " << (MSG); \
-    exit(1);                         \
+#define FAIL(MSG)                                 \
+  do {                                            \
+    std::cerr << "error: " << (MSG) << std::endl; \
+    exit(1);                                      \
   } while (false)
 
-#define FAIL_IF_ERR(X, MSG)                                  \
-  do {                                                       \
-    TRTSERVER_Error* err__ = (X);                            \
-    if (err__ != nullptr) {                                  \
-      std::cerr << "error: " << (MSG) << ": "                \
-                << TRTSERVER_ErrorCodeString(err__) << " - " \
-                << TRTSERVER_ErrorMessage(err__);            \
-      TRTSERVER_ErrorDelete(err__);                          \
-      exit(1);                                               \
-    }                                                        \
+#define FAIL_IF_ERR(X, MSG)                                    \
+  do {                                                         \
+    TRTSERVER_Error* err__ = (X);                              \
+    if (err__ != nullptr) {                                    \
+      std::cerr << "error: " << (MSG) << ": "                  \
+                << TRTSERVER_ErrorCodeString(err__) << " - "   \
+                << TRTSERVER_ErrorMessage(err__) << std::endl; \
+      TRTSERVER_ErrorDelete(err__);                            \
+      exit(1);                                                 \
+    }                                                          \
   } while (false)
 
-#define LOG_IF_ERR(X, MSG)                                   \
-  do {                                                       \
-    TRTSERVER_Error* err__ = (X);                            \
-    if (err__ != nullptr) {                                  \
-      std::cerr << "error: " << (MSG) << ": "                \
-                << TRTSERVER_ErrorCodeString(err__) << " - " \
-                << TRTSERVER_ErrorMessage(err__);            \
-      TRTSERVER_ErrorDelete(err__);                          \
-    }                                                        \
+#define LOG_IF_ERR(X, MSG)                                     \
+  do {                                                         \
+    TRTSERVER_Error* err__ = (X);                              \
+    if (err__ != nullptr) {                                    \
+      std::cerr << "error: " << (MSG) << ": "                  \
+                << TRTSERVER_ErrorCodeString(err__) << " - "   \
+                << TRTSERVER_ErrorMessage(err__) << std::endl; \
+      TRTSERVER_ErrorDelete(err__);                            \
+    }                                                          \
   } while (false)
 
 #define RETURN_IF_ERR(X)          \
