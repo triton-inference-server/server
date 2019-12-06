@@ -41,7 +41,10 @@
 #include "src/core/constants.h"
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
-#include "src/servers/tracer.h"
+
+// The GRPC frontend logging is closely related to the server, thus keep it
+// using the server logging utils
+#include "src/core/logging.h"
 
 #ifdef TRTIS_ENABLE_TRACING
 #include "src/servers/tracer.h"
