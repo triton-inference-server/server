@@ -178,6 +178,47 @@ for MODEL in \
         RET=1
     fi
 
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
+
+for MODEL in \
+        graphdef_float32_float32_float32 \
+        savedmodel_float32_float32_float32; do
+    rm -fr models && mkdir -p models
+    cp -r $DATADIR/qa_model_repository/${MODEL} \
+       models/${MODEL}_def && \
+    rm -fr models/${MODEL}_def/2 && \
+    rm -fr models/${MODEL}_def/3 && \
+    (cd models/${MODEL}_def && \
+            sed -i 's/_float32_float32_float32/&_def/' config.pbtxt) && \
+    # GPU execution accelerators with default setting
+    cp -r models/${MODEL}_def models/${MODEL}_trt && \
+    (cd models/${MODEL}_trt && \
+            sed -i 's/_float32_def/_float32_trt/' \
+                config.pbtxt && \
+            echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\"} ] } }" >> config.pbtxt) && \
+    # GPU execution accelerators with correct parameters
+    cp -r models/${MODEL}_def models/${MODEL}_param && \
+    (cd models/${MODEL}_param && \
+            sed -i 's/_float32_def/_float32_param/' \
+                config.pbtxt && \
+            echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\" \
+            parameters { key: \"precision_mode\" value: \"FP16\" } \
+            parameters { key: \"minimum_segment_size\" value: \"1\" } }]}}" \
+            >> config.pbtxt)
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+
     TEST_TYPE=test_graphdef && \
             [[ "$MODEL" == "savedmodel_float32_float32_float32" ]] && \
             TEST_TYPE=test_savedmodel
