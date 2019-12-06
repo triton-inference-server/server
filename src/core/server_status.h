@@ -95,8 +95,8 @@ class ModelInferStats {
     COUNT__
   };
 
-#ifdef TRTIS_ENABLE_INFER_STATS
  public:
+#ifdef TRTIS_ENABLE_INFER_STATS
   // Start model-specific timer for 'model_name' and a given status
   // 'kind'.
   ModelInferStats(
@@ -104,9 +104,9 @@ class ModelInferStats {
       const std::string& model_name)
       : status_manager_(status_manager), model_name_(model_name),
         requested_model_version_(-1), batch_size_(0), gpu_device_(-1),
-        failed_(false), execution_count_(0),
-        timestamps_((size_t)TimestampKind::COUNT__), extra_queue_duration_(0),
-        extra_compute_duration_(0), trace_manager_(nullptr), trace_(nullptr)
+        failed_(false), execution_count_(0), extra_queue_duration_(0),
+        extra_compute_duration_(0), trace_manager_(nullptr), trace_(nullptr),
+        timestamps_((size_t)TimestampKind::COUNT__)
   {
     memset(&timestamps_[0], 0, sizeof(struct timespec) * timestamps_.size());
   }
@@ -157,6 +157,23 @@ class ModelInferStats {
   // has not been called.
   TRTSERVER_Trace* GetTrace() const { return trace_; }
 
+  // Include queue time from another stat into this stat's queue time.
+  void IncrementQueueDuration(const ModelInferStats& other);
+
+  // Include compute time from another stat into this stat's compute
+  // time.
+  void IncrementComputeDuration(const ModelInferStats& other);
+
+#else
+  // Start model-specific timer for 'model_name' and a given status
+  // 'kind'.
+  ModelInferStats() : timestamps_((size_t)TimestampKind::COUNT__)
+  {
+    memset(&timestamps_[0], 0, sizeof(struct timespec) * timestamps_.size());
+  }
+
+#endif  // TRTIS_ENABLE_INFER_STATS
+
   // Get the timestamp for a kind.
   const struct timespec& Timestamp(TimestampKind kind) const
   {
@@ -171,14 +188,8 @@ class ModelInferStats {
     return ts;
   }
 
-  // Include queue time from another stat into this stat's queue time.
-  void IncrementQueueDuration(const ModelInferStats& other);
-
-  // Include compute time from another stat into this stat's compute
-  // time.
-  void IncrementComputeDuration(const ModelInferStats& other);
-
  private:
+#ifdef TRTIS_ENABLE_INFER_STATS
   uint64_t Duration(
       ModelInferStats::TimestampKind start_kind,
       ModelInferStats::TimestampKind end_kind) const;
@@ -192,7 +203,6 @@ class ModelInferStats {
   bool failed_;
 
   uint32_t execution_count_;
-  std::vector<struct timespec> timestamps_;
 
   uint64_t extra_queue_duration_;
   uint64_t extra_compute_duration_;
@@ -204,32 +214,9 @@ class ModelInferStats {
   // The trace associated with these stats. This object is not owned by
   // this ModelInferStats object and so is not destroyed by this object.
   TRTSERVER_Trace* trace_;
-#else
- public:
-  // Start model-specific timer for 'model_name' and a given status
-  // 'kind'.
-  ModelInferStats() : timestamps_((size_t)TimestampKind::COUNT__)
-  {
-    memset(&timestamps_[0], 0, sizeof(struct timespec) * timestamps_.size());
-  }
-
-  // Get the timestamp for a kind.
-  const struct timespec& Timestamp(TimestampKind kind) const
-  {
-    return timestamps_[(size_t)kind];
-  }
-
-  // Set a timestamp to the current time. Return the timestamp.
-  const struct timespec& CaptureTimestamp(TimestampKind kind)
-  {
-    struct timespec& ts = timestamps_[(size_t)kind];
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts;
-  }
-
- private:
-  std::vector<struct timespec> timestamps_;
 #endif  // TRTIS_ENABLE_INFER_STATS
+
+  std::vector<struct timespec> timestamps_;
 };
 
 // Manage access and updates to server status information.

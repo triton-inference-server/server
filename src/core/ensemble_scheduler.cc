@@ -745,7 +745,7 @@ EnsembleContext::ScheduleSteps(
           if (!status.IsOk()) {
             LOG_VERBOSE(1) << "Ensemble infer failed: " << status.Message();
           }
-          
+
 #ifdef TRTIS_ENABLE_INFER_STATS
           infer_stats->SetFailed(!status.IsOk());
           infer_stats->CaptureTimestamp(
