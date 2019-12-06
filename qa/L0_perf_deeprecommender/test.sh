@@ -50,15 +50,14 @@ INSTANCE_CNT=1
 
 # Copy TF Model
 rm -fr tfmodels && mkdir -p tfmodels && \
-    cp -r $REPODIR/tf_model_store2/deep_recommender tfmodels/deeprecommender_graphdef && \
+    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/. && \
     (cd tfmodels/deeprecommender_graphdef && \
-        sed -i "s/^name:.*/name: \"deeprecommender_graphdef\"/" config.pbtxt && \
         sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
         echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
 
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
-    cp -r $REPODIR/tf_model_store2/deep_recommender tensorrt_models/deeprecommender_plan && \
+    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tensorrt_models/deeprecommender_plan && \
     (cd tensorrt_models/deeprecommender_plan && \
         sed -i "s/^name:.*/name: \"deeprecommender_plan\"/" config.pbtxt && \
         sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
@@ -66,14 +65,14 @@ rm -fr tensorrt_models && mkdir tensorrt_models
         sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt && \
         echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
 
-$TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deep_recommender.uff \
+$TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
          --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
 
 # Create the TFTRT plan from TF
 rm -fr tftrt_models && mkdir tftrt_models
-    cp -r $REPODIR/tf_model_store2/deep_recommender tftrt_models/deeprecommender_graphdef_trt && \
+    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tftrt_models/deeprecommender_graphdef_trt && \
     (cd tftrt_models/deeprecommender_graphdef_trt && \
         sed -i "s/^name:.*/name: \"deeprecommender_graphdef_trt\"/" config.pbtxt && \
         sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
@@ -105,23 +104,22 @@ for FRAMEWORK in graphdef plan graphdef_trt; do
 done
 
 #
-# Test large static batch = 128 w/ 2 instances
+# Test large static batch = 1024 w/ 2 instances
 #
-STATIC_BATCH=128
+STATIC_BATCH=1024
 DYNAMIC_BATCH=1
 INSTANCE_CNT=2
 
 # Copy TF Model
 rm -fr models && mkdir -p models && \
-    cp -r $REPODIR/tf_model_store2/ tfmodels/deeprecommender_graphdef && \
+    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/. && \
     (cd tfmodels/deeprecommender_graphdef && \
-        sed -i "s/^name:.*/name: \"deeprecommender_graphdef\"/" config.pbtxt && \
         sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
         echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
 
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
-    cp -r $REPODIR/tf_model_store2/deep_recommender tensorrt_models/deeprecommender_plan && \
+    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tensorrt_models/deeprecommender_plan && \
     (cd tensorrt_models/deeprecommender_plan && \
         sed -i "s/^name:.*/name: \"deeprecommender_plan\"/" config.pbtxt && \
         sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
@@ -129,14 +127,14 @@ rm -fr tensorrt_models && mkdir tensorrt_models
         sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt && \
         echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
 
-$TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deep_recommender.uff \
+$TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
          --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
 
 # Create the TFTRT plan from TF
 rm -fr tftrt_models && mkdir tftrt_models
-    cp -r $REPODIR/tf_model_store2/deep_recommender tftrt_models/deeprecommender_graphdef_trt && \
+    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tftrt_models/deeprecommender_graphdef_trt && \
     (cd tftrt_models/deeprecommender_graphdef_trt && \
         sed -i "s/^name:.*/name: \"deeprecommender_graphdef_trt\"/" config.pbtxt && \
         sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
@@ -168,23 +166,22 @@ for FRAMEWORK in graphdef plan graphdef_trt; do
 done
 
 #
-# Test dynamic batcher 8 w/ 2 instances
+# Test dynamic batcher 64 w/ 2 instances
 #
 STATIC_BATCH=1
-DYNAMIC_BATCH=8
+DYNAMIC_BATCH=64
 INSTANCE_CNT=2
 
 # Copy TF Model
 rm -fr models && mkdir -p models && \
-    cp -r $REPODIR/tf_model_store2/deep_recommender tfmodels/deeprecommender_graphdef && \
+    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tfmodels/. && \
     (cd tfmodels/deeprecommender_graphdef && \
-        sed -i "s/^name:.*/name: \"deeprecommender_graphdef\"/" config.pbtxt && \
         sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
         echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
 
 # Create the TensorRT plan from TF
 rm -fr tensorrt_models && mkdir tensorrt_models
-    cp -r $REPODIR/tf_model_store2/deep_recommender tensorrt_models/deeprecommender_plan && \
+    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tensorrt_models/deeprecommender_plan && \
     (cd tensorrt_models/deeprecommender_plan && \
         sed -i "s/^name:.*/name: \"deeprecommender_plan\"/" config.pbtxt && \
         sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
@@ -192,14 +189,14 @@ rm -fr tensorrt_models && mkdir tensorrt_models
         sed -i "s/\[17736\]/\[17736,1,1\]/" config.pbtxt && \
         echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
 
-$TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deep_recommender.uff \
+$TRTEXEC --uff=tfmodels/deeprecommender_graphdef/deeprecommender_graphdef.uff \
          --uffInput=Placeholder,1,1,17736\
          --batch=${STATIC_BATCH} --output=fc5/Relu --verbose \
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
 
 # Create the TFTRT plan from TF
 rm -fr tftrt_models && mkdir tftrt_models
-    cp -r $REPODIR/tf_model_store2/deep_recommender tftrt_models/deeprecommender_graphdef_trt && \
+    cp -r $REPODIR/perf_model_store/deeprecommender_graphdef tftrt_models/deeprecommender_graphdef_trt && \
     (cd tftrt_models/deeprecommender_graphdef_trt && \
         sed -i "s/^name:.*/name: \"deeprecommender_graphdef_trt\"/" config.pbtxt && \
         sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
