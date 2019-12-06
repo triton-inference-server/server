@@ -52,16 +52,6 @@ struct IOSpec {
 // Meta data used for preparing input data and validate output data
 IOSpec io_spec;
 
-#define FAIL_IF_CUDA_ERR(X, MSG)                                          \
-  do {                                                                    \
-    cudaError_t err = (X);                                                \
-    if (err != cudaSuccess) {                                             \
-      LOG_ERROR << "error: " << (MSG) << ": " << cudaGetErrorString(err); \
-      exit(1);                                                            \
-    }                                                                     \
-  } while (false)
-
-
 static auto gpu_data_deleter = [](void* data) {
   if (data != nullptr) {
     FAIL_IF_CUDA_ERR(
@@ -76,17 +66,17 @@ void
 Usage(char** argv, const std::string& msg = std::string())
 {
   if (!msg.empty()) {
-    LOG_ERROR << msg;
+    std::cerr << msg << std::endl;
   }
 
-  LOG_ERROR << "Usage: " << argv[0] << " [options]";
-  LOG_ERROR << "\t-i [input device ID]";
-  LOG_ERROR << "\t-out [output device ID]";
-  LOG_ERROR << "\t-v Enable verbose logging";
-  LOG_ERROR << "\t-r [model repository absolute path]";
-  LOG_ERROR << "\t-m [model name to be tested]";
-  LOG_ERROR << "\tFor device ID, -1 is used to stand for CPU device, "
-            << "non-negative value is for GPU device.";
+  std::cerr << "Usage: " << argv[0] << " [options]" << std::endl;
+  std::cerr << "\t-i [input device ID]" << std::endl;
+  std::cerr << "\t-out [output device ID]" << std::endl;
+  std::cerr << "\t-v Enable verbose logging" << std::endl;
+  std::cerr << "\t-r [model repository absolute path]" << std::endl;
+  std::cerr << "\t-m [model name to be tested]" << std::endl;
+  std::cerr << "\tFor device ID, -1 is used to stand for CPU device, "
+            << "non-negative value is for GPU device." << std::endl;
 
   exit(1);
 }
@@ -113,8 +103,8 @@ ResponseAlloc(
   if (byte_size == 0) {
     *buffer = nullptr;
     *buffer_userp = nullptr;
-    LOG_INFO << "allocated " << byte_size << " bytes for result tensor "
-             << tensor_name;
+    std::cout << "allocated " << byte_size << " bytes for result tensor "
+              << tensor_name << std::endl;
   } else {
     void* allocated_ptr = nullptr;
     if (io_spec.output_type_ == TRTSERVER_MEMORY_CPU) {
@@ -145,9 +135,9 @@ ResponseAlloc(
 
     *buffer = allocated_ptr;
     *buffer_userp = new std::string(tensor_name);
-    LOG_INFO << "allocated " << byte_size << " bytes in "
-             << MemoryTypeString(io_spec.output_type_) << " for result tensor "
-             << tensor_name;
+    std::cout << "allocated " << byte_size << " bytes in "
+              << MemoryTypeString(io_spec.output_type_) << " for result tensor "
+              << tensor_name << std::endl;
   }
 
   *actual_memory_type = io_spec.output_type_;
@@ -167,9 +157,9 @@ ResponseRelease(
     name.reset(new std::string("<unknown>"));
   }
 
-  LOG_INFO << "Releasing buffer " << buffer << " of size " << byte_size
-           << " in " << MemoryTypeString(memory_type) << " for result '"
-           << *name << "'";
+  std::cout << "Releasing buffer " << buffer << " of size " << byte_size
+            << " in " << MemoryTypeString(memory_type) << " for result '"
+            << *name << "'" << std::endl;
   if (memory_type == TRTSERVER_MEMORY_CPU) {
     free(buffer);
   } else {
@@ -315,10 +305,10 @@ CompareResult(
     const void* output1)
 {
   for (size_t i = 0; i < 16; ++i) {
-    LOG_INFO << ((T*)input0)[i] << " + " << ((T*)input1)[i] << " = "
-             << ((T*)output0)[i];
-    LOG_INFO << ((T*)input0)[i] << " - " << ((T*)input1)[i] << " = "
-             << ((T*)output1)[i];
+    std::cout << ((T*)input0)[i] << " + " << ((T*)input1)[i] << " = "
+              << ((T*)output0)[i] << std::endl;
+    std::cout << ((T*)input0)[i] << " - " << ((T*)input1)[i] << " = "
+              << ((T*)output1)[i] << std::endl;
 
     if ((((T*)input0)[i] + ((T*)input1)[i]) != ((T*)output0)[i]) {
       FAIL("incorrect sum in " + output0_name);
@@ -360,8 +350,10 @@ CompareStringResult(
   }
 
   for (int i = 0; i < 16; ++i) {
-    LOG_INFO << (i + 1) << " + " << 1 << " = " << output0_numbers[i];
-    LOG_INFO << (i + 1) << " - " << 1 << " = " << output1_numbers[i];
+    std::cout << (i + 1) << " + " << 1 << " = " << output0_numbers[i]
+              << std::endl;
+    std::cout << (i + 1) << " - " << 1 << " = " << output1_numbers[i]
+              << std::endl;
 
     if (((i + 1) + 1) != output0_numbers[i]) {
       FAIL("incorrect sum in " + output0_name);
@@ -472,7 +464,8 @@ main(int argc, char** argv)
     FAIL_IF_ERR(
         TRTSERVER_ServerIsReady(server.get(), &ready),
         "unable to get server readiness");
-    LOG_INFO << "Server Health: live " << live << ", ready " << ready;
+    std::cout << "Server Health: live " << live << ", ready " << ready
+              << std::endl;
     if (live && ready) {
       break;
     }
@@ -502,8 +495,8 @@ main(int argc, char** argv)
       FAIL("error: failed to parse server status");
     }
 
-    LOG_INFO << "Server Status:";
-    LOG_INFO << server_status.DebugString();
+    std::cout << "Server Status:" << std::endl;
+    std::cout << server_status.DebugString() << std::endl;
 
     FAIL_IF_ERR(
         TRTSERVER_ProtobufDelete(server_status_protobuf),
@@ -544,8 +537,9 @@ main(int argc, char** argv)
       FAIL("unable to find version 1 status for model '" + model_name + "'");
     }
 
-    LOG_INFO << "'" + model_name + "' model is "
-             << ni::ModelReadyState_Name(vitr->second.ready_state());
+    std::cout << "'" + model_name + "' model is "
+              << ni::ModelReadyState_Name(vitr->second.ready_state())
+              << std::endl;
     if (vitr->second.ready_state() == ni::ModelReadyState::MODEL_READY) {
       FAIL_IF_ERR(
           ParseModelConfig(itr->second.config(), &dtype, &is_torch_model),
@@ -695,8 +689,8 @@ main(int argc, char** argv)
       FAIL("error: failed to parse response header");
     }
 
-    LOG_INFO << "Model \"" << model_name << "\" response header:";
-    LOG_INFO << response_header.DebugString();
+    std::cout << "Model \"" << model_name << "\" response header:" << std::endl;
+    std::cout << response_header.DebugString() << std::endl;
 
     FAIL_IF_ERR(
         TRTSERVER_ProtobufDelete(response_protobuf),
@@ -789,9 +783,9 @@ main(int argc, char** argv)
   std::vector<char> output0_data(output0_byte_size);
   std::vector<char> output1_data(output1_byte_size);
   if (output0_memory_type == TRTSERVER_MEMORY_CPU) {
-    LOG_INFO << "OUTPUT0 are stored in CPU memory";
+    std::cout << "OUTPUT0 are stored in CPU memory" << std::endl;
   } else {
-    LOG_INFO << "OUTPUT0 are stored in GPU memory";
+    std::cout << "OUTPUT0 are stored in GPU memory" << std::endl;
     FAIL_IF_CUDA_ERR(
         cudaMemcpy(
             &output0_data[0], output0_content, output0_byte_size,
@@ -801,9 +795,9 @@ main(int argc, char** argv)
   }
 
   if (output1_memory_type == TRTSERVER_MEMORY_CPU) {
-    LOG_INFO << "OUTPUT1 are stored in CPU memory";
+    std::cout << "OUTPUT1 are stored in CPU memory" << std::endl;
   } else {
-    LOG_INFO << "OUTPUT1 are stored in GPU memory";
+    std::cout << "OUTPUT1 are stored in GPU memory" << std::endl;
     FAIL_IF_CUDA_ERR(
         cudaMemcpy(
             &output1_data[0], output1_content, output1_byte_size,

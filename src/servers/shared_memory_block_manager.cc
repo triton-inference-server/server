@@ -30,10 +30,7 @@ namespace nvidia { namespace inferenceserver {
 
 SharedMemoryBlockManager::~SharedMemoryBlockManager()
 {
-  TRTSERVER_Error* err = Clear();
-  if (err != nullptr) {
-    LOG_ERROR << TRTSERVER_ErrorMessage(err);
-  }
+  LOG_IF_ERR(Clear(), "destroying shared memory block manager");
 }
 
 TRTSERVER_Error*

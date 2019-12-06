@@ -25,50 +25,64 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <iostream>
 #include "src/core/request_status.pb.h"
 #include "src/core/trtserver.h"
 
-// For now just use the src/core logging utils...
-#include "src/core/logging.h"
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
-#define FAIL(MSG)                    \
-  do {                               \
-    LOG_ERROR << "error: " << (MSG); \
-    exit(1);                         \
+#define FAIL(MSG)                                 \
+  do {                                            \
+    std::cerr << "error: " << (MSG) << std::endl; \
+    exit(1);                                      \
   } while (false)
 
-#define FAIL_IF_ERR(X, MSG)                                \
-  do {                                                     \
-    TRTSERVER_Error* err = (X);                            \
-    if (err != nullptr) {                                  \
-      LOG_ERROR << "error: " << (MSG) << ": "              \
-                << TRTSERVER_ErrorCodeString(err) << " - " \
-                << TRTSERVER_ErrorMessage(err);            \
-      TRTSERVER_ErrorDelete(err);                          \
-      exit(1);                                             \
-    }                                                      \
+#define FAIL_IF_ERR(X, MSG)                                    \
+  do {                                                         \
+    TRTSERVER_Error* err__ = (X);                              \
+    if (err__ != nullptr) {                                    \
+      std::cerr << "error: " << (MSG) << ": "                  \
+                << TRTSERVER_ErrorCodeString(err__) << " - "   \
+                << TRTSERVER_ErrorMessage(err__) << std::endl; \
+      TRTSERVER_ErrorDelete(err__);                            \
+      exit(1);                                                 \
+    }                                                          \
   } while (false)
 
-#define LOG_IF_ERR(X, MSG)                                 \
-  do {                                                     \
-    TRTSERVER_Error* err = (X);                            \
-    if (err != nullptr) {                                  \
-      LOG_ERROR << "error: " << (MSG) << ": "              \
-                << TRTSERVER_ErrorCodeString(err) << " - " \
-                << TRTSERVER_ErrorMessage(err);            \
-      TRTSERVER_ErrorDelete(err);                          \
-    }                                                      \
+#define LOG_IF_ERR(X, MSG)                                     \
+  do {                                                         \
+    TRTSERVER_Error* err__ = (X);                              \
+    if (err__ != nullptr) {                                    \
+      std::cerr << "error: " << (MSG) << ": "                  \
+                << TRTSERVER_ErrorCodeString(err__) << " - "   \
+                << TRTSERVER_ErrorMessage(err__) << std::endl; \
+      TRTSERVER_ErrorDelete(err__);                            \
+    }                                                          \
   } while (false)
 
-#define RETURN_IF_ERR(X)        \
-  do {                          \
-    TRTSERVER_Error* err = (X); \
-    if (err != nullptr) {       \
-      return err;               \
-    }                           \
+#define RETURN_IF_ERR(X)          \
+  do {                            \
+    TRTSERVER_Error* err__ = (X); \
+    if (err__ != nullptr) {       \
+      return err__;               \
+    }                             \
   } while (false)
+
+#ifdef TRTIS_ENABLE_GPU
+#define FAIL_IF_CUDA_ERR(X, MSG)                                           \
+  do {                                                                     \
+    cudaError_t err__ = (X);                                               \
+    if (err__ != cudaSuccess) {                                            \
+      std::cerr << "error: " << (MSG) << ": " << cudaGetErrorString(err__) \
+                << std::endl;                                              \
+      exit(1);                                                             \
+    }                                                                      \
+  } while (false)
+#endif  // TRTIS_ENABLE_GPU
 
 //
 // RequestStatusUtil
