@@ -40,6 +40,7 @@ MetricModelReporter::MetricModelReporter(
 }
 
 #ifdef TRTIS_ENABLE_METRICS
+#ifdef TRTIS_ENABLE_STATS
 
 void
 MetricModelReporter::GetMetricLabels(
@@ -155,6 +156,7 @@ MetricModelReporter::MetricInferenceLoadRatio(int gpu_device) const
   return hist;
 }
 
+#endif  // TRTIS_ENABLE_STATS
 #endif  // TRTIS_ENABLE_METRICS
 
 }}  // namespace nvidia::inferenceserver
