@@ -955,14 +955,14 @@ PlanBackend::Context::Run(
         static_cast<char*>(buffers_[bindex]));
   }
 
-#ifdef TRTIS_ENABLE_INFER_STATS
+#ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeInputEnd);
     }
   }
-#endif  // TRTIS_ENABLE_INFER_STATS
+#endif  // TRTIS_ENABLE_STATS
 
   // Async execute the inference using a CUDA graph if available for
   // the batch-size, otherwise execution normally.
@@ -1004,14 +1004,14 @@ PlanBackend::Context::Run(
     }
   }
 
-#ifdef TRTIS_ENABLE_INFER_STATS
+#ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeOutputStart);
     }
   }
-#endif  // TRTIS_ENABLE_INFER_STATS
+#endif  // TRTIS_ENABLE_STATS
 
   // For each requested output verify that the output can accept the
   // actual model output and then copy that output from the GPU

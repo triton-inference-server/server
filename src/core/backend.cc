@@ -241,7 +241,7 @@ InferenceBackend::Run(
     return;
   }
 
-#ifdef TRTIS_ENABLE_INFER_STATS
+#ifdef TRTIS_ENABLE_STATS
   // Stop queue timer and start compute timer when the payload is
   // scheduled to run
   for (auto& payload : *payloads) {
@@ -251,11 +251,11 @@ InferenceBackend::Run(
       payload.stats_->SetGPUDevice(contexts_[runner_idx]->gpu_device_);
     }
   }
-#endif  // TRTIS_ENABLE_INFER_STATS
+#endif  // TRTIS_ENABLE_STATS
 
   Status status = contexts_[runner_idx]->Run(this, payloads);
 
-#ifdef TRTIS_ENABLE_INFER_STATS
+#ifdef TRTIS_ENABLE_STATS
   // Stop compute timers.
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
@@ -263,7 +263,7 @@ InferenceBackend::Run(
           ModelInferStats::TimestampKind::kComputeEnd);
     }
   }
-#endif  // TRTIS_ENABLE_INFER_STATS
+#endif  // TRTIS_ENABLE_STATS
 
   OnCompleteQueuedPayloads(status);
 }
