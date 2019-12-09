@@ -182,17 +182,19 @@ LoadManager::LoadManager(
       max_threads_(max_threads), sequence_length_(sequence_length),
       shared_memory_type_(shared_memory_type),
       output_shm_size_(output_shm_size), factory_(factory),
-      using_json_data_(false), json_data_stream_cnt_(0), next_corr_id_(1)
+      using_json_data_(false), next_corr_id_(1)
 {
   on_sequence_model_ =
       ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
        (factory_->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE));
+
+  data_loader_.reset(new DataLoader(batch_size));
 }
 
 nic::Error
 LoadManager::InitManagerInputs(
     const size_t string_length, const std::string& string_data,
-    const bool zero_input, const std::string& user_data)
+    const bool zero_input, std::vector<std::string>& user_data)
 {
   std::unique_ptr<nic::InferContext> ctx;
   RETURN_IF_ERROR(factory_->CreateInferContext(&ctx));
@@ -257,15 +259,22 @@ LoadManager::InitManagerInputs(
 
   // Read provided data
   if (!user_data.empty()) {
-    if (IsDirectory(user_data)) {
-      RETURN_IF_ERROR(ReadDataFromDir(ctx->Inputs(), user_data));
+    if (IsDirectory(user_data[0])) {
+      RETURN_IF_ERROR(
+          data_loader_->ReadDataFromDir(ctx->Inputs(), user_data[0]));
     } else {
       using_json_data_ = true;
-      RETURN_IF_ERROR(ReadDataFromJSON(ctx->Inputs(), user_data));
+      for (const auto& json_file : user_data) {
+        RETURN_IF_ERROR(
+            data_loader_->ReadDataFromJSON(ctx->Inputs(), json_file));
+      }
+      std::cout << " Successfully read Data for "
+                << data_loader_->GetDataStreamsCount() << " stream/streams."
+                << std::endl;
     }
   } else {
-    RETURN_IF_ERROR(
-        GenerateData(ctx->Inputs(), zero_input, string_length, string_data));
+    RETURN_IF_ERROR(data_loader_->GenerateData(
+        ctx->Inputs(), zero_input, string_length, string_data));
   }
 
   // Reserve the required vector space
@@ -341,8 +350,9 @@ LoadManager::InitSharedMemory()
   }
 
   for (const auto& input : ctx->Inputs()) {
-    for (int i = 0; i < json_data_stream_cnt_; i++) {
-      for (int j = 0; j < json_step_num_[i]; j += batch_size_) {
+    for (int i = 0; i < (int)data_loader_->GetDataStreamsCount(); i++) {
+      for (int j = 0; j < (int)data_loader_->GetTotalSteps(i);
+           j += batch_size_) {
         // Extract the data for requested batch size
         std::vector<const uint8_t*> data_ptrs;
         std::vector<size_t> byte_size;
@@ -351,9 +361,9 @@ LoadManager::InitSharedMemory()
         while (count < batch_size_) {
           const uint8_t* data_ptr;
           size_t batch1_bytesize;
-          RETURN_IF_ERROR(GetInputData(
+          RETURN_IF_ERROR(data_loader_->GetInputData(
               input, &data_ptr, &batch1_bytesize,
-              (j + count) % json_step_num_[i], i));
+              (j + count) % data_loader_->GetTotalSteps(i), i));
           data_ptrs.push_back(data_ptr);
           byte_size.push_back(batch1_bytesize);
           alloc_size += batch1_bytesize;
@@ -489,7 +499,8 @@ LoadManager::PrepareInfer(
 
     const uint8_t* data_ptr;
     size_t batch1_bytesize;
-    RETURN_IF_ERROR(GetInputData(input, &data_ptr, &batch1_bytesize));
+    RETURN_IF_ERROR(
+        data_loader_->GetInputData(input, &data_ptr, &batch1_bytesize));
 
     for (size_t i = 0; i < batch_size_; ++i) {
       RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
@@ -557,301 +568,24 @@ LoadManager::PrepareSharedMemoryInfer(
 }
 
 nic::Error
-LoadManager::ReadDataFromDir(
-    std::vector<std::shared_ptr<nic::InferContext::Input>> inputs,
-    const std::string& data_directory)
-{
-  // Directory structure supports only a single data step
-  json_data_stream_cnt_ = 1;
-  json_step_num_.push_back(1);
-
-  for (const auto& input : inputs) {
-    if (input->DType() != ni::DataType::TYPE_STRING) {
-      const auto file_path = data_directory + "/" + input->Name();
-      std::string key_name(
-          input->Name() + "_" + std::to_string(0) + "_" + std::to_string(0));
-      auto it = input_data_.emplace(key_name, std::vector<char>()).first;
-      RETURN_IF_ERROR(ReadFile(file_path, &it->second));
-      size_t batch1_size = input->ByteSize();
-      if (batch1_size != it->second.size()) {
-        return nic::Error(
-            ni::RequestStatusCode::INVALID_ARG,
-            "input '" + input->Name() + "' requires " +
-                std::to_string(batch1_size) +
-                " bytes for each batch, but provided data has " +
-                std::to_string(it->second.size()) + " bytes");
-      }
-    } else {
-      const auto file_path = data_directory + "/" + input->Name();
-      std::vector<std::string> input_string_data;
-      RETURN_IF_ERROR(ReadTextFile(file_path, &input_string_data));
-      // Get the number of strings needed for this input batch-1
-      size_t batch1_num_strings = GetElementCount(input);
-      if (input_string_data.size() != batch1_num_strings) {
-        return nic::Error(
-            ni::RequestStatusCode::INVALID_ARG,
-            "input '" + input->Name() + "' requires " +
-                std::to_string(batch1_num_strings) +
-                " strings for each batch, but provided data has " +
-                std::to_string(input_string_data.size()) + " strings.");
-      }
-      std::string key_name(
-          input->Name() + "_" + std::to_string(0) + "_" + std::to_string(0));
-      auto it = input_data_.emplace(key_name, std::vector<char>()).first;
-      SerializeStringTensor(input_string_data, &it->second);
-    }
-  }
-  return nic::Error::Success;
-}
-
-
-nic::Error
-LoadManager::ReadDataFromJSON(
-    std::vector<std::shared_ptr<nic::InferContext::Input>> inputs,
-    const std::string& json_file)
-{
-  FILE* data_file = fopen(json_file.c_str(), "r");
-  if (data_file == nullptr) {
-    return nic::Error(
-        ni::RequestStatusCode::INVALID_ARG,
-        "failed to open file for reading input data");
-  }
-
-  char readBuffer[65536];
-  rapidjson::FileReadStream fs(data_file, readBuffer, sizeof(readBuffer));
-
-  rapidjson::Document d{};
-  d.ParseStream(fs);
-  if (d.HasParseError()) {
-    std::cerr << "Error  : " << d.GetParseError() << '\n'
-              << "Offset : " << d.GetErrorOffset() << '\n';
-    return nic::Error(
-        ni::RequestStatusCode::INVALID_ARG,
-        "failed to parse the specified json file for reading inputs");
-  }
-
-  int count = 0;
-  if (d.HasMember("count")) {
-    if (!d["count"].IsInt()) {
-      return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "The count field in the json should be of type int");
-    }
-    count = d["count"].GetInt();
-  }
-
-  if (!d.HasMember("data")) {
-    return nic::Error(
-        ni::RequestStatusCode::INVALID_ARG,
-        "The json file doesn't contain data field");
-  }
-
-  const rapidjson::Value& sequences = d["data"];
-  json_data_stream_cnt_ =
-      (count == 0) ? sequences.Size() : std::min((int)sequences.Size(), count);
-  json_step_num_.reserve(json_data_stream_cnt_);
-
-  for (int i = 0; i < json_data_stream_cnt_; i++) {
-    const rapidjson::Value& steps = sequences[i];
-    json_step_num_[i] = steps.Size();
-
-    for (int k = 0; k < json_step_num_[i]; k++) {
-      for (const auto& input : inputs) {
-        if (steps[k].HasMember((input->Name()).c_str())) {
-          std::string key_name(
-              input->Name() + "_" + std::to_string(i) + "_" +
-              std::to_string(k));
-
-          auto it = input_data_.emplace(key_name, std::vector<char>()).first;
-
-          const rapidjson::Value& tensor = steps[k][(input->Name()).c_str()];
-          if (tensor.IsArray()) {
-            const size_t batch1_element_cnt = GetElementCount(input);
-            if (batch1_element_cnt != tensor.Size()) {
-              return nic::Error(
-                  ni::RequestStatusCode::INVALID_ARG,
-                  "mismatch in the number of elements of provided. Expected: " +
-                      std::to_string(batch1_element_cnt) +
-                      ", Got: " + std::to_string(tensor.Size()) +
-                      "( Location stream id: " + std::to_string(i) +
-                      ", Step id: " + std::to_string(k) + ")");
-            }
-            RETURN_IF_ERROR(
-                SerializeExplicitTensor(tensor, input->DType(), &it->second));
-          } else {
-            if (tensor.HasMember("b64")) {
-              if (tensor["b64"].IsString()) {
-                RETURN_IF_ERROR(
-                    DecodeFromBase64(tensor["b64"].GetString(), &it->second));
-                size_t batch1_byte = input->ByteSize();
-                if (batch1_byte != it->second.size()) {
-                  return nic::Error(
-                      ni::RequestStatusCode::INVALID_ARG,
-                      "mismatch in the data provided. "
-                      "Expected: " +
-                          std::to_string(batch1_byte) +
-                          " bytes, Got: " + std::to_string(it->second.size()) +
-                          " bytes ( Location stream id: " + std::to_string(i) +
-                          ", Step id: " + std::to_string(k) + ")");
-                }
-              } else {
-                return nic::Error(
-                    ni::RequestStatusCode::INVALID_ARG,
-                    "the value of b64 field should be of type string ( "
-                    "Location stream id: " +
-                        std::to_string(i) + ", Step id: " + std::to_string(k) +
-                        ")");
-              }
-            } else {
-              return nic::Error(
-                  ni::RequestStatusCode::INVALID_ARG,
-                  "The input values are not supported. Expected an array or "
-                  "b64 string ( Location stream id: " +
-                      std::to_string(i) + ", Step id: " + std::to_string(k) +
-                      ")");
-            }
-          }
-        } else {
-          return nic::Error(
-              ni::RequestStatusCode::INVALID_ARG,
-              "missing input " + input->Name() + "( Location stream id: " +
-                  std::to_string(i) + ", Step id: " + std::to_string(k) + ")");
-        }
-      }
-    }
-  }
-
-  max_non_sequence_step_id_ =
-      std::max(1, (json_step_num_[0] / (int)batch_size_));
-
-  fclose(data_file);
-  return nic::Error::Success;
-}
-
-
-nic::Error
-LoadManager::GenerateData(
-    std::vector<std::shared_ptr<nic::InferContext::Input>> inputs,
-    const bool zero_input, const size_t string_length,
-    const std::string& string_data)
-{
-  // Data Generation supports only a single data step
-  json_data_stream_cnt_ = 1;
-  json_step_num_.push_back(1);
-
-  uint64_t max_input_byte_size = 0;
-  for (const auto& input : inputs) {
-    if (input->DType() != ni::DataType::TYPE_STRING) {
-      max_input_byte_size =
-          std::max(max_input_byte_size, (size_t)input->ByteSize());
-    } else {
-      // Generate string input and store it into map
-      std::vector<std::string> input_string_data;
-      size_t batch1_num_strings = GetElementCount(input);
-      input_string_data.resize(batch1_num_strings);
-      if (!string_data.empty()) {
-        for (size_t i = 0; i < batch1_num_strings; i++) {
-          input_string_data[i] = string_data;
-        }
-      } else {
-        for (size_t i = 0; i < batch1_num_strings; i++) {
-          input_string_data[i] = GetRandomString(string_length);
-        }
-      }
-
-      std::string key_name(
-          input->Name() + "_" + std::to_string(0) + "_" + std::to_string(0));
-      auto it = input_data_.emplace(key_name, std::vector<char>()).first;
-      SerializeStringTensor(input_string_data, &it->second);
-    }
-  }
-
-  // Create a zero or randomly (as indicated by zero_input)
-  // initialized buffer that is large enough to provide the largest
-  // needed input. We (re)use this buffer for all non-string input values.
-  if (max_input_byte_size > 0) {
-    if (zero_input) {
-      input_buf_.resize(max_input_byte_size, 0);
-    } else {
-      input_buf_.resize(max_input_byte_size);
-      for (auto& byte : input_buf_) {
-        byte = rand();
-      }
-    }
-  }
-
-  return nic::Error::Success;
-}
-
-nic::Error
-LoadManager::GetInputData(
-    std::shared_ptr<nic::InferContext::Input> input, const uint8_t** data,
-    size_t* batch1_size, const int step_id, const int sequence_id)
-{
-  // If json data is available then try to retrieve the data from there
-  if (!input_data_.empty()) {
-    // validate if the indices conform to the vector sizes
-    if (sequence_id < 0 || sequence_id >= json_data_stream_cnt_) {
-      return nic::Error(
-          ni::RequestStatusCode::INTERNAL,
-          "sequence_id for retrieving the data should be less than " +
-              std::to_string(json_data_stream_cnt_) + " .");
-    }
-    if (step_id < 0 || step_id >= json_step_num_[sequence_id]) {
-      return nic::Error(
-          ni::RequestStatusCode::INTERNAL,
-          "step_id for retrieving the data should be less than " +
-              std::to_string(json_step_num_[sequence_id]) + " .");
-    }
-    std::string key_name(
-        input->Name() + "_" + std::to_string(sequence_id) + "_" +
-        std::to_string(step_id));
-    auto it = input_data_.find(key_name);
-    if (it != input_data_.end()) {
-      if (input->DType() != ni::DataType::TYPE_STRING) {
-        *batch1_size = (size_t)input->ByteSize();
-      } else {
-        std::vector<char>* string_data;
-        string_data = &it->second;
-        *batch1_size = string_data->size();
-      }
-      *data = (const uint8_t*)&((it->second)[0]);
-    } else {
-      return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "unable to find data for input '" + input->Name() +
-              "' in provided data.");
-    }
-  } else if (
-      (input->DType() != ni::DataType::TYPE_STRING) &&
-      (input_buf_.size() != 0)) {
-    *batch1_size = (size_t)input->ByteSize();
-    *data = &input_buf_[0];
-  } else {
-    return nic::Error(
-        ni::RequestStatusCode::INVALID_ARG,
-        "unable to find data for input '" + input->Name() + "'.");
-  }
-  return nic::Error::Success;
-}
-
-nic::Error
 LoadManager::UpdateInputs(
     const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
     int stream_index, int step_index)
 {
-  // validate if the indices conform to the vector sizes
-  if (stream_index < 0 || stream_index >= json_data_stream_cnt_) {
+  // Validate update parameters here
+  size_t data_stream_count = data_loader_->GetDataStreamsCount();
+  if (stream_index < 0 || stream_index >= (int)data_stream_count) {
     return nic::Error(
         ni::RequestStatusCode::INTERNAL,
         "stream_index for retrieving the data should be less than " +
-            std::to_string(json_data_stream_cnt_) + " .");
+            std::to_string(data_stream_count) + " .");
   }
-  if (step_index < 0 || step_index >= json_step_num_[stream_index]) {
+  size_t step_count = data_loader_->GetTotalSteps(stream_index);
+  if (step_index < 0 || step_index >= (int)step_count) {
     return nic::Error(
         ni::RequestStatusCode::INTERNAL,
         "step_id for retrieving the data should be less than " +
-            std::to_string(json_step_num_[stream_index]) + ".");
+            std::to_string(step_count) + ".");
   }
 
   if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
@@ -876,14 +610,14 @@ LoadManager::SetInputs(
 
     if (!on_sequence_model_) {
       for (size_t i = 0; i < batch_size_; ++i) {
-        RETURN_IF_ERROR(GetInputData(
+        RETURN_IF_ERROR(data_loader_->GetInputData(
             input, &data_ptr, &batch1_bytesize,
-            (step_index + i) % json_step_num_[0], stream_index));
+            (step_index + i) % data_loader_->GetTotalSteps(0), stream_index));
         RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
       }
     } else {
       // Sequence models only support single batch_size_
-      RETURN_IF_ERROR(GetInputData(
+      RETURN_IF_ERROR(data_loader_->GetInputData(
           input, &data_ptr, &batch1_bytesize, step_index, stream_index));
       RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
     }
@@ -908,6 +642,24 @@ LoadManager::SetInputsSharedMemory(
         region_name, 0, shared_memory_regions_[region_name].second));
   }
   return nic::Error::Success;
+}
+
+void
+LoadManager::InitNewSequence(int sequence_id)
+{
+  sequence_stat_[sequence_id]->corr_id_ = next_corr_id_++;
+  if (!using_json_data_) {
+    size_t new_length = GetRandomLength(0.2);
+    sequence_stat_[sequence_id]->remaining_queries_ =
+        new_length == 0 ? 1 : new_length;
+  } else {
+    sequence_stat_[sequence_id]->data_stream_id_ =
+        sequence_stat_[sequence_id]->corr_id_ %
+        data_loader_->GetDataStreamsCount();
+    sequence_stat_[sequence_id]->remaining_queries_ =
+        data_loader_->GetTotalSteps(
+            sequence_stat_[sequence_id]->data_stream_id_);
+  }
 }
 
 size_t

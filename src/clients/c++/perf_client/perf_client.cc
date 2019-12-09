@@ -572,7 +572,7 @@ main(int argc, char** argv)
   std::unordered_map<std::string, std::vector<int64_t>> input_shapes;
   size_t string_length = 128;
   std::string string_data;
-  std::string user_data("");
+  std::vector<std::string> user_data;
   bool zero_input = false;
   int32_t concurrent_request_count = 1;
   size_t max_concurrency = 0;
@@ -641,7 +641,7 @@ main(int argc, char** argv)
         percentile = std::atoi(optarg);
         break;
       case 4:
-        user_data = optarg;
+        user_data.push_back(optarg);
         break;
       case 5: {
         std::string arg = optarg;
@@ -724,7 +724,7 @@ main(int argc, char** argv)
         std::string arg = optarg;
         // Check whether the argument is a directory
         if (IsDirectory(arg) || IsFile(arg)) {
-          user_data = optarg;
+          user_data.push_back(optarg);
         } else if (arg.compare("zero") == 0) {
           zero_input = true;
         } else if (arg.compare("random") == 0) {

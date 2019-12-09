@@ -37,6 +37,7 @@ set(
   context_factory.cc
   inference_profiler.cc
   perf_utils.cc
+  data_loader.cc
   load_manager.cc
   concurrency_manager.cc
   request_rate_manager.cc
@@ -49,6 +50,7 @@ set(
   context_factory.h
   inference_profiler.h
   perf_utils.h
+  data_loader.h
   load_manager.h
   concurrency_manager.h
   request_rate_manager.h

@@ -42,8 +42,8 @@ ConcurrencyManager::Create(
     const size_t string_length, const std::string& string_data,
     const bool zero_input,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-    const std::string& user_data, const SharedMemoryType shared_memory_type,
-    const size_t output_shm_size,
+    std::vector<std::string>& user_data,
+    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
@@ -142,10 +142,8 @@ ConcurrencyManager::Infer(
     std::shared_ptr<ThreadConfig> thread_config)
 {
   std::vector<std::unique_ptr<InferContextMetaData>> ctxs;
-  std::queue<int> free_ctx_ids;
-
   uint32_t seq_id = 0, ctx_id = 0;
-  std::atomic<int> total_ongoing_requests(0);
+  std::queue<int> free_ctx_ids;
 
   // Reserve the vectors in case of sequence models. In non-sequence or
   // synchronous mode only one context will be opened hence no need of
@@ -162,6 +160,8 @@ ConcurrencyManager::Infer(
   std::mutex cb_mtx;
   std::condition_variable cb_cv;
 
+  std::atomic<int> total_ongoing_requests(0);
+
   // run inferencing until receiving exit signal to maintain server load.
   do {
     // Only interact with synchronous mechanism if the worker should wait
@@ -176,7 +176,7 @@ ConcurrencyManager::Infer(
     size_t num_reqs = thread_config->concurrency_;
 
     // If the model is non-sequence model, use one InferContext to maintain
-    // concurrency for this thread
+    // concurrency for this thread.
     size_t active_ctx_cnt = on_sequence_model_ ? num_reqs : 1;
 
     while (active_ctx_cnt > ctxs.size()) {
@@ -197,9 +197,9 @@ ConcurrencyManager::Infer(
     while (total_ongoing_requests < (int)num_reqs) {
       // Update the inputs if required for non-sequence
       if (using_json_data_ && (!on_sequence_model_)) {
-        int step_id =
-            (thread_config->non_sequence_step_id_ % max_non_sequence_step_id_) *
-            batch_size_;
+        int step_id = (thread_config->non_sequence_step_id_ %
+                       data_loader_->GetTotalStepsNonSequence()) *
+                      batch_size_;
         thread_config->non_sequence_step_id_ += active_threads_;
         // There will be only one ctx in non-sequence case
         thread_stat->status_ =
@@ -212,58 +212,50 @@ ConcurrencyManager::Infer(
       uint32_t flags = 0;
       if (on_sequence_model_) {
         flags = 0;
-        // Select the next sequence id in the range of the worker thread
+
         size_t offset = 0;
         for (size_t i = 0; i < thread_config->thread_id_; i++) {
           offset += threads_config_[i]->concurrency_;
         }
 
+        // Find the next available context id to use for this request
         ctx_id = free_ctx_ids.front();
         free_ctx_ids.pop();
         seq_id = offset + ctx_id;
 
-        // No need to lock because different worker threads dispatch distinct
-        // sequences
-        if (sequence_stat_[seq_id]->remaining_queries_ == 0) {
-          flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;
-          // Update the correlation id to the next available unique id
-          sequence_stat_[seq_id]->corr_id_ = next_corr_id_++;
-          if (!using_json_data_) {
-            size_t new_length = GetRandomLength(0.2);
-            sequence_stat_[seq_id]->remaining_queries_ =
-                new_length == 0 ? 1 : new_length;
-          } else {
-            sequence_stat_[seq_id]->data_stream_id_ =
-                sequence_stat_[seq_id]->corr_id_ % json_data_stream_cnt_;
-            sequence_stat_[seq_id]->remaining_queries_ =
-                json_step_num_[sequence_stat_[seq_id]->data_stream_id_];
+        {
+          std::lock_guard<std::mutex> guard(sequence_stat_[seq_id]->mtx_);
+          if (sequence_stat_[seq_id]->remaining_queries_ == 0) {
+            flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;
+            InitNewSequence(seq_id);
           }
-        }
-        if (sequence_stat_[seq_id]->remaining_queries_ == 1) {
-          flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
-        }
-        options->SetFlag(
-            ni::InferRequestHeader::FLAG_SEQUENCE_START,
-            flags & ni::InferRequestHeader::FLAG_SEQUENCE_START);
-        options->SetFlag(
-            ni::InferRequestHeader::FLAG_SEQUENCE_END,
-            flags & ni::InferRequestHeader::FLAG_SEQUENCE_END);
-
-        // Override the correlation ID.
-        options->SetCorrelationId(sequence_stat_[seq_id]->corr_id_);
-        ctxs[ctx_id]->ctx_->SetRunOptions(*options);
-
-        // Update the inputs if required
-        if (using_json_data_) {
-          int step_id =
-              json_step_num_[sequence_stat_[seq_id]->data_stream_id_] -
-              sequence_stat_[seq_id]->remaining_queries_;
-          thread_stat->status_ = UpdateInputs(
-              ctxs[ctx_id]->ctx_->Inputs(),
-              sequence_stat_[seq_id]->data_stream_id_, step_id);
-          if (!thread_stat->status_.IsOk()) {
-            return;
+          if (sequence_stat_[seq_id]->remaining_queries_ == 1) {
+            flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
           }
+          options->SetFlag(
+              ni::InferRequestHeader::FLAG_SEQUENCE_START,
+              flags & ni::InferRequestHeader::FLAG_SEQUENCE_START);
+          options->SetFlag(
+              ni::InferRequestHeader::FLAG_SEQUENCE_END,
+              flags & ni::InferRequestHeader::FLAG_SEQUENCE_END);
+
+          // Override the correlation ID.
+          options->SetCorrelationId(sequence_stat_[seq_id]->corr_id_);
+          ctxs[ctx_id]->ctx_->SetRunOptions(*options);
+
+          // Update the inputs if required
+          if (using_json_data_) {
+            int step_id = data_loader_->GetTotalSteps(
+                              sequence_stat_[seq_id]->data_stream_id_) -
+                          sequence_stat_[seq_id]->remaining_queries_;
+            thread_stat->status_ = UpdateInputs(
+                ctxs[ctx_id]->ctx_->Inputs(),
+                sequence_stat_[seq_id]->data_stream_id_, step_id);
+            if (!thread_stat->status_.IsOk()) {
+              return;
+            }
+          }
+          sequence_stat_[seq_id]->remaining_queries_--;
         }
       }
       if (async_) {
@@ -298,7 +290,7 @@ ConcurrencyManager::Infer(
                 notified = true;
               }
               total_ongoing_requests--;
-              
+
               cb_cv.notify_all();
             });
         if (!thread_stat->status_.IsOk()) {
@@ -323,10 +315,8 @@ ConcurrencyManager::Infer(
           ctxs[ctx_id]->ctx_->GetStat(&(thread_stat->contexts_stat_[ctx_id]));
         }
       }
+      free_ctx_ids.push(ctx_id);
       total_ongoing_requests++;
-      if (on_sequence_model_) {
-        sequence_stat_[seq_id]->remaining_queries_--;
-      }
     }
 
     if (async_) {
