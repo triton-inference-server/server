@@ -33,39 +33,6 @@ ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:20.02-py3
 ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:20.02-tf1-py3
 
 ############################################################################
-## TensorFlow stage: Use TensorFlow container to build
-############################################################################
-FROM ${TENSORFLOW_IMAGE} AS trtserver_tf
-
-# Modify the TF model loader to allow us to set the default GPU for
-# multi-GPU support
-COPY tools/patch/tensorflow /tmp/trtis/tools/patch/tensorflow
-RUN sha1sum -c /tmp/trtis/tools/patch/tensorflow/checksums && \
-    patch -i /tmp/trtis/tools/patch/tensorflow/cc/saved_model/loader.cc \
-          /opt/tensorflow/tensorflow-source/tensorflow/cc/saved_model/loader.cc && \
-    patch -i /tmp/trtis/tools/patch/tensorflow/BUILD \
-          /opt/tensorflow/tensorflow-source/tensorflow/BUILD && \
-    patch -i /tmp/trtis/tools/patch/tensorflow/tf_version_script.lds \
-          /opt/tensorflow/tensorflow-source/tensorflow/tf_version_script.lds && \
-    patch -i /tmp/trtis/tools/patch/tensorflow/nvbuild.sh \
-          /opt/tensorflow/nvbuild.sh && \
-    patch -i /tmp/trtis/tools/patch/tensorflow/nvbuildopts \
-          /opt/tensorflow/nvbuildopts && \
-    patch -i /tmp/trtis/tools/patch/tensorflow/bazel_build.sh \
-          /opt/tensorflow/bazel_build.sh
-
-# Copy tensorflow_backend_tf into TensorFlow so it builds into the
-# monolithic libtensorflow_cc library. We want tensorflow_backend_tf
-# to build against the TensorFlow protobuf since it interfaces with
-# that code.
-COPY src/backends/tensorflow/tensorflow_backend_tf.* \
-     /opt/tensorflow/tensorflow-source/tensorflow/
-
-# Build TensorFlow library for TRTIS
-WORKDIR /opt/tensorflow
-RUN ./nvbuild.sh --python3.6
-
-############################################################################
 ## PyTorch stage: Use PyTorch container for Caffe2 and libtorch
 ############################################################################
 FROM ${PYTORCH_IMAGE} AS trtserver_pytorch
@@ -175,6 +142,11 @@ RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspac
             --build
 
 ############################################################################
+## TensorFlow stage: Use TensorFlow container
+############################################################################
+FROM ${TENSORFLOW_IMAGE} AS trtserver_tf
+
+############################################################################
 ## Build stage: Build inference server
 ############################################################################
 FROM ${BASE_IMAGE} AS trtserver_build
@@ -217,17 +189,20 @@ RUN apt-get update && \
     fi && \
     rm -rf /var/lib/apt/lists/*
 
-# TensorFlow libraries. Install the monolithic libtensorflow_cc and
-# create a link libtensorflow_framework.so -> libtensorflow_cc.so so
-# that custom tensorflow operations work correctly. Custom TF
-# operations link against libtensorflow_framework.so so it must be
-# present (and its functionality is provided by libtensorflow_cc.so).
+# TensorFlow libraries. Install the monolithic libtensorflow_trtis and
+# create links from libtensorflow_framework.so and
+# libtensorflow_cc.so.  Custom TF operations link against
+# libtensorflow_framework.so so it must be present (and that
+# functionality is provided by libtensorflow_trtis.so).
 COPY --from=trtserver_tf \
-     /usr/local/lib/tensorflow/libtensorflow_cc.so.1 /opt/tensorrtserver/lib/tensorflow/
+     /usr/local/lib/tensorflow/libtensorflow_trtis.so.1 \
+     /opt/tensorrtserver/lib/tensorflow/
 RUN cd /opt/tensorrtserver/lib/tensorflow && \
-    patchelf --set-rpath '$ORIGIN' libtensorflow_cc.so.1 && \
-    ln -sf libtensorflow_cc.so.1 libtensorflow_framework.so.1 && \
-    ln -sf libtensorflow_cc.so.1 libtensorflow_framework.so && \
+    patchelf --set-rpath '$ORIGIN' libtensorflow_trtis.so.1 && \
+    ln -sf libtensorflow_trtis.so.1 libtensorflow_trtis.so && \
+    ln -sf libtensorflow_trtis.so.1 libtensorflow_framework.so.1 && \
+    ln -sf libtensorflow_framework.so.1 libtensorflow_framework.so && \
+    ln -sf libtensorflow_trtis.so.1 libtensorflow_cc.so.1 && \
     ln -sf libtensorflow_cc.so.1 libtensorflow_cc.so
 
 # Caffe2 libraries
