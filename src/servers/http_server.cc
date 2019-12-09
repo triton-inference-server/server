@@ -29,6 +29,7 @@
 #include <event2/buffer.h>
 #include <evhtp/evhtp.h>
 #include <google/protobuf/text_format.h>
+#include <google/protobuf/util/json_util.h>
 #include <re2/re2.h>
 #include <algorithm>
 #include <thread>
@@ -588,10 +589,19 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
           err = TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
         } else {
-          std::string server_status_str = server_status.DebugString();
-          evbuffer_add(
-              req->buffer_out, server_status_str.c_str(),
-              server_status_str.size());
+          if (format == "json") {
+            std::string server_status_json;
+            ::google::protobuf::util::MessageToJsonString(
+                server_status, &server_status_json);
+            evbuffer_add(
+                req->buffer_out, server_status_json.c_str(),
+                server_status_json.size());
+          } else {
+            std::string server_status_str = server_status.DebugString();
+            evbuffer_add(
+                req->buffer_out, server_status_str.c_str(),
+                server_status_str.size());
+          }
         }
       }
     }
