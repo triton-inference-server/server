@@ -86,7 +86,6 @@ for FRAMEWORK in graphdef plan graphdef_trt; do
     else
         REPO=`pwd`/tftrt_models
     fi
-    FRAMEWORK=$(echo ${FRAMEWORK} | cut -d '_' -f 1)
     MODEL_NAME=${MODEL_NAME} \
             MODEL_FRAMEWORK=${FRAMEWORK} \
             MODEL_PATH="$REPO/${MODEL_NAME}" \
@@ -141,7 +140,6 @@ for FRAMEWORK in graphdef plan graphdef_trt; do
     else
         REPO=`pwd`/tftrt_models
     fi
-    FRAMEWORK=$(echo ${FRAMEWORK} | cut -d '_' -f 1)
     MODEL_NAME=${MODEL_NAME} \
             MODEL_FRAMEWORK=${FRAMEWORK} \
             MODEL_PATH="$REPO/${MODEL_NAME}" \
@@ -196,7 +194,6 @@ for FRAMEWORK in graphdef plan graphdef_trt; do
     else
         REPO=`pwd`/tftrt_models
     fi
-    FRAMEWORK=$(echo ${FRAMEWORK} | cut -d '_' -f 1)
     MODEL_NAME=${MODEL_NAME} \
             MODEL_FRAMEWORK=${FRAMEWORK} \
             MODEL_PATH="$REPO/${MODEL_NAME}" \
