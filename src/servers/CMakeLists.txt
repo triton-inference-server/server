@@ -376,7 +376,7 @@ if(${TRTIS_ENABLE_TENSORFLOW})
   target_link_libraries(
     trtserver
     PUBLIC ${TRTIS_EXTRA_LDFLAGS}
-    PUBLIC -ltensorflow_cc
+    PUBLIC -ltensorflow_trtis
   )
 endif() # TRTIS_ENABLE_TENSORFLOW
 
