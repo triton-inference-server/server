@@ -1017,31 +1017,6 @@ main(int argc, char** argv)
     max_threads = 16;
   }
 
-  if (target_concurrency) {
-    if (!async) {
-      if (concurrency_range[SEARCH_RANGE::kEND] == NO_LIMIT) {
-        std::cerr
-            << "WARNING: The maximum attainable concurrency will be limited by "
-               "max_threads specification."
-            << std::endl;
-        concurrency_range[SEARCH_RANGE::kEND] = max_threads;
-      } else {
-        // As only one synchronous request can be generated from a thread at a
-        // time, to maintain the requested concurrency, that many threads need
-        // to be generated.
-        if (max_threads_specified) {
-          std::cerr
-              << "WARNING: Overriding max_threads specification to ensure "
-                 "requested concurrency range."
-              << std::endl;
-        }
-        max_threads = std::max(
-            concurrency_range[SEARCH_RANGE::kSTART],
-            concurrency_range[SEARCH_RANGE::kEND]);
-      }
-    }
-  }
-
   // trap SIGINT to allow threads to exit gracefully
   signal(SIGINT, SignalHandler);
 
@@ -1078,6 +1053,30 @@ main(int argc, char** argv)
     max_concurrency = std::max(
         concurrency_range[SEARCH_RANGE::kSTART],
         concurrency_range[SEARCH_RANGE::kEND]);
+
+
+    if (!async) {
+      if (concurrency_range[SEARCH_RANGE::kEND] == NO_LIMIT) {
+        std::cerr
+            << "WARNING: The maximum attainable concurrency will be limited by "
+               "max_threads specification."
+            << std::endl;
+        concurrency_range[SEARCH_RANGE::kEND] = max_threads;
+      } else {
+        // As only one synchronous request can be generated from a thread at a
+        // time, to maintain the requested concurrency, that many threads need
+        // to be generated.
+        if (max_threads_specified) {
+          std::cerr
+              << "WARNING: Overriding max_threads specification to ensure "
+                 "requested concurrency range."
+              << std::endl;
+        }
+        max_threads = std::max(
+            concurrency_range[SEARCH_RANGE::kSTART],
+            concurrency_range[SEARCH_RANGE::kEND]);
+      }
+    }
 
     err = ConcurrencyManager::Create(
         async, batch_size, max_threads, max_concurrency, sequence_length,

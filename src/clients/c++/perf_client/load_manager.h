@@ -204,7 +204,7 @@ class LoadManager {
     // The status of the worker thread
     nic::Error status_;
     // The statistics of the InferContext
-    nic::InferContext::Stat context_stat_;
+    std::vector<nic::InferContext::Stat> contexts_stat_;
     //  The concurrency level that the worker should produce
     size_t concurrency_;
     // A vector of request timestamps <start_time, end_time>
@@ -226,7 +226,7 @@ class LoadManager {
   };
 
   std::vector<std::shared_ptr<SequenceStat>> sequence_stat_;
-  ni::CorrelationID next_corr_id_;
+  std::atomic<ni::CorrelationID> next_corr_id_;
 
   // Worker threads that loads the server with inferences
   std::vector<std::thread> threads_;

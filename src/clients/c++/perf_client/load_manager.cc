@@ -152,18 +152,20 @@ LoadManager::SwapTimestamps(TimestampVector& new_timestamps)
 }
 
 nic::Error
-LoadManager::GetAccumulatedContextStat(nic::InferContext::Stat* context_stat)
+LoadManager::GetAccumulatedContextStat(nic::InferContext::Stat* contexts_stat)
 {
   for (auto& thread_stat : threads_stat_) {
     std::lock_guard<std::mutex> lock(thread_stat->mu_);
-    context_stat->completed_request_count +=
-        thread_stat->context_stat_.completed_request_count;
-    context_stat->cumulative_total_request_time_ns +=
-        thread_stat->context_stat_.cumulative_total_request_time_ns;
-    context_stat->cumulative_send_time_ns +=
-        thread_stat->context_stat_.cumulative_send_time_ns;
-    context_stat->cumulative_receive_time_ns +=
-        thread_stat->context_stat_.cumulative_receive_time_ns;
+    for (auto& context_stat : thread_stat->contexts_stat_) {
+      contexts_stat->completed_request_count +=
+          context_stat.completed_request_count;
+      contexts_stat->cumulative_total_request_time_ns +=
+          context_stat.cumulative_total_request_time_ns;
+      contexts_stat->cumulative_send_time_ns +=
+          context_stat.cumulative_send_time_ns;
+      contexts_stat->cumulative_receive_time_ns +=
+          context_stat.cumulative_receive_time_ns;
+    }
   }
   return nic::Error::Success;
 }
@@ -733,6 +735,10 @@ LoadManager::GenerateData(
     const bool zero_input, const size_t string_length,
     const std::string& string_data)
 {
+  // Data Generation supports only a single data step
+  json_data_stream_cnt_ = 1;
+  json_step_num_.push_back(1);
+
   uint64_t max_input_byte_size = 0;
   for (const auto& input : inputs) {
     if (input->DType() != ni::DataType::TYPE_STRING) {

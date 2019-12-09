@@ -185,6 +185,7 @@ RequestRateManager::Infer(
     std::shared_ptr<ThreadConfig> thread_config)
 {
   std::shared_ptr<InferContextMetaData> ctx(new InferContextMetaData());
+  thread_stat->contexts_stat_.emplace_back();
 
   std::unique_ptr<nic::InferContext::Options> options(nullptr);
   if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
@@ -361,7 +362,7 @@ RequestRateManager::Request(
             std::lock_guard<std::mutex> lock(thread_stat->mu_);
             thread_stat->request_timestamps_.emplace_back(
                 std::make_tuple(start_time, end_time_async, flags, delayed));
-            context->ctx_->GetStat(&(thread_stat->context_stat_));
+            context->ctx_->GetStat(&(thread_stat->contexts_stat_[0]));
           }
           context->inflight_request_cnt_--;
         });
@@ -383,7 +384,7 @@ RequestRateManager::Request(
       std::lock_guard<std::mutex> lock(thread_stat->mu_);
       thread_stat->request_timestamps_.emplace_back(
           std::make_tuple(start_time, end_time_sync, flags, delayed));
-      context->ctx_->GetStat(&(thread_stat->context_stat_));
+      context->ctx_->GetStat(&(thread_stat->contexts_stat_[0]));
     }
   }
 }
