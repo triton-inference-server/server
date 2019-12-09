@@ -307,9 +307,11 @@ SequenceBatchScheduler::Enqueue(
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(const Status&)> OnComplete)
 {
+#ifdef TRTIS_ENABLE_STATS
   // Queue timer starts at the beginning of the queueing and
   // scheduling process
   stats->CaptureTimestamp(ModelInferStats::TimestampKind::kQueueStart);
+#endif  // TRTIS_ENABLE_STATS
 
   const auto& request_header = request_provider->RequestHeader();
 
@@ -1099,10 +1101,13 @@ DirectSequenceBatch::SchedulerThread(
         }
 
         // Complete each payload by calling the competion function.
+#ifdef TRTIS_ENABLE_STATS
         bool found_success = false;
+#endif  // TRTIS_ENABLE_STATS
         for (auto& payload : *payloads) {
           const Status& final_status = status.IsOk() ? payload.status_ : status;
 
+#ifdef TRTIS_ENABLE_STATS
           // All the payloads executed together, so count 1 execution
           // in the first successful payload. Other payloads stay at 0
           // executions.
@@ -1111,6 +1116,7 @@ DirectSequenceBatch::SchedulerThread(
             payload.stats_->SetModelExecutionCount(1);
             found_success = true;
           }
+#endif  // TRTIS_ENABLE_STATS
 
           if (payload.complete_function_ != nullptr) {
             payload.complete_function_(final_status);

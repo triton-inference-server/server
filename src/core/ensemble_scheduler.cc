@@ -600,7 +600,9 @@ EnsembleContext::ReshapeTensorDims(
 Status
 EnsembleContext::FinishEnsemble()
 {
+#ifdef TRTIS_ENABLE_STATS
   stats_->SetModelExecutionCount(1);
+#endif  // TRTIS_ENABLE_STATS
   if (ensemble_status_.IsOk()) {
     ensemble_status_ = CheckAndSetEnsembleOutput();
   }
@@ -718,6 +720,7 @@ EnsembleContext::ScheduleSteps(
     const std::shared_ptr<EnsembleContext>& context, const StepList& steps)
 {
   for (const auto& step : steps) {
+#ifdef TRTIS_ENABLE_STATS
     auto infer_stats = std::make_shared<ModelInferStats>(
         context->is_->StatusManager(), step->backend_->Name());
     infer_stats->CaptureTimestamp(
@@ -731,21 +734,28 @@ EnsembleContext::ScheduleSteps(
     // Passing trace-related objects down
     infer_stats->SetTraceManager(context->stats_->GetTraceManager());
     infer_stats->NewTrace(context->stats_->GetTrace());
+#else
+    auto infer_stats = std::make_shared<ModelInferStats>();
+#endif  // TRTIS_ENABLE_STATS
 
     context->is_->InferAsync(
         step->backend_, step->request_provider_, step->response_provider_,
         infer_stats,
         [context, step, infer_stats](const Status& status) mutable {
-          infer_stats->SetFailed(!status.IsOk());
           if (!status.IsOk()) {
             LOG_VERBOSE(1) << "Ensemble infer failed: " << status.Message();
           }
 
+#ifdef TRTIS_ENABLE_STATS
+          infer_stats->SetFailed(!status.IsOk());
           infer_stats->CaptureTimestamp(
               ModelInferStats::TimestampKind::kRequestEnd);
           infer_stats->Report();
+#endif  // TRTIS_ENABLE_STATS
+
           step->infer_status_ = status;
 
+#ifdef TRTIS_ENABLE_STATS
           {
             std::lock_guard<std::mutex> lk(context->mutex_);
             // Accumulate the queue and compute durations from this
@@ -753,6 +763,7 @@ EnsembleContext::ScheduleSteps(
             context->stats_->IncrementQueueDuration(*infer_stats);
             context->stats_->IncrementComputeDuration(*infer_stats);
           }
+#endif  // TRTIS_ENABLE_STATS
 
           Proceed(context, step);
         });

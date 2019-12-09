@@ -643,22 +643,26 @@ LibTorchBackend::Context::Run(
     SetInputTensor(input_meta_data[i], &(inputs_[i]));
   }
 
+#ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeInputEnd);
     }
   }
+#endif  // TRTIS_ENABLE_STATS
 
   // Run...
   RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
 
+#ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeOutputStart);
     }
   }
+#endif  // TRTIS_ENABLE_STATS
 
   // verify output indices are valid with number of outputs after execution
   for (const auto& output : base->Config().output()) {

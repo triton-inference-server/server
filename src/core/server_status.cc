@@ -337,6 +337,9 @@ ServerStatTimerScoped::~ServerStatTimerScoped()
   }
 }
 
+
+#ifdef TRTIS_ENABLE_STATS
+
 void
 ModelInferStats::NewTrace(TRTSERVER_Trace* parent)
 {
@@ -466,5 +469,7 @@ ModelInferStats::Duration(
 
   return (start_ns > end_ns) ? 0 : end_ns - start_ns;
 }
+
+#endif  // TRTIS_ENABLE_STATS
 
 }}  // namespace nvidia::inferenceserver

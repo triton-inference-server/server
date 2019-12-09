@@ -43,6 +43,7 @@ namespace nvidia { namespace inferenceserver {
 Metrics::Metrics()
     : registry_(std::make_shared<prometheus::Registry>()),
       serializer_(new prometheus::TextSerializer()),
+#ifdef TRTIS_ENABLE_STATS
       inf_success_family_(
           prometheus::BuildCounter()
               .Name("nv_inference_request_success")
@@ -79,6 +80,7 @@ Metrics::Metrics()
       inf_load_ratio_family_(prometheus::BuildHistogram()
                                  .Name("nv_inference_load_ratio")
                                  .Register(*registry_)),
+#endif  // TRTIS_ENABLE_STATS
       gpu_utilization_family_(prometheus::BuildGauge()
                                   .Name("nv_gpu_utilization")
                                   .Help("GPU utilization rate [0.0 - 1.0)")

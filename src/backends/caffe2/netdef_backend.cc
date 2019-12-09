@@ -552,12 +552,14 @@ NetDefBackend::Context::Run(
   }
 #endif  // TRTIS_ENABLE_GPU
 
+#ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeInputEnd);
     }
   }
+#endif  // TRTIS_ENABLE_STATS
 
   // Run...
   Caffe2Workspace::Error err = workspace_->Run();
@@ -565,12 +567,14 @@ NetDefBackend::Context::Run(
     return Status(RequestStatusCode::INTERNAL, err.Message());
   }
 
+#ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeOutputStart);
     }
   }
+#endif  // TRTIS_ENABLE_STATS
 
   // Make sure each output is of the expected size and copy it into
   // the payload responses.

@@ -52,6 +52,7 @@ class MetricModelReporter {
   // Get a metric for the backend specialized for the given GPU index
   // (if -1 then return non-specialized version of the metric).
 #ifdef TRTIS_ENABLE_METRICS
+#ifdef TRTIS_ENABLE_STATS
   prometheus::Counter& MetricInferenceSuccess(int gpu_device) const;
   prometheus::Counter& MetricInferenceFailure(int gpu_device) const;
   prometheus::Counter& MetricInferenceCount(int gpu_device) const;
@@ -60,6 +61,7 @@ class MetricModelReporter {
   prometheus::Counter& MetricInferenceComputeDuration(int gpu_device) const;
   prometheus::Counter& MetricInferenceQueueDuration(int gpu_device) const;
   prometheus::Histogram& MetricInferenceLoadRatio(int gpu_device) const;
+#endif  // TRTIS_ENABLE_STATS
 #endif  // TRTIS_ENABLE_METRICS
 
  private:
@@ -68,6 +70,7 @@ class MetricModelReporter {
   const MetricTagsMap model_tags_;
 
 #ifdef TRTIS_ENABLE_METRICS
+#ifdef TRTIS_ENABLE_STATS
   void GetMetricLabels(
       std::map<std::string, std::string>* labels, const int gpu_device) const;
   prometheus::Counter& GetCounterMetric(
@@ -83,6 +86,7 @@ class MetricModelReporter {
   mutable std::map<int, prometheus::Counter*> metric_inf_compute_duration_us_;
   mutable std::map<int, prometheus::Counter*> metric_inf_queue_duration_us_;
   mutable std::map<int, prometheus::Histogram*> metric_inf_load_ratio_;
+#endif  // TRTIS_ENABLE_STATS
 #endif  // TRTIS_ENABLE_METRICS
 };
 
