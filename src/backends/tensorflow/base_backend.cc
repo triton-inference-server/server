@@ -749,12 +749,14 @@ BaseBackend::Context::Run(
   }
 #endif  // TRTIS_ENABLE_GPU
 
+#ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeInputEnd);
     }
   }
+#endif  // TRTIS_ENABLE_STATS
 
   // Run. Session will update the 'output_tensors'.
   std::unique_ptr<TRTISTF_TensorList, decltype(&TRTISTF_TensorListDelete)>
@@ -768,12 +770,14 @@ BaseBackend::Context::Run(
     output_tensors.reset(rtl);
   }
 
+#ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeOutputStart);
     }
   }
+#endif  // TRTIS_ENABLE_STATS
 
   // Make sure each output is of the expected size and copy it into
   // the appropriate response providers.

@@ -617,12 +617,14 @@ OnnxBackend::Context::Run(
     output_tensors_.emplace_back(nullptr);
   }
 
+#ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeInputEnd);
     }
   }
+#endif  // TRTIS_ENABLE_STATS
 
   // Run...
   RETURN_IF_ORT_ERROR(ort_api->Run(
@@ -630,12 +632,14 @@ OnnxBackend::Context::Run(
       (const OrtValue* const*)input_tensors_.data(), input_tensors_.size(),
       output_names.data(), output_names.size(), output_tensors_.data()));
 
+#ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeOutputStart);
     }
   }
+#endif  // TRTIS_ENABLE_STATS
 
   // Make sure each output is of the expected size and copy it into
   // the payload responses.

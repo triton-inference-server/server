@@ -60,11 +60,16 @@ set(TRTIS_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for TRTIS build")
 set(TRTIS_CLIENT_CMAKE_DIR "" CACHE PATH "Path to TRTIS client library cmake configuration")
 
 option(TRTIS_ENABLE_LOGGING "Include logging support in server" ON)
+option(TRTIS_ENABLE_STATS "Include statistics collections in server" ON)
 option(TRTIS_ENABLE_TRACING "Include tracing support in server" OFF)
 option(TRTIS_ENABLE_ASAN "Build with address sanitizer" OFF)
 option(TRTIS_ENABLE_GPU "Enable GPU support in server/client" ON)
 set(TRTIS_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING
     "The minimum CUDA compute capability supported by TRTIS" )
+
+if(TRTIS_ENABLE_TRACING AND NOT TRTIS_ENABLE_STATS)
+  message(FATAL_ERROR "TRTIS_ENABLE_TRACING=ON requires TRTIS_ENABLE_STATS=ON")
+endif()
 
 if(TRTIS_ENABLE_TENSORRT AND NOT TRTIS_ENABLE_GPU)
   message(FATAL_ERROR "TRTIS_ENABLE_TENSORRT=ON requires TRTIS_ENABLE_GPU=ON")
@@ -448,6 +453,7 @@ ExternalProject_Add(trtis
     -DTRTIS_ENABLE_ASAN:BOOL=${TRTIS_ENABLE_ASAN}
     -DTRTIS_ENABLE_TRACING:BOOL=${TRTIS_ENABLE_TRACING}
     -DTRTIS_ENABLE_LOGGING:BOOL=${TRTIS_ENABLE_LOGGING}
+    -DTRTIS_ENABLE_STATS:BOOL=${TRTIS_ENABLE_STATS}
     -DTRTIS_ENABLE_GPU:BOOL=${TRTIS_ENABLE_GPU}
     -DTRTIS_ENABLE_HTTP:BOOL=${TRTIS_ENABLE_HTTP}
     -DTRTIS_ENABLE_GRPC:BOOL=${TRTIS_ENABLE_GRPC}

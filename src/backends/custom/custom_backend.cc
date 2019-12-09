@@ -421,12 +421,14 @@ CustomBackend::Context::Run(
     custom_payload.error_code = 0;
   }
 
+#ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeInputEnd);
     }
   }
+#endif  // TRTIS_ENABLE_STATS
 
   // Execute the custom backend which will use CustomGetOutput to get
   // the output buffers into which it will write the results for the
@@ -460,12 +462,14 @@ CustomBackend::Context::Run(
   cudaStreamSynchronize(stream_);
 #endif  // TRTIS_ENABLE_GPU
 
+#ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeOutputStart);
     }
   }
+#endif  // TRTIS_ENABLE_STATS
 
   if (err != 0) {
     return Status(

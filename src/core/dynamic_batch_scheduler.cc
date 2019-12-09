@@ -297,10 +297,13 @@ DynamicBatchScheduler::SchedulerThread(
 
     if ((payloads != nullptr) && !payloads->empty()) {
       auto OnCompleteQueuedPayloads = [payloads](const Status& status) {
+#ifdef TRTIS_ENABLE_STATS
         bool found_success = false;
+#endif  // TRTIS_ENABLE_STATS
         for (auto& payload : *payloads) {
           Status final_status = status.IsOk() ? payload.status_ : status;
 
+#ifdef TRTIS_ENABLE_STATS
           // All the payloads executed together, so count 1 execution in
           // the first successful payload. Other payloads stay at 0
           // executions.
@@ -309,6 +312,7 @@ DynamicBatchScheduler::SchedulerThread(
             payload.stats_->SetModelExecutionCount(1);
             found_success = true;
           }
+#endif  // TRTIS_ENABLE_STATS
 
           if (payload.complete_function_ != nullptr) {
             payload.complete_function_(final_status);

@@ -51,6 +51,7 @@ class Metrics {
   // if a UUID is found, return false if a UUID cannot be returned.
   static bool UUIDForCudaDevice(int cuda_device, std::string* uuid);
 
+#ifdef TRTIS_ENABLE_STATS
   // Metric family counting successful inference requests
   static prometheus::Family<prometheus::Counter>& FamilyInferenceSuccess()
   {
@@ -106,6 +107,7 @@ class Metrics {
   {
     return GetSingleton()->inf_load_ratio_family_;
   }
+#endif  // TRTIS_ENABLE_STATS
 
  private:
   Metrics();
@@ -116,6 +118,7 @@ class Metrics {
   std::shared_ptr<prometheus::Registry> registry_;
   std::unique_ptr<prometheus::Serializer> serializer_;
 
+#ifdef TRTIS_ENABLE_STATS
   prometheus::Family<prometheus::Counter>& inf_success_family_;
   prometheus::Family<prometheus::Counter>& inf_failure_family_;
   prometheus::Family<prometheus::Counter>& inf_count_family_;
@@ -124,6 +127,7 @@ class Metrics {
   prometheus::Family<prometheus::Counter>& inf_compute_duration_us_family_;
   prometheus::Family<prometheus::Counter>& inf_queue_duration_us_family_;
   prometheus::Family<prometheus::Histogram>& inf_load_ratio_family_;
+#endif  // TRTIS_ENABLE_STATS
   prometheus::Family<prometheus::Gauge>& gpu_utilization_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_total_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_used_family_;
