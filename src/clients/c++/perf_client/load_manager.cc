@@ -268,9 +268,13 @@ LoadManager::InitManagerInputs(
         RETURN_IF_ERROR(
             data_loader_->ReadDataFromJSON(ctx->Inputs(), json_file));
       }
-      std::cout << " Successfully read Data for "
-                << data_loader_->GetDataStreamsCount() << " stream/streams."
-                << std::endl;
+      std::cout << " Successfully read data for "
+                << data_loader_->GetDataStreamsCount() << " stream/streams";
+      if (data_loader_->GetDataStreamsCount() == 1) {
+        std::cout << " with " << data_loader_->GetTotalSteps(0)
+                  << " step/steps";
+      }
+      std::cout << "." << std::endl;
     }
   } else {
     RETURN_IF_ERROR(data_loader_->GenerateData(
@@ -362,8 +366,8 @@ LoadManager::InitSharedMemory()
           const uint8_t* data_ptr;
           size_t batch1_bytesize;
           RETURN_IF_ERROR(data_loader_->GetInputData(
-              input, &data_ptr, &batch1_bytesize,
-              (j + count) % data_loader_->GetTotalSteps(i), i));
+              input, i, (j + count) % data_loader_->GetTotalSteps(i), &data_ptr,
+              &batch1_bytesize));
           data_ptrs.push_back(data_ptr);
           byte_size.push_back(batch1_bytesize);
           alloc_size += batch1_bytesize;
@@ -500,7 +504,7 @@ LoadManager::PrepareInfer(
     const uint8_t* data_ptr;
     size_t batch1_bytesize;
     RETURN_IF_ERROR(
-        data_loader_->GetInputData(input, &data_ptr, &batch1_bytesize));
+        data_loader_->GetInputData(input, 0, 0, &data_ptr, &batch1_bytesize));
 
     for (size_t i = 0; i < batch_size_; ++i) {
       RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
@@ -578,20 +582,21 @@ LoadManager::UpdateInputs(
     return nic::Error(
         ni::RequestStatusCode::INTERNAL,
         "stream_index for retrieving the data should be less than " +
-            std::to_string(data_stream_count) + " .");
+            std::to_string(data_stream_count) + ", got " +
+            std::to_string(stream_index));
   }
   size_t step_count = data_loader_->GetTotalSteps(stream_index);
   if (step_index < 0 || step_index >= (int)step_count) {
     return nic::Error(
         ni::RequestStatusCode::INTERNAL,
         "step_id for retrieving the data should be less than " +
-            std::to_string(step_count) + ".");
+            std::to_string(step_count) + ", got " + std::to_string(step_index));
   }
 
   if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
-    RETURN_IF_ERROR(SetInputs(inputs, step_index, stream_index));
+    RETURN_IF_ERROR(SetInputs(inputs, stream_index, step_index));
   } else {
-    RETURN_IF_ERROR(SetInputsSharedMemory(inputs, step_index, stream_index));
+    RETURN_IF_ERROR(SetInputsSharedMemory(inputs, stream_index, step_index));
   }
 
   return nic::Error::Success;
@@ -600,7 +605,7 @@ LoadManager::UpdateInputs(
 nic::Error
 LoadManager::SetInputs(
     const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
-    const int step_index, const int stream_index)
+    const int stream_index, const int step_index)
 {
   for (const auto& input : inputs) {
     RETURN_IF_ERROR(input->Reset());
@@ -611,14 +616,14 @@ LoadManager::SetInputs(
     if (!on_sequence_model_) {
       for (size_t i = 0; i < batch_size_; ++i) {
         RETURN_IF_ERROR(data_loader_->GetInputData(
-            input, &data_ptr, &batch1_bytesize,
-            (step_index + i) % data_loader_->GetTotalSteps(0), stream_index));
+            input, 0, (step_index + i) % data_loader_->GetTotalSteps(0),
+            &data_ptr, &batch1_bytesize));
         RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
       }
     } else {
       // Sequence models only support single batch_size_
       RETURN_IF_ERROR(data_loader_->GetInputData(
-          input, &data_ptr, &batch1_bytesize, step_index, stream_index));
+          input, stream_index, step_index, &data_ptr, &batch1_bytesize));
       RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
     }
   }
@@ -629,7 +634,7 @@ LoadManager::SetInputs(
 nic::Error
 LoadManager::SetInputsSharedMemory(
     const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
-    const int step_index, const int stream_index)
+    const int stream_index, const int step_index)
 {
   for (const auto& input : inputs) {
     RETURN_IF_ERROR(input->Reset());

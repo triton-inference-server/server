@@ -41,7 +41,7 @@ DataLoader::ReadDataFromDir(
     std::vector<std::shared_ptr<nic::InferContext::Input>> inputs,
     const std::string& data_directory)
 {
-  // Directory structure supports only a single data step
+  // Directory structure supports only a single data stream and step
   data_stream_cnt_ = 1;
   step_num_.push_back(1);
 
@@ -127,78 +127,33 @@ DataLoader::ReadDataFromJSON(
         "The json file doesn't contain data field");
   }
 
-  const rapidjson::Value& sequences = d["data"];
+  const rapidjson::Value& streams = d["data"];
   data_stream_cnt_ +=
-      (count == 0) ? sequences.Size() : std::min((int)sequences.Size(), count);
+      (count == 0) ? streams.Size() : std::min((int)streams.Size(), count);
 
   int offset = step_num_.size();
   for (size_t i = offset; i < data_stream_cnt_; i++) {
-    const rapidjson::Value& steps = sequences[i - offset];
-    step_num_.push_back(steps.Size());
-
-    for (size_t k = 0; k < step_num_[i]; k++) {
-      for (const auto& input : inputs) {
-        if (steps[k].HasMember((input->Name()).c_str())) {
-          std::string key_name(
-              input->Name() + "_" + std::to_string(i) + "_" +
-              std::to_string(k));
-
-          auto it = input_data_.emplace(key_name, std::vector<char>()).first;
-
-          const rapidjson::Value& tensor = steps[k][(input->Name()).c_str()];
-          if (tensor.IsArray()) {
-            const size_t batch1_element_cnt = GetElementCount(input);
-            if (batch1_element_cnt != tensor.Size()) {
-              return nic::Error(
-                  ni::RequestStatusCode::INVALID_ARG,
-                  "mismatch in the number of elements of provided. Expected: " +
-                      std::to_string(batch1_element_cnt) +
-                      ", Got: " + std::to_string(tensor.Size()) +
-                      "( Location stream id: " + std::to_string(i) +
-                      ", Step id: " + std::to_string(k) + ")");
-            }
-            RETURN_IF_ERROR(
-                SerializeExplicitTensor(tensor, input->DType(), &it->second));
-          } else {
-            if (tensor.HasMember("b64")) {
-              if (tensor["b64"].IsString()) {
-                RETURN_IF_ERROR(
-                    DecodeFromBase64(tensor["b64"].GetString(), &it->second));
-                size_t batch1_byte = input->ByteSize();
-                if (batch1_byte != it->second.size()) {
-                  return nic::Error(
-                      ni::RequestStatusCode::INVALID_ARG,
-                      "mismatch in the data provided. "
-                      "Expected: " +
-                          std::to_string(batch1_byte) +
-                          " bytes, Got: " + std::to_string(it->second.size()) +
-                          " bytes ( Location stream id: " + std::to_string(i) +
-                          ", Step id: " + std::to_string(k) + ")");
-                }
-              } else {
-                return nic::Error(
-                    ni::RequestStatusCode::INVALID_ARG,
-                    "the value of b64 field should be of type string ( "
-                    "Location stream id: " +
-                        std::to_string(i) + ", Step id: " + std::to_string(k) +
-                        ")");
-              }
-            } else {
-              return nic::Error(
-                  ni::RequestStatusCode::INVALID_ARG,
-                  "The input values are not supported. Expected an array or "
-                  "b64 string ( Location stream id: " +
-                      std::to_string(i) + ", Step id: " + std::to_string(k) +
-                      ")");
-            }
-          }
-        } else {
-          return nic::Error(
-              ni::RequestStatusCode::INVALID_ARG,
-              "missing input " + input->Name() + "( Location stream id: " +
-                  std::to_string(i) + ", Step id: " + std::to_string(k) + ")");
-        }
+    const rapidjson::Value& steps = streams[i - offset];
+    if (steps.IsArray()) {
+      step_num_.push_back(steps.Size());
+      for (size_t k = 0; k < step_num_[i]; k++) {
+        RETURN_IF_ERROR(ReadInputTensorData(steps[k], inputs, i, k));
       }
+    } else {
+      // There is no nesting of tensors, hence, will interpret streams as steps
+      // and add the tensors to a single stream '0'.
+      int offset = 0;
+      if (step_num_.empty()) {
+        step_num_.push_back(data_stream_cnt_);
+      } else {
+        offset = step_num_[0];
+        step_num_[0] += data_stream_cnt_;
+      }
+      data_stream_cnt_ = 1;
+      for (size_t k = offset; k < step_num_[0]; k++) {
+        RETURN_IF_ERROR(ReadInputTensorData(streams[k], inputs, 0, k));
+      }
+      break;
     }
   }
 
@@ -215,7 +170,7 @@ DataLoader::GenerateData(
     const bool zero_input, const size_t string_length,
     const std::string& string_data)
 {
-  // Data Generation supports only a single data step
+  // Data generation supports only a single data stream and step
   data_stream_cnt_ = 1;
   step_num_.push_back(1);
 
@@ -265,26 +220,28 @@ DataLoader::GenerateData(
 
 nic::Error
 DataLoader::GetInputData(
-    std::shared_ptr<nic::InferContext::Input> input, const uint8_t** data,
-    size_t* batch1_size, const int step_id, const int sequence_id)
+    std::shared_ptr<nic::InferContext::Input> input, const int stream_id,
+    const int step_id, const uint8_t** data_ptr, size_t* batch1_size)
 {
   // If json data is available then try to retrieve the data from there
   if (!input_data_.empty()) {
     // validate if the indices conform to the vector sizes
-    if (sequence_id < 0 || sequence_id >= (int)data_stream_cnt_) {
+    if (stream_id < 0 || stream_id >= (int)data_stream_cnt_) {
       return nic::Error(
           ni::RequestStatusCode::INTERNAL,
-          "sequence_id for retrieving the data should be less than " +
-              std::to_string(data_stream_cnt_) + " .");
+          "stream_id for retrieving the data should be less than " +
+              std::to_string(data_stream_cnt_) + ", got " +
+              std::to_string(stream_id));
     }
-    if (step_id < 0 || step_id >= (int)step_num_[sequence_id]) {
+    if (step_id < 0 || step_id >= (int)step_num_[stream_id]) {
       return nic::Error(
           ni::RequestStatusCode::INTERNAL,
           "step_id for retrieving the data should be less than " +
-              std::to_string(step_num_[sequence_id]) + " .");
+              std::to_string(step_num_[stream_id]) + ", got " +
+              std::to_string(step_id));
     }
     std::string key_name(
-        input->Name() + "_" + std::to_string(sequence_id) + "_" +
+        input->Name() + "_" + std::to_string(stream_id) + "_" +
         std::to_string(step_id));
     auto it = input_data_.find(key_name);
     if (it != input_data_.end()) {
@@ -295,7 +252,7 @@ DataLoader::GetInputData(
         string_data = &it->second;
         *batch1_size = string_data->size();
       }
-      *data = (const uint8_t*)&((it->second)[0]);
+      *data_ptr = (const uint8_t*)&((it->second)[0]);
     } else {
       return nic::Error(
           ni::RequestStatusCode::INVALID_ARG,
@@ -306,11 +263,85 @@ DataLoader::GetInputData(
       (input->DType() != ni::DataType::TYPE_STRING) &&
       (input_buf_.size() != 0)) {
     *batch1_size = (size_t)input->ByteSize();
-    *data = &input_buf_[0];
+    *data_ptr = &input_buf_[0];
   } else {
     return nic::Error(
         ni::RequestStatusCode::INVALID_ARG,
         "unable to find data for input '" + input->Name() + "'.");
   }
+  return nic::Error::Success;
+}
+
+nic::Error
+DataLoader::ReadInputTensorData(
+    const rapidjson::Value& step,
+    std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+    int stream_index, int step_index)
+{
+  for (const auto& input : inputs) {
+    if (step.HasMember((input->Name()).c_str())) {
+      std::string key_name(
+          input->Name() + "_" + std::to_string(stream_index) + "_" +
+          std::to_string(step_index));
+
+      auto it = input_data_.emplace(key_name, std::vector<char>()).first;
+
+      const rapidjson::Value& tensor = step[(input->Name()).c_str()];
+      if (tensor.IsArray()) {
+        const size_t batch1_element_cnt = GetElementCount(input);
+        if (batch1_element_cnt != tensor.Size()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "mismatch in the number of elements of provided. Expected: " +
+                  std::to_string(batch1_element_cnt) +
+                  ", Got: " + std::to_string(tensor.Size()) +
+                  " ( Location stream id: " + std::to_string(stream_index) +
+                  ", step id: " + std::to_string(step_index) + ")");
+        }
+        RETURN_IF_ERROR(
+            SerializeExplicitTensor(tensor, input->DType(), &it->second));
+      } else {
+        if (tensor.HasMember("b64")) {
+          if (tensor["b64"].IsString()) {
+            RETURN_IF_ERROR(
+                DecodeFromBase64(tensor["b64"].GetString(), &it->second));
+            size_t batch1_byte = input->ByteSize();
+            if (batch1_byte != it->second.size()) {
+              return nic::Error(
+                  ni::RequestStatusCode::INVALID_ARG,
+                  "mismatch in the data provided. "
+                  "Expected: " +
+                      std::to_string(batch1_byte) +
+                      " bytes, Got: " + std::to_string(it->second.size()) +
+                      " bytes ( Location stream id: " +
+                      std::to_string(stream_index) +
+                      ", step id: " + std::to_string(step_index) + ")");
+            }
+          } else {
+            return nic::Error(
+                ni::RequestStatusCode::INVALID_ARG,
+                "the value of b64 field should be of type string ( "
+                "Location stream id: " +
+                    std::to_string(stream_index) +
+                    ", step id: " + std::to_string(step_index) + ")");
+          }
+        } else {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "The input values are not supported. Expected an array or "
+              "b64 string ( Location stream id: " +
+                  std::to_string(stream_index) +
+                  ", step id: " + std::to_string(step_index) + ")");
+        }
+      }
+    } else {
+      return nic::Error(
+          ni::RequestStatusCode::INVALID_ARG,
+          "missing input " + input->Name() +
+              " ( Location stream id: " + std::to_string(stream_index) +
+              ", step id: " + std::to_string(step_index) + ")");
+    }
+  }
+
   return nic::Error::Success;
 }

@@ -69,8 +69,8 @@ class RequestRateManager : public LoadManager {
   /// \param sequence_length The base length of each sequence.
   /// \param zero_input Whether to fill the input tensors with zero.
   /// \param input_shapes The shape of the input tensors.
-  /// \param user_data The path to the directory containing the data to
-  /// use for input tensors.
+  /// \param user_data The vector containing path/paths to user-provided data
+  /// that can be a directory or path to a json data file.
   /// \param shared_memory_type The type of shared memory to use for inputs.
   /// \param output_shm_size The size of the shared memory to allocate for the
   /// output.
@@ -104,7 +104,7 @@ class RequestRateManager : public LoadManager {
   struct ThreadConfig {
     ThreadConfig(uint32_t index, uint32_t stride)
         : index_(index), id_(index), stride_(stride), is_paused_(false),
-          rounds_(0), non_sequence_step_id_(index)
+          rounds_(0), non_sequence_data_step_id_(index)
     {
     }
 
@@ -113,7 +113,7 @@ class RequestRateManager : public LoadManager {
     uint32_t stride_;
     bool is_paused_;
     uint64_t rounds_;
-    int non_sequence_step_id_;
+    int non_sequence_data_step_id_;
   };
 
   RequestRateManager(

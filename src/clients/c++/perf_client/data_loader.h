@@ -32,10 +32,16 @@ class DataLoader {
  public:
   DataLoader(size_t batch_size);
 
+  /// Returns the total number of data steps that can be supported by a
+  /// non-sequence model.
   size_t GetTotalStepsNonSequence() { return max_non_sequence_step_id_; }
 
+  /// Returns the total number of data streams available.
   size_t GetDataStreamsCount() { return data_stream_cnt_; }
 
+  /// Returns the total data steps supported for a requested data stream
+  /// id.
+  /// \param stream_id The target stream id
   size_t GetTotalSteps(size_t stream_id)
   {
     if (stream_id < data_stream_cnt_) {
@@ -43,40 +49,70 @@ class DataLoader {
     }
     return 0;
   }
-  /// Helper function to access data for the specified input
-  /// \param input The target input
-  /// Returns the pointer to the memory holding data
-  nic::Error GetInputData(
-      std::shared_ptr<nic::InferContext::Input> input, const uint8_t** data,
-      size_t* batch1_size, const int step_id = 0, const int sequence_id = 0);
 
   /// Reads the input data from the specified data directory
-  /// \param input The input for which the data is to be read
+  /// \param inputs The vector of inputs to the target model.
   /// \param data_directory The path to the directory containing the data
-  /// \param index The index to allocate for the read data
   nic::Error ReadDataFromDir(
       std::vector<std::shared_ptr<nic::InferContext::Input>> inputs,
       const std::string& data_directory);
 
-  /// Reads the input data from the specified json file
-  /// \param input The input for which the data is to be read
-  /// \param data_directory The path to the directory containing the data
-  /// \param index The index to allocate for the read data
+  /// Reads the input data from the specified json file and append to the
+  /// stream buffers.
+  /// \param inputs The vector of inputs to the target model.
+  /// \param json_file The json file containing the user-provided input
+  /// data.
+  /// Returns error object indicating status
   nic::Error ReadDataFromJSON(
       std::vector<std::shared_ptr<nic::InferContext::Input>> inputs,
-      const std::string& data_directory);
+      const std::string& json_file);
 
-  /// Generates the input data for specified input
-  /// \param input The target input
+  /// Generates the input data to use with the inference requests
+  /// \param inputs The vector of inputs to the target model.
+  /// \param zero_input Whether or not to use zero value for buffer
+  /// initialization.
+  /// \param string_length The length of the string to generate for
+  /// tensor inputs.
+  /// \param string_data The user provided string to use to populate
+  /// string tensors
+  /// Returns error object indicating status
   nic::Error GenerateData(
       std::vector<std::shared_ptr<nic::InferContext::Input>> inputs,
       const bool zero_input, const size_t string_length,
       const std::string& string_data);
 
+  /// Helper function to access data for the specified input
+  /// \param input The target input
+  /// \param stream_id The data stream_id to use for retrieving input data.
+  /// \param step_id The data step_id to use for retrieving input data.
+  /// \param data Returns the pointer to the data for the requested input.
+  /// \param batch1_size Returns the size of the input data in bytes.
+  /// Returns error object indicating status
+  nic::Error GetInputData(
+      std::shared_ptr<nic::InferContext::Input> input, const int stream_id,
+      const int step_id, const uint8_t** data_ptr, size_t* batch1_size);
+
+
  private:
+  /// Helper function to read data for the specified input from json
+  /// \param step the DOM for current step
+  /// \param inputs The inputs to the model
+  /// \param stream_index the stream index the data should be exported to.
+  /// \param step_index the step index the data should be exported to.
+  /// Returns error object indicating status
+  nic::Error ReadInputTensorData(
+      const rapidjson::Value& step,
+      std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+      int stream_index, int step_index);
+
+
+  // The batch_size_ for the data
   size_t batch_size_;
+  // The total number of data streams available.
   size_t data_stream_cnt_;
+  // A vector containing the supported step number for respective stream ids.
   std::vector<size_t> step_num_;
+  // The maximum supported data step id for non-sequence model.
   size_t max_non_sequence_step_id_;
 
   // User provided input data, it will be preferred over synthetic data

@@ -153,6 +153,7 @@ ConcurrencyManager::Infer(
     ctxs.reserve(max_concurrency_);
   }
 
+  // Variable that can be used across InferContexts
   std::unique_ptr<nic::InferContext::Options> options(nullptr);
 
   // Variable used to signal request completion
@@ -194,13 +195,17 @@ ConcurrencyManager::Infer(
       }
     }
 
+    // Create async requests such that the number of ongoing requests
+    // matches the concurrency level
+    // Non-sequence model is 'num_reqs' * 1 ctx
+    // Sequence model is 1 request of 1 sequence * 'active_ctx_cnt' ctxs
     while (total_ongoing_requests < (int)num_reqs) {
       // Update the inputs if required for non-sequence
       if (using_json_data_ && (!on_sequence_model_)) {
-        int step_id = (thread_config->non_sequence_step_id_ %
+        int step_id = (thread_config->non_sequence_data_step_id_ %
                        data_loader_->GetTotalStepsNonSequence()) *
                       batch_size_;
-        thread_config->non_sequence_step_id_ += active_threads_;
+        thread_config->non_sequence_data_step_id_ += active_threads_;
         // There will be only one ctx in non-sequence case
         thread_stat->status_ =
             UpdateInputs(ctxs[0]->ctx_->Inputs(), 0, step_id);

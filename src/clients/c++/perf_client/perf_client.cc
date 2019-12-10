@@ -438,18 +438,29 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << std::setw(9) << std::left
             << " -b: " << FormatMessage("Batch size for each request sent.", 9)
             << std::endl;
-  std::cerr << FormatMessage(
-                   " --input-data: Select the type of data that will be used "
-                   "for input in inference requests. The available "
-                   "options are \"zero\", \"random\" or path to a directory. "
-                   "If the option is path to a directory then the directory "
-                   "must contain a binary file for each input, named the same "
-                   "as the input. Each file must contain the data required for "
-                   "that input for a batch-1 request. Each file should contain "
-                   "the raw binary representation of the input in row-major "
-                   "order. Default is \"random\".",
-                   18)
-            << std::endl;
+  std::cerr
+      << FormatMessage(
+             " --input-data: Select the type of data that will be used "
+             "for input in inference requests. The available options are "
+             "\"zero\", \"random\", path to a directory or a json file. If the "
+             "option is path to a directory then the directory must "
+             "contain a binary/text file for each non-string/string input "
+             "respectively, named the same as the input. Each "
+             "file must contain the data required for that input for a batch-1 "
+             "request. Each binary file should contain the raw binary "
+             "representation of the input in row-major order for non-string "
+             "inputs. The text file should contain all strings needed by "
+             "batch-1, each in a new line, listed in row-major order. When "
+             "pointing to a json file, user must adhere to the format "
+             "described in /docs/perf_client.rst. By specifying json data, "
+             "users can control data used with every request. Multiple data "
+             "streams can be specified for a sequence model and the client "
+             "will select a data stream in a round-robin fashion for every new "
+             "sequence. Muliple json files can also be provided (--input-data "
+             "json_file1 --input-data json-file2 and so on) and the client "
+             "will append data streams from each file. Default is \"random\".",
+             18)
+      << std::endl;
   std::cerr << FormatMessage(
                    " --shared-memory <\"system\"|\"cuda\"|\"none\">: Specifies "
                    "the type of the shared memory to use for input and output "

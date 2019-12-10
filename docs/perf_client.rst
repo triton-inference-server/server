@@ -200,7 +200,8 @@ the -\\-input-data option:
 
 - *random*: (default) Send random data for each input.
 - *zero*: Send zeros for each input.
-- path: A path to a directory containing a binary file for each input, named the same as the input. Each binary file must contain the data required for that input for a batch-1 request. Each file should contain the raw binary representation of the input in row-major order.
+- directory path: A path to a directory containing a binary file for each input, named the same as the input. Each binary file must contain the data required for that input for a batch-1 request. Each file should contain the raw binary representation of the input in row-major order.
+- file path: A path to a json file containing data to be used with every inference request. Have a look at the next section for further details.
 
 For tensors with with STRING datatype there are additional options
 -\\-string-length and -\\-string-data that may be used in some cases
@@ -215,6 +216,136 @@ has shape [ 3, N, M ], where N and M are variable-size dimensions, to
 tell perf\_client to send batch-size 4 requests of shape [ 3, 224, 224 ]::
 
   $ perf_client -m mymodel -b 4 --shape IMAGE:3,224,224
+
+Real Input Data
+^^^^^^^^^^^^^^^
+
+The performance of some of the models is highly dependent on the data used.
+For such cases users can provide data to be used with every inference request
+made by client in a json file. The client will keep cycling through the data
+to maintain steady inferences.
+
+Every data object should specify data for all the inputs with exact size
+expected. Otherwise, an error will be thrown. The following example describes
+data for a model with inputs named, INPUT0 and INPUT1, shape [16] and data
+type STRING: ::
+
+
+  {
+    "count" : 0,
+    "data" :
+     [
+        {
+          "INPUT0" : ["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"],
+          "INPUT1" : ["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
+        },
+        {
+          "INPUT0" : ["2", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"],
+          "INPUT1" : ["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
+        },
+        {
+          "INPUT0" : ["3", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"],
+          "INPUT1" : ["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
+        },
+        {
+          "INPUT0" : ["4", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"],
+          "INPUT1" : ["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
+        }
+        .
+        .
+        .
+      ]
+  }
+
+
+The "count" field describes the number of data objects to use from the file. A specification of zero
+would mean selecting the entire data. A part from specifying explicit tensors, users can also 
+provide Base64 encoded binary data for the tensors. The following example highlights how this 
+can be acheived: ::
+
+  {
+    "count" : 4,
+    "data" :
+     [
+        {
+          "INPUT0" : {"b64": "YmFzZTY0IGRlY29kZXI="},
+          "INPUT1" : {"b64": "YmFzZTY0IGRlY29kZXI="}
+        },
+        {
+          "INPUT0" : {"b64": "YmFzZTY0IGRlY29kZXI="},
+          "INPUT1" : {"b64": "YmFzZTY0IGRlY29kZXI="}
+        },
+        {
+          "INPUT0" : {"b64": "YmFzZTY0IGRlY29kZXI="},
+          "INPUT1" : {"b64": "YmFzZTY0IGRlY29kZXI="}
+        },
+        .
+        .
+        .
+      ]
+  }
+
+
+In case of sequence models, multiple data streams can be specified in the json file. Each sequence
+will get a data stream of its own and the client will ensure the data from each stream is
+played back to the same correlation id. The below example highlights how to specify data for
+multiple streams for a sequence model with a single input named INPUT, shape [1] and data type STRING: ::
+
+
+  {
+    "count" : 0,
+    "data" :
+      [
+        [
+          {
+            "INPUT" : ["1"]
+          },
+          {
+            "INPUT" : ["2"]
+          },
+          {
+            "INPUT" : ["3"]
+          },
+          {
+            "INPUT" : ["4"]
+          }
+        ],
+        [
+          {
+            "INPUT" : ["1"]
+          },
+          {
+            "INPUT" : ["1"]
+          },
+          {
+            "INPUT" : ["1"]
+          }
+        ],
+        [
+          {
+            "INPUT" : ["1"]
+          },
+          {
+            "INPUT" : ["1"]
+          }
+        ]
+      ]
+  }
+
+The count field above describes the number of data streams to use. Again, if the
+the value of this field is 0 or >= 3 then all the three data streams will be 
+used.
+
+The above example describes three data streams with lengths 3, 2 and 1 respectively.
+The client will hence produce sequences of length 3, 2 and 1 in this case. Users
+can break down a large file into multiple files and then specify each with
+CLI option. The client will append the data streams from these files.
+
+Below is the example ::
+
+  $ perf_client -m mymodel -b 1 --input-data json_file_1 --input-data json_file_2 --input-data json_file_3
+
+
 
 Shared Memory
 ^^^^^^^^^^^^^

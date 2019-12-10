@@ -237,10 +237,10 @@ RequestRateManager::Infer(
 
     // Update the inputs if required
     if (using_json_data_ && (!on_sequence_model_)) {
-      int step_id = (thread_config->non_sequence_step_id_ %
+      int step_id = (thread_config->non_sequence_data_step_id_ %
                      data_loader_->GetTotalStepsNonSequence()) *
                     batch_size_;
-      thread_config->non_sequence_step_id_ += max_threads_;
+      thread_config->non_sequence_data_step_id_ += max_threads_;
       thread_stat->status_ = UpdateInputs(ctx->ctx_->Inputs(), 0, step_id);
       if (!thread_stat->status_.IsOk()) {
         return;

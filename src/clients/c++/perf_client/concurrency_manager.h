@@ -56,8 +56,8 @@ class ConcurrencyManager : public LoadManager {
   /// \param sequence_length The base length of each sequence.
   /// \param zero_input Whether to fill the input tensors with zero.
   /// \param input_shapes The shape of the input tensors.
-  /// \param user_data The path to the directory containing the data to
-  /// use for input tensors.
+  /// \param user_data The vector containing path/paths to user-provided data
+  /// that can be a directory or path to a json data file.
   /// \param shared_memory_type The type of shared memory to use for inputs.
   /// \param output_shm_size The size in bytes of the shared memory to
   /// allocate for the output.
@@ -94,7 +94,7 @@ class ConcurrencyManager : public LoadManager {
   struct ThreadConfig {
     ThreadConfig(size_t thread_id)
         : thread_id_(thread_id), concurrency_(0),
-          non_sequence_step_id_(thread_id)
+          non_sequence_data_step_id_(thread_id)
     {
     }
 
@@ -102,8 +102,8 @@ class ConcurrencyManager : public LoadManager {
     size_t thread_id_;
     // The concurrency level that the worker should produce
     size_t concurrency_;
-    // Step ID for the non-sequence model
-    size_t non_sequence_step_id_;
+    // The current data step id in case of non-sequence model
+    size_t non_sequence_data_step_id_;
   };
 
   /// Function for worker that sends inference requests.
@@ -113,6 +113,7 @@ class ConcurrencyManager : public LoadManager {
       std::shared_ptr<ThreadStat> thread_stat,
       std::shared_ptr<ThreadConfig> thread_config);
 
+  // The number of worker threads with non-zero concurrencies
   size_t active_threads_;
 
   size_t max_concurrency_;

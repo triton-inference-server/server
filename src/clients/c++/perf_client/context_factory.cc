@@ -109,8 +109,7 @@ nic::Error
 ContextFactory::CreateInferContext(std::unique_ptr<nic::InferContext>* ctx)
 {
   nic::Error err;
-  // Create the context for inference of the specified model,
-  // make sure to use an unused correlation id if requested.
+  // Create the context for inference of the specified model
   ni::CorrelationID correlation_id = 0;
 
   if (streaming_) {
