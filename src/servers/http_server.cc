@@ -575,7 +575,13 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
       if (format_c_str != NULL) {
         format = std::string(format_c_str);
       } else {
-        format = "text";
+        // If format empty, Accept: application/json in header then return json
+        const char* header_accept = evhtp_kv_find(req->headers_in, "Accept");
+        if (std::string(header_accept) == "application/json") {
+          format = "json";
+        } else {
+          format = "text";
+        }
       }
 
       if (format == "binary") {
