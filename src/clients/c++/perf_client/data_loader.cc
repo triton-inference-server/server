@@ -128,9 +128,10 @@ DataLoader::ReadDataFromJSON(
   }
 
   const rapidjson::Value& streams = d["data"];
-  data_stream_cnt_ +=
-      (count == 0) ? streams.Size() : std::min((int)streams.Size(), count);
+  int this_count =
+      ((count == 0) ? streams.Size() : std::min((int)streams.Size(), count));
 
+  data_stream_cnt_ += this_count;
   int offset = step_num_.size();
   for (size_t i = offset; i < data_stream_cnt_; i++) {
     const rapidjson::Value& steps = streams[i - offset];
@@ -144,14 +145,14 @@ DataLoader::ReadDataFromJSON(
       // and add the tensors to a single stream '0'.
       int offset = 0;
       if (step_num_.empty()) {
-        step_num_.push_back(data_stream_cnt_);
+        step_num_.push_back(this_count);
       } else {
         offset = step_num_[0];
-        step_num_[0] += data_stream_cnt_;
+        step_num_[0] += (this_count);
       }
       data_stream_cnt_ = 1;
       for (size_t k = offset; k < step_num_[0]; k++) {
-        RETURN_IF_ERROR(ReadInputTensorData(streams[k], inputs, 0, k));
+        RETURN_IF_ERROR(ReadInputTensorData(streams[k - offset], inputs, 0, k));
       }
       break;
     }

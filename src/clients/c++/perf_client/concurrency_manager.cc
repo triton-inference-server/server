@@ -224,8 +224,11 @@ ConcurrencyManager::Infer(
         }
 
         // Find the next available context id to use for this request
-        ctx_id = free_ctx_ids.front();
-        free_ctx_ids.pop();
+        {
+          std::lock_guard<std::mutex> lk(cb_mtx);
+          ctx_id = free_ctx_ids.front();
+          free_ctx_ids.pop();
+        }
         seq_id = offset + ctx_id;
 
         {
@@ -319,8 +322,8 @@ ConcurrencyManager::Infer(
               start_time_sync, end_time_sync, flags, false /* delayed */));
           ctxs[ctx_id]->ctx_->GetStat(&(thread_stat->contexts_stat_[ctx_id]));
         }
+        free_ctx_ids.push(ctx_id);
       }
-      free_ctx_ids.push(ctx_id);
       total_ongoing_requests++;
     }
 

@@ -658,6 +658,8 @@ LoadManager::InitNewSequence(int sequence_id)
     sequence_stat_[sequence_id]->remaining_queries_ =
         new_length == 0 ? 1 : new_length;
   } else {
+    // Selecting next available data stream in a round-robin fashion.
+    // TODO: A mode to randomly pick data stream for new sequences.
     sequence_stat_[sequence_id]->data_stream_id_ =
         sequence_stat_[sequence_id]->corr_id_ %
         data_loader_->GetDataStreamsCount();
