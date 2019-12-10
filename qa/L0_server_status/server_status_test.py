@@ -32,6 +32,8 @@ from future.utils import iteritems
 import os
 import infer_util as iu
 import unittest
+from google.protobuf import json_format
+import json
 from tensorrtserver.api import *
 import tensorrtserver.api.server_status_pb2 as server_status
 
@@ -217,6 +219,17 @@ class ServerStatusTest(unittest.TestCase):
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_json_server_status(self):
+        # Convert to json, verify json is consistent with protobuf
+        model_name = "graphdef_float32_float32_float32"
+        server_status, req_id = _get_server_status("localhost:8000", ProtocolType.HTTP, model_name)
+        json_str = json_format.MessageToJson(server_status)
+        tmp_data = json.loads(json_str)
+        self.assertEqual(tmp_data['modelStatus']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
+        # convert back to protobuf, should be identical to original
+        server_status2 = ServerStatus()
+        json_format.Parse(json_str, server_status2)
+        self.assertEqual(server_status, server_status2)
 
 class ModelStatusTest(unittest.TestCase):
     '''
