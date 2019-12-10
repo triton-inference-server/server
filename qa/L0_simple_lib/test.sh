@@ -43,6 +43,10 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 
 export CUDA_VISIBLE_DEVICES=0
 
+# Must explicitly set LD_LIBRARY_PATH so that SIMPLE_CLIENT can find
+# libtrtserver.so.
+LD_LIBRARY_PATH=/opt/tensorrtserver/lib:$LD_LIBRARY_PATH
+
 rm -f $CLIENT_LOG.*
 
 RET=0
