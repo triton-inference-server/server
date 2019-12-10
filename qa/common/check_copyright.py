@@ -34,7 +34,7 @@ FLAGS = None
 SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png',
              'log', 'serverlog',
              'preprocessed', 'jmx', 'gz',
-             'caffemodel')
+             'caffemodel', 'json')
 SKIP_PATHS = ('builddir',
               'build/libevhtp',
               'deploy/single_server/.helmignore',
