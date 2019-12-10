@@ -200,6 +200,14 @@ set_property(TARGET main PROPERTY OUTPUT_NAME trtserver)
 if(${TRTIS_ENABLE_GPU})
   target_include_directories(main PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRTIS_ENABLE_GPU
+set_target_properties(
+  main
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH "$\{ORIGIN\}/../lib"
+)
 target_link_libraries(
   main
   ${HTTP_ENDPOINT_LIBRARIES}
@@ -232,6 +240,14 @@ add_executable(
   ${SIMPLE_HDRS}
   $<TARGET_OBJECTS:proto-library>
   ${TRACING_OBJECTS}
+)
+set_target_properties(
+  simple
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH ""
 )
 target_link_libraries(
   simple
@@ -274,6 +290,15 @@ add_executable(
   $<TARGET_OBJECTS:proto-library>
   ${TRACING_OBJECTS}
 )
+target_include_directories(memory_alloc PRIVATE ${CUDA_INCLUDE_DIRS})
+set_target_properties(
+  memory_alloc
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH ""
+)
 target_link_libraries(
   memory_alloc
   PUBLIC -L/usr/local/cuda/lib64/stubs
@@ -283,7 +308,6 @@ target_link_libraries(
   PRIVATE protobuf::libprotobuf
   ${TRACING_LIBRARIES}
 )
-target_include_directories(memory_alloc PRIVATE ${CUDA_INCLUDE_DIRS})
 install(
   TARGETS memory_alloc
   RUNTIME DESTINATION bin
@@ -330,11 +354,13 @@ add_library(
 )
 set_target_properties(
   trtserver
-  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtrtserver.ldscript
-)
-set_target_properties(
-  trtserver
-  PROPERTIES LINK_FLAGS "-Wl,--version-script libtrtserver.ldscript"
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/tensorflow:$\{ORIGIN\}/pytorch:$\{ORIGIN\}/onnx"
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtrtserver.ldscript
+    LINK_FLAGS "-Wl,--version-script libtrtserver.ldscript"
 )
 target_link_libraries(
   trtserver

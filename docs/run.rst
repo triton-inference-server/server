@@ -146,14 +146,15 @@ Running The Inference Server Without Docker
 -------------------------------------------
 
 After :ref:`building the inference server outside of Docker
-<section-building-the-server-with-cmake>`, the *trtserver* binary will
-be in builddir/trtis/install/bin and the required shared libraries
-will be in builddir/trtis/install/lib. To run make sure that
-builddir/trtis/install/lib is on your library path (for example, by
-adding it to LD_LIBRARY_PATH), and then execute *trtserver* with the
-desired arguments::
+<section-building-the-server-with-cmake>`, the *trtserver* executable
+will be in builddir/trtis/install/bin and the required shared
+libraries will be in builddir/trtis/install/lib. The *trtserver*
+executable and libraries are configured to be installed and executed
+from the /opt/tensorrtserver directory, so copy
+builddir/trtis/install/* to /opt/tensorrtserver/. . Then execute
+*trtserver* with the desired arguments::
 
-  $ builddir/trtis/install/bin/trtserver --model-repository=/models
+  $ /opt/tensorrtserver/bin/trtserver --model-repository=/models
 
 .. _section-checking-inference-server-status:
 
