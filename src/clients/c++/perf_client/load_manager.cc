@@ -28,8 +28,6 @@
 #include "src/clients/c++/examples/shm_utils.h"
 #include "src/core/model_config.h"
 
-#include "rapidjson/filereadstream.h"
-
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
 
