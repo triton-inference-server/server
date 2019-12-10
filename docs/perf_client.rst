@@ -226,9 +226,9 @@ made by client in a json file. The client will keep cycling through the data
 to maintain steady inferences.
 
 Every data object should specify data for all the inputs with exact size
-expected. Otherwise, an error will be thrown. The following example describes
-data for a model with inputs named, INPUT0 and INPUT1, shape [16] and data
-type STRING: ::
+as expected by the model. Otherwise, an error will be thrown. The following
+example describes data for a model with inputs named, INPUT0 and INPUT1,
+shape [16] and data type STRING: ::
 
 
   {
@@ -260,8 +260,8 @@ type STRING: ::
 
 The "count" field describes the number of data objects to use from the file. A specification of zero
 would mean selecting the entire data. A part from specifying explicit tensors, users can also 
-provide Base64 encoded binary data for the tensors. The following example highlights how this 
-can be acheived: ::
+provide Base64 encoded binary data for the tensors. Each data object must list its data in a row-major
+order. The following example highlights how this can be acheived: ::
 
   {
     "count" : 4,
