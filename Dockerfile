@@ -192,7 +192,6 @@ ARG TRTIS_CONTAINER_VERSION=20.01dev
 # libcurl4-openSSL-dev is needed for GCS
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-            software-properties-common \
             autoconf \
             automake \
             build-essential \
@@ -202,7 +201,9 @@ RUN apt-get update && \
             libre2-dev \
             libssl-dev \
             libtool \
-            libboost-dev && \
+            libboost-dev \
+            patchelf \
+            software-properties-common && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
                 libcurl3-dev; \
@@ -222,8 +223,9 @@ RUN apt-get update && \
 # operations link against libtensorflow_framework.so so it must be
 # present (and its functionality is provided by libtensorflow_cc.so).
 COPY --from=trtserver_tf \
-     /usr/local/lib/tensorflow/libtensorflow_cc.so.1 /opt/tensorrtserver/lib/
-RUN cd /opt/tensorrtserver/lib && \
+     /usr/local/lib/tensorflow/libtensorflow_cc.so.1 /opt/tensorrtserver/lib/tensorflow/
+RUN cd /opt/tensorrtserver/lib/tensorflow && \
+    patchelf --set-rpath '$ORIGIN' libtensorflow_cc.so.1 && \
     ln -sf libtensorflow_cc.so.1 libtensorflow_framework.so.1 && \
     ln -sf libtensorflow_cc.so.1 libtensorflow_framework.so && \
     ln -sf libtensorflow_cc.so.1 libtensorflow_cc.so
@@ -231,28 +233,32 @@ RUN cd /opt/tensorrtserver/lib && \
 # Caffe2 libraries
 COPY --from=trtserver_pytorch \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_detectron_ops_gpu.so \
-     /opt/tensorrtserver/lib/
+     /opt/tensorrtserver/lib/pytorch/
 COPY --from=trtserver_pytorch \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so \
-     /opt/tensorrtserver/lib/
+     /opt/tensorrtserver/lib/pytorch/
 COPY --from=trtserver_pytorch \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so \
-     /opt/tensorrtserver/lib/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_avx2.so /opt/tensorrtserver/lib/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_core.so /opt/tensorrtserver/lib/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_def.so /opt/tensorrtserver/lib/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_gnu_thread.so /opt/tensorrtserver/lib/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_intel_lp64.so /opt/tensorrtserver/lib/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_rt.so /opt/tensorrtserver/lib/
-COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_vml_def.so /opt/tensorrtserver/lib/
+     /opt/tensorrtserver/lib/pytorch/
+COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_avx2.so /opt/tensorrtserver/lib/pytorch/
+COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_core.so /opt/tensorrtserver/lib/pytorch/
+COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_def.so /opt/tensorrtserver/lib/pytorch/
+COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_gnu_thread.so /opt/tensorrtserver/lib/pytorch/
+COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_intel_lp64.so /opt/tensorrtserver/lib/pytorch/
+COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_rt.so /opt/tensorrtserver/lib/pytorch/
+COPY --from=trtserver_pytorch /opt/conda/lib/libmkl_vml_def.so /opt/tensorrtserver/lib/pytorch/
 
 # LibTorch headers and libraries
 COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/include \
      /opt/tensorrtserver/include/torch
 COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so \
-      /opt/tensorrtserver/lib/
+      /opt/tensorrtserver/lib/pytorch/
 COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_nvrtc.so \
-     /opt/tensorrtserver/lib/
+     /opt/tensorrtserver/lib/pytorch/
+RUN cd /opt/tensorrtserver/lib/pytorch && \
+    for i in `find . -mindepth 1 -maxdepth 1 -type f`; do \
+        patchelf --set-rpath '$ORIGIN' $i; \
+    done
 
 # Onnx Runtime headers and library
 # Put include files to same directory as ONNX Runtime changed the include path
@@ -269,19 +275,23 @@ COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/provi
 COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/openvino/openvino_provider_factory.h \
      /opt/tensorrtserver/include/onnxruntime/
 COPY --from=trtserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
-     /opt/tensorrtserver/lib/
-RUN cd /opt/tensorrtserver/lib && \
+     /opt/tensorrtserver/lib/onnx/
+RUN cd /opt/tensorrtserver/lib/onnx && \
     ln -sf libonnxruntime.so.${ONNX_RUNTIME_VERSION} libonnxruntime.so
 
 # Minimum OpenVINO libraries required by ONNX Runtime to link and to run
 # with OpenVINO Execution Provider
 COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
-     /opt/tensorrtserver/lib/
+     /opt/tensorrtserver/lib/onnx/
 COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
-     /opt/tensorrtserver/lib/
+     /opt/tensorrtserver/lib/onnx/
 COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
-     /opt/tensorrtserver/lib/
-RUN cd /opt/tensorrtserver/lib && ln -sf libtbb.so.2 libtbb.so
+     /opt/tensorrtserver/lib/onnx/
+RUN cd /opt/tensorrtserver/lib/onnx && \
+    ln -sf libtbb.so.2 libtbb.so && \
+    for i in `find . -mindepth 1 -maxdepth 1 -type f`; do \
+        patchelf --set-rpath '$ORIGIN' $i; \
+    done
 
 # Copy entire repo into container even though some is not needed for
 # build itself... because we want to be able to copyright check on
@@ -300,7 +310,6 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/stubs; \
         ln -fs /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1; \
     fi && \
-    echo $LD_LIBRARY_PATH && \
     rm -fr builddir && mkdir -p builddir && \
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
@@ -317,7 +326,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRTIS_ENABLE_PYTORCH=ON \
                   -DTRTIS_ONNXRUNTIME_INCLUDE_PATHS="/opt/tensorrtserver/include/onnxruntime" \
                   -DTRTIS_PYTORCH_INCLUDE_PATHS="/opt/tensorrtserver/include/torch" \
-                  -DTRTIS_EXTRA_LIB_PATHS="/opt/tensorrtserver/lib" \
+                  -DTRTIS_EXTRA_LIB_PATHS="/opt/tensorrtserver/lib;/opt/tensorrtserver/lib/tensorflow;/opt/tensorrtserver/lib/pytorch;/opt/tensorrtserver/lib/onnx" \
                   ../build && \
             make -j16 trtis && \
             mkdir -p /opt/tensorrtserver/include && \
@@ -325,12 +334,13 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
             cp -r trtis/install/lib /opt/tensorrtserver/. && \
             cp -r trtis/install/include /opt/tensorrtserver/include/trtserver) && \
     (cd /opt/tensorrtserver && ln -sf /workspace/qa qa) && \
-    (cd /opt/tensorrtserver/lib && chmod ugo-w+rx *)
+    (cd /opt/tensorrtserver/lib && chmod ugo-w+rx *) && \
+    (cd /opt/tensorrtserver/lib/tensorflow && chmod ugo-w+rx *) && \
+    (cd /opt/tensorrtserver/lib/pytorch && chmod ugo-w+rx *) && \
+    (cd /opt/tensorrtserver/lib/onnx && chmod ugo-w+rx *)
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
 ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
-
-ENV LD_LIBRARY_PATH /opt/tensorrtserver/lib:${LD_LIBRARY_PATH}
 ENV PATH /opt/tensorrtserver/bin:${PATH}
 
 COPY nvidia_entrypoint.sh /opt/tensorrtserver
@@ -348,7 +358,6 @@ ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
 ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
 LABEL com.nvidia.tensorrtserver.version="${TENSORRT_SERVER_VERSION}"
 
-ENV LD_LIBRARY_PATH /opt/tensorrtserver/lib:${LD_LIBRARY_PATH}
 ENV PATH /opt/tensorrtserver/bin:${PATH}
 
 ENV TF_ADJUST_HUE_FUSED         1
