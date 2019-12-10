@@ -48,6 +48,10 @@ rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
 
+# Must explicitly set LD_LIBRARY_PATH so that the custom operations
+# can find libtensorflow_framework.so.
+LD_LIBRARY_PATH=/opt/tensorrtserver/lib/tensorflow:$LD_LIBRARY_PATH
+
 export LD_PRELOAD=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libzeroout.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libcudaop.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libbusyop.so
 
 run_server
