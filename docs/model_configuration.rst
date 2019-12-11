@@ -214,7 +214,7 @@ inference server does not support that datatype for that model.
 +--------------+--------------+--------------+--------------+--------------+---------+--------------+
 |Type          |TensorRT      |TensorFlow    |Caffe2        |ONNX Runtime  |PyTorch  |NumPy         |
 +==============+==============+==============+==============+==============+=========+==============+
-|TYPE_BOOL     |              |DT_BOOL       |BOOL          |BOOL          |kBool    |bool          |
+|TYPE_BOOL     | kBOOL        |DT_BOOL       |BOOL          |BOOL          |kBool    |bool          |
 +--------------+--------------+--------------+--------------+--------------+---------+--------------+
 |TYPE_UINT8    |              |DT_UINT8      |UINT8         |UINT8         |kByte    |uint8         |
 +--------------+--------------+--------------+--------------+--------------+---------+--------------+

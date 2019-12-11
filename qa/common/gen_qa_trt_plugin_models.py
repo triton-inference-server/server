@@ -63,7 +63,9 @@ def np_to_model_dtype(np_dtype):
     return None
 
 def np_to_trt_dtype(np_dtype):
-    if np_dtype == np.int8:
+    if np_dtype == np.bool:
+        return trt.bool
+    elif np_dtype == np.int8:
         return trt.int8
     elif np_dtype == np.int32:
         return trt.int32

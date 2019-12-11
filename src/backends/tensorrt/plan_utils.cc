@@ -40,6 +40,8 @@ ConvertTrtTypeToDataType(nvinfer1::DataType trt_type)
       return TYPE_INT8;
     case nvinfer1::DataType::kINT32:
       return TYPE_INT32;
+    case nvinfer1::DataType::kBOOL:
+      return TYPE_BOOL;
   }
 
   return TYPE_INVALID;
@@ -105,6 +107,9 @@ ConvertDataTypeToTrtType(const DataType& dtype)
       break;
     case TYPE_INT32:
       trt_type = nvinfer1::DataType::kINT32;
+      break;
+    case TYPE_BOOL:
+      trt_type = nvinfer1::DataType::kBOOL;
       break;
     default:
       return std::make_pair(false, trt_type);
