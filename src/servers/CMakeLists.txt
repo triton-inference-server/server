@@ -194,6 +194,7 @@ add_executable(
   ${HTTP_ENDPOINT_OBJECTS}
   ${GRPC_ENDPOINT_OBJECTS}
   ${TRACING_OBJECTS}
+  $<TARGET_OBJECTS:proto-library>
 )
 set_property(TARGET main PROPERTY OUTPUT_NAME trtserver)
 if(${TRTIS_ENABLE_GPU})
@@ -204,6 +205,7 @@ target_link_libraries(
   ${HTTP_ENDPOINT_LIBRARIES}
   ${GRPC_ENDPOINT_LIBRARIES}
   ${TRACING_LIBRARIES}
+  PRIVATE protobuf::libprotobuf
   PRIVATE trtserver
 )
 install(
