@@ -158,11 +158,16 @@ DynamicBatchScheduler::Enqueue(
   {
     std::lock_guard<std::mutex> lock(mu_);
     queue_.emplace_back(stats, request_provider, response_provider, OnComplete);
+    queued_batch_size_ += request_provider->RequestHeader().batch_size();
 
-    // If there are any idle runners then wake one up to service this
-    // request. We do the actual wake outside of the lock to avoid
-    // having the woken thread immediately block on the lock
-    wake_runner = (idle_scheduler_thread_cnt_ > 0);
+    // If there are any idle runners and the queued batch size is greater or
+    // equal to next preferred batch size, then wake one up to service this
+    // request. This the optimistic for dynamic shape model as the batch may
+    // need to be executed early due to inconsistent pending shape. We do the
+    // actual wake outside of the lock to avoid having the woken thread
+    // immediately block on the lock
+    wake_runner = (idle_scheduler_thread_cnt_ > 0) &&
+                  (queued_batch_size_ >= next_preferred_batch_size_);
   }
 
   if (wake_runner) {
@@ -275,6 +280,11 @@ DynamicBatchScheduler::SchedulerThread(
             completion_promises_[runner_id] =
                 std::make_shared<std::promise<void>>();
           }
+          
+          queued_batch_size_ -= pending_batch_size_;
+          next_preferred_batch_size_ = preferred_batch_sizes_.empty()
+                                           ? 0
+                                           : *preferred_batch_sizes_.begin();
 
           pending_batch_size_ = 0;
           pending_batch_queue_cnt_ = 0;
@@ -515,6 +525,16 @@ DynamicBatchScheduler::GetDynamicBatch()
 
   if (delay_ns >= pending_batch_delay_ns_) {
     return 0;
+  }
+
+  // Set the next preferred batch size given the pending batch size
+  auto next_preferred_batch_size_it =
+      preferred_batch_sizes_.upper_bound(pending_batch_size_);
+  if (next_preferred_batch_size_it != preferred_batch_sizes_.end()) {
+    next_preferred_batch_size_ = *next_preferred_batch_size_it;
+  } else {
+    next_preferred_batch_size_ =
+        preferred_batch_sizes_.empty() ? 0 : *preferred_batch_sizes_.begin();
   }
 
   // Return non-zero wait microseconds to cause this thread to wait
