@@ -64,13 +64,13 @@ def np_to_model_dtype(np_dtype):
 
 def np_to_trt_dtype(np_dtype):
     if np_dtype == np.int8:
-        return trt.infer.DataType.INT8
+        return trt.int8
     elif np_dtype == np.int32:
-        return trt.infer.DataType.INT32
+        return trt.int32
     elif np_dtype == np.float16:
-        return trt.infer.DataType.HALF
+        return trt.float16
     elif np_dtype == np.float32:
-        return trt.infer.DataType.FLOAT
+        return trt.float32
     return None
 
 def get_trt_plugin(plugin_name):

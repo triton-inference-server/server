@@ -111,13 +111,13 @@ def np_to_c2_dtype(np_dtype):
 
 def np_to_trt_dtype(np_dtype):
     if np_dtype == np.int8:
-        return trt.infer.DataType.INT8
+        return trt.int8
     elif np_dtype == np.int32:
-        return trt.infer.DataType.INT32
+        return trt.int32
     elif np_dtype == np.float16:
-        return trt.infer.DataType.HALF
+        return trt.float16
     elif np_dtype == np.float32:
-        return trt.infer.DataType.FLOAT
+        return trt.float32
     return None
 
 def np_to_onnx_dtype(np_dtype):
@@ -421,8 +421,8 @@ def create_plan_modelfile(
     io_cnt = len(input_shapes)
 
     # Create the model that copies inputs to corresponding outputs.
-    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
-    builder = trt.infer.create_infer_builder(G_LOGGER)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.infer.Builder(TRT_LOGGER)
     network = builder.create_network()
 
     for io_num in range(io_cnt):

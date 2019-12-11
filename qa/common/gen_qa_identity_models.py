@@ -111,13 +111,13 @@ def np_to_c2_dtype(np_dtype):
 
 def np_to_trt_dtype(np_dtype):
     if np_dtype == np.int8:
-        return trt.infer.DataType.INT8
+        return trt.int8
     elif np_dtype == np.int32:
-        return trt.infer.DataType.INT32
+        return trt.int32
     elif np_dtype == np.float16:
-        return trt.infer.DataType.HALF
+        return trt.float16
     elif np_dtype == np.float32:
-        return trt.infer.DataType.FLOAT
+        return trt.float32
     return None
 
 def np_to_onnx_dtype(np_dtype):
@@ -171,13 +171,13 @@ def np_to_torch_dtype(np_dtype):
 
 def np_to_trt_dtype(np_dtype):
     if np_dtype == np.int8:
-        return trt.infer.DataType.INT8
+        return trt.int8
     elif np_dtype == np.int32:
-        return trt.infer.DataType.INT32
+        return trt.int32
     elif np_dtype == np.float16:
-        return trt.infer.DataType.HALF
+        return trt.float16
     elif np_dtype == np.float32:
-        return trt.infer.DataType.FLOAT
+        return trt.float32
     return None
 
 def create_tf_modelfile(
@@ -569,8 +569,8 @@ def create_plan_modelfile(
 def create_plan_dynamic_rf_modelfile(
         models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size):
     # Create the model
-    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
-    builder = trt.infer.create_infer_builder(G_LOGGER)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.infer.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
     if max_batch == 0:
         shape_with_batchsize = [i for i in shape]
@@ -613,7 +613,6 @@ def create_plan_dynamic_rf_modelfile(
             max_shape = max_shape + [i]
 
     profile = builder.create_optimization_profile()
-    profile = builder.create_optimization_profile()
     for io_num in range(io_cnt):
         profile.set_shape("INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
 
@@ -621,16 +620,13 @@ def create_plan_dynamic_rf_modelfile(
     datatype_set = set([trt_dtype])
     for dt in datatype_set:
         if (dt == trt.DataType.INT8):
-            builder.int8_mode = True
             flags |= 1 << int(trt.BuilderFlag.INT8)
         elif (dt == trt.DataType.HALF):
-            builder.fp16_mode = True
             flags |= 1 << int(trt.BuilderFlag.FP16)
-    builder.strict_type_constraints = True
     config = builder.create_builder_config()
     config.flags=flags
     config.add_optimization_profile(profile)
-    builder.set_max_workspace_size(1 << 20)
+    config.max_workspace_size = 1 << 20
     engine = builder.build_engine(network,config)
 
 
@@ -653,8 +649,8 @@ def create_plan_dynamic_rf_modelfile(
 def create_plan_dynamic_modelfile(
         models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size):
     # Create the model
-    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
-    builder = trt.infer.create_infer_builder(G_LOGGER)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.infer.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
     if max_batch == 0:
         shape_with_batchsize = [i for i in shape]
@@ -691,7 +687,7 @@ def create_plan_dynamic_modelfile(
         profile.set_shape("INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
     config = builder.create_builder_config()
     config.add_optimization_profile(profile)
-    builder.set_max_workspace_size(1 << 20)
+    config.max_workspace_size = 1 << 20
     engine = builder.build_engine(network,config)
 
     model_name = tu.get_zero_model_name(
