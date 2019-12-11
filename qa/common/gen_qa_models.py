@@ -876,7 +876,7 @@ def create_plan_fixed_modelfile( models_dir, max_batch, model_version,
     network.mark_output(out1.get_output(0))
 
     builder.set_max_batch_size(max(1, max_batch))
-    builder.set_max_workspace_size(1 << 20)
+    builder.max_workspace_size = 1 << 20
     engine = builder.build_cuda_engine(network)
     network.destroy()
 

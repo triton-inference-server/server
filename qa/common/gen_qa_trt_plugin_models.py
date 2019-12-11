@@ -107,7 +107,7 @@ def create_plan_modelfile(models_dir, max_batch, model_version, plugin_name,
 
     with trt.Builder(TRT_LOGGER) as builder, builder.create_network() as network:
         builder.set_max_batch_size(max(1, max_batch))
-        builder.set_max_workspace_size(1 << 20)
+        builder.max_workspace_size = 1 << 20
         input_layer = network.add_input(name="INPUT0", dtype=trt_input_dtype, shape=input_shape)
         plugin_layer = network.add_plugin_v2(inputs=[input_layer], plugin=get_trt_plugin(plugin_name))
         plugin_layer.get_output(0).name = "OUTPUT0"
