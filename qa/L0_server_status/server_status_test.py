@@ -32,8 +32,9 @@ from future.utils import iteritems
 import os
 import infer_util as iu
 import unittest
-from google.protobuf import json_format
+from google.protobuf import text_format
 import json
+import requests
 from tensorrtserver.api import *
 import tensorrtserver.api.server_status_pb2 as server_status
 
@@ -219,17 +220,38 @@ class ServerStatusTest(unittest.TestCase):
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
-    def test_json_server_status(self):
-        # Convert to json, verify json is consistent with protobuf
+    def test_json_format_header(self):
+        # get server status as json
         model_name = "graphdef_float32_float32_float32"
-        server_status, req_id = _get_server_status("localhost:8000", ProtocolType.HTTP, model_name)
-        json_str = json_format.MessageToJson(server_status)
-        tmp_data = json.loads(json_str)
+        url = "http://localhost:8000/api/status/" + model_name + "?format=json"
+        r = requests.get(url, headers = {"Accept": "application/json"})
+        tmp_data = json.loads(r.content)
         self.assertEqual(tmp_data['modelStatus']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
-        # convert back to protobuf, should be identical to original
-        server_status2 = ServerStatus()
-        json_format.Parse(json_str, server_status2)
-        self.assertEqual(server_status, server_status2)
+
+    def test_json_format(self):
+        # get server status as json
+        model_name = "graphdef_float32_float32_float32"
+        url = "http://localhost:8000/api/status/" + model_name + "?format=json"
+        r = requests.get(url)
+        tmp_data = json.loads(r.content)
+        self.assertEqual(tmp_data['modelStatus']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
+
+    def test_json_header(self):
+        # get server status as json
+        model_name = "graphdef_float32_float32_float32"
+        url = "http://localhost:8000/api/status/" + model_name
+        r = requests.get(url, headers = {"Accept": "application/json"})
+        tmp_data = json.loads(r.content)
+        self.assertEqual(tmp_data['modelStatus']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
+
+    def test_text_format(self):
+        # get server status as json
+        model_name = "graphdef_float32_float32_float32"
+        url = "http://localhost:8000/api/status/" + model_name + "?format=text"
+        r = requests.get(url)
+        server_status1 = ServerStatus()
+        text_format.Parse(r.content, server_status1)
+        self.assertTrue(model_name in server_status1.model_status,"expected status for model " + model_name)
 
 class ModelStatusTest(unittest.TestCase):
     '''
