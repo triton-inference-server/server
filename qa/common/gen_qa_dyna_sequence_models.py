@@ -110,13 +110,13 @@ def np_to_c2_dtype(np_dtype):
 
 def np_to_trt_dtype(np_dtype):
     if np_dtype == np.int8:
-        return trt.infer.DataType.INT8
+        return trt.int8
     elif np_dtype == np.int32:
-        return trt.infer.DataType.INT32
+        return trt.int32
     elif np_dtype == np.float16:
-        return trt.infer.DataType.HALF
+        return trt.float16
     elif np_dtype == np.float32:
-        return trt.infer.DataType.FLOAT
+        return trt.float32
     return None
 
 def np_to_onnx_dtype(np_dtype):
@@ -494,14 +494,14 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype, sha
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START'+('END'*'CORRID')
     # otherwise...  the tests know to expect this.
-    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
-    builder = trt.infer.create_infer_builder(G_LOGGER)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.infer.Builder(TRT_LOGGER)
     network = builder.create_network()
     in0 = network.add_input("INPUT", trt_dtype, shape)
     start0 = network.add_input("START", trt_dtype, [1 for i in shape])
     end0 = network.add_input("END", trt_dtype, [1 for i in shape])
     ready0 = network.add_input("READY", trt_dtype, [1 for i in shape])
-    corrid0 = network.add_input("CORRID", trt.infer.DataType.INT32, [1 for i in shape])
+    corrid0 = network.add_input("CORRID", trt.int32, [1 for i in shape])
     add0 = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
     mul0 = network.add_elementwise(end0, corrid0, trt.infer.ElementWiseOperation.PROD)
     sum0 = network.add_elementwise(add0.get_output(0), mul0.get_output(0),
@@ -512,7 +512,7 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype, sha
     network.mark_output(out0.get_output(0))
 
     builder.set_max_batch_size(max(1, max_batch))
-    builder.set_max_workspace_size(1 << 20)
+    builder.max_workspace_size = 1 << 20
     engine = builder.build_cuda_engine(network)
     network.destroy()
 
@@ -537,14 +537,14 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype, 
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START'*('END'*'CORRID')
     # otherwise...  the tests know to expect this.
-    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
-    builder = trt.infer.create_infer_builder(G_LOGGER)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.infer.Builder(TRT_LOGGER)
     network = builder.create_network()
     in0 = network.add_input("INPUT", trt_dtype, shape)
     start0 = network.add_input("START", trt_dtype, [1 for i in shape])
     end0 = network.add_input("END", trt_dtype, [1 for i in shape])
     ready0 = network.add_input("READY", trt_dtype, [1 for i in shape])
-    corrid0 = network.add_input("CORRID", trt.infer.DataType.INT32, [1 for i in shape])
+    corrid0 = network.add_input("CORRID", trt.int32, [1 for i in shape])
     add0 = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
     mul0 = network.add_elementwise(end0, corrid0, trt.infer.ElementWiseOperation.PROD)
     sum0 = network.add_elementwise(add0.get_output(0), mul0.get_output(0),
@@ -572,18 +572,14 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype, 
         corrid0.dynamic_range = (-128.0, 127.0)
 
     flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
-
     if (trt_dtype == trt.DataType.INT8):
-        builder.int8_mode = True
         flags |= 1 << int(trt.BuilderFlag.INT8)
     elif (trt_dtype == trt.DataType.HALF):
-        builder.fp16_mode = True
         flags |= 1 << int(trt.BuilderFlag.FP16)
 
-    builder.strict_type_constraints = True
     config = builder.create_builder_config()
     config.flags=flags
-    builder.set_max_workspace_size(1 << 20)
+    config.max_workspace_size = 1 << 20
     builder.set_max_batch_size(max(1, max_batch))
     engine = builder.build_engine(network,config)
 
@@ -608,8 +604,8 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, s
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START'*('END'*'CORRID')
     # otherwise...  the tests know to expect this.
-    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
-    builder = trt.infer.create_infer_builder(G_LOGGER)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.infer.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
 
     unit_shape = ([1] * len(shape))
@@ -618,13 +614,13 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, s
         start0 = network.add_input("START", trt_dtype, [-1] + unit_shape)
         end0 = network.add_input("END", trt_dtype, [-1] + unit_shape)
         ready0 = network.add_input("READY", trt_dtype, [-1] + unit_shape)
-        corrid0 = network.add_input("CORRID", trt.infer.DataType.INT32, [-1] + unit_shape)
+        corrid0 = network.add_input("CORRID", trt.int32, [-1] + unit_shape)
     else :
         in0 = network.add_input("INPUT", trt_dtype, shape)
         start0 = network.add_input("START", trt_dtype, unit_shape)
         end0 = network.add_input("END", trt_dtype, unit_shape)
         ready0 = network.add_input("READY", trt_dtype, unit_shape)
-        corrid0 = network.add_input("CORRID", trt.infer.DataType.INT32, unit_shape)
+        corrid0 = network.add_input("CORRID", trt.int32, unit_shape)
 
     add0 = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
     mul0 = network.add_elementwise(end0, corrid0, trt.infer.ElementWiseOperation.PROD)
@@ -667,7 +663,7 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, s
     config = builder.create_builder_config()
     config.add_optimization_profile(profile)
 
-    builder.set_max_workspace_size(1 << 20)
+    config.max_workspace_size = 1 << 20
     engine = builder.build_engine(network,config)
 
     model_name = tu.get_dyna_sequence_model_name(
@@ -692,8 +688,8 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START'*('END'*'CORRID')
     # otherwise...  the tests know to expect this.
-    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
-    builder = trt.infer.create_infer_builder(G_LOGGER)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.infer.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
 
     unit_shape = ([1] * len(shape))
@@ -702,13 +698,13 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype
         start0 = network.add_input("START", trt_dtype, [-1] + unit_shape)
         end0 = network.add_input("END", trt_dtype, [-1] + unit_shape)
         ready0 = network.add_input("READY", trt_dtype, [-1] + unit_shape)
-        corrid0 = network.add_input("CORRID", trt.infer.DataType.INT32, [-1] + unit_shape)
+        corrid0 = network.add_input("CORRID", trt.int32, [-1] + unit_shape)
     else :
         in0 = network.add_input("INPUT", trt_dtype, shape)
         start0 = network.add_input("START", trt_dtype, unit_shape)
         end0 = network.add_input("END", trt_dtype, unit_shape)
         ready0 = network.add_input("READY", trt_dtype, unit_shape)
-        corrid0 = network.add_input("CORRID", trt.infer.DataType.INT32, unit_shape)
+        corrid0 = network.add_input("CORRID", trt.int32, unit_shape)
 
     add0 = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
     mul0 = network.add_elementwise(end0, corrid0, trt.infer.ElementWiseOperation.PROD)
@@ -735,14 +731,10 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype
         corrid0.dynamic_range = (-128.0, 127.0)
 
     flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
-
     if (trt_dtype == trt.DataType.INT8):
-        builder.int8_mode = True
         flags |= 1 << int(trt.BuilderFlag.INT8)
     elif (trt_dtype == trt.DataType.HALF):
-        builder.fp16_mode = True
         flags |= 1 << int(trt.BuilderFlag.FP16)
-    builder.strict_type_constraints = True
 
     min_shape = []
     opt_shape = []
@@ -777,8 +769,7 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype
     config = builder.create_builder_config()
     config.flags=flags
     config.add_optimization_profile(profile)
-
-    builder.set_max_workspace_size(1 << 20)
+    config.max_workspace_size = 1 << 20
     engine = builder.build_engine(network,config)
 
     model_name = tu.get_dyna_sequence_model_name(

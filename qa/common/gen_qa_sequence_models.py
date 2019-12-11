@@ -111,13 +111,13 @@ def np_to_c2_dtype(np_dtype):
 
 def np_to_trt_dtype(np_dtype):
     if np_dtype == np.int8:
-        return trt.infer.DataType.INT8
+        return trt.int8
     elif np_dtype == np.int32:
-        return trt.infer.DataType.INT32
+        return trt.int32
     elif np_dtype == np.float16:
-        return trt.infer.DataType.HALF
+        return trt.float16
     elif np_dtype == np.float32:
-        return trt.infer.DataType.FLOAT
+        return trt.float32
     return None
 
 def np_to_onnx_dtype(np_dtype):
@@ -439,8 +439,8 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype, sha
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
     # tests know to expect this.
-    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
-    builder = trt.infer.create_infer_builder(G_LOGGER)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.infer.Builder(TRT_LOGGER)
     network = builder.create_network()
     in0 = network.add_input("INPUT", trt_dtype, shape)
     start0 = network.add_input("START", trt_dtype, [1 for i in shape])
@@ -452,7 +452,7 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype, sha
     network.mark_output(out0.get_output(0))
 
     builder.set_max_batch_size(max(1, max_batch))
-    builder.set_max_workspace_size(1 << 20)
+    builder.max_workspace_size = 1 << 20
     engine = builder.build_cuda_engine(network)
     network.destroy()
 
@@ -477,8 +477,8 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype, 
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
     # tests know to expect this.
-    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
-    builder = trt.infer.create_infer_builder(G_LOGGER)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.infer.Builder(TRT_LOGGER)
     network = builder.create_network()
     in0 = network.add_input("INPUT", trt_dtype, shape)
     start0 = network.add_input("START", trt_dtype, [1 for i in shape])
@@ -505,16 +505,13 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype, 
     flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
 
     if (trt_dtype == trt.DataType.INT8):
-        builder.int8_mode = True
         flags |= 1 << int(trt.BuilderFlag.INT8)
     elif (trt_dtype == trt.DataType.HALF):
-        builder.fp16_mode = True
         flags |= 1 << int(trt.BuilderFlag.FP16)
     
-    builder.strict_type_constraints = True
     config = builder.create_builder_config()
     config.flags=flags
-    builder.set_max_workspace_size(1 << 20)
+    config.max_workspace_size = 1 << 20
     builder.set_max_batch_size(max(1, max_batch))
     engine = builder.build_engine(network,config)
 
@@ -539,8 +536,8 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, s
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
     # tests know to expect this.
-    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
-    builder = trt.infer.create_infer_builder(G_LOGGER)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.infer.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
 
     unit_shape = ([1] * len(shape))
@@ -587,7 +584,7 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, s
     config = builder.create_builder_config()
     config.add_optimization_profile(profile)
 
-    builder.set_max_workspace_size(1 << 20)
+    config.max_workspace_size = 1 << 20
     engine = builder.build_engine(network,config)
 
     model_name = tu.get_sequence_model_name(
@@ -612,8 +609,8 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
     # tests know to expect this.
-    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
-    builder = trt.infer.create_infer_builder(G_LOGGER)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.infer.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
 
     unit_shape = ([1] * len(shape))
@@ -648,12 +645,9 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype
     flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
 
     if (trt_dtype == trt.DataType.INT8):
-        builder.int8_mode = True
         flags |= 1 << int(trt.BuilderFlag.INT8)
     elif (trt_dtype == trt.DataType.HALF):
-        builder.fp16_mode = True
         flags |= 1 << int(trt.BuilderFlag.FP16)
-    builder.strict_type_constraints = True
 
     min_shape = []
     opt_shape = []
@@ -685,7 +679,7 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype
     config.flags=flags
     config.add_optimization_profile(profile)
 
-    builder.set_max_workspace_size(1 << 20)
+    config.max_workspace_size = 1 << 20
     engine = builder.build_engine(network,config)
 
     model_name = tu.get_sequence_model_name(
