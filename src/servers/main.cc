@@ -41,6 +41,7 @@
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
 #include "src/servers/shared_memory_block_manager.h"
+#include "src/servers/tracer.h"
 
 #ifdef TRTIS_ENABLE_GPU
 static_assert(

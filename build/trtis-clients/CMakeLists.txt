@@ -78,6 +78,7 @@ include_directories(${Protobuf_INCLUDE_DIRS})
 #
 # GRPC
 #
+set(TRTIS_ENABLE_GRPC ON)
 find_package(gRPC CONFIG REQUIRED)
 message(STATUS "Using gRPC ${gRPC_VERSION}")
 include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
