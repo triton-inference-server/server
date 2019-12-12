@@ -205,6 +205,7 @@ ExternalProject_Add(RapidJSON
   # with the latest rapidjson release (v1.1.0)
   GIT_TAG "cba45fe9de6923b858edb0780e257b7257aa4f7b"
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/rapidjson/src/rapidjson"
+  TEST_COMMAND ""
 )
 
 #
