@@ -52,6 +52,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
       preferred_batch_sizes_(preferred_batch_sizes),
       pending_batch_delay_ns_(max_queue_delay_microseconds * 1000),
       pending_batch_size_(0), pending_batch_queue_cnt_(0),
+      queued_batch_size_(0), next_preferred_batch_size_(0),
       enforce_equal_shape_batch_(enforce_equal_shape_batch),
       preserve_ordering_(preserve_ordering), last_processing_runner_id_(-1)
 {
@@ -280,7 +281,7 @@ DynamicBatchScheduler::SchedulerThread(
             completion_promises_[runner_id] =
                 std::make_shared<std::promise<void>>();
           }
-          
+
           queued_batch_size_ -= pending_batch_size_;
           next_preferred_batch_size_ = preferred_batch_sizes_.empty()
                                            ? 0
