@@ -163,12 +163,15 @@ DynamicBatchScheduler::Enqueue(
 
     // If there are any idle runners and the queued batch size is greater or
     // equal to next preferred batch size, then wake one up to service this
-    // request. This the optimistic for dynamic shape model as the batch may
-    // need to be executed early due to inconsistent pending shape. We do the
-    // actual wake outside of the lock to avoid having the woken thread
-    // immediately block on the lock
-    wake_runner = (idle_scheduler_thread_cnt_ > 0) &&
-                  (queued_batch_size_ >= next_preferred_batch_size_);
+    // request. We do the actual wake outside of the lock to avoid having the
+    // woken thread immediately block on the lock
+    wake_runner = (idle_scheduler_thread_cnt_ > 0);
+
+    // We may wake up runner less often if we don't enforce equal shape within
+    // a batch, otherwise must alwasys wake up runner to check it
+    if (!enforce_equal_shape_batch_) {
+      wake_runner &= (queued_batch_size_ >= next_preferred_batch_size_);
+    }
   }
 
   if (wake_runner) {
