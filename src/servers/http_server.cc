@@ -576,9 +576,15 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
         format = std::string(format_c_str);
       } else {
         // If format empty, Accept: application/json in header then return json
-        const char* header_accept = evhtp_kv_find(req->headers_in, "Accept");
-        if (std::string(header_accept) == "application/json") {
-          format = "json";
+        const char* header_accept_c_str =
+            evhtp_kv_find(req->headers_in, "Accept");
+        if (header_accept_c_str != NULL) {
+          std::string header_accept = std::string(header_accept_c_str);
+          if (header_accept == "application/json") {
+            format = "json";
+          } else {
+            format = "text";
+          }
         } else {
           format = "text";
         }
