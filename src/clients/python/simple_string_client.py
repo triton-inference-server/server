@@ -93,8 +93,8 @@ if __name__ == '__main__':
         r0 = int(output0_data[i])
         r1 = int(output1_data[i])
         if expected_sum[i] != r0:
-            print("error: incorrect sum");
-            sys.exit(1);
+            print("error: incorrect sum")
+            sys.exit(1)
         if expected_diff[i] != r1:
-            print("error: incorrect difference");
-            sys.exit(1);
+            print("error: incorrect difference")
+            sys.exit(1)

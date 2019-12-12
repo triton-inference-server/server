@@ -109,7 +109,10 @@ def serialize_string_tensor(input_tensor):
             # don't convert it to str as Python will encode the
             # bytes which may distort the meaning
             if obj.dtype.type == np.bytes_:
-                s = bytes(obj)
+                if type(obj.item()) == bytes:
+                    s = obj.item()
+                else:
+                    s = bytes(obj)
             else:
                 s = str(obj).encode('utf-8')
             flattened += struct.pack("<I", len(s))
