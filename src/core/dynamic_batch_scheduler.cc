@@ -286,9 +286,12 @@ DynamicBatchScheduler::SchedulerThread(
           }
 
           queued_batch_size_ -= pending_batch_size_;
-          next_preferred_batch_size_ = preferred_batch_sizes_.empty()
-                                           ? 0
-                                           : *preferred_batch_sizes_.begin();
+          // Set next preferred to be 0 so that enqueue thread will wake up
+          // runners when new request arrives. In the case where the queue
+          // becomes empty, this helps the runners to set up proper wait time
+          // instead of waiting for the default timer or actual next preferred
+          // batch size is reached.
+          next_preferred_batch_size_ = 0;
 
           pending_batch_size_ = 0;
           pending_batch_queue_cnt_ = 0;
