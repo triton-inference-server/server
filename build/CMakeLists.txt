@@ -196,19 +196,6 @@ ExternalProject_Add(curl
 )
 
 #
-# Get the RapidJSON
-#
-ExternalProject_Add(RapidJSON
-  PREFIX RapidJSON
-  GIT_REPOSITORY "https://github.com/Tencent/rapidjson.git"
-  # Using a specific commit state which fixes a build issue
-  # with the latest rapidjson release (v1.1.0)
-  GIT_TAG "cba45fe9de6923b858edb0780e257b7257aa4f7b"
-  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/rapidjson/src/rapidjson"
-  TEST_COMMAND ""
-)
-
-#
 # Build libevent
 #
 ExternalProject_Add(libevent
@@ -410,7 +397,7 @@ ExternalProject_Add(trtis-clients
     -DTRTIS_ENABLE_GPU:BOOL=${TRTIS_ENABLE_GPU}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_CLIENTS_INSTALL_PREFIX}
     -DTRTIS_VERSION:STRING=${TRTIS_VERSION}
-  DEPENDS curl protobuf grpc RapidJSON
+  DEPENDS curl protobuf grpc
 )
 
 #
