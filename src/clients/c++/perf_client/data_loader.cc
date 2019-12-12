@@ -111,16 +111,6 @@ DataLoader::ReadDataFromJSON(
         "failed to parse the specified json file for reading inputs");
   }
 
-  int count = 0;
-  if (d.HasMember("count")) {
-    if (!d["count"].IsInt()) {
-      return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "The count field in the json should be of type int");
-    }
-    count = d["count"].GetInt();
-  }
-
   if (!d.HasMember("data")) {
     return nic::Error(
         ni::RequestStatusCode::INVALID_ARG,
@@ -128,10 +118,9 @@ DataLoader::ReadDataFromJSON(
   }
 
   const rapidjson::Value& streams = d["data"];
-  int this_count =
-      ((count == 0) ? streams.Size() : std::min((int)streams.Size(), count));
+  int count = streams.Size();
 
-  data_stream_cnt_ += this_count;
+  data_stream_cnt_ += count;
   int offset = step_num_.size();
   for (size_t i = offset; i < data_stream_cnt_; i++) {
     const rapidjson::Value& steps = streams[i - offset];
@@ -145,10 +134,10 @@ DataLoader::ReadDataFromJSON(
       // and add the tensors to a single stream '0'.
       int offset = 0;
       if (step_num_.empty()) {
-        step_num_.push_back(this_count);
+        step_num_.push_back(count);
       } else {
         offset = step_num_[0];
-        step_num_[0] += (this_count);
+        step_num_[0] += (count);
       }
       data_stream_cnt_ = 1;
       for (size_t k = offset; k < step_num_[0]; k++) {

@@ -44,7 +44,7 @@ DATADIR=`pwd`/models
 TESTDATADIR=`pwd`/test_data
 
 INTJSONDATAFILE=`pwd`/int_data.json
-JSONDATAFILE=`pwd`/data.json
+JSONDATAFILE=`pwd`/string_data.json
 SEQJSONDATAFILE=`pwd`/seq_data.json
 
 SERVER=/opt/tensorrtserver/bin/trtserver

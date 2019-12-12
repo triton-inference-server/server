@@ -31,6 +31,8 @@ if(WIN32)
 		      "are UNIX specific.")
 else()
 
+find_package(RapidJSON CONFIG REQUIRED)
+
 set(
   PERF_CLIENT_SRCS
   perf_client.cc
@@ -62,7 +64,7 @@ add_executable(perf_client
   ${PERF_CLIENT_SRCS} ${PERF_CLIENT_HDRS})
 target_include_directories(
   perf_client
-  PRIVATE ${Rapidjson_INCLUDE_DIRS})
+  PRIVATE ${RapidJSON_INCLUDE_DIRS})
 target_link_libraries(
   perf_client
   PRIVATE TRTIS::request_static
