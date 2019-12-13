@@ -102,12 +102,13 @@ Performing an HTTP GET to /api/status returns status information about
 the server and all the models being served. Performing an HTTP GET to
 /api/status/<model name> returns information about the server and the
 single model specified by <model name>. The server status is returned
-in the HTTP response body in either text format (the default) or in
-binary format if query parameter format=binary is specified (for
-example, /api/status?format=binary). The success or failure of the
-status request is indicated in the HTTP response code and the
-**NV-Status** response header. The **NV-Status** response header
-returns a text protobuf formatted :cpp:var:`RequestStatus
+in the HTTP response body in either text format (the default), in binary
+format if query parameter format=binary is specified (for example,
+/api/status?format=binary) or in json format if query parameter
+format=json is specified (for example, /api/status?format=json).
+The success or failure of the status request is indicated in the HTTP
+response code and the **NV-Status** response header. The **NV-Status**
+response header returns a text protobuf formatted :cpp:var:`RequestStatus
 <nvidia::inferenceserver::RequestStatus>` message.
 
 For GRPC the :cpp:var:`GRPCService
