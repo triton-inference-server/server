@@ -26,6 +26,7 @@
 #pragma once
 
 #include "src/clients/c++/perf_client/context_factory.h"
+#include "src/clients/c++/perf_client/data_loader.h"
 #include "src/clients/c++/perf_client/perf_utils.h"
 
 #include <condition_variable>
@@ -86,12 +87,12 @@ class LoadManager {
   /// for string inputs.
   /// \param string_data The string to be used as string inputs for model.
   /// \param zero_input Whether to use zero for model inputs.
-  /// \param data_directory The path to the directory containing the input data
-  /// in binary or text files.
+  /// \param user_data The vector containing path/paths to user-provided data
+  /// that can be a directory or path to a json data file.
   /// \return Error object indicating success or failure.
   nic::Error InitManagerInputs(
       const size_t string_length, const std::string& string_data,
-      const bool zero_input, const std::string& data_directory);
+      const bool zero_input, std::vector<std::string>& user_data);
 
   /// Helper function to allocate and prepare shared memory.
   /// from shared memory.
@@ -101,6 +102,7 @@ class LoadManager {
   /// Helper function to prepare the InferContext for sending inference request.
   /// \param ctx Returns a new InferContext.
   /// \param options Returns the options used by 'ctx'.
+  /// \return Error object indicating success or failure.
   nic::Error PrepareInfer(
       std::unique_ptr<nic::InferContext>* ctx,
       std::unique_ptr<nic::InferContext::Options>* options);
@@ -114,6 +116,17 @@ class LoadManager {
       std::unique_ptr<nic::InferContext>* ctx,
       std::unique_ptr<nic::InferContext::Options>* options);
 
+  /// Updates the input data to use for inference request
+  /// \param inputs The inputs to the model
+  /// \param stream_index The data stream to use for next data
+  /// \param step_index The step index to use for next data
+  /// \return Error object indicating success or failure.
+  nic::Error UpdateInputs(
+      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+      int stream_index, int step_index);
+
+  void InitNewSequence(int sequence_id);
+
   /// Generate random sequence length based on 'offset_ratio' and
   /// 'sequence_length_'. (1 +/- 'offset_ratio') * 'sequence_length_'
   /// \param offset_ratio The offset ratio of the generated length
@@ -124,12 +137,23 @@ class LoadManager {
   void StopWorkerThreads();
 
  private:
-  /// Helper function to access data for the specified input
-  /// \param input The target input
-  /// Returns the pointer to the memory holding data
-  nic::Error GetInputData(
-      std::shared_ptr<nic::InferContext::Input> input, const uint8_t** data,
-      size_t* batch1_size);
+  /// Helper function to update the inputs
+  /// \param inputs The inputs to the model
+  /// \param stream_index The data stream to use for next data
+  /// \param step_index The step index to use for next data
+  /// \return Error object indicating success or failure.
+  nic::Error SetInputs(
+      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+      const int stream_index, const int step_index);
+
+  /// Helper function to update the shared memory inputs
+  /// \param inputs The inputs to the model
+  /// \param stream_index The data stream to use for next data
+  /// \param step_index The step index to use for next data
+  /// \return Error object indicating success or failure.
+  nic::Error SetInputsSharedMemory(
+      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+      const int stream_index, const int step_index);
 
  protected:
   bool async_;
@@ -137,7 +161,6 @@ class LoadManager {
   std::unordered_map<std::string, std::vector<int64_t>> input_shapes_;
   size_t batch_size_;
   size_t max_threads_;
-
   size_t sequence_length_;
   SharedMemoryType shared_memory_type_;
   size_t output_shm_size_;
@@ -145,20 +168,16 @@ class LoadManager {
 
   std::shared_ptr<ContextFactory> factory_;
 
-  // User provided input data, it will be preferred over synthetic data
-  std::unordered_map<std::string, std::vector<char>> input_data_;
-  std::unordered_map<std::string, std::vector<char>> input_string_data_;
+  bool using_json_data_;
 
-  // Placeholder for generated input data, which will be used for all inputs
-  // except string
-  std::vector<uint8_t> input_buf_;
-
+  std::unique_ptr<DataLoader> data_loader_;
   std::unique_ptr<nic::SharedMemoryControlContext> shared_memory_ctx_;
 
   // Map from shared memory key to its starting address and size
   std::unordered_map<std::string, std::pair<uint8_t*, size_t>>
       shared_memory_regions_;
 
+  // Holds the running status of the thread.
   struct ThreadStat {
     ThreadStat() : status_(ni::RequestStatusCode::SUCCESS) {}
 
@@ -166,7 +185,7 @@ class LoadManager {
     nic::Error status_;
     // The statistics of the InferContext
     std::vector<nic::InferContext::Stat> contexts_stat_;
-    //  The concurrency level that the worker should produce
+    // The concurrency level that the worker should produce
     size_t concurrency_;
     // A vector of request timestamps <start_time, end_time>
     // Request latency will be end_time - start_time
@@ -174,6 +193,25 @@ class LoadManager {
     // A lock to protect thread data
     std::mutex mu_;
   };
+
+  // Holds the status of the inflight sequence
+  struct SequenceStat {
+    SequenceStat(uint64_t corr_id)
+        : corr_id_(corr_id), data_stream_id_(0), remaining_queries_(0)
+    {
+    }
+    // The unique correlation id allocated to the sequence
+    uint64_t corr_id_;
+    // The data stream id providing data for the sequence
+    uint64_t data_stream_id_;
+    // The number of queries remaining to complete the sequence
+    size_t remaining_queries_;
+    // A lock to protect sequence data
+    std::mutex mtx_;
+  };
+
+  std::vector<std::shared_ptr<SequenceStat>> sequence_stat_;
+  std::atomic<ni::CorrelationID> next_corr_id_;
 
   // Worker threads that loads the server with inferences
   std::vector<std::thread> threads_;

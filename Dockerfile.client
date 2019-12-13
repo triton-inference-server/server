@@ -53,7 +53,8 @@ RUN PYSFX=`[ "$PYVER" != "2" ] && echo "$PYVER" || echo ""` && \
             pkg-config \
             python${PYSFX} \
             python${PYSFX}-pip \
-            python${PYSFX}-dev && \
+            python${PYSFX}-dev \
+            rapidjson-dev && \
     pip${PYSFX} install --upgrade wheel setuptools grpcio-tools
 
 # Build expects "python" executable (not python3).
