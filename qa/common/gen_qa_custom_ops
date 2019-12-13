@@ -38,7 +38,7 @@
 ############################################################################
 
 TRTIS_VERSION=19.11
-TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRTIS_VERSION-tf1-py3}
+TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=gitlab-master.nvidia.com:5005/dl/dgx/tensorflow:use_trt7_tf1-py3-devel}
 
 CUDA_DEVICE=0
 
