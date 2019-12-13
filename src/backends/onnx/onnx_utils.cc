@@ -246,6 +246,8 @@ ConvertToOnnxDataType(DataType data_type)
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE;
     case TYPE_STRING:
       return ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING;
+    case TYPE_BOOL:
+      return ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL;
     default:
       break;
   }
