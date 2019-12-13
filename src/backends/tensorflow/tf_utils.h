@@ -33,7 +33,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-/// \return true if a TensorFlow shape exactly matches a model
+/// \return Status::Success if a TensorFlow shape exactly matches a model
 /// configuration shape. Dimensions with variable size are represented
 /// by -1 in both the TensorFlow shape and the model configuration
 /// shape and these must match as well.

@@ -40,7 +40,7 @@ CompareDimsExact(
       return Status(
           RequestStatusCode::INVALID_ARG,
           "for the model to support batching, the shape should have at least 1 "
-          "dimension and the first dimension should not be -1");
+          "dimension and the first dimension must be -1");
     }
   }
 
@@ -49,7 +49,7 @@ CompareDimsExact(
     return Status(
         RequestStatusCode::INVALID_ARG,
         "the model expects " + std::to_string(model_shape->rank_) +
-            " dimensions but the model configuration specifies " +
+            " dimensions but the model configuration specified " +
             std::to_string(dims.size() + (supports_batching ? 1 : 0)) +
             " dimensions");
   }
@@ -58,8 +58,8 @@ CompareDimsExact(
     if (model_shape->dims_[i + (supports_batching ? 1 : 0)] != dims[i]) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "the model expects dims " + ShapeToString(model_shape) +
-              " but the model configuration specifies dims " +
+          "the model expects shape " + ShapeToString(model_shape) +
+              " but the model configuration specified shape " +
               DimsListToString(dims));
     }
   }
