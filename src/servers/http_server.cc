@@ -1137,15 +1137,17 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   std::string infer_request_header(
       evhtp_kv_find(req->headers_in, kInferRequestHTTPHeader));
 
-  InferRequestHeader request_header;
+  // [TODO] clean up protobuf usage (or not? The protobuf needs to be
+  // instantiated anyway)
+  InferRequestHeader request_header_protobuf;
   if (!google::protobuf::TextFormat::ParseFromString(
-          infer_request_header, &request_header)) {
+          infer_request_header, &request_header_protobuf)) {
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
   }
 
   std::string request_header_serialized;
-  if (!request_header.SerializeToString(&request_header_serialized)) {
+  if (!request_header_protobuf.SerializeToString(&request_header_serialized)) {
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
   }
@@ -1154,18 +1156,29 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
 
   // Create the inference request provider which provides all the
   // input information needed for an inference.
+  TRTSERVER_InferenceRequestHeader* request_header = nullptr;
+  TRTSERVER_Error* err = TRTSERVER_InferenceRequestHeaderNew(
+      &request_header, model_name.c_str(), model_version);
+  if (err == nullptr) {
+    // [TODO] Set the fields explicitly to save serialization overhead
+    err = TRTSERVER_InferenceRequestHeaderParseFromString(
+        request_header, request_header_serialized.c_str(),
+        request_header_serialized.size());
+  }
   TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
-  TRTSERVER_Error* err = TRTSERVER_InferenceRequestProviderNew(
-      &request_provider, server_.get(), model_name.c_str(), model_version,
-      request_header_serialized.c_str(), request_header_serialized.size());
+  if (err == nullptr) {
+    err = TRTSERVER_InferenceRequestProviderNew(
+        &request_provider, server_.get(), request_header);
+  }
+
   if (err == nullptr) {
     EVBufferPair* response_pair(new EVBufferPair());
     err = EVBufferToInput(
-        model_name, request_header, req->buffer_in, request_provider,
+        model_name, request_header_protobuf, req->buffer_in, request_provider,
         response_pair->second);
     if (err == nullptr) {
-      InferRequest* infer_request =
-          new InferRequest(req, request_header.id(), server_id_, unique_id);
+      InferRequest* infer_request = new InferRequest(
+          req, request_header_protobuf.id(), server_id_, unique_id);
 
       response_pair->first = req->buffer_out;
       infer_request->response_pair_.reset(response_pair);
@@ -1196,13 +1209,14 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   // The request provider can be deleted before ServerInferAsync
   // callback completes.
   TRTSERVER_InferenceRequestProviderDelete(request_provider);
+  TRTSERVER_InferenceRequestHeaderDelete(request_header);
 
   if (err != nullptr) {
     RequestStatus request_status;
     RequestStatusUtil::Create(&request_status, err, unique_id, server_id_);
 
     InferResponseHeader response_header;
-    response_header.set_id(request_header.id());
+    response_header.set_id(request_header_protobuf.id());
     evhtp_headers_add_header(
         req->headers_out,
         evhtp_header_new(

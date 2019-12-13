@@ -562,18 +562,18 @@ main(int argc, char** argv)
   // InferRequestHeader and the actual data via a provider.
   int64_t model_version = -1;  // latest
 
-  ni::InferRequestHeader request_header;
-  request_header.set_id(123);
-  request_header.set_batch_size(1);
+  ni::InferRequestHeader request_header_protobuf;
+  request_header_protobuf.set_id(123);
+  request_header_protobuf.set_batch_size(1);
 
-  auto input0 = request_header.add_input();
+  auto input0 = request_header_protobuf.add_input();
   input0->set_name(is_torch_model ? "INPUT__0" : "INPUT0");
-  auto input1 = request_header.add_input();
+  auto input1 = request_header_protobuf.add_input();
   input1->set_name(is_torch_model ? "INPUT__1" : "INPUT1");
 
-  auto output0 = request_header.add_output();
+  auto output0 = request_header_protobuf.add_output();
   output0->set_name(is_torch_model ? "OUTPUT__0" : "OUTPUT0");
-  auto output1 = request_header.add_output();
+  auto output1 = request_header_protobuf.add_output();
   output1->set_name(is_torch_model ? "OUTPUT__1" : "OUTPUT1");
 
   // Create the data for the two input tensors. Initialize the first
@@ -599,15 +599,25 @@ main(int argc, char** argv)
   }
 
   std::string request_header_serialized;
-  request_header.SerializeToString(&request_header_serialized);
+  request_header_protobuf.SerializeToString(&request_header_serialized);
 
   // Create the inference request provider which provides all the
   // input information needed for an inference.
+  TRTSERVER_InferenceRequestHeader* request_header = nullptr;
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestHeaderNew(
+          &request_header, model_name.c_str(), model_version),
+      "creating inference request header");
+  // [TODO] Set the fields explicitly to save serialization overhead
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestHeaderParseFromString(
+          request_header, request_header_serialized.c_str(),
+          request_header_serialized.size()),
+      "parsing inference request header");
   TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderNew(
-          &request_provider, server.get(), model_name.c_str(), model_version,
-          request_header_serialized.c_str(), request_header_serialized.size()),
+          &request_provider, server.get(), request_header),
       "creating inference request provider");
 
   const void* input0_base = &input0_data[0];
@@ -667,6 +677,10 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderDelete(request_provider),
       "deleting inference request provider");
+  // And thus the request header can also be deleted.
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestHeaderDelete(request_header),
+      "deleting inference request header");
 
   // Wait for the inference response and check the status.
   TRTSERVER_InferenceResponse* response = completed.get();

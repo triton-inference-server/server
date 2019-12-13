@@ -1064,43 +1064,55 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
     } else {
       // Create the inference request provider which provides all the
       // input information needed for an inference.
+      TRTSERVER_InferenceRequestHeader* request_header = nullptr;
+      err = TRTSERVER_InferenceRequestHeaderNew(
+          &request_header, request.model_name().c_str(),
+          request.model_version());
+      if (err == nullptr) {
+        // [TODO] Set the fields explicitly to save serialization overhead
+        err = TRTSERVER_InferenceRequestHeaderParseFromString(
+            request_header, request_header_serialized.c_str(),
+            request_header_serialized.size());
+      }
       TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
-      err = TRTSERVER_InferenceRequestProviderNew(
-          &request_provider, trtserver_.get(), request.model_name().c_str(),
-          request.model_version(), request_header_serialized.c_str(),
-          request_header_serialized.size());
+      if (err == nullptr) {
+        err = TRTSERVER_InferenceRequestProviderNew(
+            &request_provider, trtserver_.get(), request_header);
+      }
+
       if (err == nullptr) {
         err = InferGRPCToInput(
             trtserver_, smb_manager_, request.meta_data(), request,
             request_provider);
-        if (err == nullptr) {
-          err = InferAllocatorPayload(
-              trtserver_, smb_manager_, request.meta_data(), response,
-              &state->alloc_payload_);
-          if (err == nullptr) {
-            // Provide the trace manager object to use for this request, if
-            // nullptr then no tracing will be performed.
-            TRTSERVER_TraceManager* trace_manager = nullptr;
+      }
+      if (err == nullptr) {
+        err = InferAllocatorPayload(
+            trtserver_, smb_manager_, request.meta_data(), response,
+            &state->alloc_payload_);
+      }
+      if (err == nullptr) {
+        // Provide the trace manager object to use for this request, if
+        // nullptr then no tracing will be performed.
+        TRTSERVER_TraceManager* trace_manager = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
-            if (state->trace_meta_data_ != nullptr) {
-              TRTSERVER_TraceManagerNew(
-                  &trace_manager, TraceManager::CreateTrace,
-                  TraceManager::ReleaseTrace, state->trace_meta_data_.get());
-            }
+        if (state->trace_meta_data_ != nullptr) {
+          TRTSERVER_TraceManagerNew(
+              &trace_manager, TraceManager::CreateTrace,
+              TraceManager::ReleaseTrace, state->trace_meta_data_.get());
+        }
 #endif  // TRTIS_ENABLE_TRACING
 
-            state->step_ = ISSUED;
-            err = TRTSERVER_ServerInferAsync(
-                trtserver_.get(), trace_manager, request_provider, allocator_,
-                &state->alloc_payload_ /* response_allocator_userp */,
-                InferComplete, reinterpret_cast<void*>(state));
-          }
-        }
+        state->step_ = ISSUED;
+        err = TRTSERVER_ServerInferAsync(
+            trtserver_.get(), trace_manager, request_provider, allocator_,
+            &state->alloc_payload_ /* response_allocator_userp */,
+            InferComplete, reinterpret_cast<void*>(state));
       }
 
       // The request provider can be deleted before ServerInferAsync
       // callback completes.
       TRTSERVER_InferenceRequestProviderDelete(request_provider);
+      TRTSERVER_InferenceRequestHeaderDelete(request_header);
     }
 
     // If not error then state->step_ == ISSUED and inference request
@@ -1371,43 +1383,54 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     } else {
       // Create the inference request provider which provides all the
       // input information needed for an inference.
+      TRTSERVER_InferenceRequestHeader* request_header = nullptr;
+      err = TRTSERVER_InferenceRequestHeaderNew(
+          &request_header, request.model_name().c_str(),
+          request.model_version());
+      if (err == nullptr) {
+        // [TODO] Set the fields explicitly to save serialization overhead
+        err = TRTSERVER_InferenceRequestHeaderParseFromString(
+            request_header, request_header_serialized.c_str(),
+            request_header_serialized.size());
+      }
       TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
-      err = TRTSERVER_InferenceRequestProviderNew(
-          &request_provider, trtserver_.get(), request.model_name().c_str(),
-          request.model_version(), request_header_serialized.c_str(),
-          request_header_serialized.size());
+      if (err == nullptr) {
+        err = TRTSERVER_InferenceRequestProviderNew(
+            &request_provider, trtserver_.get(), request_header);
+      }
       if (err == nullptr) {
         err = InferGRPCToInput(
             trtserver_, smb_manager_, request.meta_data(), request,
             request_provider);
-        if (err == nullptr) {
-          err = InferAllocatorPayload(
-              trtserver_, smb_manager_, request.meta_data(), response,
-              &state->alloc_payload_);
-          if (err == nullptr) {
-            // Provide the trace manager object to use for this request, if
-            // nullptr then no tracing will be performed.
-            TRTSERVER_TraceManager* trace_manager = nullptr;
+      }
+      if (err == nullptr) {
+        err = InferAllocatorPayload(
+            trtserver_, smb_manager_, request.meta_data(), response,
+            &state->alloc_payload_);
+      }
+      if (err == nullptr) {
+        // Provide the trace manager object to use for this request, if
+        // nullptr then no tracing will be performed.
+        TRTSERVER_TraceManager* trace_manager = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
-            if (state->trace_meta_data_ != nullptr) {
-              TRTSERVER_TraceManagerNew(
-                  &trace_manager, TraceManager::CreateTrace,
-                  TraceManager::ReleaseTrace, state->trace_meta_data_.get());
-            }
+        if (state->trace_meta_data_ != nullptr) {
+          TRTSERVER_TraceManagerNew(
+              &trace_manager, TraceManager::CreateTrace,
+              TraceManager::ReleaseTrace, state->trace_meta_data_.get());
+        }
 #endif  // TRTIS_ENABLE_TRACING
 
-            state->step_ = ISSUED;
-            err = TRTSERVER_ServerInferAsync(
-                trtserver_.get(), trace_manager, request_provider, allocator_,
-                &state->alloc_payload_ /* response_allocator_userp */,
-                StreamInferComplete, reinterpret_cast<void*>(state));
-          }
-        }
+        state->step_ = ISSUED;
+        err = TRTSERVER_ServerInferAsync(
+            trtserver_.get(), trace_manager, request_provider, allocator_,
+            &state->alloc_payload_ /* response_allocator_userp */,
+            StreamInferComplete, reinterpret_cast<void*>(state));
       }
 
       // The request provider can be deleted before ServerInferAsync
       // callback completes.
       TRTSERVER_InferenceRequestProviderDelete(request_provider);
+      TRTSERVER_InferenceRequestHeaderDelete(request_header);
     }
 
     // If there was not an error in issuing the 'state' request then
