@@ -32,6 +32,9 @@ from future.utils import iteritems
 import os
 import infer_util as iu
 import unittest
+from google.protobuf import text_format
+import json
+import requests
 from tensorrtserver.api import *
 import tensorrtserver.api.server_status_pb2 as server_status
 
@@ -217,6 +220,38 @@ class ServerStatusTest(unittest.TestCase):
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_json_format_header(self):
+        # get server status as json
+        model_name = "graphdef_float32_float32_float32"
+        url = "http://localhost:8000/api/status/" + model_name + "?format=json"
+        r = requests.get(url, headers = {"Accept": "application/json"})
+        tmp_data = json.loads(r.content)
+        self.assertEqual(tmp_data['modelStatus']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
+
+    def test_json_format(self):
+        # get server status as json
+        model_name = "graphdef_float32_float32_float32"
+        url = "http://localhost:8000/api/status/" + model_name + "?format=json"
+        r = requests.get(url)
+        tmp_data = json.loads(r.content)
+        self.assertEqual(tmp_data['modelStatus']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
+
+    def test_json_header(self):
+        # get server status as json
+        model_name = "graphdef_float32_float32_float32"
+        url = "http://localhost:8000/api/status/" + model_name
+        r = requests.get(url, headers = {"Accept": "application/json"})
+        tmp_data = json.loads(r.content)
+        self.assertEqual(tmp_data['modelStatus']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
+
+    def test_text_format(self):
+        # get server status as json
+        model_name = "graphdef_float32_float32_float32"
+        url = "http://localhost:8000/api/status/" + model_name + "?format=text"
+        r = requests.get(url)
+        server_status1 = ServerStatus()
+        text_format.Parse(r.content, server_status1)
+        self.assertTrue(model_name in server_status1.model_status,"expected status for model " + model_name)
 
 class ModelStatusTest(unittest.TestCase):
     '''
