@@ -73,7 +73,8 @@ fi
         pkg-config \
         python3 \
         python3-pip \
-        python3-dev && \
+        python3-dev \
+        rapidjson-dev && \
     pip3 install --upgrade wheel setuptools grpcio-tools && \
     ln -s /usr/bin/python3 /usr/bin/python)
 
