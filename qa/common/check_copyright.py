@@ -37,6 +37,7 @@ SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png',
              'caffemodel', 'json')
 SKIP_PATHS = ('builddir',
               'build/libevhtp',
+              'build/onnxruntime',
               'deploy/single_server/.helmignore',
               'docs/examples/model_repository',
               'docs/examples/ensemble_model_repository',
