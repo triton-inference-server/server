@@ -338,7 +338,7 @@ PlanBackend::CreateExecutionContext(
   }
 
   // Validate the batch dimension against the implicit batch dimension if
-  // available
+  // available.
   if (context->engine_->hasImplicitBatchDimension() &&
       (context->max_batch_size_ > context->engine_->getMaxBatchSize())) {
     return Status(
@@ -507,6 +507,20 @@ PlanBackend::Context::InitializeInputBinding(
     // Detect whether dynamic or not
     if (ContainsWildcard(engine_dims)) {
       is_dynamic_ = true;
+    }
+
+    // Validate whether the binding supports maximum batch size specification in
+    // the config
+    if ((!engine_->hasImplicitBatchDimension()) &&
+        (!ContainsWildcardAtExplicitBatchDim(engine_dims)) &&
+        (max_batch_size_ > 1)) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected configuration maximum batch size " +
+              std::to_string(max_batch_size_) + " for '" + name_ +
+              "', model maximum is 1 as model does not contain an implicit "
+              "batch dimension nor the explicit batch-dimension of '" +
+              input_name + "' is a wildcard.");
     }
 
     if (!(is_control && is_dynamic_)) {
@@ -721,6 +735,21 @@ PlanBackend::Context::InitializeConfigOutputBindings(
           (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
       nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
+
+      // Validate whether the binding supports maximum batch size specification
+      // in the config
+      if ((!engine_->hasImplicitBatchDimension()) &&
+          (!ContainsWildcardAtExplicitBatchDim(engine_dims)) &&
+          (max_batch_size_ > 1)) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected configuration maximum batch size " +
+                std::to_string(max_batch_size_) + " for '" + name_ +
+                "', model maximum is 1 as model does not contain an implicit "
+                "batch dimension nor the explicit batch-dimension of '" +
+                io.name() + "' is a wildcard.");
+      }
+
       RETURN_IF_ERROR(CompareDimsSupported(
           name_, io.name(), engine_dims, model_config_dims, support_batching,
           is_dynamic_));
