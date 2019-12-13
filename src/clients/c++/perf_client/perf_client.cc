@@ -438,18 +438,29 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << std::setw(9) << std::left
             << " -b: " << FormatMessage("Batch size for each request sent.", 9)
             << std::endl;
-  std::cerr << FormatMessage(
-                   " --input-data: Select the type of data that will be used "
-                   "for input in inference requests. The available "
-                   "options are \"zero\", \"random\" or path to a directory. "
-                   "If the option is path to a directory then the directory "
-                   "must contain a binary file for each input, named the same "
-                   "as the input. Each file must contain the data required for "
-                   "that input for a batch-1 request. Each file should contain "
-                   "the raw binary representation of the input in row-major "
-                   "order. Default is \"random\".",
-                   18)
-            << std::endl;
+  std::cerr
+      << FormatMessage(
+             " --input-data: Select the type of data that will be used "
+             "for input in inference requests. The available options are "
+             "\"zero\", \"random\", path to a directory or a json file. If the "
+             "option is path to a directory then the directory must "
+             "contain a binary/text file for each non-string/string input "
+             "respectively, named the same as the input. Each "
+             "file must contain the data required for that input for a batch-1 "
+             "request. Each binary file should contain the raw binary "
+             "representation of the input in row-major order for non-string "
+             "inputs. The text file should contain all strings needed by "
+             "batch-1, each in a new line, listed in row-major order. When "
+             "pointing to a json file, user must adhere to the format "
+             "described in /docs/perf_client.rst. By specifying json data, "
+             "users can control data used with every request. Multiple data "
+             "streams can be specified for a sequence model and the client "
+             "will select a data stream in a round-robin fashion for every new "
+             "sequence. Muliple json files can also be provided (--input-data "
+             "json_file1 --input-data json-file2 and so on) and the client "
+             "will append data streams from each file. Default is \"random\".",
+             18)
+      << std::endl;
   std::cerr << FormatMessage(
                    " --shared-memory <\"system\"|\"cuda\"|\"none\">: Specifies "
                    "the type of the shared memory to use for input and output "
@@ -572,7 +583,7 @@ main(int argc, char** argv)
   std::unordered_map<std::string, std::vector<int64_t>> input_shapes;
   size_t string_length = 128;
   std::string string_data;
-  std::string data_directory("");
+  std::vector<std::string> user_data;
   bool zero_input = false;
   int32_t concurrent_request_count = 1;
   size_t max_concurrency = 0;
@@ -641,7 +652,7 @@ main(int argc, char** argv)
         percentile = std::atoi(optarg);
         break;
       case 4:
-        data_directory = optarg;
+        user_data.push_back(optarg);
         break;
       case 5: {
         std::string arg = optarg;
@@ -723,8 +734,8 @@ main(int argc, char** argv)
       case 11: {
         std::string arg = optarg;
         // Check whether the argument is a directory
-        if (IsDirectory(arg)) {
-          data_directory = optarg;
+        if (IsDirectory(arg) || IsFile(arg)) {
+          user_data.push_back(optarg);
         } else if (arg.compare("zero") == 0) {
           zero_input = true;
         } else if (arg.compare("random") == 0) {
@@ -928,7 +939,7 @@ main(int argc, char** argv)
   if (percentile != -1 && (percentile > 99 || percentile < 1)) {
     Usage(argv, "percentile must be -1 for not reporting or in range (0, 100)");
   }
-  if (zero_input && !data_directory.empty()) {
+  if (zero_input && !user_data.empty()) {
     Usage(argv, "zero input can't be set when data directory is provided");
   }
   if (async && forced_sync) {
@@ -1017,31 +1028,6 @@ main(int argc, char** argv)
     max_threads = 16;
   }
 
-  if (target_concurrency) {
-    if (!async) {
-      if (concurrency_range[SEARCH_RANGE::kEND] == NO_LIMIT) {
-        std::cerr
-            << "WARNING: The maximum attainable concurrency will be limited by "
-               "max_threads specification."
-            << std::endl;
-        concurrency_range[SEARCH_RANGE::kEND] = max_threads;
-      } else {
-        // As only one synchronous request can be generated from a thread at a
-        // time, to maintain the requested concurrency, that many threads need
-        // to be generated.
-        if (max_threads_specified) {
-          std::cerr
-              << "WARNING: Overriding max_threads specification to ensure "
-                 "requested concurrency range."
-              << std::endl;
-        }
-        max_threads = std::max(
-            concurrency_range[SEARCH_RANGE::kSTART],
-            concurrency_range[SEARCH_RANGE::kEND]);
-      }
-    }
-  }
-
   // trap SIGINT to allow threads to exit gracefully
   signal(SIGINT, SignalHandler);
 
@@ -1079,24 +1065,48 @@ main(int argc, char** argv)
         concurrency_range[SEARCH_RANGE::kSTART],
         concurrency_range[SEARCH_RANGE::kEND]);
 
+
+    if (!async) {
+      if (concurrency_range[SEARCH_RANGE::kEND] == NO_LIMIT) {
+        std::cerr
+            << "WARNING: The maximum attainable concurrency will be limited by "
+               "max_threads specification."
+            << std::endl;
+        concurrency_range[SEARCH_RANGE::kEND] = max_threads;
+      } else {
+        // As only one synchronous request can be generated from a thread at a
+        // time, to maintain the requested concurrency, that many threads need
+        // to be generated.
+        if (max_threads_specified) {
+          std::cerr
+              << "WARNING: Overriding max_threads specification to ensure "
+                 "requested concurrency range."
+              << std::endl;
+        }
+        max_threads = std::max(
+            concurrency_range[SEARCH_RANGE::kSTART],
+            concurrency_range[SEARCH_RANGE::kEND]);
+      }
+    }
+
     err = ConcurrencyManager::Create(
         async, batch_size, max_threads, max_concurrency, sequence_length,
-        string_length, string_data, zero_input, input_shapes, data_directory,
+        string_length, string_data, zero_input, input_shapes, user_data,
         shared_memory_type, output_shm_size, factory, &manager);
 
   } else if (using_request_rate_range) {
     err = RequestRateManager::Create(
         async, measurement_window_ms, request_distribution, batch_size,
         max_threads, num_of_sequences, sequence_length, string_length,
-        string_data, zero_input, input_shapes, data_directory,
-        shared_memory_type, output_shm_size, factory, &manager);
+        string_data, zero_input, input_shapes, user_data, shared_memory_type,
+        output_shm_size, factory, &manager);
 
   } else {
     err = CustomLoadManager::Create(
         async, measurement_window_ms, request_intervals_file, batch_size,
         max_threads, num_of_sequences, sequence_length, string_length,
-        string_data, zero_input, input_shapes, data_directory,
-        shared_memory_type, output_shm_size, factory, &manager);
+        string_data, zero_input, input_shapes, user_data, shared_memory_type,
+        output_shm_size, factory, &manager);
   }
 
   if (!err.IsOk()) {

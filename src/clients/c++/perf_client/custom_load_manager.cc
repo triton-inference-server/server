@@ -34,7 +34,7 @@ CustomLoadManager::Create(
     const size_t sequence_length, const size_t string_length,
     const std::string& string_data, const bool zero_input,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-    const std::string& data_directory,
+    std::vector<std::string>& user_data,
     const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
@@ -47,7 +47,7 @@ CustomLoadManager::Create(
   local_manager->threads_config_.reserve(max_threads);
 
   RETURN_IF_ERROR(local_manager->InitManagerInputs(
-      string_length, string_data, zero_input, data_directory));
+      string_length, string_data, zero_input, user_data));
 
   if (local_manager->shared_memory_type_ !=
       SharedMemoryType::NO_SHARED_MEMORY) {

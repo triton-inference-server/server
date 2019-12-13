@@ -60,23 +60,8 @@ CreateCUDAIPCHandle(
 
   return nic::Error::Success;
 }
+
 #endif  // TRTIS_ENABLE_GPU
-
-void
-SerializeStringTensor(
-    std::vector<std::string> string_tensor, std::vector<char>* serialized_data)
-{
-  std::string serialized = "";
-  for (auto s : string_tensor) {
-    uint32_t len = s.size();
-    serialized.append(reinterpret_cast<const char*>(&len), sizeof(uint32_t));
-    serialized.append(s);
-  }
-
-  std::copy(
-      serialized.begin(), serialized.end(),
-      std::back_inserter(*serialized_data));
-}
 
 }  // namespace
 
@@ -194,25 +179,25 @@ LoadManager::LoadManager(
     : async_(async), input_shapes_(input_shapes), batch_size_(batch_size),
       max_threads_(max_threads), sequence_length_(sequence_length),
       shared_memory_type_(shared_memory_type),
-      output_shm_size_(output_shm_size), factory_(factory)
+      output_shm_size_(output_shm_size), factory_(factory),
+      using_json_data_(false), next_corr_id_(1)
 {
   on_sequence_model_ =
       ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
        (factory_->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE));
+
+  data_loader_.reset(new DataLoader(batch_size));
 }
 
 nic::Error
 LoadManager::InitManagerInputs(
     const size_t string_length, const std::string& string_data,
-    const bool zero_input, const std::string& data_directory)
+    const bool zero_input, std::vector<std::string>& user_data)
 {
   std::unique_ptr<nic::InferContext> ctx;
   RETURN_IF_ERROR(factory_->CreateInferContext(&ctx));
 
-  size_t max_input_byte_size = 0;
-
   for (const auto& input : ctx->Inputs()) {
-    size_t batch1_num_strings = 1;
     // Validate user provided shape
     if (!input_shapes_.empty()) {
       auto it = input_shapes_.find(input->Name());
@@ -267,87 +252,31 @@ LoadManager::InitManagerInputs(
                 "model '" +
                 ctx->ModelName() + "'");
       }
-
-      // Get the number of strings needed for this input batch-1
-      batch1_num_strings = 1;
-      if (!input->Shape().empty()) {
-        for (const auto dim : input->Shape()) {
-          batch1_num_strings *= dim;
-        }
-      } else {
-        for (const auto dim : input->Dims()) {
-          batch1_num_strings *= dim;
-        }
-      }
-    }
-
-    // Read provided data
-    if (!data_directory.empty()) {
-      if (input->DType() != ni::DataType::TYPE_STRING) {
-        const auto file_path = data_directory + "/" + input->Name();
-        auto it = input_data_.emplace(input->Name(), std::vector<char>()).first;
-        RETURN_IF_ERROR(ReadFile(file_path, &it->second));
-        size_t batch1_size = input->ByteSize();
-        if (batch1_size != it->second.size()) {
-          return nic::Error(
-              ni::RequestStatusCode::INVALID_ARG,
-              "input '" + input->Name() + "' requires " +
-                  std::to_string(batch1_size) +
-                  " bytes for each batch, but provided data has " +
-                  std::to_string(it->second.size()) + " bytes");
-        }
-      } else {
-        const auto file_path = data_directory + "/" + input->Name();
-        std::vector<std::string> input_string_data;
-        RETURN_IF_ERROR(ReadTextFile(file_path, &input_string_data));
-        if (input_string_data.size() != batch1_num_strings) {
-          return nic::Error(
-              ni::RequestStatusCode::INVALID_ARG,
-              "input '" + input->Name() + "' requires " +
-                  std::to_string(batch1_num_strings) +
-                  " strings for each batch, but provided data has " +
-                  std::to_string(input_string_data.size()) + " strings.");
-        }
-        auto it = input_string_data_.emplace(input->Name(), std::vector<char>())
-                      .first;
-        SerializeStringTensor(input_string_data, &it->second);
-      }
-    } else {
-      if (input->DType() != ni::DataType::TYPE_STRING) {
-        max_input_byte_size =
-            std::max(max_input_byte_size, (size_t)input->ByteSize());
-      } else {
-        // Generate string input and store it into map
-        std::vector<std::string> input_string_data;
-        input_string_data.resize(batch1_num_strings);
-        if (!string_data.empty()) {
-          for (size_t i = 0; i < batch1_num_strings; i++) {
-            input_string_data[i] = string_data;
-          }
-        } else {
-          for (size_t i = 0; i < batch1_num_strings; i++) {
-            input_string_data[i] = GetRandomString(string_length);
-          }
-        }
-        auto it = input_string_data_.emplace(input->Name(), std::vector<char>())
-                      .first;
-        SerializeStringTensor(input_string_data, &it->second);
-      }
     }
   }
 
-  // Create a zero or randomly (as indicated by zero_input_)
-  // initialized buffer that is large enough to provide the largest
-  // needed input. We (re)use this buffer for all input values.
-  if (max_input_byte_size > 0) {
-    if (zero_input) {
-      input_buf_.resize(max_input_byte_size, 0);
+  // Read provided data
+  if (!user_data.empty()) {
+    if (IsDirectory(user_data[0])) {
+      RETURN_IF_ERROR(
+          data_loader_->ReadDataFromDir(ctx->Inputs(), user_data[0]));
     } else {
-      input_buf_.resize(max_input_byte_size);
-      for (auto& byte : input_buf_) {
-        byte = rand();
+      using_json_data_ = true;
+      for (const auto& json_file : user_data) {
+        RETURN_IF_ERROR(
+            data_loader_->ReadDataFromJSON(ctx->Inputs(), json_file));
       }
+      std::cout << " Successfully read data for "
+                << data_loader_->GetDataStreamsCount() << " stream/streams";
+      if (data_loader_->GetDataStreamsCount() == 1) {
+        std::cout << " with " << data_loader_->GetTotalSteps(0)
+                  << " step/steps";
+      }
+      std::cout << "." << std::endl;
     }
+  } else {
+    RETURN_IF_ERROR(data_loader_->GenerateData(
+        ctx->Inputs(), zero_input, string_length, string_data));
   }
 
   // Reserve the required vector space
@@ -423,70 +352,92 @@ LoadManager::InitSharedMemory()
   }
 
   for (const auto& input : ctx->Inputs()) {
-    const uint8_t* data_ptr;
-    size_t batch1_bytesize;
-    RETURN_IF_ERROR(GetInputData(input, &data_ptr, &batch1_bytesize));
-
-    // create the shared memory region for the input
-    uint8_t* input_shm_ptr;
-    size_t alloc_size = batch1_bytesize * batch_size_;
-
-    if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
-      std::string shm_key("/" + input->Name());
-      int shm_fd_ip;
-      RETURN_IF_ERROR(
-          nic::CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_ip));
-      RETURN_IF_ERROR(nic::MapSharedMemory(
-          shm_fd_ip, 0, alloc_size, (void**)&input_shm_ptr));
-      shared_memory_regions_[input->Name()] =
-          std::pair<uint8_t*, size_t>(input_shm_ptr, alloc_size);
-
-      // Populate the region with data
-      size_t count = 0;
-      while (count < batch_size_) {
-        memcpy(
-            input_shm_ptr + (count * batch1_bytesize), data_ptr,
-            batch1_bytesize);
-        count++;
-      }
-
-      // Register the region with TRTIS
-      RETURN_IF_ERROR(shared_memory_ctx_->RegisterSharedMemory(
-          input->Name(), shm_key, 0, alloc_size));
-    } else {
-#ifdef TRTIS_ENABLE_GPU
-      cudaError_t cuda_err = cudaMalloc((void**)&input_shm_ptr, alloc_size);
-      if (cuda_err != cudaSuccess) {
-        return nic::Error(
-            ni::RequestStatusCode::INTERNAL,
-            "unable to allocate memory of " + std::to_string(alloc_size) +
-                "bytes on gpu for input " + input->Name());
-      }
-
-      shared_memory_regions_[input->Name()] =
-          std::pair<uint8_t*, size_t>(input_shm_ptr, alloc_size);
-
-      // Populate the region with data
-      size_t count = 0;
-      while (count < batch_size_) {
-        cudaError_t cuda_err = cudaMemcpy(
-            (void*)(input_shm_ptr + (count * batch1_bytesize)), (void*)data_ptr,
-            batch1_bytesize, cudaMemcpyHostToDevice);
-        if (cuda_err != cudaSuccess) {
-          return nic::Error(
-              ni::RequestStatusCode::INTERNAL,
-              "Failed to copy data to cuda shared memory for " + input->Name());
+    for (int i = 0; i < (int)data_loader_->GetDataStreamsCount(); i++) {
+      for (int j = 0; j < (int)data_loader_->GetTotalSteps(i);
+           j += batch_size_) {
+        // Extract the data for requested batch size
+        std::vector<const uint8_t*> data_ptrs;
+        std::vector<size_t> byte_size;
+        size_t alloc_size = 0;
+        size_t count = 0;
+        while (count < batch_size_) {
+          const uint8_t* data_ptr;
+          size_t batch1_bytesize;
+          RETURN_IF_ERROR(data_loader_->GetInputData(
+              input, i, (j + count) % data_loader_->GetTotalSteps(i), &data_ptr,
+              &batch1_bytesize));
+          data_ptrs.push_back(data_ptr);
+          byte_size.push_back(batch1_bytesize);
+          alloc_size += batch1_bytesize;
+          count++;
         }
-        count++;
-      }
 
-      cudaIpcMemHandle_t cuda_handle;
-      RETURN_IF_ERROR(CreateCUDAIPCHandle(&cuda_handle, (void*)input_shm_ptr));
+        // Generate the shared memory region name
+        std::string key_name(
+            input->Name() + "_" + std::to_string(i) + "_" + std::to_string(j));
 
-      // Register the region with TRTIS
-      RETURN_IF_ERROR(shared_memory_ctx_->RegisterCudaSharedMemory(
-          input->Name(), cuda_handle, alloc_size, 0));
+        uint8_t* input_shm_ptr;
+        if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
+          std::string shm_key("/" + key_name);
+          int shm_fd_ip;
+          RETURN_IF_ERROR(
+              nic::CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_ip));
+          RETURN_IF_ERROR(nic::MapSharedMemory(
+              shm_fd_ip, 0, alloc_size, (void**)&input_shm_ptr));
+          shared_memory_regions_[key_name] =
+              std::pair<uint8_t*, size_t>(input_shm_ptr, alloc_size);
+
+          // Populate the region with data
+          size_t count = 0;
+          size_t offset = 0;
+          while (count < batch_size_) {
+            memcpy(input_shm_ptr + offset, data_ptrs[count], byte_size[count]);
+            offset += byte_size[count];
+            count++;
+          }
+
+          // Register the region with TRTIS
+          RETURN_IF_ERROR(shared_memory_ctx_->RegisterSharedMemory(
+              key_name, shm_key, 0, alloc_size));
+        } else {
+#ifdef TRTIS_ENABLE_GPU
+          cudaError_t cuda_err = cudaMalloc((void**)&input_shm_ptr, alloc_size);
+          if (cuda_err != cudaSuccess) {
+            return nic::Error(
+                ni::RequestStatusCode::INTERNAL,
+                "unable to allocate memory of " + std::to_string(alloc_size) +
+                    "bytes on gpu for input " + key_name);
+          }
+
+          shared_memory_regions_[key_name] =
+              std::pair<uint8_t*, size_t>(input_shm_ptr, alloc_size);
+
+          // Populate the region with data
+          size_t count = 0;
+          size_t offset = 0;
+          while (count < batch_size_) {
+            cudaError_t cuda_err = cudaMemcpy(
+                (void*)(input_shm_ptr + offset), (void*)data_ptrs[count],
+                byte_size[count], cudaMemcpyHostToDevice);
+            if (cuda_err != cudaSuccess) {
+              return nic::Error(
+                  ni::RequestStatusCode::INTERNAL,
+                  "Failed to copy data to cuda shared memory for " + key_name);
+            }
+            offset += byte_size[count];
+            count++;
+          }
+
+          cudaIpcMemHandle_t cuda_handle;
+          RETURN_IF_ERROR(
+              CreateCUDAIPCHandle(&cuda_handle, (void*)input_shm_ptr));
+
+          // Register the region with TRTIS
+          RETURN_IF_ERROR(shared_memory_ctx_->RegisterCudaSharedMemory(
+              key_name, cuda_handle, alloc_size, 0));
 #endif  // TRTIS_ENABLE_GPU
+        }
+      }
     }
   }
   return nic::Error::Success;
@@ -550,7 +501,8 @@ LoadManager::PrepareInfer(
 
     const uint8_t* data_ptr;
     size_t batch1_bytesize;
-    RETURN_IF_ERROR(GetInputData(input, &data_ptr, &batch1_bytesize));
+    RETURN_IF_ERROR(
+        data_loader_->GetInputData(input, 0, 0, &data_ptr, &batch1_bytesize));
 
     for (size_t i = 0; i < batch_size_; ++i) {
       RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
@@ -602,8 +554,10 @@ LoadManager::PrepareSharedMemoryInfer(
   RETURN_IF_ERROR((*ctx)->SetRunOptions(*(*options)));
 
   for (const auto& input : (*ctx)->Inputs()) {
+    std::string key_name(
+        input->Name() + "_" + std::to_string(0) + "_" + std::to_string(0));
     RETURN_IF_ERROR(input->SetSharedMemory(
-        input->Name(), 0, shared_memory_regions_[input->Name()].second));
+        key_name, 0, shared_memory_regions_[key_name].second));
     if (input->Shape().empty()) {
       auto it = input_shapes_.find(input->Name());
       if (it != input_shapes_.end()) {
@@ -616,37 +570,101 @@ LoadManager::PrepareSharedMemoryInfer(
 }
 
 nic::Error
-LoadManager::GetInputData(
-    std::shared_ptr<nic::InferContext::Input> input, const uint8_t** data,
-    size_t* batch1_size)
+LoadManager::UpdateInputs(
+    const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+    int stream_index, int step_index)
 {
-  if (input->DType() != ni::DataType::TYPE_STRING) {
-    // if available, use provided data instead
-    auto it = input_data_.find(input->Name());
-    if (it != input_data_.end()) {
-      *data = (const uint8_t*)&(it->second)[0];
-    } else if (input_buf_.size() != 0) {
-      *batch1_size = (size_t)input->ByteSize();
-      *data = &input_buf_[0];
-    } else {
-      return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "unable to find data for input '" + input->Name() + "'.");
-    }
+  // Validate update parameters here
+  size_t data_stream_count = data_loader_->GetDataStreamsCount();
+  if (stream_index < 0 || stream_index >= (int)data_stream_count) {
+    return nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "stream_index for retrieving the data should be less than " +
+            std::to_string(data_stream_count) + ", got " +
+            std::to_string(stream_index));
+  }
+  size_t step_count = data_loader_->GetTotalSteps(stream_index);
+  if (step_index < 0 || step_index >= (int)step_count) {
+    return nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "step_id for retrieving the data should be less than " +
+            std::to_string(step_count) + ", got " + std::to_string(step_index));
+  }
+
+  if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
+    RETURN_IF_ERROR(SetInputs(inputs, stream_index, step_index));
   } else {
-    std::vector<char>* string_data;
-    auto it = input_string_data_.find(input->Name());
-    if (it != input_string_data_.end()) {
-      string_data = &it->second;
-      *batch1_size = string_data->size();
-      *data = (const uint8_t*)&it->second[0];
+    RETURN_IF_ERROR(SetInputsSharedMemory(inputs, stream_index, step_index));
+  }
+
+  return nic::Error::Success;
+}
+
+nic::Error
+LoadManager::SetInputs(
+    const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+    const int stream_index, const int step_index)
+{
+  for (const auto& input : inputs) {
+    RETURN_IF_ERROR(input->Reset());
+
+    const uint8_t* data_ptr;
+    size_t batch1_bytesize;
+
+    if (!on_sequence_model_) {
+      for (size_t i = 0; i < batch_size_; ++i) {
+        RETURN_IF_ERROR(data_loader_->GetInputData(
+            input, 0, (step_index + i) % data_loader_->GetTotalSteps(0),
+            &data_ptr, &batch1_bytesize));
+        RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
+      }
     } else {
-      return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "unable to find data for input '" + input->Name() + "'.");
+      // Sequence models only support single batch_size_
+      RETURN_IF_ERROR(data_loader_->GetInputData(
+          input, stream_index, step_index, &data_ptr, &batch1_bytesize));
+      RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
     }
   }
   return nic::Error::Success;
+}
+
+
+nic::Error
+LoadManager::SetInputsSharedMemory(
+    const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+    const int stream_index, const int step_index)
+{
+  for (const auto& input : inputs) {
+    RETURN_IF_ERROR(input->Reset());
+
+    std::string region_name(
+        input->Name() + '_' + std::to_string(stream_index) + "_" +
+        std::to_string(step_index));
+
+    RETURN_IF_ERROR(input->SetSharedMemory(
+        region_name, 0, shared_memory_regions_[region_name].second));
+  }
+  return nic::Error::Success;
+}
+
+void
+LoadManager::InitNewSequence(int sequence_id)
+{
+  sequence_stat_[sequence_id]->corr_id_ = next_corr_id_++;
+  if (!using_json_data_) {
+    size_t new_length = GetRandomLength(0.2);
+    sequence_stat_[sequence_id]->remaining_queries_ =
+        new_length == 0 ? 1 : new_length;
+  } else {
+    // Selecting next available data stream in a round-robin fashion.
+    // TODO: A mode to randomly pick data stream for new sequences.
+    sequence_stat_[sequence_id]->data_stream_id_ =
+        sequence_stat_[sequence_id]->corr_id_ %
+        data_loader_->GetDataStreamsCount();
+    sequence_stat_[sequence_id]->remaining_queries_ =
+        data_loader_->GetTotalSteps(
+            sequence_stat_[sequence_id]->data_stream_id_);
+  }
 }
 
 size_t

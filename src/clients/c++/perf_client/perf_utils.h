@@ -31,7 +31,9 @@
 #include <iostream>
 #include <random>
 
+#include <rapidjson/document.h>
 #include <sys/stat.h>
+#include "rapidjson/rapidjson.h"
 #include "src/clients/c++/library/request_grpc.h"
 #include "src/clients/c++/library/request_http.h"
 #include "src/core/constants.h"
@@ -107,6 +109,27 @@ nic::Error ReadTimeIntervalsFile(
 
 // To check whether the path points to a valid system directory
 bool IsDirectory(const std::string& path);
+
+// To check whether the path points to a valid system file
+bool IsFile(const std::string& complete_path);
+
+
+// Returns the number of elements in the specified input tensor. The SetShape()
+// for the specified input shpuld have been called before invoking this
+// function.
+// \param input pointer to the input tensor
+// \returns the number of elements in the tensor
+size_t GetElementCount(std::shared_ptr<nic::InferContext::Input> input);
+
+void SerializeStringTensor(
+    std::vector<std::string> string_tensor, std::vector<char>* serialized_data);
+
+nic::Error DecodeFromBase64(
+    const std::string& encoded_data, std::vector<char>* decoded_data);
+
+nic::Error SerializeExplicitTensor(
+    const rapidjson::Value& tensor, ni::DataType dt,
+    std::vector<char>* decoded_data);
 
 // Generates a random string of specified length using characters specified in
 // character_set.

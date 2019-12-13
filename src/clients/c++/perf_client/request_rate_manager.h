@@ -69,8 +69,8 @@ class RequestRateManager : public LoadManager {
   /// \param sequence_length The base length of each sequence.
   /// \param zero_input Whether to fill the input tensors with zero.
   /// \param input_shapes The shape of the input tensors.
-  /// \param data_directory The path to the directory containing the data to
-  /// use for input tensors.
+  /// \param user_data The vector containing path/paths to user-provided data
+  /// that can be a directory or path to a json data file.
   /// \param shared_memory_type The type of shared memory to use for inputs.
   /// \param output_shm_size The size of the shared memory to allocate for the
   /// output.
@@ -85,7 +85,7 @@ class RequestRateManager : public LoadManager {
       const size_t sequence_length, const size_t string_length,
       const std::string& string_data, const bool zero_input,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      const std::string& data_directory,
+      std::vector<std::string>& user_data,
       const SharedMemoryType shared_memory_type, const size_t output_shm_size,
       const std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
@@ -104,7 +104,7 @@ class RequestRateManager : public LoadManager {
   struct ThreadConfig {
     ThreadConfig(uint32_t index, uint32_t stride)
         : index_(index), id_(index), stride_(stride), is_paused_(false),
-          rounds_(0)
+          rounds_(0), non_sequence_data_step_id_(index)
     {
     }
 
@@ -113,13 +113,7 @@ class RequestRateManager : public LoadManager {
     uint32_t stride_;
     bool is_paused_;
     uint64_t rounds_;
-  };
-
-  struct SequenceStat {
-    SequenceStat(uint64_t corr_id) : corr_id_(corr_id), remaining_queries_(0) {}
-    uint64_t corr_id_;
-    size_t remaining_queries_;
-    std::mutex mtx_;
+    int non_sequence_data_step_id_;
   };
 
   RequestRateManager(
@@ -167,7 +161,4 @@ class RequestRateManager : public LoadManager {
   std::vector<std::chrono::nanoseconds> schedule_;
   std::chrono::steady_clock::time_point start_time_;
   bool execute_;
-
-  std::vector<std::shared_ptr<SequenceStat>> sequence_stat_;
-  uint64_t next_corr_id_;
 };

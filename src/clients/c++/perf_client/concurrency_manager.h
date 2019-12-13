@@ -56,8 +56,8 @@ class ConcurrencyManager : public LoadManager {
   /// \param sequence_length The base length of each sequence.
   /// \param zero_input Whether to fill the input tensors with zero.
   /// \param input_shapes The shape of the input tensors.
-  /// \param data_directory The path to the directory containing the data to
-  /// use for input tensors.
+  /// \param user_data The vector containing path/paths to user-provided data
+  /// that can be a directory or path to a json data file.
   /// \param shared_memory_type The type of shared memory to use for inputs.
   /// \param output_shm_size The size in bytes of the shared memory to
   /// allocate for the output.
@@ -71,7 +71,7 @@ class ConcurrencyManager : public LoadManager {
       const size_t string_length, const std::string& string_data,
       const bool zero_input,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      const std::string& data_directory,
+      std::vector<std::string>& user_data,
       const SharedMemoryType shared_memory_type, const size_t output_shm_size,
       const std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
@@ -92,10 +92,18 @@ class ConcurrencyManager : public LoadManager {
       const std::shared_ptr<ContextFactory>& factory);
 
   struct ThreadConfig {
-    ThreadConfig() : concurrency_(0) {}
+    ThreadConfig(size_t thread_id)
+        : thread_id_(thread_id), concurrency_(0),
+          non_sequence_data_step_id_(thread_id)
+    {
+    }
 
-    //  The concurrency level that the worker should produce
+    // ID of corresponding worker thread
+    size_t thread_id_;
+    // The concurrency level that the worker should produce
     size_t concurrency_;
+    // The current data step id in case of non-sequence model
+    size_t non_sequence_data_step_id_;
   };
 
   /// Function for worker that sends inference requests.
@@ -104,6 +112,9 @@ class ConcurrencyManager : public LoadManager {
   void Infer(
       std::shared_ptr<ThreadStat> thread_stat,
       std::shared_ptr<ThreadConfig> thread_config);
+
+  // The number of worker threads with non-zero concurrencies
+  size_t active_threads_;
 
   size_t max_concurrency_;
   std::vector<std::shared_ptr<ThreadConfig>> threads_config_;

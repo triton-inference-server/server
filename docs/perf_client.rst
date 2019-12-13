@@ -200,7 +200,8 @@ the -\\-input-data option:
 
 - *random*: (default) Send random data for each input.
 - *zero*: Send zeros for each input.
-- path: A path to a directory containing a binary file for each input, named the same as the input. Each binary file must contain the data required for that input for a batch-1 request. Each file should contain the raw binary representation of the input in row-major order.
+- directory path: A path to a directory containing a binary file for each input, named the same as the input. Each binary file must contain the data required for that input for a batch-1 request. Each file should contain the raw binary representation of the input in row-major order.
+- file path: A path to a JSON file containing data to be used with every inference request. See the "Real Input Data" section for further details. --input-data can be provided multiple times with different file paths to specific multiple JSON files.
 
 For tensors with with STRING datatype there are additional options
 -\\-string-length and -\\-string-data that may be used in some cases
@@ -215,6 +216,122 @@ has shape [ 3, N, M ], where N and M are variable-size dimensions, to
 tell perf\_client to send batch-size 4 requests of shape [ 3, 224, 224 ]::
 
   $ perf_client -m mymodel -b 4 --shape IMAGE:3,224,224
+
+Real Input Data
+^^^^^^^^^^^^^^^
+
+The performance of some models is highly dependent on the data used.
+For such cases users can provide data to be used with every inference request
+made by client in a JSON file. The perf_client will use the provided data when
+sending inference requests in a round-robin fashion.
+
+Each entry in the "data" array must specify all input tensors with the exact 
+size expected by the model from a single batch. The following example describes
+data for a model with inputs named, INPUT0 and INPUT1, shape [4, 4] and data 
+type INT32: ::
+
+
+  {
+    "data" :
+     [
+        {
+          "INPUT0" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "INPUT1" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        },
+        {
+          "INPUT0" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "INPUT1" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        },
+        {
+          "INPUT0" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "INPUT1" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        },
+        {
+          "INPUT0" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "INPUT1" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        }
+        .
+        .
+        .
+      ]
+  }
+
+Kindly note that the [4, 4] tensor has been flattened in a row-major format for the inputs.
+
+A part from specifying explicit tensors, users can also provide Base64 encoded binary data 
+for the tensors. Each data object must list its data in a row-major order. The following 
+example highlights how this can be acheived: ::
+
+  {
+    "data" :
+     [
+        {
+          "INPUT0" : {"b64": "YmFzZTY0IGRlY29kZXI="},
+          "INPUT1" : {"b64": "YmFzZTY0IGRlY29kZXI="}
+        },
+        {
+          "INPUT0" : {"b64": "YmFzZTY0IGRlY29kZXI="},
+          "INPUT1" : {"b64": "YmFzZTY0IGRlY29kZXI="}
+        },
+        {
+          "INPUT0" : {"b64": "YmFzZTY0IGRlY29kZXI="},
+          "INPUT1" : {"b64": "YmFzZTY0IGRlY29kZXI="}
+        },
+        .
+        .
+        .
+      ]
+  }
+
+
+In case of sequence models, multiple data streams can be specified in the JSON file. Each sequence
+will get a data stream of its own and the client will ensure the data from each stream is
+played back to the same correlation id. The below example highlights how to specify data for
+multiple streams for a sequence model with a single input named INPUT, shape [1] and data type STRING: ::
+
+
+  {
+    "data" :
+      [
+        [
+          {
+            "INPUT" : ["1"]
+          },
+          {
+            "INPUT" : ["2"]
+          },
+          {
+            "INPUT" : ["3"]
+          },
+          {
+            "INPUT" : ["4"]
+          }
+        ],
+        [
+          {
+            "INPUT" : ["1"]
+          },
+          {
+            "INPUT" : ["1"]
+          },
+          {
+            "INPUT" : ["1"]
+          }
+        ],
+        [
+          {
+            "INPUT" : ["1"]
+          },
+          {
+            "INPUT" : ["1"]
+          }
+        ]
+      ]
+  }
+
+The above example describes three data streams with lengths 4, 3 and 2 respectively.
+The perf_client will hence produce sequences of length 4, 3 and 2 in this case.
+
 
 Shared Memory
 ^^^^^^^^^^^^^

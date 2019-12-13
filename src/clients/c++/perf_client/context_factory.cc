@@ -109,15 +109,8 @@ nic::Error
 ContextFactory::CreateInferContext(std::unique_ptr<nic::InferContext>* ctx)
 {
   nic::Error err;
-  // Create the context for inference of the specified model,
-  // make sure to use an unused correlation id if requested.
+  // Create the context for inference of the specified model
   ni::CorrelationID correlation_id = 0;
-
-  if ((scheduler_type_ == SEQUENCE) || (scheduler_type_ == ENSEMBLE_SEQUENCE)) {
-    std::lock_guard<std::mutex> lock(correlation_id_mutex_);
-    current_correlation_id_++;
-    correlation_id = current_correlation_id_;
-  }
 
   if (streaming_) {
     err = nic::InferGrpcStreamContext::Create(
