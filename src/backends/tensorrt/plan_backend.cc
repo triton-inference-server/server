@@ -377,16 +377,21 @@ PlanBackend::CreateExecutionContext(
 #ifdef TRTIS_ENABLE_CUDA_GRAPH
   const bool use_cuda_graphs = Config().optimization().cuda().graphs();
   if (use_cuda_graphs) {
+    std::set<int> cuda_graph_batch_sizes{1, 2, 3, 4, 6, 8, 12, 16};
+    if (Config().has_dynamic_batching()) {
+      for (const auto bs : Config().dynamic_batching().preferred_batch_size()) {
+        cuda_graph_batch_sizes.emplace(bs);
+      }
+    }
     // CUDA graph will be captured for every TRT contexts as CUDA graph is
     // merely capturing GPU activities for a given execution. And the
     // executions might be different for different optimization profiles
     for (auto& trt_context : context->trt_contexts_) {
-      if (context->BuildCudaGraph(&(trt_context.second), 1)) {
-        for (int bs : std::vector<int>{2, 3, 4, 6, 8, 12, 16}) {
-          if (bs <= Config().max_batch_size()) {
-            if (!context->BuildCudaGraph(&(trt_context.second), bs)) {
-              break;
-            }
+      for (int bs : cuda_graph_batch_sizes) {
+        // 1 is special case as non-batching model has 'max_batch_size == 0'
+        if ((bs <= Config().max_batch_size()) || (bs == 1)) {
+          if (!context->BuildCudaGraph(&(trt_context.second), bs)) {
+            break;
           }
         }
       }
