@@ -355,19 +355,173 @@ TrtServerOptions::TrtServerOptions()
 }
 
 //
+// TrtServerRequestHeader
+//
+// Implementation for TRTSERVER_InferenceRequestHeader.
+//
+class TrtServerRequestHeader {
+ public:
+  TrtServerRequestHeader(const char* model_name, int64_t model_version);
+
+  TRTSERVER_Error* ParseFromString(
+      const char* request_header_base, size_t request_header_byte_size);
+
+  TRTSERVER_Error* SetId(uint64_t id);
+  TRTSERVER_Error* SetFlags(uint32_t flags);
+  TRTSERVER_Error* SetCorrelationId(uint64_t correlation_id);
+  TRTSERVER_Error* SetBatchSize(uint64_t batch_size);
+
+  TRTSERVER_Error* AddInput(
+      const char* input_name, const int64_t* dims, uint64_t dim_count,
+      uint64_t batch_byte_size);
+  TRTSERVER_Error* AddOutput(const char* output_name);
+  TRTSERVER_Error* AddOutput(const char* output_name, uint32_t count);
+
+  TRTSERVER_Error* Normalize(ni::InferenceBackend* backend);
+
+  const std::string& ModelName() const { return model_name_; }
+  int64_t ModelVersion() const { return model_version_; }
+  ni::InferRequestHeader* InferRequestHeader() const;
+
+ private:
+  const std::string model_name_;
+  const int64_t model_version_;
+  std::shared_ptr<ni::InferRequestHeader> request_header_;
+
+  std::mutex mtx_;
+  bool normalized_;
+};
+
+TrtServerRequestHeader::TrtServerRequestHeader(
+    const char* model_name, int64_t model_version)
+    : model_name_(model_name), model_version_(model_version), normalized_(false)
+{
+  request_header_ = std::make_shared<ni::InferRequestHeader>();
+}
+
+TRTSERVER_Error*
+TrtServerRequestHeader::ParseFromString(
+    const char* request_header_base, size_t request_header_byte_size)
+{
+  std::lock_guard<std::mutex> lk(mtx_);
+  if (!request_header_->ParseFromArray(
+          request_header_base, request_header_byte_size)) {
+    return TrtServerError::Create(
+        ni::RequestStatusCode::INVALID_ARG,
+        "failed to parse InferRequestHeader");
+  }
+  normalized_ = false;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TrtServerRequestHeader::SetId(uint64_t id)
+{
+  std::lock_guard<std::mutex> lk(mtx_);
+  request_header_->set_id(id);
+  normalized_ = false;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TrtServerRequestHeader::SetFlags(uint32_t flags)
+{
+  std::lock_guard<std::mutex> lk(mtx_);
+  request_header_->set_flags(flags);
+  normalized_ = false;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TrtServerRequestHeader::SetCorrelationId(uint64_t correlation_id)
+{
+  std::lock_guard<std::mutex> lk(mtx_);
+  request_header_->set_correlation_id(correlation_id);
+  normalized_ = false;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TrtServerRequestHeader::SetBatchSize(uint64_t batch_size)
+{
+  std::lock_guard<std::mutex> lk(mtx_);
+  request_header_->set_batch_size(batch_size);
+  normalized_ = false;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TrtServerRequestHeader::AddInput(
+    const char* input_name, const int64_t* dims, uint64_t dim_count,
+    uint64_t batch_byte_size)
+{
+  std::lock_guard<std::mutex> lk(mtx_);
+  auto rinput = request_header_->add_input();
+  rinput->set_name(input_name);
+  if (dims != nullptr) {
+    for (size_t idx = 0; idx < dim_count; idx++) {
+      rinput->add_dims(dims[idx]);
+    }
+  }
+  rinput->set_batch_byte_size(batch_byte_size);
+  normalized_ = false;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TrtServerRequestHeader::AddOutput(const char* output_name)
+{
+  std::lock_guard<std::mutex> lk(mtx_);
+  auto routput = request_header_->add_output();
+  routput->set_name(output_name);
+  normalized_ = false;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TrtServerRequestHeader::AddOutput(const char* output_name, uint32_t count)
+{
+  std::lock_guard<std::mutex> lk(mtx_);
+  auto routput = request_header_->add_output();
+  routput->set_name(output_name);
+  routput->mutable_cls()->set_count(count);
+  normalized_ = false;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TrtServerRequestHeader::Normalize(ni::InferenceBackend* backend)
+{
+  // avoid competing for mutex even after normalization is done
+  if (!normalized_) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    if (!normalized_) {
+      RETURN_IF_STATUS_ERROR(
+          ni::NormalizeRequestHeader(*(backend), *(request_header_.get())));
+      normalized_ = true;
+    }
+  }
+  return nullptr;  // Success
+}
+
+ni::InferRequestHeader*
+TrtServerRequestHeader::InferRequestHeader() const
+{
+  return request_header_.get();
+}
+
+//
 // TrtServerRequestProvider
 //
 // Implementation for TRTSERVER_InferenceRequestProvider.
 //
 class TrtServerRequestProvider {
  public:
-  TrtServerRequestProvider(
-      const char* model_name, int64_t model_version,
-      const std::shared_ptr<ni::InferRequestHeader>& request_header);
+  TrtServerRequestProvider(TrtServerRequestHeader* request_header);
   TRTSERVER_Error* Init(ni::InferenceServer* server);
 
-  const std::string& ModelName() const { return model_name_; }
-  int64_t ModelVersion() const { return model_version_; }
+  const std::string& ModelName() const { return request_header_->ModelName(); }
+  int64_t ModelVersion() const { return request_header_->ModelVersion(); }
   ni::InferRequestHeader* InferRequestHeader() const;
   const std::shared_ptr<ni::InferenceBackend>& Backend() const;
   const std::unordered_map<std::string, std::shared_ptr<ni::Memory>>& InputMap()
@@ -378,18 +532,14 @@ class TrtServerRequestProvider {
       TRTSERVER_Memory_Type memory_type, int64_t memory_type_id);
 
  private:
-  const std::string model_name_;
-  const int64_t model_version_;
-  std::shared_ptr<ni::InferRequestHeader> request_header_;
+  TrtServerRequestHeader* request_header_;
   std::shared_ptr<ni::InferenceBackend> backend_;
   std::unordered_map<std::string, std::shared_ptr<ni::Memory>> input_map_;
 };
 
 TrtServerRequestProvider::TrtServerRequestProvider(
-    const char* model_name, int64_t model_version,
-    const std::shared_ptr<ni::InferRequestHeader>& request_header)
-    : model_name_(model_name), model_version_(model_version),
-      request_header_(request_header)
+    TrtServerRequestHeader* request_header)
+    : request_header_(request_header)
 {
 }
 
@@ -400,17 +550,15 @@ TrtServerRequestProvider::Init(ni::InferenceServer* server)
   // the backend doesn't get unloaded (also need the backend to
   // normalize the request).
   RETURN_IF_STATUS_ERROR(
-      server->GetInferenceBackend(model_name_, model_version_, &backend_));
-  RETURN_IF_STATUS_ERROR(
-      ni::NormalizeRequestHeader(*(backend_.get()), *(request_header_.get())));
+      server->GetInferenceBackend(ModelName(), ModelVersion(), &backend_));
 
-  return nullptr;  // Success
+  return request_header_->Normalize(backend_.get());
 }
 
 ni::InferRequestHeader*
 TrtServerRequestProvider::InferRequestHeader() const
 {
-  return request_header_.get();
+  return request_header_->InferRequestHeader();
 }
 
 const std::shared_ptr<ni::InferenceBackend>&
@@ -798,27 +946,126 @@ TRTSERVER_TraceManagerDelete(TRTSERVER_TraceManager* trace_manager)
 }
 
 //
+// TRTSERVER_InferenceRequestHeader
+//
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestHeaderNew(
+    TRTSERVER_InferenceRequestHeader** request_header, const char* model_name,
+    int64_t model_version)
+{
+  TrtServerRequestHeader* header =
+      new TrtServerRequestHeader(model_name, model_version);
+  *request_header = reinterpret_cast<TRTSERVER_InferenceRequestHeader*>(header);
+
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestHeaderParseFromString(
+    TRTSERVER_InferenceRequestHeader* request_header,
+    const char* request_header_base, size_t request_header_byte_size)
+{
+  TrtServerRequestHeader* lheader =
+      reinterpret_cast<TrtServerRequestHeader*>(request_header);
+  lheader->ParseFromString(request_header_base, request_header_byte_size);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestHeaderSetId(
+    TRTSERVER_InferenceRequestHeader* request_header, uint64_t id)
+{
+  TrtServerRequestHeader* lheader =
+      reinterpret_cast<TrtServerRequestHeader*>(request_header);
+  lheader->SetId(id);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestHeaderSetFlags(
+    TRTSERVER_InferenceRequestHeader* request_header, uint32_t flags)
+{
+  TrtServerRequestHeader* lheader =
+      reinterpret_cast<TrtServerRequestHeader*>(request_header);
+  lheader->SetFlags(flags);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestHeaderSetCorrelationId(
+    TRTSERVER_InferenceRequestHeader* request_header, uint64_t correlation_id)
+{
+  TrtServerRequestHeader* lheader =
+      reinterpret_cast<TrtServerRequestHeader*>(request_header);
+  lheader->SetCorrelationId(correlation_id);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestHeaderSetBatchSize(
+    TRTSERVER_InferenceRequestHeader* request_header, uint32_t batch_size)
+{
+  TrtServerRequestHeader* lheader =
+      reinterpret_cast<TrtServerRequestHeader*>(request_header);
+  lheader->SetBatchSize(batch_size);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestHeaderAddInput(
+    TRTSERVER_InferenceRequestHeader* request_header, const char* input_name,
+    const int64_t* dims, uint64_t dim_count, uint64_t batch_byte_size)
+{
+  TrtServerRequestHeader* lheader =
+      reinterpret_cast<TrtServerRequestHeader*>(request_header);
+  lheader->AddInput(input_name, dims, dim_count, batch_byte_size);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestHeaderAddOutputRaw(
+    TRTSERVER_InferenceRequestHeader* request_header, const char* output_name)
+{
+  TrtServerRequestHeader* lheader =
+      reinterpret_cast<TrtServerRequestHeader*>(request_header);
+  lheader->AddOutput(output_name);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestHeaderAddOutputCls(
+    TRTSERVER_InferenceRequestHeader* request_header, const char* output_name,
+    uint32_t count)
+{
+  TrtServerRequestHeader* lheader =
+      reinterpret_cast<TrtServerRequestHeader*>(request_header);
+  lheader->AddOutput(output_name, count);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestHeaderDelete(
+    TRTSERVER_InferenceRequestHeader* request_header)
+{
+  TrtServerRequestHeader* lheader =
+      reinterpret_cast<TrtServerRequestHeader*>(request_header);
+  delete lheader;
+  return nullptr;  // Success
+}
+
+//
 // TRTSERVER_InferenceRequestProvider
 //
 TRTSERVER_Error*
 TRTSERVER_InferenceRequestProviderNew(
     TRTSERVER_InferenceRequestProvider** request_provider,
-    TRTSERVER_Server* server, const char* model_name, int64_t model_version,
-    const char* request_header_base, size_t request_header_byte_size)
+    TRTSERVER_Server* server, TRTSERVER_InferenceRequestHeader* request_header)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  TrtServerRequestHeader* lheader =
+      reinterpret_cast<TrtServerRequestHeader*>(request_header);
 
-  std::shared_ptr<ni::InferRequestHeader> request_header =
-      std::make_shared<ni::InferRequestHeader>();
-  if (!request_header->ParseFromArray(
-          request_header_base, request_header_byte_size)) {
-    return TrtServerError::Create(
-        ni::RequestStatusCode::INVALID_ARG,
-        "failed to parse InferRequestHeader");
-  }
-
-  TrtServerRequestProvider* provider =
-      new TrtServerRequestProvider(model_name, model_version, request_header);
+  TrtServerRequestProvider* provider = new TrtServerRequestProvider(lheader);
   TRTSERVER_Error* err = provider->Init(lserver);
   if (err == nullptr) {
     *request_provider =
