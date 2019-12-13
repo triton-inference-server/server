@@ -40,7 +40,7 @@ namespace nvidia { namespace inferenceserver {
 /// \param supports_batching If True then the configuration expects
 /// the model to support batching and so the shape must have the
 /// appropriate batch dimension.
-bool CompareDimsExact(
+Status CompareDimsExact(
     const TRTISTF_Shape* model_shape, const DimsList& dims,
     const bool supports_batching);
 

@@ -341,9 +341,6 @@ OnnxBackend::Context::ValidateBooleanSequenceControl(
     }
 
     // Control tensors must have shape [1].
-    DimsList dims;
-    dims.Add(1);
-
     const int nonbatch_start_idx = (max_batch_size_ > 0) ? 1 : 0;
     std::vector<int64_t> debatched_dims;
     for (size_t i = nonbatch_start_idx; i < iit->second.dims_.size(); i++) {
@@ -354,17 +351,17 @@ OnnxBackend::Context::ValidateBooleanSequenceControl(
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + model_name + "', sequence control '" +
-              tensor_name + "' dims " + DimsListToString(debatched_dims) +
-              " don't match expected dims [1]");
+              tensor_name + "' in model has dims " +
+              DimsListToString(debatched_dims) + " but dims [1] is expected");
     }
 
     if (ConvertToOnnxDataType(tensor_datatype) != iit->second.type_) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + model_name + "', sequence control '" +
-              tensor_name + "' datatype " +
+              tensor_name + "', the model expects data-type " +
               OnnxDataTypeName(iit->second.type_) +
-              " doesn't match required data-type " +
+              " but the model configuration specifies data-type " +
               DataType_Name(tensor_datatype));
     }
   }
@@ -396,9 +393,6 @@ OnnxBackend::Context::ValidateTypedSequenceControl(
     }
 
     // Control tensors must have shape [1].
-    DimsList dims;
-    dims.Add(1);
-
     const int nonbatch_start_idx = (max_batch_size_ > 0) ? 1 : 0;
     std::vector<int64_t> debatched_dims;
     for (size_t i = nonbatch_start_idx; i < iit->second.dims_.size(); i++) {
@@ -409,17 +403,17 @@ OnnxBackend::Context::ValidateTypedSequenceControl(
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + model_name + "', sequence control '" +
-              tensor_name + "' dims " + DimsListToString(debatched_dims) +
-              " don't match expected dims [1]");
+              tensor_name + "' in model has dims " +
+              DimsListToString(debatched_dims) + " but dims [1] is expected");
     }
 
     if (ConvertToOnnxDataType(tensor_datatype) != iit->second.type_) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + model_name + "', sequence control '" +
-              tensor_name + "' datatype " +
+              tensor_name + "', the model expects data-type " +
               OnnxDataTypeName(iit->second.type_) +
-              " doesn't match required data-type " +
+              " but the model configuration specifies data-type " +
               DataType_Name(tensor_datatype));
     }
   }

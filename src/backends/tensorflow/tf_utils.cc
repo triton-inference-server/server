@@ -28,7 +28,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-bool
+Status
 CompareDimsExact(
     const TRTISTF_Shape* model_shape, const DimsList& dims,
     const bool supports_batching)
@@ -37,22 +37,34 @@ CompareDimsExact(
   // then the tensorflow shape first dimension must be -1.
   if (supports_batching) {
     if ((model_shape->rank_ == 0) || (model_shape->dims_[0] != -1)) {
-      return false;
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "for the model to support batching, the shape should have at least 1 "
+          "dimension and the first dimension should not be -1");
     }
   }
 
   if (model_shape->rank_ !=
       (size_t)(dims.size() + (supports_batching ? 1 : 0))) {
-    return false;
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "the model expects " + std::to_string(model_shape->rank_) +
+            " dimensions but the model configuration specifies " +
+            std::to_string(dims.size() + (supports_batching ? 1 : 0)) +
+            " dimensions");
   }
 
   for (int i = 0; i < dims.size(); ++i) {
     if (model_shape->dims_[i + (supports_batching ? 1 : 0)] != dims[i]) {
-      return false;
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "the model expects dims " + ShapeToString(model_shape) +
+              " but the model configuration specifies dims " +
+              DimsListToString(dims));
     }
   }
 
-  return true;
+  return Status::Success;
 }
 
 Status
