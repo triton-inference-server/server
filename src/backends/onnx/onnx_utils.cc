@@ -294,13 +294,11 @@ CompareDimsSupported(
       ((model_shape.size() == 0) || (model_shape[0] != -1))) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "unable to load model '" + model_name +
-            "', model configuration supports batching but first dimension of "
-            "tensor '" +
-            tensor_name +
-            "' expected by framework is not a variable-size batch dimension: " +
-            DimsListToString(model_shape) +
-            " whereas model configuration shape is: " + DimsListToString(dims));
+        "unable to load model '" + model_name + "', tensor '" + tensor_name +
+            "': for the model to support batching, the shape should have at "
+            "least 1 dimension and the first dimension must be -1 but shape "
+            "expected by model was " +
+            DimsListToString(model_shape));
   }
 
   const int nonbatch_start_idx = (supports_batching ? 1 : 0);
@@ -314,10 +312,10 @@ CompareDimsSupported(
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unable to load model '" + model_name + "', tensor '" + tensor_name +
-            "' shape expected by framework " +
-            DimsListToString(debatched_model_shape) +
-            " doesn't match model configuration shape " +
-            DimsListToString(dims));
+            "': the model expects " + std::to_string(model_shape->rank_) +
+            " dimensions but the model configuration specified " +
+            std::to_string(dims.size() + (supports_batching ? 1 : 0)) +
+            " dimensions");
   }
 
   for (int i = 0; i < dims.size(); ++i) {
@@ -330,9 +328,8 @@ CompareDimsSupported(
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + model_name + "', tensor '" + tensor_name +
-              "' shape expected by framework " +
-              DimsListToString(debatched_model_shape) +
-              " doesn't match model configuration shape " +
+              "': the model expects shape " + ShapeToString(model_shape) +
+              " but the model configuration specified shape " +
               DimsListToString(dims));
     }
   }

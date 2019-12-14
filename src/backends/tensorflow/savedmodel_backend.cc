@@ -241,7 +241,7 @@ SavedModelBackend::ValidateBooleanSequenceControl(
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + Name() + "', sequence control '" +
-              tensor_name + "', the model expects data-type " +
+              tensor_name + "': the model expects data-type " +
               DataType_Name(ConvertDataType(input->data_type_)) +
               " but the model configuration specifies data-type " +
               DataType_Name(tensor_datatype));

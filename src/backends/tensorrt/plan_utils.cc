@@ -140,13 +140,11 @@ CompareDimsSupported(
       ((model_dims.nbDims == 0) || (model_dims.d[0] != -1))) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "unable to load model '" + model_name +
-            "', model configuration supports batching but first dimension of "
-            "binding '" +
-            binding_name +
-            "' expected by framework is not a variable-size batch dimension: " +
-            DimsDebugString(model_dims) +
-            " whereas model configuration shape is: " + DimsListToString(dims));
+        "unable to load model '" + model_name + "', binding '" + binding_name +
+            "': for the model to support batching, the shape should have at "
+            "least 1 dimension and the first dimension must be -1 but shape "
+            "expected by model was " +
+            DimsDebugString(model_dims));
   }
 
   const int nonbatch_start_idx = (supports_batching && is_dynamic ? 1 : 0);
@@ -155,9 +153,9 @@ CompareDimsSupported(
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unable to load model '" + model_name + "', binding '" + binding_name +
-            "' shape expected by framework " + DimsDebugString(model_dims) +
-            " doesn't match model configuration shape " +
-            DimsListToString(dims));
+            "': the model expects " + std::to_string(model_dims.nbDims) +
+            " dimensions but the model configuration specified " +
+            std::to_string(dims.size() + nonbatch_start_idx) + " dimensions");
   }
 
   for (int i = 0; i < dims.size(); ++i) {
@@ -170,9 +168,9 @@ CompareDimsSupported(
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + model_name + "', binding '" +
-              binding_name + "' shape expected by framework " +
+              binding_name + "': the model expects shape " +
               DimsDebugString(model_dims) +
-              " doesn't match model configuration shape " +
+              " but the model configuration specified shape " +
               DimsListToString(dims));
     }
   }
