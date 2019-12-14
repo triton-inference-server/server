@@ -229,9 +229,10 @@ ValidateDimension(
   if ((this_dims.nbDims + nonbatch_start_idx) != max_dims.nbDims) {
     return Status(
         RequestStatusCode::INTERNAL,
-        "The number of dimensions expected by engine: " +
+        "model expected " +
             std::to_string(max_dims.nbDims - nonbatch_start_idx) +
-            ", Got: " + std::to_string(this_dims.nbDims));
+            " dimensions but received " + std::to_string(this_dims.nbDims) +
+            " dimensions");
   }
 
   for (int i = 0; i < this_dims.nbDims; i++) {
@@ -239,11 +240,11 @@ ValidateDimension(
         this_dims.d[i] > max_dims.d[i + nonbatch_start_idx]) {
       return Status(
           RequestStatusCode::INTERNAL,
-          "The shape of dimension " + std::to_string(i) +
-              " is expected to be in range from " +
-              std::to_string(min_dims.d[i + nonbatch_start_idx]) + " to " +
+          "model expected the shape of dimension " + std::to_string(i) +
+              " to be between " +
+              std::to_string(min_dims.d[i + nonbatch_start_idx]) + " and " +
               std::to_string(max_dims.d[i + nonbatch_start_idx]) +
-              ", Got: " + std::to_string(this_dims.d[i]));
+              " but received " + std::to_string(this_dims.d[i]));
     }
   }
   return Status::Success;
@@ -258,9 +259,10 @@ ValidateDimension(
   if (int(this_dims.size() + nonbatch_start_idx) != max_dims.nbDims) {
     return Status(
         RequestStatusCode::INTERNAL,
-        "The number of dimensions expected by engine: " +
+        "model expected " +
             std::to_string(max_dims.nbDims - nonbatch_start_idx) +
-            ", Got: " + std::to_string(this_dims.size()));
+            " dimensions but received " + std::to_string(this_dims.size()) +
+            " dimensions");
   }
 
   for (int i = 0; i < int(this_dims.size()); i++) {
@@ -271,11 +273,11 @@ ValidateDimension(
         this_dims[i] > max_dims.d[i + nonbatch_start_idx]) {
       return Status(
           RequestStatusCode::INTERNAL,
-          "The shape of dimension " + std::to_string(i) +
-              " is expected to be in range from " +
-              std::to_string(min_dims.d[i + nonbatch_start_idx]) + " to " +
+          "model expected the shape of dimension " + std::to_string(i) +
+              " to be between " +
+              std::to_string(min_dims.d[i + nonbatch_start_idx]) + " and " +
               std::to_string(max_dims.d[i + nonbatch_start_idx]) +
-              ", Got: " + std::to_string(this_dims[i]));
+              " but received " + std::to_string(this_dims[i]));
     }
   }
   return Status::Success;
@@ -288,18 +290,18 @@ ValidateControlDimsDynamic(
   int expected_first_shape = (support_batching ? -1 : 1);
   if (dims.d[0] != expected_first_shape) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "The shape of first dimension of a control input should be " +
-            std::to_string(expected_first_shape) + ". Got " +
-            std::to_string(dims.d[0]));
+        RequestStatusCode::INTERNAL, "expects the first dimension to be " +
+                                         std::to_string(expected_first_shape) +
+                                         " but the model specified " +
+                                         std::to_string(dims.d[0]));
   }
   for (int i = 1; i < dims.nbDims; i++) {
     if (dims.d[i] != 1) {
       return Status(
           RequestStatusCode::INTERNAL,
-          "All dimensions (conditionally first) of a control input should have "
-          "shape 1. Got " +
-              std::to_string(dims.d[i]) + " at " + std::to_string(i));
+          "expects all dimensions (conditionally first) to be 1 but the model "
+          "specified shape " +
+              DimsDebugString(dims));
     }
   }
   return Status::Success;

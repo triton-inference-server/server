@@ -672,8 +672,8 @@ LibTorchBackend::Context::Run(
       return Status(
           RequestStatusCode::INVALID_ARG,
           "The output " + output.name() +
-              " in the model config refers to an output index which doesn't "
-              "exist. This model has " +
+              " in the model configuration refers to an output index which "
+              "doesn't exist. This model has " +
               std::to_string(max_index + 1) + " outputs");
     }
   }
