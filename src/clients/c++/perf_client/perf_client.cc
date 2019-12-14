@@ -1049,6 +1049,12 @@ main(int argc, char** argv)
     if (!async) {
       async = forced_sync ? false : true;
     }
+    // Validate the batch_size specification
+    if (batch_size > 1) {
+      std::cerr << "can not specify batch size > 1 when using a sequence model"
+                << std::endl;
+      return 1;
+    }
   }
 
   if (target_concurrency) {
