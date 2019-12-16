@@ -1,1 +1,1 @@
-binding 'OUTPUT1' shape expected by framework \[16\] doesn't match model configuration shape \[7\]
+binding 'OUTPUT1': the model expects shape \[16\] but the model configuration specified shape \[7\]
