@@ -134,9 +134,9 @@ ENV IE_PLUGINS_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel
 # [DLIS-816] Patch OpenVINO dependency (networkx) to fixed version until
 # the incompatible change is addressed:
 # https://github.com/microsoft/onnxruntime/issues/2169
-COPY tools/patch/onnx /tmp/trtis/tools/patch/onnx
-RUN sha1sum -c /tmp/trtis/tools/patch/onnx/checksums && \
-    patch -i /tmp/trtis/tools/patch/onnx/requirements_onnx.txt \
+COPY build/onnxruntime /tmp/trtis/build/onnxruntime
+RUN sha1sum -c /tmp/trtis/build/onnxruntime/checksums && \
+    patch -i /tmp/trtis/build/onnxruntime/requirements_onnx.txt.patch \
           $INTEL_OPENVINO_DIR/deployment_tools/model_optimizer/requirements_onnx.txt
 
 RUN wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-gmmlib_19.1.1_amd64.deb && \
