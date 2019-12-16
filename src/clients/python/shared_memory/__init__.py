@@ -73,6 +73,23 @@ def _raise_error(msg):
     ex = SharedMemoryException(msg)
     raise ex
 
+def _prepare_string_tensor(input_value):
+    flattened = bytes()
+    for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
+        # If directly passing bytes to STRING type,
+        # don't convert it to str as Python will encode the
+        # bytes which may distort the meaning
+        if obj.dtype.type == np.bytes_:
+            if type(obj.item()) == bytes:
+                s = obj.item()
+            else:
+                s = bytes(obj)
+        else:
+            s = str(obj).encode('utf-8')
+        flattened += struct.pack("<I", len(s))
+        flattened += s
+    return np.asarray(flattened)
+
 def serialize_string_tensor(input_tensor):
     """Serializes a string tensor into a flat numpy array of type uint8.
 
@@ -103,22 +120,7 @@ def serialize_string_tensor(input_tensor):
     # actual string characters. All strings are concatenated together in "C"
     # order.
     if (input_tensor.dtype == np.object) or (input_tensor.dtype.type == np.bytes_):
-        flattened = bytes()
-        for obj in np.nditer(input_tensor, flags=["refs_ok"], order='C'):
-            # If directly passing bytes to STRING type,
-            # don't convert it to str as Python will encode the
-            # bytes which may distort the meaning
-            if obj.dtype.type == np.bytes_:
-                if type(obj.item()) == bytes:
-                    s = obj.item()
-                else:
-                    s = bytes(obj)
-            else:
-                s = str(obj).encode('utf-8')
-            flattened += struct.pack("<I", len(s))
-            flattened += s
-        serialized_string_tensor = np.asarray(flattened)
-        return serialized_string_tensor
+        return _prepare_string_tensor(input_tensor)
     else:
         _raise_error("cannot serialize string tensor: invalid datatype")
     return None

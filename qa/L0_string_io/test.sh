@@ -36,7 +36,7 @@ if [ -z "$REPO_VERSION" ]; then
 fi
 
 CLIENT_LOG="./client.log"
-STRING_CLIENT_TEST_PY=../clients/string_client_test.py
+STRING_CLIENT_TEST_PY=string_client_test.py
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-repository=`pwd`/models

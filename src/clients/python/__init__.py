@@ -265,6 +265,22 @@ def _raise_error(msg):
     _crequest_error_del(err)
     raise ex
 
+def _prepare_string_tensor(input_value):
+    flattened = bytes()
+    for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
+        # If directly passing bytes to STRING type,
+        # don't convert it to str as Python will encode the
+        # bytes which may distort the meaning
+        if obj.dtype.type == np.bytes_:
+            if type(obj.item()) == bytes:
+                s = obj.item()
+            else:
+                s = bytes(obj)
+        else:
+            s = str(obj).encode('utf-8')
+        flattened += struct.pack("<I", len(s))
+        flattened += s
+    return np.asarray(flattened)
 
 class ProtocolType(IntEnum):
     """Protocol types supported by the client API
@@ -1215,21 +1231,7 @@ class InferContext:
                                 # All strings are concatenated together in "C"
                                 # order.
                                 if (input_value.dtype == np.object) or (input_value.dtype.type == np.bytes_):
-                                    flattened = bytes()
-                                    for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
-                                        # If directly passing bytes to STRING type,
-                                        # don't convert it to str as Python will encode the
-                                        # bytes which may distort the meaning
-                                        if obj.dtype.type == np.bytes_:
-                                            if type(obj.item()) == bytes:
-                                                s = obj.item()
-                                            else:
-                                                s = bytes(obj)
-                                        else:
-                                            s = str(obj).encode('utf-8')
-                                        flattened += struct.pack("<I", len(s))
-                                        flattened += s
-                                    input_value = np.asarray(flattened)
+                                    input_value = _prepare_string_tensor(input_value)
 
                                 if not input_value.flags['C_CONTIGUOUS']:
                                     input_value = np.ascontiguousarray(input_value)

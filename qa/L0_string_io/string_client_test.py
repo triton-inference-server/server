@@ -35,9 +35,8 @@ import unittest
 class ClientStringTest(unittest.TestCase):
     def test_tf_unicode_bytes(self):
         # We use a simple model that takes an input tensor of 6000 strings
-        # and returns an output tensors of 6000 strings. The input
-        # strings must represent integers. The output tensor is the
-        # same as the input tensor.
+        # and returns an output tensors of 6000 strings. The output tensor
+        # is the same as the input tensor.
         model_name = "graphdef_nobatch_zero_1_object"
         model_version = -1
         batch_size = 1
