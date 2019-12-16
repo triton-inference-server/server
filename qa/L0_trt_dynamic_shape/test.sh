@@ -70,7 +70,7 @@ if [ $? -eq 0 ]; then
     RET=1
 fi
 
-EXPECTED_MESSAGE="The shape of dimension 1 is expected to be in range from 4 to 32, Got:"
+EXPECTED_MESSAGE="model expected the shape of dimension 1 to be between 4 and 32 but received"
 if [ $(cat ${CLIENT_LOG}_max | grep "${EXPECTED_MESSAGE} 33" | wc -l) -eq 0 ]; then
     cat ${CLIENT_LOG}_max
     echo -e "\n***\n*** Test Failed\n***"
