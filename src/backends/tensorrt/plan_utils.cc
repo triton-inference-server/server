@@ -184,6 +184,43 @@ CompareDimsSupported(
 }
 
 Status
+CompareShapeDimsSupported(
+    const std::string& model_name, const std::string& binding_name,
+    const nvinfer1::Dims& model_dims, const DimsList& dims,
+    const bool supports_batching)
+{
+  const int batch_offset = supports_batching ? 1 : 0;
+  bool not_supported = false;
+  if (dims.size() != model_dims.nbDims) {
+    not_supported = true;
+  } else if (model_dims.nbDims == 1) {
+    if (((dims[0] + batch_offset) != model_dims.d[0]) ||
+        (dims[0] == WILDCARD_DIM)) {
+      not_supported = true;
+    }
+  } else if (model_dims.nbDims > 1) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to load model '" + model_name + "', shape binding '" +
+            binding_name + "' can only be 0-d or 1-D tensor, got " +
+            DimsDebugString(model_dims));
+  }
+
+
+  if (not_supported) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + model_name + "', binding '" + binding_name +
+            "' shape expected by framework " + DimsDebugString(model_dims) +
+            " doesn't match model configuration shape " +
+            DimsListToString(dims));
+  }
+
+
+  return Status::Success;
+}
+
+Status
 MaximumDims(
     const nvinfer1::Dims& max_profile_dims, const DimsList& dims,
     const bool support_batching, const int max_batch_size,
@@ -310,6 +347,34 @@ ValidateControlDimsDynamic(
   return Status::Success;
 }
 
+Status
+ValidateShapeValues(
+    const std::vector<int32_t>& request_shape_values,
+    const int32_t* min_shape_values, const int32_t* max_shape_values,
+    size_t nb_shape_values, const bool support_batching)
+{
+  if (request_shape_values.size() != nb_shape_values) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "mismatch between the number of shape values. Expecting " +
+            std::to_string(nb_shape_values) + ". Got " +
+            std::to_string(request_shape_values.size()));
+  }
+
+  for (size_t i = 0; i < nb_shape_values; i++) {
+    if (request_shape_values[i] < *(min_shape_values + i) ||
+        request_shape_values[i] > *(max_shape_values + i)) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "The shape value at index " + std::to_string(i) +
+              " is expected to be in range from " +
+              std::to_string(*(min_shape_values + i)) + " to " +
+              std::to_string(*(max_shape_values + i)) +
+              ", Got: " + std::to_string(request_shape_values[i]));
+    }
+  }
+  return Status::Success;
+}
 
 void
 DimsToDimVec(const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims)

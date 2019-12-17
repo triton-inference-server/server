@@ -564,60 +564,26 @@ def create_plan_dynamic_rf_modelfile(
     builder = trt.infer.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
     if max_batch == 0:
-        if FLAGS.tensorrt_shape_io:
-            shape_with_batchsize = shape[0]
-            dummy_shape = [-1] * shape_with_batchsize
-        else:
-            shape_with_batchsize = [i for i in shape]
+        shape_with_batchsize = [i for i in shape]
     else:
-        if FLAGS.tensorrt_shape_io:
-            shape_with_batchsize = shape[0] + 1
-            dummy_shape = [-1] * shape_with_batchsize
-        else:
-            shape_with_batchsize = [-1] + [i for i in shape]
+        shape_with_batchsize = [-1] + [i for i in shape]
 
     trt_dtype = np_to_trt_dtype(dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
     for io_num in range(io_cnt):
-        if FLAGS.tensorrt_shape_io:
-            in_node = network.add_input("INPUT{}".format(io_num), trt_dtype, [shape_with_batchsize])
-            in_node.allowed_formats = 1 << int(trt_memory_format)
-            dummy_in_node = network.add_input("DUMMY_INPUT{}".format(io_num), trt.float32, dummy_shape)
-            dummy_in_node.allowed_formats = 1 << int(trt_memory_format)
-            resize_layer = network.add_resize(dummy_in_node)
-            resize_layer.set_input(1, in_node)
-            out_node = network.add_shape(resize_layer.get_output(0))
+        in_node = network.add_input("INPUT{}".format(io_num), trt_dtype, shape_with_batchsize)
+        in_node.allowed_formats = 1 << int(trt_memory_format)
 
-            dummy_out_node = resize_layer.get_output(0)
-            out_node.get_output(0).name = "OUTPUT{}".format(io_num)
+        out_node = network.add_identity(in_node)
 
-            dummy_out_node.name = "DUMMY_OUTPUT{}".format(io_num)
+        out_node.get_output(0).set_name("OUTPUT{}".format(io_num))
+        out_node.get_output(0).set_type(trt_dtype)
+        network.mark_output(out_node.get_output(0))
+        out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
-            dummy_out_node.set_type(trt.float32)
-            network.mark_output(dummy_out_node)
-            dummy_out_node.allowed_formats = 1 << int(trt_memory_format)
-
-            out_node.get_output(0).set_type(trt_dtype)
-            network.mark_output_for_shapes(out_node.get_output(0))
-            out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
-
-            if (trt_dtype == trt.DataType.INT8):
-                in_node.dynamic_range = (-128.0, 127.0)
-                out_node.get_output(0).dynamic_range = (-128.0, 127.0)
-        else:
-            in_node = network.add_input("INPUT{}".format(io_num), trt_dtype, shape_with_batchsize)
-            in_node.allowed_formats = 1 << int(trt_memory_format)
-
-            out_node = network.add_identity(in_node)
-
-            out_node.get_output(0).set_name("OUTPUT{}".format(io_num))
-            out_node.get_output(0).set_type(trt_dtype)
-            network.mark_output(out_node.get_output(0))
-            out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
-
-            if (trt_dtype == trt.DataType.INT8):
-                in_node.dynamic_range = (-128.0, 127.0)
-                out_node.get_output(0).dynamic_range = (-128.0, 127.0)
+        if (trt_dtype == trt.DataType.INT8):
+            in_node.dynamic_range = (-128.0, 127.0)
+            out_node.get_output(0).dynamic_range = (-128.0, 127.0)
 
     min_shape = []
     opt_shape = []
@@ -626,51 +592,20 @@ def create_plan_dynamic_rf_modelfile(
         min_shape = min_shape + [1]
         opt_shape = opt_shape + [max(1, max_batch)]
         max_shape = max_shape + [max(1, max_batch)]
-    if not FLAGS.tensorrt_shape_io:
-        for i in shape:
-            if i == -1:
-                # Generating a very generous optimization profile
-                min_shape = min_shape + [1]
-                opt_shape = opt_shape + [8]
-                max_shape = max_shape + [profile_max_size]
-            else:
-                min_shape = min_shape + [i]
-                opt_shape = opt_shape + [i]
-                max_shape = max_shape + [i]
-    else:
-        min_shape = min_shape + [1] * shape[0]
-        opt_shape = opt_shape + [8] * shape[0]
-        max_shape = max_shape + [profile_max_size] * shape[0]
+    for i in shape:
+        if i == -1:
+            # Generating a very generous optimization profile
+            min_shape = min_shape + [1]
+            opt_shape = opt_shape + [8]
+            max_shape = max_shape + [profile_max_size]
+        else:
+            min_shape = min_shape + [i]
+            opt_shape = opt_shape + [i]
+            max_shape = max_shape + [i]
 
     profile = builder.create_optimization_profile()
     for io_num in range(io_cnt):
-        if FLAGS.tensorrt_shape_io:
-            if shape:
-                profile.set_shape_input("INPUT{}".format(io_num),
-                    [1] * shape_with_batchsize, [8] * shape_with_batchsize,
-                    [profile_max_size] * shape_with_batchsize)
-            profile.set_shape("DUMMY_INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
-        else:
-             profile.set_shape("INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
-
-	# Profiles that don't support batching.
-    if FLAGS.tensorrt_shape_io:
-        # The minimum shape value is 2
-    	profile = builder.create_optimization_profile()
-    	for io_num in range(io_cnt):
-            if shape:
-                profile.set_shape_input("INPUT{}".format(io_num),
-                    [2] * shape_with_batchsize, [8] * shape_with_batchsize,
-                    [profile_max_size] * shape_with_batchsize)
-            profile.set_shape("DUMMY_INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
-        # The maximum shape value is less than max_batch 
-    	profile = builder.create_optimization_profile()
-    	for io_num in range(io_cnt):
-            if shape:
-                profile.set_shape_input("INPUT{}".format(io_num),
-                    [1] * shape_with_batchsize, [4] * shape_with_batchsize,
-                    [4] * shape_with_batchsize)
-            profile.set_shape("DUMMY_INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
+        profile.set_shape("INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
 
 
     flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
@@ -682,7 +617,100 @@ def create_plan_dynamic_rf_modelfile(
             flags |= 1 << int(trt.BuilderFlag.FP16)
     config = builder.create_builder_config()
     config.flags=flags
+    config.max_workspace_size = 1 << 20
     config.add_optimization_profile(profile)
+    engine = builder.build_engine(network,config)
+
+
+    model_name = tu.get_zero_model_name(
+        "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(model_version_dir + "/model.plan", "wb") as f:
+        f.write(engine.serialize())
+
+    engine.destroy()
+    builder.destroy()
+
+
+def create_plan_shape_tensor_modelfile(
+        models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size):
+    # Create the model
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.infer.Builder(TRT_LOGGER)
+    network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+    if max_batch == 0:
+        shape_with_batchsize = shape[0]
+        dummy_shape = [-1] * shape_with_batchsize
+    else:
+        shape_with_batchsize = shape[0] + 1
+        dummy_shape = [-1] * shape_with_batchsize
+       
+    trt_dtype = np_to_trt_dtype(dtype)
+    trt_memory_format = trt.TensorFormat.LINEAR
+    for io_num in range(io_cnt):
+        in_node = network.add_input("INPUT{}".format(io_num), trt.int32, [shape_with_batchsize])
+        in_node.allowed_formats = 1 << int(trt_memory_format)
+        dummy_in_node = network.add_input("DUMMY_INPUT{}".format(io_num), trt_dtype, dummy_shape)
+        dummy_in_node.allowed_formats = 1 << int(trt_memory_format)
+        resize_layer = network.add_resize(dummy_in_node)
+        resize_layer.set_input(1, in_node)
+        out_node = network.add_shape(resize_layer.get_output(0))
+
+        dummy_out_node = resize_layer.get_output(0)
+        out_node.get_output(0).name = "OUTPUT{}".format(io_num)
+
+        dummy_out_node.name = "DUMMY_OUTPUT{}".format(io_num)
+
+        dummy_out_node.set_type(trt_dtype)
+        network.mark_output(dummy_out_node)
+        dummy_out_node.allowed_formats = 1 << int(trt_memory_format)
+
+        out_node.get_output(0).set_type(trt.int32)
+        network.mark_output_for_shapes(out_node.get_output(0))
+        out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
+
+        if (trt_dtype == trt.DataType.INT8):
+            in_node.dynamic_range = (-128.0, 127.0)
+            out_node.get_output(0).dynamic_range = (-128.0, 127.0)
+    
+    config = builder.create_builder_config()
+
+    min_prefix = []
+    opt_prefix = []
+    max_prefix = []
+
+    if max_batch != 0:
+        min_prefix = [1]
+        opt_prefix = [max(1, max_batch)]
+        max_prefix = [max(1, max_batch)]
+    
+    min_shape = min_prefix + [1] * shape[0]
+    opt_shape = opt_prefix + [8] * shape[0]
+    max_shape = max_prefix + [profile_max_size] * shape[0]
+
+    profile = builder.create_optimization_profile()
+    for io_num in range(io_cnt):
+        profile.set_shape_input("INPUT{}".format(io_num),min_shape, opt_shape, max_shape)
+        profile.set_shape("DUMMY_INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
+    
+    config.add_optimization_profile(profile)
+
+
+    flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
+    datatype_set = set([trt_dtype])
+    for dt in datatype_set:
+        if (dt == trt.DataType.INT8):
+            flags |= 1 << int(trt.BuilderFlag.INT8)
+        elif (dt == trt.DataType.HALF):
+            flags |= 1 << int(trt.BuilderFlag.FP16)
+    config.flags=flags
+
     config.max_workspace_size = 1 << 20
     engine = builder.build_engine(network,config)
 
@@ -789,31 +817,33 @@ max_batch_size: {}
 input [
   {{
     name: "DUMMY_INPUT{}"
-    data_type: TYPE_FP32
+    data_type: {}
     dims: [ {} ]
   }},
   {{
     name: "INPUT{}"
-    data_type: {}
+    data_type: TYPE_INT32
     dims: [ {} ]
+    is_shape_tensor: true
   }}
 ]
 output [
   {{
     name: "DUMMY_OUTPUT{}"
-    data_type: TYPE_FP32
+    data_type: {}
     dims: [ {} ]
   }},
   {{
     name: "OUTPUT{}"
-    data_type: {}
+    data_type: TYPE_INT32
     dims: [ {} ]
+    is_shape_tensor: true
   }}
 ]
-'''.format(io_num, dummy_shape_str,
-           io_num, np_to_model_dtype(dtype), shape_str,
-           io_num, dummy_shape_str,
-           io_num, np_to_model_dtype(dtype), shape_str)
+'''.format(io_num, np_to_model_dtype(dtype), dummy_shape_str,
+           io_num, shape_str,
+           io_num, np_to_model_dtype(dtype), dummy_shape_str,
+           io_num, shape_str)
 
     else:
         model_name = tu.get_zero_model_name(
@@ -851,6 +881,15 @@ output [
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
+
+def create_shape_tensor_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
+    model_version = 1
+
+    create_plan_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+    create_plan_shape_tensor_modelfile(models_dir, model_version, io_cnt, 8, dtype, shape, 32)
+    if no_batch:
+        create_plan_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+        create_plan_shape_tensor_modelfile(models_dir, model_version, io_cnt, 0, dtype, shape, 32)
 
 
 def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
@@ -907,13 +946,6 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
             create_plan_modelfile(True, models_dir, model_version, io_cnt, 0,
                                   dtype, shape, 16 * 1024 * 1024)
 
-    if FLAGS.tensorrt_shape_io:
-        create_plan_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_plan_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape, 32)
-        if no_batch:
-            create_plan_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
-            create_plan_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape, 32)
-
     if FLAGS.ensemble:
         emu.create_nop_modelconfig(models_dir, shape, dtype)
         create_ensemble_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
@@ -969,9 +1001,7 @@ if __name__ == '__main__':
     if FLAGS.tensorrt_big:
         create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1)
     elif FLAGS.tensorrt_shape_io:
-        # The shape tensors should have data type of int32 and fixed
-        # 1-D shape
-        create_models(FLAGS.models_dir, np.int32, [2], io_cnt=1)
+        create_shape_tensor_models(FLAGS.models_dir, np.float32, [2], io_cnt=1)
     else:
         create_models(FLAGS.models_dir, np.bool, [-1], io_cnt=1)
         create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1)

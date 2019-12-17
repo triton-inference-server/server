@@ -87,22 +87,45 @@ struct BackendContext {
       TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
       char* input_buffer);
 
-  // Helper function to set output buffer of fixed size data type to payloads
+  // Helper function to populate the shape value of specified shape input
+  // that corresponds with the batch size. The first shape value is asssumed
+  // to be the batch size. Its the user's responsibility to ensure it is called
+  // only for the shape tensors.
   // Return true if cudaMemcpyAsync is called, and the caller should call
   // cudaStreamSynchronize before using the data. Otherwise, return false.
+  bool SetShapeInputBuffer(
+      const std::string& name, const int32_t total_batch_size,
+      const int expected_byte_size, const bool support_batching,
+      Scheduler::Payload* payload, TRTSERVER_Memory_Type dst_memory_type,
+      int64_t dst_memory_type_id, char* input_buffer);
+
+  // Helper function to set output buffer of fixed size data type to
+  // payloads Return true if cudaMemcpyAsync is called, and the caller
+  // should call cudaStreamSynchronize before using the data. Otherwise,
+  // return false.
   bool SetFixedSizeOutputBuffer(
       const std::string& name, const size_t batch1_byte_size,
       const char* content, const std::vector<int64_t>& content_shape,
       TRTSERVER_Memory_Type src_memory_type, int64_t src_memory_type_id,
       std::vector<Scheduler::Payload>* payloads);
 
-  // Helper function for handling string input. This function will return the
-  // requested input content within a payload in a contiguous chunk. In some
-  // cases this will require copying the data. If it happens,
+  // Helper function to set output buffer Output Shape tensor to payloads. It is
+  // callers resposibilty to ensure this method is called only for the shape
+  // tensors. Return true if cudaMemcpyAsync is called, and the caller should
+  // call cudaStreamSynchronize before using the data. Otherwise, return false.
+  bool SetOutputShapeTensorBuffer(
+      const std::string& name, const int32_t* content,
+      std::vector<int64_t>& content_shape, const bool support_batching,
+      TRTSERVER_Memory_Type src_memory_type, int64_t src_memory_type_id,
+      std::vector<Scheduler::Payload>* payloads);
+
+  // Helper function for handling string input. This function will return
+  // the requested input content within a payload in a contiguous chunk. In
+  // some cases this will require copying the data. If it happens,
   // 'contiguous_buffer' will be set to hold the contiguous chunk and
   // 'cuda_copy' will be set to indicate whether CUDA copy is conducted.
-  // The data copy can be avoid if the input is already in contiguous chunk and
-  // the input is located in memory type and id specified.
+  // The data copy can be avoid if the input is already in contiguous chunk
+  // and the input is located in memory type and id specified.
   Status GetContiguousInputContent(
       const std::string& name, TRTSERVER_Memory_Type memory_type,
       int64_t memory_type_id, const Scheduler::Payload& payload,
