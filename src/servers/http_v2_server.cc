@@ -679,12 +679,6 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& model_name)
     return;
   }
 
-  std::string request_header_serialized;
-  if (!request_header_protobuf.SerializeToString(&request_header_serialized)) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  }
-
   // Convert the json string to protobuf message
   EVBufferTuple* response_tuple(new EVBufferTuple());
   size_t buffer_length = evbuffer_get_length(req->buffer_in);
@@ -707,10 +701,8 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& model_name)
   TRTSERVER_Error* err = TRTSERVER_InferenceRequestHeaderNew(
       &request_header, model_name.c_str(), model_version);
   if (err == nullptr) {
-    // [TODO] Set the fields explicitly to save serialization overhead
-    err = TRTSERVER_InferenceRequestHeaderParseFromString(
-        request_header, request_header_serialized.c_str(),
-        request_header_serialized.size());
+    err = SetTRTSERVER_InferenceRequestHeader(
+        request_header, request_header_protobuf);
   }
   TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
   if (err == nullptr) {

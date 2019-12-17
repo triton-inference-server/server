@@ -598,9 +598,6 @@ main(int argc, char** argv)
     input1->set_batch_byte_size(input1_size);
   }
 
-  std::string request_header_serialized;
-  request_header_protobuf.SerializeToString(&request_header_serialized);
-
   // Create the inference request provider which provides all the
   // input information needed for an inference.
   TRTSERVER_InferenceRequestHeader* request_header = nullptr;
@@ -608,11 +605,9 @@ main(int argc, char** argv)
       TRTSERVER_InferenceRequestHeaderNew(
           &request_header, model_name.c_str(), model_version),
       "creating inference request header");
-  // [TODO] Set the fields explicitly to save serialization overhead
   FAIL_IF_ERR(
-      TRTSERVER_InferenceRequestHeaderParseFromString(
-          request_header, request_header_serialized.c_str(),
-          request_header_serialized.size()),
+      SetTRTSERVER_InferenceRequestHeader(
+          request_header, request_header_protobuf),
       "parsing inference request header");
   TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
   FAIL_IF_ERR(

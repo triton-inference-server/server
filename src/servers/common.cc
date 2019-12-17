@@ -102,4 +102,36 @@ RequestStatusUtil::NextUniqueRequestId()
   return ++id;
 }
 
+TRTSERVER_Error*
+SetTRTSERVER_InferenceRequestHeader(
+    TRTSERVER_InferenceRequestHeader* request_header,
+    InferRequestHeader request_header_protobuf)
+{
+  RETURN_IF_ERR(TRTSERVER_InferenceRequestHeaderSetId(
+      request_header, request_header_protobuf.id()));
+  RETURN_IF_ERR(TRTSERVER_InferenceRequestHeaderSetFlags(
+      request_header, request_header_protobuf.flags()));
+  RETURN_IF_ERR(TRTSERVER_InferenceRequestHeaderSetCorrelationId(
+      request_header, request_header_protobuf.correlation_id()));
+  RETURN_IF_ERR(TRTSERVER_InferenceRequestHeaderSetBatchSize(
+      request_header, request_header_protobuf.batch_size()));
+
+  for (const auto& input : request_header_protobuf.input()) {
+    RETURN_IF_ERR(TRTSERVER_InferenceRequestHeaderAddInput(
+        request_header, input.name().c_str(), input.dims().data(),
+        input.dims_size(), input.batch_byte_size()));
+  }
+
+  for (const auto& output : request_header_protobuf.output()) {
+    if (output.has_cls()) {
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestHeaderAddOutputCls(
+          request_header, output.name().c_str(), output.cls().count()));
+    } else {
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestHeaderAddOutputRaw(
+          request_header, output.name().c_str()));
+    }
+  }
+  return nullptr;  // Success
+}
+
 }}  // namespace nvidia::inferenceserver

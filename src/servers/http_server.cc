@@ -1137,17 +1137,9 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   std::string infer_request_header(
       evhtp_kv_find(req->headers_in, kInferRequestHTTPHeader));
 
-  // [TODO] clean up protobuf usage (or not? The protobuf needs to be
-  // instantiated anyway)
   InferRequestHeader request_header_protobuf;
   if (!google::protobuf::TextFormat::ParseFromString(
           infer_request_header, &request_header_protobuf)) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  }
-
-  std::string request_header_serialized;
-  if (!request_header_protobuf.SerializeToString(&request_header_serialized)) {
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
   }
@@ -1160,10 +1152,8 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   TRTSERVER_Error* err = TRTSERVER_InferenceRequestHeaderNew(
       &request_header, model_name.c_str(), model_version);
   if (err == nullptr) {
-    // [TODO] Set the fields explicitly to save serialization overhead
-    err = TRTSERVER_InferenceRequestHeaderParseFromString(
-        request_header, request_header_serialized.c_str(),
-        request_header_serialized.size());
+    err = SetTRTSERVER_InferenceRequestHeader(
+        request_header, request_header_protobuf);
   }
   TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
   if (err == nullptr) {
