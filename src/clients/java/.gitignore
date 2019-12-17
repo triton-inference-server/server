@@ -2,3 +2,4 @@ build/*
 .gradle/*
 .idea/*
 java.iml
+src/main/java/generated/*
