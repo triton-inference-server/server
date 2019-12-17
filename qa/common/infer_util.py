@@ -313,9 +313,12 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         expected_list = list()
         for b in range(batch_size):
             rtensor_dtype = _range_repr_dtype(tensor_dtype)
-            in0 = np.random.randint(low=np.iinfo(rtensor_dtype).min,
-                                    high=np.iinfo(rtensor_dtype).max,
-                                    size=input_shapes[io_num], dtype=rtensor_dtype)
+            if (rtensor_dtype != np.bool):
+                in0 = np.random.randint(low=np.iinfo(rtensor_dtype).min,
+                                        high=np.iinfo(rtensor_dtype).max,
+                                        size=input_shapes[io_num], dtype=rtensor_dtype)
+            else:
+                in0 = np.random.choice(a=[False, True], size=input_shapes[io_num])
             if tensor_dtype != np.object:
                 in0 = in0.astype(tensor_dtype)
                 expected0 = np.ndarray.copy(in0)

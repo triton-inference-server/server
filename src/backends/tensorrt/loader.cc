@@ -27,7 +27,6 @@
 #include "src/backends/tensorrt/loader.h"
 
 #include <NvInferPlugin.h>
-#include <NvOnnxParserRuntime.h>
 #include <mutex>
 #include "src/backends/tensorrt/logging.h"
 #include "src/core/logging.h"
@@ -50,13 +49,14 @@ LoadPlan(
 
   *engine = nullptr;
 
-  // Create plugin factory to provide onnx plugins. This should be
-  // generalized based on what the model requires [DLIS-54]
-  nvonnxparser::IPluginFactory* onnx_plugin_factory =
-      nvonnxparser::createPluginFactory(tensorrt_logger);
+  *runtime = nvinfer1::createInferRuntime(tensorrt_logger);
+  if (*runtime == nullptr) {
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to create TensorRT runtime");
+  }
 
   *engine = (*runtime)->deserializeCudaEngine(
-      &model_data[0], model_data.size(), onnx_plugin_factory);
+      &model_data[0], model_data.size());
   if (*engine == nullptr) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to create TensorRT engine");
