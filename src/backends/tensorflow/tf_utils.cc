@@ -111,7 +111,8 @@ CompareDimsSupported(
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + model_name + "', tensor '" + tensor_name +
-              "': the model expects shape " + ShapeToString(model_shape) +
+              "': the model expects shape " +
+              ShapeToString(model_shape, nonbatch_start_idx) +
               " but the model configuration specified shape " +
               DimsListToString(dims));
     }
