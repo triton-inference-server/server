@@ -46,7 +46,8 @@ class ClientStringTest(unittest.TestCase):
 
         # Create the data for the input tensor. Initialize the tensor to the
         # byte representation of the first 6000 unicode characters.
-        in0 = np.array([chr(i) for i in range(6000)])
+        # TODO: For now pass non-utf chars -> change if needed later
+        in0 = np.array([b'\xf4\x9a\xb6\xb1' for i in range(6000)])
         in0n = np.array([bytes(x, encoding='utf8') for x in in0])
 
         # Send inference request to the inference server. Get results for
