@@ -240,8 +240,8 @@ ExternalProject_Add(libevhtp
 #
 ExternalProject_Add(prometheus-cpp
   PREFIX prometheus-cpp
-  URL "https://github.com/jupp0r/prometheus-cpp/archive/v0.5.0.tar.gz"
-  URL_HASH SHA256=76c60f9b1bba19bcfb29b06749ec7530db7151692eb12443d00d3511e16696e2
+  URL "https://github.com/jupp0r/prometheus-cpp/archive/v0.7.0.tar.gz"
+  URL_HASH SHA256=93907d937fa7eab9605cba786123d3eba4e87e3dca8ecec93ff9eae4eef8de5a
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/src/prometheus-cpp"
   CMAKE_CACHE_ARGS
     -DENABLE_PUSH:BOOL=OFF
