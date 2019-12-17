@@ -50,9 +50,8 @@
 
 TRTIS_VERSION=19.11
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRTIS_VERSION-py3}
-TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=gitlab-master.nvidia.com:5005/dl/dgx/tensorflow:use_trt7_tf1-py3-devel}
-# UPDATE to public path once the official TRT7 container gets released
-TENSORRT_IMAGE=${TENSORRT_IMAGE:=gitlab-master.nvidia.com:5005/dl/dgx/tensorrtserver/tanmayv/trt7-container}
+TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRTIS_VERSION-tf1-py3}
+TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRTIS_VERSION-py3}
 CUDA_DEVICE=0
 
 ###
