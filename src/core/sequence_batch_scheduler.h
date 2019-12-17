@@ -55,8 +55,10 @@ class SequenceBatchScheduler : public Scheduler {
   // function to call when a request is scheduled.
   static Status Create(
       const ModelConfig& config, const uint32_t runner_cnt,
-      StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
-      StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler);
+      const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
+      const StandardRunFunc& OnSchedule,
+      const StandardShapeTensorPeekFunc& OnPeek,
+      std::unique_ptr<Scheduler>* scheduler);
 
   // \see Scheduler::Enqueue()
   void Enqueue(
@@ -234,9 +236,9 @@ class DirectSequenceBatch : public SequenceBatch {
   DirectSequenceBatch(
       SequenceBatchScheduler* base, const uint32_t batcher_idx,
       const size_t seq_slot_cnt, const ModelConfig& config,
-      Scheduler::StandardInitFunc OnInit,
-      Scheduler::StandardWarmupFunc OnWarmup,
-      Scheduler::StandardRunFunc OnSchedule,
+      const Scheduler::StandardInitFunc& OnInit,
+      const Scheduler::StandardWarmupFunc& OnWarmup,
+      const Scheduler::StandardRunFunc& OnSchedule,
       const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
           start_input_overrides,
       const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
@@ -309,9 +311,10 @@ class OldestSequenceBatch : public SequenceBatch {
   OldestSequenceBatch(
       SequenceBatchScheduler* base, const uint32_t batcher_idx,
       const size_t seq_slot_cnt, const ModelConfig& config,
-      Scheduler::StandardInitFunc OnInit,
-      Scheduler::StandardWarmupFunc OnWarmup,
-      Scheduler::StandardRunFunc OnSchedule,
+      const Scheduler::StandardInitFunc& OnInit,
+      const Scheduler::StandardWarmupFunc& OnWarmup,
+      const Scheduler::StandardRunFunc& OnSchedule,
+      const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
       const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
           start_input_overrides,
       const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
