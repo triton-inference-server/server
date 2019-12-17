@@ -437,13 +437,18 @@ docuementation.
 To build the docs install the required dependencies::
 
   $ apt-get update
-  $ apt-get install -y --no-install-recommends doxygen
-  $ pip install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale
+  $ apt-get install -y --no-install-recommends python3-pip doxygen
+  $ pip3 install --upgrade setuptools
+  $ pip3 install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale
 
 To get the Python client library API docs the TensorRT Inference
-Server Python package must be installed::
+Server Python package must be installed and a couple of files must be copied::
 
   $ pip install --upgrade tensorrtserver-*.whl
+  $ cd src/clients/c++/library
+  $ cp -f request.h.in request.h
+  $ cp -f request_grpc.h.in request_grpc.h
+  $ cp -f request_http.h.in request_http.h
 
 Then use Sphinx to build the documentation into the build/html
 directory::

@@ -38,10 +38,14 @@ apt-get update && \
 
 set +e
 
-(cd src/clients/c++/library && 
+(cd src/clients/c++/library &&
     cp -f request.h.in request.h
     cp -f request_grpc.h.in request_grpc.h
     cp -f request_http.h.in request_http.h)
+
+# Set visitor script to be included on every HTML page
+mkdir docs/_static && cp visitor_script docs/_static/.
+export VISITS_COUNTING_SCRIPT=visitor_script
 
 (cd docs && rm -f trtis_docs.zip && \
         make BUILDDIR=/opt/tensorrtserver/qa/L0_docs/build clean html) > $TEST_LOG 2>&1
