@@ -370,6 +370,16 @@ ContainsWildcard(const nvinfer1::Dims& dims)
   return false;
 }
 
+bool
+ContainsWildcardAtExplicitBatchDim(const nvinfer1::Dims& dims)
+{
+  if (dims.d[0] == WILDCARD_DIM) {
+    return true;
+  }
+  return false;
+}
+
+
 const std::string
 DimsDebugString(const nvinfer1::Dims& dims)
 {

@@ -88,6 +88,8 @@ bool DimVecToDims(const std::vector<int64_t>& dim_vec, nvinfer1::Dims* dims);
 
 bool ContainsWildcard(const nvinfer1::Dims& dims);
 
+bool ContainsWildcardAtExplicitBatchDim(const nvinfer1::Dims& dims);
+
 const std::string DimsDebugString(const nvinfer1::Dims& dims);
 
 }}  // namespace nvidia::inferenceserver
