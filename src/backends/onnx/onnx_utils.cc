@@ -312,10 +312,10 @@ CompareDimsSupported(
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unable to load model '" + model_name + "', tensor '" + tensor_name +
-            "': the model expects " + std::to_string(model_shape.size()) +
+            "': the model expects " +
+            std::to_string(debatched_model_shape.size()) +
             " dimensions but the model configuration specified " +
-            std::to_string(dims.size() + (supports_batching ? 1 : 0)) +
-            " dimensions");
+            std::to_string(dims.size()) + " dimensions");
   }
 
   for (int i = 0; i < dims.size(); ++i) {
@@ -328,7 +328,8 @@ CompareDimsSupported(
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + model_name + "', tensor '" + tensor_name +
-              "': the model expects shape " + DimsListToString(model_shape) +
+              "': the model expects shape " +
+              DimsListToString(debatched_model_shape) +
               " but the model configuration specified shape " +
               DimsListToString(dims));
     }
