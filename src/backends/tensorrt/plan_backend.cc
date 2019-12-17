@@ -47,6 +47,7 @@ PlanBackend::Context::Context(
       num_expected_bindings_(0)
 {
   stream_ = nullptr;
+  support_batching_ = (max_batch_size != NO_BATCHING);
 }
 
 PlanBackend::Context::~Context()
@@ -317,12 +318,21 @@ PlanBackend::CreateExecutionContext(
 
   // Collect all the expected input and allowed output tensor names
   // and validate that the model configuration specifies only those.
-  std::set<std::string> allowed_inputs, allowed_outputs;
+  std::set<std::string> allowed_inputs, allowed_outputs, allowed_shape_tensors;
   for (int i = 0; i < context->num_expected_bindings_; ++i) {
     if (context->engine_->bindingIsInput(i)) {
       allowed_inputs.emplace(context->engine_->getBindingName(i));
     } else {
       allowed_outputs.emplace(context->engine_->getBindingName(i));
+    }
+    if (context->engine_->isExecutionBinding(i)) {
+      LOG_VERBOSE(1) << "Detected " << context->engine_->getBindingName(i)
+                     << " as execution binding for " + Name();
+    }
+    if (context->engine_->isShapeBinding(i)) {
+      allowed_shape_tensors.emplace(context->engine_->getBindingName(i));
+      LOG_VERBOSE(1) << "Detected " << context->engine_->getBindingName(i)
+                     << " as shape binding for " + Name();
     }
   }
 
@@ -334,8 +344,10 @@ PlanBackend::CreateExecutionContext(
     RETURN_IF_ERROR(CheckAllowedModelOutput(io, allowed_outputs));
   }
 
-  RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
-  RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
+  RETURN_IF_ERROR(
+      context->ValidateInputs(Config().input(), allowed_shape_tensors));
+  RETURN_IF_ERROR(
+      context->ValidateOutputs(Config().output(), allowed_shape_tensors));
   // Initialize the inputs and outputs. Make sure the model matches
   // what is in the configuration. Allocate memory for the maximum
   // possible batch size: min(engine maximum, config maximum)
@@ -346,17 +358,21 @@ PlanBackend::CreateExecutionContext(
   context->buffer_bindings_ =
       std::vector<void*>(context->total_bindings_, nullptr);
 
-  const bool support_batching = (mbs != Context::NO_BATCHING);
-
-  RETURN_IF_ERROR(context->InitializeConfigInputBindings(
-      Config().input(), support_batching));
-  RETURN_IF_ERROR(context->InitializeSequenceControlInputBindings(
-      Config(), support_batching));
+  RETURN_IF_ERROR(
+      context->InitializeConfigShapeInputBindings(Config().input()));
+  RETURN_IF_ERROR(
+      context->InitializeConfigExecuteInputBindings(Config().input()));
+  RETURN_IF_ERROR(context->InitializeSequenceControlInputBindings(Config()));
   for (const auto& trt_context : context->trt_contexts_) {
     if (!trt_context.second.context_->allInputDimensionsSpecified()) {
       return Status(
           RequestStatusCode::INTERNAL,
           "failed to specify the dimensions of all input bindings");
+    }
+    if (!trt_context.second.context_->allInputShapesSpecified()) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to specify the values for all input shape tensors");
     }
   }
 
@@ -372,12 +388,16 @@ PlanBackend::CreateExecutionContext(
             std::to_string(context->engine_->getMaxBatchSize()));
   }
 
-  RETURN_IF_ERROR(context->InitializeConfigOutputBindings(
-      Config().output(), support_batching));
+  RETURN_IF_ERROR(
+      context->InitializeConfigShapeOutputBindings(Config().output()));
+  RETURN_IF_ERROR(
+      context->InitializeConfigExecuteOutputBindings(Config().output()));
 
-  // Make sure every index is initialized.
+  // Make sure every index which corresponds to an execution binding is
+  // initialized.
   for (int i = 0; i < context->num_expected_bindings_; ++i) {
-    if (context->buffers_[i] == nullptr) {
+    if (context->buffers_[i] == nullptr &&
+        context->engine_->isExecutionBinding(i)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "expected configuration for " +
@@ -442,7 +462,8 @@ PlanBackend::CreateExecutionContext(
 
 Status
 PlanBackend::Context::ValidateInputs(
-    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios,
+    const std::set<std::string> shape_tensors)
 {
   for (const auto& io : ios) {
     if (!ConvertDataTypeToTrtType(io.data_type()).first) {
@@ -450,6 +471,25 @@ PlanBackend::Context::ValidateInputs(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
               " for input '" + io.name() + "' for model '" + name_ + "'");
+    }
+
+    // Check the shape tensor specification
+    if (shape_tensors.find(io.name()) != shape_tensors.end()) {
+      if (!io.is_shape_tensor()) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "input '" + io.name() + "' for model '" + name_ +
+                "' is a shape tensor but the model configuration doesn't mark "
+                "it as a shape tensor.");
+      }
+    } else {
+      if (io.is_shape_tensor()) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "input '" + io.name() + "' for model '" + name_ +
+                "' is incorrectly marked as a shape tensor in the model "
+                "configuration.");
+      }
     }
   }
 
@@ -459,7 +499,8 @@ PlanBackend::Context::ValidateInputs(
 
 Status
 PlanBackend::Context::ValidateOutputs(
-    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
+    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios,
+    const std::set<std::string> shape_tensors)
 {
   for (const auto& io : ios) {
     if (!ConvertDataTypeToTrtType(io.data_type()).first) {
@@ -468,16 +509,34 @@ PlanBackend::Context::ValidateOutputs(
           "unsupported datatype " + DataType_Name(io.data_type()) +
               " for output '" + io.name() + "' for model '" + name_ + "'");
     }
+
+    // Check the shape tensor specification
+    if (shape_tensors.find(io.name()) != shape_tensors.end()) {
+      if (!io.is_shape_tensor()) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "output '" + io.name() + "' for model '" + name_ +
+                "' is a shape tensor but the model configuration doesn't mark "
+                "it as a shape tensor.");
+      }
+    } else {
+      if (io.is_shape_tensor()) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "output '" + io.name() + "' for model '" + name_ +
+                "' is incorrectly marked as a shape tensor in the model "
+                "configuration.");
+      }
+    }
   }
 
   return Status::Success;
 }
 
 Status
-PlanBackend::Context::InitializeInputBinding(
+PlanBackend::Context::InitializeShapeInputBinding(
     const std::string& input_name, const DataType input_datatype,
-    const DimsList& model_config_dims, const bool support_batching,
-    const bool is_control)
+    const DimsList& model_config_dims)
 {
   // the maximum byte sizes across all profiles
   int64_t max_byte_size = 0;
@@ -490,6 +549,154 @@ PlanBackend::Context::InitializeInputBinding(
       return Status(
           RequestStatusCode::NOT_FOUND,
           "input '" + input_name + "' not found for " + name_);
+    }
+
+    if (buffers_[io_index] != nullptr) {
+      return Status(
+          RequestStatusCode::INVALID_ARG, "input '" + input_name +
+                                              "' has already appeared as an " +
+                                              "input or output for " + name_);
+    }
+
+    if (!engine_->bindingIsInput(binding_index)) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "input '" + input_name +
+              "' is expected to be an output in model for " + name_);
+    }
+
+    // Skip if the binding is not a shape tensor
+    if (!engine_->isShapeBinding(binding_index)) {
+      return Status::Success;
+    }
+
+    // The presence of shape binding indicates the dynamic model plan
+    is_dynamic_ = true;
+
+    if (input_datatype != TYPE_INT32) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected datatype " + DataType_Name(input_datatype) +
+              "  in model configuration for shape input '" + input_name +
+              "', expecting " + DataType_Name(TYPE_INT32) + " for " + name_);
+    }
+
+    DataType dt =
+        ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
+    if (dt != input_datatype) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected datatype " + DataType_Name(dt) +
+              " in engine for shape input '" + input_name + "', expecting " +
+              DataType_Name(input_datatype) + " for " + name_);
+    }
+
+    MemoryFormat fmt =
+        ConvertTrtFmtToFmt(engine_->getBindingFormat(binding_index));
+    if (fmt != MemoryFormat::LINEAR) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected tensor format " + MemoryFormat_Name(fmt) +
+              " for input '" + input_name +
+              "'. Only LINEAR memory format is supported at present.");
+    }
+
+    nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
+
+    RETURN_IF_ERROR(CompareShapeDimsSupported(
+        name_, input_name, engine_dims, model_config_dims, support_batching_));
+
+    context.max_dims_[io_index] = engine_->getProfileDimensions(
+        binding_index, profile_index, nvinfer1::OptProfileSelector::kMAX);
+    context.min_dims_[io_index] = engine_->getProfileDimensions(
+        binding_index, profile_index, nvinfer1::OptProfileSelector::kMIN);
+    context.opt_dims_[io_index] = engine_->getProfileDimensions(
+        binding_index, profile_index, nvinfer1::OptProfileSelector::kOPT);
+
+    if (!context.context_->setBindingDimensions(
+            binding_index, context.max_dims_[io_index])) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "trt failed to set binding dimension to " +
+              DimsDebugString(context.max_dims_[io_index]) + " for input '" +
+              input_name + "' for " + name_);
+    }
+
+    context.nb_shape_values_ = (context.max_dims_[io_index].nbDims == 0)
+                                   ? 1
+                                   : context.max_dims_[io_index].d[0];
+    context.max_shapes_[io_index] = engine_->getProfileShapeValues(
+        binding_index, profile_index, nvinfer1::OptProfileSelector::kMAX);
+    context.min_shapes_[io_index] = engine_->getProfileShapeValues(
+        binding_index, profile_index, nvinfer1::OptProfileSelector::kMIN);
+    context.opt_shapes_[io_index] = engine_->getProfileShapeValues(
+        binding_index, profile_index, nvinfer1::OptProfileSelector::kOPT);
+
+    if (!context.context_->setInputShapeBinding(
+            binding_index, context.max_shapes_[io_index])) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "trt failed to set the input shape binding for '" + input_name +
+              "' for " + name_ + ".");
+    }
+
+    if (engine_->isExecutionBinding(binding_index)) {
+      std::vector<int64_t> dim_vec;
+      DimsToDimVec(
+          context.context_->getBindingDimensions(binding_index), &dim_vec);
+      int64_t byte_size = GetByteSize(dt, dim_vec);
+      max_byte_size = std::max(max_byte_size, byte_size);
+    }
+  }
+
+  if (max_byte_size != 0) {
+    // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
+    // indicate that the buffer has been correctly initalized so even
+    // for zero-sized tensors always allocate something.
+    void* buffer;
+    cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+    if (err != cudaSuccess) {
+      return Status(
+          RequestStatusCode::INTERNAL, "unable to allocate memory for input '" +
+                                           input_name + " for " + name_ + ": " +
+                                           cudaGetErrorString(err));
+    }
+
+    byte_sizes_[io_index] = max_byte_size;
+    buffers_[io_index] = buffer;
+
+    // Set buffer bindings of all optimization profile since buffer is allocated
+    for (auto& trt_context : trt_contexts_) {
+      auto binding_index =
+          num_expected_bindings_ * trt_context.first + io_index;
+      buffer_bindings_[binding_index] = buffers_[io_index];
+    }
+  }
+
+  return Status::Success;
+}
+
+Status
+PlanBackend::Context::InitializeExecuteInputBinding(
+    const std::string& input_name, const DataType input_datatype,
+    const DimsList& model_config_dims, const bool is_control)
+{
+  // the maximum byte sizes across all profiles
+  int64_t max_byte_size = 0;
+  int io_index = engine_->getBindingIndex(input_name.c_str());
+  for (auto& trt_context : trt_contexts_) {
+    auto& profile_index = trt_context.first;
+    auto& context = trt_context.second;
+    int binding_index = num_expected_bindings_ * profile_index + io_index;
+    if (io_index < 0) {
+      return Status(
+          RequestStatusCode::NOT_FOUND,
+          "input '" + input_name + "' not found for " + name_);
+    }
+
+    // Skip if shape binding is encountered
+    if (engine_->isShapeBinding(binding_index)) {
+      return Status::Success;
     }
 
     if (buffers_[io_index] != nullptr) {
@@ -548,10 +755,11 @@ PlanBackend::Context::InitializeInputBinding(
 
     if (!(is_control && is_dynamic_)) {
       RETURN_IF_ERROR(CompareDimsSupported(
-          name_, input_name, engine_dims, model_config_dims, support_batching,
+          name_, input_name, engine_dims, model_config_dims, support_batching_,
           is_dynamic_));
     } else {
-      Status status = ValidateControlDimsDynamic(engine_dims, support_batching);
+      Status status =
+          ValidateControlDimsDynamic(engine_dims, support_batching_);
       if (!status.IsOk()) {
         return Status(
             RequestStatusCode::INVALID_ARG,
@@ -575,7 +783,7 @@ PlanBackend::Context::InitializeInputBinding(
 
       Status status = ValidateDimension(
           model_config_dims, context.min_dims_[io_index],
-          context.max_dims_[io_index], support_batching);
+          context.max_dims_[io_index], support_batching_);
       if (!status.IsOk()) {
         return Status(
             RequestStatusCode::INTERNAL,
@@ -584,7 +792,7 @@ PlanBackend::Context::InitializeInputBinding(
                 ". Error details: " + status.Message());
       }
       RETURN_IF_ERROR(MaximumDims(
-          context.max_dims_[io_index], model_config_dims, support_batching,
+          context.max_dims_[io_index], model_config_dims, support_batching_,
           max_batch_size_, &maximum_dims));
       byte_size = GetByteSize(dt, maximum_dims);
       // Update the maximum dimension with respect to the allocated buffer
@@ -634,7 +842,7 @@ PlanBackend::Context::InitializeInputBinding(
 
 Status
 PlanBackend::Context::InitializeSequenceControlInputBindings(
-    const ModelConfig& config, const bool support_batching)
+    const ModelConfig& config)
 {
   if (config.has_sequence_batching()) {
     std::vector<ModelSequenceBatching::Control::Kind> boolean_kinds{
@@ -656,8 +864,8 @@ PlanBackend::Context::InitializeSequenceControlInputBindings(
         DimsList dims;
         dims.Add(1);
 
-        RETURN_IF_ERROR(InitializeInputBinding(
-            tensor_name, tensor_datatype, dims, support_batching, true));
+        RETURN_IF_ERROR(InitializeExecuteInputBinding(
+            tensor_name, tensor_datatype, dims, true));
       }
     }
 
@@ -678,8 +886,8 @@ PlanBackend::Context::InitializeSequenceControlInputBindings(
         DimsList dims;
         dims.Add(1);
 
-        RETURN_IF_ERROR(InitializeInputBinding(
-            tensor_name, tensor_datatype, dims, support_batching, true));
+        RETURN_IF_ERROR(InitializeExecuteInputBinding(
+            tensor_name, tensor_datatype, dims, true));
       }
     }
   }
@@ -688,28 +896,159 @@ PlanBackend::Context::InitializeSequenceControlInputBindings(
 }
 
 Status
-PlanBackend::Context::InitializeConfigInputBindings(
-    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios,
-    const bool support_batching)
+PlanBackend::Context::InitializeConfigShapeInputBindings(
+    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
   for (const auto& io : ios) {
     const DimsList& model_config_dims =
         (io.has_reshape()) ? io.reshape().shape() : io.dims();
-    RETURN_IF_ERROR(InitializeInputBinding(
-        io.name(), io.data_type(), model_config_dims, support_batching));
+    RETURN_IF_ERROR(InitializeShapeInputBinding(
+        io.name(), io.data_type(), model_config_dims));
   }
 
   return Status::Success;
 }
 
 Status
-PlanBackend::Context::InitializeConfigOutputBindings(
-    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios,
-    const bool support_batching)
+PlanBackend::Context::InitializeConfigExecuteInputBindings(
+    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+{
+  for (const auto& io : ios) {
+    const DimsList& model_config_dims =
+        (io.has_reshape()) ? io.reshape().shape() : io.dims();
+    RETURN_IF_ERROR(InitializeExecuteInputBinding(
+        io.name(), io.data_type(), model_config_dims));
+  }
+
+  return Status::Success;
+}
+
+Status
+PlanBackend::Context::InitializeConfigShapeOutputBindings(
+    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
   for (const auto& io : ios) {
     // the maximum byte sizes across all profiles
     int64_t max_byte_size = 0;
+
+    // Skip if this output is not a shape tensor
+    if (!io.is_shape_tensor()) {
+      continue;
+    }
+    is_dynamic_ = true;
+
+    int io_index = engine_->getBindingIndex(io.name().c_str());
+    for (auto& trt_context : trt_contexts_) {
+      auto& profile_index = trt_context.first;
+      auto& context = trt_context.second;
+      int binding_index = num_expected_bindings_ * profile_index + io_index;
+      if (binding_index < 0) {
+        return Status(
+            RequestStatusCode::NOT_FOUND,
+            "output '" + io.name() + "' not found for " + name_);
+      }
+
+      if (buffers_[io_index] != nullptr) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "output '" + io.name() + "' has already appeared as an " +
+                "input or output for " + name_);
+      }
+
+      if (engine_->bindingIsInput(binding_index)) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "output '" + io.name() +
+                "' is expected to be an input in model for " + name_);
+      }
+
+      if (io.data_type() != TYPE_INT32) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected datatype " + DataType_Name(io.data_type()) +
+                "  in model configuration for shape output '" + io.name() +
+                "', expecting " + DataType_Name(TYPE_INT32) + " for " + name_);
+      }
+
+      DataType dt =
+          ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
+      if (dt != io.data_type()) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected datatype " + DataType_Name(dt) +
+                " for inference output '" + io.name() + "', expecting " +
+                DataType_Name(io.data_type()) + " for " + name_);
+      }
+
+      MemoryFormat fmt =
+          ConvertTrtFmtToFmt(engine_->getBindingFormat(binding_index));
+      if (fmt != MemoryFormat::LINEAR) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected tensor format " + MemoryFormat_Name(fmt) +
+                " for output '" + io.name() +
+                "'. Only LINEAR memory format is supported at present.");
+      }
+
+      const DimsList& model_config_dims =
+          (io.has_reshape()) ? io.reshape().shape() : io.dims();
+
+      nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
+
+      RETURN_IF_ERROR(CompareShapeDimsSupported(
+          name_, io.name(), engine_dims, model_config_dims, support_batching_));
+
+
+      const nvinfer1::Dims output_dim =
+          context.context_->getBindingDimensions(binding_index);
+      std::vector<int64_t> dim_vec;
+      DimsToDimVec(output_dim, &dim_vec);
+      int64_t byte_size = GetByteSize(dt, dim_vec);
+
+      max_byte_size = std::max(max_byte_size, byte_size);
+    }
+
+    if (max_byte_size != 0) {
+      // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
+      // indicate that the buffer has been correctly initalized so even
+      // for zero-sized tensors always allocate something.
+      void* buffer;
+      cudaError_t err =
+          cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
+      if (err != cudaSuccess) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "unable to allocate memory for input '" + io.name() + " for " +
+                name_ + ": " + std::string(cudaGetErrorString(err)));
+      }
+
+      byte_sizes_[io_index] = max_byte_size;
+      buffers_[io_index] = buffer;
+
+      // Set buffer bindings of all optimization profile since buffer is
+      // allocated
+      for (auto& trt_context : trt_contexts_) {
+        auto binding_index =
+            num_expected_bindings_ * trt_context.first + io_index;
+        buffer_bindings_[binding_index] = buffers_[io_index];
+      }
+    }
+  }
+
+  return Status::Success;
+}
+
+Status
+PlanBackend::Context::InitializeConfigExecuteOutputBindings(
+    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
+{
+  for (const auto& io : ios) {
+    // the maximum byte sizes across all profiles
+    int64_t max_byte_size = 0;
+    // Skip if the output is specified to be a shape tensor
+    if (io.is_shape_tensor()) {
+      continue;
+    }
     int io_index = engine_->getBindingIndex(io.name().c_str());
     for (auto& trt_context : trt_contexts_) {
       auto& profile_index = trt_context.first;
@@ -775,7 +1114,7 @@ PlanBackend::Context::InitializeConfigOutputBindings(
       }
 
       RETURN_IF_ERROR(CompareDimsSupported(
-          name_, io.name(), engine_dims, model_config_dims, support_batching,
+          name_, io.name(), engine_dims, model_config_dims, support_batching_,
           is_dynamic_));
 
       int64_t byte_size;
@@ -862,7 +1201,7 @@ PlanBackend::Context::PeekShapeTensor(
     payload.request_provider_->SetInputOverrideConsumed(input.name(), false);
   } else {
     InferRequestProvider::InputOverride override;
-    override.content_.assign(dims, dims + element_cnt);
+    override.content_.assign(content, content + content_byte_size);
     override.dims_ = input.dims();
     override.datatype_ = DataType::TYPE_INT32;
 
@@ -940,6 +1279,8 @@ PlanBackend::Context::Run(
 
   std::shared_ptr<InferRequestProvider> input_request_provider;
 
+  Status status;
+
   // For each request in 'payloads' collect the total batch size for
   // this inference execution. The batch-size, number of inputs, and
   // size of each input has already been checked by each payloads
@@ -967,6 +1308,12 @@ PlanBackend::Context::Run(
     return Status::Success;
   }
 
+  std::map<int32_t, std::vector<int32_t>> request_shape_values;
+  // Scheduler ensures all the payloads have identical shape values so use
+  // values from any shape tensor
+  GetRequestShapeValues(
+      total_batch_size, payloads->front(), &request_shape_values);
+
   // total_batch_size can be 1 for models that don't support batching
   // (i.e. max_batch_size_ == 0).
   if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size_)) {
@@ -976,18 +1323,51 @@ PlanBackend::Context::Run(
             name_ + "', max allowed is " + std::to_string(max_batch_size_));
   }
 
-  auto citr = GetMostOptimizedProfile(total_batch_size, input_request_provider);
+  auto citr = GetMostOptimizedProfile(
+      total_batch_size, input_request_provider, request_shape_values);
 
   int binding_offset = citr->first * num_expected_bindings_;
 
   // For each input, concatenate input values from each payload into
   // the corresponding binding.
   for (int bindex = 0; bindex < num_expected_bindings_; ++bindex) {
-    if (!engine_->bindingIsInput(binding_offset + bindex)) {
+    int io_index = binding_offset + bindex;
+    if (!engine_->bindingIsInput(io_index)) {
       continue;
     }
 
     const std::string& name = engine_->getBindingName(bindex);
+
+    // Set the shape binding if needed
+    if (engine_->isShapeBinding(io_index)) {
+      auto it = request_shape_values.find(io_index);
+      if (it != request_shape_values.end()) {
+        status = ValidateShapeValues(
+            it->second, citr->second.min_shapes_[io_index],
+            citr->second.max_shapes_[io_index], citr->second.nb_shape_values_,
+            support_batching_);
+      } else {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "unable to find shape values for shape input '" + name +
+                "' in request for " + name_);
+      }
+      if (status.IsOk()) {
+        citr->second.context_->setInputShapeBinding(io_index, &(it->second[0]));
+      } else {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "request specifies invalid shape values for shape input '" + name +
+                "' for " + name_ + ". Error details: " + status.Message());
+      }
+    }
+
+
+    // Skip the upcoming section if not an execution tensor
+    if (!engine_->isExecutionBinding(io_index)) {
+      continue;
+    }
+
 
     // Get the shape of the input. The provider has already checked
     // that the request shape is valid so don't need to do it here.
@@ -1006,8 +1386,8 @@ PlanBackend::Context::Run(
         }
       }
 
-      DataType dt = ConvertTrtTypeToDataType(
-          engine_->getBindingDataType(binding_offset + bindex));
+      DataType dt =
+          ConvertTrtTypeToDataType(engine_->getBindingDataType(io_index));
 
       batch1_byte_size = GetByteSize(dt, shape);
       if (max_batch_size_ != 0) {
@@ -1020,7 +1400,7 @@ PlanBackend::Context::Run(
     }
 
     // Set the binding dimension so that output dimensions can be obtained
-    if (is_dynamic_) {
+    if (is_dynamic_ && (!engine_->isShapeBinding(io_index))) {
       nvinfer1::Dims this_dim;
       if (!DimVecToDims(shape, &this_dim)) {
         return Status(
@@ -1028,7 +1408,7 @@ PlanBackend::Context::Run(
             "failed to create dims object for " + DimsListToString(shape) +
                 " for input '" + name + "' for " + name_ + ".");
       }
-      Status status = ValidateDimension(
+      status = ValidateDimension(
           this_dim, citr->second.min_dims_[bindex],
           citr->second.max_dims_[bindex], false);
       if (!status.IsOk()) {
@@ -1037,8 +1417,7 @@ PlanBackend::Context::Run(
             "request specifies invalid shape for input '" + name + "' for " +
                 name_ + ". Error details: " + status.Message());
       }
-      if (!citr->second.context_->setBindingDimensions(
-              binding_offset + bindex, this_dim)) {
+      if (!citr->second.context_->setBindingDimensions(io_index, this_dim)) {
         return Status(
             RequestStatusCode::INTERNAL,
             "trt failed to set binding dimension to " +
@@ -1047,20 +1426,29 @@ PlanBackend::Context::Run(
       }
     }
 
-    // Visit the payloads in order and copy the input tensors to
-    // GPU. Skip payloads that had errors since they are not included
-    // in the dynamic batch.
-    std::vector<size_t> expected_byte_sizes;
-    for (auto& payload : *payloads) {
-      const InferRequestHeader& request_header =
-          payload.request_provider_->RequestHeader();
-      expected_byte_sizes.push_back(
-          request_header.batch_size() * batch1_byte_size);
-    }
+    if (!engine_->isShapeBinding(io_index)) {
+      // Visit the payloads in order and copy the input tensors to
+      // GPU. Skip payloads that had errors since they are not included
+      // in the dynamic batch.
+      std::vector<size_t> expected_byte_sizes;
+      for (auto& payload : *payloads) {
+        const InferRequestHeader& request_header =
+            payload.request_provider_->RequestHeader();
+        expected_byte_sizes.push_back(
+            request_header.batch_size() * batch1_byte_size);
+      }
+      SetInputBuffer(
+          name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_GPU,
+          gpu_device_, static_cast<char*>(buffers_[bindex]));
 
-    SetInputBuffer(
-        name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_GPU, gpu_device_,
-        static_cast<char*>(buffers_[bindex]));
+    } else {
+      // Set the shape values using the first payload for extracting the status
+      // of the copy
+      SetShapeInputBuffer(
+          name, total_batch_size, batch1_byte_size, support_batching_,
+          &(*payloads)[0], TRTSERVER_MEMORY_GPU, gpu_device_,
+          static_cast<char*>(buffers_[bindex]));
+    }
   }
 
 #ifdef TRTIS_ENABLE_STATS
@@ -1088,11 +1476,17 @@ PlanBackend::Context::Run(
     LOG_VERBOSE(1) << "Context with profile " << citr->second.profile_name_
                    << " [" << std::to_string(citr->first)
                    << "] is being executed for " << name_;
-    if (is_dynamic_ &&
-        (!citr->second.context_->allInputDimensionsSpecified())) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "failed to specify the dimensions of all input bindings");
+    if (is_dynamic_) {
+      if (!citr->second.context_->allInputDimensionsSpecified()) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "failed to specify the dimensions of all input bindings");
+      }
+      if (!citr->second.context_->allInputShapesSpecified()) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "failed to specify the values for all input shape tensors");
+      }
     }
     if (!engine_->hasImplicitBatchDimension()) {
       if (!citr->second.context_->enqueueV2(
@@ -1126,7 +1520,8 @@ PlanBackend::Context::Run(
   // actual model output and then copy that output from the GPU
   bool cuda_copy = false;
   for (int bindex = 0; bindex < num_expected_bindings_; ++bindex) {
-    if (engine_->bindingIsInput(binding_offset + bindex)) {
+    int io_index = binding_offset + bindex;
+    if (engine_->bindingIsInput(io_index)) {
       continue;
     }
 
@@ -1134,42 +1529,80 @@ PlanBackend::Context::Run(
 
     nvinfer1::Dims dims;
     if (is_dynamic_) {
-      dims =
-          citr->second.context_->getBindingDimensions(binding_offset + bindex);
+      dims = citr->second.context_->getBindingDimensions(io_index);
     } else {
-      dims = engine_->getBindingDimensions(binding_offset + bindex);
+      dims = engine_->getBindingDimensions(io_index);
     }
 
-    std::vector<int64_t> shape;
+    if (engine_->isShapeBinding(io_index)) {
+      // Obtain the shape value
+      if (dims.nbDims != 0) {
+        int32_t* shape_value_ptr =
+            (int32_t*)malloc(dims.d[0] * sizeof(int32_t));
+        if (!citr->second.context_->getShapeBinding(
+                io_index, shape_value_ptr)) {
+          return Status(
+              RequestStatusCode::INTERNAL,
+              "failed to retrieve the output shape values from binding '" +
+                  name + "'");
+        }
 
-    if (!is_dynamic_ && max_batch_size_ != NO_BATCHING) {
-      shape.insert(shape.begin(), total_batch_size);
+        // The first shape value must be equal to the total batch_size
+        if (support_batching_ &&
+            total_batch_size != (uint32_t)*shape_value_ptr) {
+          return Status(
+              RequestStatusCode::INTERNAL,
+              "unexpected batch shape value " +
+                  std::to_string(*shape_value_ptr) + " for '" + name +
+                  "', total batch size was " +
+                  std::to_string(total_batch_size));
+        }
+
+        std::vector<int64_t> content_shape;
+        if (support_batching_) {
+          content_shape.push_back(total_batch_size);
+          content_shape.push_back(dims.d[0] - 1);
+        } else {
+          content_shape.push_back(dims.d[0]);
+        }
+
+        cuda_copy |= SetOutputShapeTensorBuffer(
+            name, shape_value_ptr, content_shape, support_batching_,
+            TRTSERVER_MEMORY_CPU, 0, payloads);
+
+        free(shape_value_ptr);
+      }
+    } else {
+      std::vector<int64_t> shape;
+      if (!is_dynamic_ && max_batch_size_ != NO_BATCHING) {
+        shape.insert(shape.begin(), total_batch_size);
+      }
+
+      for (int i = 0; i < dims.nbDims; ++i) {
+        shape.push_back(dims.d[i]);
+      }
+
+      DataType dt =
+          ConvertTrtTypeToDataType(engine_->getBindingDataType(io_index));
+
+      size_t batch1_byte_size = GetByteSize(dt, shape);
+      if (max_batch_size_ != NO_BATCHING) {
+        batch1_byte_size /= total_batch_size;
+      }
+
+      if (byte_sizes_[bindex] < (batch1_byte_size * total_batch_size)) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "unexpected size for output '" + name + "', byte-size " +
+                std::to_string(byte_sizes_[bindex]) + " is less than " +
+                std::to_string(total_batch_size) + " * " +
+                std::to_string(batch1_byte_size));
+      }
+
+      cuda_copy |= SetFixedSizeOutputBuffer(
+          name, batch1_byte_size, static_cast<char*>(buffers_[bindex]), shape,
+          TRTSERVER_MEMORY_GPU /* src_memory_type */, gpu_device_, payloads);
     }
-
-    for (int i = 0; i < dims.nbDims; ++i) {
-      shape.push_back(dims.d[i]);
-    }
-
-    DataType dt = ConvertTrtTypeToDataType(
-        engine_->getBindingDataType(binding_offset + bindex));
-
-    size_t batch1_byte_size = GetByteSize(dt, shape);
-    if (max_batch_size_ != NO_BATCHING) {
-      batch1_byte_size /= total_batch_size;
-    }
-
-    if (byte_sizes_[bindex] < (batch1_byte_size * total_batch_size)) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "unexpected size for output '" + name + "', byte-size " +
-              std::to_string(byte_sizes_[bindex]) + " is less than " +
-              std::to_string(total_batch_size) + " * " +
-              std::to_string(batch1_byte_size));
-    }
-
-    cuda_copy |= SetFixedSizeOutputBuffer(
-        name, batch1_byte_size, static_cast<char*>(buffers_[bindex]), shape,
-        TRTSERVER_MEMORY_GPU /* src_memory_type */, gpu_device_, payloads);
   }
 
   // Wait for the copy-out to complete
@@ -1179,10 +1612,43 @@ PlanBackend::Context::Run(
   return Status::Success;
 }
 
+Status
+PlanBackend::Context::GetRequestShapeValues(
+    size_t total_batch_size, const Scheduler::Payload& payload,
+    std::map<int, std::vector<int32_t>>* request_shape_values)
+{
+  // Visit all the inputs and extract the shape values present in the request
+  Status status;
+  for (const auto& input : payload.request_provider_->RequestHeader().input()) {
+    int io_index = engine_->getBindingIndex(input.name().c_str());
+    if (engine_->isShapeBinding(io_index)) {
+      auto it =
+          request_shape_values->emplace(io_index, std::vector<int32_t>()).first;
+      if (max_batch_size_ != 0) {
+        it->second.push_back((int32_t)total_batch_size);
+      }
+
+      // Using Peek to read shape values from the tensor.
+      std::vector<int64_t> shape;
+      if (!PeekShapeTensor(input, payload, &shape).IsOk()) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "unable to peek shape values for input '" + input.name() + "'");
+      }
+      for (auto value : shape) {
+        it->second.push_back((int32_t)value);
+      }
+    }
+  }
+  return Status::Success;
+}
+
+
 std::map<int, PlanBackend::Context::TensorRTContext>::iterator
 PlanBackend::Context::GetMostOptimizedProfile(
     size_t total_batch_size,
-    const std::shared_ptr<InferRequestProvider>& input_request_provider)
+    const std::shared_ptr<InferRequestProvider>& input_request_provider,
+    const std::map<int, std::vector<int32_t>>& request_shape_values)
 {
   // Returns the TensorRT context that uses profile with shortest Manhattan
   // distance in terms of input dimensions
@@ -1196,8 +1662,10 @@ PlanBackend::Context::GetMostOptimizedProfile(
            input_request_provider->RequestHeader().input()) {
         int io_index = engine_->getBindingIndex(input.name().c_str());
         nvinfer1::Dims engine_dims = engine_->getBindingDimensions(io_index);
-        // If the input has no dynamic shape, then skip it as distance will be 0
-        if (!ContainsWildcard(engine_dims)) {
+        // If the input has no dynamic shape nor is a shape binding, then skip
+        // it as distance will be 0
+        if (!(ContainsWildcard(engine_dims) ||
+              engine_->isShapeBinding(io_index))) {
           continue;
         }
         auto status = ValidateDimension(
@@ -1208,7 +1676,27 @@ PlanBackend::Context::GetMostOptimizedProfile(
               cit->second.min_dims_[io_index].d[0]) &&
              ((int64_t)total_batch_size <=
               cit->second.max_dims_[io_index].d[0]));
-        if (!status.IsOk() || !valid_bs) {
+
+        bool missing_shape_values = false;
+        if (valid_bs && status.IsOk() && engine_->isShapeBinding(io_index)) {
+          auto it = request_shape_values.find(io_index);
+          if (it != request_shape_values.end()) {
+            status = ValidateShapeValues(
+                it->second, cit->second.min_shapes_[io_index],
+                cit->second.max_shapes_[io_index], cit->second.nb_shape_values_,
+                support_batching_);
+            valid_bs =
+                (((int32_t)total_batch_size >=
+                  *cit->second.min_shapes_[io_index]) &&
+                 ((int64_t)total_batch_size <=
+                  *cit->second.max_shapes_[io_index]));
+          } else {
+            missing_shape_values = true;
+          }
+        }
+
+
+        if (!status.IsOk() || !valid_bs || missing_shape_values) {
           current_distance = LLONG_MAX;
           break;
         } else {
@@ -1217,6 +1705,16 @@ PlanBackend::Context::GetMostOptimizedProfile(
               std::abs(opt_dims.d[0] - (int64_t)total_batch_size);
           for (int idx = 1; idx < opt_dims.nbDims; idx++) {
             current_distance += std::abs(opt_dims.d[idx] - input.dims(idx - 1));
+          }
+          if (engine_->isShapeBinding(io_index)) {
+            const auto* opt_shape_values = cit->second.opt_shapes_[io_index];
+            current_distance +=
+                std::abs(*opt_shape_values - (int64_t)total_batch_size);
+            auto it = request_shape_values.find(io_index);
+            for (size_t idx = 1; idx < cit->second.nb_shape_values_; idx++) {
+              current_distance +=
+                  std::abs(*(opt_shape_values + idx) - it->second[idx - 1]);
+            }
           }
         }
       }

@@ -193,6 +193,7 @@ class InputImpl : public InferContext::Input {
   size_t TotalByteSize() const override { return total_byte_size_; }
   size_t TotalSendByteSize() const { return total_send_byte_size_; }
   DataType DType() const override { return mio_.data_type(); }
+  bool IsShapeTensor() const override { return mio_.is_shape_tensor(); }
   ModelInput::Format Format() const override { return mio_.format(); }
   const DimsList& Dims() const override { return mio_.dims(); }
   bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
@@ -268,6 +269,7 @@ class OutputImpl : public InferContext::Output {
 
   const std::string& Name() const override { return mio_.name(); }
   DataType DType() const override { return mio_.data_type(); }
+  bool IsShapeTensor() const override { return mio_.is_shape_tensor(); }
   const DimsList& Dims() const override { return mio_.dims(); }
 
   InferContext::Result::ResultFormat ResultFormat() const

@@ -74,8 +74,18 @@ Status CompareDimsSupported(
     const nvinfer1::Dims& model_dims, const DimsList& dims,
     const bool supports_batching, const bool is_dynamic);
 
+Status CompareShapeDimsSupported(
+    const std::string& model_name, const std::string& tensor_name,
+    const nvinfer1::Dims& model_dims, const DimsList& dims,
+    const bool supports_batching);
+
 Status ValidateControlDimsDynamic(
     const nvinfer1::Dims& dims, const bool support_batching);
+
+Status ValidateShapeValues(
+    const std::vector<int32_t>& request_shape_values,
+    const int32_t* min_shape_values, const int32_t* max_shape_values,
+    size_t nb_shape_values, const bool support_batching);
 
 Status MaximumDims(
     const nvinfer1::Dims& max_profile_dims, const DimsList& dims,

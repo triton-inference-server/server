@@ -70,22 +70,27 @@ class PlanBackend : public InferenceBackend {
     struct TensorRTContext;
 
     Status ValidateInputs(
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
-    Status ValidateOutputs(
-        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
-
-    Status InitializeInputBinding(
-        const std::string& input_name, const DataType input_datatype,
-        const DimsList& input_dims, const bool support_batching,
-        const bool is_control = false);
-    Status InitializeSequenceControlInputBindings(
-        const ModelConfig& config, const bool support_batching);
-    Status InitializeConfigInputBindings(
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios,
-        const bool support_batching);
-    Status InitializeConfigOutputBindings(
+        const std::set<std::string> allowed_shape_tensors);
+    Status ValidateOutputs(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios,
-        const bool support_batching);
+        const std::set<std::string> allowed_shape_tensors);
+
+    Status InitializeExecuteInputBinding(
+        const std::string& input_name, const DataType input_datatype,
+        const DimsList& input_dims, const bool is_control = false);
+    Status InitializeShapeInputBinding(
+        const std::string& input_name, const DataType input_datatype,
+        const DimsList& input_dims);
+    Status InitializeSequenceControlInputBindings(const ModelConfig& config);
+    Status InitializeConfigExecuteInputBindings(
+        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
+    Status InitializeConfigShapeInputBindings(
+        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
+    Status InitializeConfigExecuteOutputBindings(
+        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+    Status InitializeConfigShapeOutputBindings(
+        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
     bool BuildCudaGraph(TensorRTContext* trt_context, const int batch_size);
 
     Status InitOptimizationProfiles(
@@ -108,7 +113,8 @@ class PlanBackend : public InferenceBackend {
       TensorRTContext(const std::string& profile_name, int binding_cnts)
           : profile_name_(profile_name), context_(nullptr),
             min_dims_(binding_cnts), max_dims_(binding_cnts),
-            opt_dims_(binding_cnts)
+            opt_dims_(binding_cnts), min_shapes_(binding_cnts),
+            max_shapes_(binding_cnts), opt_shapes_(binding_cnts)
       {
       }
       std::string profile_name_;
@@ -127,11 +133,28 @@ class PlanBackend : public InferenceBackend {
 
       // Optimized Dimensions per bindings
       std::vector<nvinfer1::Dims> opt_dims_;
+
+      // Min shape values per bindings
+      std::vector<const int32_t*> min_shapes_;
+
+      // Max shape values per bindings
+      std::vector<const int32_t*> max_shapes_;
+
+      // Optimized shape values per bindings
+      std::vector<const int32_t*> opt_shapes_;
+
+      // The number of shape values
+      size_t nb_shape_values_;
     };
+
+    Status GetRequestShapeValues(
+        size_t total_batch_size, const Scheduler::Payload& payload,
+        std::map<int, std::vector<int32_t>>* request_shape_values);
 
     std::map<int, TensorRTContext>::iterator GetMostOptimizedProfile(
         size_t total_batch_size,
-        const std::shared_ptr<InferRequestProvider>& input_request_provider);
+        const std::shared_ptr<InferRequestProvider>& input_request_provider,
+        const std::map<int, std::vector<int32_t>>& request_shape_values);
 
     // TensorRT components for the model
     nvinfer1::IRuntime* runtime_;
@@ -140,6 +163,9 @@ class PlanBackend : public InferenceBackend {
     // Map from profile index to the corresponding TensorRT context. Use map
     // to ensure each profile index is mapped to exactly one TensorRT context.
     std::map<int, TensorRTContext> trt_contexts_;
+
+    // Is set true if the configuration supports batching
+    bool support_batching_;
 
     // Is set true if the loaded model has one or more dynamic shaped inputs
     bool is_dynamic_;

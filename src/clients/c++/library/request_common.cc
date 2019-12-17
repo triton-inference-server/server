@@ -173,15 +173,23 @@ InputImpl::SetRaw(const uint8_t* input, size_t input_byte_size)
             std::to_string(byte_size_) + " bytes");
   }
 
-  if (bufs_.size() >= batch_size_) {
+  if (bufs_.size() >= (IsShapeTensor() ? 1 : batch_size_)) {
     bufs_.clear();
     buf_byte_sizes_.clear();
     str_bufs_.clear();
-    return Error(
-        RequestStatusCode::INVALID_ARG,
-        "expecting " + std::to_string(batch_size_) +
-            " invocations of SetRaw for input '" + Name() +
-            "', one per batch entry");
+    if (!IsShapeTensor()) {
+      return Error(
+          RequestStatusCode::INVALID_ARG,
+          "expecting " + std::to_string(batch_size_) +
+              " invocations of SetRaw for input '" + Name() +
+              "', one per batch entry");
+    } else {
+      return Error(
+          RequestStatusCode::INVALID_ARG,
+          "expecting single invocation of SetRaw for shape input '" + Name() +
+              "', one shape tensor should represent the shape for entire "
+              "batch");
+    }
   }
 
   total_byte_size_ += input_byte_size;
@@ -220,13 +228,15 @@ InputImpl::SetSharedMemory(
 
   // Verify byte size of shared memory equals that of expected batch byte size
   // Skip check for string and variable size tensors
-  if ((byte_size_ != -1) && (byte_size != (batch_size_ * byte_size_))) {
+  int multiplier = (IsShapeTensor() ? 1 : batch_size_);
+  if ((byte_size_ != -1) &&
+      (byte_size != (uint32_t)(multiplier * byte_size_))) {
     return Error(
         RequestStatusCode::INVALID_ARG,
         "The input '" + Name() + "' has shared memory of size " +
             std::to_string(byte_size) + " bytes while the expected size is " +
-            std::to_string(batch_size_) + " * " + std::to_string(byte_size_) +
-            " = " + std::to_string(batch_size_ * byte_size_) + " bytes");
+            std::to_string(multiplier) + " * " + std::to_string(byte_size_) +
+            " = " + std::to_string(multiplier * byte_size_) + " bytes");
   }
 
   io_type_ = SHARED_MEMORY;

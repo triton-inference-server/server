@@ -228,6 +228,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+
 # TensorRT
 cat >$HOST_SRCDIR/$TRTSCRIPT <<EOF
 #!/bin/bash
