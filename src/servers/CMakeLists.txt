@@ -349,7 +349,6 @@ if(${TRTIS_ENABLE_TENSORRT})
     trtserver
     PUBLIC -lnvinfer
     PUBLIC -lnvinfer_plugin
-    PUBLIC -lnvonnxparser_runtime
   )
 endif() # TRTIS_ENABLE_TENSORRT
 
