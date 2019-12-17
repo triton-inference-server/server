@@ -82,8 +82,8 @@ if __name__ == '__main__':
     input1_data = in1n.reshape(in1.shape)
 
     # serialize the string tensors
-    input0_data_serialized = cudashm.serialize_string_tensor(input0_data)
-    input1_data_serialized = cudashm.serialize_string_tensor(input1_data)
+    input0_data_serialized = serialize_string_tensor(input0_data)
+    input1_data_serialized = serialize_string_tensor(input1_data)
 
     # Use the size of the serialized tensors to create the shared memory regions
     input0_byte_size = input0_data_serialized.size * input0_data_serialized.itemsize

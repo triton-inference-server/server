@@ -267,7 +267,10 @@ def _raise_error(msg):
 
 
 def serialize_string_tensor(input_tensor):
-    """Serializes a string tensor into a flat numpy array of length prepend strings.
+    """
+    Serializes a string tensor into a flat numpy array of length prepend strings.
+    Can pass string tensor as numpy array of bytes with dtype of np.bytes_,
+    numpy strings with dtype of np.str_ or python strings with dtype of np.object.
 
     Parameters
     ----------
