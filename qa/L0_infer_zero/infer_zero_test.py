@@ -146,6 +146,10 @@ class InferZeroTest(unittest.TestCase):
     def test_oo3_4(self):
         self._full_zero(np_dtype_string, ([1, 1],[0, 6],[2, 2]))
 
+    def test_bb1_sanity(self):
+        self._full_zero(np.bool, ([10,],))
+    def test_bb1_0(self):
+        self._full_zero(np.bool, ([0,],))
 
 if __name__ == '__main__':
     unittest.main()

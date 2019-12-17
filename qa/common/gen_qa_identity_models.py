@@ -110,7 +110,9 @@ def np_to_c2_dtype(np_dtype):
     return None
 
 def np_to_trt_dtype(np_dtype):
-    if np_dtype == np.int8:
+    if np_dtype == np.bool:
+        return trt.bool
+    elif np_dtype == np.int8:
         return trt.int8
     elif np_dtype == np.int32:
         return trt.int32
@@ -168,17 +170,6 @@ def np_to_torch_dtype(np_dtype):
         return torch.double
     elif np_dtype == np_dtype_string:
         return None # Not supported in Torch
-
-def np_to_trt_dtype(np_dtype):
-    if np_dtype == np.int8:
-        return trt.int8
-    elif np_dtype == np.int32:
-        return trt.int32
-    elif np_dtype == np.float16:
-        return trt.float16
-    elif np_dtype == np.float32:
-        return trt.float32
-    return None
 
 def create_tf_modelfile(
         create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
@@ -857,6 +848,7 @@ if __name__ == '__main__':
     if FLAGS.tensorrt_big:
         create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1)
     else:
+        create_models(FLAGS.models_dir, np.bool, [-1], io_cnt=1)
         create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1)
         create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=3)
         create_models(FLAGS.models_dir, np.float16, [-1,-1], io_cnt=1)
