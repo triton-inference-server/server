@@ -173,7 +173,11 @@ LibTorchBackend::CreateExecutionContexts(
           uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
           std::function<void(Status)> func) {
         Run(runner_idx, payloads, func);
-      }));
+      },
+      [this](
+          uint32_t runner_idx, const InferRequestHeader::Input& input,
+          const Scheduler::Payload& payload,
+          std::vector<int64_t>* shape) -> Status { return Status::Success; }));
 
   return Status::Success;
 }

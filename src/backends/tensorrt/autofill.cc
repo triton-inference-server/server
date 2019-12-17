@@ -280,7 +280,7 @@ AutoFillPlanImpl::Init(ModelConfig* config)
         }
       } else {
         LOG_WARNING << "Some of the profiles for " << model_name_
-                    << " does not support batching.";
+                    << " do not support batching.";
         max_batch_size_ = 0;
       }
     }
