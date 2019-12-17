@@ -337,9 +337,9 @@ PlanBackend::CreateExecutionContext(
     }
   }
 
-  // As we have visited all the input bindings at this point, if any of the
-  // shapes had dynamic dimension then is_dynamic_ flag would be set.
-  if (!context->is_dynamic_ &&
+  // Validate the batch dimension against the implicit batch dimension if
+  // available.
+  if (context->engine_->hasImplicitBatchDimension() &&
       (context->max_batch_size_ > context->engine_->getMaxBatchSize())) {
     return Status(
         RequestStatusCode::INVALID_ARG,
@@ -507,6 +507,20 @@ PlanBackend::Context::InitializeInputBinding(
     // Detect whether dynamic or not
     if (ContainsWildcard(engine_dims)) {
       is_dynamic_ = true;
+    }
+
+    // Validate whether the binding supports maximum batch size specification in
+    // the config
+    if ((!engine_->hasImplicitBatchDimension()) &&
+        (!ContainsWildcardAtExplicitBatchDim(engine_dims)) &&
+        (max_batch_size_ > 1)) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected configuration maximum batch size " +
+              std::to_string(max_batch_size_) + " for '" + name_ +
+              "', model maximum is 1 as model does not contain an implicit "
+              "batch dimension nor the explicit batch-dimension of '" +
+              input_name + "' is a wildcard.");
     }
 
     if (!(is_control && is_dynamic_)) {
@@ -722,6 +736,21 @@ PlanBackend::Context::InitializeConfigOutputBindings(
           (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
       nvinfer1::Dims engine_dims = engine_->getBindingDimensions(binding_index);
+
+      // Validate whether the binding supports maximum batch size specification
+      // in the config
+      if ((!engine_->hasImplicitBatchDimension()) &&
+          (!ContainsWildcardAtExplicitBatchDim(engine_dims)) &&
+          (max_batch_size_ > 1)) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected configuration maximum batch size " +
+                std::to_string(max_batch_size_) + " for '" + name_ +
+                "', model maximum is 1 as model does not contain an implicit "
+                "batch dimension nor the explicit batch-dimension of '" +
+                io.name() + "' is a wildcard.");
+      }
+
       RETURN_IF_ERROR(CompareDimsSupported(
           name_, io.name(), engine_dims, model_config_dims, support_batching,
           is_dynamic_));
@@ -986,12 +1015,13 @@ PlanBackend::Context::Run(
     LOG_VERBOSE(1) << "Context with profile " << citr->second.profile_name_
                    << " [" << std::to_string(citr->first)
                    << "] is being executed for " << name_;
-    if (is_dynamic_) {
-      if (!citr->second.context_->allInputDimensionsSpecified()) {
-        return Status(
-            RequestStatusCode::INTERNAL,
-            "failed to specify the dimensions of all input bindings");
-      }
+    if (is_dynamic_ &&
+        (!citr->second.context_->allInputDimensionsSpecified())) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to specify the dimensions of all input bindings");
+    }
+    if (!engine_->hasImplicitBatchDimension()) {
       if (!citr->second.context_->enqueueV2(
               buffer_bindings_.data(), stream_, nullptr)) {
         cudaStreamSynchronize(stream_);

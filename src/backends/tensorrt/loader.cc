@@ -47,8 +47,8 @@ LoadPlan(
         RequestStatusCode::INTERNAL, "unable to create TensorRT runtime");
   }
 
-  *engine = (*runtime)->deserializeCudaEngine(
-      &model_data[0], model_data.size());
+  *engine =
+      (*runtime)->deserializeCudaEngine(&model_data[0], model_data.size());
   if (*engine == nullptr) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to create TensorRT engine");
