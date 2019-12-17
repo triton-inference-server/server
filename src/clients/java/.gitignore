@@ -1,5 +1,4 @@
 build/*
 .gradle/*
 .idea/*
-gradle/*
 java.iml
