@@ -265,10 +265,12 @@ DynamicBatchScheduler::SchedulerThread(
             queue_.pop_front();
           }
 
-          // There is runner processing payloads before current runner
-          if (preserve_ordering_ && (last_processing_runner_id_ != -1)) {
-            completion_promise =
-                completion_promises_[last_processing_runner_id_];
+          if (preserve_ordering_) {
+            // There is runner processing payloads before current runner
+            if (last_processing_runner_id_ != -1) {
+              completion_promise =
+                  completion_promises_[last_processing_runner_id_];
+            }
             last_processing_runner_id_ = runner_id;
             completion_promises_[runner_id] =
                 std::make_shared<std::promise<void>>();

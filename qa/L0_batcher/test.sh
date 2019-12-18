@@ -236,13 +236,13 @@ rm -fr ./custom_models && mkdir ./custom_models && \
 
 # Two instances will be created for the custom model, one delays 100 ms while
 # the other delays 400 ms
-(cd models/custom_models && \
+(cd custom_models/custom_zero_1_float32 && \
         sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
         sed -i "s/max_batch_size:.*/max_batch_size: 4/g" config.pbtxt && \
         echo "dynamic_batching { preferred_batch_size: [ 4 ] }" >> config.pbtxt && \
-        echo "instance_group [ { count: 2 }]" >> config.pbtxt && \
+        echo "instance_group [ { kind: KIND_CPU count: 2 }]" >> config.pbtxt && \
         echo "parameters [" >> config.pbtxt && \
-        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"100\" }}" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"100\" }}," >> config.pbtxt && \
         echo "{ key: \"instance_wise_delay_multiplier\"; value: { string_value: \"4\" }}" >> config.pbtxt && \
         echo "]" >> config.pbtxt)
 
@@ -287,7 +287,7 @@ fi
 set -e
 
 # preserve
-(cd models/custom_models && \
+(cd custom_models/custom_zero_1_float32 && \
         sed -i "s/dynamic_batching.*/dynamic_batching { preferred_batch_size: [ 4 ] preserve_ordering: true }/g" config.pbtxt)
 
 SERVER_ARGS="--trace-file=preserve.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/custom_models"

@@ -986,6 +986,27 @@ class BatcherTest(unittest.TestCase):
         _cleanup_after(precreated_shm1_regions)
         _cleanup_after(precreated_shm2_regions)
 
+    def test_multi_batch_preserve_ordering(self):
+        model_base = "custom"
+        dtype = np.float32
+        shapes = ([1,],)
+
+        try:
+            # use threads to send 12 requests without waiting for response
+            threads = []
+            for i in range(12):
+                threads.append(threading.Thread(target=iu.infer_zero,
+                                                args=(self, model_base, 1, dtype, shapes, shapes),
+                                                kwargs={'use_grpc': False,
+                                                'use_streaming': False}))
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            self.check_deferred_exception()
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
 
 if __name__ == '__main__':
     unittest.main()

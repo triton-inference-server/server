@@ -127,7 +127,7 @@ Context::Context(
         int multiplier = std::stoi(mitr->second.string_value());
 
         size_t suffix_pos;
-        if (gpu_device != CUSTOM_NO_GPU_DEVICE) {
+        if (gpu_device == CUSTOM_NO_GPU_DEVICE) {
           static std::string cpu_suffix = "_cpu";
           suffix_pos = instance_name.rfind(cpu_suffix);
         } else {
