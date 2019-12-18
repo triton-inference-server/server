@@ -45,20 +45,19 @@ class ClientStringTest(unittest.TestCase):
         ctx = InferContext("localhost:8000", ProtocolType.HTTP, model_name, model_version, verbose=True)
 
         # Create the data for the input tensor. Initialize the tensor to the
-        # byte representation of the first 6000 unicode characters.
-        # TODO: For now pass non-utf chars -> change if needed later
+        # byte representation of 6000 bytes objects. (dtype of np.bytes_)
+        # TODO: For now pass non-utf byte rep. -> change if needed later
         in0 = np.array([b'\xf4\x9a\xb6\xb1' for i in range(6000)])
-        in0n = np.array([bytes(x, encoding='utf8') for x in in0])
 
         # Send inference request to the inference server. Get results for
         # both output tensors.
-        result = ctx.run({ 'INPUT0' : (in0n,) },
+        result = ctx.run({ 'INPUT0' : (in0,) },
                         { 'OUTPUT0' : InferContext.ResultFormat.RAW },
                         batch_size)
 
         # We expect there to be 1 results (with batch-size 1). Verify
         # that all the 6000 result elements are the same as the input.
-        self.assertTrue(all(np.equal(in0n, result['OUTPUT0'][0])))
+        self.assertTrue(all(np.equal(in0, result['OUTPUT0'][0])))
 
 if __name__ == '__main__':
     unittest.main()
