@@ -118,7 +118,6 @@ class DynamicBatchScheduler : public Scheduler {
   const bool enforce_equal_shape_batch_;
   std::unordered_map<std::string, DimsList> pending_batch_shapes_;
 
-
   const bool preserve_ordering_;
   // the runner that is currently processing payloads
   int64_t last_processing_runner_id_;

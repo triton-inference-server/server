@@ -103,11 +103,11 @@ DynamicBatchScheduler::Create(
     return Status(
         RequestStatusCode::INTERNAL,
         "Initialization failed for all dynamic-batch scheduler threads");
-  } else {
-    sched->completion_promises_ =
-        std::vector<std::shared_ptr<std::promise<void>>>(
-            sched->scheduler_threads_.size());
   }
+
+  sched->completion_promises_ =
+      std::vector<std::shared_ptr<std::promise<void>>>(
+          sched->scheduler_threads_.size());
 
   scheduler->reset(sched.release());
 
