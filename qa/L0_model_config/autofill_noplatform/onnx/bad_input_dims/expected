@@ -1,1 +1,1 @@
-unable to load model 'bad_input_dims', tensor 'INPUT0': the model expects 2 dimensions but the model configuration specified 3 dimensions
+unable to load model 'bad_input_dims', tensor 'INPUT0': the model expects 1 dimensions but the model configuration specified 2 dimensions
