@@ -228,21 +228,22 @@ SavedModelBackend::ValidateBooleanSequenceControl(
     DimsList dims;
     dims.Add(1);
 
-    if (!CompareDimsExact(input->shape_, dims, Config().max_batch_size() > 0)) {
+    Status compare_status =
+        CompareDimsExact(input->shape_, dims, Config().max_batch_size() > 0);
+    if (!compare_status.IsOk()) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + Name() + "', sequence control '" +
-              tensor_name + "' dims " + ShapeToString(input->shape_) +
-              " don't match expected dims [1]");
+              tensor_name + "': " + compare_status.Message());
     }
 
     if (!CompareDataType(input->data_type_, tensor_datatype)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + Name() + "', sequence control '" +
-              tensor_name + "' data-type " +
+              tensor_name + "': the model expects data-type " +
               DataType_Name(ConvertDataType(input->data_type_)) +
-              " doesn't match required data-type " +
+              " but the model configuration specifies data-type " +
               DataType_Name(tensor_datatype));
     }
   }
@@ -274,21 +275,22 @@ SavedModelBackend::ValidateTypedSequenceControl(
     DimsList dims;
     dims.Add(1);
 
-    if (!CompareDimsExact(input->shape_, dims, Config().max_batch_size() > 0)) {
+    Status compare_status =
+        CompareDimsExact(input->shape_, dims, Config().max_batch_size() > 0);
+    if (!compare_status.IsOk()) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + Name() + "', sequence control '" +
-              tensor_name + "' dims " + ShapeToString(input->shape_) +
-              " don't match expected dims [1]");
+              tensor_name + "': " + compare_status.Message());
     }
 
     if (!CompareDataType(input->data_type_, tensor_datatype)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + Name() + "', sequence control '" +
-              tensor_name + "' data-type " +
+              tensor_name + "', the model expects data-type " +
               DataType_Name(ConvertDataType(input->data_type_)) +
-              " doesn't match required data-type " +
+              " but the model configuration specifies data-type " +
               DataType_Name(tensor_datatype));
     }
   }

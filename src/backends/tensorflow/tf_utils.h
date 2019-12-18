@@ -33,14 +33,14 @@
 
 namespace nvidia { namespace inferenceserver {
 
-/// \return true if a TensorFlow shape exactly matches a model
+/// \return Status::Success if a TensorFlow shape exactly matches a model
 /// configuration shape. Dimensions with variable size are represented
 /// by -1 in both the TensorFlow shape and the model configuration
 /// shape and these must match as well.
 /// \param supports_batching If True then the configuration expects
 /// the model to support batching and so the shape must have the
 /// appropriate batch dimension.
-bool CompareDimsExact(
+Status CompareDimsExact(
     const TRTISTF_Shape* model_shape, const DimsList& dims,
     const bool supports_batching);
 

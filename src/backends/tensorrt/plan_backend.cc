@@ -518,8 +518,8 @@ PlanBackend::Context::InitializeInputBinding(
       if (!status.IsOk()) {
         return Status(
             RequestStatusCode::INVALID_ARG,
-            "unexpected dimensions " + DimsDebugString(engine_dims) +
-                " for control input '" + input_name + "' for " + name_ +
+            "unexpected shape " + DimsDebugString(engine_dims) +
+                " for control input '" + input_name + "' for model " + name_ +
                 ". Error details: " + status.Message());
       }
     }
@@ -542,8 +542,9 @@ PlanBackend::Context::InitializeInputBinding(
       if (!status.IsOk()) {
         return Status(
             RequestStatusCode::INTERNAL,
-            "model config specifies invalid shape for input '" + input_name +
-                "' for " + name_ + ". Error details: " + status.Message());
+            "model configuration specified invalid shape for input '" +
+                input_name + "' for " + name_ +
+                ". Error details: " + status.Message());
       }
       RETURN_IF_ERROR(MaximumDims(
           context.max_dims_[io_index], model_config_dims, support_batching,

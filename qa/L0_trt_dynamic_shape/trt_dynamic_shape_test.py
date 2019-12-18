@@ -53,7 +53,7 @@ class TrtDynamicShapeTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
-              "The shape of dimension 0 is expected to be in range from 6 to 8, Got: 1" in ex.message())
+              "model expected the shape of dimension 0 to be between 6 and 8 but received 1" in ex.message())
 
         try:
             iu.infer_exact(self, self.model_name_, tensor_shape, 8,
@@ -78,7 +78,7 @@ class TrtDynamicShapeTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
-                    "The shape of dimension 1 is expected to be in range from 1 to 33, Got: 34" in ex.message())
+                    "model expected the shape of dimension 1 to be between 1 and 33 but received 34" in ex.message())
 
     def test_select_optimization_profile(self):
         # Different profile has different optimized input shape
