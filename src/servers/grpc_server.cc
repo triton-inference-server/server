@@ -1057,17 +1057,18 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
 
     // Create the inference request provider which provides all the
     // input information needed for an inference.
-    TRTSERVER_InferenceRequestHeader* request_header = nullptr;
-    TRTSERVER_Error* err = TRTSERVER_InferenceRequestHeaderNew(
-        &request_header, request.model_name().c_str(), request.model_version());
+    TRTSERVER_InferenceRequestOptions* request_options = nullptr;
+    TRTSERVER_Error* err = TRTSERVER_InferenceRequestOptionsNew(
+        &request_options, request.model_name().c_str(),
+        request.model_version());
     if (err == nullptr) {
-      err = SetTRTSERVER_InferenceRequestHeader(
-          request_header, request.meta_data());
+      err = SetTRTSERVER_InferenceRequestOptions(
+          request_options, request.meta_data());
     }
     TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
     if (err == nullptr) {
-      err = TRTSERVER_InferenceRequestProviderNew(
-          &request_provider, trtserver_.get(), request_header);
+      err = TRTSERVER_InferenceRequestProviderNewV2(
+          &request_provider, trtserver_.get(), request_options);
     }
 
     if (err == nullptr) {
@@ -1102,7 +1103,7 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
     // The request provider can be deleted before ServerInferAsync
     // callback completes.
     TRTSERVER_InferenceRequestProviderDelete(request_provider);
-    TRTSERVER_InferenceRequestHeaderDelete(request_header);
+    TRTSERVER_InferenceRequestOptionsDelete(request_options);
 
     // If not error then state->step_ == ISSUED and inference request
     // has initiated... completion callback will transition to
@@ -1366,18 +1367,19 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
     // Create the inference request provider which provides all the
     // input information needed for an inference.
-    TRTSERVER_InferenceRequestHeader* request_header = nullptr;
-    TRTSERVER_Error* err = TRTSERVER_InferenceRequestHeaderNew(
-        &request_header, request.model_name().c_str(), request.model_version());
+    TRTSERVER_InferenceRequestOptions* request_options = nullptr;
+    TRTSERVER_Error* err = TRTSERVER_InferenceRequestOptionsNew(
+        &request_options, request.model_name().c_str(),
+        request.model_version());
     if (err == nullptr) {
-      err = SetTRTSERVER_InferenceRequestHeader(
-          request_header, request.meta_data());
+      err = SetTRTSERVER_InferenceRequestOptions(
+          request_options, request.meta_data());
     }
 
     TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
     if (err == nullptr) {
-      err = TRTSERVER_InferenceRequestProviderNew(
-          &request_provider, trtserver_.get(), request_header);
+      err = TRTSERVER_InferenceRequestProviderNewV2(
+          &request_provider, trtserver_.get(), request_options);
     }
     if (err == nullptr) {
       err = InferGRPCToInput(
@@ -1411,7 +1413,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // The request provider can be deleted before ServerInferAsync
     // callback completes.
     TRTSERVER_InferenceRequestProviderDelete(request_provider);
-    TRTSERVER_InferenceRequestHeaderDelete(request_header);
+    TRTSERVER_InferenceRequestOptionsDelete(request_options);
 
     // If there was not an error in issuing the 'state' request then
     // state->step_ == ISSUED and inference request has

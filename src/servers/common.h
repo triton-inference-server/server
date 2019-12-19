@@ -111,8 +111,8 @@ class RequestStatusUtil {
   static uint64_t NextUniqueRequestId();
 };
 
-TRTSERVER_Error* SetTRTSERVER_InferenceRequestHeader(
-    TRTSERVER_InferenceRequestHeader* request_header,
+TRTSERVER_Error* SetTRTSERVER_InferenceRequestOptions(
+    TRTSERVER_InferenceRequestOptions* request_options,
     InferRequestHeader request_header_protobuf);
 
 }}  // namespace nvidia::inferenceserver

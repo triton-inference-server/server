@@ -1148,17 +1148,17 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
 
   // Create the inference request provider which provides all the
   // input information needed for an inference.
-  TRTSERVER_InferenceRequestHeader* request_header = nullptr;
-  TRTSERVER_Error* err = TRTSERVER_InferenceRequestHeaderNew(
-      &request_header, model_name.c_str(), model_version);
+  TRTSERVER_InferenceRequestOptions* request_options = nullptr;
+  TRTSERVER_Error* err = TRTSERVER_InferenceRequestOptionsNew(
+      &request_options, model_name.c_str(), model_version);
   if (err == nullptr) {
-    err = SetTRTSERVER_InferenceRequestHeader(
-        request_header, request_header_protobuf);
+    err = SetTRTSERVER_InferenceRequestOptions(
+        request_options, request_header_protobuf);
   }
   TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
   if (err == nullptr) {
-    err = TRTSERVER_InferenceRequestProviderNew(
-        &request_provider, server_.get(), request_header);
+    err = TRTSERVER_InferenceRequestProviderNewV2(
+        &request_provider, server_.get(), request_options);
   }
 
   if (err == nullptr) {
@@ -1199,7 +1199,7 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   // The request provider can be deleted before ServerInferAsync
   // callback completes.
   TRTSERVER_InferenceRequestProviderDelete(request_provider);
-  TRTSERVER_InferenceRequestHeaderDelete(request_header);
+  TRTSERVER_InferenceRequestOptionsDelete(request_options);
 
   if (err != nullptr) {
     RequestStatus request_status;

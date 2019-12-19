@@ -452,19 +452,19 @@ main(int argc, char** argv)
 
   // Create the inference request provider which provides all the
   // input information needed for an inference.
-  TRTSERVER_InferenceRequestHeader* request_header = nullptr;
+  TRTSERVER_InferenceRequestOptions* request_options = nullptr;
   FAIL_IF_ERR(
-      TRTSERVER_InferenceRequestHeaderNew(
-          &request_header, model_name.c_str(), model_version),
-      "creating inference request header");
+      TRTSERVER_InferenceRequestOptionsNew(
+          &request_options, model_name.c_str(), model_version),
+      "creating inference request options");
   FAIL_IF_ERR(
-      SetTRTSERVER_InferenceRequestHeader(
-          request_header, request_header_protobuf),
+      SetTRTSERVER_InferenceRequestOptions(
+          request_options, request_header_protobuf),
       "parsing inference request header");
   TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
   FAIL_IF_ERR(
-      TRTSERVER_InferenceRequestProviderNew(
-          &request_provider, server.get(), request_header),
+      TRTSERVER_InferenceRequestProviderNewV2(
+          &request_provider, server.get(), request_options),
       "creating inference request provider");
 
   // Create the data for the two input tensors. Initialize the first
@@ -537,10 +537,10 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderDelete(request_provider),
       "deleting inference request provider");
-  // And thus the request header can also be deleted.
+  // And thus the request options can also be deleted.
   FAIL_IF_ERR(
-      TRTSERVER_InferenceRequestHeaderDelete(request_header),
-      "deleting inference request header");
+      TRTSERVER_InferenceRequestOptionsDelete(request_options),
+      "deleting inference request options");
 
   // Wait for the inference response and check the status.
   TRTSERVER_InferenceResponse* response = completed.get();
