@@ -30,6 +30,7 @@
 #include <deque>
 #include <future>
 #include <mutex>
+#include <set>
 #include <thread>
 #include "src/core/api.pb.h"
 #include "src/core/model_config.h"
@@ -48,7 +49,7 @@ class DynamicBatchScheduler : public Scheduler {
       const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
       StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
       StandardRunFunc OnSchedule, const bool dynamic_batching_enabled,
-      const bool enforce_equal_shape_batch,
+      const bool enforce_equal_shape_batch, const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds,
       std::unique_ptr<Scheduler>* scheduler);
@@ -67,7 +68,7 @@ class DynamicBatchScheduler : public Scheduler {
       const uint32_t runner_id_start, const uint32_t runner_cnt,
       StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
       StandardRunFunc OnSchedule, const bool dynamic_batching_enabled,
-      const bool enforce_equal_shape_batch,
+      const bool enforce_equal_shape_batch, const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds);
   void SchedulerThread(
@@ -116,6 +117,14 @@ class DynamicBatchScheduler : public Scheduler {
 
   const bool enforce_equal_shape_batch_;
   std::unordered_map<std::string, DimsList> pending_batch_shapes_;
+
+  const bool preserve_ordering_;
+  // the runner that is currently processing payloads
+  int64_t last_processing_runner_id_;
+
+  // per runner parameters to inform and wait for completion of the particular
+  // runner
+  std::vector<std::shared_ptr<std::promise<void>>> completion_promises_;
 };
 
 }}  // namespace nvidia::inferenceserver
