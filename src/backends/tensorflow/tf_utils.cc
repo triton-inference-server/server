@@ -145,8 +145,6 @@ ShapeToString(const TRTISTF_Shape* shape, const size_t start_idx)
       }
       str += std::to_string(dim);
     }
-
-    idx++;
   }
 
   str += "]";
