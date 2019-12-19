@@ -138,13 +138,11 @@ ShapeToString(const TRTISTF_Shape* shape, const size_t start_idx)
 {
   std::string str("[");
   for (size_t idx = start_idx; idx < shape->rank_; idx++) {
-    const int64_t dim = shape->dims_[idx];
-    if (idx >= start_idx) {
-      if (idx > start_idx) {
-        str += ",";
-      }
-      str += std::to_string(dim);
+    if (idx > start_idx) {
+      str += ",";
     }
+
+    str += std::to_string(shape->dims_[idx]);
   }
 
   str += "]";
