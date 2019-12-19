@@ -579,6 +579,20 @@ message ModelDynamicBatching
   //@@     batching. Default is 0.
   //@@
   uint64 max_queue_delay_microseconds = 2;
+
+  //@@  .. cpp:var:: bool preserve_ordering
+  //@@
+  //@@     Should the dynamic batcher preserve the ordering of responses to
+  //@@     match the order of requests received by the scheduler. Default is
+  //@@     false. If true, the responses will be returned in the same order as
+  //@@     the order of requests sent to the scheduler. If false, the responses
+  //@@     may be returned in arbitrary order. This option is specifically
+  //@@     needed when a sequence of related inference requests (i.e. inference
+  //@@     requests with the same correlation ID) are sent to the dynamic
+  //@@     batcher to ensure that the sequence responses are in the correct
+  //@@     order.
+  //@@
+  bool preserve_ordering = 3;
 }
 
 //@@

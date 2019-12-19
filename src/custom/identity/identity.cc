@@ -117,6 +117,29 @@ Context::Context(
     const auto itr = model_config_.parameters().find("execute_delay_ms");
     if (itr != model_config_.parameters().end()) {
       execute_delay_ms_ = std::stoi(itr->second.string_value());
+
+      // Apply delay multiplier based on instance index, this is not taking
+      // multiple devices into consideration, so the behavior is best controlled
+      // in single device case.
+      const auto mitr =
+          model_config_.parameters().find("instance_wise_delay_multiplier");
+      if (mitr != model_config_.parameters().end()) {
+        int multiplier = std::stoi(mitr->second.string_value());
+
+        size_t suffix_pos;
+        if (gpu_device == CUSTOM_NO_GPU_DEVICE) {
+          static std::string cpu_suffix = "_cpu";
+          suffix_pos = instance_name.rfind(cpu_suffix);
+        } else {
+          static std::string gpu_suffix = "_gpu";
+          suffix_pos = instance_name.rfind(gpu_suffix);
+        }
+        auto idx_pos = instance_name.rfind('_', suffix_pos - 1) + 1;
+
+        multiplier *=
+            std::stoi(instance_name.substr(idx_pos, suffix_pos - idx_pos));
+        execute_delay_ms_ *= std::max(multiplier, 1);
+      }
     }
   }
 #ifdef TRTIS_ENABLE_GPU

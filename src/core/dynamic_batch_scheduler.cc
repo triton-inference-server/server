@@ -43,7 +43,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
     const uint32_t runner_id_start, const uint32_t runner_cnt,
     StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
     StandardRunFunc OnSchedule, const bool dynamic_batching_enabled,
-    const bool enforce_equal_shape_batch,
+    const bool enforce_equal_shape_batch, const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds)
     : OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
@@ -52,7 +52,8 @@ DynamicBatchScheduler::DynamicBatchScheduler(
       preferred_batch_sizes_(preferred_batch_sizes),
       pending_batch_delay_ns_(max_queue_delay_microseconds * 1000),
       pending_batch_size_(0), pending_batch_queue_cnt_(0),
-      enforce_equal_shape_batch_(enforce_equal_shape_batch)
+      enforce_equal_shape_batch_(enforce_equal_shape_batch),
+      preserve_ordering_(preserve_ordering), last_processing_runner_id_(-1)
 {
   max_preferred_batch_size_ = 0;
   for (const auto size : preferred_batch_sizes_) {
@@ -66,14 +67,14 @@ DynamicBatchScheduler::Create(
     const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
     StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
     StandardRunFunc OnSchedule, const bool dynamic_batching_enabled,
-    const bool enforce_equal_shape_batch,
+    const bool enforce_equal_shape_batch, const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds,
     std::unique_ptr<Scheduler>* scheduler)
 {
   DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
       runner_id_start, runner_cnt, OnInit, OnWarmup, OnSchedule,
-      dynamic_batching_enabled, enforce_equal_shape_batch,
+      dynamic_batching_enabled, enforce_equal_shape_batch, preserve_ordering,
       preferred_batch_sizes, max_queue_delay_microseconds);
   std::unique_ptr<DynamicBatchScheduler> sched(dyna_sched);
 
@@ -103,6 +104,10 @@ DynamicBatchScheduler::Create(
         RequestStatusCode::INTERNAL,
         "Initialization failed for all dynamic-batch scheduler threads");
   }
+
+  sched->completion_promises_ =
+      std::vector<std::shared_ptr<std::promise<void>>>(
+          sched->scheduler_threads_.size());
 
   scheduler->reset(sched.release());
 
@@ -233,6 +238,7 @@ DynamicBatchScheduler::SchedulerThread(
     std::shared_ptr<std::vector<Scheduler::Payload>> payloads;
     bool wake_thread = false;
     uint64_t wait_microseconds = 0;
+    std::shared_ptr<std::promise<void>> completion_promise;
 
     // Hold the lock for as short a time as possible.
     {
@@ -257,6 +263,17 @@ DynamicBatchScheduler::SchedulerThread(
           for (size_t idx = 0; idx < pending_batch_queue_cnt_; ++idx) {
             payloads->emplace_back(std::move(queue_.front()));
             queue_.pop_front();
+          }
+
+          if (preserve_ordering_) {
+            // There is runner processing payloads before current runner
+            if (last_processing_runner_id_ != -1) {
+              completion_promise =
+                  completion_promises_[last_processing_runner_id_];
+            }
+            last_processing_runner_id_ = runner_id;
+            completion_promises_[runner_id] =
+                std::make_shared<std::promise<void>>();
           }
 
           pending_batch_size_ = 0;
@@ -296,10 +313,23 @@ DynamicBatchScheduler::SchedulerThread(
     }
 
     if ((payloads != nullptr) && !payloads->empty()) {
-      auto OnCompleteQueuedPayloads = [payloads](const Status& status) {
+      auto OnCompleteQueuedPayloads = [this, runner_id, payloads,
+                                       completion_promise](
+                                          const Status& status) {
 #ifdef TRTIS_ENABLE_STATS
         bool found_success = false;
 #endif  // TRTIS_ENABLE_STATS
+
+        if (completion_promise != nullptr) {
+          auto completion_future = completion_promise->get_future();
+          if (completion_future.valid()) {
+            completion_future.get();
+          } else {
+            LOG_ERROR << "Unexpected state for perserving order, response will "
+                      << "be returned in arbitrary order";
+          }
+        }
+
         for (auto& payload : *payloads) {
           Status final_status = status.IsOk() ? payload.status_ : status;
 
@@ -317,6 +347,18 @@ DynamicBatchScheduler::SchedulerThread(
           if (payload.complete_function_ != nullptr) {
             payload.complete_function_(final_status);
           }
+        }
+
+        if (preserve_ordering_) {
+          {
+            std::lock_guard<std::mutex> lock(mu_);
+            // If runner id hasn't changed, then reset
+            // last_processing_runner_id_
+            if (last_processing_runner_id_ == runner_id) {
+              last_processing_runner_id_ = -1;
+            }
+          }
+          completion_promises_[runner_id]->set_value();
         }
       };
 

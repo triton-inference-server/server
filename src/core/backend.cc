@@ -189,7 +189,8 @@ InferenceBackend::SetConfiguredScheduler(
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         0 /* runner_id_start */, runner_cnt, GetCpuNiceLevel(config_), OnInit,
         OnWarmup, OnRun, true /* dynamic_batching_enabled */,
-        enforce_equal_shape_batch, preferred_batch_sizes,
+        enforce_equal_shape_batch,
+        config_.dynamic_batching().preserve_ordering(), preferred_batch_sizes,
         config_.dynamic_batching().max_queue_delay_microseconds(), &scheduler));
   } else {
     // Use dynamic batch scheduler (with batching disabled) as the
@@ -197,7 +198,7 @@ InferenceBackend::SetConfiguredScheduler(
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         0 /* runner_id_start */, runner_cnt, GetCpuNiceLevel(config_), OnInit,
         OnWarmup, OnRun, false /* dynamic_batching_enabled */,
-        false /* enforce_equal_shape_batch */,
+        false /* enforce_equal_shape_batch */, false /* preserve_ordering */,
         std::set<int32_t>() /* preferred_batch_sizes */,
         0 /* max_queue_delay_microseconds */, &scheduler));
   }

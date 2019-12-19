@@ -162,6 +162,8 @@ RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_warmup/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_cmdline_trace/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_batcher/. && \
     mkdir -p qa/L0_infer_shm && \
     cp -r qa/L0_infer/. qa/L0_infer_shm && \
     mkdir -p qa/L0_infer_cudashm && \
