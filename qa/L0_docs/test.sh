@@ -44,8 +44,7 @@ set +e
     cp -f request_http.h.in request_http.h)
 
 # Set visitor script to be included on every HTML page
-mkdir docs/_static && cp visitor_script docs/_static/.
-export VISITS_COUNTING_SCRIPT=visitor_script
+export VISITS_COUNTING_SCRIPT=//assets.adobedtm.com/b92787824f2e0e9b68dc2e993f9bd995339fe417/satelliteLib-7ba51e58dc61bcb0e9311aadd02a0108ab24cc6c.js
 
 (cd docs && rm -f trtis_docs.zip && \
         make BUILDDIR=/opt/tensorrtserver/qa/L0_docs/build clean html) > $TEST_LOG 2>&1
