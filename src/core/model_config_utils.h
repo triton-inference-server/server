@@ -114,9 +114,11 @@ Status BuildEnsembleGraph(
 /// configuration.
 /// \param io The model input.
 /// \param max_batch_size The max batch size specified in model configuration.
+/// \param platform The platform name
 /// \return The error status. A non-OK status indicates the input
 /// is not valid.
-Status ValidateModelInput(const ModelInput& io, int32_t max_batch_size);
+Status ValidateModelInput(
+    const ModelInput& io, int32_t max_batch_size, const std::string& platform);
 
 /// Validate that an input matches one of the allowed input names.
 /// \param io The model input.
@@ -130,9 +132,11 @@ Status CheckAllowedModelInput(
 /// configuration.
 /// \param io The model output.
 /// \param max_batch_size The max batch size specified in model configuration.
+/// \param platform The platform name
 /// \return The error status. A non-OK status indicates the output
 /// is not valid.
-Status ValidateModelOutput(const ModelOutput& io, int32_t max_batch_size);
+Status ValidateModelOutput(
+    const ModelOutput& io, int32_t max_batch_size, const std::string& platform);
 
 /// Validate that an output matches one of the allowed output names.
 /// \param io The model output.

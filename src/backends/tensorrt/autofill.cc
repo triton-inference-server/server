@@ -44,7 +44,7 @@ class AutoFillPlanImpl : public AutoFill {
       const std::string& model_name, const std::string& plan_filename,
       nvinfer1::ICudaEngine* engine, nvinfer1::IRuntime* runtime)
       : AutoFill(model_name), plan_filename_(plan_filename), engine_(engine),
-        runtime_(runtime), skip_first_dim_(false), max_batch_size_(0)
+        runtime_(runtime), max_batch_size_(0), is_dynamic_(false)
   {
   }
 
@@ -64,12 +64,16 @@ class AutoFillPlanImpl : public AutoFill {
  private:
   template <class ModelIO>
   using IOList = ::google::protobuf::RepeatedPtrField<ModelIO>;
+  using DimsList = ::google::protobuf::RepeatedField<int64_t>;
 
   Status Init(ModelConfig* config);
 
   Status FixBatchingSupport(ModelConfig* config);
 
   void InitIOLists();
+
+  void InitIODims(
+      nvinfer1::Dims& dims, bool is_shape_binding, DimsList* config_dims);
 
   template <class IO>
   Status FixIO(const IOList<IO>& reference_list, IOList<IO>* mutable_list);
@@ -78,8 +82,8 @@ class AutoFillPlanImpl : public AutoFill {
   ModelConfig config_;
   nvinfer1::ICudaEngine* engine_;
   nvinfer1::IRuntime* runtime_;
-  bool skip_first_dim_;
   int max_batch_size_;
+  bool is_dynamic_;
 };
 
 Status
@@ -116,7 +120,6 @@ AutoFillPlanImpl::Fix(ModelConfig* config)
 Status
 AutoFillPlanImpl::Init(ModelConfig* config)
 {
-  bool is_dynamic = false;
   bool first_dim_variable = true;
   int num_profiles = 0;
 
@@ -128,27 +131,34 @@ AutoFillPlanImpl::Init(ModelConfig* config)
   for (int i = 0; i < num_model_bindings; ++i) {
     nvinfer1::Dims dims = engine_->getBindingDimensions(i);
     if (engine_->bindingIsInput(i)) {
-      if (!is_dynamic) {
+      if (!is_dynamic_) {
         for (int didx = 0; didx < dims.nbDims; ++didx) {
           if (dims.d[didx] == -1) {
             // Initialize the necessary variables
             num_profiles = engine_->getNbOptimizationProfiles();
             num_model_bindings /= num_profiles;
-            is_dynamic = true;
+            is_dynamic_ = true;
             break;
           }
         }
       }
     }
-    if (dims.d[0] != -1 || dims.nbDims == 1) {
-      first_dim_variable = false;
-      break;
+    if (!engine_->isShapeBinding(i)) {
+      if (dims.d[0] != -1 || dims.nbDims == 1) {
+        first_dim_variable = false;
+        break;
+      }
+    } else {
+      // Handle models with empty shape tensors
+      if (dims.nbDims == 0) {
+        first_dim_variable = false;
+        break;
+      }
     }
   }
 
-  if (!is_dynamic) {
-    // If engine doesn't contain any dynamic shape then get the max batch size
-    // from the engine and exit
+  if (engine_->hasImplicitBatchDimension()) {
+    // If engine has implicit batch dimension then retrieve the value and exit
     max_batch_size_ = engine_->getMaxBatchSize();
     return Status::Success;
   } else if (!first_dim_variable) {
@@ -165,12 +175,22 @@ AutoFillPlanImpl::Init(ModelConfig* config)
       for (int binding = 0; binding < num_model_bindings; binding++) {
         int effective_binding_index = binding + (profile * num_model_bindings);
         if (engine_->bindingIsInput(effective_binding_index)) {
-          nvinfer1::Dims min_shape = engine_->getProfileDimensions(
-              effective_binding_index, profile,
-              nvinfer1::OptProfileSelector::kMIN);
-          if (min_shape.d[0] != 1) {
-            supports_batching = false;
-            break;
+          if (!engine_->isShapeBinding(effective_binding_index)) {
+            nvinfer1::Dims min_shape = engine_->getProfileDimensions(
+                effective_binding_index, profile,
+                nvinfer1::OptProfileSelector::kMIN);
+            if (min_shape.d[0] != 1) {
+              supports_batching = false;
+              break;
+            }
+          } else {
+            const int32_t* shapes = engine_->getProfileShapeValues(
+                effective_binding_index, profile,
+                nvinfer1::OptProfileSelector::kMIN);
+            if (*shapes != 1) {
+              supports_batching = false;
+              break;
+            }
           }
         }
       }
@@ -186,11 +206,20 @@ AutoFillPlanImpl::Init(ModelConfig* config)
       for (int binding = 0; binding < num_model_bindings; binding++) {
         int effective_binding_index = binding + (profile * num_model_bindings);
         if (engine_->bindingIsInput(effective_binding_index)) {
-          nvinfer1::Dims max_shape = engine_->getProfileDimensions(
-              effective_binding_index, profile,
-              nvinfer1::OptProfileSelector::kMAX);
-          if (min_max_shape > max_shape.d[0]) {
-            min_max_shape = max_shape.d[0];
+          if (!engine_->isShapeBinding(effective_binding_index)) {
+            nvinfer1::Dims max_shape = engine_->getProfileDimensions(
+                effective_binding_index, profile,
+                nvinfer1::OptProfileSelector::kMAX);
+            if (min_max_shape > max_shape.d[0]) {
+              min_max_shape = max_shape.d[0];
+            }
+          } else {
+            const int32_t* shapes = engine_->getProfileShapeValues(
+                effective_binding_index, profile,
+                nvinfer1::OptProfileSelector::kMAX);
+            if (min_max_shape > *shapes) {
+              min_max_shape = *shapes;
+            }
           }
         }
       }
@@ -270,7 +299,12 @@ AutoFillPlanImpl::Init(ModelConfig* config)
         for (int binding = 0; binding < num_model_bindings; binding++) {
           if (config_io.name() == engine_->getBindingName(binding)) {
             nvinfer1::Dims shape = engine_->getBindingDimensions(binding);
-            bool should_batch = (shape.nbDims == (config_io.dims_size() + 1));
+            bool should_batch;
+            if (!engine_->isShapeBinding(binding)) {
+              should_batch = (shape.nbDims == (config_io.dims_size() + 1));
+            } else {
+              should_batch = (shape.d[0] == (config_io.dims(0) + 1));
+            }
             if (should_batch) {
               config_batch_hint = true;
             }
@@ -292,7 +326,12 @@ AutoFillPlanImpl::Init(ModelConfig* config)
         for (int binding = 0; binding < num_model_bindings; binding++) {
           if (config_io.name() == engine_->getBindingName(binding)) {
             nvinfer1::Dims shape = engine_->getBindingDimensions(binding);
-            bool should_batch = (shape.nbDims == (config_io.dims_size() + 1));
+            bool should_batch;
+            if (!engine_->isShapeBinding(binding)) {
+              should_batch = (shape.nbDims == (config_io.dims_size() + 1));
+            } else {
+              should_batch = (shape.d[0] == (config_io.dims(0) + 1));
+            }
             if (should_batch) {
               config_batch_hint = true;
             }
@@ -332,10 +371,6 @@ AutoFillPlanImpl::Init(ModelConfig* config)
     max_batch_size_ = 0;
   }
 
-
-  if (max_batch_size_ != 0) {
-    skip_first_dim_ = true;
-  }
   return Status::Success;
 }
 
@@ -362,25 +397,43 @@ AutoFillPlanImpl::InitIOLists()
   int num_model_bindings =
       engine_->getNbBindings() / engine_->getNbOptimizationProfiles();
   for (int i = 0; i < num_model_bindings; ++i) {
+    nvinfer1::Dims dims = engine_->getBindingDimensions(i);
+    bool is_shape_binding = engine_->isShapeBinding(i);
     if (engine_->bindingIsInput(i)) {
       ModelInput* config_input = config_.add_input();
       std::string input_name{engine_->getBindingName(i)};
       config_input->set_name(input_name.substr(0, input_name.find(" ")));
       config_input->set_data_type(
           ConvertTrtTypeToDataType(engine_->getBindingDataType(i)));
-      nvinfer1::Dims dims = engine_->getBindingDimensions(i);
-      for (int didx = skip_first_dim_ ? 1 : 0; didx < dims.nbDims; ++didx) {
-        config_input->mutable_dims()->Add(dims.d[didx]);
-      }
+      InitIODims(dims, is_shape_binding, config_input->mutable_dims());
+      config_input->set_is_shape_tensor(is_shape_binding);
     } else {
       ModelOutput* config_output = config_.add_output();
       std::string output_name{engine_->getBindingName(i)};
       config_output->set_name(output_name.substr(0, output_name.find(" ")));
       config_output->set_data_type(
           ConvertTrtTypeToDataType(engine_->getBindingDataType(i)));
-      nvinfer1::Dims dims = engine_->getBindingDimensions(i);
-      for (int didx = skip_first_dim_ ? 1 : 0; didx < dims.nbDims; ++didx) {
-        config_output->mutable_dims()->Add(dims.d[didx]);
+      InitIODims(dims, is_shape_binding, config_output->mutable_dims());
+      config_output->set_is_shape_tensor(is_shape_binding);
+    }
+  }
+}
+
+void
+AutoFillPlanImpl::InitIODims(
+    nvinfer1::Dims& dims, bool is_shape_binding, DimsList* config_dims)
+{
+  bool skip_first = (max_batch_size_ != 0) && is_dynamic_;
+  if (!is_shape_binding) {
+    for (int didx = (skip_first ? 1 : 0); didx < dims.nbDims; ++didx) {
+      config_dims->Add(dims.d[didx]);
+    }
+  } else {
+    if (dims.nbDims != 0) {
+      if (skip_first) {
+        config_dims->Add(dims.d[0] - 1);
+      } else {
+        config_dims->Add(dims.d[0]);
       }
     }
   }
@@ -407,6 +460,22 @@ AutoFillPlanImpl::FixIO(
               io.mutable_reshape()->CopyFrom(io_ref.reshape());
             }
           }
+          // Check if the IO is a shape tensor.
+          bool is_shape_tensor = false;
+          int io_index = engine_->getBindingIndex(io.name().c_str());
+          if (io_index == -1) {
+            return Status(
+                RequestStatusCode::INVALID_ARG,
+                "binding for '" + io.name() + "' not found in the model.");
+          }
+          is_shape_tensor = engine_->isShapeBinding(io_index);
+          if (io.is_shape_tensor() && (!is_shape_tensor)) {
+            return Status(
+                RequestStatusCode::INVALID_ARG,
+                "'" + io.name() +
+                    "' is incorrectly specified as a shape tensor.");
+          }
+          io.set_is_shape_tensor(is_shape_tensor);
           break;
         }
       }
