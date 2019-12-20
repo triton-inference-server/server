@@ -115,6 +115,9 @@ class DynamicBatchScheduler : public Scheduler {
   size_t pending_batch_size_;
   size_t pending_batch_queue_cnt_;
 
+  size_t queued_batch_size_;
+  size_t next_preferred_batch_size_;
+
   const bool enforce_equal_shape_batch_;
   std::unordered_map<std::string, DimsList> pending_batch_shapes_;
 
