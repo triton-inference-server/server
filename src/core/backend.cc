@@ -182,9 +182,7 @@ InferenceBackend::SetConfiguredScheduler(
     // don't enable it in that case for efficiency reasons.
     std::unordered_map<std::string, bool> enforce_equal_shape_tensors;
     for (const auto input : config_.input()) {
-      bool is_shape_tensor;
-      RETURN_IF_ERROR(IsShapeTensor(input.name(), &is_shape_tensor));
-      if (is_shape_tensor) {
+      if (input.is_shape_tensor()) {
         enforce_equal_shape_tensors.insert({input.name(), true});
       } else if (GetElementCount(input) == -1) {
         enforce_equal_shape_tensors.insert({input.name(), false});
@@ -194,7 +192,8 @@ InferenceBackend::SetConfiguredScheduler(
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         0 /* runner_id_start */, runner_cnt, GetCpuNiceLevel(config_), OnInit,
         OnWarmup, OnRun, OnPeek, true /* dynamic_batching_enabled */,
-        enforce_equal_shape_tensors, config_.dynamic_batching().preserve_ordering(), preferred_batch_sizes,
+        enforce_equal_shape_tensors,
+        config_.dynamic_batching().preserve_ordering(), preferred_batch_sizes,
         config_.dynamic_batching().max_queue_delay_microseconds(), &scheduler));
   } else {
     // Use dynamic batch scheduler (with batching disabled) as the
@@ -203,7 +202,8 @@ InferenceBackend::SetConfiguredScheduler(
         0 /* runner_id_start */, runner_cnt, GetCpuNiceLevel(config_), OnInit,
         OnWarmup, OnRun, OnPeek, false /* dynamic_batching_enabled */,
         std::unordered_map<
-            std::string, bool>() /* enforce_equal_shape_tensors */, false /* preserve_ordering */,
+            std::string, bool>() /* enforce_equal_shape_tensors */,
+        false /* preserve_ordering */,
         std::set<int32_t>() /* preferred_batch_sizes */,
         0 /* max_queue_delay_microseconds */, &scheduler));
   }

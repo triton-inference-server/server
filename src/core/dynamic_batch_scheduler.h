@@ -51,7 +51,8 @@ class DynamicBatchScheduler : public Scheduler {
       const StandardRunFunc& OnSchedule,
       const StandardShapeTensorPeekFunc& OnPeek,
       const bool dynamic_batching_enabled,
-      const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors, const bool preserve_ordering,
+      const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+      const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds,
       std::unique_ptr<Scheduler>* scheduler);
@@ -73,7 +74,7 @@ class DynamicBatchScheduler : public Scheduler {
       const StandardShapeTensorPeekFunc& OnPeek,
       const bool dynamic_batching_enabled,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-       const bool preserve_ordering,
+      const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds);
   void SchedulerThread(
@@ -81,10 +82,11 @@ class DynamicBatchScheduler : public Scheduler {
       const std::shared_ptr<std::atomic<bool>>& rthread_exit,
       std::promise<bool>* is_initialized);
   Status InitPendingShape(
-      const std::shared_ptr<InferRequestProvider>& request_provider);
+      const int64_t runner_id, const Scheduler::Payload& request_provider);
   bool CompareWithPendingShape(
-      const std::shared_ptr<InferRequestProvider>& request_provider) const;
-  uint64_t GetDynamicBatch();
+      const int64_t runner_id,
+      const Scheduler::Payload& request_provider) const;
+  uint64_t GetDynamicBatch(const int64_t runner_id);
 
   // Function the scheduler will call to initialize a runner.
   const StandardInitFunc OnInit_;
