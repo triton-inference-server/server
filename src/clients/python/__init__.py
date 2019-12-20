@@ -266,6 +266,58 @@ def _raise_error(msg):
     raise ex
 
 
+def serialize_string_tensor(input_tensor):
+    """
+    Serializes a string tensor into a flat numpy array of length prepend strings.
+    Can pass string tensor as numpy array of bytes with dtype of np.bytes_,
+    numpy strings with dtype of np.str_ or python strings with dtype of np.object.
+
+    Parameters
+    ----------
+    input_tensor : np.array
+        The string tensor to serialize.
+
+    Returns
+    -------
+    serialized_string_tensor : np.array
+        The 1-D numpy array of type uint8 containing the serialized string in 'C' order.
+
+    Raises
+    ------
+    InferenceServerException
+        If unable to serialize the given tensor.
+    """
+
+    if not isinstance(input_tensor, (np.ndarray,)):
+        _raise_error("input must be a numpy array")
+
+    if input_tensor.size == 0:
+        _raise_error("input cannot be empty")
+
+    # If the input is a tensor of string objects, then must flatten those into
+    # a 1-dimensional array containing the 4-byte string length followed by the
+    # actual string characters. All strings are concatenated together in "C"
+    # order.
+    if (input_tensor.dtype == np.object) or (input_tensor.dtype.type == np.bytes_):
+        flattened = bytes()
+        for obj in np.nditer(input_tensor, flags=["refs_ok"], order='C'):
+            # If directly passing bytes to STRING type,
+            # don't convert it to str as Python will encode the
+            # bytes which may distort the meaning
+            if obj.dtype.type == np.bytes_:
+                if type(obj.item()) == bytes:
+                    s = obj.item()
+                else:
+                    s = bytes(obj)
+            else:
+                s = str(obj).encode('utf-8')
+            flattened += struct.pack("<I", len(s))
+            flattened += s
+        return np.asarray(flattened)
+    else:
+        _raise_error("cannot serialize string tensor: invalid datatype")
+    return None
+
 class ProtocolType(IntEnum):
     """Protocol types supported by the client API
 
@@ -1215,18 +1267,7 @@ class InferContext:
                                 # All strings are concatenated together in "C"
                                 # order.
                                 if (input_value.dtype == np.object) or (input_value.dtype.type == np.bytes_):
-                                    flattened = bytes()
-                                    for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
-                                        # If directly passing bytes to STRING type,
-                                        # don't convert it to str as Python will encode the
-                                        # bytes which may distort the meaning
-                                        if obj.dtype.type == np.bytes_:
-                                            s = bytes(obj)
-                                        else:
-                                            s = str(obj).encode('utf-8')
-                                        flattened += struct.pack("<I", len(s))
-                                        flattened += s
-                                    input_value = np.asarray(flattened)
+                                    input_value = serialize_string_tensor(input_value)
 
                                 if not input_value.flags['C_CONTIGUOUS']:
                                     input_value = np.ascontiguousarray(input_value)

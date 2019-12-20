@@ -73,52 +73,6 @@ def _raise_error(msg):
     ex = CudaSharedMemoryException(msg)
     raise ex
 
-def serialize_string_tensor(input_tensor):
-    """Serializes a string tensor into a flat numpy array of type uint8.
-
-    Parameters
-    ----------
-    input_tensor : np.array
-        The string tensor to serialize.
-
-    Returns
-    -------
-    serialized_string_tensor : np.array
-        The 1-D numpy array of type uint8 containing the serialized string in 'C' order.
-
-    Raises
-    ------
-    CudaSharedMemoryException
-        If unable to serialize the given tensor.
-    """
-
-    if not isinstance(input_tensor, (np.ndarray,)):
-        _raise_error("input must be a numpy array")
-
-    if input_tensor.size == 0:
-        _raise_error("input cannot be empty")
-
-    # If the input is a tensor of string objects, then must flatten those into
-    # a 1-dimensional array containing the 4-byte string length followed by the
-    # actual string characters. All strings are concatenated together in "C"
-    # order.
-    if (input_tensor.dtype == np.object) or (input_tensor.dtype.type == np.bytes_):
-        flattened = bytes()
-        for obj in np.nditer(input_tensor, flags=["refs_ok"], order='C'):
-            # If directly passing bytes to STRING type,
-            # don't convert it to str as Python will encode the
-            # bytes which may distort the meaning
-            if obj.dtype.type == np.bytes_:
-                s = bytes(obj)
-            else:
-                s = str(obj).encode('utf-8')
-            flattened += struct.pack("<I", len(s))
-            flattened += s
-        serialized_string_tensor = np.asarray(flattened)
-        return serialized_string_tensor
-    else:
-        _raise_error("cannot serialize string tensor: invalid datatype")
-
 def create_shared_memory_region(trtis_shm_name, byte_size, device_id):
     """Creates a shared memory region with the specified name and size.
 

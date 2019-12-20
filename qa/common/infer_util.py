@@ -59,18 +59,7 @@ def _range_repr_dtype(dtype):
 def _prepend_string_size(input_values):
     input_list = []
     for input_value in input_values:
-        flattened = bytes()
-        for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
-            # If directly passing bytes to STRING type,
-            # don't convert it to str as Python will encode the
-            # bytes which may distort the meaning
-            if obj.dtype.type == np.bytes_:
-                s = bytes(obj)
-            else:
-                s = str(obj).encode('utf-8')
-            flattened += struct.pack("<I", len(s))
-            flattened += s
-        input_list.append(np.asarray(flattened))
+        input_list.append(serialize_string_tensor(input_value))
     return input_list
 
 # Perform inference using an "addsum" type verification backend.
