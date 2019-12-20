@@ -1,0 +1,24 @@
+input [
+  {
+    name: "DUMMY_INPUT0"
+    data_type: TYPE_FP32
+    dims: [ -1,-1 ]
+  },
+  {
+    name: "INPUT0"
+    data_type: TYPE_INT32
+    dims: [ 3 ]
+  }
+]
+output [
+  {
+    name: "DUMMY_OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ -1,-1 ]
+  },
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT32
+    dims: [ 2 ]
+  }
+]

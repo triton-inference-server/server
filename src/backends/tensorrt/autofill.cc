@@ -44,7 +44,7 @@ class AutoFillPlanImpl : public AutoFill {
       const std::string& model_name, const std::string& plan_filename,
       nvinfer1::ICudaEngine* engine, nvinfer1::IRuntime* runtime)
       : AutoFill(model_name), plan_filename_(plan_filename), engine_(engine),
-        runtime_(runtime), max_batch_size_(0)
+        runtime_(runtime), max_batch_size_(0), is_dynamic_(false)
   {
   }
 
@@ -73,7 +73,7 @@ class AutoFillPlanImpl : public AutoFill {
   void InitIOLists();
 
   void InitIODims(
-      nvinfer1::Dims dims, bool is_shape_binding, DimsList* config_dims);
+      nvinfer1::Dims& dims, bool is_shape_binding, DimsList* config_dims);
 
   template <class IO>
   Status FixIO(const IOList<IO>& reference_list, IOList<IO>* mutable_list);
@@ -83,6 +83,7 @@ class AutoFillPlanImpl : public AutoFill {
   nvinfer1::ICudaEngine* engine_;
   nvinfer1::IRuntime* runtime_;
   int max_batch_size_;
+  bool is_dynamic_;
 };
 
 Status
@@ -119,7 +120,6 @@ AutoFillPlanImpl::Fix(ModelConfig* config)
 Status
 AutoFillPlanImpl::Init(ModelConfig* config)
 {
-  bool is_dynamic = false;
   bool first_dim_variable = true;
   int num_profiles = 0;
 
@@ -131,13 +131,13 @@ AutoFillPlanImpl::Init(ModelConfig* config)
   for (int i = 0; i < num_model_bindings; ++i) {
     nvinfer1::Dims dims = engine_->getBindingDimensions(i);
     if (engine_->bindingIsInput(i)) {
-      if (!is_dynamic) {
+      if (!is_dynamic_) {
         for (int didx = 0; didx < dims.nbDims; ++didx) {
           if (dims.d[didx] == -1) {
             // Initialize the necessary variables
             num_profiles = engine_->getNbOptimizationProfiles();
             num_model_bindings /= num_profiles;
-            is_dynamic = true;
+            is_dynamic_ = true;
             break;
           }
         }
@@ -415,16 +415,17 @@ AutoFillPlanImpl::InitIOLists()
 
 void
 AutoFillPlanImpl::InitIODims(
-    nvinfer1::Dims dims, bool is_shape_binding, DimsList* config_dims)
+    nvinfer1::Dims& dims, bool is_shape_binding, DimsList* config_dims)
 {
+  bool skip_first = (max_batch_size_ != 0) && is_dynamic_;
   if (!is_shape_binding) {
-    for (int didx = ((max_batch_size_ != 0) ? 1 : 0); didx < dims.nbDims;
+    for (int didx = (skip_first ? 1 : 0); didx < dims.nbDims;
          ++didx) {
       config_dims->Add(dims.d[didx]);
     }
   } else {
     if (dims.nbDims != 0) {
-      if (max_batch_size_ != 0) {
+      if (skip_first) {
         config_dims->Add(dims.d[0] - 1);
       } else {
         config_dims->Add(dims.d[0]);
