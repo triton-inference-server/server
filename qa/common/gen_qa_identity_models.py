@@ -653,6 +653,26 @@ def create_plan_dynamic_rf_modelfile(
         else:
              profile.set_shape("INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
 
+	# Profiles that don't support batching.
+    if FLAGS.tensorrt_shape_io:
+        # The minimum shape value is 2
+    	profile = builder.create_optimization_profile()
+    	for io_num in range(io_cnt):
+            if shape:
+                profile.set_shape_input("INPUT{}".format(io_num),
+                    [2] * shape_with_batchsize, [8] * shape_with_batchsize,
+                    [profile_max_size] * shape_with_batchsize)
+            profile.set_shape("DUMMY_INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
+        # The maximum shape value is less than max_batch 
+    	profile = builder.create_optimization_profile()
+    	for io_num in range(io_cnt):
+            if shape:
+                profile.set_shape_input("INPUT{}".format(io_num),
+                    [1] * shape_with_batchsize, [4] * shape_with_batchsize,
+                    [4] * shape_with_batchsize)
+            profile.set_shape("DUMMY_INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
+
+
     flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
     datatype_set = set([trt_dtype])
     for dt in datatype_set:
