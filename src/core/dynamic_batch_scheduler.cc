@@ -52,6 +52,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
       preferred_batch_sizes_(preferred_batch_sizes),
       pending_batch_delay_ns_(max_queue_delay_microseconds * 1000),
       pending_batch_size_(0), pending_batch_queue_cnt_(0),
+      queued_batch_size_(0), next_preferred_batch_size_(0),
       enforce_equal_shape_batch_(enforce_equal_shape_batch),
       preserve_ordering_(preserve_ordering), last_processing_runner_id_(-1)
 {
@@ -158,11 +159,19 @@ DynamicBatchScheduler::Enqueue(
   {
     std::lock_guard<std::mutex> lock(mu_);
     queue_.emplace_back(stats, request_provider, response_provider, OnComplete);
+    queued_batch_size_ += request_provider->RequestHeader().batch_size();
 
-    // If there are any idle runners then wake one up to service this
-    // request. We do the actual wake outside of the lock to avoid
-    // having the woken thread immediately block on the lock
+    // If there are any idle runners and the queued batch size is greater or
+    // equal to next preferred batch size, then wake one up to service this
+    // request. We do the actual wake outside of the lock to avoid having the
+    // woken thread immediately block on the lock
     wake_runner = (idle_scheduler_thread_cnt_ > 0);
+
+    // We may wake up runner less often if we don't enforce equal shape within
+    // a batch, otherwise must alwasys wake up runner to check it
+    if (!enforce_equal_shape_batch_) {
+      wake_runner &= (queued_batch_size_ >= next_preferred_batch_size_);
+    }
   }
 
   if (wake_runner) {
@@ -275,6 +284,14 @@ DynamicBatchScheduler::SchedulerThread(
             completion_promises_[runner_id] =
                 std::make_shared<std::promise<void>>();
           }
+
+          queued_batch_size_ -= pending_batch_size_;
+          // Set next preferred to be 0 so that enqueue thread will wake up
+          // runners when new request arrives. In the case where the queue
+          // becomes empty, this helps the runners to set up proper wait time
+          // instead of waiting for the default timer or actual next preferred
+          // batch size is reached.
+          next_preferred_batch_size_ = 0;
 
           pending_batch_size_ = 0;
           pending_batch_queue_cnt_ = 0;
@@ -515,6 +532,16 @@ DynamicBatchScheduler::GetDynamicBatch()
 
   if (delay_ns >= pending_batch_delay_ns_) {
     return 0;
+  }
+
+  // Set the next preferred batch size given the pending batch size
+  auto next_preferred_batch_size_it =
+      preferred_batch_sizes_.upper_bound(pending_batch_size_);
+  if (next_preferred_batch_size_it != preferred_batch_sizes_.end()) {
+    next_preferred_batch_size_ = *next_preferred_batch_size_it;
+  } else {
+    next_preferred_batch_size_ =
+        preferred_batch_sizes_.empty() ? 0 : *preferred_batch_sizes_.begin();
   }
 
   // Return non-zero wait microseconds to cause this thread to wait
