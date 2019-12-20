@@ -148,6 +148,12 @@ AutoFillPlanImpl::Init(ModelConfig* config)
         first_dim_variable = false;
         break;
       }
+    } else {
+      // Handle models with empty shape tensors
+      if (dims.nbDims == 0) {
+        first_dim_variable = false;
+        break;
+      }
     }
   }
 
@@ -419,8 +425,7 @@ AutoFillPlanImpl::InitIODims(
 {
   bool skip_first = (max_batch_size_ != 0) && is_dynamic_;
   if (!is_shape_binding) {
-    for (int didx = (skip_first ? 1 : 0); didx < dims.nbDims;
-         ++didx) {
+    for (int didx = (skip_first ? 1 : 0); didx < dims.nbDims; ++didx) {
       config_dims->Add(dims.d[didx]);
     }
   } else {
