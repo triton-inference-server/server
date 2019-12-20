@@ -35,9 +35,6 @@ import shm_util as su
 from sets import Set
 from ctypes import *
 
-TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
-
 # unicode() doesn't exist on python3, for how we use it the
 # corresponding function is bytes()
 if sys.version_info.major == 3:
@@ -78,9 +75,6 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         configs.append(("localhost:8001", ProtocolType.GRPC, False))
     if use_streaming:
         configs.append(("localhost:8001", ProtocolType.GRPC, True))
-
-    if TEST_CUDA_SHARED_MEMORY and TEST_SYSTEM_SHARED_MEMORY:
-        raise ValueError("Cannot set both System and CUDA shared memory flags to 1")
 
     # outputs are sum and difference of inputs so set max input
     # values so that they will not overflow the output. This
@@ -165,9 +159,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
     else:
         expected1_list_tmp = expected1_list
 
-    if TEST_CUDA_SHARED_MEMORY or TEST_SYSTEM_SHARED_MEMORY:
-        shm_handles = su.create_register_set_shm_regions(input0_list_tmp, input1_list_tmp, expected0_list_tmp, \
-                                        expected1_list_tmp, outputs, shm_region_names, precreated_shm_regions)
+    # Create and register system/cuda shared memory regions if needed
+    shm_handles = su.create_register_set_shm_regions(input0_list_tmp, input1_list_tmp, expected0_list_tmp, \
+                                    expected1_list_tmp, outputs, shm_region_names, precreated_shm_regions)
 
     # Run inference and check results for each config
     for config in configs:
@@ -192,7 +186,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             INPUT1 = "INPUT__1"
         i=0
         if "OUTPUT0" in outputs:
-            if TEST_CUDA_SHARED_MEMORY or TEST_SYSTEM_SHARED_MEMORY:
+            if len(shm_handles) != 0:
                 output_req[OUTPUT0] = (InferContext.ResultFormat.RAW, shm_handles[2])
             else:
                 if output0_raw:
@@ -201,7 +195,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                     output_req[OUTPUT0] = (InferContext.ResultFormat.CLASS, num_classes)
             i+=1
         if "OUTPUT1" in outputs:
-            if TEST_CUDA_SHARED_MEMORY or TEST_SYSTEM_SHARED_MEMORY:
+            if len(shm_handles) != 0:
                 output_req[OUTPUT1] = (InferContext.ResultFormat.RAW, shm_handles[2+i])
             else:
                 if output1_raw:
@@ -209,7 +203,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 else:
                     output_req[OUTPUT1] = (InferContext.ResultFormat.CLASS, num_classes)
 
-        if TEST_CUDA_SHARED_MEMORY or TEST_SYSTEM_SHARED_MEMORY:
+        if len(shm_handles) != 0:
             results = ctx.run(
                     { INPUT0 : (shm_handles[0], tensor_shape),
                     INPUT1 : (shm_handles[1], tensor_shape) },
@@ -272,8 +266,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                         else:
                             tester.assertTrue(False, "unexpected class result {}".format(result_name))
 
-    if TEST_CUDA_SHARED_MEMORY or TEST_SYSTEM_SHARED_MEMORY:
-        su.unregister_cleanup_shm_regions(shm_handles, precreated_shm_regions, outputs)
+    # Unregister system/cuda shared memory regions if they exist
+    su.unregister_cleanup_shm_regions(shm_handles, precreated_shm_regions, outputs)
 
     return results
 
@@ -293,9 +287,6 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         configs.append(("localhost:8001", ProtocolType.GRPC, True))
     tester.assertEqual(len(input_shapes), len(output_shapes))
     io_cnt = len(input_shapes)
-
-    if TEST_CUDA_SHARED_MEMORY and TEST_SYSTEM_SHARED_MEMORY:
-        raise ValueError("Cannot set both System and CUDA shared memory flags to 1")
 
     input_dict = {}
     output_dict = {}
@@ -340,26 +331,11 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         output_byte_size = tu.shape_element_count(output_shapes[io_num]) *\
                             np.dtype(tensor_dtype).itemsize * batch_size
         # create and register shared memory region for inputs and outputs
-        if TEST_SYSTEM_SHARED_MEMORY:
-            shm_ip_handles.append(cudashm.create_shared_memory_region("input"+str(io_num)+"_data",
-                                                                input_byte_size, 0))
-            shm_op_handles.append(cudashm.create_shared_memory_region("output"+str(io_num)+"_data",
-                                                                output_byte_size, 0))
-            shared_memory_ctx.cuda_register(shm_ip_handles[io_num])
-            shared_memory_ctx.cuda_register(shm_op_handles[io_num])
-            # copy data into shared memory region for input values
-            cudashm.set_shared_memory_region(shm_ip_handles[io_num], input_list)
-        elif TEST_CUDA_SHARED_MEMORY:
-            shm_ip_handles.append(shm.create_shared_memory_region("input"+str(io_num)+"_data",\
-                                        "/input"+str(io_num), input_byte_size))
-            shm_op_handles.append(shm.create_shared_memory_region("output"+str(io_num)+"_data",\
-                                        "/output"+str(io_num), output_byte_size))
-            shared_memory_ctx.register(shm_ip_handles[io_num])
-            shared_memory_ctx.register(shm_op_handles[io_num])
-            # copy data into shared memory region for input values
-            shm.set_shared_memory_region(shm_ip_handles[io_num], input_list)
-
-        if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+        shm_io_handle = su.create_register_set_either_shm_region(["input"+str(io_num), "output"+str(io_num)],\
+                                                input_list, input_byte_size, output_byte_size, shared_memory_ctx)
+        if len(shm_io_handle) != 0:
+            shm_ip_handles.append(shm_io_handle[0])
+            shm_op_handles.append(shm_io_handle[1])
             input_dict[input_name] = shm_ip_handles[io_num]
             output_dict[output_name] = (InferContext.ResultFormat.RAW, shm_op_handles[io_num])
         else:
@@ -390,15 +366,11 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
                                   "{}, {}, slot {}, expected: {}, got {}".format(
                                       model_name, result_name, b, expected, result_val[b]))
 
-    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+    if len(shm_ip_handles) != 0:
         for io_num in range(io_cnt):
             shared_memory_ctx.unregister(shm_ip_handles[io_num])
             shared_memory_ctx.unregister(shm_op_handles[io_num])
-            if TEST_CUDA_SHARED_MEMORY:
-                cudashm.destroy_shared_memory_region(shm_ip_handles[io_num])
-                cudashm.destroy_shared_memory_region(shm_op_handles[io_num])
-            else:
-                shm.destroy_shared_memory_region(shm_ip_handles[io_num])
-                shm.destroy_shared_memory_region(shm_op_handles[io_num])
+            su.destroy_either_shm_region(shm_ip_handles[io_num])
+            su.destroy_either_shm_region(shm_op_handles[io_num])
 
     return results

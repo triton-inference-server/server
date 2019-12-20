@@ -57,6 +57,9 @@ def create_register_set_shm_regions(input0_list, input1_list, expected0_list, \
     if TEST_CUDA_SHARED_MEMORY and TEST_SYSTEM_SHARED_MEMORY:
         raise ValueError("Cannot set both System and CUDA shared memory flags to 1")
 
+    if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
+        return []
+
     shared_memory_ctx = SharedMemoryControlContext("localhost:8000",  ProtocolType.HTTP, verbose=False)
 
     input0_byte_size = sum([i0.nbytes for i0 in input0_list])
@@ -139,6 +142,9 @@ def create_register_set_shm_regions(input0_list, input1_list, expected0_list, \
     return shm_io_handles
 
 def unregister_cleanup_shm_regions(shm_handles, precreated_shm_regions, outputs):
+    if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
+        return None
+
     shared_memory_ctx = SharedMemoryControlContext("localhost:8000",  ProtocolType.HTTP, verbose=False)
     shared_memory_ctx.unregister(shm_handles[0])
     shared_memory_ctx.unregister(shm_handles[1])
@@ -164,3 +170,38 @@ def unregister_cleanup_shm_regions(shm_handles, precreated_shm_regions, outputs)
                 cudashm.destroy_shared_memory_region(shm_handles[2+i])
             else:
                 shm.destroy_shared_memory_region(shm_handles[2+i])
+
+def create_register_set_either_shm_region(shm_region_name, input_list, input_byte_size,\
+                                                output_byte_size, shared_memory_ctx):
+    if TEST_CUDA_SHARED_MEMORY and TEST_SYSTEM_SHARED_MEMORY:
+        raise ValueError("Cannot set both System and CUDA shared memory flags to 1")
+
+    if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
+        return []
+
+    if TEST_SYSTEM_SHARED_MEMORY:
+        shm_ip_handle = append(cudashm.create_shared_memory_region(shm_region_names[0]+"_data",
+                                                            input_byte_size, 0))
+        shm_op_handle = append(cudashm.create_shared_memory_region(shm_region_names[1]+"_data",
+                                                            output_byte_size, 0))
+        shared_memory_ctx.cuda_register(shm_ip_handle)
+        shared_memory_ctx.cuda_register(shm_op_handle)
+        # copy data into shared memory region for input values
+        cudashm.set_shared_memory_region(shm_ip_handle, input_list)
+    elif TEST_CUDA_SHARED_MEMORY:
+        shm_ip_handles.append(shm.create_shared_memory_region(shm_region_names[0]+"_data",\
+                                    "/"+shm_region_names[0], input_byte_size))
+        shm_op_handles.append(shm.create_shared_memory_region(shm_region_names[1]+"_data",\
+                                    "/"+shm_region_names[1], output_byte_size))
+        shared_memory_ctx.register(shm_ip_handle)
+        shared_memory_ctx.register(shm_op_handle)
+        # copy data into shared memory region for input values
+        shm.set_shared_memory_region(shm_ip_handle, input_list)
+    
+    return [shm_ip_handle, shm_op_handle]
+
+def destroy_either_shm_region(shm_handle):
+    if TEST_CUDA_SHARED_MEMORY:
+        cudashm.destroy_shared_memory_region(shm_handle)
+    else:
+        shm.destroy_shared_memory_region(shm_handle)
