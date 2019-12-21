@@ -62,7 +62,7 @@ sure to checkout the release version of the branch that corresponds to
 the server you are using (or the master branch if you are using a
 server build from master)::
 
-  $ git checkout r19.11
+  $ git checkout r19.12
   $ cd docs/examples
   $ ./fetch_models.sh
 
