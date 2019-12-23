@@ -124,10 +124,10 @@ SetTRTSERVER_InferenceRequestOptions(
 
   for (const auto& output : request_header_protobuf.output()) {
     if (output.has_cls()) {
-      RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddOutputCls(
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddClassificationOutput(
           request_options, output.name().c_str(), output.cls().count()));
     } else {
-      RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddOutputRaw(
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddOutput(
           request_options, output.name().c_str()));
     }
   }

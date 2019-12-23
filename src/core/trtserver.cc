@@ -1019,7 +1019,7 @@ TRTSERVER_InferenceRequestOptionsAddInput(
 }
 
 TRTSERVER_Error*
-TRTSERVER_InferenceRequestOptionsAddOutputRaw(
+TRTSERVER_InferenceRequestOptionsAddOutput(
     TRTSERVER_InferenceRequestOptions* request_options, const char* output_name)
 {
   TrtServerRequestOptions* loptions =
@@ -1029,7 +1029,7 @@ TRTSERVER_InferenceRequestOptionsAddOutputRaw(
 }
 
 TRTSERVER_Error*
-TRTSERVER_InferenceRequestOptionsAddOutputCls(
+TRTSERVER_InferenceRequestOptionsAddClassificationOutput(
     TRTSERVER_InferenceRequestOptions* request_options, const char* output_name,
     uint32_t count)
 {

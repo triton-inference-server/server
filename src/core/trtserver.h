@@ -471,6 +471,13 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceManagerDelete(
 /// Object representing the request meta-data needed for an inference.
 ///
 
+/// Inference request option flags. The enum values must be power-of-2 values.
+typedef enum trtserver_requestoptionsflag_enum {
+  TRTSERVER_REQUEST_FLAG_NONE = 0,
+  TRTSERVER_REQUEST_FLAG_SEQUENCE_START = 1,
+  TRTSERVER_REQUEST__FLAG_SEQUENCE_END = 2
+} TRTSERVER_REQUEST_OPTIONS_FLAG;
+
 /// Create a new inference request options object.
 /// \param request_options Returns the new request options object.
 /// \param model_name The name of the model that the inference request is for.
@@ -483,7 +490,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsNew(
 
 /// Set the ID for the request in a request options. The response of the request
 /// will contain the same ID. The request sender can use the ID to correlate
-/// the response to corresponding request if needed.
+/// the response to corresponding request if needed. The default value is 0.
 /// \param request_options The request options object.
 /// \param id The ID.
 /// \return a TRTSERVER_Error indicating success or failure.
@@ -491,13 +498,19 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetId(
     TRTSERVER_InferenceRequestOptions* request_options, uint64_t id);
 
 /// Set the flag associated with the request in a request options. 'flags'
-/// should holds a bitwise-or of all flag values. \param request_options The
-/// request options object. \param flags The flags. \return a TRTSERVER_Error
-/// indicating success or failure.
+/// should holds a bitwise-or of all flag values, see
+/// TRTSERVER_REQUEST_OPTIONS_FLAG for available flags.
+/// \param request_options The request options object.
+/// \param flags The flags.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetFlags(
     TRTSERVER_InferenceRequestOptions* request_options, uint32_t flags);
 
-/// Set the correlation ID for the request in a request options.
+/// The correlation ID of the inference request. Default is 0, which
+/// indictes that the request has no correlation ID. The correlation ID
+/// is used to indicate two or more inference request are related to
+/// each other. How this relationship is handled by the inference
+/// server is determined by the model's scheduling policy.
 /// \param request_options The request options object.
 /// \param correlation_id The correlation ID.
 /// \return a TRTSERVER_Error indicating success or failure.
@@ -512,7 +525,6 @@ TRTSERVER_InferenceRequestOptionsSetCorrelationId(
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetBatchSize(
     TRTSERVER_InferenceRequestOptions* request_options, uint32_t batch_size);
-
 
 /// Add a input meta-data associated with the request in a request options.
 /// \param request_options The request options object.
@@ -534,7 +546,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsAddInput(
 /// \param request_options The request options object.
 /// \param output_name The name of the output.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsAddOutputRaw(
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsAddOutput(
     TRTSERVER_InferenceRequestOptions* request_options,
     const char* output_name);
 
@@ -545,7 +557,8 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsAddOutputRaw(
 /// \param count Indicates how many classification values should be returned
 /// for the output. The 'count' highest priority values are returned.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsAddOutputCls(
+TRTSERVER_EXPORT TRTSERVER_Error*
+TRTSERVER_InferenceRequestOptionsAddClassificationOutput(
     TRTSERVER_InferenceRequestOptions* request_options, const char* output_name,
     uint32_t count);
 
@@ -584,10 +597,9 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestProviderNew(
     const char* request_header_base, size_t request_header_byte_size);
 
 /// Create a new inference request provider object. The caller retains ownership
-/// of 'request_options' but may release it by calling
-/// TRTSERVER_InferenceRequestOptionsDelete once this function returns.
-/// However, the values in 'request_options' must not be modified until the
-/// request provider object can be deleted.
+/// of 'request_options' and the caller must extend the options object's
+/// lifetime to be longer than the lifetime of any providers created with the
+/// options object.
 /// \param request_provider Returns the new request provider object.
 /// \param server the inference server object.
 /// \param request_options The request options object for this inference

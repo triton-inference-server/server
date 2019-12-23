@@ -558,24 +558,6 @@ main(int argc, char** argv)
           &allocator, ResponseAlloc, ResponseRelease),
       "creating response allocator");
 
-  // The inference request provides meta-data with an
-  // InferRequestHeader and the actual data via a provider.
-  int64_t model_version = -1;  // latest
-
-  ni::InferRequestHeader request_header_protobuf;
-  request_header_protobuf.set_id(123);
-  request_header_protobuf.set_batch_size(1);
-
-  auto input0 = request_header_protobuf.add_input();
-  input0->set_name(is_torch_model ? "INPUT__0" : "INPUT0");
-  auto input1 = request_header_protobuf.add_input();
-  input1->set_name(is_torch_model ? "INPUT__1" : "INPUT1");
-
-  auto output0 = request_header_protobuf.add_output();
-  output0->set_name(is_torch_model ? "OUTPUT__0" : "OUTPUT0");
-  auto output1 = request_header_protobuf.add_output();
-  output1->set_name(is_torch_model ? "OUTPUT__1" : "OUTPUT1");
-
   // Create the data for the two input tensors. Initialize the first
   // to unique integers and the second to all ones.
   std::vector<char> input0_data;
@@ -588,27 +570,58 @@ main(int argc, char** argv)
     GenerateStringInputData(&input0_data, &input1_data);
   }
 
-  // Get the size of the input tensors
-  size_t input0_size = input0_data.size();
-  size_t input1_size = input1_data.size();
+  // The inference request provides meta-data with an
+  // inference request options and the actual data via a provider.
+  int64_t model_version = -1;  // latest
 
-  // For string we need to set batch byte size explicitly
-  if (dtype == ni::TYPE_STRING) {
-    input0->set_batch_byte_size(input0_size);
-    input1->set_batch_byte_size(input1_size);
-  }
-
-  // Create the inference request provider which provides all the
-  // input information needed for an inference.
   TRTSERVER_InferenceRequestOptions* request_options = nullptr;
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestOptionsNew(
           &request_options, model_name.c_str(), model_version),
       "creating inference request options");
+
   FAIL_IF_ERR(
-      SetTRTSERVER_InferenceRequestOptions(
-          request_options, request_header_protobuf),
-      "parsing inference request header");
+      TRTSERVER_InferenceRequestOptionsSetId(request_options, 123),
+      "setting ID for the request");
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsSetBatchSize(request_options, 1),
+      "setting batch size for the request");
+
+  auto input0 = is_torch_model ? "INPUT__0" : "INPUT0";
+  auto input1 = is_torch_model ? "INPUT__1" : "INPUT1";
+
+  // Get the size of the input tensors
+  size_t input0_size = input0_data.size();
+  size_t input1_size = input1_data.size();
+
+
+  // Setting input meta-data, some fields may be optional.
+  // i.e. dims and dims_count are optional for fixed-size tensor and
+  // batch_byte_size is optional for fixed-size data type.
+  // Here only the batch_byte_size is set because the inputs are fixed-size
+  // but the data type may be STRING
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsAddInput(
+          request_options, input0, nullptr /* dims */, 0 /* dim_count */,
+          input0_size),
+      "setting input 0 meta-data for the request");
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsAddInput(
+          request_options, input1, nullptr /* dims */, 0 /* dim_count */,
+          input1_size),
+      "setting input 1 meta-data for the request");
+
+  auto output0 = is_torch_model ? "OUTPUT__0" : "OUTPUT0";
+  auto output1 = is_torch_model ? "OUTPUT__1" : "OUTPUT1";
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsAddOutput(request_options, output0),
+      "requesting output 0 for the request");
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsAddOutput(request_options, output1),
+      "requesting output 1 for the request");
+
+  // Create the inference request provider which provides all the
+  // input information needed for an inference.
   TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderNewV2(
@@ -647,12 +660,12 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, input0->name().c_str(), input0_base, input0_size,
+          request_provider, input0, input0_base, input0_size,
           io_spec.input_type_, io_spec.input_type_id_),
       "assigning INPUT0 data");
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, input1->name().c_str(), input1_base, input1_size,
+          request_provider, input1, input1_base, input1_size,
           io_spec.input_type_, io_spec.input_type_id_),
       "assigning INPUT1 data");
 
@@ -722,8 +735,8 @@ main(int argc, char** argv)
   int64_t output0_memory_type_id;
   FAIL_IF_ERR(
       TRTSERVER_InferenceResponseOutputData(
-          response, output0->name().c_str(), &output0_content,
-          &output0_byte_size, &output0_memory_type, &output0_memory_type_id),
+          response, output0, &output0_content, &output0_byte_size,
+          &output0_memory_type, &output0_memory_type_id),
       "getting output0 result");
   if (dtype == ni::TYPE_STRING) {
     size_t expected0_size = expected0_data.size();
@@ -756,8 +769,8 @@ main(int argc, char** argv)
   int64_t output1_memory_type_id;
   FAIL_IF_ERR(
       TRTSERVER_InferenceResponseOutputData(
-          response, output1->name().c_str(), &output1_content,
-          &output1_byte_size, &output1_memory_type, &output1_memory_type_id),
+          response, output1, &output1_content, &output1_byte_size,
+          &output1_memory_type, &output1_memory_type_id),
       "getting output1 result");
   if (dtype == ni::TYPE_STRING) {
     size_t expected1_size = expected1_data.size();
@@ -817,16 +830,16 @@ main(int argc, char** argv)
 
   if (dtype == ni::TYPE_INT32) {
     CompareResult<int32_t>(
-        output0->name(), output1->name(), &input0_data[0], &input1_data[0],
-        output0_result, output1_result);
+        output0, output1, &input0_data[0], &input1_data[0], output0_result,
+        output1_result);
   } else if (dtype == ni::TYPE_FP32) {
     CompareResult<float>(
-        output0->name(), output1->name(), &input0_data[0], &input1_data[0],
-        output0_result, output1_result);
+        output0, output1, &input0_data[0], &input1_data[0], output0_result,
+        output1_result);
   } else {
     CompareStringResult(
-        output0->name(), output1->name(), &input0_data[0], &input1_data[0],
-        output0_result, output1_result);
+        output0, output1, &input0_data[0], &input1_data[0], output0_result,
+        output1_result);
   }
 
   FAIL_IF_ERR(
