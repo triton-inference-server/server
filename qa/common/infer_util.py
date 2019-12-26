@@ -66,7 +66,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
                 skip_request_id_check=False, use_streaming=True,
-                correlation_id=0, shm_region_names=None, precreated_shm_regions=None):
+                correlation_id=0, shm_region_names=None, precreated_shm_regions=None,
+                use_system_shared_memory=False, use_cuda_shared_memory=False):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
@@ -160,8 +161,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         expected1_list_tmp = expected1_list
 
     # Create and register system/cuda shared memory regions if needed
-    shm_handles = su.create_register_set_shm_regions(input0_list_tmp, input1_list_tmp, expected0_list_tmp, \
-                                    expected1_list_tmp, outputs, shm_region_names, precreated_shm_regions)
+    shm_handles = su.create_register_set_shm_regions(input0_list_tmp, input1_list_tmp, expected0_list_tmp,
+                                    expected1_list_tmp, outputs, shm_region_names, precreated_shm_regions,
+                                    use_system_shared_memory, use_cuda_shared_memory)
 
     # Run inference and check results for each config
     for config in configs:
@@ -267,7 +269,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                             tester.assertTrue(False, "unexpected class result {}".format(result_name))
 
     # Unregister system/cuda shared memory regions if they exist
-    su.unregister_cleanup_shm_regions(shm_handles, precreated_shm_regions, outputs)
+    su.unregister_cleanup_shm_regions(shm_handles, precreated_shm_regions, outputs,
+                                        use_system_shared_memory, use_cuda_shared_memory)
 
     return results
 
@@ -276,7 +279,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 # zero-sized input/output tensor.
 def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes,
                model_version=None, use_http=True, use_grpc=True,
-               use_streaming=True):
+               use_streaming=True, use_system_shared_memory=False, use_cuda_shared_memory=False):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
@@ -332,7 +335,8 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
                             np.dtype(tensor_dtype).itemsize * batch_size
         # create and register shared memory region for inputs and outputs
         shm_io_handle = su.create_register_set_either_shm_region(["input"+str(io_num), "output"+str(io_num)],\
-                                                input_list, input_byte_size, output_byte_size, shared_memory_ctx)
+                                                input_list, input_byte_size, output_byte_size, shared_memory_ctx,
+                                                use_system_shared_memory, use_cuda_shared_memory)
         if len(shm_io_handle) != 0:
             shm_ip_handles.append(shm_io_handle[0])
             shm_op_handles.append(shm_io_handle[1])
@@ -370,7 +374,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         for io_num in range(io_cnt):
             shared_memory_ctx.unregister(shm_ip_handles[io_num])
             shared_memory_ctx.unregister(shm_op_handles[io_num])
-            su.destroy_either_shm_region(shm_ip_handles[io_num])
-            su.destroy_either_shm_region(shm_op_handles[io_num])
+            su.destroy_either_shm_region(shm_ip_handles[io_num], use_system_shared_memory, use_cuda_shared_memory)
+            su.destroy_either_shm_region(shm_op_handles[io_num], use_system_shared_memory, use_cuda_shared_memory)
 
     return results

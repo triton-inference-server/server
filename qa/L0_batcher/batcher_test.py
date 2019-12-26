@@ -108,7 +108,9 @@ class BatcherTest(unittest.TestCase):
                                model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True,
                                use_streaming=False, shm_region_names=shm_region_names,
-                               precreated_shm_regions=precreated_shm_regions)
+                               precreated_shm_regions=precreated_shm_regions,
+                               use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                               use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             else:
                 self.assertFalse(True, "unknown trial type: " + trial)
 
@@ -998,7 +1000,9 @@ class BatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(target=iu.infer_zero,
                                                 args=(self, model_base, 1, dtype, shapes, shapes),
                                                 kwargs={'use_grpc': False,
-                                                'use_streaming': False}))
+                                                'use_streaming': False,
+                                                'use_system_shared_memory': TEST_SYSTEM_SHARED_MEMORY,
+                                                'use_cuda_shared_memory': TEST_CUDA_SHARED_MEMORY}))
             for t in threads:
                 t.start()
             for t in threads:
