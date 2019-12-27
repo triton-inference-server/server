@@ -170,7 +170,7 @@ def unregister_cleanup_shm_regions(shm_handles, precreated_shm_regions, outputs,
             else:
                 shm.destroy_shared_memory_region(shm_handles[2+i])
 
-def create_register_set_either_shm_region(shm_region_name, input_list, input_byte_size,
+def create_register_set_either_shm_region(shm_region_names, input_list, input_byte_size,
                                         output_byte_size, shared_memory_ctx,
                                         use_system_shared_memory, use_cuda_shared_memory):
     if use_cuda_shared_memory and use_system_shared_memory:
