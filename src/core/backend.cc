@@ -134,6 +134,7 @@ InferenceBackend::SetConfiguredScheduler(
 
   auto& model_name = Name();
   auto version = Version();
+  // [TODO] Assumption on runner tied to instance is not longer valid
   auto OnWarmup = [this, &model_name, &version,
                    &samples](uint32_t runner_idx) -> Status {
     for (const auto& sample : samples) {

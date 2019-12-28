@@ -25,6 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <condition_variable>
+#include <deque>
+#include <mutex>
 #include <NvInfer.h>
 #include <cuda_runtime_api.h>
 #include "src/core/backend.h"
@@ -35,10 +38,51 @@
 
 namespace nvidia { namespace inferenceserver {
 
+//
+// C++11 doesn't have a sync queue so we implement a simple one.
+//
+template<typename Item>
+class SyncQueue {
+ public:
+  SyncQueue() {}
+
+  bool Empty() {
+    std::lock_guard<std::mutex> lk(mu_);
+    return queue_.empty();
+  }
+
+  Item Get() {
+    std::unique_lock<std::mutex> lk(mu_);
+    if (queue_.empty()) {
+      cv_.wait(lk, [this] { return !queue_.empty(); });
+    }
+    auto res = queue_.front();
+    queue_.pop_front();
+    return res;
+  }
+
+  void Put(const Item& value) {
+    {
+      std::lock_guard<std::mutex> lk(mu_);
+      queue_.push_back(value);
+    }
+    cv_.notify_all();
+  }
+
+ private:
+  std::mutex mu_;
+  std::condition_variable cv_;
+  std::deque<Item> queue_;
+};
+
 class PlanBackend : public InferenceBackend {
  public:
   PlanBackend() = default;
   PlanBackend(PlanBackend&&) = default;
+
+  void Run(
+      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+      std::function<void(Status)> OnCompleteQueuedPayloads) override;
 
   // Create a context for execution for each instance for the
   // serialized plans specified in 'models'.
@@ -155,6 +199,13 @@ class PlanBackend : public InferenceBackend {
     // The array size is equal to Context::total_bindings_
     std::vector<void*> buffer_bindings_;
   };
+
+  // map from device ID (runner) to a queue containing available contexts
+  // associated with the device
+  std::map<int, SyncQueue<size_t>> device_context_map_;
+
+  // Next context to be used for the device.
+  std::map<int, size_t> next_context_;
 };
 
 std::ostream& operator<<(std::ostream& out, const PlanBackend& pb);
