@@ -279,7 +279,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 # zero-sized input/output tensor.
 def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes,
                model_version=None, use_http=True, use_grpc=True,
-               use_streaming=True, use_system_shared_memory=False, use_cuda_shared_memory=False):
+               use_streaming=True, shm_region_name_prefix=None, 
+               use_system_shared_memory=False, use_cuda_shared_memory=False):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
@@ -290,6 +291,9 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         configs.append(("localhost:8001", ProtocolType.GRPC, True))
     tester.assertEqual(len(input_shapes), len(output_shapes))
     io_cnt = len(input_shapes)
+
+    if shm_region_name_prefix is None:
+        shm_region_name_prefix = ["input", "output"]
 
     input_dict = {}
     output_dict = {}
@@ -334,8 +338,9 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         output_byte_size = tu.shape_element_count(output_shapes[io_num]) *\
                             np.dtype(tensor_dtype).itemsize * batch_size
         # create and register shared memory region for inputs and outputs
-        shm_io_handle = su.create_register_set_either_shm_region(["input"+str(io_num), "output"+str(io_num)],\
-                                                input_list, input_byte_size, output_byte_size, shared_memory_ctx,
+        shm_io_handle = su.create_register_set_either_shm_region([shm_region_name_prefix[0]+str(io_num), 
+                                                shm_region_name_prefix[1]+str(io_num)], input_list, 
+                                                input_byte_size, output_byte_size, shared_memory_ctx,
                                                 use_system_shared_memory, use_cuda_shared_memory)
         if len(shm_io_handle) != 0:
             shm_ip_handles.append(shm_io_handle[0])

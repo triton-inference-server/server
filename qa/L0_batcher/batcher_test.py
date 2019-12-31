@@ -997,10 +997,15 @@ class BatcherTest(unittest.TestCase):
             # use threads to send 12 requests without waiting for response
             threads = []
             for i in range(12):
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                    shm_region_name_prefix = ["input" + str(i), "output" + str(i)]
+                else:
+                    shm_region_name_prefix = None
                 threads.append(threading.Thread(target=iu.infer_zero,
                                                 args=(self, model_base, 1, dtype, shapes, shapes),
                                                 kwargs={'use_grpc': False,
                                                 'use_streaming': False,
+                                                'shm_region_name_prefix': shm_region_name_prefix,
                                                 'use_system_shared_memory': TEST_SYSTEM_SHARED_MEMORY,
                                                 'use_cuda_shared_memory': TEST_CUDA_SHARED_MEMORY}))
             for t in threads:
