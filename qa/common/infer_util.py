@@ -340,7 +340,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         if len(shm_io_handle) != 0:
             shm_ip_handles.append(shm_io_handle[0])
             shm_op_handles.append(shm_io_handle[1])
-            input_dict[input_name] = shm_ip_handles[io_num]
+            input_dict[input_name] = (shm_ip_handles[io_num], input_shapes)
             output_dict[output_name] = (InferContext.ResultFormat.RAW, shm_op_handles[io_num])
         else:
             input_dict[input_name] = input_list
