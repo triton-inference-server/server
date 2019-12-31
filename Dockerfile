@@ -291,7 +291,7 @@ COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/infer
 RUN cd /opt/tensorrtserver/lib && ln -sf libtbb.so.2 libtbb.so
 
 # Install openssl (Needed for h2o)
-RUN apt install build-essential checkinstall zlib1g-dev -y
+RUN apt-get update && apt-get install build-essential checkinstall zlib1g-dev -y
 RUN (cd /usr/local/src && \
     wget https://www.openssl.org/source/openssl-1.1.1c.tar.gz && \
     tar -xf openssl-1.1.1c.tar.gz && \
