@@ -25,11 +25,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <NvInfer.h>
+#include <cuda_runtime_api.h>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
-#include <NvInfer.h>
-#include <cuda_runtime_api.h>
+#include <thread>
 #include "src/core/backend.h"
 #include "src/core/backend_context.h"
 #include "src/core/model_config.pb.h"
@@ -41,17 +42,19 @@ namespace nvidia { namespace inferenceserver {
 //
 // C++11 doesn't have a sync queue so we implement a simple one.
 //
-template<typename Item>
+template <typename Item>
 class SyncQueue {
  public:
   SyncQueue() {}
 
-  bool Empty() {
+  bool Empty()
+  {
     std::lock_guard<std::mutex> lk(mu_);
     return queue_.empty();
   }
 
-  Item Get() {
+  Item Get()
+  {
     std::unique_lock<std::mutex> lk(mu_);
     if (queue_.empty()) {
       cv_.wait(lk, [this] { return !queue_.empty(); });
@@ -61,7 +64,8 @@ class SyncQueue {
     return res;
   }
 
-  void Put(const Item& value) {
+  void Put(const Item& value)
+  {
     {
       std::lock_guard<std::mutex> lk(mu_);
       queue_.push_back(value);
@@ -91,7 +95,8 @@ class PlanBackend : public InferenceBackend {
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
       const std::unordered_map<std::string, std::vector<char>>& models,
-      const ::google::protobuf::RepeatedPtrField<std::string>& profile_names);
+      const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
+      const std::shared_ptr<SyncQueue<size_t>>& context_queue);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(PlanBackend);
@@ -172,6 +177,22 @@ class PlanBackend : public InferenceBackend {
     nvinfer1::IRuntime* runtime_;
     nvinfer1::ICudaEngine* engine_;
 
+    // Additional CUDA stream and events to overlap copy and execution
+    cudaStream_t input_copy_stream_;
+
+    // input buffer can be filled with next request
+    cudaEvent_t* ready_for_input_;
+    cudaEvent_t* input_ready_;
+    // [TODO] this may be done in the form of callback
+    // execution is completed and output is copied out
+    cudaEvent_t* ready_for_execution_;
+
+    // Completion thread for handling items in the corresponding completion
+    // queue. One thread per instance so that the thread logic is simple as this
+    // avoids busy-looping on different model executions' event states.
+    std::thread completion_thread_;
+    SyncQueue<std::function<void(Status)>> completion_queue_;
+
     // Map from profile index to the corresponding TensorRT context. Use map
     // to ensure each profile index is mapped to exactly one TensorRT context.
     std::map<int, TensorRTContext> trt_contexts_;
@@ -202,7 +223,7 @@ class PlanBackend : public InferenceBackend {
 
   // map from device ID (runner) to a queue containing available contexts
   // associated with the device
-  std::map<int, SyncQueue<size_t>> device_context_map_;
+  std::map<int, std::shared_ptr<SyncQueue<size_t>>> device_context_map_;
 
   // Next context to be used for the device.
   std::map<int, size_t> next_context_;
