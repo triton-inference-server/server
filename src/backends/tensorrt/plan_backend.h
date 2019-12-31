@@ -181,11 +181,11 @@ class PlanBackend : public InferenceBackend {
     cudaStream_t input_copy_stream_;
 
     // input buffer can be filled with next request
-    cudaEvent_t* ready_for_input_;
-    cudaEvent_t* input_ready_;
+    cudaEvent_t ready_for_input_;
+    cudaEvent_t input_ready_;
     // [TODO] this may be done in the form of callback
     // execution is completed and output is copied out
-    cudaEvent_t* ready_for_execution_;
+    cudaEvent_t ready_for_execution_;
 
     // Completion thread for handling items in the corresponding completion
     // queue. One thread per instance so that the thread logic is simple as this
@@ -221,12 +221,11 @@ class PlanBackend : public InferenceBackend {
     std::vector<void*> buffer_bindings_;
   };
 
-  // map from device ID (runner) to a queue containing available contexts
-  // associated with the device
-  std::map<int, std::shared_ptr<SyncQueue<size_t>>> device_context_map_;
+  // vector for storing available context queue associated with a runner (device)
+  std::vector<std::shared_ptr<SyncQueue<size_t>>> available_context_queue_;
 
-  // Next context to be used for the device.
-  std::map<int, size_t> next_context_;
+  // Next context to be used for the runner (device).
+  std::vector<size_t> next_context_;
 };
 
 std::ostream& operator<<(std::ostream& out, const PlanBackend& pb);

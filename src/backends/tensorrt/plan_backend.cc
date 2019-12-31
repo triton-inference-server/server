@@ -123,21 +123,17 @@ PlanBackend::Context::~Context()
     runtime_->destroy();
     runtime_ = nullptr;
   }
-  if (ready_for_input_ != nullptr) {
-    cudaEventDestroy(*ready_for_input_);
-    ready_for_input_ = nullptr;
-  }
-  if (input_ready_ != nullptr) {
-    cudaEventDestroy(*input_ready_);
-    input_ready_ = nullptr;
-  }
-  if (ready_for_execution_ != nullptr) {
-    cudaEventDestroy(*ready_for_execution_);
-    ready_for_execution_ = nullptr;
-  }
+
+  // [TODO] must not destroy an event if not created
+  cudaEventDestroy(ready_for_input_);
+  cudaEventDestroy(input_ready_);
+  cudaEventDestroy(ready_for_execution_);
+
   // Notify the completion thread to exit
   completion_queue_.Put(nullptr);
-  completion_thread_.join();
+  if (completion_thread_.joinable()) {
+    completion_thread_.join();
+  }
 }
 
 Status
@@ -148,6 +144,10 @@ PlanBackend::CreateExecutionContexts(
   // are serialized with a global lock.
   static std::mutex global_context_mu;
   std::lock_guard<std::mutex> glock(global_context_mu);
+
+  // Only need to map device to runner when creating contexts, after that,
+  // only runner idx is needed.
+  std::map<int, size_t> device_to_runner_map;
 
   // Create a runtime/engine/context trifecta for each instance.
   //
@@ -166,15 +166,17 @@ PlanBackend::CreateExecutionContexts(
 
     for (int c = 0; c < group.count(); c++) {
       for (int gpu_device : group.gpus()) {
+        auto it = device_to_runner_map.find(gpu_device);
+        if (it == device_to_runner_map.end()) {
+          it = device_to_runner_map.emplace(gpu_device, available_context_queue_.size()).first;
+          available_context_queue_.emplace_back(new SyncQueue<size_t>());
+          next_context_.emplace_back(-1);
+        }
         // Initialize all key-value pair in advance so that the map
         // can be mutex-free.
-        next_context_[gpu_device] = -1;
         // The last entry in contexts_ is the newly created context
-        auto& queue = device_context_map_[gpu_device];
-        if (queue == nullptr) {
-          queue.reset(new SyncQueue<size_t>());
-        }
-        queue->Put(contexts_.size() - 1);
+        auto& queue = available_context_queue_[it->second];
+        queue->Put(contexts_.size());
 
         const std::string instance_name = group.name() + "_" +
                                           std::to_string(c) + "_gpu" +
@@ -190,10 +192,10 @@ PlanBackend::CreateExecutionContexts(
   // this model. Each runner is responsible to dispatch tasks to contexts
   // associated with the corresponding GPU.
   RETURN_IF_ERROR(SetConfiguredScheduler(
-      device_context_map_.size(),
+      available_context_queue_.size(),
       [this](uint32_t runner_idx) -> Status {
         // Obtain any context as the next context for the corresponding device
-        next_context_[runner_idx] = device_context_map_[runner_idx]->Get();
+        next_context_[runner_idx] = available_context_queue_[runner_idx]->Get();
         return Status::Success;
       },
       [this](
@@ -328,12 +330,27 @@ PlanBackend::CreateExecutionContext(
   auto context_idx = contexts_.size() - 1;
 
   // Set the device before generating engine and context.
+  // [TODO] FIXME set device is not obvious here..
   cuerr = cudaSetDevice(gpu_device);
   if (cuerr != cudaSuccess) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to set device for " + Name() +
                                          ": " + cudaGetErrorString(cuerr));
   }
+
+  // Create CUDA streams associated with the execution context
+  const int cuda_stream_priority =
+      GetCudaStreamPriority(Config().optimization().priority());
+  RETURN_IF_ERROR(context->CreateCudaStream(cuda_stream_priority));
+  RETURN_IF_ERROR(context->CreateCudaStream(
+      cuda_stream_priority, &context->input_copy_stream_));
+
+  // Create CUDA events associated with the execution states
+  RETURN_IF_ERROR(
+      CreateCudaEvent("ready for input", &context->ready_for_input_));
+  RETURN_IF_ERROR(CreateCudaEvent("input ready", &context->input_ready_));
+  RETURN_IF_ERROR(
+      CreateCudaEvent("ready for execution", &context->ready_for_execution_));
 
   RETURN_IF_ERROR(
       LoadPlan(mn_itr->second, &context->runtime_, &context->engine_));
@@ -412,20 +429,6 @@ PlanBackend::CreateExecutionContext(
     }
   }
 
-  // Create CUDA streams associated with the execution context
-  const int cuda_stream_priority =
-      GetCudaStreamPriority(Config().optimization().priority());
-  RETURN_IF_ERROR(context->CreateCudaStream(cuda_stream_priority));
-  RETURN_IF_ERROR(context->CreateCudaStream(
-      cuda_stream_priority, &context->input_copy_stream_));
-
-  // Create CUDA events associated with the execution states
-  RETURN_IF_ERROR(
-      CreateCudaEvent("ready for input", context->ready_for_input_));
-  RETURN_IF_ERROR(CreateCudaEvent("input ready", context->input_ready_));
-  RETURN_IF_ERROR(
-      CreateCudaEvent("ready for execution", context->ready_for_execution_));
-
   // Passing the queue for available contexts here so that completion thread
   // knows where to inform that the context is ready for inputs.
   std::shared_ptr<SyncQueue<size_t>> lqueue = context_queue;
@@ -436,9 +439,9 @@ PlanBackend::CreateExecutionContext(
         break;
       }
       // A model execution has been issued on the context
-      cudaEventSynchronize(*context->ready_for_input_);
+      cudaEventSynchronize(context->ready_for_input_);
       lqueue->Put(context_idx);
-      cudaEventSynchronize(*context->ready_for_execution_);
+      cudaEventSynchronize(context->ready_for_execution_);
       // Just trigger the callback, Payloads are all-set
       // [TODO] check CUDA error?
       OnComplete(Status::Success);
@@ -909,11 +912,11 @@ PlanBackend::Run(
     std::function<void(Status)> OnCompleteQueuedPayloads)
 {
   // Each runner executes using the corresponding context...
-  if (runner_idx >= device_context_map_.size()) {
+  if (runner_idx >= available_context_queue_.size()) {
     OnCompleteQueuedPayloads(Status(
         RequestStatusCode::INTERNAL,
         "unexpected runner index" + std::to_string(runner_idx) +
-            ", max allowed " + std::to_string(device_context_map_.size())));
+            ", max allowed " + std::to_string(available_context_queue_.size())));
     return;
   }
 
@@ -957,7 +960,7 @@ PlanBackend::Run(
 
   // Set the next context to be executed on this runner, will block
   // until there is available context for the runner
-  next_context_[runner_idx] = device_context_map_[runner_idx]->Get();
+  next_context_[runner_idx] = available_context_queue_[runner_idx]->Get();
 }
 
 Status
@@ -1094,7 +1097,7 @@ PlanBackend::Context::Run(
         input_copy_stream_, static_cast<char*>(buffers_[bindex]));
   }
 
-  cudaEventRecord(*input_ready_, input_copy_stream_);
+  cudaEventRecord(input_ready_, input_copy_stream_);
 
   // [TODO] the timestamp is not being captured correctly?
 #ifdef TRTIS_ENABLE_STATS
@@ -1108,8 +1111,8 @@ PlanBackend::Context::Run(
 
   // Ensure inputs are ready and output buffers are available before
   // execution.
-  cudaStreamWaitEvent(stream_, *input_ready_, 0);
-  cudaStreamWaitEvent(stream_, *ready_for_execution_, 0);
+  cudaStreamWaitEvent(stream_, input_ready_, 0);
+  cudaStreamWaitEvent(stream_, ready_for_execution_, 0);
 
   // Async execute the inference using a CUDA graph if available for
   // the batch-size, otherwise execution normally.
@@ -1128,7 +1131,7 @@ PlanBackend::Context::Run(
     // [TODO] can we include event record when capturing the graph?
     // If we end up using event, we need completion thread to be busy-waiting
     // for event to be finished. Or per instance basis? Task-based concurrecy
-    cudaEventRecord(*ready_for_input_, stream_);
+    cudaEventRecord(ready_for_input_, stream_);
   } else {
     LOG_VERBOSE(1) << "Context with profile " << citr->second.profile_name_
                    << " [" << std::to_string(citr->first)
@@ -1140,7 +1143,7 @@ PlanBackend::Context::Run(
             "failed to specify the dimensions of all input bindings");
       }
       if (!citr->second.context_->enqueueV2(
-              buffer_bindings_.data(), stream_, ready_for_input_)) {
+              buffer_bindings_.data(), stream_, &ready_for_input_)) {
         cudaStreamSynchronize(stream_);
         return Status(
             RequestStatusCode::INTERNAL,
@@ -1149,7 +1152,7 @@ PlanBackend::Context::Run(
     } else {
       if (!citr->second.context_->enqueue(
               total_batch_size, buffer_bindings_.data(), stream_,
-              ready_for_input_)) {
+              &ready_for_input_)) {
         cudaStreamSynchronize(stream_);
         return Status(
             RequestStatusCode::INTERNAL,
@@ -1217,7 +1220,7 @@ PlanBackend::Context::Run(
         TRTSERVER_MEMORY_GPU /* src_memory_type */, gpu_device_, payloads);
   }
 
-  cudaEventRecord(*ready_for_execution_, stream_);
+  cudaEventRecord(ready_for_execution_, stream_);
 
   return Status::Success;
 }
