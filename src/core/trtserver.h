@@ -475,8 +475,8 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceManagerDelete(
 typedef enum trtserver_requestoptionsflag_enum {
   TRTSERVER_REQUEST_FLAG_NONE = 0,
   TRTSERVER_REQUEST_FLAG_SEQUENCE_START = 1,
-  TRTSERVER_REQUEST__FLAG_SEQUENCE_END = 2
-} TRTSERVER_REQUEST_OPTIONS_FLAG;
+  TRTSERVER_REQUEST_FLAG_SEQUENCE_END = 2
+} TRTSERVER_Request_Options_Flag;
 
 /// Create a new inference request options object.
 /// \param request_options Returns the new request options object.
@@ -499,7 +499,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetId(
 
 /// Set the flag associated with the request in a request options. 'flags'
 /// should holds a bitwise-or of all flag values, see
-/// TRTSERVER_REQUEST_OPTIONS_FLAG for available flags.
+/// TRTSERVER_Request_Options_Flag for available flags.
 /// \param request_options The request options object.
 /// \param flags The flags.
 /// \return a TRTSERVER_Error indicating success or failure.
