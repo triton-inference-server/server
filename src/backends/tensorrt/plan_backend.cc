@@ -44,7 +44,9 @@ namespace {
 Status
 CreateCudaEvent(const std::string& event_name, cudaEvent_t* event)
 {
-  auto cuerr = cudaEventCreateWithFlags(event, cudaEventDisableTiming);
+  // cudaEventBlockingSync to avoid busy-waiting on CPU thread
+  auto cuerr = cudaEventCreateWithFlags(
+      event, cudaEventDisableTiming | cudaEventBlockingSync);
   if (cuerr != cudaSuccess) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to create CUDA event for " +
@@ -64,6 +66,7 @@ PlanBackend::Context::Context(
 {
   stream_ = nullptr;
   input_copy_stream_ = nullptr;
+  input_ready_ = nullptr;
   ready_for_input_ = nullptr;
   ready_for_execution_ = nullptr;
 }
@@ -124,10 +127,15 @@ PlanBackend::Context::~Context()
     runtime_ = nullptr;
   }
 
-  // [TODO] must not destroy an event if not created
-  cudaEventDestroy(ready_for_input_);
-  cudaEventDestroy(input_ready_);
-  cudaEventDestroy(ready_for_execution_);
+  if (ready_for_input_ != nullptr) {
+    cudaEventDestroy(ready_for_input_);
+  }
+  if (input_ready_ != nullptr) {
+    cudaEventDestroy(input_ready_);
+  }
+  if (ready_for_execution_ != nullptr) {
+    cudaEventDestroy(ready_for_execution_);
+  }
 
   // Notify the completion thread to exit
   completion_queue_.Put(nullptr);
@@ -168,7 +176,9 @@ PlanBackend::CreateExecutionContexts(
       for (int gpu_device : group.gpus()) {
         auto it = device_to_runner_map.find(gpu_device);
         if (it == device_to_runner_map.end()) {
-          it = device_to_runner_map.emplace(gpu_device, available_context_queue_.size()).first;
+          it = device_to_runner_map
+                   .emplace(gpu_device, available_context_queue_.size())
+                   .first;
           available_context_queue_.emplace_back(new SyncQueue<size_t>());
           next_context_.emplace_back(-1);
         }
@@ -329,8 +339,7 @@ PlanBackend::CreateExecutionContext(
   Context* context = static_cast<Context*>(contexts_.back().get());
   auto context_idx = contexts_.size() - 1;
 
-  // Set the device before generating engine and context.
-  // [TODO] FIXME set device is not obvious here..
+  // Set the device before preparing the context.
   cuerr = cudaSetDevice(gpu_device);
   if (cuerr != cudaSuccess) {
     return Status(
@@ -916,7 +925,8 @@ PlanBackend::Run(
     OnCompleteQueuedPayloads(Status(
         RequestStatusCode::INTERNAL,
         "unexpected runner index" + std::to_string(runner_idx) +
-            ", max allowed " + std::to_string(available_context_queue_.size())));
+            ", max allowed " +
+            std::to_string(available_context_queue_.size())));
     return;
   }
 

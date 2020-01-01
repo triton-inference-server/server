@@ -221,7 +221,8 @@ class PlanBackend : public InferenceBackend {
     std::vector<void*> buffer_bindings_;
   };
 
-  // vector for storing available context queue associated with a runner (device)
+  // vector for storing available context queue associated with a runner
+  // (device)
   std::vector<std::shared_ptr<SyncQueue<size_t>>> available_context_queue_;
 
   // Next context to be used for the runner (device).
