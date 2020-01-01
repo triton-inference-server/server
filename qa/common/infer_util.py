@@ -422,7 +422,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
 # return the shape of the resized tensor.
 def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values, dummy_input_shapes,
                model_version=None, use_http=True, use_grpc=True,
-               use_streaming=True):
+               use_streaming=True, shm_suffix=""):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
@@ -443,7 +443,6 @@ def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values,
     shm_ip_handles = list()
     shm_op_handles = list()
     shared_memory_ctx = SharedMemoryControlContext("localhost:8000",  ProtocolType.HTTP, verbose=False)
-    shared_memory_ctx.unregister_all()
 
     for io_num in range(io_cnt):
         tester.assertTrue(pf == "plan" or pf == "plan_nobatch")
@@ -493,13 +492,13 @@ def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values,
         
         # create and register shared memory region for inputs and outputs
         if TEST_CUDA_SHARED_MEMORY:
-            shm_ip_handles.append(cudashm.create_shared_memory_region("input"+str(io_num)+"_data",
+            shm_ip_handles.append(cudashm.create_shared_memory_region("input"+str(io_num)+"_data"+shm_suffix,
                                                                 input_byte_size, 0))
-            shm_ip_handles.append(cudashm.create_shared_memory_region("dummy_input"+str(io_num)+"_data",
+            shm_ip_handles.append(cudashm.create_shared_memory_region("dummy_input"+str(io_num)+"_data"+shm_suffix,
                                                                 dummy_input_byte_size, 0))
-            shm_op_handles.append(cudashm.create_shared_memory_region("output"+str(io_num)+"_data",
+            shm_op_handles.append(cudashm.create_shared_memory_region("output"+str(io_num)+"_data"+shm_suffix,
                                                                 output_byte_size, 0))
-            shm_op_handles.append(cudashm.create_shared_memory_region("dummy_output"+str(io_num)+"_data",
+            shm_op_handles.append(cudashm.create_shared_memory_region("dummy_output"+str(io_num)+"_data"+shm_suffix,
                                                                 dummy_output_byte_size, 0))
             
             shared_memory_ctx.cuda_register(shm_ip_handles[2 * io_num])
@@ -511,14 +510,14 @@ def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values,
             cudashm.set_shared_memory_region(shm_ip_handles[2 * io_num], input_list)
             cudashm.set_shared_memory_region(shm_ip_handles[2 * io_num + 1], dummy_input_list)
         elif TEST_SYSTEM_SHARED_MEMORY:
-            shm_ip_handles.append(shm.create_shared_memory_region("input"+str(io_num)+"_data",\
-                                        "/input"+str(io_num), input_byte_size))
-            shm_ip_handles.append(shm.create_shared_memory_region("dumy_input"+str(io_num)+"_data",\
-                                        "/dummy_input"+str(io_num), dummy_input_byte_size))
-            shm_op_handles.append(shm.create_shared_memory_region("output"+str(io_num)+"_data",\
-                                        "/output"+str(io_num), output_byte_size))
-            shm_op_handles.append(shm.create_shared_memory_region("dummy_output"+str(io_num)+"_data",\
-                                        "/dummy_output"+str(io_num), dummy_output_byte_size))                   
+            shm_ip_handles.append(shm.create_shared_memory_region("input"+str(io_num)+"_data"+shm_suffix,\
+                                        "/input"+str(io_num)+shm_suffix, input_byte_size))
+            shm_ip_handles.append(shm.create_shared_memory_region("dumy_input"+str(io_num)+"_data"+shm_suffix,\
+                                        "/dummy_input"+str(io_num)+shm_suffix, dummy_input_byte_size))
+            shm_op_handles.append(shm.create_shared_memory_region("output"+str(io_num)+"_data"+shm_suffix,\
+                                        "/output"+str(io_num)+shm_suffix, output_byte_size))
+            shm_op_handles.append(shm.create_shared_memory_region("dummy_output"+str(io_num)+"_data"+shm_suffix,\
+                                        "/dummy_output"+str(io_num)+shm_suffix, dummy_output_byte_size)) 
             shared_memory_ctx.register(shm_ip_handles[2 * io_num])
             shared_memory_ctx.register(shm_ip_handles[2 * io_num + 1])
             shared_memory_ctx.register(shm_op_handles[2 * io_num])

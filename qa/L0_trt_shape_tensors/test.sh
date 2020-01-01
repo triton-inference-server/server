@@ -39,15 +39,20 @@ CLIENT_LOG="./client.log"
 INFER_TEST=trt_shape_tensor_test.py
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-repository=`pwd`/models
+SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 rm -f $SERVER_LOG $CLIENT_LOG
+rm -fr *.serverlog
 rm -fr models && mkdir models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_shapetensor_model_repository/* models/.
 
 RET=0
+
+# Must run on a single device or else the TRTSERVER_DELAY_SCHEDULER
+# can fail when the requests are distributed to multiple devices.
+export CUDA_VISIBLE_DEVICES=0
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -61,7 +66,9 @@ set +e
 # python unittest seems to swallow ImportError and still return 0
 # exit code. So need to explicitly check CLIENT_LOG to make sure
 # we see some running tests
-python $INFER_TEST >$CLIENT_LOG 2>&1
+
+# Sanity tests
+python $INFER_TEST InferShapeTensorTest.test_static_batch >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -75,10 +82,68 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+python $INFER_TEST InferShapeTensorTest.test_nobatch >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed To Run\n***"
+    RET=1
+fi
+
+python $INFER_TEST InferShapeTensorTest.test_wrong_shape_values >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
 set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+if [ $RET -eq 0 ]; then
+  echo -e "\n*** Sanity Test Passed*** \n"
+else
+  exit $RET
+fi
+
+# Prepare the config file for dynamic batching tests
+CONFIG_FILE="models/plan_zero_1_float32/config.pbtxt"
+sed -i "s/^max_batch_size:.*/max_batch_size: 8/" $CONFIG_FILE && \
+sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" $CONFIG_FILE && \
+                echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> $CONFIG_FILE
+
+for i in \
+            test_multi_batch_different_shape_values \
+            test_multi_batch_same_shape_values; do
+        SERVER_LOG="./$i.serverlog"
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
+
+        echo "Test: $i, $model_type" >>$CLIENT_LOG
+
+        set +e
+        python $INFER_TEST InferShapeTensorTest.$i >>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+
+        kill $SERVER_PID
+        wait $SERVER_PID
+    done
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
