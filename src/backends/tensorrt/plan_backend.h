@@ -183,15 +183,22 @@ class PlanBackend : public InferenceBackend {
     // input buffer can be filled with next request
     cudaEvent_t ready_for_input_;
     cudaEvent_t input_ready_;
-    // [TODO] this may be done in the form of callback
-    // execution is completed and output is copied out
-    cudaEvent_t ready_for_execution_;
+
+    // event for capturing correct timestamp, the next execution must wait for
+    // 'output_ready_' as it signals that the output buffers are available
+    cudaEvent_t ready_for_output_;
+    cudaEvent_t output_ready_;
 
     // Completion thread for handling items in the corresponding completion
     // queue. One thread per instance so that the thread logic is simple as this
     // avoids busy-looping on different model executions' event states.
     std::thread completion_thread_;
-    SyncQueue<std::function<void(Status)>> completion_queue_;
+
+    // Assume that the lifetime of the payload is extended until the completion
+    // callback is called
+    SyncQueue<std::pair<
+        std::function<void(Status)>, std::vector<Scheduler::Payload>*>>
+        completion_queue_;
 
     // Map from profile index to the corresponding TensorRT context. Use map
     // to ensure each profile index is mapped to exactly one TensorRT context.
@@ -222,10 +229,9 @@ class PlanBackend : public InferenceBackend {
   };
 
   // vector for storing available context queue associated with a runner
-  // (device)
   std::vector<std::shared_ptr<SyncQueue<size_t>>> available_context_queue_;
 
-  // Next context to be used for the runner (device).
+  // Next context to be used for the runner.
   std::vector<size_t> next_context_;
 };
 
