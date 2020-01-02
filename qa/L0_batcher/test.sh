@@ -224,113 +224,103 @@ for i in \
     wait $SERVER_PID
 done
 
-# Workaround to avoid the deeply condition on environment variable in test utils
-SHARED_MEMORY_SET=0
-if [[ ! -z $TEST_SYSTEM_SHARED_MEMORY ]] && [[ "$TEST_SYSTEM_SHARED_MEMORY" != "0" ]] ; then
-    SHARED_MEMORY_SET=1
+# Test that verify the 'preserve_ordering' option in dynamic batcher
+# Run the test scheme with and without preserve ordering, verify behavior
+# by comparing the "response send" timestamps.
+TEST_CASE=test_multi_batch_preserve_ordering
+
+rm -fr ./custom_models && mkdir ./custom_models && \
+    cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
+    mkdir -p ./custom_models/custom_zero_1_float32/1 && \
+    cp ./libidentity.so ./custom_models/custom_zero_1_float32/1/libcustom.so
+
+# Two instances will be created for the custom model, one delays 100 ms while
+# the other delays 400 ms
+(cd custom_models/custom_zero_1_float32 && \
+        sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
+        sed -i "s/max_batch_size:.*/max_batch_size: 4/g" config.pbtxt && \
+        echo "dynamic_batching { preferred_batch_size: [ 4 ] }" >> config.pbtxt && \
+        echo "instance_group [ { kind: KIND_CPU count: 2 }]" >> config.pbtxt && \
+        echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"100\" }}," >> config.pbtxt && \
+        echo "{ key: \"instance_wise_delay_multiplier\"; value: { string_value: \"4\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
+
+# equeue 3 batches to guarantee that a large delay batch will be followed by
+# a small delay one regardless of the order issued to model instances.
+# i.e. the 3 batches will be queued: [1, 2, 3] and there are two delay instances
+# [small, large], then the distributions can be the following:
+# [1:small 2:large 3:small] or [1:large 2:small 3:*] (* depends on whether order
+# is preserved), and we only interested in the timestamps where the large delay
+# batch is followed by small delay batch
+export TRTSERVER_DELAY_SCHEDULER=12
+
+# not preserve
+SERVER_ARGS="--trace-file=not_preserve.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/custom_models"
+SERVER_LOG="./not_preserve.serverlog"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
 fi
-if [[ ! -z $TEST_CUDA_SHARED_MEMORY ]] && [[ "$TEST_CUDA_SHARED_MEMORY" != "0" ]] ; then
-    SHARED_MEMORY_SET=1
+
+echo "Test: not_preserve" >>$CLIENT_LOG
+
+set +e
+python $BATCHER_TEST BatcherTest.$TEST_CASE >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
-if [[ "$SHARED_MEMORY_SET" == "0" ]]; then
-    # Test that verify the 'preserve_ordering' option in dynamic batcher
-    # Run the test scheme with and without preserve ordering, verify behavior
-    # by comparing the "response send" timestamps.
-    TEST_CASE=test_multi_batch_preserve_ordering
+set -e
 
-    rm -fr ./custom_models && mkdir ./custom_models && \
-        cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
-        mkdir -p ./custom_models/custom_zero_1_float32/1 && \
-        cp ./libidentity.so ./custom_models/custom_zero_1_float32/1/libcustom.so
+kill $SERVER_PID
+wait $SERVER_PID
 
-    # Two instances will be created for the custom model, one delays 100 ms while
-    # the other delays 400 ms
-    (cd custom_models/custom_zero_1_float32 && \
-            sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
-            sed -i "s/max_batch_size:.*/max_batch_size: 4/g" config.pbtxt && \
-            echo "dynamic_batching { preferred_batch_size: [ 4 ] }" >> config.pbtxt && \
-            echo "instance_group [ { kind: KIND_CPU count: 2 }]" >> config.pbtxt && \
-            echo "parameters [" >> config.pbtxt && \
-            echo "{ key: \"execute_delay_ms\"; value: { string_value: \"100\" }}," >> config.pbtxt && \
-            echo "{ key: \"instance_wise_delay_multiplier\"; value: { string_value: \"4\" }}" >> config.pbtxt && \
-            echo "]" >> config.pbtxt)
-
-    # equeue 3 batches to guarantee that a large delay batch will be followed by
-    # a small delay one regardless of the order issued to model instances.
-    # i.e. the 3 batches will be queued: [1, 2, 3] and there are two delay instances
-    # [small, large], then the distributions can be the following:
-    # [1:small 2:large 3:small] or [1:large 2:small 3:*] (* depends on whether order
-    # is preserved), and we only interested in the timestamps where the large delay
-    # batch is followed by small delay batch
-    export TRTSERVER_DELAY_SCHEDULER=12
-
-    # not preserve
-    SERVER_ARGS="--trace-file=not_preserve.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/custom_models"
-    SERVER_LOG="./not_preserve.serverlog"
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
-
-    echo "Test: not_preserve" >>$CLIENT_LOG
-
-    set +e
-    python $BATCHER_TEST BatcherTest.$TEST_CASE >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
-
-    kill $SERVER_PID
-    wait $SERVER_PID
-
-    set +e
-    python $VERIFY_TIMESTAMPS not_preserve.log
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
-
-    # preserve
-    (cd custom_models/custom_zero_1_float32 && \
-            sed -i "s/dynamic_batching.*/dynamic_batching { preferred_batch_size: [ 4 ] preserve_ordering: true }/g" config.pbtxt)
-
-    SERVER_ARGS="--trace-file=preserve.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/custom_models"
-    SERVER_LOG="./preserve.serverlog"
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
-
-    echo "Test: preserve" >>$CLIENT_LOG
-
-    set +e
-    python $BATCHER_TEST BatcherTest.$TEST_CASE >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
-
-    kill $SERVER_PID
-    wait $SERVER_PID
-
-    set +e
-    python $VERIFY_TIMESTAMPS -p preserve.log
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
-
-    unset TRTSERVER_DELAY_SCHEDULER
+set +e
+python $VERIFY_TIMESTAMPS not_preserve.log
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
 fi
+set -e
+
+# preserve
+(cd custom_models/custom_zero_1_float32 && \
+        sed -i "s/dynamic_batching.*/dynamic_batching { preferred_batch_size: [ 4 ] preserve_ordering: true }/g" config.pbtxt)
+
+SERVER_ARGS="--trace-file=preserve.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/custom_models"
+SERVER_LOG="./preserve.serverlog"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+echo "Test: preserve" >>$CLIENT_LOG
+
+set +e
+python $BATCHER_TEST BatcherTest.$TEST_CASE >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+python $VERIFY_TIMESTAMPS -p preserve.log
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+unset TRTSERVER_DELAY_SCHEDULER
 
 # python unittest seems to swallow ImportError and still return 0 exit
 # code. So need to explicitly check CLIENT_LOG to make sure we see
