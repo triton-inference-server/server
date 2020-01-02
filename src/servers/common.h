@@ -26,6 +26,7 @@
 #pragma once
 
 #include <iostream>
+#include "src/core/api.pb.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/trtserver.h"
 
@@ -109,5 +110,9 @@ class RequestStatusUtil {
   // Return a unique request ID
   static uint64_t NextUniqueRequestId();
 };
+
+TRTSERVER_Error* SetTRTSERVER_InferenceRequestOptions(
+    TRTSERVER_InferenceRequestOptions* request_options,
+    InferRequestHeader request_header_protobuf);
 
 }}  // namespace nvidia::inferenceserver

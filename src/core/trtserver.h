@@ -50,6 +50,7 @@ typedef void cudaIpcMemHandle_t;
 #endif  // TRTIS_ENABLE_GPU
 
 struct TRTSERVER_Error;
+struct TRTSERVER_InferenceRequestOptions;
 struct TRTSERVER_InferenceRequestProvider;
 struct TRTSERVER_InferenceResponse;
 struct TRTSERVER_Metrics;
@@ -465,6 +466,108 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceManagerNew(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceManagerDelete(
     TRTSERVER_TraceManager* trace_manager);
 
+/// TRTSERVER_InferenceRequestOptions
+///
+/// Object representing the request meta-data needed for an inference.
+///
+
+/// Inference request option flags. The enum values must be power-of-2 values.
+typedef enum trtserver_requestoptionsflag_enum {
+  TRTSERVER_REQUEST_FLAG_NONE = 0,
+  TRTSERVER_REQUEST_FLAG_SEQUENCE_START = 1,
+  TRTSERVER_REQUEST_FLAG_SEQUENCE_END = 2
+} TRTSERVER_Request_Options_Flag;
+
+/// Create a new inference request options object.
+/// \param request_options Returns the new request options object.
+/// \param model_name The name of the model that the inference request is for.
+/// \param model_version The version of the model that the inference
+/// request is for, or -1 to select the latest (highest numbered) version.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsNew(
+    TRTSERVER_InferenceRequestOptions** request_options, const char* model_name,
+    int64_t model_version);
+
+/// Set the ID for the request in a request options. The response of the request
+/// will contain the same ID. The request sender can use the ID to correlate
+/// the response to corresponding request if needed. The default value is 0.
+/// \param request_options The request options object.
+/// \param id The ID.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetId(
+    TRTSERVER_InferenceRequestOptions* request_options, uint64_t id);
+
+/// Set the flag associated with the request in a request options. 'flags'
+/// should holds a bitwise-or of all flag values, see
+/// TRTSERVER_Request_Options_Flag for available flags.
+/// \param request_options The request options object.
+/// \param flags The flags.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetFlags(
+    TRTSERVER_InferenceRequestOptions* request_options, uint32_t flags);
+
+/// The correlation ID of the inference request. Default is 0, which
+/// indictes that the request has no correlation ID. The correlation ID
+/// is used to indicate two or more inference request are related to
+/// each other. How this relationship is handled by the inference
+/// server is determined by the model's scheduling policy.
+/// \param request_options The request options object.
+/// \param correlation_id The correlation ID.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error*
+TRTSERVER_InferenceRequestOptionsSetCorrelationId(
+    TRTSERVER_InferenceRequestOptions* request_options,
+    uint64_t correlation_id);
+
+/// Set the batch size for the request in a request options.
+/// \param request_options The request options object.
+/// \param batch_size The batch size.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetBatchSize(
+    TRTSERVER_InferenceRequestOptions* request_options, uint32_t batch_size);
+
+/// Add a input meta-data associated with the request in a request options.
+/// \param request_options The request options object.
+/// \param input_name The name of the input.
+/// \param dims The shape of the input. nullptr can be used if the input shape
+/// is fixed size.
+/// \param dim_count The length 'dims'.
+/// \param batch_byte_size The size of the full batch of the input tensor, in
+/// bytes. This field is only requried for non-fixed-size data type (like
+/// STRING). In the case of fixed-size data type, 0 can always be set for this
+/// field.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsAddInput(
+    TRTSERVER_InferenceRequestOptions* request_options, const char* input_name,
+    const int64_t* dims, uint64_t dim_count, uint64_t batch_byte_size);
+
+/// Request the raw data of the specified output to be returned for requests
+/// associated with the request options.
+/// \param request_options The request options object.
+/// \param output_name The name of the output.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsAddOutput(
+    TRTSERVER_InferenceRequestOptions* request_options,
+    const char* output_name);
+
+/// Request the classification values of the specified output to be returned
+/// for requests associated with the request options.
+/// \param request_options The request options object.
+/// \param output_name The name of the output.
+/// \param count Indicates how many classification values should be returned
+/// for the output. The 'count' highest priority values are returned.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error*
+TRTSERVER_InferenceRequestOptionsAddClassificationOutput(
+    TRTSERVER_InferenceRequestOptions* request_options, const char* output_name,
+    uint32_t count);
+
+/// Delete an inference request options object.
+/// \param request_options The request options object.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsDelete(
+    TRTSERVER_InferenceRequestOptions* request_options);
+
 /// TRTSERVER_InferenceRequestProvider
 ///
 /// Object representing the request provider for an inference
@@ -472,6 +575,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceManagerDelete(
 /// tensor values needed for an inference.
 ///
 
+/// [DEPRECATED] Please use TRTSERVER_InferenceRequestProviderNewV2() API
 /// Create a new inference request provider object. The request header
 /// protobuf must be serialized and provided as a base address and a
 /// size, in bytes.
@@ -491,6 +595,19 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestProviderNew(
     TRTSERVER_InferenceRequestProvider** request_provider,
     TRTSERVER_Server* server, const char* model_name, int64_t model_version,
     const char* request_header_base, size_t request_header_byte_size);
+
+/// Create a new inference request provider object. The caller retains ownership
+/// of 'request_options' and the caller must extend the options object's
+/// lifetime to be longer than the lifetime of any providers created with the
+/// options object.
+/// \param request_provider Returns the new request provider object.
+/// \param server the inference server object.
+/// \param request_options The request options object for this inference
+/// request. \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestProviderNewV2(
+    TRTSERVER_InferenceRequestProvider** request_provider,
+    TRTSERVER_Server* server,
+    TRTSERVER_InferenceRequestOptions* request_options);
 
 /// Delete an inference request provider object.
 /// \param request_provider The request provider object.
