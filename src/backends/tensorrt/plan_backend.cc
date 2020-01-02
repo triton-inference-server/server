@@ -174,18 +174,28 @@ PlanBackend::CreateExecutionContexts(
 
     for (int c = 0; c < group.count(); c++) {
       for (int gpu_device : group.gpus()) {
-        auto it = device_to_runner_map.find(gpu_device);
-        if (it == device_to_runner_map.end()) {
-          it = device_to_runner_map
-                   .emplace(gpu_device, available_context_queue_.size())
-                   .first;
+        size_t runner_idx = 0;
+        if (Config().has_sequence_batching()) {
+          // For sequence batcher, there must be one runner per instance
+          // instead of one runner per device
+          runner_idx = available_context_queue_.size();
           available_context_queue_.emplace_back(new SyncQueue<size_t>());
           next_context_.emplace_back(-1);
+        } else {
+          auto it = device_to_runner_map.find(gpu_device);
+          if (it == device_to_runner_map.end()) {
+            it = device_to_runner_map
+                    .emplace(gpu_device, available_context_queue_.size())
+                    .first;
+            available_context_queue_.emplace_back(new SyncQueue<size_t>());
+            next_context_.emplace_back(-1);
+          }
+          runner_idx = it->second;
         }
         // Initialize all key-value pair in advance so that the map
         // can be mutex-free.
         // The last entry in contexts_ is the newly created context
-        auto& queue = available_context_queue_[it->second];
+        auto& queue = available_context_queue_[runner_idx];
         queue->Put(contexts_.size());
 
         const std::string instance_name = group.name() + "_" +
