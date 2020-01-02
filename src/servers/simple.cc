@@ -432,34 +432,51 @@ main(int argc, char** argv)
       "creating response allocator");
 
   // The inference request provides meta-data with an
-  // InferRequestHeader and the actual data via a provider.
+  // inference request options and the actual data via a provider.
   const std::string model_name("simple");
   int64_t model_version = -1;  // latest
 
-  ni::InferRequestHeader request_header;
-  request_header.set_id(123);
-  request_header.set_batch_size(1);
+  TRTSERVER_InferenceRequestOptions* request_options = nullptr;
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsNew(
+          &request_options, model_name.c_str(), model_version),
+      "creating inference request options");
 
-  auto input0 = request_header.add_input();
-  input0->set_name(is_torch_model ? "INPUT__0" : "INPUT0");
-  auto input1 = request_header.add_input();
-  input1->set_name(is_torch_model ? "INPUT__1" : "INPUT1");
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsSetId(request_options, 123),
+      "setting ID for the request");
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsSetBatchSize(request_options, 1),
+      "setting batch size for the request");
 
-  auto output0 = request_header.add_output();
-  output0->set_name(is_torch_model ? "OUTPUT__0" : "OUTPUT0");
-  auto output1 = request_header.add_output();
-  output1->set_name(is_torch_model ? "OUTPUT__1" : "OUTPUT1");
+  auto input0 = is_torch_model ? "INPUT__0" : "INPUT0";
+  auto input1 = is_torch_model ? "INPUT__1" : "INPUT1";
+  // Setting input meta-data, dims and dims_count are optional for fixed-size
+  // tensor and batch_byte_size is optional for fixed-size data type.
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsAddInput(
+          request_options, input0, nullptr /* dims */, 0 /* dim_count */,
+          0 /* batch_byte_size */),
+      "setting input 0 meta-data for the request");
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsAddInput(
+          request_options, input1, nullptr /* dims */, 0 /* dim_count */,
+          0 /* batch_byte_size */),
+      "setting input 1 meta-data for the request");
 
-  std::string request_header_serialized;
-  request_header.SerializeToString(&request_header_serialized);
+  auto output0 = is_torch_model ? "OUTPUT__0" : "OUTPUT0";
+  auto output1 = is_torch_model ? "OUTPUT__1" : "OUTPUT1";
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsAddOutput(request_options, output0),
+      "requesting output 0 for the request");
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsAddOutput(request_options, output1),
+      "requesting output 1 for the request");
 
-  // Create the inference request provider which provides all the
-  // input information needed for an inference.
   TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
   FAIL_IF_ERR(
-      TRTSERVER_InferenceRequestProviderNew(
-          &request_provider, server.get(), model_name.c_str(), model_version,
-          request_header_serialized.c_str(), request_header_serialized.size()),
+      TRTSERVER_InferenceRequestProviderNewV2(
+          &request_provider, server.get(), request_options),
       "creating inference request provider");
 
   // Create the data for the two input tensors. Initialize the first
@@ -507,13 +524,13 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, input0->name().c_str(), input0_base, input0_size,
-          memory_type, 0 /* memory_type_id */),
+          request_provider, input0, input0_base, input0_size, memory_type,
+          0 /* memory_type_id */),
       "assigning INPUT0 data");
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, input1->name().c_str(), input1_base, input1_size,
-          memory_type, 0 /* memory_type_id */),
+          request_provider, input1, input1_base, input1_size, memory_type,
+          0 /* memory_type_id */),
       "assigning INPUT1 data");
 
   // Perform inference...
@@ -532,6 +549,10 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderDelete(request_provider),
       "deleting inference request provider");
+  // And thus the request options can also be deleted.
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsDelete(request_options),
+      "deleting inference request options");
 
   // Wait for the inference response and check the status.
   TRTSERVER_InferenceResponse* response = completed.get();
@@ -571,8 +592,8 @@ main(int argc, char** argv)
   int64_t output0_memory_type_id;
   FAIL_IF_ERR(
       TRTSERVER_InferenceResponseOutputData(
-          response, output0->name().c_str(), &output0_content,
-          &output0_byte_size, &output0_memory_type, &output0_memory_type_id),
+          response, output0, &output0_content, &output0_byte_size,
+          &output0_memory_type, &output0_memory_type_id),
       "getting output0 result");
   if (output0_byte_size != input0_size) {
     FAIL(
@@ -595,8 +616,8 @@ main(int argc, char** argv)
   int64_t output1_memory_type_id;
   FAIL_IF_ERR(
       TRTSERVER_InferenceResponseOutputData(
-          response, output1->name().c_str(), &output1_content,
-          &output1_byte_size, &output1_memory_type, &output1_memory_type_id),
+          response, output1, &output1_content, &output1_byte_size,
+          &output1_memory_type, &output1_memory_type_id),
       "getting output1 result");
   if (output1_byte_size != input1_size) {
     FAIL(
@@ -648,12 +669,12 @@ main(int argc, char** argv)
 
   if (is_int) {
     CompareResult<int32_t>(
-        output0->name(), output1->name(), &input0_data[0], &input1_data[0],
-        output0_result, output1_result);
+        output0, output1, &input0_data[0], &input1_data[0], output0_result,
+        output1_result);
   } else {
     CompareResult<float>(
-        output0->name(), output1->name(), &input0_data[0], &input1_data[0],
-        output0_result, output1_result);
+        output0, output1, &input0_data[0], &input1_data[0], output0_result,
+        output1_result);
   }
 
   FAIL_IF_ERR(
