@@ -218,7 +218,7 @@ PlanBackend::CreateExecutionContexts(
   RETURN_IF_ERROR(SetConfiguredScheduler(
       available_context_queue_.size(),
       [this](uint32_t runner_idx) -> Status {
-        // Obtain any context as the next context for the corresponding device
+        // Obtain any context as the next context for the corresponding runner
         next_context_[runner_idx] = available_context_queue_[runner_idx]->Get();
         return Status::Success;
       },
@@ -463,14 +463,12 @@ PlanBackend::CreateExecutionContext(
       if (OnComplete == nullptr) {
         break;
       }
-      // A model execution has been issued on the context
-      cudaEventSynchronize(context->ready_for_input_);
-      lqueue->Put(context_idx);
-
 #ifdef TRTIS_ENABLE_STATS
       // Only need to access payload when stats is being recorded
       auto& payloads = OnCompletePair.second;
 
+      // Only need to wait for input copy for recording stats
+      cudaEventSynchronize(context->input_ready_);
       for (auto& payload : *payloads) {
         if (payload.stats_ != nullptr) {
           payload.stats_->CaptureTimestamp(
@@ -478,6 +476,11 @@ PlanBackend::CreateExecutionContext(
         }
       }
 #endif  // TRTIS_ENABLE_STATS
+
+      // The model execution associated with the OnCompletePair
+      // has consumed the inputs
+      cudaEventSynchronize(context->ready_for_input_);
+      lqueue->Put(context_idx);
 
       cudaEventSynchronize(context->ready_for_output_);
 
@@ -987,15 +990,17 @@ PlanBackend::Run(
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeStart);
-      payload.stats_->SetGPUDevice(contexts_[next_context_[runner_idx]]->gpu_device_);
+      payload.stats_->SetGPUDevice(
+          contexts_[next_context_[runner_idx]]->gpu_device_);
     }
   }
 #endif  // TRTIS_ENABLE_STATS
 
   auto status = contexts_[next_context_[runner_idx]]->Run(this, payloads);
 
-  // [TODO] make sure events and stream is in proper state if error happens
-  // during execution
+  // On error, handle the response here instead of delegating to the completion
+  // thread as the completion thread will wait on CUDA events unconditionally,
+  // which can be ignored on error.
   if (!status.IsOk()) {
 #ifdef TRTIS_ENABLE_STATS
     // Stop compute timers.
@@ -1159,10 +1164,10 @@ PlanBackend::Context::Run(
 
   cudaEventRecord(input_ready_, input_copy_stream_);
 
-  // Ensure inputs are ready and output buffers are available before
-  // execution.
+  // Ensure inputs are ready before execution. Output buffers will always be
+  // available at this point as the execution and output copy are on the same
+  // stream.
   cudaStreamWaitEvent(stream_, input_ready_, 0);
-  cudaStreamWaitEvent(stream_, output_ready_, 0);
 
   // Async execute the inference using a CUDA graph if available for
   // the batch-size, otherwise execution normally.

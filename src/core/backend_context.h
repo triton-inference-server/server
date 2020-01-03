@@ -85,7 +85,7 @@ struct BackendContext {
       TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
       char* input_buffer);
 
-  // Overload of SetInputBuffer() which places the CUDA copies on 'stream'
+  // Overload of SetInputBuffer() which issues the CUDA copies on 'stream'
   // instead of 'stream_'.
   bool SetInputBuffer(
       const std::string& name, const std::vector<size_t>& expected_byte_sizes,

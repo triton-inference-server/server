@@ -177,15 +177,14 @@ class PlanBackend : public InferenceBackend {
     nvinfer1::IRuntime* runtime_;
     nvinfer1::ICudaEngine* engine_;
 
-    // Additional CUDA stream and events to overlap copy and execution
+    // Additional CUDA stream to overlap copy and execution.
     cudaStream_t input_copy_stream_;
 
-    // input buffer can be filled with next request
+    // CUDA event to signal input buffer availability.
     cudaEvent_t ready_for_input_;
     cudaEvent_t input_ready_;
 
-    // event for capturing correct timestamp, the next execution must wait for
-    // 'output_ready_' as it signals that the output buffers are available
+    // CUDA event for capturing correct timestamp.
     cudaEvent_t ready_for_output_;
     cudaEvent_t output_ready_;
 
