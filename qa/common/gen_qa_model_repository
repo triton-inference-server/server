@@ -155,7 +155,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $PYTORCH_IMAGE
-nvidia-docker run --rm --entrypoint $SRCDIR/$C2SCRIPT \
+docker run --gpus=1 --rm --entrypoint $SRCDIR/$C2SCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
@@ -208,7 +208,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $TENSORFLOW_IMAGE
-nvidia-docker run --rm --entrypoint $SRCDIR/$TFSCRIPT \
+docker run --gpus=1 --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
@@ -262,7 +262,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $TENSORRT_IMAGE
-nvidia-docker run --rm --entrypoint $SRCDIR/$TRTSCRIPT \
+docker run --gpus=1 --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
