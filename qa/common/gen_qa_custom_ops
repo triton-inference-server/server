@@ -100,7 +100,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $TENSORFLOW_IMAGE
-nvidia-docker run --rm --entrypoint $SRCDIR/$TFSCRIPT \
+docker run --gpus=1 --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        $TENSORFLOW_IMAGE
