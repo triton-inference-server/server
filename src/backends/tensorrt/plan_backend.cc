@@ -463,12 +463,14 @@ PlanBackend::CreateExecutionContext(
       if (OnComplete == nullptr) {
         break;
       }
-      auto& payloads = OnCompletePair.second;
       // A model execution has been issued on the context
       cudaEventSynchronize(context->ready_for_input_);
       lqueue->Put(context_idx);
 
 #ifdef TRTIS_ENABLE_STATS
+      // Only need to access payload when stats is being recorded
+      auto& payloads = OnCompletePair.second;
+
       for (auto& payload : *payloads) {
         if (payload.stats_ != nullptr) {
           payload.stats_->CaptureTimestamp(
@@ -985,7 +987,7 @@ PlanBackend::Run(
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeStart);
-      payload.stats_->SetGPUDevice(runner_idx);
+      payload.stats_->SetGPUDevice(contexts_[next_context_[runner_idx]]->gpu_device_);
     }
   }
 #endif  // TRTIS_ENABLE_STATS
