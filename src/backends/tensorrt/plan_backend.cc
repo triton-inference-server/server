@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -196,8 +196,6 @@ PlanBackend::CreateExecutionContexts(
           }
           runner_idx = it->second;
         }
-        // Initialize all key-value pair in advance so that the map
-        // can be mutex-free.
         // The last entry in contexts_ is the newly created context
         auto& queue = available_context_queue_[runner_idx];
         queue->Put(contexts_.size());
@@ -212,9 +210,10 @@ PlanBackend::CreateExecutionContexts(
     }
   }
 
-  // Create a scheduler with one thread for each GPU specified for
+  // Create a scheduler with one thread for each context queue specified for
   // this model. Each runner is responsible to dispatch tasks to contexts
-  // associated with the corresponding GPU.
+  // assigned to the corresponding queue. For different scheduler type, the
+  // context queue will be formed differently to fit the scheduler's need.
   RETURN_IF_ERROR(SetConfiguredScheduler(
       available_context_queue_.size(),
       [this](uint32_t runner_idx) -> Status {
@@ -455,60 +454,8 @@ PlanBackend::CreateExecutionContext(
 
   // Passing the queue for available contexts here so that completion thread
   // knows where to inform that the context is ready for inputs.
-  std::shared_ptr<SyncQueue<size_t>> lqueue = context_queue;
-  context->completion_thread_ = std::thread([context, context_idx, lqueue]() {
-    while (true) {
-      auto OnCompletePair = context->completion_queue_.Get();
-      auto& OnComplete = OnCompletePair.first;
-      if (OnComplete == nullptr) {
-        break;
-      }
-#ifdef TRTIS_ENABLE_STATS
-      // Only need to access payload when stats is being recorded
-      auto& payloads = OnCompletePair.second;
-
-      // Only need to wait for input copy for recording stats
-      cudaEventSynchronize(context->input_ready_);
-      for (auto& payload : *payloads) {
-        if (payload.stats_ != nullptr) {
-          payload.stats_->CaptureTimestamp(
-              ModelInferStats::TimestampKind::kComputeInputEnd);
-        }
-      }
-#endif  // TRTIS_ENABLE_STATS
-
-      // The model execution associated with the OnCompletePair
-      // has consumed the inputs
-      cudaEventSynchronize(context->ready_for_input_);
-      lqueue->Put(context_idx);
-
-      cudaEventSynchronize(context->ready_for_output_);
-
-#ifdef TRTIS_ENABLE_STATS
-      for (auto& payload : *payloads) {
-        if (payload.stats_ != nullptr) {
-          payload.stats_->CaptureTimestamp(
-              ModelInferStats::TimestampKind::kComputeOutputStart);
-        }
-      }
-#endif  // TRTIS_ENABLE_STATS
-
-      cudaEventSynchronize(context->output_ready_);
-
-#ifdef TRTIS_ENABLE_STATS
-      // Stop compute timers.
-      for (auto& payload : *payloads) {
-        if (payload.stats_ != nullptr) {
-          payload.stats_->CaptureTimestamp(
-              ModelInferStats::TimestampKind::kComputeEnd);
-        }
-      }
-#endif  // TRTIS_ENABLE_STATS
-
-      // Just trigger the callback, Payloads are all-set
-      OnComplete(Status::Success);
-    }
-  });
+  context->completion_thread_ = std::thread(
+      &Context::ProcessResponse, context, context_idx, context_queue);
 
   // CUDA 10.1 starts to support CUDA graphs.
   // If enabled, build CUDA graphs for a default set of graph
@@ -1269,6 +1216,63 @@ PlanBackend::Context::Run(
   cudaEventRecord(output_ready_, stream_);
 
   return Status::Success;
+}
+
+void
+PlanBackend::Context::ProcessResponse(
+    size_t context_idx, std::shared_ptr<SyncQueue<size_t>> context_queue)
+{
+  while (true) {
+    auto OnCompletePair = completion_queue_.Get();
+    auto& OnComplete = OnCompletePair.first;
+    if (OnComplete == nullptr) {
+      break;
+    }
+#ifdef TRTIS_ENABLE_STATS
+    // Only need to access payload when stats is being recorded
+    auto& payloads = OnCompletePair.second;
+
+    // Only need to wait for input copy for recording stats
+    cudaEventSynchronize(input_ready_);
+    for (auto& payload : *payloads) {
+      if (payload.stats_ != nullptr) {
+        payload.stats_->CaptureTimestamp(
+            ModelInferStats::TimestampKind::kComputeInputEnd);
+      }
+    }
+#endif  // TRTIS_ENABLE_STATS
+
+    // The model execution associated with the OnCompletePair
+    // has consumed the inputs. Put the context back into the available queue
+    // so that it can begin enqueuing new memcpys into the input buffers
+    cudaEventSynchronize(ready_for_input_);
+    context_queue->Put(context_idx);
+
+#ifdef TRTIS_ENABLE_STATS
+    cudaEventSynchronize(ready_for_output_);
+    for (auto& payload : *payloads) {
+      if (payload.stats_ != nullptr) {
+        payload.stats_->CaptureTimestamp(
+            ModelInferStats::TimestampKind::kComputeOutputStart);
+      }
+    }
+#endif  // TRTIS_ENABLE_STATS
+
+    cudaEventSynchronize(output_ready_);
+
+#ifdef TRTIS_ENABLE_STATS
+    // Stop compute timers.
+    for (auto& payload : *payloads) {
+      if (payload.stats_ != nullptr) {
+        payload.stats_->CaptureTimestamp(
+            ModelInferStats::TimestampKind::kComputeEnd);
+      }
+    }
+#endif  // TRTIS_ENABLE_STATS
+
+    // Just trigger the callback, Payloads are all-set
+    OnComplete(Status::Success);
+  }
 }
 
 std::map<int, PlanBackend::Context::TensorRTContext>::iterator

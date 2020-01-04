@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,57 +27,15 @@
 
 #include <NvInfer.h>
 #include <cuda_runtime_api.h>
-#include <condition_variable>
-#include <deque>
-#include <mutex>
 #include <thread>
 #include "src/core/backend.h"
 #include "src/core/backend_context.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
+#include "src/core/sync_queue.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
-
-//
-// C++11 doesn't have a sync queue so we implement a simple one.
-//
-template <typename Item>
-class SyncQueue {
- public:
-  SyncQueue() {}
-
-  bool Empty()
-  {
-    std::lock_guard<std::mutex> lk(mu_);
-    return queue_.empty();
-  }
-
-  Item Get()
-  {
-    std::unique_lock<std::mutex> lk(mu_);
-    if (queue_.empty()) {
-      cv_.wait(lk, [this] { return !queue_.empty(); });
-    }
-    auto res = queue_.front();
-    queue_.pop_front();
-    return res;
-  }
-
-  void Put(const Item& value)
-  {
-    {
-      std::lock_guard<std::mutex> lk(mu_);
-      queue_.push_back(value);
-    }
-    cv_.notify_all();
-  }
-
- private:
-  std::mutex mu_;
-  std::condition_variable cv_;
-  std::deque<Item> queue_;
-};
 
 class PlanBackend : public InferenceBackend {
  public:
@@ -140,6 +98,9 @@ class PlanBackend : public InferenceBackend {
     Status Run(
         const InferenceBackend* base,
         std::vector<Scheduler::Payload>* payloads) override;
+
+    void ProcessResponse(
+        size_t context_idx, std::shared_ptr<SyncQueue<size_t>> context_queue);
 
     // A struct to hold TensorRT execution context and its meta data, a backend
     // context can have multiple of this struct if multiple optimization
