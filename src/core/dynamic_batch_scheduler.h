@@ -47,9 +47,12 @@ class DynamicBatchScheduler : public Scheduler {
   // function to call when a request is scheduled.
   static Status Create(
       const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
-      StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
-      StandardRunFunc OnSchedule, const bool dynamic_batching_enabled,
-      const bool enforce_equal_shape_batch, const bool preserve_ordering,
+      const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
+      const StandardRunFunc& OnSchedule,
+      const StandardShapeTensorPeekFunc& OnPeek,
+      const bool dynamic_batching_enabled,
+      const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+      const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds,
       std::unique_ptr<Scheduler>* scheduler);
@@ -66,18 +69,24 @@ class DynamicBatchScheduler : public Scheduler {
  private:
   DynamicBatchScheduler(
       const uint32_t runner_id_start, const uint32_t runner_cnt,
-      StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
-      StandardRunFunc OnSchedule, const bool dynamic_batching_enabled,
-      const bool enforce_equal_shape_batch, const bool preserve_ordering,
+      const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
+      const StandardRunFunc& OnSchedule,
+      const StandardShapeTensorPeekFunc& OnPeek,
+      const bool dynamic_batching_enabled,
+      const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+      const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds);
   void SchedulerThread(
       const uint32_t runner_id, const int nice,
       const std::shared_ptr<std::atomic<bool>>& rthread_exit,
       std::promise<bool>* is_initialized);
-  void InitPendingShape(const InferRequestHeader& request);
-  bool CompareWithPendingShape(const InferRequestHeader& request) const;
-  uint64_t GetDynamicBatch();
+  Status InitPendingShape(
+      const int64_t runner_id, const Scheduler::Payload& request_provider);
+  bool CompareWithPendingShape(
+      const int64_t runner_id,
+      const Scheduler::Payload& request_provider) const;
+  uint64_t GetDynamicBatch(const int64_t runner_id);
 
   // Function the scheduler will call to initialize a runner.
   const StandardInitFunc OnInit_;
@@ -88,6 +97,9 @@ class DynamicBatchScheduler : public Scheduler {
   // Function the scheduler will call to schedule a payload(s) for
   // execution.
   const StandardRunFunc OnSchedule_;
+
+  // Function the scheduler will call to peek at shape tensors.
+  const StandardShapeTensorPeekFunc OnPeek_;
 
   // True if dynamic batching is enabled.
   const bool dynamic_batching_enabled_;
@@ -118,8 +130,9 @@ class DynamicBatchScheduler : public Scheduler {
   size_t queued_batch_size_;
   size_t next_preferred_batch_size_;
 
-  const bool enforce_equal_shape_batch_;
-  std::unordered_map<std::string, DimsList> pending_batch_shapes_;
+  const std::unordered_map<std::string, bool> enforce_equal_shape_tensors_;
+  std::unordered_map<std::string, std::pair<DimsList, std::vector<int64_t>>>
+      pending_batch_shapes_;
 
   const bool preserve_ordering_;
   // the runner that is currently processing payloads

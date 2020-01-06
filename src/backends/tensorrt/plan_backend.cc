@@ -282,11 +282,34 @@ PlanBackend::CreateExecutionContexts(
           uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
           std::function<void(Status)> func) {
         Run(runner_idx, payloads, func);
+      },
+      [this](
+          uint32_t runner_idx, const InferRequestHeader::Input& input,
+          const Scheduler::Payload& payload,
+          std::vector<int64_t>* shape) -> Status {
+        return PeekShapeTensor(runner_idx, input, payload, shape);
       }));
 
   LOG_VERBOSE(1) << "plan backend for " << Name() << std::endl << *this;
 
   return Status::Success;
+}
+
+Status
+PlanBackend::PeekShapeTensor(
+    uint32_t runner_idx, const InferRequestHeader::Input& input,
+    const Scheduler::Payload& payload, std::vector<int64_t>* shape)
+{
+  // Each runner performs the peek using the corresponding since it
+  // may require a CUDA stream to get the tensor contents.
+  if (runner_idx >= contexts_.size()) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unexpected runner index" + std::to_string(runner_idx) +
+            ", max allowed " + std::to_string(contexts_.size()));
+  }
+
+  return contexts_[runner_idx]->PeekShapeTensor(input, payload, shape);
 }
 
 Status
@@ -930,6 +953,56 @@ PlanBackend::Context::InitializeConfigOutputBindings(
           num_expected_bindings_ * trt_context.first + io_index;
       buffer_bindings_[binding_index] = buffers_[io_index];
     }
+  }
+
+  return Status::Success;
+}
+
+Status
+PlanBackend::Context::PeekShapeTensor(
+    const InferRequestHeader::Input& input, const Scheduler::Payload& payload,
+    std::vector<int64_t>* shape)
+{
+  // It is the caller's responsibility to only call on shape tensors,
+  // which means the datatype must be INT32.
+  int64_t element_cnt = GetElementCount(input.dims());
+  size_t content_byte_size =
+      element_cnt * GetDataTypeByteSize(DataType::TYPE_INT32);
+  const char* content;
+
+  // Get the tensor contents into contiguous CPU memory...
+  std::unique_ptr<AllocatedSystemMemory> contiguous_buffer;
+  bool cuda_copy = false;
+  RETURN_IF_ERROR(GetContiguousInputContent(
+      input.name(), TRTSERVER_MEMORY_CPU, 0 /* src_memory_type_id */, payload,
+      &content, &content_byte_size, &contiguous_buffer, &cuda_copy));
+
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+
+  shape->clear();
+
+  const int32_t* dims = reinterpret_cast<const int32_t*>(content);
+  for (int64_t i = 0; i < element_cnt; ++i) {
+    shape->push_back(dims[i]);
+  }
+
+  // If have an provider override for this tensor already (because
+  // peek was already called, then mark it as not being consumed so
+  // that the next peek or usage will be able to access it. If don't
+  // already have an override, add it...
+  if (payload.request_provider_->HasInputOverride(input.name())) {
+    payload.request_provider_->SetInputOverrideConsumed(input.name(), false);
+  } else {
+    InferRequestProvider::InputOverride override;
+    override.content_.assign(dims, dims + element_cnt);
+    override.dims_ = input.dims();
+    override.datatype_ = DataType::TYPE_INT32;
+
+    auto overrides = std::make_shared<InferRequestProvider::InputOverrideMap>();
+    overrides->insert(std::make_pair(input.name(), override));
+    payload.request_provider_->AddInputOverrides(overrides);
   }
 
   return Status::Success;

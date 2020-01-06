@@ -290,6 +290,23 @@ CompareDims(const DimsList& dims0, const DimsList& dims1)
 }
 
 bool
+CompareDims(
+    const std::vector<int64_t>& dims0, const std::vector<int64_t>& dims1)
+{
+  if (dims0.size() != dims1.size()) {
+    return false;
+  }
+
+  for (size_t i = 0; i < dims0.size(); ++i) {
+    if (dims0[i] != dims1[i]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool
 CompareDimsWithWildcard(const DimsList& dims0, const DimsList& dims1)
 {
   if (dims0.size() != dims1.size()) {
