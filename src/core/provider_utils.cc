@@ -91,9 +91,9 @@ NormalizeRequestHeader(
       }
 
       // If there is a reshape for this input then clear the dims and
-      // set them to the reshape. As reshape may have variable-size dimensions,
-      // we need to record corresponding value
-      // so that we can set the value correctly for reshape.
+      // set them to the reshape. As reshape may have variable-size
+      // dimensions, we need to record corresponding value so that we
+      // can set the value correctly for reshape.
       if (input_config->has_reshape()) {
         std::deque<int64_t> variable_size_values;
         for (int64_t idx = 0; idx < input_config->dims_size(); idx++) {

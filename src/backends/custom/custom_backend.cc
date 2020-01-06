@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -222,6 +222,21 @@ CustomBackend::CreateExecutionContext(
     RETURN_IF_ERROR(context->CreateCudaStream());
   }
 
+  // Collect shape for inputs that have fixed dimensions.
+  for (const auto& io : Config().input()) {
+    if (GetElementCount(io) != -1) {
+      std::unique_ptr<std::vector<int64_t>> shape(new std::vector<int64_t>());
+      const DimsList& dims =
+          (io.has_reshape()) ? io.reshape().shape() : io.dims();
+      for (auto d : dims) {
+        shape->push_back(d);
+      }
+
+      context->fixed_input_shapes_.emplace(
+          std::make_pair(io.name(), std::move(shape)));
+    }
+  }
+
   return Status::Success;
 }
 
@@ -285,28 +300,6 @@ CustomBackend::Context::Run(
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
 
-  // Each payload will have the same number and shape for inputs. Get
-  // the shape for each input into a vector suitable to passing via
-  // the custom backend interface. As a performance improvement for
-  // models that don't have any variable-size input tensors we could
-  // calculate the input tensor shapes once during backend
-  // initialization.
-  std::unordered_map<std::string, std::unique_ptr<std::vector<int64_t>>>
-      input_shapes;
-
-  if (!payloads->empty()) {
-    const InferRequestHeader& request_header =
-        payloads->front().request_provider_->RequestHeader();
-
-    for (const auto& input : request_header.input()) {
-      std::unique_ptr<std::vector<int64_t>> shape(new std::vector<int64_t>());
-      for (auto d : input.dims()) {
-        shape->push_back(d);
-      }
-      input_shapes.emplace(std::make_pair(input.name(), std::move(shape)));
-    }
-  }
-
   // For each request in 'payloads' collect the total batch size for
   // this inference execution. The batch-size, number of inputs, and
   // size of each input has already been checked by each payload's
@@ -362,6 +355,11 @@ CustomBackend::Context::Run(
   std::vector<const int64_t*> work_input_dims_ptrs;
   work_input_dims_ptrs.reserve(total_inputs);
 
+  // The shapes for variable-size input tensors are collected below
+  // and their lifetime must extend over the custom Execute call, so
+  // collect them here.
+  std::vector<std::vector<int64_t>> variable_input_shapes;
+
   // We use the following to hold contexts needed for the input and
   // output callbacks. We don't want this to resize as that will
   // invalidate the pointers so set the capacity big enough to hold
@@ -388,20 +386,29 @@ CustomBackend::Context::Run(
     custom_payload.input_shape_dim_cnts = nullptr;
     custom_payload.input_shape_dims = nullptr;
     for (const auto& input : request_header.input()) {
-      auto itr = input_shapes.find(input.name());
-      if (itr == input_shapes.end()) {
-        return Status(
-            RequestStatusCode::INTERNAL, "unable to find shape for input '" +
-                                             input.name() + "' for '" + name_ +
-                                             "'");
+      // If the input has fixed size then use the pre-calculated
+      // shape, otherwise must look at the request header to find the
+      // specific shape for the input in this payload.
+      auto itr = fixed_input_shapes_.find(input.name());
+      if (itr != fixed_input_shapes_.end()) {
+        std::unique_ptr<std::vector<int64_t>>& shape = itr->second;
+        work_input_dim_cnts.push_back(shape->size());
+        work_input_dims_ptrs.push_back(
+            (shape->size() == 0) ? nullptr : &(shape->at(0)));
+      } else {
+        std::vector<int64_t> shape;
+        shape.reserve(input.dims_size());
+        for (auto d : input.dims()) {
+          shape.push_back(d);
+        }
+        variable_input_shapes.emplace_back(std::move(shape));
+        const std::vector<int64_t>& vshape = variable_input_shapes.back();
+        work_input_dim_cnts.push_back(vshape.size());
+        work_input_dims_ptrs.push_back(
+            (vshape.size() == 0) ? nullptr : &vshape[0]);
       }
 
-      std::unique_ptr<std::vector<int64_t>>& shape = itr->second;
-
       work_input_name_ptrs.push_back(input.name().c_str());
-      work_input_dim_cnts.push_back(shape->size());
-      work_input_dims_ptrs.push_back(
-          (shape->size() == 0) ? nullptr : &(shape->at(0)));
       if (custom_payload.input_names == nullptr) {
         custom_payload.input_names = &work_input_name_ptrs.back();
         custom_payload.input_shape_dim_cnts = &work_input_dim_cnts.back();

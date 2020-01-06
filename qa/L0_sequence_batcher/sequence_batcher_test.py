@@ -612,6 +612,108 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.cleanup_shm_regions(precreated_shm2_handles)
                     self.cleanup_shm_regions(precreated_shm3_handles)
 
+    def test_ragged_batch(self):
+        # Test model instances together are configured with
+        # total-batch-size 4. Two of the sequences use the same size
+        # inputs and other two different sizes.  Send four
+        # equal-length sequences in parallel and make sure they get
+        # batched appropriately even with size differences.
+
+        # Only works with 1 model instance since want to test all
+        # sequences batching together.
+        if _model_instances != 1:
+            return
+
+        # Ragged batch only allowed for custom backend
+        for trial in ("custom",):
+            self.clear_deferred_exceptions()
+            dtype = self.get_datatype(trial)
+            precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0,
+                                                                      tensor_shape=(2,))
+            precreated_shm1_handles = self.precreate_register_regions((11,12,13), dtype, 1,
+                                                                      tensor_shape=(2,))
+            precreated_shm2_handles = self.precreate_register_regions((111,112,113), dtype, 2,
+                                                                      tensor_shape=(1,))
+            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3,
+                                                                      tensor_shape=(3,))
+            try:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+                protocol = "streaming"
+
+                self.check_setup(model_name)
+
+                # Need scheduler to wait for queue to contain all
+                # inferences for both sequences.
+                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+
+                threads = []
+                threads.append(threading.Thread(
+                    target=self.check_sequence_async,
+                    args=(trial, model_name, dtype, 1001,
+                          (None, None),
+                          # (flag_str, value, pre_delay_ms)
+                          (("start", 1, None),
+                           (None, 2, None),
+                           ("end", 3, None)),
+                          self.get_expected_result(6*2, 3, trial, "end"),
+                          protocol, precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                            'tensor_shape' : (2,) }))
+                threads.append(threading.Thread(
+                    target=self.check_sequence_async,
+                    args=(trial, model_name, dtype, 1002,
+                          (None, None),
+                          # (flag_str, value, pre_delay_ms)
+                          (("start", 11, None),
+                           (None, 12, None),
+                           ("end", 13, None)),
+                          self.get_expected_result(36*2, 13, trial, "end"),
+                          protocol, precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                            'tensor_shape' : (2,) }))
+                threads.append(threading.Thread(
+                    target=self.check_sequence_async,
+                    args=(trial, model_name, dtype, 1003,
+                          (None, None),
+                          # (flag_str, value, pre_delay_ms)
+                          (("start", 111, None),
+                           (None, 112, None),
+                           ("end", 113, None)),
+                          self.get_expected_result(336, 113, trial, "end"),
+                          protocol, precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                            'tensor_shape' : (1,) }))
+                threads.append(threading.Thread(
+                    target=self.check_sequence_async,
+                    args=(trial, model_name, dtype, 1004,
+                          (None, None),
+                          # (flag_str, value, pre_delay_ms)
+                          (("start", 1111, None),
+                           (None, 1112, None),
+                           ("end", 1113, None)),
+                          self.get_expected_result(3336*3, 1113, trial, "end"),
+                          protocol, precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                            'tensor_shape' : (3,) }))
+
+                for t in threads:
+                    t.start()
+                for t in threads:
+                    t.join()
+                self.check_deferred_exception()
+                self.check_status(model_name, (1,), 3, 12)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+            finally:
+                if _test_system_shared_memory or _test_cuda_shared_memory:
+                    self.cleanup_shm_regions(precreated_shm0_handles)
+                    self.cleanup_shm_regions(precreated_shm1_handles)
+                    self.cleanup_shm_regions(precreated_shm2_handles)
+                    self.cleanup_shm_regions(precreated_shm3_handles)
+
     def test_backlog(self):
         # Test model instances together are configured with
         # total-max-batch-size 4. Send 5 equal-length sequences in
