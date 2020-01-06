@@ -42,19 +42,22 @@ namespace nvidia { namespace inferenceserver {
 
 DynamicBatchScheduler::DynamicBatchScheduler(
     const uint32_t runner_id_start, const uint32_t runner_cnt,
-    StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
-    StandardRunFunc OnSchedule, const bool dynamic_batching_enabled,
-    const bool enforce_equal_shape_batch, const bool preserve_ordering,
+    const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
+    const StandardRunFunc& OnSchedule,
+    const StandardShapeTensorPeekFunc& OnPeek,
+    const bool dynamic_batching_enabled,
+    const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+    const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds)
     : OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
-      dynamic_batching_enabled_(dynamic_batching_enabled),
+      OnPeek_(OnPeek), dynamic_batching_enabled_(dynamic_batching_enabled),
       scheduler_thread_cnt_(runner_cnt), idle_scheduler_thread_cnt_(0),
       preferred_batch_sizes_(preferred_batch_sizes),
       pending_batch_delay_ns_(max_queue_delay_microseconds * 1000),
       pending_batch_size_(0), pending_batch_queue_cnt_(0),
       queued_batch_size_(0), next_preferred_batch_size_(0),
-      enforce_equal_shape_batch_(enforce_equal_shape_batch),
+      enforce_equal_shape_tensors_(enforce_equal_shape_tensors),
       preserve_ordering_(preserve_ordering), last_processing_runner_id_(-1)
 {
   max_preferred_batch_size_ = 0;
@@ -67,16 +70,19 @@ DynamicBatchScheduler::DynamicBatchScheduler(
 Status
 DynamicBatchScheduler::Create(
     const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
-    StandardInitFunc OnInit, StandardWarmupFunc OnWarmup,
-    StandardRunFunc OnSchedule, const bool dynamic_batching_enabled,
-    const bool enforce_equal_shape_batch, const bool preserve_ordering,
+    const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
+    const StandardRunFunc& OnSchedule,
+    const StandardShapeTensorPeekFunc& OnPeek,
+    const bool dynamic_batching_enabled,
+    const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+    const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds,
     std::unique_ptr<Scheduler>* scheduler)
 {
   DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
-      runner_id_start, runner_cnt, OnInit, OnWarmup, OnSchedule,
-      dynamic_batching_enabled, enforce_equal_shape_batch, preserve_ordering,
+      runner_id_start, runner_cnt, OnInit, OnWarmup, OnSchedule, OnPeek,
+      dynamic_batching_enabled, enforce_equal_shape_tensors, preserve_ordering,
       preferred_batch_sizes, max_queue_delay_microseconds);
   std::unique_ptr<DynamicBatchScheduler> sched(dyna_sched);
 
@@ -169,8 +175,8 @@ DynamicBatchScheduler::Enqueue(
     wake_runner = (idle_scheduler_thread_cnt_ > 0);
 
     // We may wake up runner less often if we don't enforce equal shape within
-    // a batch, otherwise must alwasys wake up runner to check it
-    if (!enforce_equal_shape_batch_) {
+    // a batch, otherwise must always wake up runner to check it
+    if (enforce_equal_shape_tensors_.empty()) {
       wake_runner &= (queued_batch_size_ >= next_preferred_batch_size_);
     }
   }
@@ -269,7 +275,7 @@ DynamicBatchScheduler::SchedulerThread(
         wait_microseconds = default_wait_microseconds;
       } else if (dynamic_batching_enabled_) {
         // Use dynamic batching to get request payload(s) to execute.
-        wait_microseconds = GetDynamicBatch();
+        wait_microseconds = GetDynamicBatch(runner_id);
         if (wait_microseconds == 0) {
           payloads = std::make_shared<std::vector<Scheduler::Payload>>();
           for (size_t idx = 0; idx < pending_batch_queue_cnt_; ++idx) {
@@ -411,32 +417,62 @@ DynamicBatchScheduler::SchedulerThread(
                  << "...";
 }
 
-void
-DynamicBatchScheduler::InitPendingShape(const InferRequestHeader& request)
+Status
+DynamicBatchScheduler::InitPendingShape(
+    const int64_t runner_id, const Scheduler::Payload& payload)
 {
   pending_batch_shapes_.clear();
 
+  const InferRequestHeader& request =
+      payload.request_provider_->RequestHeader();
   for (const auto& input : request.input()) {
-    pending_batch_shapes_.emplace(std::make_pair(input.name(), input.dims()));
+    const auto itr = enforce_equal_shape_tensors_.find(input.name());
+    if (itr != enforce_equal_shape_tensors_.end()) {
+      std::pair<DimsList, std::vector<int64_t>> shapes;
+      shapes.first = input.dims();
+
+      // For shape tensors must compare the contents of the tensor in
+      // addition to the tensor shape itself.
+      if (itr->second) {
+        RETURN_IF_ERROR(OnPeek_(runner_id, input, payload, &shapes.second));
+      }
+
+      pending_batch_shapes_.emplace(
+          std::make_pair(input.name(), std::move(shapes)));
+    }
   }
+
+  return Status::Success;
 }
 
 bool
 DynamicBatchScheduler::CompareWithPendingShape(
-    const InferRequestHeader& request) const
+    const int64_t runner_id, const Scheduler::Payload& payload) const
 {
+  const InferRequestHeader& request =
+      payload.request_provider_->RequestHeader();
+
   for (const auto& input : request.input()) {
     const auto itr = pending_batch_shapes_.find(input.name());
+    if (itr != pending_batch_shapes_.end()) {
+      if (!CompareDims(itr->second.first, input.dims())) {
+        return false;
+      }
 
-    // It should never happen that we don't find the shape for an
-    // input, but if it does just return to be conservative.
-    if (itr == pending_batch_shapes_.end()) {
-      LOG_ERROR << "expected to find shape for input '" << input.name() << "'";
-      return false;
-    }
+      // If there are shape-tensor contents then compare those as
+      // well.
+      if (!itr->second.second.empty()) {
+        std::vector<int64_t> shape;
 
-    if (!CompareDims(itr->second, input.dims())) {
-      return false;
+        // If fail getting the tensor shape then conservatively return
+        // false to indicate that the shapes don't match.
+        if (!OnPeek_(runner_id, input, payload, &shape).IsOk()) {
+          return false;
+        }
+        if (!CompareDims(itr->second.second, shape)) {
+          return false;
+        }
+      }
     }
   }
 
@@ -444,7 +480,7 @@ DynamicBatchScheduler::CompareWithPendingShape(
 }
 
 uint64_t
-DynamicBatchScheduler::GetDynamicBatch()
+DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
 {
   // 'mu_' mutex must be held when this function is called. queue_
   // must not be empty.
@@ -467,8 +503,11 @@ DynamicBatchScheduler::GetDynamicBatch()
     // new batch.
     if (search_batch_cnt == 0) {
       // Get the shape of the new batch that is being started...
-      if (enforce_equal_shape_batch_) {
-        InitPendingShape(queue_[idx].request_provider_->RequestHeader());
+      if (!enforce_equal_shape_tensors_.empty()) {
+        if (!InitPendingShape(runner_id, queue_[idx]).IsOk()) {
+          send_now = true;
+          break;
+        }
       }
     } else {
       // There is a pending batch and adding this request would make
@@ -480,9 +519,8 @@ DynamicBatchScheduler::GetDynamicBatch()
 
       // There is a pending batch and it has a different shape then
       // this request, so send the pending batch as it is.
-      if (enforce_equal_shape_batch_ &&
-          !CompareWithPendingShape(
-              queue_[idx].request_provider_->RequestHeader())) {
+      if (!enforce_equal_shape_tensors_.empty() &&
+          !CompareWithPendingShape(runner_id, queue_[idx])) {
         send_now = true;
         break;
       }

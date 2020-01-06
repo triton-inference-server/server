@@ -42,8 +42,9 @@ namespace nvidia { namespace inferenceserver {
 Status
 SequenceBatchScheduler::Create(
     const ModelConfig& config, const uint32_t runner_cnt,
-    Scheduler::StandardInitFunc OnInit, Scheduler::StandardWarmupFunc OnWarmup,
-    Scheduler::StandardRunFunc OnSchedule,
+    const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
+    const StandardRunFunc& OnSchedule,
+    const StandardShapeTensorPeekFunc& OnPeek,
     std::unique_ptr<Scheduler>* scheduler)
 {
   std::unique_ptr<SequenceBatchScheduler> sched(new SequenceBatchScheduler());
@@ -95,7 +96,7 @@ SequenceBatchScheduler::Create(
     if (config.sequence_batching().has_oldest()) {
       sb.reset(new OldestSequenceBatch(
           sched.get(), c, seq_slot_cnt, config, OnInit, OnWarmup, OnSchedule,
-          start, end, startend, cont, notready, &init_state));
+          OnPeek, start, end, startend, cont, notready, &init_state));
     } else {
       sb.reset(new DirectSequenceBatch(
           sched.get(), c, seq_slot_cnt, config, OnInit, OnWarmup, OnSchedule,
@@ -826,8 +827,9 @@ SequenceBatch::SetControlTensors(
 DirectSequenceBatch::DirectSequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
     const size_t seq_slot_cnt, const ModelConfig& config,
-    Scheduler::StandardInitFunc OnInit, Scheduler::StandardWarmupFunc OnWarmup,
-    Scheduler::StandardRunFunc OnSchedule,
+    const Scheduler::StandardInitFunc& OnInit,
+    const Scheduler::StandardWarmupFunc& OnWarmup,
+    const Scheduler::StandardRunFunc& OnSchedule,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         start_input_overrides,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
@@ -1218,8 +1220,10 @@ DirectSequenceBatch::SchedulerThread(
 OldestSequenceBatch::OldestSequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
     const size_t seq_slot_cnt, const ModelConfig& config,
-    Scheduler::StandardInitFunc OnInit, Scheduler::StandardWarmupFunc OnWarmup,
-    Scheduler::StandardRunFunc OnSchedule,
+    const Scheduler::StandardInitFunc& OnInit,
+    const Scheduler::StandardWarmupFunc& OnWarmup,
+    const Scheduler::StandardRunFunc& OnSchedule,
+    const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         start_input_overrides,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
@@ -1255,9 +1259,9 @@ OldestSequenceBatch::OldestSequenceBatch(
 
   Status status = DynamicBatchScheduler::Create(
       batcher_idx_, 1 /* runner_cnt */, GetCpuNiceLevel(config), OnInit,
-      OnWarmup, OnSchedule, true /* dynamic_batching_enabled */,
-      false /* enforce_equal_shape_batch */, true /* preserve_ordering */,
-      preferred_batch_sizes,
+      OnWarmup, OnSchedule, OnPeek, true /* dynamic_batching_enabled */,
+      std::unordered_map<std::string, bool>() /* enforce_equal_shape_tensors */,
+      true /* preserve_ordering */, preferred_batch_sizes,
       config.sequence_batching().oldest().max_queue_delay_microseconds(),
       &dynamic_batcher_);
   if (!status.IsOk()) {

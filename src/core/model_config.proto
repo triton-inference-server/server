@@ -255,6 +255,15 @@ message ModelInput
   //@@     specified by 'dims'. Optional.
   //@@
   ModelTensorReshape reshape = 5;
+
+  //@@  .. cpp:var:: bool is_shape_tensor
+  //@@
+  //@@     Whether or not the input is a shape tensor to the model. This field
+  //@@     is currently supported only for the TensorRT model. An error will be
+  //@@     generated if this specification does not comply with underlying
+  //@@     model.
+  //@@
+  bool is_shape_tensor = 6;
 }
 
 //@@
@@ -297,6 +306,16 @@ message ModelOutput
   //@@     for outputs that represent classifications. Optional.
   //@@
   string label_filename = 4;
+
+
+  //@@  .. cpp:var:: bool is_shape_tensor
+  //@@
+  //@@     Whether or not the output is a shape tensor to the model. This field
+  //@@     is currently supported only for the TensorRT model. An error will be
+  //@@     generated if this specification does not comply with underlying
+  //@@     model.
+  //@@
+  bool is_shape_tensor = 6;
 }
 
 //@@

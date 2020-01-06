@@ -214,6 +214,8 @@ class InferRequestProvider {
   using InputOverrideMapVec = std::vector<std::shared_ptr<InputOverrideMap>>;
   const InputOverrideMapVec& GetInputOverrides() const;
   Status AddInputOverrides(const std::shared_ptr<InputOverrideMap>& overrides);
+  bool HasInputOverride(const std::string& name);
+  void SetInputOverrideConsumed(const std::string& name, const bool consumed);
 
  protected:
   explicit InferRequestProvider(

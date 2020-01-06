@@ -580,4 +580,13 @@ BackendContext::CompareOutputDims(
   return Status::Success;
 }
 
+Status
+BackendContext::PeekShapeTensor(
+    const InferRequestHeader::Input& input, const Scheduler::Payload& payload,
+    std::vector<int64_t>* shape)
+{
+  // By default a backend doesn't support shape tensors.
+  return Status(RequestStatusCode::INTERNAL, "shape tensors not supported");
+}
+
 }}  // namespace nvidia::inferenceserver

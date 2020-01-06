@@ -115,8 +115,9 @@ InferenceBackend::SetScheduler(std::unique_ptr<Scheduler> scheduler)
 
 Status
 InferenceBackend::SetConfiguredScheduler(
-    const uint32_t runner_cnt, Scheduler::StandardInitFunc OnInit,
-    Scheduler::StandardRunFunc OnRun)
+    const uint32_t runner_cnt, const Scheduler::StandardInitFunc& OnInit,
+    const Scheduler::StandardRunFunc& OnRun,
+    const Scheduler::StandardShapeTensorPeekFunc& OnPeek)
 {
   std::unique_ptr<Scheduler> scheduler;
 
@@ -168,29 +169,31 @@ InferenceBackend::SetConfiguredScheduler(
   // otherwise use the default DynamicBatchScheduler.
   if (config_.has_sequence_batching()) {
     RETURN_IF_ERROR(SequenceBatchScheduler::Create(
-        config_, runner_cnt, OnInit, OnWarmup, OnRun, &scheduler));
+        config_, runner_cnt, OnInit, OnWarmup, OnRun, OnPeek, &scheduler));
   } else if (config_.has_dynamic_batching()) {
     std::set<int32_t> preferred_batch_sizes;
     for (const auto size : config_.dynamic_batching().preferred_batch_size()) {
       preferred_batch_sizes.insert(size);
     }
 
-    // Need to enforce equal shape batches (i.e. non-ragged batches) if
-    // the model allows one or more variable-size input tensors. This is
-    // not needed if all input shapes are non-variable and so we don't
-    // enable it for efficiency reasons.
-    bool enforce_equal_shape_batch = false;
+    // Need to enforce equal shape batches (i.e. non-ragged batches)
+    // if the model allows one or more variable-size input tensors or
+    // has shape-tensor inputs. This is not needed if all input shapes
+    // are non-variable and if there are no shape tensors... so we
+    // don't enable it in that case for efficiency reasons.
+    std::unordered_map<std::string, bool> enforce_equal_shape_tensors;
     for (const auto input : config_.input()) {
-      if (GetElementCount(input) == -1) {
-        enforce_equal_shape_batch = true;
-        break;
+      if (input.is_shape_tensor()) {
+        enforce_equal_shape_tensors.insert({input.name(), true});
+      } else if (GetElementCount(input) == -1) {
+        enforce_equal_shape_tensors.insert({input.name(), false});
       }
     }
 
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         0 /* runner_id_start */, runner_cnt, GetCpuNiceLevel(config_), OnInit,
-        OnWarmup, OnRun, true /* dynamic_batching_enabled */,
-        enforce_equal_shape_batch,
+        OnWarmup, OnRun, OnPeek, true /* dynamic_batching_enabled */,
+        enforce_equal_shape_tensors,
         config_.dynamic_batching().preserve_ordering(), preferred_batch_sizes,
         config_.dynamic_batching().max_queue_delay_microseconds(), &scheduler));
   } else {
@@ -198,8 +201,10 @@ InferenceBackend::SetConfiguredScheduler(
     // default scheduler.
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         0 /* runner_id_start */, runner_cnt, GetCpuNiceLevel(config_), OnInit,
-        OnWarmup, OnRun, false /* dynamic_batching_enabled */,
-        false /* enforce_equal_shape_batch */, false /* preserve_ordering */,
+        OnWarmup, OnRun, OnPeek, false /* dynamic_batching_enabled */,
+        std::unordered_map<
+            std::string, bool>() /* enforce_equal_shape_tensors */,
+        false /* preserve_ordering */,
         std::set<int32_t>() /* preferred_batch_sizes */,
         0 /* max_queue_delay_microseconds */, &scheduler));
   }
