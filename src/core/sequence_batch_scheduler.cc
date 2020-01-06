@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -634,7 +634,7 @@ SequenceBatchScheduler::ReaperThread(const int nice)
       LOG_VERBOSE(1) << "Reaper: force-ending CORRID " << idle_correlation_id
                      << " in batcher " << batcher_idx << ", slot " << seq_slot;
 
-      // An slot assignment is released by enqueuing a payload with
+      // A slot assignment is released by enqueuing a payload with
       // null providers and null completion callback. The scheduler
       // thread will interpret the payload as meaning it should
       // release the sequence slot but otherwise do nothing with the
@@ -749,10 +749,7 @@ SequenceBatch::SetControlTensors(
     request_provider->AddInputOverrides(continue_input_overrides_);
   }
 
-  // Set correlation ID control tensor if requested by the
-  // model. This must be called after AddInputOverrides
-  // above since AddInputOverride simply adds to an
-  // existing map of overrides.
+  // Set correlation ID control tensor if requested by the model.
   if (!correlation_id_tensor_.empty()) {
     const uint8_t* corrid_p = reinterpret_cast<const uint8_t*>(&corr_id);
     std::vector<uint8_t>& content =
@@ -978,7 +975,7 @@ DirectSequenceBatch::SchedulerThread(
             } else {
               // If the payload has no request provider then the
               // sequence is being forcibly ended (e.g. because it has
-              // been idle to long). Use a null provider for the
+              // been idle too long). Use a null provider for the
               // sequence slot since there isn't an actual payload but
               // also handle as if it were the end of the sequence.
               Scheduler::Payload& seq_slot_payload = queue.front();
@@ -989,7 +986,7 @@ DirectSequenceBatch::SchedulerThread(
               }
             }
 
-            // Use null-provider if necessary otherwise the next
+            // Use null-provider if necessary otherwise use the next
             // payload in the queue...
             if (use_null_provider) {
               auto null_request_provider =
