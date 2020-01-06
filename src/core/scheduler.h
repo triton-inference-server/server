@@ -26,6 +26,7 @@
 #pragma once
 
 #include <functional>
+#include "src/core/api.pb.h"
 #include "src/core/server_status.h"
 #include "src/core/status.h"
 
@@ -98,6 +99,15 @@ class Scheduler {
   using StandardRunFunc = std::function<void(
       uint32_t runner_idx, std::vector<Payload>* payloads,
       std::function<void(const Status&)> OnRunComplete)>;
+
+  // The prototype for the shape-tensor peek function that can be
+  // called by the "standard" schedulers created based on a model's
+  // scheduling_choice settings. The peek function can be called to
+  // get the contents of a shape tensor. A non-OK error status
+  // indicates that the peek failed.
+  using StandardShapeTensorPeekFunc = std::function<Status(
+      uint32_t runner_idx, const InferRequestHeader::Input& input,
+      const Scheduler::Payload& payload, std::vector<int64_t>* shape)>;
 
   // Enqueue a request with the scheduler.
   virtual void Enqueue(
