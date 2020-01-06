@@ -465,13 +465,14 @@ ValidateModelConfig(
 
   Status status;
   for (const auto& io : config.input()) {
-    status = ValidateModelInput(io, config.max_batch_size());
+    status = ValidateModelInput(io, config.max_batch_size(), config.platform());
     if (!status.IsOk()) {
       return Status(status.Code(), status.Message() + " for " + config.name());
     }
   }
   for (const auto& io : config.output()) {
-    status = ValidateModelOutput(io, config.max_batch_size());
+    status =
+        ValidateModelOutput(io, config.max_batch_size(), config.platform());
     if (!status.IsOk()) {
       return Status(status.Code(), status.Message() + " for " + config.name());
     }
@@ -1010,7 +1011,8 @@ ValidateIOShape(
 }  // namespace
 
 Status
-ValidateModelInput(const ModelInput& io, int32_t max_batch_size)
+ValidateModelInput(
+    const ModelInput& io, int32_t max_batch_size, const std::string& platform)
 {
   RETURN_IF_ERROR(ValidateIOShape(io, max_batch_size, "model input "));
 
@@ -1019,6 +1021,16 @@ ValidateModelInput(const ModelInput& io, int32_t max_batch_size)
       (io.dims_size() != 3)) {
     return Status(
         RequestStatusCode::INVALID_ARG, "model input NHWC/NCHW require 3 dims");
+  }
+
+  if (
+#ifdef TRTIS_ENABLE_TENSORRT
+      (platform != kTensorRTPlanPlatform) &&
+#endif  // TRTIS_ENABLE_TENSORRT
+      io.is_shape_tensor()) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "shape tensors are only supported for TensorRT platform");
   }
 
   return Status::Success;
@@ -1046,9 +1058,21 @@ CheckAllowedModelInput(
 }
 
 Status
-ValidateModelOutput(const ModelOutput& io, int32_t max_batch_size)
+ValidateModelOutput(
+    const ModelOutput& io, int32_t max_batch_size, const std::string& platform)
 {
   RETURN_IF_ERROR(ValidateIOShape(io, max_batch_size, "model output "));
+
+  if (
+#ifdef TRTIS_ENABLE_TENSORRT
+      (platform != kTensorRTPlanPlatform) &&
+#endif  // TRTIS_ENABLE_TENSORRT
+      io.is_shape_tensor()) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "shape tensors are only supported for TensorRT platform");
+  }
+
   return Status::Success;
 }
 

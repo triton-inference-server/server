@@ -99,6 +99,14 @@ struct BackendContext {
       const InferenceBackend* base,
       std::vector<Scheduler::Payload>* payloads) = 0;
 
+  // Return the contents of a shape tensor. It is the caller's
+  // responsibility to call this only for shape tensors that are
+  // 1-dimensional, INT32 tensors. A non-OK status indicates that the
+  // contents of the tensor could not be peeked.
+  virtual Status PeekShapeTensor(
+      const InferRequestHeader::Input& input, const Scheduler::Payload& payload,
+      std::vector<int64_t>* shape);
+
   // Helper function to batch input data from payloads into 'input_buffer'.
   // 'input_buffer' must be a continuous block that can hold the sum of
   // 'expected_byte_sizes' bytes. On byte size mismatch, the function will

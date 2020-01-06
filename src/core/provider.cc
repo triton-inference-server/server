@@ -245,6 +245,18 @@ InferRequestProvider::GetInputOverrides() const
   return overrides_maps_;
 }
 
+bool
+InferRequestProvider::HasInputOverride(const std::string& name)
+{
+  for (const auto& override_map : overrides_maps_) {
+    if (override_map->find(name) != override_map->end()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 Status
 InferRequestProvider::AddInputOverrides(
     const std::shared_ptr<InputOverrideMap>& overrides)
@@ -254,6 +266,17 @@ InferRequestProvider::AddInputOverrides(
   }
 
   return Status::Success;
+}
+
+void
+InferRequestProvider::SetInputOverrideConsumed(
+    const std::string& name, const bool consumed)
+{
+  if (consumed) {
+    overrides_consumed_.insert(name);
+  } else {
+    overrides_consumed_.erase(name);
+  }
 }
 
 bool
