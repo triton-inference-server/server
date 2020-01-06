@@ -291,7 +291,7 @@ COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/infer
 RUN cd /opt/tensorrtserver/lib && ln -sf libtbb.so.2 libtbb.so
 
 # Install openssl (Needed for h2o)
-RUN apt-get update && apt-get install build-essential checkinstall zlib1g-dev -y
+RUN apt-get update && apt-get install checkinstall zlib1g-dev -y
 RUN (cd /usr/local/src && \
     wget https://www.openssl.org/source/openssl-1.1.1c.tar.gz && \
     tar -xf openssl-1.1.1c.tar.gz && \
@@ -309,12 +309,12 @@ RUN (wget --no-check-certificate https://dist.libuv.org/dist/v1.34.0/libuv-v1.34
     make && make install)
 
 # Install h2o (will be installed under /usr/local/bin)
-RUN (git clone https://github.com/h2o/h2o && \
-    cd h2o && \
-    git checkout v2.2.6 && \
-    cmake -DWITH_BUNDLED_SSL=OFF -DOPENSSL_ROOT_DIR=/usr/local/ssl . && \
-    make && \
-    make libh2o)
+ENV H2O_VERSION=v2.2.6
+RUN (mkdir /opt/h2o && cd /opt/h2o && \
+    wget -qO - "https://github.com/h2o/h2o/archive/${H2O_VERSION}.tar.gz" | \
+    tar xz --strip-components=1 && \
+    cmake -DWITH_BUNDLED_SSL=OFF -DOPENSSL_ROOT_DIR=/usr/local/ssl -DLIBUV_VERSION=1.34.0 . && \
+    make -j "$(nproc)" libh2o)
 
 # Copy entire repo into container even though some is not needed for
 # build itself... because we want to be able to copyright check on
