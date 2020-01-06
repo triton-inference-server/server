@@ -32,8 +32,8 @@
 #include "src/core/backend_context.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
-#include "src/core/sync_queue.h"
 #include "src/core/status.h"
+#include "src/core/sync_queue.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -130,6 +130,24 @@ class PlanBackend : public InferenceBackend {
       std::vector<nvinfer1::Dims> opt_dims_;
     };
 
+    // A group of CUDA events that signals different stages of the request.
+    // One group should be used for one request at any given moment.
+    struct CUDAEventSet {
+      // CUDA event to signal input buffer availability.
+      cudaEvent_t ready_for_input_;
+      cudaEvent_t input_ready_;
+
+      // CUDA event for capturing correct timestamp.
+      cudaEvent_t ready_for_output_;
+      cudaEvent_t output_ready_;
+    };
+
+    // Number of CUDA event set for each instance.
+    static constexpr int EVENT_SET_COUNT = 2;
+
+    Status InitEventSet();
+    Status DestroyEventSet();
+
     std::map<int, TensorRTContext>::iterator GetMostOptimizedProfile(
         size_t total_batch_size,
         const std::shared_ptr<InferRequestProvider>& input_request_provider);
@@ -141,13 +159,9 @@ class PlanBackend : public InferenceBackend {
     // Additional CUDA stream to overlap copy and execution.
     cudaStream_t input_copy_stream_;
 
-    // CUDA event to signal input buffer availability.
-    cudaEvent_t ready_for_input_;
-    cudaEvent_t input_ready_;
-
-    // CUDA event for capturing correct timestamp.
-    cudaEvent_t ready_for_output_;
-    cudaEvent_t output_ready_;
+    // Use two sets of events each for current request and next request.
+    CUDAEventSet events_[EVENT_SET_COUNT];
+    size_t next_set_;
 
     // Completion thread for handling items in the corresponding completion
     // queue. One thread per instance so that the thread logic is simple as this
@@ -156,8 +170,8 @@ class PlanBackend : public InferenceBackend {
 
     // Assume that the lifetime of the payload is extended until the completion
     // callback is called
-    SyncQueue<std::pair<
-        std::function<void(Status)>, std::vector<Scheduler::Payload>*>>
+    SyncQueue<std::tuple<
+        std::function<void(Status)>, std::vector<Scheduler::Payload>*, size_t>>
         completion_queue_;
 
     // Map from profile index to the corresponding TensorRT context. Use map
