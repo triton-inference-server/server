@@ -145,9 +145,6 @@ nic::Error* InferContextOptionsAddClass(
 nic::Error* InferContextOptionsAddSharedMemory(
     InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
     const char* output_name, void* shm_handle);
-nic::Error* InferContextOptionsAddCudaSharedMemory(
-    InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
-    const char* output_name, void* cuda_shm_handle);
 ni::CorrelationID CorrelationId(InferContextCtx* ctx);
 
 //==============================================================================
