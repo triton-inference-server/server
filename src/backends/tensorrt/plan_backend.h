@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,11 +27,13 @@
 
 #include <NvInfer.h>
 #include <cuda_runtime_api.h>
+#include <thread>
 #include "src/core/backend.h"
 #include "src/core/backend_context.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
+#include "src/core/sync_queue.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -40,6 +42,10 @@ class PlanBackend : public InferenceBackend {
   PlanBackend() = default;
   PlanBackend(PlanBackend&&) = default;
 
+  void Run(
+      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+      std::function<void(Status)> OnCompleteQueuedPayloads) override;
+
   // Create a context for execution for each instance for the
   // serialized plans specified in 'models'.
   Status CreateExecutionContexts(
@@ -47,7 +53,8 @@ class PlanBackend : public InferenceBackend {
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
       const std::unordered_map<std::string, std::vector<char>>& models,
-      const ::google::protobuf::RepeatedPtrField<std::string>& profile_names);
+      const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
+      const std::shared_ptr<SyncQueue<size_t>>& context_queue);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(PlanBackend);
@@ -92,6 +99,9 @@ class PlanBackend : public InferenceBackend {
         const InferenceBackend* base,
         std::vector<Scheduler::Payload>* payloads) override;
 
+    void ProcessResponse(
+        size_t context_idx, std::shared_ptr<SyncQueue<size_t>> context_queue);
+
     // A struct to hold TensorRT execution context and its meta data, a backend
     // context can have multiple of this struct if multiple optimization
     // profiles is specified.
@@ -120,6 +130,24 @@ class PlanBackend : public InferenceBackend {
       std::vector<nvinfer1::Dims> opt_dims_;
     };
 
+    // A group of CUDA events that signals different stages of the request.
+    // One group should be used for one request at any given moment.
+    struct CUDAEventSet {
+      // CUDA event to signal input buffer availability.
+      cudaEvent_t ready_for_input_;
+      cudaEvent_t input_ready_;
+
+      // CUDA event for capturing correct timestamp.
+      cudaEvent_t ready_for_output_;
+      cudaEvent_t output_ready_;
+    };
+
+    // Number of CUDA event set for each instance.
+    static constexpr int EVENT_SET_COUNT = 2;
+
+    Status InitEventSet();
+    Status DestroyEventSet();
+
     std::map<int, TensorRTContext>::iterator GetMostOptimizedProfile(
         size_t total_batch_size,
         const std::shared_ptr<InferRequestProvider>& input_request_provider);
@@ -127,6 +155,24 @@ class PlanBackend : public InferenceBackend {
     // TensorRT components for the model
     nvinfer1::IRuntime* runtime_;
     nvinfer1::ICudaEngine* engine_;
+
+    // Additional CUDA stream to overlap copy and execution.
+    cudaStream_t input_copy_stream_;
+
+    // Use two sets of events each for current request and next request.
+    CUDAEventSet events_[EVENT_SET_COUNT];
+    size_t next_set_;
+
+    // Completion thread for handling items in the corresponding completion
+    // queue. One thread per instance so that the thread logic is simple as this
+    // avoids busy-looping on different model executions' event states.
+    std::thread completion_thread_;
+
+    // Assume that the lifetime of the payload is extended until the completion
+    // callback is called
+    SyncQueue<std::tuple<
+        std::function<void(Status)>, std::vector<Scheduler::Payload>*, size_t>>
+        completion_queue_;
 
     // Map from profile index to the corresponding TensorRT context. Use map
     // to ensure each profile index is mapped to exactly one TensorRT context.
@@ -155,6 +201,12 @@ class PlanBackend : public InferenceBackend {
     // The array size is equal to Context::total_bindings_
     std::vector<void*> buffer_bindings_;
   };
+
+  // vector for storing available context queue associated with a runner
+  std::vector<std::shared_ptr<SyncQueue<size_t>>> available_context_queue_;
+
+  // Next context to be used for the runner.
+  std::vector<size_t> next_context_;
 };
 
 std::ostream& operator<<(std::ostream& out, const PlanBackend& pb);

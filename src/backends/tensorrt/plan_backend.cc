@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,7 +28,6 @@
 
 #include <NvInfer.h>
 #include <stdint.h>
-#include <mutex>
 #include "src/backends/tensorrt/loader.h"
 #include "src/backends/tensorrt/plan_utils.h"
 #include "src/core/constants.h"
@@ -40,6 +39,25 @@
 
 namespace nvidia { namespace inferenceserver {
 
+namespace {
+
+Status
+CreateCudaEvent(const std::string& event_name, cudaEvent_t* event)
+{
+  // cudaEventBlockingSync to avoid busy-waiting on CPU thread
+  auto cuerr = cudaEventCreateWithFlags(
+      event, cudaEventDisableTiming | cudaEventBlockingSync);
+  if (cuerr != cudaSuccess) {
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to create CUDA event for " +
+                                         event_name + ": " +
+                                         cudaGetErrorString(cuerr));
+  }
+  return Status::Success;
+}
+
+}  // namespace
+
 PlanBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : BackendContext(name, gpu_device, max_batch_size), runtime_(nullptr),
@@ -47,6 +65,15 @@ PlanBackend::Context::Context(
       num_expected_bindings_(0)
 {
   stream_ = nullptr;
+  input_copy_stream_ = nullptr;
+
+  next_set_ = 0;
+  for (size_t idx = 0; idx < EVENT_SET_COUNT; idx++) {
+    events_[idx].input_ready_ = nullptr;
+    events_[idx].ready_for_input_ = nullptr;
+    events_[idx].output_ready_ = nullptr;
+    events_[idx].ready_for_output_ = nullptr;
+  }
 }
 
 PlanBackend::Context::~Context()
@@ -104,6 +131,14 @@ PlanBackend::Context::~Context()
     runtime_->destroy();
     runtime_ = nullptr;
   }
+
+  DestroyEventSet();
+
+  // Notify the completion thread to exit
+  completion_queue_.Put(std::make_tuple(nullptr, nullptr, 0));
+  if (completion_thread_.joinable()) {
+    completion_thread_.join();
+  }
 }
 
 Status
@@ -115,7 +150,9 @@ PlanBackend::CreateExecutionContexts(
   static std::mutex global_context_mu;
   std::lock_guard<std::mutex> glock(global_context_mu);
 
-  uint32_t total_context_cnt = 0;
+  // Only need to map device to runner when creating contexts, after that,
+  // only runner idx is needed.
+  std::map<int, size_t> device_to_runner_map;
 
   // Create a runtime/engine/context trifecta for each instance.
   //
@@ -134,22 +171,49 @@ PlanBackend::CreateExecutionContexts(
 
     for (int c = 0; c < group.count(); c++) {
       for (int gpu_device : group.gpus()) {
+        size_t runner_idx = 0;
+        if (Config().has_sequence_batching()) {
+          // For sequence batcher, there must be one runner per instance
+          // instead of one runner per device
+          runner_idx = available_context_queue_.size();
+          available_context_queue_.emplace_back(new SyncQueue<size_t>());
+          next_context_.emplace_back(-1);
+        } else {
+          auto it = device_to_runner_map.find(gpu_device);
+          if (it == device_to_runner_map.end()) {
+            it = device_to_runner_map
+                     .emplace(gpu_device, available_context_queue_.size())
+                     .first;
+            available_context_queue_.emplace_back(new SyncQueue<size_t>());
+            next_context_.emplace_back(-1);
+          }
+          runner_idx = it->second;
+        }
+        // The last entry in contexts_ is the newly created context
+        auto& queue = available_context_queue_[runner_idx];
+        queue->Put(contexts_.size());
+
         const std::string instance_name = group.name() + "_" +
                                           std::to_string(c) + "_gpu" +
                                           std::to_string(gpu_device);
 
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, gpu_device, models, group.profile()));
-        total_context_cnt++;
+            instance_name, gpu_device, models, group.profile(), queue));
       }
     }
   }
 
-  // Create a scheduler with one thread for each context available for
-  // this model. Each runner is exclusively tied to the context.
+  // Create a scheduler with one thread for each context queue specified for
+  // this model. Each runner is responsible to dispatch tasks to contexts
+  // assigned to the corresponding queue. For different scheduler type, the
+  // context queue will be formed differently to fit the scheduler's need.
   RETURN_IF_ERROR(SetConfiguredScheduler(
-      total_context_cnt,
-      [](uint32_t runner_idx) -> Status { return Status::Success; },
+      available_context_queue_.size(),
+      [this](uint32_t runner_idx) -> Status {
+        // Obtain any context as the next context for the corresponding runner
+        next_context_[runner_idx] = available_context_queue_[runner_idx]->Get();
+        return Status::Success;
+      },
       [this](
           uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
           std::function<void(Status)> func) {
@@ -240,7 +304,8 @@ Status
 PlanBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     const std::unordered_map<std::string, std::vector<char>>& models,
-    const ::google::protobuf::RepeatedPtrField<std::string>& profile_names)
+    const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
+    const std::shared_ptr<SyncQueue<size_t>>& context_queue)
 {
   cudaError_t cuerr;
 
@@ -278,14 +343,25 @@ PlanBackend::CreateExecutionContext(
 
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   Context* context = static_cast<Context*>(contexts_.back().get());
+  auto context_idx = contexts_.size() - 1;
 
-  // Set the device before generating engine and context.
+  // Set the device before preparing the context.
   cuerr = cudaSetDevice(gpu_device);
   if (cuerr != cudaSuccess) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to set device for " + Name() +
                                          ": " + cudaGetErrorString(cuerr));
   }
+
+  // Create CUDA streams associated with the execution context
+  const int cuda_stream_priority =
+      GetCudaStreamPriority(Config().optimization().priority());
+  RETURN_IF_ERROR(context->CreateCudaStream(cuda_stream_priority));
+  RETURN_IF_ERROR(context->CreateCudaStream(
+      cuda_stream_priority, &context->input_copy_stream_));
+
+  // Create CUDA events associated with the execution states
+  RETURN_IF_ERROR(context->InitEventSet());
 
   RETURN_IF_ERROR(
       LoadPlan(mn_itr->second, &context->runtime_, &context->engine_));
@@ -364,10 +440,10 @@ PlanBackend::CreateExecutionContext(
     }
   }
 
-  // Create CUDA stream associated with the execution context
-  const int cuda_stream_priority =
-      GetCudaStreamPriority(Config().optimization().priority());
-  RETURN_IF_ERROR(context->CreateCudaStream(cuda_stream_priority));
+  // Passing the queue for available contexts here so that completion thread
+  // knows where to inform that the context is ready for inputs.
+  context->completion_thread_ = std::thread(
+      &Context::ProcessResponse, context, context_idx, context_queue);
 
   // CUDA 10.1 starts to support CUDA graphs.
   // If enabled, build CUDA graphs for a default set of graph
@@ -827,6 +903,68 @@ PlanBackend::Context::BuildCudaGraph(
 }
 #endif
 
+void
+PlanBackend::Run(
+    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+    std::function<void(Status)> OnCompleteQueuedPayloads)
+{
+  // Each runner executes using the corresponding context...
+  if (runner_idx >= available_context_queue_.size()) {
+    OnCompleteQueuedPayloads(Status(
+        RequestStatusCode::INTERNAL,
+        "unexpected runner index" + std::to_string(runner_idx) +
+            ", max allowed " +
+            std::to_string(available_context_queue_.size())));
+    return;
+  }
+
+#ifdef TRTIS_ENABLE_STATS
+  // Stop queue timer and start compute timer when the payload is
+  // scheduled to run
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeStart);
+      payload.stats_->SetGPUDevice(
+          contexts_[next_context_[runner_idx]]->gpu_device_);
+    }
+  }
+#endif  // TRTIS_ENABLE_STATS
+
+  auto status = contexts_[next_context_[runner_idx]]->Run(this, payloads);
+
+  // On error, handle the response here instead of delegating to the completion
+  // thread as the completion thread will wait on CUDA events unconditionally,
+  // which can be ignored on error.
+  if (!status.IsOk()) {
+#ifdef TRTIS_ENABLE_STATS
+    // Stop compute timers.
+    for (auto& payload : *payloads) {
+      if (payload.stats_ != nullptr) {
+        payload.stats_->CaptureTimestamp(
+            ModelInferStats::TimestampKind::kComputeEnd);
+      }
+    }
+#endif  // TRTIS_ENABLE_STATS
+
+    OnCompleteQueuedPayloads(status);
+    // On inference error, place the context back to the queue immediately
+    // as all works for the context should be ignored.
+    available_context_queue_[runner_idx]->Put(next_context_[runner_idx]);
+  } else {
+    auto context =
+        static_cast<Context*>(contexts_[next_context_[runner_idx]].get());
+    auto event_set_idx = context->next_set_;
+    context->next_set_ = (event_set_idx + 1) % context->EVENT_SET_COUNT;
+    context->completion_queue_.Put(
+        std::make_tuple(OnCompleteQueuedPayloads, payloads, event_set_idx));
+  }
+
+  // Set the next context to be executed on this runner, will block
+  // until there is available context for the runner
+  next_context_[runner_idx] = available_context_queue_[runner_idx]->Get();
+}
+
 Status
 PlanBackend::Context::Run(
     const InferenceBackend* base, std::vector<Scheduler::Payload>* payloads)
@@ -958,17 +1096,15 @@ PlanBackend::Context::Run(
 
     SetInputBuffer(
         name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_GPU, gpu_device_,
-        static_cast<char*>(buffers_[bindex]));
+        input_copy_stream_, static_cast<char*>(buffers_[bindex]));
   }
 
-#ifdef TRTIS_ENABLE_STATS
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeInputEnd);
-    }
-  }
-#endif  // TRTIS_ENABLE_STATS
+  cudaEventRecord(events_[next_set_].input_ready_, input_copy_stream_);
+
+  // Ensure inputs are ready before execution. Output buffers will always be
+  // available at this point as the execution and output copy are on the same
+  // stream.
+  cudaStreamWaitEvent(stream_, events_[next_set_].input_ready_, 0);
 
   // Async execute the inference using a CUDA graph if available for
   // the batch-size, otherwise execution normally.
@@ -982,6 +1118,10 @@ PlanBackend::Context::Run(
           "unable to execute graph for inference " + name_ + ": " +
               cudaGetErrorString(err));
     }
+    // CUDA graph doesn't know when input is consumed, need to record
+    // the event at the end
+    // [TODO] can we include event record when capturing the graph?
+    cudaEventRecord(events_[next_set_].ready_for_input_, stream_);
   } else {
     LOG_VERBOSE(1) << "Context with profile " << citr->second.profile_name_
                    << " [" << std::to_string(citr->first)
@@ -993,7 +1133,8 @@ PlanBackend::Context::Run(
             "failed to specify the dimensions of all input bindings");
       }
       if (!citr->second.context_->enqueueV2(
-              buffer_bindings_.data(), stream_, nullptr)) {
+              buffer_bindings_.data(), stream_,
+              &events_[next_set_].ready_for_input_)) {
         cudaStreamSynchronize(stream_);
         return Status(
             RequestStatusCode::INTERNAL,
@@ -1001,7 +1142,8 @@ PlanBackend::Context::Run(
       }
     } else {
       if (!citr->second.context_->enqueue(
-              total_batch_size, buffer_bindings_.data(), stream_, nullptr)) {
+              total_batch_size, buffer_bindings_.data(), stream_,
+              &events_[next_set_].ready_for_input_)) {
         cudaStreamSynchronize(stream_);
         return Status(
             RequestStatusCode::INTERNAL,
@@ -1010,14 +1152,7 @@ PlanBackend::Context::Run(
     }
   }
 
-#ifdef TRTIS_ENABLE_STATS
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeOutputStart);
-    }
-  }
-#endif  // TRTIS_ENABLE_STATS
+  cudaEventRecord(events_[next_set_].ready_for_output_, stream_);
 
   // For each requested output verify that the output can accept the
   // actual model output and then copy that output from the GPU
@@ -1069,9 +1204,105 @@ PlanBackend::Context::Run(
         TRTSERVER_MEMORY_GPU /* src_memory_type */, gpu_device_, payloads);
   }
 
-  // Wait for the copy-out to complete
-  if (cuda_copy) {
-    cudaStreamSynchronize(stream_);
+  cudaEventRecord(events_[next_set_].output_ready_, stream_);
+
+  return Status::Success;
+}
+
+void
+PlanBackend::Context::ProcessResponse(
+    size_t context_idx, std::shared_ptr<SyncQueue<size_t>> context_queue)
+{
+  while (true) {
+    auto OnCompleteMetaData = completion_queue_.Get();
+    auto& OnComplete = std::get<0>(OnCompleteMetaData);
+    if (OnComplete == nullptr) {
+      break;
+    }
+    auto& event_set = events_[std::get<2>(OnCompleteMetaData)];
+#ifdef TRTIS_ENABLE_STATS
+    // Only need to access payload when stats is being recorded
+    auto& payloads = std::get<1>(OnCompleteMetaData);
+
+    // Only need to wait for input copy for recording stats
+    cudaEventSynchronize(event_set.input_ready_);
+    for (auto& payload : *payloads) {
+      if (payload.stats_ != nullptr) {
+        payload.stats_->CaptureTimestamp(
+            ModelInferStats::TimestampKind::kComputeInputEnd);
+      }
+    }
+#endif  // TRTIS_ENABLE_STATS
+
+    // The model execution associated with the OnCompletePair
+    // has consumed the inputs. Put the context back into the available queue
+    // so that it can begin enqueuing new memcpys into the input buffers
+    cudaEventSynchronize(event_set.ready_for_input_);
+    context_queue->Put(context_idx);
+
+#ifdef TRTIS_ENABLE_STATS
+    cudaEventSynchronize(event_set.ready_for_output_);
+    for (auto& payload : *payloads) {
+      if (payload.stats_ != nullptr) {
+        payload.stats_->CaptureTimestamp(
+            ModelInferStats::TimestampKind::kComputeOutputStart);
+      }
+    }
+#endif  // TRTIS_ENABLE_STATS
+
+    cudaEventSynchronize(event_set.output_ready_);
+
+#ifdef TRTIS_ENABLE_STATS
+    // Stop compute timers.
+    for (auto& payload : *payloads) {
+      if (payload.stats_ != nullptr) {
+        payload.stats_->CaptureTimestamp(
+            ModelInferStats::TimestampKind::kComputeEnd);
+      }
+    }
+#endif  // TRTIS_ENABLE_STATS
+
+    // Just trigger the callback, Payloads are all-set
+    OnComplete(Status::Success);
+  }
+}
+
+Status
+PlanBackend::Context::InitEventSet()
+{
+  for (size_t idx = 0; idx < EVENT_SET_COUNT; idx++) {
+    RETURN_IF_ERROR(CreateCudaEvent(
+        "Set " + std::to_string(idx) + " ready for input",
+        &events_[idx].ready_for_input_));
+    RETURN_IF_ERROR(CreateCudaEvent(
+        "Set " + std::to_string(idx) + " input ready",
+        &events_[idx].input_ready_));
+    RETURN_IF_ERROR(CreateCudaEvent(
+        "Set " + std::to_string(idx) + " ready for output",
+        &events_[idx].ready_for_output_));
+    RETURN_IF_ERROR(CreateCudaEvent(
+        "Set " + std::to_string(idx) + " output ready",
+        &events_[idx].output_ready_));
+  }
+  return Status::Success;
+}
+
+Status
+PlanBackend::Context::DestroyEventSet()
+{
+  for (size_t idx = 0; idx < EVENT_SET_COUNT; idx++) {
+    if (events_[idx].ready_for_input_ != nullptr) {
+      cudaEventDestroy(events_[idx].ready_for_input_);
+    }
+    if (events_[idx].input_ready_ != nullptr) {
+      cudaEventDestroy(events_[idx].input_ready_);
+    }
+    if (events_[idx].ready_for_output_ != nullptr) {
+      cudaEventDestroy(events_[idx].ready_for_output_);
+    }
+    if (events_[idx].output_ready_ != nullptr) {
+      cudaEventDestroy(events_[idx].output_ready_);
+    }
   }
   return Status::Success;
 }
