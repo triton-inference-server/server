@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -290,48 +290,63 @@ CompareDimsSupported(
   // If the model configuration expects batching support in the model,
   // then the onnx shape first dimension must be -1.
   const bool supports_batching = (max_batch_size > 0);
-  if (supports_batching &&
-      ((model_shape.size() == 0) || (model_shape[0] != -1))) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "unable to load model '" + model_name + "', tensor '" + tensor_name +
-            "': for the model to support batching, the shape should have at "
-            "least 1 dimension and the first dimension must be -1 but shape "
-            "expected by model was " +
-            DimsListToString(model_shape));
-  }
-
-  const int nonbatch_start_idx = (supports_batching ? 1 : 0);
-  std::vector<int64_t> debatched_model_shape;
-  for (size_t i = nonbatch_start_idx; i < model_shape.size(); i++) {
-    debatched_model_shape.push_back(model_shape[i]);
-  }
-
-  // Tensor rank in configuration must match what framework expects.
-  if (debatched_model_shape.size() != (size_t)dims.size()) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "unable to load model '" + model_name + "', tensor '" + tensor_name +
-            "': the model expects " +
-            std::to_string(debatched_model_shape.size()) +
-            " dimensions but the model configuration specified " +
-            std::to_string(dims.size()) + " dimensions");
-  }
-
-  for (int i = 0; i < dims.size(); ++i) {
-    int64_t model_dim = debatched_model_shape[i];
-    if (model_dim == -1) {
-      continue;
-    }
-
-    if (model_dim != dims[i]) {
+  if (supports_batching) {
+    if ((model_shape.size() == 0) || (model_shape[0] != -1)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "unable to load model '" + model_name + "', tensor '" + tensor_name +
-              "': the model expects shape " +
-              DimsListToString(debatched_model_shape) +
-              " but the model configuration specified shape " +
-              DimsListToString(dims));
+          "model '" + model_name + "', tensor '" + tensor_name +
+              "': for the model to support batching the shape should have at "
+              "least 1 dimension and the first dimension must be -1; but shape "
+              "expected by the model is " +
+              DimsListToString(model_shape));
+    }
+
+    DimsList full_dims;
+    full_dims.Add(-1);
+    for (int i = 0; i < dims.size(); ++i) {
+      full_dims.Add(dims[i]);
+    }
+
+    bool succ = (model_shape.size() == (size_t)full_dims.size());
+    if (succ) {
+      for (int i = 0; i < full_dims.size(); ++i) {
+        const int64_t model_dim = model_shape[i];
+        if (model_dim != -1) {
+          succ &= (model_dim == full_dims[i]);
+        }
+      }
+    }
+
+    if (!succ) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "model '" + model_name + "', tensor '" + tensor_name +
+              "': the model expects " + std::to_string(model_shape.size()) +
+              " dimensions (shape " + DimsListToString(model_shape) +
+              ") but the model configuration specifies " +
+              std::to_string(full_dims.size()) +
+              " dimensions (an initial batch dimension for max_batch_size > 0 "
+              "plus the explicit tensor shape for a full shape " +
+              DimsListToString(full_dims) + ")");
+    }
+  } else {
+    // ! supports_batching
+    bool succ = (model_shape.size() == (size_t)dims.size());
+    if (succ) {
+      for (int i = 0; i < dims.size(); ++i) {
+        succ &= (model_shape[i] == dims[i]);
+      }
+    }
+
+    if (!succ) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "model '" + model_name + "', tensor '" + tensor_name +
+              "': the model expects " + std::to_string(model_shape.size()) +
+              " dimensions (shape " + DimsListToString(model_shape) +
+              ") but the model configuration specifies " +
+              std::to_string(dims.size()) + " dimensions (shape " +
+              DimsListToString(dims) + ")");
     }
   }
 
