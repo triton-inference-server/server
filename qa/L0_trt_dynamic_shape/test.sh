@@ -260,6 +260,9 @@ wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
+else
+  cat $CLIENT_LOG
+  echo -e "\n***\n*** Test Failed\n***"
 fi
 
 exit $RET
