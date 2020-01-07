@@ -197,6 +197,7 @@ ARG TRTIS_CONTAINER_VERSION=20.01dev
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl4-openSSL-dev is needed for GCS
+# libh2o-dev is needed for h2o variant of HTTP server
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             software-properties-common \
@@ -209,7 +210,8 @@ RUN apt-get update && \
             libre2-dev \
             libssl-dev \
             libtool \
-            libboost-dev && \
+            libboost-dev \
+            libh2o-dev && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
                 libcurl3-dev; \
@@ -289,32 +291,6 @@ COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/infer
 COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
      /opt/tensorrtserver/lib/
 RUN cd /opt/tensorrtserver/lib && ln -sf libtbb.so.2 libtbb.so
-
-# Install openssl (Needed for h2o)
-RUN apt-get update && apt-get install checkinstall zlib1g-dev -y
-RUN (cd /usr/local/src && \
-    wget https://www.openssl.org/source/openssl-1.1.1c.tar.gz && \
-    tar -xf openssl-1.1.1c.tar.gz && \
-    cd openssl-1.1.1c && \
-    ./config --prefix=/usr/local/ssl --openssldir=/usr/local/ssl shared zlib && \
-    make && make install)
-
-# Install libuv (Needed for h2o)
-RUN (wget --no-check-certificate https://dist.libuv.org/dist/v1.34.0/libuv-v1.34.0.tar.gz && \
-    tar -xf libuv-v1.34.0.tar.gz && \
-    cd libuv-v1.34.0 && \
-    apt-get install libtool automake -y && \
-    sh autogen.sh                              && \
-    ./configure --prefix=/usr --disable-static && \
-    make && make install)
-
-# Install h2o (will be installed under /usr/local/bin)
-ENV H2O_VERSION=v2.2.6
-RUN (mkdir /opt/h2o && cd /opt/h2o && \
-    wget -qO - "https://github.com/h2o/h2o/archive/${H2O_VERSION}.tar.gz" | \
-    tar xz --strip-components=1 && \
-    cmake -DWITH_BUNDLED_SSL=OFF -DOPENSSL_ROOT_DIR=/usr/local/ssl -DLIBUV_VERSION=1.34.0 . && \
-    make -j "$(nproc)" libh2o)
 
 # Copy entire repo into container even though some is not needed for
 # build itself... because we want to be able to copyright check on
