@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -490,7 +490,130 @@ instance_group [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
+def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch, dtype, shape):
+    # Note that resize layer does not support int tensors.
+    # The model takes three inputs (INPUT, DUMMY_INPUT and SHAPE_INPUT)
+    # and four control inputs(START, END, READY, CORR_ID).
+    # In absence of proper accumulator, 
+    # OUTPUT : 0 if not-ready and 'DUMMY_INPUT'+'START'+('END'*'CORRID')
+    #          otherwise
+    # RESIZED_OUTPUT : Obtained after resizing 'INPUT' to shape specified
+    #          in 'SHAPE_INPUT'
+    # SHAPE_OUTPUT : The shape values of resized output
 
+    trt_dtype = np_to_trt_dtype(dtype)
+    trt_memory_format = trt.TensorFormat.LINEAR
+
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.infer.Builder(TRT_LOGGER)
+    network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+
+    unit_shape = ([1] * len(shape))
+    dummy_shape = ([-1] * len(shape))
+    if max_batch != 0:
+        in0 = network.add_input("INPUT", trt.int32, [-1] + dummy_shape)
+        dummy_in0 = network.add_input("DUMMY_INPUT", trt_dtype, [-1] + dummy_shape)
+        shape_in0 = network.add_input("SHAPE_INPUT", trt.int32, [1 + len(shape)])
+        start0 = network.add_input("START", trt.int32, [-1] + unit_shape)
+        end0 = network.add_input("END", trt.int32, [-1] + unit_shape)
+        ready0 = network.add_input("READY", trt.int32, [-1] + unit_shape)
+        corrid0 = network.add_input("CORRID", trt.int32, [-1] + unit_shape)
+    else :
+        in0 = network.add_input("INPUT", trt.int32, dummy_shape)
+        dummy_in0 = network.add_input("DUMMY_INPUT", trt_dtype, dummy_shape)
+        shape_in0 = network.add_input("SHAPE_INPUT", trt.int32, [len(shape)])
+        start0 = network.add_input("START", trt.int32, unit_shape)
+        end0 = network.add_input("END", trt.int32, unit_shape)
+        ready0 = network.add_input("READY", trt.int32, unit_shape)
+        corrid0 = network.add_input("CORRID", trt.int32, unit_shape)
+
+    add0 = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
+    mul0 = network.add_elementwise(end0, corrid0, trt.infer.ElementWiseOperation.PROD)
+    sum0 = network.add_elementwise(add0.get_output(0), mul0.get_output(0),
+                                   trt.infer.ElementWiseOperation.SUM)
+    out0 = network.add_elementwise(sum0.get_output(0), ready0, trt.infer.ElementWiseOperation.PROD).get_output(0)
+
+    resize_layer = network.add_resize(dummy_in0)
+    resize_layer.set_input(1, shape_in0)
+    shape_out0 = network.add_shape(resize_layer.get_output(0))
+    resized_out0 = resize_layer.get_output(0)
+
+    shape_out0.get_output(0).name = "SHAPE_OUTPUT"
+    shape_out0.get_output(0).set_type(trt.int32)
+    network.mark_output_for_shapes(shape_out0.get_output(0))
+
+    out0.name = "OUTPUT"
+    out0.set_type(trt.int32)
+    network.mark_output(out0)
+
+    resized_out0.name = "RESIZED_OUTPUT"
+    resized_out0.set_type(trt_dtype)
+    network.mark_output(resized_out0)
+
+    shape_in0.allowed_formats = 1 << int(trt_memory_format)
+    dummy_in0.allowed_formats = 1 << int(trt_memory_format)
+    start0.allowed_formats = 1 << int(trt_memory_format)
+    ready0.allowed_formats = 1 << int(trt_memory_format)
+    out0.allowed_formats = 1 << int(trt_memory_format)
+    shape_out0.get_output(0).allowed_formats = 1 << int(trt_memory_format)
+    resized_out0.allowed_formats = 1 << int(trt_memory_format)
+
+    if (trt_dtype == trt.DataType.INT8):
+        dummy_in0.dynamic_range = (-128.0, 127.0)
+        resized_out0.dynamic_range = (-128.0, 127.0)
+        start0.dynamic_range = (-128.0, 127.0)
+        end0.dynamic_range = (-128.0, 127.0)
+        ready0.dynamic_range = (-128.0, 127.0)
+
+    flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
+    if (trt_dtype == trt.DataType.INT8):
+        flags |= 1 << int(trt.BuilderFlag.INT8)
+    elif (trt_dtype == trt.DataType.HALF):
+        flags |= 1 << int(trt.BuilderFlag.FP16)
+
+    min_prefix = []
+    opt_prefix = []
+    max_prefix = []
+
+    if max_batch != 0:
+        min_prefix = [1]
+        opt_prefix = [max(1, max_batch)]
+        max_prefix = [max(1, max_batch)]
+    
+    min_shape = min_prefix + [1] * len(shape)
+    opt_shape = opt_prefix + [8] * len(shape)
+    max_shape = max_prefix + [32] * len(shape)
+
+    profile = builder.create_optimization_profile()
+    profile.set_shape("INPUT", min_shape, opt_shape, max_shape)
+    profile.set_shape_input("SHAPE_INPUT", min_shape, opt_shape, max_shape)
+    profile.set_shape("DUMMY_INPUT", min_shape, opt_shape, max_shape)
+    profile.set_shape("START", min_prefix + unit_shape, opt_prefix + unit_shape, max_prefix + unit_shape)
+    profile.set_shape("END", min_prefix + unit_shape, opt_prefix + unit_shape, max_prefix + unit_shape)
+    profile.set_shape("READY", min_prefix + unit_shape, opt_prefix + unit_shape, max_prefix + unit_shape)
+    profile.set_shape("CORRID", min_prefix + unit_shape, opt_prefix + unit_shape, max_prefix + unit_shape)
+
+    config = builder.create_builder_config()
+    config.flags=flags
+    config.add_optimization_profile(profile)
+    config.max_workspace_size = 1 << 20
+    engine = builder.build_engine(network,config)
+
+    model_name = tu.get_dyna_sequence_model_name(
+        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(model_version_dir + "/model.plan", "wb") as f:
+        f.write(engine.serialize())
+
+    engine.destroy()
+    builder.destroy()
+    
 def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
     # Create the model. For now don't implement a proper accumulator
@@ -816,7 +939,112 @@ def create_plan_modelconfig(
     model_name = tu.get_dyna_sequence_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", dtype)
     config_dir = models_dir + "/" + model_name
-    config = '''
+
+    if FLAGS.tensorrt_shape_io:
+      shape_tensor_dim = len(shape)
+      config = '''
+name: "{}"
+platform: "tensorrt_plan"
+max_batch_size: {}
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  {}
+  control_input [
+    {{
+      name: "START"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_START
+          {}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
+      name: "END"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_END
+          {}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
+      name: "READY"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_READY
+          {}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
+      name: "CORRID"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_CORRID
+          data_type: TYPE_INT32
+        }}
+      ]
+    }}
+  ]
+}}
+input [
+  {{
+    name: "INPUT"
+    data_type: TYPE_INT32
+    dims: [ {} ]
+  }}
+]
+input [
+  {{
+    name: "DUMMY_INPUT"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+input [
+  {{
+    name: "SHAPE_INPUT"
+    data_type: TYPE_INT32
+    dims: [ {} ]
+    is_shape_tensor: true
+  }}
+]
+output [
+  {{
+    name: "OUTPUT"
+    data_type: TYPE_INT32
+    dims: [ {} ]
+  }}
+]
+output [
+  {{
+    name: "RESIZED_OUTPUT"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+output [
+  {{
+    name: "SHAPE_OUTPUT"
+    data_type: TYPE_INT32
+    dims: [ {} ]
+    is_shape_tensor: true
+  }}
+]
+instance_group [
+  {{
+    kind: KIND_GPU
+  }}
+]
+'''.format(model_name, max_batch,
+           "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}" if max_batch > 0 else "",
+           "int32", "int32", "int32",
+           tu.shape_to_dims_str(shape), np_to_model_dtype(dtype), tu.shape_to_dims_str(shape), shape_tensor_dim,
+           tu.shape_to_dims_str(shape), np_to_model_dtype(dtype), tu.shape_to_dims_str(shape), shape_tensor_dim)
+
+    else:
+      config = '''
 name: "{}"
 platform: "tensorrt_plan"
 max_batch_size: {}
@@ -1183,6 +1411,15 @@ instance_group [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
+def create_shape_tensor_models(models_dir, dtype, shape, no_batch=True):
+    model_version = 1
+
+    create_plan_modelconfig(models_dir, model_version, 8, dtype, shape)
+    create_plan_shape_tensor_modelfile(models_dir, model_version, 8, dtype, shape)
+    if no_batch:
+        create_plan_modelconfig(models_dir, model_version, 0, dtype, shape)
+        create_plan_shape_tensor_modelfile(models_dir, model_version, 0, dtype, shape)
+
 
 def create_models(models_dir, dtype, shape, no_batch=True):
     model_version = 1
@@ -1246,6 +1483,8 @@ if __name__ == '__main__':
                         help='Generate NetDef models')
     parser.add_argument('--tensorrt', required=False, action='store_true',
                         help='Generate TensorRT PLAN models')
+    parser.add_argument('--tensorrt-shape-io', required=False, action='store_true',
+                        help='Generate TensorRT PLAN models w/ shape tensor i/o')
     parser.add_argument('--onnx', required=False, action='store_true',
                         help='Generate Onnx models')
     parser.add_argument('--libtorch', required=False, action='store_true',
@@ -1260,7 +1499,7 @@ if __name__ == '__main__':
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
         from tensorflow.python.framework import graph_io, graph_util
-    if FLAGS.tensorrt:
+    if FLAGS.tensorrt or FLAGS.tensorrt_shape_io:
         import tensorrt.legacy as trt
     if FLAGS.onnx:
         import onnx
@@ -1270,10 +1509,13 @@ if __name__ == '__main__':
 
     import test_util as tu
 
-    # Tests with models that accept fixed-shape input/output tensors
-    if not FLAGS.variable:
+    if FLAGS.tensorrt_shape_io:
+      create_shape_tensor_models(FLAGS.models_dir, np.float32, [-1,])
+    else:
+      # Tests with models that accept fixed-shape input/output tensors
+      if not FLAGS.variable:
         create_models(FLAGS.models_dir, np.int32, [1,])
 
-    # Tests with models that accept variable-shape input/output tensors
-    if FLAGS.variable:
+      # Tests with models that accept variable-shape input/output tensors
+      if FLAGS.variable:
         create_models(FLAGS.models_dir, np.int32, [-1,], False)

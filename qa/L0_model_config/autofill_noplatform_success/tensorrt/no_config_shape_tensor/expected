@@ -1,0 +1,27 @@
+platform: "tensorrt_plan"
+max_batch_size: 8
+input {
+  name: "INPUT0"
+  data_type: TYPE_INT32
+  dims: 2
+  is_shape_tensor: true
+}
+input {
+  name: "DUMMY_INPUT0"
+  data_type: TYPE_FP32
+  dims: -1
+  dims: -1
+}
+output {
+  name: "DUMMY_OUTPUT0"
+  data_type: TYPE_FP32
+  dims: -1
+  dims: -1
+}
+output {
+  name: "OUTPUT0"
+  data_type: TYPE_INT32
+  dims: 2
+  is_shape_tensor: true
+}
+default_model_filename: "model.plan"

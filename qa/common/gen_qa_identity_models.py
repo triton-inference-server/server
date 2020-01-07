@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -640,15 +640,23 @@ def create_plan_dynamic_rf_modelfile(
 
 def create_plan_shape_tensor_modelfile(
         models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size):
-    # Create the model
+    # Note that resize layer does not support int tensors.
+    # The model takes two inputs (INPUT and DUMMY_INPUT)
+    # and produce two outputs.
+    # OUTPUT : The shape of resized output 'DUMMY_OUTPUT'.
+    # DUMMY_OUTPUT : Obtained after resizing 'DUMMY_INPUT' 
+    # to shape specified in 'INPUT'.
+    # Note that values of OUTPUT tensor must be identical
+    # to INPUT values
+
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.infer.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
     if max_batch == 0:
-        shape_with_batchsize = shape[0]
+        shape_with_batchsize = len(shape)
         dummy_shape = [-1] * shape_with_batchsize
     else:
-        shape_with_batchsize = shape[0] + 1
+        shape_with_batchsize = len(shape) + 1
         dummy_shape = [-1] * shape_with_batchsize
        
     trt_dtype = np_to_trt_dtype(dtype)
@@ -690,9 +698,9 @@ def create_plan_shape_tensor_modelfile(
         opt_prefix = [max(1, max_batch)]
         max_prefix = [max(1, max_batch)]
     
-    min_shape = min_prefix + [1] * shape[0]
-    opt_shape = opt_prefix + [8] * shape[0]
-    max_shape = max_prefix + [profile_max_size] * shape[0]
+    min_shape = min_prefix + [1] * len(shape)
+    opt_shape = opt_prefix + [8] * len(shape)
+    max_shape = max_prefix + [profile_max_size] * len(shape)
 
     profile = builder.create_optimization_profile()
     for io_num in range(io_cnt):
@@ -798,14 +806,14 @@ def create_plan_modelconfig(
 
     shape_str = tu.shape_to_dims_str(shape)
 
-    if FLAGS.tensorrt_shape_io:
-        dummy_shape_str = tu.shape_to_dims_str([-1] * shape[0])
+    model_name = tu.get_zero_model_name(
+        "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
+    config_dir = models_dir + "/" + model_name
 
 
+
     if FLAGS.tensorrt_shape_io:
-        model_name = tu.get_zero_model_name(
-            "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
-        config_dir = models_dir + "/" + model_name
+        shape_tensor_dim = len(shape)
         config = '''
 name: "{}"
 platform: "tensorrt_plan"
@@ -840,15 +848,12 @@ output [
     is_shape_tensor: true
   }}
 ]
-'''.format(io_num, np_to_model_dtype(dtype), dummy_shape_str,
-           io_num, shape_str,
-           io_num, np_to_model_dtype(dtype), dummy_shape_str,
-           io_num, shape_str)
+'''.format(io_num, np_to_model_dtype(dtype), shape_str,
+           io_num, shape_tensor_dim,
+           io_num, np_to_model_dtype(dtype), shape_str,
+           io_num, shape_tensor_dim)
 
     else:
-        model_name = tu.get_zero_model_name(
-            "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
-        config_dir = models_dir + "/" + model_name
         config = '''
 name: "{}"
 platform: "tensorrt_plan"
@@ -1001,7 +1006,7 @@ if __name__ == '__main__':
     if FLAGS.tensorrt_big:
         create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1)
     elif FLAGS.tensorrt_shape_io:
-        create_shape_tensor_models(FLAGS.models_dir, np.float32, [2], io_cnt=1)
+        create_shape_tensor_models(FLAGS.models_dir, np.float32, [-1,-1], io_cnt=1)
     else:
         create_models(FLAGS.models_dir, np.bool, [-1], io_cnt=1)
         create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1)

@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,22 +30,25 @@ sys.path.append("../common")
 from builtins import range
 from future.utils import iteritems
 import unittest
-import numpy as np
-import infer_util as iu
-import test_util as tu
 import time
 import threading
 import traceback
+import numpy as np
+import infer_util as iu
+import test_util as tu
+import sequence_util as su
 
 from tensorrtserver.api import *
 import os
 
-TEST_SYSTEM_SHARED_MEMORY = bool(
+_test_system_shared_memory = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
-                                                  0)))
+_test_cuda_shared_memory = bool(
+    int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
 
+_model_instances = 1
 _max_queue_delay_ms = 10000
+_max_sequence_idle_ms = 5000
 
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
@@ -171,7 +174,7 @@ class InferShapeTensorTest(unittest.TestCase):
                 in ex.message())
 
     # Dynamic Batcher tests
-    def test_multi_batch_different_shape_values(self):
+    def test_dynamic_different_shape_values(self):
         # Send two requests with sum of static batch sizes ==
         # preferred size, but with different shape values. This
         # should cause the requests to not be batched. The first
@@ -212,7 +215,7 @@ class InferShapeTensorTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-    def test_multi_batch_same_shape_values(self):
+    def test_dynamic_identical_shape_values(self):
         # Send two requests with sum of static batch sizes ==
         # preferred size, but with identical shape values. This
         # should cause the requests to get batched. Both
@@ -250,6 +253,596 @@ class InferShapeTensorTest(unittest.TestCase):
             self.check_status(url, protocol, model_name, (4, 2), 1, 6)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+
+
+class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
+
+    def get_expected_result(self, expected_result, value, flag_str=None):
+        # Adjust the expected_result for models
+        expected_result = value
+        if (flag_str is not None) and ("start" in flag_str):
+            expected_result += 1
+        return expected_result
+
+    def test_sequence_identical_shape_values(self):
+        # Test model instances together are configured with
+        # total-batch-size 4. Send four equal-length sequences
+        # with identical shape values in parallel and make sure
+        # they get completely batched into batch-size 4
+        # inferences.
+        self.clear_deferred_exceptions()
+        dtype = np.float32
+        try:
+            model_name = tu.get_sequence_model_name("plan", dtype)
+            protocol = "streaming"
+
+            self.check_setup(model_name)
+
+            # Need scheduler to wait for queue to contain all
+            # inferences for both sequences.
+            self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+            self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 12)
+            self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+            self.assertEqual(
+                int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+            precreated_shm0_handles = self.precreate_register_regions(
+                ((2, 1), (4, 2), (8, 3)),
+                dtype,
+                0,
+                model_type="sequence_shape_tensor")
+            precreated_shm1_handles = self.precreate_register_regions(
+                ((2, 11), (4, 12), (8, 13)),
+                dtype,
+                1,
+                model_type="sequence_shape_tensor")
+            precreated_shm2_handles = self.precreate_register_regions(
+                ((2, 111), (4, 112), (8, 113)),
+                dtype,
+                2,
+                model_type="sequence_shape_tensor")
+            precreated_shm3_handles = self.precreate_register_regions(
+                ((2, 1111), (4, 1112), (8, 1113)),
+                dtype,
+                3,
+                model_type="sequence_shape_tensor")
+            threads = []
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        1001,
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 2, 1, None), (None, 4, 2, None), ("end", 8,
+                                                                     3, None)),
+                        self.get_expected_result(6, 3, "end"),
+                        protocol,
+                        precreated_shm0_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}".format(self._testMethodName, protocol)
+                    }))
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        1002,
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 2, 11, None), (None, 4, 12, None),
+                         ("end", 8, 13, None)),
+                        self.get_expected_result(36, 13, "end"),
+                        protocol,
+                        precreated_shm1_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}".format(self._testMethodName, protocol)
+                    }))
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        1003,
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 2, 111, None), (None, 4, 112, None),
+                         ("end", 8, 113, None)),
+                        self.get_expected_result(336, 113, "end"),
+                        protocol,
+                        precreated_shm2_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}".format(self._testMethodName, protocol)
+                    }))
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        1004,
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 2, 1111, None), (None, 4, 1112, None),
+                         ("end", 8, 1113, None)),
+                        self.get_expected_result(3336, 1113, "end"),
+                        protocol,
+                        precreated_shm3_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}".format(self._testMethodName, protocol)
+                    }))
+
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            self.check_deferred_exception()
+            self.check_status(model_name, (1,), 3 * _model_instances, 12)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        finally:
+            if _test_system_shared_memory or _test_cuda_shared_memory:
+                self.cleanup_shm_regions(precreated_shm0_handles)
+                self.cleanup_shm_regions(precreated_shm1_handles)
+                self.cleanup_shm_regions(precreated_shm2_handles)
+                self.cleanup_shm_regions(precreated_shm3_handles)
+
+    def test_sequence_different_shape_values(self):
+        # Test model instances together are configured with
+        # total-batch-size 4. Send four equal-length sequences
+        # with different shape values in parallel. As the
+        # sequence batcher currently doesn't support ragged batch
+        # the requests will still get batched together but the
+        # result will be incorrect.
+        self.clear_deferred_exceptions()
+        dtype = np.float32
+
+        precreated_shm0_handles = self.precreate_register_regions(
+            ((1, 1), (1, 2), (1, 3)),
+            dtype,
+            0,
+            model_type="sequence_shape_tensor")
+        precreated_shm1_handles = self.precreate_register_regions(
+            ((32, 11), (32, 12), (32, 13)),
+            dtype,
+            1,
+            model_type="sequence_shape_tensor")
+        precreated_shm2_handles = self.precreate_register_regions(
+            ((16, 111), (16, 112), (16, 113)),
+            dtype,
+            2,
+            model_type="sequence_shape_tensor")
+        precreated_shm3_handles = self.precreate_register_regions(
+            ((1, 1111), (1, 1112), (1, 1113)),
+            dtype,
+            3,
+            model_type="sequence_shape_tensor")
+        try:
+            model_name = tu.get_sequence_model_name("plan", dtype)
+            protocol = "streaming"
+
+            self.check_setup(model_name)
+
+            # Need scheduler to wait for queue to contain all
+            # inferences for both sequences.
+            self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+            self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 12)
+            self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+            self.assertEqual(
+                int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+
+            threads = []
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        1001,
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 1, 1, None), (None, 1, 2, None), ("end", 1,
+                                                                     3, None)),
+                        self.get_expected_result(6, 3, "end"),
+                        protocol,
+                        precreated_shm0_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}".format(self._testMethodName, protocol)
+                    }))
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        1002,
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 32, 11, None), (None, 32, 12, None),
+                         ("end", 32, 13, None)),
+                        self.get_expected_result(36, 13, "end"),
+                        protocol,
+                        precreated_shm1_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}".format(self._testMethodName, protocol)
+                    }))
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        1003,
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 16, 111, None), (None, 16, 112, None),
+                         ("end", 16, 113, None)),
+                        self.get_expected_result(336, 113, "end"),
+                        protocol,
+                        precreated_shm2_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}".format(self._testMethodName, protocol)
+                    }))
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        1004,
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 1, 1111, None), (None, 1, 1112, None),
+                         ("end", 1, 1113, None)),
+                        self.get_expected_result(3336, 1113, "end"),
+                        protocol,
+                        precreated_shm3_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}".format(self._testMethodName, protocol)
+                    }))
+
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+            self.check_failure()
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        finally:
+            if _test_system_shared_memory or _test_cuda_shared_memory:
+                self.cleanup_shm_regions(precreated_shm0_handles)
+                self.cleanup_shm_regions(precreated_shm1_handles)
+                self.cleanup_shm_regions(precreated_shm2_handles)
+                self.cleanup_shm_regions(precreated_shm3_handles)
+
+
+class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
+
+    def get_expected_result(self, expected_result, corrid, value,
+                            flag_str=None):
+        expected_result = value
+        if flag_str is not None:
+            if "start" in flag_str:
+                expected_result += 1
+            if "end" in flag_str:
+                expected_result += corrid
+        return expected_result
+
+    def _multi_sequence_different_shape_impl(self, sleep_secs):
+        self.clear_deferred_exceptions()
+        dtype = np.float32
+
+        precreated_shm0_handles = self.precreate_register_regions(
+            ((1, 1), (12, 2), (2, 3)),
+            dtype,
+            0,
+            model_type="dynaseq_shape_tensor")
+        precreated_shm1_handles = self.precreate_register_regions(
+            ((3, 11), (4, 12), (5, 13)),
+            dtype,
+            1,
+            model_type="dynaseq_shape_tensor")
+        precreated_shm2_handles = self.precreate_register_regions(
+            ((6, 111), (7, 112), (8, 113)),
+            dtype,
+            2,
+            model_type="dynaseq_shape_tensor")
+        precreated_shm3_handles = self.precreate_register_regions(
+            ((9, 1111), (10, 1112), (11, 1113)),
+            dtype,
+            3,
+            model_type="dynaseq_shape_tensor")
+
+        try:
+            model_name = tu.get_dyna_sequence_model_name("plan", dtype)
+            protocol = "streaming"
+
+            self.check_setup(model_name)
+            self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+            self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+
+            corrids = [1001, 1002, 1003, 1004]
+            threads = []
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        corrids[0],
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 1, 1, None), (None, 12, 2, None), ("end", 2,
+                                                                      3, None)),
+                        self.get_expected_result(4 + corrids[0], corrids[0], 3,
+                                                 "end"),
+                        protocol,
+                        precreated_shm0_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}_{}".format(self._testMethodName, protocol,
+                                              corrids[0]),
+                        'using_dynamic_batcher':
+                            True
+                    }))
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        corrids[1],
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 3, 11, None), (None, 4, 12, None),
+                         ("end", 5, 13, None)),
+                        self.get_expected_result(36 + corrids[1], corrids[1],
+                                                 13, "end"),
+                        protocol,
+                        precreated_shm1_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}_{}".format(self._testMethodName, protocol,
+                                              corrids[1]),
+                        'using_dynamic_batcher':
+                            True
+                    }))
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        corrids[2],
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 6, 111, None), (None, 7, 112, None),
+                         ("end", 8, 113, None)),
+                        self.get_expected_result(336 + corrids[2], corrids[2],
+                                                 113, "end"),
+                        protocol,
+                        precreated_shm2_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}_{}".format(self._testMethodName, protocol,
+                                              corrids[2]),
+                        'using_dynamic_batcher':
+                            True
+                    }))
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        corrids[3],
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 9, 1111, None), (None, 10, 1112, None),
+                         ("end", 11, 1113, None)),
+                        self.get_expected_result(3336 + corrids[3], corrids[3],
+                                                 1113, "end"),
+                        protocol,
+                        precreated_shm3_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}_{}".format(self._testMethodName, protocol,
+                                              corrids[3]),
+                        'using_dynamic_batcher':
+                            True
+                    }))
+
+            for t in threads:
+                t.start()
+                if sleep_secs > 0:
+                    time.sleep(sleep_secs)
+            for t in threads:
+                t.join()
+            self.check_deferred_exception()
+            self.check_status(model_name, (1,), 12, 12)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        finally:
+            if _test_system_shared_memory or _test_cuda_shared_memory:
+                self.cleanup_shm_regions(precreated_shm0_handles)
+                self.cleanup_shm_regions(precreated_shm1_handles)
+                self.cleanup_shm_regions(precreated_shm2_handles)
+                self.cleanup_shm_regions(precreated_shm3_handles)
+
+    def _multi_sequence_identical_shape_impl(self, sleep_secs):
+        self.clear_deferred_exceptions()
+        dtype = np.float32
+
+        precreated_shm0_handles = self.precreate_register_regions(
+            ((2, 1), (4, 2), (8, 3)),
+            dtype,
+            0,
+            model_type="dynaseq_shape_tensor")
+        precreated_shm1_handles = self.precreate_register_regions(
+            ((2, 11), (4, 12), (8, 13)),
+            dtype,
+            1,
+            model_type="dynaseq_shape_tensor")
+        precreated_shm2_handles = self.precreate_register_regions(
+            ((2, 111), (4, 112), (8, 113)),
+            dtype,
+            2,
+            model_type="dynaseq_shape_tensor")
+        precreated_shm3_handles = self.precreate_register_regions(
+            ((2, 1111), (4, 1112), (8, 1113)),
+            dtype,
+            3,
+            model_type="dynaseq_shape_tensor")
+
+        try:
+            model_name = tu.get_dyna_sequence_model_name("plan", dtype)
+            protocol = "streaming"
+
+            self.check_setup(model_name)
+            self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+            self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+
+            corrids = [1001, 1002, 1003, 1004]
+            threads = []
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        corrids[0],
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 2, 1, None), (None, 4, 2, None), ("end", 8,
+                                                                     3, None)),
+                        self.get_expected_result(4 + corrids[0], corrids[0], 3,
+                                                 "end"),
+                        protocol,
+                        precreated_shm0_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}_{}".format(self._testMethodName, protocol,
+                                              corrids[0]),
+                        'using_dynamic_batcher':
+                            True
+                    }))
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        corrids[1],
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 2, 11, None), (None, 4, 12, None),
+                         ("end", 8, 13, None)),
+                        self.get_expected_result(36 + corrids[1], corrids[1],
+                                                 13, "end"),
+                        protocol,
+                        precreated_shm1_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}_{}".format(self._testMethodName, protocol,
+                                              corrids[1]),
+                        'using_dynamic_batcher':
+                            True
+                    }))
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        corrids[2],
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 2, 111, None), (None, 4, 112, None),
+                         ("end", 8, 113, None)),
+                        self.get_expected_result(336 + corrids[2], corrids[2],
+                                                 113, "end"),
+                        protocol,
+                        precreated_shm2_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}_{}".format(self._testMethodName, protocol,
+                                              corrids[2]),
+                        'using_dynamic_batcher':
+                            True
+                    }))
+            threads.append(
+                threading.Thread(
+                    target=self.check_sequence_shape_tensor_io,
+                    args=(
+                        model_name,
+                        dtype,
+                        corrids[3],
+                        (None, None),
+                        # (flag_str, shape_value, value, pre_delay_ms)
+                        (("start", 2, 1111, None), (None, 4, 1112, None),
+                         ("end", 8, 1113, None)),
+                        self.get_expected_result(3336 + corrids[3], corrids[3],
+                                                 1113, "end"),
+                        protocol,
+                        precreated_shm3_handles),
+                    kwargs={
+                        'sequence_name':
+                            "{}_{}_{}".format(self._testMethodName, protocol,
+                                              corrids[3]),
+                        'using_dynamic_batcher':
+                            True
+                    }))
+
+            for t in threads:
+                t.start()
+                if sleep_secs > 0:
+                    time.sleep(sleep_secs)
+            for t in threads:
+                t.join()
+            self.check_deferred_exception()
+            self.check_status(model_name, (1,), 3, 12)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        finally:
+            if _test_system_shared_memory or _test_cuda_shared_memory:
+                self.cleanup_shm_regions(precreated_shm0_handles)
+                self.cleanup_shm_regions(precreated_shm1_handles)
+                self.cleanup_shm_regions(precreated_shm2_handles)
+                self.cleanup_shm_regions(precreated_shm3_handles)
+
+    def test_dynaseq_identical_shape_values_series(self):
+        # Send four sequences with identical shape values in series
+        # and make sure they get completely batched into batch-size
+        # 4 inferences.
+        self._multi_sequence_identical_shape_impl(1)
+
+    def test_dynaseq_identical_shape_values_parallel(self):
+        # Send four sequences with identical shape values in parallel
+        # and make sure they get completely batched into batch-size
+        # 4 inferences.
+        self._multi_sequence_identical_shape_impl(0)
+
+    def test_dynaseq_different_shape_values_series(self):
+        # Send four sequences with different shape values in series
+        # and make sure they don't get batched together.
+        self._multi_sequence_different_shape_impl(1)
+
+    def test_dynaseq_different_shape_values_parallel(self):
+        # Send four sequences with different shape values in parallel
+        # and make sure they don't get batched together.
+        self._multi_sequence_different_shape_impl(0)
 
 
 if __name__ == '__main__':
