@@ -316,6 +316,9 @@ class InferContext {
     /// \return The data-type of the input.
     virtual DataType DType() const = 0;
 
+    /// \return Whether the input is a shape tensor 
+    virtual bool IsShapeTensor() const = 0;
+
     /// \return The format of the input.
     virtual ModelInput::Format Format() const = 0;
 
@@ -408,6 +411,9 @@ class InferContext {
 
     /// \return The data-type of the output.
     virtual DataType DType() const = 0;
+
+    /// \return Whether the output is a shape tensor
+    virtual bool IsShapeTensor() const = 0;
 
     /// \return The dimensions/shape of the output specified in the
     /// model configuration. Variable-size dimensions are reported as

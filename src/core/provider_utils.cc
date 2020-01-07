@@ -165,12 +165,13 @@ NormalizeRequestHeader(
     uint64_t bs = 0;
     if (IsFixedSizeDataType(input_config->data_type())) {
       bs = GetByteSize(input_config->data_type(), io.dims());
+      int multiplier =
+          (input_config->is_shape_tensor() ? 1 : request_header.batch_size());
       if (model_config.max_batch_size() > 0) {
         if (io.dims_size() == 0) {
-          bs = GetDataTypeByteSize(input_config->data_type()) *
-               request_header.batch_size();
+          bs = GetDataTypeByteSize(input_config->data_type()) * multiplier;
         } else {
-          bs *= request_header.batch_size();
+          bs *= multiplier;
         }
       }
 

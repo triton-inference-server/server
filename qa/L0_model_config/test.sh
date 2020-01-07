@@ -75,7 +75,7 @@ for modelpath in \
         autofill_noplatform/tensorrt/mixed_batch_hint_dims/1 \
         autofill_noplatform/tensorrt/mixed_batch_hint_shape_values/1 ; do
     mkdir -p $modelpath
-    cp /data/inferenceserver/${REPO_VERSION}/qa_identity_shapetensor_model_repository/plan_zero_1_int32/1/model.plan \
+    cp /data/inferenceserver/${REPO_VERSION}/qa_identity_shapetensor_model_repository/plan_zero_1_float32/1/model.plan \
        $modelpath/.
 done
 
