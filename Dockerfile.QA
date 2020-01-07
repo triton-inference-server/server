@@ -168,6 +168,8 @@ RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
     cp -r qa/L0_infer/. qa/L0_infer_shm && \
     mkdir -p qa/L0_infer_cudashm && \
     cp -r qa/L0_infer/. qa/L0_infer_cudashm && \
+    mkdir -p qa/L0_trt_shape_tensors_shm && \
+    cp -r qa/L0_trt_shape_tensors/. qa/L0_trt_shape_tensors_shm && \
     mkdir -p qa/L0_batcher_shm && \
     cp -r qa/L0_batcher/. qa/L0_batcher_shm && \
     mkdir -p qa/L0_batcher_cudashm && \

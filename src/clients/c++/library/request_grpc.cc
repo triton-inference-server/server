@@ -949,7 +949,8 @@ InferGrpcContextImpl::PreRunProcessing(GrpcRequestImpl* request)
     // Append all batches of one input together (skip if using shared memory)
     if (!io->IsSharedMemory()) {
       std::string* new_input = request_.add_raw_input();
-      for (size_t batch_idx = 0; batch_idx < batch_size_; batch_idx++) {
+      for (size_t batch_idx = 0;
+           batch_idx < (io->IsShapeTensor() ? 1 : batch_size_); batch_idx++) {
         const uint8_t* data_ptr;
         size_t data_byte_size;
         io->GetRaw(batch_idx, &data_ptr, &data_byte_size);
