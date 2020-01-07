@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -40,6 +40,10 @@ class InferenceBackend;
 
 struct BackendContext {
  public:
+#ifndef TRTIS_ENABLE_GPU
+  using cudaStream_t = void*;
+#endif  // !TRTIS_ENABLE_GPU
+
   // GPU device number that indicates that no gpu is available for a
   // context (which is an invalid state since TensorRT requires a
   // GPU).
@@ -53,9 +57,11 @@ struct BackendContext {
 
   virtual ~BackendContext();
 
-  // Create the CUDA stream for data transfer operations. Have no effect
-  // if GPU support is disabled.
-  Status CreateCudaStream(const int cuda_stream_priority = 0);
+  // Create the CUDA stream for data transfer operations. If 'stream' is
+  // nullptr, the stream will be created on 'stream_'. Have no effect if GPU
+  // support is disabled.
+  Status CreateCudaStream(
+      const int cuda_stream_priority = 0, cudaStream_t* stream = nullptr);
 
   // Run model to execute for one or more requests. This function
   // assumes that it is only called by the single runner thread that
@@ -78,6 +84,14 @@ struct BackendContext {
       std::vector<Scheduler::Payload>* payloads,
       TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
       char* input_buffer);
+
+  // Overload of SetInputBuffer() which issues the CUDA copies on 'stream'
+  // instead of 'stream_'.
+  bool SetInputBuffer(
+      const std::string& name, const std::vector<size_t>& expected_byte_sizes,
+      std::vector<Scheduler::Payload>* payloads,
+      TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
+      cudaStream_t stream, char* input_buffer);
 
   // Helper function to set output buffer of fixed size data type to payloads
   // Return true if cudaMemcpyAsync is called, and the caller should call
@@ -112,10 +126,6 @@ struct BackendContext {
   // supported by the model and what is requested in the
   // configuration.
   int max_batch_size_;
-
-#ifndef TRTIS_ENABLE_GPU
-  using cudaStream_t = void*;
-#endif  // !TRTIS_ENABLE_GPU
 
   // The stream where data transfer operations are executed on.
   cudaStream_t stream_;

@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -171,6 +171,7 @@ set(
   pinned_memory_manager.h
   provider.h
   provider_utils.h
+  sync_queue.h
   scheduler.h
   sequence_batch_scheduler.h
   server.h

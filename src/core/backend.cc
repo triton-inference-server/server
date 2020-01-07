@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -134,6 +134,7 @@ InferenceBackend::SetConfiguredScheduler(
 
   auto& model_name = Name();
   auto version = Version();
+  // [DLIS-1001] Assumption on runner tied to instance is not longer valid
   auto OnWarmup = [this, &model_name, &version,
                    &samples](uint32_t runner_idx) -> Status {
     for (const auto& sample : samples) {
