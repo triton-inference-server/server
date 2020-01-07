@@ -41,6 +41,7 @@ class PlanBackend : public InferenceBackend {
  public:
   PlanBackend() = default;
   PlanBackend(PlanBackend&&) = default;
+  ~PlanBackend();
 
   void Run(
       uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
@@ -152,9 +153,13 @@ class PlanBackend : public InferenceBackend {
         size_t total_batch_size,
         const std::shared_ptr<InferRequestProvider>& input_request_provider);
 
-    // TensorRT components for the model
-    nvinfer1::IRuntime* runtime_;
+    // The engine used for the context. If the model uses dynamic shape, then
+    // the CUDA engine is owned by the context. Otherwise, the engine is shared
+    // across all contexts and it must not be destroyed by the contexts.
+    // In the future version of TensorRT, the engine may be shared even in the
+    // dynamic shape case.
     nvinfer1::ICudaEngine* engine_;
+    bool is_shared_engine_;
 
     // Additional CUDA stream to overlap copy and execution.
     cudaStream_t input_copy_stream_;
@@ -201,6 +206,11 @@ class PlanBackend : public InferenceBackend {
     // The array size is equal to Context::total_bindings_
     std::vector<void*> buffer_bindings_;
   };
+
+  // [TODO] can an engine be shared across devices?
+  // CUDA engine shared across all model instances on the same device.
+  std::map<int, std::pair<nvinfer1::IRuntime*, nvinfer1::ICudaEngine*>>
+      device_engine_;
 
   // vector for storing available context queue associated with a runner
   std::vector<std::shared_ptr<SyncQueue<size_t>>> available_context_queue_;

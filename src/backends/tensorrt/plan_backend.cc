@@ -60,8 +60,8 @@ CreateCudaEvent(const std::string& event_name, cudaEvent_t* event)
 
 PlanBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
-    : BackendContext(name, gpu_device, max_batch_size), runtime_(nullptr),
-      engine_(nullptr), is_dynamic_(false), total_bindings_(0),
+    : BackendContext(name, gpu_device, max_batch_size), engine_(nullptr),
+      is_shared_engine_(true), is_dynamic_(false), total_bindings_(0),
       num_expected_bindings_(0)
 {
   stream_ = nullptr;
@@ -123,13 +123,9 @@ PlanBackend::Context::~Context()
     stream_ = nullptr;
   }
 
-  if (engine_ != nullptr) {
+  if ((engine_ != nullptr) && (!is_shared_engine_)) {
     engine_->destroy();
     engine_ = nullptr;
-  }
-  if (runtime_ != nullptr) {
-    runtime_->destroy();
-    runtime_ = nullptr;
   }
 
   DestroyEventSet();
@@ -196,6 +192,64 @@ PlanBackend::CreateExecutionContexts(
         const std::string instance_name = group.name() + "_" +
                                           std::to_string(c) + "_gpu" +
                                           std::to_string(gpu_device);
+
+        // [TODO] abstract the following as a function
+        // Determine the model file to use for device compute capability
+        auto eit = device_engine_.find(gpu_device);
+        if (eit == device_engine_.end()) {
+          eit = device_engine_
+                    .emplace(gpu_device, std::make_pair(nullptr, nullptr))
+                    .first;
+
+          cudaDeviceProp cuprops;
+          auto cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
+          if (cuerr != cudaSuccess) {
+            return Status(
+                RequestStatusCode::INTERNAL,
+                "unable to get CUDA device properties for " + Name() + ": " +
+                    cudaGetErrorString(cuerr));
+          }
+
+          const std::string cc = std::to_string(cuprops.major) + "." +
+                                 std::to_string(cuprops.minor);
+          const auto& cc_itr = Config().cc_model_filenames().find(cc);
+          const std::string& cc_model_filename =
+              (cc_itr == Config().cc_model_filenames().end())
+                  ? Config().default_model_filename()
+                  : cc_itr->second;
+
+          const auto& mn_itr = models.find(cc_model_filename);
+          if (mn_itr == models.end()) {
+            return Status(
+                RequestStatusCode::INTERNAL, "unable to find PLAN model '" +
+                                                 cc_model_filename + "' for " +
+                                                 Name());
+          }
+
+
+          // Create a CUDA engine shared by all contexts
+          RETURN_IF_ERROR(LoadPlan(
+              mn_itr->second, &eit->second.first, &eit->second.second));
+          // Validate whether the engine can be shared
+          bool is_dynamic = false;
+          auto binding_count = eit->second.second->getNbBindings();
+          for (int idx = 0; idx < binding_count; idx++) {
+            auto dims = eit->second.second->getBindingDimensions(idx);
+            // Detect whether dynamic or not
+            if (ContainsWildcard(dims)) {
+              is_dynamic = true;
+              break;
+            }
+          }
+          // Model with dynamic shapes can't share engine, set to engine to
+          // 'nullptr' as hint, but keeping runtime as it can be used repeatly
+          if (is_dynamic) {
+            if (eit->second.second != nullptr) {
+              eit->second.second->destroy();
+              eit->second.second = nullptr;
+            }
+          }
+        }
 
         RETURN_IF_ERROR(CreateExecutionContext(
             instance_name, gpu_device, models, group.profile(), queue));
@@ -363,8 +417,14 @@ PlanBackend::CreateExecutionContext(
   // Create CUDA events associated with the execution states
   RETURN_IF_ERROR(context->InitEventSet());
 
-  RETURN_IF_ERROR(
-      LoadPlan(mn_itr->second, &context->runtime_, &context->engine_));
+  auto eit = device_engine_.find(gpu_device);
+  if (eit->second.second == nullptr) {
+    context->is_shared_engine_ = false;
+    RETURN_IF_ERROR(
+        LoadPlan(mn_itr->second, &eit->second.first, &context->engine_));
+  } else {
+    context->engine_ = eit->second.second;
+  }
 
   RETURN_IF_ERROR(context->InitOptimizationProfiles(profile_names));
 
@@ -902,6 +962,25 @@ PlanBackend::Context::BuildCudaGraph(
   return captured;
 }
 #endif
+
+PlanBackend::~PlanBackend()
+{
+  // Must destory all TensorRT contexts before engine
+  contexts_.clear();
+
+  for (auto& device_engine : device_engine_) {
+    auto& runtime = device_engine.second.first;
+    auto& engine = device_engine.second.second;
+    if (engine != nullptr) {
+      engine->destroy();
+      engine = nullptr;
+    }
+    if (runtime != nullptr) {
+      runtime->destroy();
+      runtime = nullptr;
+    }
+  }
+}
 
 void
 PlanBackend::Run(

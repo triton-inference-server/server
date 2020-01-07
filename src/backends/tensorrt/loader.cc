@@ -39,19 +39,21 @@ LoadPlan(
     const std::vector<char>& model_data, nvinfer1::IRuntime** runtime,
     nvinfer1::ICudaEngine** engine)
 {
+  // Create runtime only if it is not provided
+  if (*runtime == nullptr) {
+    *runtime = nvinfer1::createInferRuntime(tensorrt_logger);
+    if (*runtime == nullptr) {
+      return Status(
+          RequestStatusCode::INTERNAL, "unable to create TensorRT runtime");
+    }
+  }
+
   *engine = nullptr;
-  *runtime = nullptr;
 
   // Create plugin factory to provide onnx plugins. This should be
   // generalized based on what the model requires [DLIS-54]
   nvonnxparser::IPluginFactory* onnx_plugin_factory =
       nvonnxparser::createPluginFactory(tensorrt_logger);
-
-  *runtime = nvinfer1::createInferRuntime(tensorrt_logger);
-  if (*runtime == nullptr) {
-    return Status(
-        RequestStatusCode::INTERNAL, "unable to create TensorRT runtime");
-  }
 
   *engine = (*runtime)->deserializeCudaEngine(
       &model_data[0], model_data.size(), onnx_plugin_factory);
