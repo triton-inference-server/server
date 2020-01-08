@@ -520,15 +520,18 @@ SharedMemoryControlContextGetStatus(
 }
 
 nic::Error*
-SharedMemoryControlContextGetSharedMemoryHandle(
-    void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd,
+SharedMemoryControlContextGetSharedMemoryHandleInfo(
+    void* shm_handle, char** shm_addr, const char** shm_key, int* shm_fd,
     size_t* offset, size_t* byte_size)
 {
   SharedMemoryHandle* handle =
       reinterpret_cast<SharedMemoryHandle*>(shm_handle);
   if (handle->shm_key_ == "") {
 #ifdef TRTIS_ENABLE_GPU
-    *shm_addr = reinterpret_cast<void*>(new uint8_t[handle->byte_size_]);
+    // Must call SharedMemoryControlContextReleaseBuffer to destroy 'new' object
+    // after writing into results. Numpy cannot read buffer from GPU and hence
+    // this is needed to maintain a copy of the data on GPU shared memory.
+    *shm_addr = new char[handle->byte_size_];
     cudaError_t err = cudaMemcpy(
         *shm_addr, handle->base_addr_, handle->byte_size_,
         cudaMemcpyDeviceToHost);
@@ -540,7 +543,7 @@ SharedMemoryControlContextGetSharedMemoryHandle(
     }
 #endif  // TRTIS_ENABLE_GPU
   } else {
-    *shm_addr = handle->base_addr_;
+    *shm_addr = reinterpret_cast<char*>(handle->base_addr_);
   }
   *shm_key = handle->shm_key_.c_str();
   *shm_fd = handle->shm_fd_;
@@ -549,19 +552,19 @@ SharedMemoryControlContextGetSharedMemoryHandle(
   return nullptr;
 }
 
-#ifdef TRTIS_ENABLE_GPU
 nic::Error*
-SharedMemoryControlContextGetCudaSharedMemoryHandle(
-    void* cuda_shm_handle, void** shm_addr, size_t* byte_size, int* device_id)
+SharedMemoryControlContextReleaseBuffer(void* shm_handle, char* ptr)
 {
   SharedMemoryHandle* handle =
-      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle);
-  *shm_addr = handle->base_addr_;
-  *device_id = handle->device_id_;
-  *byte_size = handle->byte_size_;
+      reinterpret_cast<SharedMemoryHandle*>(shm_handle);
+  // Only destroy in case of GPU shared memory since it is a temporary buffer
+  if (handle->shm_key_ == "") {
+    if (ptr) {
+      delete ptr;
+    }
+  }
   return nullptr;
 }
-#endif  // TRTIS_ENABLE_GPU
 
 //==============================================================================
 struct InferContextCtx {

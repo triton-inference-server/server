@@ -107,11 +107,11 @@ nic::Error* SharedMemoryControlContextUnregisterAll(
     SharedMemoryControlContextCtx* ctx);
 nic::Error* SharedMemoryControlContextGetStatus(
     SharedMemoryControlContextCtx* ctx, char** status, uint32_t* status_len);
-nic::Error* SharedMemoryControlContextGetSharedMemoryHandle(
-    void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd,
+nic::Error* SharedMemoryControlContextGetSharedMemoryHandleInfo(
+    void* shm_handle, char** shm_addr, const char** shm_key, int* shm_fd,
     size_t* offset, size_t* byte_size);
-nic::Error* SharedMemoryControlContextGetCudaSharedMemoryHandle(
-    void* cuda_shm_handle, void** shm_addr, size_t* byte_size, int* device_id);
+nic::Error* SharedMemoryControlContextReleaseBuffer(
+    void* shm_handle, char* ptr);
 
 //==============================================================================
 // InferContext
