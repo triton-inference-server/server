@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -151,14 +151,9 @@ minimal configuration above. Specifically:
   a model configuration file because the inference server can derive
   all the required settings automatically.
 
-* Some :ref:`TensorFlow SavedModel <section-tensorflow-models>` models
-  do not require a model configuration file. The models must specify
-  all inputs and outputs as fixed-size tensors (with an optional
-  initial batch dimension) for the model configuration to be generated
-  automatically. The easiest way to determine if a particular
-  SavedModel is supported is to try it with the server and check the
-  console log and :ref:`Status API <section-api-status>` to determine
-  if the model loaded successfully.
+* :ref:`TensorFlow SavedModel <section-tensorflow-models>` models do
+  not require a model configuration file because the inference server
+  can derive all the required settings automatically.
 
 * :ref:`ONNX Runtime ONNX <section-onnx-models>` models do not require
   a model configuration file because the inference server can derive
