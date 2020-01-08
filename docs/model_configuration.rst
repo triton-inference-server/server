@@ -134,6 +134,55 @@ configuration could be specific as **dims: [ 4, 4 ]**. In this case,
 the inference server would only accept inference requests where the
 input tensor's shape was exactly **[ 4, 4 ]**.
 
+For models that support shape tensors, :cpp:var:`is_shape_tensor
+<nvidia::inferenceserver::ModelInput::is_shape_tensor>` must be
+appropriately set for inputs and :cpp:var:`is_shape_tensor
+<nvidia::inferenceserver::ModelOutput::is_shape_tensor>` must be
+correctly set for outputs.
+Consider the following example configuration to understand how to
+use shape tensors with batching::
+
+  name: "myshapetensormodel"
+  platform: "tensorrt_plan"
+  max_batch_size: 8
+  input [
+    {
+      name: "input0"
+      data_type: TYPE_FP32
+      dims: [ -1 ]
+    },
+    {
+      name: "input1"
+      data_type: TYPE_INT32
+      dims: [ 1 ]
+      is_shape_tensor: true
+    }
+  ]
+  output [
+    {
+      name: "output0"
+      data_type: TYPE_FP32
+      dims: [ -1 ]
+    }
+  ]
+
+As discussed before, the TensorRT Inference Server assumes that
+batching occurs along the first dimension which is not listed in
+in the input or output tensor dims. However, for shape tensors,
+batching occurs at the first shape value. For the above example,
+an inference request must provide inputs with the following
+shapes::
+
+  "input0": [ x, -1]
+  "input1": [ 1 ]
+  "output0": [ x, -1]
+
+Where **x** is the batch size of the request. The server requires
+the shape tensors to be marked as shape tensors in the model when
+using batching. Note that "input1" has shape **[ 1 ]** and not
+**[ 2 ]**. The server will prepend the shape value **x** at "input1"
+before issuing the request to model.
+
 .. _section-generated-model-configuration:
 
 Generated Model Configuration
