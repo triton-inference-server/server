@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -353,6 +353,8 @@ class InferContext {
     /// call(s) that use the input have completed). For batched inputs
     /// this function must be called batch-size times to provide all
     /// tensor values for a batch of this input.
+    /// However, in case of shape tensor, this function must be called
+    /// only once per batch.
     /// \param input The pointer to the array holding the tensor value.
     /// \param input_byte_size The size of the array in bytes, must match
     /// the size expected by the input.
