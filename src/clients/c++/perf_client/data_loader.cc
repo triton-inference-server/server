@@ -168,6 +168,16 @@ DataLoader::GenerateData(
   data_stream_cnt_ = 1;
   step_num_.push_back(1);
 
+  // Validate the absence of shape tensors
+  for (const auto& input : inputs) {
+    if (input->IsShapeTensor()) {
+      return nic::Error(
+          ni::RequestStatusCode::INVALID_ARG,
+          "can not generate data for shape tensor '" + input->Name() +
+              "', user-provided data is needed.");
+    }
+  }
+
   uint64_t max_input_byte_size = 0;
   for (const auto& input : inputs) {
     if (input->DType() != ni::DataType::TYPE_STRING) {
