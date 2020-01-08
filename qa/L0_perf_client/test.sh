@@ -46,6 +46,7 @@ TESTDATADIR=`pwd`/test_data
 INTJSONDATAFILE=`pwd`/int_data.json
 JSONDATAFILE=`pwd`/string_data.json
 SEQJSONDATAFILE=`pwd`/seq_data.json
+SHAPETENSORADTAFILE=`pwd`/shape_tensor_data.json
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-repository=$DATADIR
@@ -65,6 +66,9 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_nobatch
 # Copy a variable-shape models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphdef_object_int32_int32 $DATADIR/
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphdef_int32_int32_float32 $DATADIR/
+
+# Copy shape tensor models
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_shapetensor_model_repository/plan_zero_1_float32 $DATADIR/
 
 # Copying ensemble including a sequential model
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/savedmodel_sequence_object $DATADIR
@@ -320,6 +324,23 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
+
+# Shape tensor I/O model
+for SHARED_MEMORY_TYPE in none system cuda; do
+    $PERF_CLIENT -v -i grpc -m plan_zero_1_float32 --input-data=$SHAPETENSORADTAFILE \
+--shape DUMMY_INPUT0:4,4 -p2000 --shared-memory=$SHARED_MEMORY_TYPE -b 8 \
+>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+done
 
 # Testing with ensemble and sequential model variants
 $PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --streaming \
