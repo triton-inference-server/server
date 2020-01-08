@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -136,42 +136,67 @@ CompareDimsSupported(
 {
   // If the model configuration expects batching support in the model,
   // then the first dimension must be -1.
-  if (supports_batching && is_dynamic &&
-      ((model_dims.nbDims == 0) || (model_dims.d[0] != -1))) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "unable to load model '" + model_name + "', binding '" + binding_name +
-            "': for the model to support batching, the shape should have at "
-            "least 1 dimension and the first dimension must be -1 but shape "
-            "expected by model was " +
-            DimsDebugString(model_dims));
-  }
-
-  const int nonbatch_start_idx = (supports_batching && is_dynamic ? 1 : 0);
-
-  if (model_dims.nbDims != (dims.size() + nonbatch_start_idx)) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "unable to load model '" + model_name + "', binding '" + binding_name +
-            "': the model expects " + std::to_string(model_dims.nbDims) +
-            " dimensions but the model configuration specified " +
-            std::to_string(dims.size() + nonbatch_start_idx) + " dimensions");
-  }
-
-  for (int i = 0; i < dims.size(); ++i) {
-    int64_t model_dim = model_dims.d[i + nonbatch_start_idx];
-    if (model_dim == -1) {
-      continue;
-    }
-
-    if (model_dim != dims[i]) {
+  if (supports_batching && is_dynamic) {
+    if ((model_dims.nbDims == 0) || (model_dims.d[0] != -1)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "unable to load model '" + model_name + "', binding '" +
-              binding_name + "': the model expects shape " +
-              DimsDebugString(model_dims) +
-              " but the model configuration specified shape " +
-              DimsListToString(dims));
+          "model '" + model_name + "', tensor '" + binding_name +
+              "': for the model to support batching the shape should have at "
+              "least 1 dimension and the first dimension must be -1; but shape "
+              "expected by the model is " +
+              DimsDebugString(model_dims));
+    }
+
+    DimsList full_dims;
+    full_dims.Add(-1);
+    for (int i = 0; i < dims.size(); ++i) {
+      full_dims.Add(dims[i]);
+    }
+
+    bool succ = (model_dims.nbDims == full_dims.size());
+    if (succ) {
+      for (int i = 0; i < full_dims.size(); ++i) {
+        const int64_t model_dim = model_dims.d[i];
+        if (model_dim != -1) {
+          succ &= (model_dim == full_dims[i]);
+        }
+      }
+    }
+
+    if (!succ) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "model '" + model_name + "', tensor '" + binding_name +
+              "': the model expects " + std::to_string(model_dims.nbDims) +
+              " dimensions (shape " + DimsDebugString(model_dims) +
+              ") but the model configuration specifies " +
+              std::to_string(full_dims.size()) +
+              " dimensions (an initial batch dimension because max_batch_size "
+              "> 0 followed by the explicit tensor shape, making complete "
+              "shape " +
+              DimsListToString(full_dims) + ")");
+    }
+  } else {
+    // ! supports_batching
+    bool succ = (model_dims.nbDims == dims.size());
+    if (succ) {
+      for (int i = 0; i < dims.size(); ++i) {
+        const int64_t model_dim = model_dims.d[i];
+        if (model_dim != -1) {
+          succ &= (model_dim == dims[i]);
+        }
+      }
+    }
+
+    if (!succ) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "model '" + model_name + "', tensor '" + binding_name +
+              "': the model expects " + std::to_string(model_dims.nbDims) +
+              " dimensions (shape " + DimsDebugString(model_dims) +
+              ") but the model configuration specifies " +
+              std::to_string(dims.size()) + " dimensions (shape " +
+              DimsListToString(dims) + ")");
     }
   }
 

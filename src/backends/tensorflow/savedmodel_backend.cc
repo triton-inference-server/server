@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -131,9 +131,9 @@ SavedModelBackend::CreateTRTISTFModel(
         (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
     if (input->shape_->rank_ != 0) {
-      RETURN_IF_ERROR(CompareDimsSupported(
-          Name(), io.name(), input->shape_, dims,
-          Config().max_batch_size() > 0));
+      RETURN_IF_ERROR(CompareDims(
+          Name(), io.name(), input->shape_, dims, Config().max_batch_size() > 0,
+          false /* compare_exact */));
     } else {
       // The savedmodel doesn't specify a shape for the input so use the shape
       // from the model configuration
@@ -174,9 +174,9 @@ SavedModelBackend::CreateTRTISTFModel(
         (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
     if (output->shape_->rank_ != 0) {
-      RETURN_IF_ERROR(CompareDimsSupported(
+      RETURN_IF_ERROR(CompareDims(
           Name(), io.name(), output->shape_, dims,
-          Config().max_batch_size() > 0));
+          Config().max_batch_size() > 0, false /* compare_exact */));
     } else {
       // The savedmodel doesn't specify a shape for the output so use the shape
       // from the model configuration
@@ -228,8 +228,9 @@ SavedModelBackend::ValidateBooleanSequenceControl(
     DimsList dims;
     dims.Add(1);
 
-    Status compare_status =
-        CompareDimsExact(input->shape_, dims, Config().max_batch_size() > 0);
+    Status compare_status = CompareDims(
+        Name(), tensor_name, input->shape_, dims, Config().max_batch_size() > 0,
+        true /* compare_exact */);
     if (!compare_status.IsOk()) {
       return Status(
           RequestStatusCode::INVALID_ARG,
@@ -275,8 +276,9 @@ SavedModelBackend::ValidateTypedSequenceControl(
     DimsList dims;
     dims.Add(1);
 
-    Status compare_status =
-        CompareDimsExact(input->shape_, dims, Config().max_batch_size() > 0);
+    Status compare_status = CompareDims(
+        Name(), tensor_name, input->shape_, dims, Config().max_batch_size() > 0,
+        true /* compare_exact */);
     if (!compare_status.IsOk()) {
       return Status(
           RequestStatusCode::INVALID_ARG,

@@ -1,1 +1,1 @@
-unable to load model 'bad_input_dims', tensor 'INPUT0': the model expects 1 dimensions but the model configuration specified 2 dimensions
+model 'bad_input_dims', tensor 'INPUT0': the model expects 2 dimensions (shape \[-1,16\]) but the model configuration specifies 3 dimensions (an initial batch dimension because max_batch_size > 0 followed by the explicit tensor shape, making complete shape \[-1,16,1\])

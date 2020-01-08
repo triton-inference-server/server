@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -33,17 +33,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-/// \return Status::Success if a TensorFlow shape exactly matches a model
-/// configuration shape. Dimensions with variable size are represented
-/// by -1 in both the TensorFlow shape and the model configuration
-/// shape and these must match as well.
-/// \param supports_batching If True then the configuration expects
-/// the model to support batching and so the shape must have the
-/// appropriate batch dimension.
-Status CompareDimsExact(
-    const TRTISTF_Shape* model_shape, const DimsList& dims,
-    const bool supports_batching);
-
 /// \return Status::Success if a TensorFlow shape can support a model
 /// configuration shape. Dimensions with variable size in the
 /// TensorFlow shape can support any size in the corresponding model
@@ -53,10 +42,10 @@ Status CompareDimsExact(
 /// \param supports_batching If True then the configuration expects
 /// the model to support batching and so the shape must have the
 /// appropriate batch dimension.
-Status CompareDimsSupported(
+Status CompareDims(
     const std::string& model_name, const std::string& tensor_name,
     const TRTISTF_Shape* model_shape, const DimsList& dims,
-    const bool supports_batching);
+    const bool supports_batching, const bool compare_exact);
 
 /// \return a named input/output tensor. Return nullptr if not found.
 const TRTISTF_IO* FindIOByName(
