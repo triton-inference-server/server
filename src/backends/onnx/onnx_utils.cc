@@ -325,8 +325,9 @@ CompareDimsSupported(
               " dimensions (shape " + DimsListToString(model_shape) +
               ") but the model configuration specifies " +
               std::to_string(full_dims.size()) +
-              " dimensions (an initial batch dimension for max_batch_size > 0 "
-              "plus the explicit tensor shape for a full shape " +
+              " dimensions (an initial batch dimension because max_batch_size "
+              "> 0 followed by the explicit tensor shape, making complete "
+              "shape " +
               DimsListToString(full_dims) + ")");
     }
   } else {
@@ -334,7 +335,10 @@ CompareDimsSupported(
     bool succ = (model_shape.size() == (size_t)dims.size());
     if (succ) {
       for (int i = 0; i < dims.size(); ++i) {
-        succ &= (model_shape[i] == dims[i]);
+        const int64_t model_dim = model_shape[i];
+        if (model_dim != -1) {
+          succ &= (model_dim == dims[i]);
+        }
       }
     }
 
