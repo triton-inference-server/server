@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -430,3 +430,16 @@ the C++ example application at
 and a Python version at
 `src/clients/python/simple\_sequence\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_sequence_client.py>`_.
+
+Shape Tensor
+^^^^^^^^^^^^
+
+TensorRT models allow shape tensors. The inference server client
+libraries support these tensors using the existing APIs. A shape
+tensor should provide values for only a single batch-1, even for
+a batch request. This single shape tensor is used for the entire
+batch but the batch size should not be included as one of the
+shape values in the tensor.
+
+See :ref:`section--model-configuration` for correctly specifying model
+configuration to use shape tensors.

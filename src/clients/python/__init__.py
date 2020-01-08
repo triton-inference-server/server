@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1460,6 +1460,8 @@ class InferContext:
             input in the dictionary maps to a list of values (i.e. a
             list of numpy array objects), where the length of the list
             must equal the 'batch_size'.
+            However, for shape tensor input the list should contain
+            just a single tensor.
 
         outputs : dict
             Dictionary from output name to a value indicating the
@@ -1541,6 +1543,8 @@ class InferContext:
             input in the dictionary maps to a list of values (i.e. a
             list of numpy array objects), where the length of the list
             must equal the 'batch_size'.
+            However, for shape tensor input the list should contain
+            just a single tensor.
 
         outputs : dict
             Dictionary from output name to a value indicating the
