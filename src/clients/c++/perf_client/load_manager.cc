@@ -357,7 +357,8 @@ LoadManager::InitSharedMemory()
         std::vector<size_t> byte_size;
         size_t alloc_size = 0;
         size_t count = 0;
-        while (count < batch_size_) {
+        size_t max_count = input->IsShapeTensor() ? 1 : batch_size_;
+        while (count < max_count) {
           const uint8_t* data_ptr;
           size_t batch1_bytesize;
 
@@ -391,6 +392,31 @@ LoadManager::InitSharedMemory()
           count++;
         }
 
+        // Validate if the shape tensors specified in the batch are identical.
+        while (count < batch_size_) {
+          const uint8_t* data_ptr;
+          size_t batch1_bytesize;
+          RETURN_IF_ERROR(data_loader_->GetInputData(
+              input, i, (j + count) % data_loader_->GetTotalSteps(i), &data_ptr,
+              &batch1_bytesize));
+          if (batch1_bytesize != byte_size.back()) {
+            return nic::Error(
+                ni::RequestStatusCode::INVALID_ARG,
+                "The shape tensors should be identical in a batch (mismatch in "
+                "size)");
+          }
+
+          for (size_t data_idx = 0; data_idx < batch1_bytesize; data_idx++) {
+            if (*(data_ptr + data_idx) != *(data_ptrs.back() + data_idx)) {
+              return nic::Error(
+                  ni::RequestStatusCode::INVALID_ARG,
+                  "The shape tensors should be identical in a batch (mismatch "
+                  "in content)");
+            }
+          }
+          count++;
+        }
+
         // Generate the shared memory region name
         std::string key_name(
             input->Name() + "_" + std::to_string(i) + "_" + std::to_string(j));
@@ -409,7 +435,8 @@ LoadManager::InitSharedMemory()
           // Populate the region with data
           size_t count = 0;
           size_t offset = 0;
-          while (count < batch_size_) {
+          size_t max_count = input->IsShapeTensor() ? 1 : batch_size_;
+          while (count < max_count) {
             memcpy(input_shm_ptr + offset, data_ptrs[count], byte_size[count]);
             offset += byte_size[count];
             count++;
@@ -434,7 +461,8 @@ LoadManager::InitSharedMemory()
           // Populate the region with data
           size_t count = 0;
           size_t offset = 0;
-          while (count < batch_size_) {
+          size_t max_count = input->IsShapeTensor() ? 1 : batch_size_;
+          while (count < max_count) {
             cudaError_t cuda_err = cudaMemcpy(
                 (void*)(input_shm_ptr + offset), (void*)data_ptrs[count],
                 byte_size[count], cudaMemcpyHostToDevice);
@@ -520,7 +548,8 @@ LoadManager::PrepareInfer(
     RETURN_IF_ERROR(
         data_loader_->GetInputData(input, 0, 0, &data_ptr, &batch1_bytesize));
 
-    for (size_t i = 0; i < batch_size_; ++i) {
+    size_t max_count = input->IsShapeTensor() ? 1 : batch_size_;
+    for (size_t i = 0; i < max_count; ++i) {
       RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
     }
   }
@@ -626,6 +655,8 @@ LoadManager::SetInputs(
 
     const uint8_t* data_ptr;
     size_t batch1_bytesize;
+    const int* set_shape_values = nullptr;
+    int set_shape_value_cnt = 0;
 
     for (size_t i = 0; i < batch_size_; ++i) {
       const std::vector<int64_t>* shape = nullptr;
@@ -649,12 +680,44 @@ LoadManager::SetInputs(
           }
         }
       }
-
       RETURN_IF_ERROR(data_loader_->GetInputData(
-          input, stream_index,
-          (step_index + i) % data_loader_->GetTotalSteps(stream_index),
+          input, 0, (step_index + i) % data_loader_->GetTotalSteps(0),
           &data_ptr, &batch1_bytesize));
-      RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
+      if (!input->IsShapeTensor()) {
+        RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
+      } else {
+        if (i == 0) {
+          // Set data only once for shape tensors
+          RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
+          set_shape_values = (const int*)data_ptr;
+          set_shape_value_cnt = batch1_bytesize / sizeof(int);
+        } else {
+          // Validate if the shape values are identical in the batch
+          bool is_identical = true;
+          if ((size_t)set_shape_value_cnt != (batch1_bytesize / sizeof(int))) {
+            is_identical = false;
+          } else {
+            for (int i = 0; i < set_shape_value_cnt; i++) {
+              if (*(set_shape_values + i) != *((const int*)data_ptr + i)) {
+                is_identical = false;
+                break;
+              }
+            }
+          }
+          if (!is_identical) {
+            return nic::Error(
+                ni::RequestStatusCode::INVALID_ARG,
+                "can not batch shape tensors with different values together "
+                "(input '" +
+                    input->Name() + "' expected shape values" +
+                    ShapeTensorValuesToString(
+                        set_shape_values, set_shape_value_cnt) +
+                    " and received " +
+                    ShapeTensorValuesToString(
+                        (int*)data_ptr, (batch1_bytesize / sizeof(int))));
+          }
+        }
+      }
     }
   }
   return nic::Error::Success;
