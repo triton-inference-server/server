@@ -214,7 +214,8 @@ RUN apt-get update && \
             libh2o-dev \
             libh2o-evloop-dev \
             libnuma-dev \
-            libwslay-dev && \
+            libwslay-dev
+            libuv1-dev && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
                 libcurl3-dev; \
