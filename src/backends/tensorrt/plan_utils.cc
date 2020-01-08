@@ -171,8 +171,9 @@ CompareDimsSupported(
               " dimensions (shape " + DimsDebugString(model_dims) +
               ") but the model configuration specifies " +
               std::to_string(full_dims.size()) +
-              " dimensions (an initial batch dimension for max_batch_size > 0 "
-              "followed by the explicit tensor shape, making complete shape " +
+              " dimensions (an initial batch dimension because max_batch_size "
+              "> 0 followed by the explicit tensor shape, making complete "
+              "shape " +
               DimsListToString(full_dims) + ")");
     }
   } else {
