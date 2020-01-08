@@ -49,6 +49,7 @@ FLOAT_DIFFSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/float_data_with_shape.j
 STRING_JSONDATAFILE=`pwd`/json_input_data_files/string_data.json
 STRING_WITHSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/string_data_with_shape.json
 SEQ_JSONDATAFILE=`pwd`/json_input_data_files/seq_data.json
+SHAPETENSORADTAFILE=`pwd`/json_input_data_files/shape_tensor_data.json
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-repository=$DATADIR
@@ -68,6 +69,9 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_nobatch
 # Copy a variable-shape models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphdef_object_int32_int32 $DATADIR/
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphdef_int32_int32_float32 $DATADIR/
+
+# Copy shape tensor models
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_shapetensor_model_repository/plan_zero_1_float32 $DATADIR/
 
 # Copying ensemble including a sequential model
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/savedmodel_sequence_object $DATADIR
@@ -98,10 +102,10 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 # Sanity check on measurements are not all zero
-set +e
 
 # Testing simple configurations with different shared memory types
 for SHARED_MEMORY_TYPE in none system cuda; do
+    set +e
     $PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 \
 --shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
@@ -127,9 +131,8 @@ for SHARED_MEMORY_TYPE in none system cuda; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
+    set -e
 done
-
-set -e
 
 # Test perf client behavior on different model with different batch size
 for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
@@ -234,8 +237,11 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
+set -e
+
 # Testing with combinations of string input and shared memory types
 for SHARED_MEMORY_TYPE in none system cuda; do
+    set +e
     $PERF_CLIENT -v -i grpc -m graphdef_object_object_object --string-data=1 -p2000 \
 --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
@@ -248,10 +254,12 @@ for SHARED_MEMORY_TYPE in none system cuda; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
+    set -e
 done
 
 # Testing with combinations of file inputs and shared memory types
 for SHARED_MEMORY_TYPE in none system cuda; do
+    set +e
     $PERF_CLIENT -v -i grpc -m graphdef_object_object_object --input-data=$TESTDATADIR -p2000 \
 --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
@@ -264,9 +272,11 @@ for SHARED_MEMORY_TYPE in none system cuda; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
+    set -e
 done
 
 for SHARED_MEMORY_TYPE in none system cuda; do
+    set +e
     $PERF_CLIENT -v -i grpc -m graphdef_object_object_object --input-data=$STRING_JSONDATAFILE \
 --input-data=$STRING_JSONDATAFILE -p2000 --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
@@ -279,10 +289,12 @@ for SHARED_MEMORY_TYPE in none system cuda; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
+    set -e
 done
 
 # Testing with combinations of variable inputs and shared memory types
 for SHARED_MEMORY_TYPE in none system cuda; do
+    set +e
     $PERF_CLIENT -v -i grpc -m graphdef_object_int32_int32 --input-data=$TESTDATADIR \
 --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 --shared-memory=$SHARED_MEMORY_TYPE \
 >$CLIENT_LOG 2>&1
@@ -296,9 +308,11 @@ for SHARED_MEMORY_TYPE in none system cuda; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
+    set -e
 done
 
 for SHARED_MEMORY_TYPE in none system cuda; do
+    set +e
     $PERF_CLIENT -v -i grpc -m graphdef_object_int32_int32 --input-data=$STRING_WITHSHAPE_JSONDATAFILE \
 --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 --shared-memory=$SHARED_MEMORY_TYPE \
 >$CLIENT_LOG 2>&1
@@ -312,8 +326,10 @@ for SHARED_MEMORY_TYPE in none system cuda; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
+    set -e
 done
 
+set +e
 $PERF_CLIENT -v -i grpc -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 \
 --shape INPUT1:2,8,2 -p2000 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -326,9 +342,11 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
+set -e
 
 # Trying to batch tensors with different shape
 for SHARED_MEMORY_TYPE in none system cuda; do
+    set +e
     $PERF_CLIENT -v -i grpc -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 --shape INPUT1:2,8,2 -p2000 -b 4 \
 --shared-memory=$SHARED_MEMORY_TYPE --input-data=$INT_DIFFSHAPE_JSONDATAFILE >$CLIENT_LOG 2>&1
     if [ $? -eq 0 ]; then
@@ -341,8 +359,29 @@ for SHARED_MEMORY_TYPE in none system cuda; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
+    set -e
 done
 
+# Shape tensor I/O model
+for SHARED_MEMORY_TYPE in none system cuda; do
+    set +e
+    $PERF_CLIENT -v -i grpc -m plan_zero_1_float32 --input-data=$SHAPETENSORADTAFILE \
+--shape DUMMY_INPUT0:4,4 -p2000 --shared-memory=$SHARED_MEMORY_TYPE -b 8 \
+>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    set -e
+done
+
+set +e
 # Testing with ensemble and sequential model variants
 $PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --streaming \
 --input-data=$SEQ_JSONDATAFILE  --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
@@ -414,6 +453,7 @@ set -e
 # Testing with variable ensemble model. This unit specifies different shape values
 # for different inferences.
 for SHARED_MEMORY_TYPE in none system cuda; do
+    set +e
     $PERF_CLIENT -v -i grpc -m graphdef_sequence_float32 --shape INPUT:2 --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \
 --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 --shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
@@ -426,6 +466,7 @@ for SHARED_MEMORY_TYPE in none system cuda; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
+    set -e
 done
 
 # Testing with very large concurrencies and large dataset
@@ -433,6 +474,7 @@ INPUT_DATA_OPTION="--input-data $SEQ_JSONDATAFILE "
 for i in {1..9}; do
     INPUT_DATA_OPTION=" ${INPUT_DATA_OPTION} ${INPUT_DATA_OPTION}"
 done
+set +e
 $PERF_CLIENT -v -m  simple_savedmodel_sequence_object -p 10000 --concurrency-range 1500:2500:500 -i grpc --streaming \
 ${INPUT_DATA_OPTION} >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -452,6 +494,8 @@ wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
+else
+  echo -e "\n***\n*** Test FAILED\n***"
 fi
 
 exit $RET

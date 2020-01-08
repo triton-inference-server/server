@@ -412,6 +412,24 @@ ShapeVecToString(const std::vector<int64_t> shape_vec)
   return str;
 }
 
+std::string
+ShapeTensorValuesToString(const int* data_ptr, const int count)
+{
+  bool first = true;
+  std::string str("[");
+  for (int i = 0; i < count; i++) {
+    if (!first) {
+      str += ",";
+    }
+    str += std::to_string(*(data_ptr + i));
+    first = false;
+  }
+
+  str += "]";
+  return str;
+}
+
+
 template <>
 std::function<std::chrono::nanoseconds(std::mt19937&)>
 ScheduleDistribution<Distribution::POISSON>(const double request_rate)

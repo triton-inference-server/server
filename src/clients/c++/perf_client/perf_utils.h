@@ -138,6 +138,9 @@ std::string GetRandomString(const int string_length);
 // Returns the shape string containing the values provided in the vector
 std::string ShapeVecToString(const std::vector<int64_t> shape_vec);
 
+// Returns the string containing the shape tensor values
+std::string ShapeTensorValuesToString(const int* data_ptr, const int count);
+
 // Returns the request schedule distribution generator with the specified
 // request rate.
 template <Distribution distribution>
