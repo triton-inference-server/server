@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -134,6 +134,9 @@ nic::Error SerializeExplicitTensor(
 // Generates a random string of specified length using characters specified in
 // character_set.
 std::string GetRandomString(const int string_length);
+
+// Returns the shape string containing the values provided in the vector
+std::string ShapeVecToString(const std::vector<int64_t> shape_vec);
 
 // Returns the request schedule distribution generator with the specified
 // request rate.

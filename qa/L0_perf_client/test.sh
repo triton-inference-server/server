@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,9 +43,12 @@ PERF_CLIENT=../clients/perf_client
 DATADIR=`pwd`/models
 TESTDATADIR=`pwd`/test_data
 
-INTJSONDATAFILE=`pwd`/int_data.json
-JSONDATAFILE=`pwd`/string_data.json
-SEQJSONDATAFILE=`pwd`/seq_data.json
+INT_JSONDATAFILE=`pwd`/json_input_data_files/int_data.json
+INT_DIFFSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/int_data_diff_shape.json
+FLOAT_DIFFSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/float_data_with_shape.json
+STRING_JSONDATAFILE=`pwd`/json_input_data_files/string_data.json
+STRING_WITHSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/string_data_with_shape.json
+SEQ_JSONDATAFILE=`pwd`/json_input_data_files/seq_data.json
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-repository=$DATADIR
@@ -70,6 +73,9 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphde
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/savedmodel_sequence_object $DATADIR
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_sequence_model_repository/simple_savedmodel_sequence_object $DATADIR
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_sequence_model_repository/nop_TYPE_FP32_-1 $DATADIR
+
+# Copying variable sequence model
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_sequence_model_repository/graphdef_sequence_float32 $DATADIR
 
 mkdir $DATADIR/nop_TYPE_FP32_-1/1
 cp libidentity.so $DATADIR/nop_TYPE_FP32_-1/1/
@@ -177,7 +183,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec|Request concurrency: 2" |
 fi
 
 $PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 --concurrency-range 1:5:2 \
---input-data=${INTJSONDATAFILE} >$CLIENT_LOG 2>&1
+--input-data=${INT_JSONDATAFILE} >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -203,7 +209,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
 fi
 
 $PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 \
---input-data=${INTJSONDATAFILE} -p1000 -b 1 -a>$CLIENT_LOG 2>&1
+--input-data=${INT_JSONDATAFILE} -p1000 -b 1 -a>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -261,8 +267,8 @@ for SHARED_MEMORY_TYPE in none system cuda; do
 done
 
 for SHARED_MEMORY_TYPE in none system cuda; do
-    $PERF_CLIENT -v -i grpc -m graphdef_object_object_object --input-data=$JSONDATAFILE \
---input-data=$JSONDATAFILE -p2000 --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
+    $PERF_CLIENT -v -i grpc -m graphdef_object_object_object --input-data=$STRING_JSONDATAFILE \
+--input-data=$STRING_JSONDATAFILE -p2000 --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -293,7 +299,7 @@ for SHARED_MEMORY_TYPE in none system cuda; do
 done
 
 for SHARED_MEMORY_TYPE in none system cuda; do
-    $PERF_CLIENT -v -i grpc -m graphdef_object_int32_int32 --input-data=$JSONDATAFILE \
+    $PERF_CLIENT -v -i grpc -m graphdef_object_int32_int32 --input-data=$STRING_WITHSHAPE_JSONDATAFILE \
 --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 --shared-memory=$SHARED_MEMORY_TYPE \
 >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
@@ -321,9 +327,25 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
+# Trying to batch tensors with different shape
+for SHARED_MEMORY_TYPE in none system cuda; do
+    $PERF_CLIENT -v -i grpc -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 --shape INPUT1:2,8,2 -p2000 -b 4 \
+--shared-memory=$SHARED_MEMORY_TYPE --input-data=$INT_DIFFSHAPE_JSONDATAFILE >$CLIENT_LOG 2>&1
+    if [ $? -eq 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG | grep "can not batch tensors with different shapes together" | wc -l) -eq 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+done
+
 # Testing with ensemble and sequential model variants
 $PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --streaming \
---input-data=$SEQJSONDATAFILE  --input-data=$SEQJSONDATAFILE >$CLIENT_LOG 2>&1
+--input-data=$SEQ_JSONDATAFILE  --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -336,7 +358,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
 fi
 
 $PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
---input-data=$SEQJSONDATAFILE >$CLIENT_LOG 2>&1
+--input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -349,7 +371,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
 fi
 
 $PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
---input-data=$SEQJSONDATAFILE  >$CLIENT_LOG 2>&1
+--input-data=$SEQ_JSONDATAFILE  >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -362,7 +384,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
 fi
 
 $PERF_CLIENT -v -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
---input-data=$SEQJSONDATAFILE  >$CLIENT_LOG 2>&1
+--input-data=$SEQ_JSONDATAFILE  >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -375,7 +397,7 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
 fi
 
 $PERF_CLIENT -v -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 100:200:50 --sync \
---input-data=$SEQJSONDATAFILE >$CLIENT_LOG 2>&1
+--input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -388,8 +410,26 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
 fi
 set -e
 
+
+# Testing with variable ensemble model. This unit specifies different shape values
+# for different inferences.
+for SHARED_MEMORY_TYPE in none system cuda; do
+    $PERF_CLIENT -v -i grpc -m graphdef_sequence_float32 --shape INPUT:2 --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \
+--input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 --shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+done
+
 # Testing with very large concurrencies and large dataset
-INPUT_DATA_OPTION="--input-data $SEQJSONDATAFILE "
+INPUT_DATA_OPTION="--input-data $SEQ_JSONDATAFILE "
 for i in {1..9}; do
     INPUT_DATA_OPTION=" ${INPUT_DATA_OPTION} ${INPUT_DATA_OPTION}"
 done
