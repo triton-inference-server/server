@@ -130,13 +130,13 @@ fi
 set -e
 
 set +e
-if [ `grep -c "Context with profile 0 \[0\] is being executed for " $SERVER_LOG` != "1" ]; then
-    echo -e "\n***\n*** Failed. Expected only one execution without CUDA graph\n***"
+if [ `grep -c "Context with profile 0 \[0\] is being executed for " $SERVER_LOG` != "2" ]; then
+    echo -e "\n***\n*** Failed. Expected 2 execution without CUDA graph\n***"
     RET=1
 fi
 
-if [ `grep -c "captured CUDA graph for" $SERVER_LOG` != "6" ]; then
-    echo -e "\n***\n*** Failed. Expected 6 CUDA graphs are captured\n***"
+if [ `grep -c "captured CUDA graph for" $SERVER_LOG` != "0" ]; then
+    echo -e "\n***\n*** Failed. Expected no CUDA graphs are captured\n***"
     RET=1
 fi
 set -e

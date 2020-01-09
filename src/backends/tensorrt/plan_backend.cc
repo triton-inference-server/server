@@ -461,14 +461,18 @@ PlanBackend::CreateExecutionContext(
       }
     }
     // CUDA graph will be captured for every TRT contexts as CUDA graph is
-    // merely capturing GPU activities for a given execution. And the
-    // executions might be different for different optimization profiles
-    for (auto& trt_context : context->trt_contexts_) {
-      for (int bs : cuda_graph_batch_sizes) {
-        // 1 is special case as non-batching model has 'max_batch_size == 0'
-        if ((bs <= Config().max_batch_size()) || (bs == 1)) {
-          if (!context->BuildCudaGraph(&(trt_context.second), bs)) {
-            break;
+    // merely capturing GPU activities for a given execution.
+    // But CUDA graph will only be captured for fixed shape model as it only
+    // captures activities for the shapes used, so it may misbehave for other
+    // shapes.
+    if (!context->is_dynamic_) {
+      for (auto& trt_context : context->trt_contexts_) {
+        for (int bs : cuda_graph_batch_sizes) {
+          // 1 is special case as non-batching model has 'max_batch_size == 0'
+          if ((bs <= Config().max_batch_size()) || (bs == 1)) {
+            if (!context->BuildCudaGraph(&(trt_context.second), bs)) {
+              break;
+            }
           }
         }
       }
@@ -855,51 +859,20 @@ bool
 PlanBackend::Context::BuildCudaGraph(
     TensorRTContext* trt_context, const int batch_size)
 {
-  // Need to set context with proper shape in the case of dynamic shape
-  if (is_dynamic_) {
-    auto binding_count = trt_context->opt_dims_.size();
-    auto binding_offset = trt_context->profile_index_ * binding_count;
-    for (size_t bindex = 0; bindex < binding_count; bindex++) {
-      if (!engine_->bindingIsInput(binding_offset + bindex)) {
-        continue;
-      }
-      // Use opt shape for dimensions other than batch size. There is no
-      // definited answer on whether CUDA graph should be captured for each
-      // set of shapes, however, the existing test case suggests that the
-      // correctness is preserved.
-      auto this_dim = trt_context->opt_dims_[bindex];
-      this_dim.d[0] = batch_size;
-      trt_context->context_->setBindingDimensions(
-          binding_offset + bindex, this_dim);
-    }
-  }
-
   bool captured = true;
-  cudaError_t cuerr;
 
   cudaGraph_t graph;
-  cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeGlobal);
+  auto cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeGlobal);
   if (cuerr != cudaSuccess) {
     LOG_ERROR << "unable to start CUDA graph for " << name_ << ": "
               << cudaGetErrorString(cuerr);
     captured = false;
   } else {
     auto context = trt_context->context_;
-    if (is_dynamic_) {
-      if (!trt_context->context_->allInputDimensionsSpecified()) {
-        LOG_ERROR << "failed to specify the dimensions of all input bindings";
-        captured = false;
-      } else if (!trt_context->context_->enqueueV2(
-                     buffer_bindings_.data(), stream_, nullptr)) {
-        LOG_WARNING << "unable to record CUDA graph for " << name_;
-        captured = false;
-      }
-    } else {
-      if (!context->enqueue(
-              batch_size, buffer_bindings_.data(), stream_, nullptr)) {
-        LOG_WARNING << "unable to record CUDA graph for " << name_;
-        captured = false;
-      }
+    if (!context->enqueue(
+            batch_size, buffer_bindings_.data(), stream_, nullptr)) {
+      LOG_WARNING << "unable to record CUDA graph for " << name_;
+      captured = false;
     }
 
     cuerr = cudaStreamEndCapture(stream_, &graph);
