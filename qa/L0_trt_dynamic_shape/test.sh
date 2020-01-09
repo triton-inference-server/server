@@ -128,6 +128,7 @@ set +e
 python $TRT_OP_TEST TrtDynamicShapeTest.test_load_specific_optimization_profile >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
     RET=1
 fi
 set -e
@@ -152,6 +153,7 @@ set +e
 python $TRT_OP_TEST TrtDynamicShapeTest.test_load_default_optimization_profile >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
     RET=1
 fi
 set -e
@@ -216,6 +218,7 @@ set +e
 python $TRT_OP_TEST TrtDynamicShapeTest.test_select_optimization_profile >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
     RET=1
 fi
 set -e
@@ -244,12 +247,13 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-sleep 5
+sleep 10
 
 set +e
 python $TRT_OP_TEST TrtDynamicShapeTest.test_load_wrong_optimization_profile >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
     RET=1
 fi
 set -e
@@ -261,7 +265,6 @@ wait $SERVER_PID
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
-  cat $CLIENT_LOG
   echo -e "\n***\n*** Test Failed\n***"
 fi
 
