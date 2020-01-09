@@ -162,7 +162,7 @@ for TRIAL in $TRIALS; do
     # the model config before running the test
     for TARGET in `ls noautofill_platform`; do
         SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"
-        SERVER_LOG=$SERVER_LOG_BASE.noautofill_platform_${TARGET}.log
+        SERVER_LOG=$SERVER_LOG_BASE.noautofill_platform_${TRIAL}_${TARGET}.log
 
         rm -fr models && mkdir models
         cp -r noautofill_platform/$TARGET models/.
@@ -202,6 +202,62 @@ for TRIAL in $TRIALS; do
 
             if [ "$EXFOUND" == "0" ]; then
                 echo -e "*** FAILED: platform $TRIAL noautofill_platform/$TARGET" >> $CLIENT_LOG
+                RET=1
+            fi
+        fi
+    done
+done
+
+for TRIAL in $TRIALS; do
+    # Run all tests that require no autofill but that add the platform
+    # to the model config before running the test. These are tested on
+    # all platforms except custom
+    if [ $TRIAL == "custom" ]; then
+        continue
+    fi
+
+    for TARGET in `ls noautofill_platform_not_custom`; do
+        SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"
+        SERVER_LOG=$SERVER_LOG_BASE.noautofill_platform_not_custom_${TRIAL}_${TARGET}.log
+
+        rm -fr models && mkdir models
+        cp -r noautofill_platform_not_custom/$TARGET models/.
+
+        CONFIG=models/$TARGET/config.pbtxt
+        EXPECTEDS=models/$TARGET/expected*
+
+        # If there is a config.pbtxt change/add platform to it
+        if [ -f $CONFIG ]; then
+            sed -i '/platform:/d' $CONFIG
+            echo "platform: \"$TRIAL\"" >> $CONFIG
+            cat $CONFIG
+        fi
+
+        echo -e "Test platform $TRIAL on noautofill_platform_not_custom/$TARGET" >> $CLIENT_LOG
+
+        # We expect all the tests to fail with one of the expected
+        # error messages
+        run_server
+        if [ "$SERVER_PID" != "0" ]; then
+            echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+            RET=1
+            kill $SERVER_PID
+            wait $SERVER_PID
+        else
+            EXFOUND=0
+            for EXPECTED in `ls $EXPECTEDS`; do
+                EX=`cat $EXPECTED`
+                if grep ^E[0-9][0-9][0-9][0-9].*"$EX" $SERVER_LOG; then
+                    echo -e "Found \"$EX\"" >> $CLIENT_LOG
+                    EXFOUND=1
+                    break
+                else
+                    echo -e "Not found \"$EX\"" >> $CLIENT_LOG
+                fi
+            done
+
+            if [ "$EXFOUND" == "0" ]; then
+                echo -e "*** FAILED: platform $TRIAL noautofill_platform_not_custom/$TARGET" >> $CLIENT_LOG
                 RET=1
             fi
         fi

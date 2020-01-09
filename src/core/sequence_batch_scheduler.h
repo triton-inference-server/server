@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -58,6 +58,7 @@ class SequenceBatchScheduler : public Scheduler {
       const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
       const StandardRunFunc& OnSchedule,
       const StandardShapeTensorPeekFunc& OnPeek,
+      const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       std::unique_ptr<Scheduler>* scheduler);
 
   // \see Scheduler::Enqueue()
@@ -166,6 +167,7 @@ class SequenceBatch {
   SequenceBatch(
       SequenceBatchScheduler* base, const uint32_t batcher_idx,
       const size_t seq_slot_cnt,
+      const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
           start_input_overrides,
       const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
@@ -203,6 +205,15 @@ class SequenceBatch {
   // The number of candidate sequence slots.
   const size_t seq_slot_cnt_;
 
+  // The input tensors that require shape checking before being
+  // allowed in a batch. As a map from the tensor name to a bool. If
+  // tensor is in map then its shape must match shape of same tensor
+  // in requests already in the batch. If value is "true" then
+  // additional tensor is treated as a shape tensor and the values
+  // contained in the shape tensor must match same tensor already in
+  // the batch.
+  const std::unordered_map<std::string, bool> enforce_equal_shape_tensors_;
+
   // The control values, delivered as input tensors, that should be
   // used when starting a sequence, continuing a sequence, ending a
   // sequence, and showing that a sequence has not input available.
@@ -239,6 +250,7 @@ class DirectSequenceBatch : public SequenceBatch {
       const Scheduler::StandardInitFunc& OnInit,
       const Scheduler::StandardWarmupFunc& OnWarmup,
       const Scheduler::StandardRunFunc& OnSchedule,
+      const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
           start_input_overrides,
       const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
@@ -315,6 +327,7 @@ class OldestSequenceBatch : public SequenceBatch {
       const Scheduler::StandardWarmupFunc& OnWarmup,
       const Scheduler::StandardRunFunc& OnSchedule,
       const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
+      const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
           start_input_overrides,
       const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
