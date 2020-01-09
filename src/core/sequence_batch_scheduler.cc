@@ -45,6 +45,7 @@ SequenceBatchScheduler::Create(
     const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
     const StandardRunFunc& OnSchedule,
     const StandardShapeTensorPeekFunc& OnPeek,
+    const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     std::unique_ptr<Scheduler>* scheduler)
 {
   std::unique_ptr<SequenceBatchScheduler> sched(new SequenceBatchScheduler());
@@ -96,11 +97,13 @@ SequenceBatchScheduler::Create(
     if (config.sequence_batching().has_oldest()) {
       sb.reset(new OldestSequenceBatch(
           sched.get(), c, seq_slot_cnt, config, OnInit, OnWarmup, OnSchedule,
-          OnPeek, start, end, startend, cont, notready, &init_state));
+          OnPeek, enforce_equal_shape_tensors, start, end, startend, cont,
+          notready, &init_state));
     } else {
       sb.reset(new DirectSequenceBatch(
           sched.get(), c, seq_slot_cnt, config, OnInit, OnWarmup, OnSchedule,
-          start, end, startend, cont, notready, &init_state));
+          enforce_equal_shape_tensors, start, end, startend, cont, notready,
+          &init_state));
     }
 
     if (init_state.get_future().get()) {
@@ -719,6 +722,7 @@ SequenceBatchScheduler::ReaperThread(const int nice)
 SequenceBatch::SequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
     const size_t seq_slot_cnt,
+    const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         start_input_overrides,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
@@ -730,6 +734,7 @@ SequenceBatch::SequenceBatch(
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         notready_input_overrides)
     : base_(base), batcher_idx_(batcher_idx), seq_slot_cnt_(seq_slot_cnt),
+      enforce_equal_shape_tensors_(enforce_equal_shape_tensors),
       start_input_overrides_(start_input_overrides),
       end_input_overrides_(end_input_overrides),
       startend_input_overrides_(startend_input_overrides),
@@ -830,6 +835,7 @@ DirectSequenceBatch::DirectSequenceBatch(
     const Scheduler::StandardInitFunc& OnInit,
     const Scheduler::StandardWarmupFunc& OnWarmup,
     const Scheduler::StandardRunFunc& OnSchedule,
+    const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         start_input_overrides,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
@@ -842,8 +848,8 @@ DirectSequenceBatch::DirectSequenceBatch(
         notready_input_overrides,
     std::promise<bool>* is_initialized)
     : SequenceBatch(
-          base, batcher_idx, seq_slot_cnt, start_input_overrides,
-          end_input_overrides, startend_input_overrides,
+          base, batcher_idx, seq_slot_cnt, enforce_equal_shape_tensors,
+          start_input_overrides, end_input_overrides, startend_input_overrides,
           continue_input_overrides, notready_input_overrides),
       OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
       scheduler_thread_exit_(false), scheduler_idle_(false),
@@ -1224,6 +1230,7 @@ OldestSequenceBatch::OldestSequenceBatch(
     const Scheduler::StandardWarmupFunc& OnWarmup,
     const Scheduler::StandardRunFunc& OnSchedule,
     const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
+    const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         start_input_overrides,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
@@ -1236,8 +1243,8 @@ OldestSequenceBatch::OldestSequenceBatch(
         notready_input_overrides,
     std::promise<bool>* is_initialized)
     : SequenceBatch(
-          base, batcher_idx, seq_slot_cnt, start_input_overrides,
-          end_input_overrides, startend_input_overrides,
+          base, batcher_idx, seq_slot_cnt, enforce_equal_shape_tensors,
+          start_input_overrides, end_input_overrides, startend_input_overrides,
           continue_input_overrides, notready_input_overrides),
       in_flight_(seq_slot_cnt, false), queues_(seq_slot_cnt)
 {
@@ -1257,27 +1264,10 @@ OldestSequenceBatch::OldestSequenceBatch(
     preferred_batch_sizes.insert(size);
   }
 
-  // Need to enforce equal shape batches (i.e. non-ragged batches)
-  // if the model allows one or more variable-size input tensors or
-  // has shape-tensor inputs. This is not needed if all input shapes
-  // are non-variable and if there are no shape tensors... so we
-  // don't enable it in that case for efficiency reasons.
-  std::unordered_map<std::string, bool> enforce_equal_shape_tensors;
-  for (const auto input : config.input()) {
-    if (input.is_shape_tensor()) {
-      enforce_equal_shape_tensors.insert({input.name(), true});
-    } else if (GetElementCount(input) == -1) {
-      // This should be "true" but some existing custom backend
-      // implementations rely on ragged batches being allowed.
-      // Hence, setting to "false" until DLIS-904 is fixed.
-      enforce_equal_shape_tensors.insert({input.name(), false});
-    }
-  }
-
   Status status = DynamicBatchScheduler::Create(
       batcher_idx_, 1 /* runner_cnt */, GetCpuNiceLevel(config), OnInit,
       OnWarmup, OnSchedule, OnPeek, true /* dynamic_batching_enabled */,
-      enforce_equal_shape_tensors, true /* preserve_ordering */,
+      enforce_equal_shape_tensors_, true /* preserve_ordering */,
       preferred_batch_sizes,
       config.sequence_batching().oldest().max_queue_delay_microseconds(),
       &dynamic_batcher_);

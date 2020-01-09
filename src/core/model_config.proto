@@ -264,6 +264,17 @@ message ModelInput
   //@@     model.
   //@@
   bool is_shape_tensor = 6;
+
+  //@@  .. cpp:var:: bool allow_ragged_batch
+  //@@
+  //@@     Whether or not the input is allowed to be "ragged" in a dynamically
+  //@@     created batch. Default is false indicating that two requests will
+  //@@     only be batched if this tensor has the same shape in both requests.
+  //@@     True indicates that two requests can be batched even if this tensor
+  //@@     has a different shape in each request. A true value is currently
+  //@@     supported only for custom models.
+  //@@
+  bool allow_ragged_batch = 7;
 }
 
 //@@
