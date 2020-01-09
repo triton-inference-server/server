@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -130,16 +130,24 @@ class DynamicBatchScheduler : public Scheduler {
   size_t queued_batch_size_;
   size_t next_preferred_batch_size_;
 
+  // The input tensors that require shape checking before being
+  // allowed in a batch. As a map from the tensor name to a bool. If
+  // tensor is in map then its shape must match shape of same tensor
+  // in requests already in the batch. If value is "true" then
+  // additional tensor is treated as a shape tensor and the values
+  // contained in the shape tensor must match same tensor already in
+  // the batch.
   const std::unordered_map<std::string, bool> enforce_equal_shape_tensors_;
   std::unordered_map<std::string, std::pair<DimsList, std::vector<int64_t>>>
       pending_batch_shapes_;
 
   const bool preserve_ordering_;
-  // the runner that is currently processing payloads
+
+  // The runner that is currently processing payloads
   int64_t last_processing_runner_id_;
 
-  // per runner parameters to inform and wait for completion of the particular
-  // runner
+  // Per runner parameters to inform and wait for completion of the
+  // particular runner
   std::vector<std::shared_ptr<std::promise<void>>> completion_promises_;
 };
 

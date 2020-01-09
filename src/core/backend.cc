@@ -165,32 +165,33 @@ InferenceBackend::SetConfiguredScheduler(
     return Status::Success;
   };
 
+  // Need to enforce equal shape batches (i.e. non-ragged batches) if
+  // the model 1) allows one or more variable-size input tensors that
+  // are not marked as 'allow_ragged_batch' or 2) has one or more
+  // shape-tensor inputs. This is not needed if all input shapes are
+  // non-variable and if there are no shape tensors... so we don't
+  // enable it in that case for efficiency reasons.
+  std::unordered_map<std::string, bool> enforce_equal_shape_tensors;
+  for (const auto input : config_.input()) {
+    if (input.is_shape_tensor()) {
+      enforce_equal_shape_tensors.insert({input.name(), true});
+    } else if (!input.allow_ragged_batch() && (GetElementCount(input) == -1)) {
+      enforce_equal_shape_tensors.insert({input.name(), false});
+    }
+  }
+
   // If 'sequence_batching' is configured use the SequenceBatchScheduler,
   // otherwise use the default DynamicBatchScheduler.
   if (config_.has_sequence_batching()) {
+    // Sequence batcher
     RETURN_IF_ERROR(SequenceBatchScheduler::Create(
-        config_, runner_cnt, OnInit, OnWarmup, OnRun, OnPeek, &scheduler));
+        config_, runner_cnt, OnInit, OnWarmup, OnRun, OnPeek,
+        enforce_equal_shape_tensors, &scheduler));
   } else if (config_.has_dynamic_batching()) {
+    // Dynamic batcher
     std::set<int32_t> preferred_batch_sizes;
     for (const auto size : config_.dynamic_batching().preferred_batch_size()) {
       preferred_batch_sizes.insert(size);
-    }
-
-    // Need to enforce equal shape batches (i.e. non-ragged batches)
-    // if the model allows one or more variable-size input tensors or
-    // has shape-tensor inputs. This is not needed if all input shapes
-    // are non-variable and if there are no shape tensors... so we
-    // don't enable it in that case for efficiency reasons.
-    std::unordered_map<std::string, bool> enforce_equal_shape_tensors;
-    for (const auto input : config_.input()) {
-      if (input.is_shape_tensor()) {
-        enforce_equal_shape_tensors.insert({input.name(), true});
-      } else if (GetElementCount(input) == -1) {
-        // This should be "true" but some existing custom backend
-        // implementations rely on ragged batches being allowed.
-        // Hence, setting to "false" until DLIS-904 is fixed.
-        enforce_equal_shape_tensors.insert({input.name(), false});
-      }
     }
 
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
@@ -200,8 +201,8 @@ InferenceBackend::SetConfiguredScheduler(
         config_.dynamic_batching().preserve_ordering(), preferred_batch_sizes,
         config_.dynamic_batching().max_queue_delay_microseconds(), &scheduler));
   } else {
-    // Use dynamic batch scheduler (with batching disabled) as the
-    // default scheduler.
+    // Default scheduler. Use dynamic batch scheduler (with batching
+    // disabled) as the default scheduler.
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         0 /* runner_id_start */, runner_cnt, GetCpuNiceLevel(config_), OnInit,
         OnWarmup, OnRun, OnPeek, false /* dynamic_batching_enabled */,

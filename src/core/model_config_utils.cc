@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -1031,6 +1031,16 @@ ValidateModelInput(
     return Status(
         RequestStatusCode::INVALID_ARG,
         "shape tensors are only supported for TensorRT platform");
+  }
+
+  if (
+#ifdef TRTIS_ENABLE_CUSTOM
+      (platform != kCustomPlatform) &&
+#endif  // TRTIS_ENABLE_CUSTOM
+      io.allow_ragged_batch()) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "ragged-batch input tensors are only supported for custom platform");
   }
 
   return Status::Success;
