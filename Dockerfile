@@ -214,7 +214,7 @@ RUN apt-get update && \
             libh2o-dev \
             libh2o-evloop-dev \
             libnuma-dev \
-            libwslay-dev
+            libwslay-dev \
             libuv1-dev && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
@@ -398,12 +398,12 @@ RUN apt-get update && \
         exit 1; \
     fi && \
     # Install common libraries for 18.04 and 16.04 (Including h2o dependencies)
-    apt-get install -y --no-install-recommends
+    apt-get install -y --no-install-recommends \
             libgoogle-glog0v5 \
-            libh2o \
-            libh2o-evloop \
-            libnuma \
-            libwslay && \
+            libh2o0.13 \
+            libh2o-evloop0.13 \
+            libnuma1 \
+            libwslay1 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/tensorrtserver
