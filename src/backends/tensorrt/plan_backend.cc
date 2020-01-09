@@ -449,17 +449,32 @@ PlanBackend::CreateExecutionContext(
   // CUDA 10.1 starts to support CUDA graphs.
   // If enabled, build CUDA graphs for a default set of graph
   // sizes. Graphs are most likely to help for small batch sizes so by
-  // default build for batch sizes 1, 2, 3, 4, 6, 8, 12, 16. If any
+  // default build for batch sizes 1, 2, 3, 4, 6, 8, 12, 16, 'max_batch_size'.
+  // If preferred batch size is specified, then the batch sizes will be
+  // 1, preferred batch sizes, 'max_batch_size'. If any
   // build fails don't attempt for any larger batch sizes.
 #ifdef TRTIS_ENABLE_CUDA_GRAPH
   const bool use_cuda_graphs = Config().optimization().cuda().graphs();
   if (use_cuda_graphs) {
-    std::set<int> cuda_graph_batch_sizes{1, 2, 3, 4, 6, 8, 12, 16};
+    std::set<int> cuda_graph_batch_sizes{1};
     if (Config().has_dynamic_batching()) {
       for (const auto bs : Config().dynamic_batching().preferred_batch_size()) {
         cuda_graph_batch_sizes.emplace(bs);
       }
+    } else if (
+        Config().has_sequence_batching() &&
+        Config().sequence_batching().has_oldest()) {
+      for (const auto bs :
+           Config().sequence_batching().oldest().preferred_batch_size()) {
+        cuda_graph_batch_sizes.emplace(bs);
+      }
+    } else {
+      cuda_graph_batch_sizes = {1, 2, 3, 4, 6, 8, 12, 16};
     }
+    if (Config().max_batch_size() > 0) {
+      cuda_graph_batch_sizes.emplace(Config().max_batch_size());
+    }
+
     // CUDA graph will be captured for every TRT contexts as CUDA graph is
     // merely capturing GPU activities for a given execution.
     // But CUDA graph will only be captured for fixed shape model as it only
