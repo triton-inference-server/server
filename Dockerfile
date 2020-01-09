@@ -388,17 +388,22 @@ RUN apt-get update && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
                 libcurl3-dev \
-                libgoogle-glog0v5 \
                 libre2-1v5; \
     elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
                 libcurl4-openssl-dev \
-                libgoogle-glog0v5 \
                 libre2-4; \
     else \
         echo "Ubuntu version must be either 16.04 or 18.04" && \
         exit 1; \
     fi && \
+    # Install common libraries for 18.04 and 16.04 (Including h2o dependencies)
+    apt-get install -y --no-install-recommends
+            libgoogle-glog0v5 \
+            libh2o \
+            libh2o-evloop \
+            libnuma \
+            libwslay && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/tensorrtserver
