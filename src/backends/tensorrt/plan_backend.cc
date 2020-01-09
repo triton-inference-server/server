@@ -860,7 +860,7 @@ PlanBackend::Context::BuildCudaGraph(
     auto binding_count = trt_context->opt_dims_.size();
     auto binding_offset = trt_context->profile_index_ * binding_count;
     for (size_t bindex = 0; bindex < binding_count; bindex++) {
-      if (engine_->bindingIsInput(binding_offset + bindex)) {
+      if (!engine_->bindingIsInput(binding_offset + bindex)) {
         continue;
       }
       // Use opt shape for dimensions other than batch size. There is no
@@ -874,7 +874,6 @@ PlanBackend::Context::BuildCudaGraph(
     }
   }
 
-  // [DLIS-947] Need extra care for dynamic shape
   bool captured = true;
   cudaError_t cuerr;
 
