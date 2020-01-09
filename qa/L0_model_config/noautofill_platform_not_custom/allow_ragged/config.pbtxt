@@ -1,0 +1,16 @@
+name: "allow_ragged"
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_INT32
+    dims: [ -1 ]
+    allow_ragged_batch: true
+  }
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]

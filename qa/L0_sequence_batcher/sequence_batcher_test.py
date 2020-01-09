@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -62,6 +62,10 @@ for trial in _trials:
     for ensemble_prefix in ENSEMBLE_PREFIXES:
         res.append(ensemble_prefix + trial)
 _trials = tuple(res)
+
+_ragged_batch_supported_trials = list()
+if "custom" in _trials:
+    _ragged_batch_supported_trials = ("custom",)
 
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
@@ -624,10 +628,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         if _model_instances != 1:
             return
 
-        # Ragged batch only allowed for custom backend
-        if "custom" in _trials:
-            trial = "custom"
-
+        for trial in _ragged_batch_supported_trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
             precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0,

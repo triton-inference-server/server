@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,6 +44,7 @@ import tensorrtserver.api.server_status_pb2 as server_status
 from ctypes import *
 
 _trials = ("savedmodel", "graphdef", "plan", "netdef", "custom", "libtorch", "onnx")
+_ragged_batch_supported_trials = ("custom",)
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
@@ -248,6 +249,39 @@ class BatcherTest(unittest.TestCase):
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
         _cleanup_after(precreated_shm_regions)
+
+    def test_multi_batch_different_shape_allow_ragged(self):
+        # Send two requests with static batch sizes == preferred size,
+        # but with different shapes (using model with variable-size
+        # tensors). Input tensors are marked as allowing ragged batch
+        # so requests should be batched.
+        for trial in _ragged_batch_supported_trials:
+            try:
+                url = "localhost:8000"
+                protocol = ProtocolType.HTTP
+                dtype = np.float32
+                model_name = tu.get_zero_model_name(trial, 1, dtype)
+
+                self.check_setup(url, protocol, model_name)
+                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+
+                threads = []
+                threads.append(threading.Thread(target=iu.infer_zero,
+                                                args=(self, trial, 1, dtype, ([16],), ([16],)),
+                                                kwargs={'use_grpc': False,
+                                                'use_streaming': False}))
+                threads.append(threading.Thread(target=iu.infer_zero,
+                                                args=(self, trial, 1, dtype, ([8],), ([8],)),
+                                                kwargs={'use_grpc': False,
+                                                'use_streaming': False}))
+                threads[0].start()
+                threads[1].start()
+                for t in threads:
+                    t.join()
+                self.check_deferred_exception()
+                self.check_status(url, protocol, model_name, (1,), 1, 2)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_multi_batch_different_shape(self):
         # Send two requests with sum of static batch sizes ==

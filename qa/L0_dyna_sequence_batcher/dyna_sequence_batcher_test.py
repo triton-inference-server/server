@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,6 +49,10 @@ _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan", "onnx", "libtor
 if _no_batching:
     _trials += ("savedmodel_nobatch", "graphdef_nobatch", "netdef_nobatch",
                 "plan_nobatch", "onnx_nobatch", "libtorch_nobatch")
+
+_ragged_batch_supported_trials = list()
+if "custom" in _trials:
+    _ragged_batch_supported_trials = ("custom",)
 
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
@@ -140,14 +144,18 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 except InferenceServerException as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
-    def _multi_sequence_impl(self, sleep_secs):
-        for trial in _trials:
+    def _multi_sequence_impl(self, trials, expected_exec_cnt, sleep_secs, tensor_shapes):
+        for trial in trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11,12,13), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions((111,112,113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3)
+            precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0,
+                                                                      tensor_shape=(tensor_shapes[0],))
+            precreated_shm1_handles = self.precreate_register_regions((11,12,13), dtype, 1,
+                                                                      tensor_shape=(tensor_shapes[1],))
+            precreated_shm2_handles = self.precreate_register_regions((111,112,113), dtype, 2,
+                                                                      tensor_shape=(tensor_shapes[2],))
+            precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3,
+                                                                      tensor_shape=(tensor_shapes[3],))
             try:
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
                 protocol = "streaming"
@@ -165,10 +173,12 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
                            ("end", 3, None)),
-                          self.get_expected_result(4 + corrids[0], corrids[0], 3, trial, "end"),
+                          self.get_expected_result(4*tensor_shapes[0] + corrids[0],
+                                                   corrids[0], 3, trial, "end"),
                           protocol, precreated_shm0_handles),
                     kwargs={'sequence_name' : "{}_{}_{}".format(
-                      self._testMethodName, protocol, corrids[0])}))
+                        self._testMethodName, protocol, corrids[0]),
+                            'tensor_shape' : (tensor_shapes[0],) }))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[1],
@@ -177,10 +187,12 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 11, None),
                            (None, 12, None),
                            ("end", 13, None)),
-                          self.get_expected_result(36 + corrids[1], corrids[1], 13, trial, "end"),
+                          self.get_expected_result(36*tensor_shapes[1] + corrids[1],
+                                                   corrids[1], 13, trial, "end"),
                           protocol, precreated_shm1_handles),
                     kwargs={'sequence_name' : "{}_{}_{}".format(
-                      self._testMethodName, protocol, corrids[1])}))
+                        self._testMethodName, protocol, corrids[1]),
+                            'tensor_shape' : (tensor_shapes[1],) }))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[2],
@@ -189,10 +201,12 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 111, None),
                            (None, 112, None),
                            ("end", 113, None)),
-                          self.get_expected_result(336 + corrids[2], corrids[2], 113, trial, "end"),
+                          self.get_expected_result(336*tensor_shapes[2] + corrids[2],
+                                                   corrids[2], 113, trial, "end"),
                           protocol, precreated_shm2_handles),
                     kwargs={'sequence_name' : "{}_{}_{}".format(
-                      self._testMethodName, protocol, corrids[2])}))
+                        self._testMethodName, protocol, corrids[2]),
+                            'tensor_shape' : (tensor_shapes[2],) }))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[3],
@@ -201,10 +215,12 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 1111, None),
                            (None, 1112, None),
                            ("end", 1113, None)),
-                          self.get_expected_result(3336 + corrids[3], corrids[3], 1113, trial, "end"),
+                          self.get_expected_result(3336*tensor_shapes[3] + corrids[3],
+                                                   corrids[3], 1113, trial, "end"),
                           protocol, precreated_shm3_handles),
                     kwargs={'sequence_name' : "{}_{}_{}".format(
-                      self._testMethodName, protocol, corrids[3])}))
+                        self._testMethodName, protocol, corrids[3]),
+                            'tensor_shape' : (tensor_shapes[3],) }))
 
                 for t in threads:
                     t.start()
@@ -213,7 +229,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), 3, 11)
+                self.check_status(model_name, (1,), expected_exec_cnt, 11)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
@@ -226,12 +242,25 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
     def test_multi_sequence(self):
         # Send four sequences in series and make sure they get
         # completely batched into batch-size 4 inferences.
-        self._multi_sequence_impl(1)
+        self._multi_sequence_impl(_trials, 3, 1, (1, 1, 1, 1))
 
     def test_multi_parallel_sequence(self):
         # Send four sequences in parallel and make sure they get
         # completely batched into batch-size 4 inferences.
-        self._multi_sequence_impl(0)
+        self._multi_sequence_impl(_trials, 3, 0, (1, 1, 1, 1))
+
+    def test_multi_sequence_different_shape(self):
+        # Send four sequences in parallel where the requests in each
+        # sequence have different shape. Sequence should not be
+        # (completely) batched due to input tensor size differences.
+        self._multi_sequence_impl(_ragged_batch_supported_trials, 11, 0, (4, 3, 1, 2))
+
+    def test_multi_sequence_different_shape_allow_ragged(self):
+        # Send four sequences in parallel where the requests in each
+        # sequence have different shape. Input is marked as allowing
+        # ragged and so sequences should be batched even with input
+        # tensor size differences.
+        self._multi_sequence_impl(_ragged_batch_supported_trials, 3, 0, (4, 3, 1, 2))
 
     def test_backlog(self):
         # Test model instances together are configured with
