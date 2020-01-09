@@ -1419,11 +1419,11 @@ class InferContext:
                     byte_size = c_uint64()
                     shm_addr = c_char_p()
                     shm_key = c_char_p()
-                    _raise_if_error(
-                        c_void_p(_crequest_get_shared_memory_handle_info(output_format[1], \
-                                byref(shm_addr), byref(shm_key), byref(shm_fd), \
-                                byref(offset), byref(byte_size))))
                     try:
+                        _raise_if_error(
+                            c_void_p(_crequest_get_shared_memory_handle_info(output_format[1], \
+                                    byref(shm_addr), byref(shm_key), byref(shm_fd), \
+                                    byref(offset), byref(byte_size))))
                         if (np.prod(shape) * np.dtype(result_dtype).itemsize) < int(byte_size.value/batch_size):
                             element_byte_size = np.prod(shape) * np.dtype(result_dtype).itemsize
                         else:
