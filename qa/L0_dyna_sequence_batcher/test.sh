@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,7 +40,6 @@ BATCHER_TEST=dyna_sequence_batcher_test.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
-SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER=/opt/tensorrtserver/bin/trtserver
 source ../common/util.sh
 
@@ -50,9 +49,16 @@ RET=0
 
 rm -fr *.log *.serverlog
 
-rm -fr *.log *.serverlog models && mkdir models
+# models
+rm -fr models && mkdir models
 cp -r ${DATADIR}/qa_dyna_sequence_model_repository/* models/.
 cp -r ../custom_models/custom_dyna_sequence_int32 models/.
+
+# ragged models
+rm -fr ragged_models && mkdir ragged_models
+cp -r ../custom_models/custom_dyna_sequence_int32 ragged_models/.
+(cd ragged_models/custom_dyna_sequence_int32 && \
+        sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
 
 # Need to launch the server for each test so that the model status is
 # reset (which is used to make sure the correct batch size was used
@@ -64,6 +70,7 @@ for i in \
         test_length1_sequence \
          ; do
     SERVER_LOG="./$i.serverlog"
+    SERVER_ARGS="--model-repository=`pwd`/models"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -96,6 +103,7 @@ done
 
 export NO_BATCHING=0
 for i in \
+    test_multi_sequence_different_shape \
     test_multi_sequence \
         test_multi_parallel_sequence \
         test_backlog \
@@ -105,6 +113,45 @@ for i in \
     ; do
 
     SERVER_LOG="./$i.serverlog"
+    SERVER_ARGS="--model-repository=`pwd`/models"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    echo "Test: $i" >>$CLIENT_LOG
+
+    set +e
+    python $BATCHER_TEST DynaSequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+        echo -e "\n***\n*** Test $i Failed\n***"
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
+
+# Ragged-batch tests that require max_queue_delay_microseconds to be
+# non-zero so that batching is delayed until a full preferred batch is
+# available.
+for m in `ls ragged_models`; do
+    (cd ragged_models/$m && \
+            sed -i "s/max_candidate_sequences:.*/max_candidate_sequences:4/" config.pbtxt && \
+            sed -i "s/max_queue_delay_microseconds:.*/max_queue_delay_microseconds:5000000/" config.pbtxt)
+done
+
+export NO_BATCHING=0
+for i in \
+    test_multi_sequence_different_shape_allow_ragged \
+    ; do
+
+    SERVER_LOG="./$i.serverlog"
+    SERVER_ARGS="--model-repository=`pwd`/ragged_models"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"

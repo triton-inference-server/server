@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -76,15 +76,26 @@ for m in \
         $DATADIR/qa_variable_model_repository/plan_float32_float32_float32 \
         $DATADIR/qa_variable_model_repository/libtorch_float32_float32_float32 \
         $DATADIR/qa_variable_model_repository/onnx_float32_float32_float32 \
-        ../custom_models/custom_float32_float32_float32 ; do
+        ../custom_models/custom_float32_float32_float32 \
+        ../custom_models/custom_zero_1_float32; do
     cp -r $m var_models/. && \
         (cd var_models/$(basename $m) && \
                 sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
                 sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
-                echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt) && \
-        for MC in `ls var_models/*/config.pbtxt`; do
-            sed -i "s/16/-1/g" $MC
-        done
+                echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
+done
+
+for MC in `ls var_models/*/config.pbtxt`; do
+    sed -i "s/16/-1/g" $MC
+done
+
+# Create allow-ragged model to variable-size model repository
+for m in custom_zero_1_float32 ; do
+    (cd var_models/$m && \
+            mkdir -p 1 && cp ../../libidentity.so 1/libcustom.so && \
+            echo "instance_group [ { kind: KIND_CPU count: 1 }]" >> config.pbtxt && \
+            sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
+            sed -i "s/name:.*\"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt)
 done
 
 # Need to launch the server for each test so that the model status is
@@ -164,11 +175,11 @@ for model_type in FIXED VARIABLE; do
     done
 done
 
-
 export BATCHER_TYPE=VARIABLE
 for i in \
         test_multi_batch_not_preferred_different_shape \
         test_multi_batch_preferred_different_shape \
+        test_multi_batch_different_shape_allow_ragged \
         test_multi_batch_different_shape ; do
     SERVER_ARGS="--model-repository=`pwd`/var_models"
     SERVER_LOG="./$i.VARIABLE.serverlog"
