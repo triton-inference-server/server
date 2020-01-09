@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -73,25 +73,44 @@ set(HTTP_ENDPOINT_OBJECTS "")
 set(HTTP_ENDPOINT_LIBRARIES "")
 
 if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
-  find_package(libevhtp CONFIG REQUIRED)
-  message(STATUS "Using libevhtp ${libevhtp_VERSION}")
+  if(NOT ${TRTIS_ENABLE_HTTP_H2O})
+    find_package(libevhtp CONFIG REQUIRED)
+    message(STATUS "Using libevhtp ${libevhtp_VERSION}")
 
-  if(${TRTIS_ENABLE_HTTP_V2})
+    if(${TRTIS_ENABLE_HTTP_V2})
+      set(
+        HTTP_ENDPOINT_SRCS
+        http_v2_server.cc
+      )
+    else()
+      set(
+        HTTP_ENDPOINT_SRCS
+        http_server.cc
+      )
+    endif() # TRTIS_ENABLE_HTTP_V2
+
     set(
-      HTTP_ENDPOINT_SRCS
-      http_v2_server.cc
+      HTTP_ENDPOINT_HDRS
+      http_server.h
     )
   else()
+    find_library(H2O_LIB h2o REQUIRED)
+    message(STATUS "Using libh2o ${H2O_LIB}")
+    find_library(UV_LIB uv REQUIRED)
+    message(STATUS "Using libuv ${UV_LIB}")
+    find_package(Threads REQUIRED)
+    find_package(OpenSSL REQUIRED)
     set(
       HTTP_ENDPOINT_SRCS
-      http_server.cc
+      http_h2o_server.cc
+      ${H2O_C}
     )
-  endif() # TRTIS_ENABLE_HTTP_V2
-
-  set(
-    HTTP_ENDPOINT_HDRS
-    http_server.h
-  )
+    set(
+      HTTP_ENDPOINT_HDRS
+      http_server.h
+      ${H2O_H}
+    )
+  endif() # TRTIS_ENABLE_HTTP_H2O
 
   add_library(
     http-endpoint-library EXCLUDE_FROM_ALL OBJECT
@@ -103,38 +122,61 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
   endif() # TRTIS_ENABLE_GPU
 
   add_dependencies(http-endpoint-library proto-library)
-  target_include_directories(
-    http-endpoint-library
-    PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
-  )
+
+  if(NOT ${TRTIS_ENABLE_HTTP_H2O})
+    target_include_directories(
+      http-endpoint-library
+      PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
+    )
+  else()
+    target_include_directories(
+      http-endpoint-library
+      PRIVATE -lh2o
+      PRIVATE -luv
+    )
+  endif() # TRTIS_ENABLE_HTTP_H2O
 
   set(
     HTTP_ENDPOINT_OBJECTS
     $<TARGET_OBJECTS:http-endpoint-library>
     $<TARGET_OBJECTS:proto-library>
   )
-  if(${TRTIS_ENABLE_HTTP_V2})
+
+  if(NOT ${TRTIS_ENABLE_HTTP_H2O})
+    if(${TRTIS_ENABLE_HTTP_V2})
+      set(
+        HTTP_ENDPOINT_OBJECTS
+        ${HTTP_ENDPOINT_OBJECTS}
+        $<TARGET_OBJECTS:grpc-library>
+      )
+    endif() # TRTIS_ENABLE_HTTP_V2
     set(
-      HTTP_ENDPOINT_OBJECTS 
-      ${HTTP_ENDPOINT_OBJECTS} 
-      $<TARGET_OBJECTS:grpc-library>
+      HTTP_ENDPOINT_LIBRARIES
+      PRIVATE ${LIBEVENT_LIBRARIES}
+      PRIVATE libevhtp::evhtp
+      PRIVATE protobuf::libprotobuf
+      PRIVATE -lre2
     )
-  endif() # TRTIS_ENABLE_HTTP_V2
-  set(
-    HTTP_ENDPOINT_LIBRARIES
-    PRIVATE ${LIBEVENT_LIBRARIES}
-    PRIVATE libevhtp::evhtp
-    PRIVATE protobuf::libprotobuf
-    PRIVATE -lre2
-  )
-  if(${TRTIS_ENABLE_HTTP_V2})
+    if(${TRTIS_ENABLE_HTTP_V2})
+      set(
+        HTTP_ENDPOINT_LIBRARIES
+        ${HTTP_ENDPOINT_LIBRARIES}
+        PRIVATE gRPC::grpc++
+        PRIVATE gRPC::grpc
+      )
+    endif() # TRTIS_ENABLE_HTTP_V2
+  else()
     set(
-      HTTP_ENDPOINT_LIBRARIES 
-      ${HTTP_ENDPOINT_LIBRARIES} 
-      PRIVATE gRPC::grpc++
-      PRIVATE gRPC::grpc
+      HTTP_ENDPOINT_LIBRARIES
+      PRIVATE h2o
+      PRIVATE h2o-evloop
+      PRIVATE uv
+      PRIVATE -lwslay
+      PRIVATE protobuf::libprotobuf
+      PRIVATE -lre2
+      PRIVATE -lnuma
     )
-  endif() # TRTIS_ENABLE_HTTP_V2
+  endif() # TRTIS_ENABLE_HTTP_H2O
 endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 
 #

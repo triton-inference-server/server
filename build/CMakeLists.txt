@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,6 +45,7 @@ option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" OFF)
 option(TRTIS_ENABLE_HTTP "Include HTTP API in server" ON)
 option(TRTIS_ENABLE_GRPC "Include GRPC API in server" ON)
 option(TRTIS_ENABLE_HTTP_V2 "Enable version 2 of the HTTP API in server" OFF)
+option(TRTIS_ENABLE_HTTP_H2O "Enable h2o version of the HTTP API in server" OFF)
 option(TRTIS_ENABLE_METRICS "Include metrics support in server" ON)
 
 # Cloud storage
@@ -73,6 +74,10 @@ endif()
 
 if(TRTIS_ENABLE_TENSORRT AND NOT TRTIS_ENABLE_GPU)
   message(FATAL_ERROR "TRTIS_ENABLE_TENSORRT=ON requires TRTIS_ENABLE_GPU=ON")
+endif()
+
+if(TRTIS_ENABLE_HTTP_V2 AND TRTIS_ENABLE_HTTP_H2O)
+  message(FATAL_ERROR "TRTIS_ENABLE_HTTP_V2=ON requires TRTIS_ENABLE_HTTP_H2O=OFF")
 endif()
 
 if(TRTIS_ENABLE_HTTP_V2 AND NOT TRTIS_ENABLE_HTTP)
@@ -459,6 +464,7 @@ ExternalProject_Add(trtis
     -DTRTIS_ENABLE_HTTP:BOOL=${TRTIS_ENABLE_HTTP}
     -DTRTIS_ENABLE_GRPC:BOOL=${TRTIS_ENABLE_GRPC}
     -DTRTIS_ENABLE_HTTP_V2:BOOL=${TRTIS_ENABLE_HTTP_V2}
+    -DTRTIS_ENABLE_HTTP_H2O:BOOL=${TRTIS_ENABLE_HTTP_H2O}
     -DTRTIS_MIN_COMPUTE_CAPABILITY:STRING=${TRTIS_MIN_COMPUTE_CAPABILITY}
     -DTRTIS_ENABLE_METRICS:BOOL=${TRTIS_ENABLE_METRICS}
     -DTRTIS_ENABLE_GCS:BOOL=${TRTIS_ENABLE_GCS}
