@@ -252,7 +252,7 @@ PlanBackend::Context::InitOptimizationProfiles(
   if ((total_profiles == 0) || profile_names.empty()) {
     auto it =
         trt_contexts_
-            .emplace(0, TensorRTContext("default", num_expected_bindings_))
+            .emplace(0, TensorRTContext("default", 0, num_expected_bindings_))
             .first;
     it->second.context_ = default_trt_context;
     default_trt_context = nullptr;
@@ -262,7 +262,8 @@ PlanBackend::Context::InitOptimizationProfiles(
       int profile_index = 0;
       RETURN_IF_ERROR(GetProfileIndex(profile_name, &profile_index));
       auto res = trt_contexts_.emplace(
-          profile_index, TensorRTContext(profile_name, num_expected_bindings_));
+          profile_index,
+          TensorRTContext(profile_name, profile_index, num_expected_bindings_));
       if (!res.second) {
         LOG_WARNING << profile_name << " maps to profile index "
                     << profile_index << " which has been mapped by "
@@ -854,6 +855,25 @@ bool
 PlanBackend::Context::BuildCudaGraph(
     TensorRTContext* trt_context, const int batch_size)
 {
+  // Need to set context with proper shape in the case of dynamic shape
+  if (is_dynamic_) {
+    auto binding_count = trt_context->opt_dims_.size();
+    auto binding_offset = trt_context->profile_index_ * binding_count;
+    for (size_t bindex = 0; bindex < binding_count; bindex++) {
+      if (engine_->bindingIsInput(binding_offset + bindex)) {
+        continue;
+      }
+      // Use opt shape for dimensions other than batch size. There is no
+      // definited answer on whether CUDA graph should be captured for each
+      // set of shapes, however, the existing test case suggests that the
+      // correctness is preserved.
+      auto this_dim = trt_context->opt_dims_[bindex];
+      this_dim.d[0] = batch_size;
+      trt_context->context_->setBindingDimensions(
+          binding_offset + bindex, this_dim);
+    }
+  }
+
   // [DLIS-947] Need extra care for dynamic shape
   bool captured = true;
   cudaError_t cuerr;
@@ -866,10 +886,21 @@ PlanBackend::Context::BuildCudaGraph(
     captured = false;
   } else {
     auto context = trt_context->context_;
-    if (!context->enqueue(
-            batch_size, buffer_bindings_.data(), stream_, nullptr)) {
-      LOG_WARNING << "unable to record CUDA graph for " << name_;
-      captured = false;
+    if (is_dynamic_) {
+      if (!trt_context->context_->allInputDimensionsSpecified()) {
+        LOG_ERROR << "failed to specify the dimensions of all input bindings";
+        captured = false;
+      } else if (!trt_context->context_->enqueueV2(
+                     buffer_bindings_.data(), stream_, nullptr)) {
+        LOG_WARNING << "unable to record CUDA graph for " << name_;
+        captured = false;
+      }
+    } else {
+      if (!context->enqueue(
+              batch_size, buffer_bindings_.data(), stream_, nullptr)) {
+        LOG_WARNING << "unable to record CUDA graph for " << name_;
+        captured = false;
+      }
     }
 
     cuerr = cudaStreamEndCapture(stream_, &graph);
