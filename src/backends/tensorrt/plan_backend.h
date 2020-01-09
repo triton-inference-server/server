@@ -53,7 +53,7 @@ class PlanBackend : public InferenceBackend {
       const std::unordered_map<std::string, std::vector<char>>& models);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
-      const std::unordered_map<std::string, std::vector<char>>& models,
+      const std::vector<char>& models,
       const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
       const std::shared_ptr<SyncQueue<size_t>>& context_queue);
 
@@ -207,10 +207,9 @@ class PlanBackend : public InferenceBackend {
     std::vector<void*> buffer_bindings_;
   };
 
-  // [TODO] can an engine be shared across devices?
   // CUDA engine shared across all model instances on the same device.
   std::map<int, std::pair<nvinfer1::IRuntime*, nvinfer1::ICudaEngine*>>
-      device_engine_;
+      device_engines_;
 
   // vector for storing available context queue associated with a runner
   std::vector<std::shared_ptr<SyncQueue<size_t>>> available_context_queue_;
