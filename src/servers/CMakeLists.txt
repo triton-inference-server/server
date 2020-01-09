@@ -82,20 +82,27 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
 
   if(${TRTIS_ENABLE_HTTP_V2})
     set(
-      HTTP_ENDPOINT_SRCS
-      http_v2_server.cc
+      HTTP_ENDPOINT_HDRS
+      http_server.h
     )
   else()
+    find_library(H2O_LIB h2o REQUIRED)
+    message(STATUS "Using libh2o ${H2O_LIB}")
+    find_library(UV_LIB uv REQUIRED)
+    message(STATUS "Using libuv ${UV_LIB}")
+    find_package(Threads REQUIRED)
+    find_package(OpenSSL REQUIRED)
     set(
       HTTP_ENDPOINT_SRCS
-      http_server.cc
+      http_h2o_server.cc
+      ${H2O_C}
     )
-  endif() # TRTIS_ENABLE_HTTP_V2
-
-  set(
-    HTTP_ENDPOINT_HDRS
-    http_server.h
-  )
+    set(
+      HTTP_ENDPOINT_HDRS
+      http_server.h
+      ${H2O_H}
+    )
+  endif() # TRTIS_ENABLE_HTTP_H2O
 
   add_library(
     http-endpoint-library EXCLUDE_FROM_ALL OBJECT
@@ -142,7 +149,7 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
       PRIVATE gRPC::grpc++
       PRIVATE gRPC::grpc
     )
-  endif() # TRTIS_ENABLE_HTTP_V2
+  endif() # TRTIS_ENABLE_HTTP_H2O
 endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 
 #
