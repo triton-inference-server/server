@@ -252,7 +252,7 @@ PlanBackend::Context::InitOptimizationProfiles(
   if ((total_profiles == 0) || profile_names.empty()) {
     auto it =
         trt_contexts_
-            .emplace(0, TensorRTContext("default", 0, num_expected_bindings_))
+            .emplace(0, TensorRTContext("default", num_expected_bindings_))
             .first;
     it->second.context_ = default_trt_context;
     default_trt_context = nullptr;
@@ -262,8 +262,7 @@ PlanBackend::Context::InitOptimizationProfiles(
       int profile_index = 0;
       RETURN_IF_ERROR(GetProfileIndex(profile_name, &profile_index));
       auto res = trt_contexts_.emplace(
-          profile_index,
-          TensorRTContext(profile_name, profile_index, num_expected_bindings_));
+          profile_index, TensorRTContext(profile_name, num_expected_bindings_));
       if (!res.second) {
         LOG_WARNING << profile_name << " maps to profile index "
                     << profile_index << " which has been mapped by "

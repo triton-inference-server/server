@@ -106,15 +106,13 @@ class PlanBackend : public InferenceBackend {
     // context can have multiple of this struct if multiple optimization
     // profiles is specified.
     struct TensorRTContext {
-      TensorRTContext(
-          const std::string& profile_name, int profile_index, int binding_cnts)
-          : profile_name_(profile_name), profile_index_(profile_index),
-            context_(nullptr), min_dims_(binding_cnts), max_dims_(binding_cnts),
+      TensorRTContext(const std::string& profile_name, int binding_cnts)
+          : profile_name_(profile_name), context_(nullptr),
+            min_dims_(binding_cnts), max_dims_(binding_cnts),
             opt_dims_(binding_cnts)
       {
       }
       std::string profile_name_;
-      int profile_index_;
       nvinfer1::IExecutionContext* context_;
 
       // The CUDA graphs captured for the model for different
