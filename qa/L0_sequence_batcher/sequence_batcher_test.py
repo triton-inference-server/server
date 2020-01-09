@@ -625,7 +625,9 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             return
 
         # Ragged batch only allowed for custom backend
-        for trial in ("custom",):
+        if "custom" in _trials:
+            trial = "custom"
+
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
             precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0,
