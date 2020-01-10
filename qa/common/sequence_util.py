@@ -104,7 +104,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                     if dtype == np.object:
                         output_byte_size = 4 # size of empty string
                     else:
-                        output_byte_size = np.dtype(dtype).itemsize
+                        output_byte_size = 0
 
                     # create data
                     input_list = list()
@@ -116,6 +116,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                             output_byte_size += 64 * in0.size
                         else:
                             in0 = np.full(tensor_shape, value, dtype=dtype)
+                            output_byte_size += np.dtype(dtype).itemsize * in0.size
                         input_list.append(in0)
 
                     input_list_tmp = iu._prepend_string_size(input_list) if (dtype == np.object) else input_list

@@ -613,21 +613,14 @@ CustomBackend::Context::GetOutput(
         name, content, content_byte_size, shape,
         ToTRTServerMemoryType(*memory_type), *memory_type_id,
         &actual_memory_type, &actual_memory_type_id);
-
-    // Done with this output if 'content_byte_size' is 0
-    if (content_byte_size == 0) {
-      *content = nullptr;
-    } else if (*content == nullptr) {
+    if (!status.IsOk()) {
+      LOG_VERBOSE(1) << status.AsString();
       return false;
     }
 
     // Update memory type with actual memory type
     *memory_type = ToCustomMemoryType(actual_memory_type);
     *memory_type_id = actual_memory_type_id;
-
-    if (!status.IsOk()) {
-      LOG_VERBOSE(1) << status.AsString();
-    }
 
     return status.IsOk();
   }
