@@ -1596,14 +1596,21 @@ PlanBackend::Context::Run(
 
     std::vector<int64_t> shape;
     if (is_dynamic_) {
-      for (const auto& input :
-           input_request_provider->RequestHeader().input()) {
-        const std::string& this_name = input.name();
-        if (this_name.compare(name) == 0) {
-          for (auto dim : input.dims()) {
-            shape.push_back(dim);
+      if (input_request_provider->HasInputOverride(name)) {
+        // Retrieve the dimensions from the override
+        std::vector<int> override_dims;
+        input_request_provider->GetInputOverrideShape(name, &shape);
+        input_request_provider->SetInputOverrideConsumed(name, false);
+      } else {
+        for (const auto& input :
+             input_request_provider->RequestHeader().input()) {
+          const std::string& this_name = input.name();
+          if (this_name.compare(name) == 0) {
+            for (auto dim : input.dims()) {
+              shape.push_back(dim);
+            }
+            break;
           }
-          break;
         }
       }
 

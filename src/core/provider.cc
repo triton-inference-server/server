@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -250,6 +250,24 @@ InferRequestProvider::HasInputOverride(const std::string& name)
 {
   for (const auto& override_map : overrides_maps_) {
     if (override_map->find(name) != override_map->end()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool
+InferRequestProvider::GetInputOverrideShape(
+    const std::string& name, std::vector<int64_t>* shape)
+{
+  shape->clear();
+  for (const auto& override_map : overrides_maps_) {
+    auto it = override_map->find(name);
+    if (it != override_map->end()) {
+      for (auto dim : it->second.dims_) {
+        shape->push_back(dim);
+      }
       return true;
     }
   }

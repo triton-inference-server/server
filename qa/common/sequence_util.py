@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -82,45 +82,203 @@ class SequenceBatcherTestUtil(unittest.TestCase):
             if len(_deferred_exceptions) > 0:
                 raise _deferred_exceptions[0]
 
-    def precreate_register_regions(self, value_list, dtype, i, batch_size=1):
+    def check_failure(self):
+        # Check securely whether a failure has been registered
+        # This is generic because the failure behavior is undefined
+        # for rugged batches. 
+        with _deferred_exceptions_lock:
+            if len(_deferred_exceptions) == 0:
+                raise Exception("Unexpected inference success")
+
+    def precreate_register_regions(self, value_list, dtype, i, batch_size=1, model_type="normal"):
         if _test_system_shared_memory or _test_cuda_shared_memory:
             shared_memory_ctx = SharedMemoryControlContext("localhost:8000",  ProtocolType.HTTP, verbose=True)
             shm_region_handles = []
-            for j, value in enumerate(value_list):
-                # create data
-                input_list = list()
-                for b in range(batch_size):
-                    if dtype == np.object:
-                        in0 = np.full((1,), value, dtype=np.int32)
-                        in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
-                        in0 = in0n.reshape((1,))
-                    else:
-                        in0 = np.full((1,), value, dtype=dtype)
-                    input_list.append(in0)
+            if model_type == "normal":
+                for j, value in enumerate(value_list):
+                    # create data
+                    input_list = list()
+                    for b in range(batch_size):
+                        if dtype == np.object:
+                            in0 = np.full((1,), value, dtype=np.int32)
+                            in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+                            in0 = in0n.reshape((1,))
+                        else:
+                            in0 = np.full((1,), value, dtype=dtype)
+                        input_list.append(in0)
 
-                input_list_tmp = iu._prepend_string_size(input_list) if (dtype == np.object) else input_list
-                input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
-                output_byte_size = np.dtype(dtype).itemsize + 2
+                    input_list_tmp = iu._prepend_string_size(input_list) if (dtype == np.object) else input_list
+                    input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
+                    output_byte_size = np.dtype(dtype).itemsize + 2
 
-                # create shared memory regions and copy data for input values
-                if _test_system_shared_memory:
-                    shm_ip_handle = shm.create_shared_memory_region(
-                        'ip{}{}_data'.format(i,j), '/ip{}{}'.format(i,j), input_byte_size)
-                    shm_op_handle = shm.create_shared_memory_region(
-                        'op{}{}_data'.format(i,j), '/op{}{}'.format(i,j), output_byte_size)
-                    shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
-                    shared_memory_ctx.register(shm_ip_handle)
-                    shared_memory_ctx.register(shm_op_handle)
-                elif _test_cuda_shared_memory:
-                    shm_ip_handle = cudashm.create_shared_memory_region(
-                        'ip{}{}_data'.format(i,j), input_byte_size, 0)
-                    shm_op_handle = cudashm.create_shared_memory_region(
-                        'op{}{}_data'.format(i,j), output_byte_size, 0)
-                    cudashm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
-                    shared_memory_ctx.cuda_register(shm_ip_handle)
-                    shared_memory_ctx.cuda_register(shm_op_handle)
-                shm_region_handles.append(shm_ip_handle)
-                shm_region_handles.append(shm_op_handle)
+                    # create shared memory regions and copy data for input values
+                    if _test_system_shared_memory:
+                        shm_ip_handle = shm.create_shared_memory_region(
+                            'ip{}{}_data'.format(i,j), '/ip{}{}'.format(i,j), input_byte_size)
+                        shm_op_handle = shm.create_shared_memory_region(
+                            'op{}{}_data'.format(i,j), '/op{}{}'.format(i,j), output_byte_size)
+                        shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
+                        shared_memory_ctx.register(shm_ip_handle)
+                        shared_memory_ctx.register(shm_op_handle)
+                    elif _test_cuda_shared_memory:
+                        shm_ip_handle = cudashm.create_shared_memory_region(
+                            'ip{}{}_data'.format(i,j), input_byte_size, 0)
+                        shm_op_handle = cudashm.create_shared_memory_region(
+                            'op{}{}_data'.format(i,j), output_byte_size, 0)
+                        cudashm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
+                        shared_memory_ctx.cuda_register(shm_ip_handle)
+                        shared_memory_ctx.cuda_register(shm_op_handle)
+                    shm_region_handles.append(shm_ip_handle)
+                    shm_region_handles.append(shm_op_handle)
+
+            elif model_type == "sequence_shape_tensor":
+                for j, (shape_value, value) in enumerate(value_list):
+                    input_list = list()
+                    shape_input_list = list()
+
+                    for b in range(batch_size):
+                        if dtype == np.object:
+                            in0 = np.full((1,), value, dtype=np.int32)
+                            in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+                            in0 = in0n.reshape(1,)
+                        else:
+                            in0 = np.full((1,), value, dtype=dtype)
+                        input_list.append(in0)
+
+                    # Only one shape tensor input per batch
+                    shape_input_list.append(np.full((1,), shape_value, dtype=np.int32))
+                
+                    input_list_tmp = iu._prepend_string_size(input_list) if (dtype == np.object) else input_list
+                    input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
+                    shape_input_byte_size = sum([i0.nbytes for i0 in shape_input_list])
+                    shape_output_byte_size = shape_input_byte_size
+                    output_byte_size = np.dtype(dtype).itemsize + 2
+                    resized_output_byte_size = 32 * shape_value
+
+                    # create shared memory regions and copy data for input values
+                    if _test_system_shared_memory:
+                        shm_ip_handle = shm.create_shared_memory_region(
+                            'ip{}{}_data'.format(i,j), '/ip{}{}'.format(i,j), input_byte_size)
+                        shm_shape_ip_handle = shm.create_shared_memory_region(
+                            'shape_ip{}{}_data'.format(i,j), '/shape_ip{}{}'.format(i,j), shape_input_byte_size)
+                        shm_shape_op_handle = shm.create_shared_memory_region(
+                            'shape_op{}{}_data'.format(i,j), '/shape_op{}{}'.format(i,j), shape_output_byte_size)
+                        shm_op_handle = shm.create_shared_memory_region(
+                            'op{}{}_data'.format(i,j), '/op{}{}'.format(i,j), output_byte_size)
+                        shm_resized_op_handle = shm.create_shared_memory_region(
+                            'resized_op{}{}_data'.format(i,j), '/resized_op{}{}'.format(i,j), resized_output_byte_size)
+                        shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
+                        shm.set_shared_memory_region(shm_shape_ip_handle, shape_input_list)
+                        shared_memory_ctx.register(shm_ip_handle)
+                        shared_memory_ctx.register(shm_shape_ip_handle)
+                        shared_memory_ctx.register(shm_shape_op_handle)
+                        shared_memory_ctx.register(shm_op_handle)
+                        shared_memory_ctx.register(shm_resized_op_handle)
+                    elif _test_cuda_shared_memory:
+                        shm_ip_handle = cudashm.create_shared_memory_region(
+                            'ip{}{}_data'.format(i,j), input_byte_size, 0)
+                        shm_shape_ip_handle = cudashm.create_shared_memory_region(
+                            'shape_ip{}{}_data'.format(i,j), shape_input_byte_size, 0)
+                        shm_shape_op_handle = cudashm.create_shared_memory_region(
+                            'shape_op{}{}_data'.format(i,j), shape_output_byte_size, 0)
+                        shm_op_handle = cudashm.create_shared_memory_region(
+                            'op{}{}_data'.format(i,j), output_byte_size, 0)
+                        shm_resized_op_handle = cudashm.create_shared_memory_region(
+                            'resized_op{}{}_data'.format(i,j), resized_output_byte_size, 0)
+                        cudashm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
+                        cudashm.set_shared_memory_region(shm_shape_ip_handle, shape_input_list)
+                        shared_memory_ctx.cuda_register(shm_ip_handle)
+                        shared_memory_ctx.cuda_register(shm_shape_ip_handle)
+                        shared_memory_ctx.cuda_register(shm_shape_op_handle)
+                        shared_memory_ctx.cuda_register(shm_op_handle)
+                        shared_memory_ctx.cuda_register(shm_resized_op_handle)
+                    shm_region_handles.append(shm_ip_handle)
+                    shm_region_handles.append(shm_shape_ip_handle)
+                    shm_region_handles.append(shm_shape_op_handle)
+                    shm_region_handles.append(shm_op_handle)
+                    shm_region_handles.append(shm_resized_op_handle)
+
+            elif model_type == "dynaseq_shape_tensor":
+                for j, (shape_value, value) in enumerate(value_list):
+                    input_list = list()
+                    shape_input_list = list()
+                    dummy_input_list = list()
+
+                    for b in range(batch_size):
+                        if dtype == np.object:
+                            dummy_in0 = np.full((1,), value, dtype=np.int32)
+                            dummy_in0n = np.array([str(x) for x in dummy_in0.reshape(in0.size)], dtype=object)
+                            dummy_in0 = in0n.reshape(1,)
+                        else:
+                            dummy_in0 = np.full((1,), value, dtype=dtype)
+                        dummy_input_list.append(dummy_in0)
+                        in0 =  np.full((1,), value, dtype=np.int32)
+                        input_list.append(in0)
+
+                    # Only one shape tensor input per batch
+                    shape_input_list.append(np.full((1,), shape_value, dtype=np.int32))
+                
+                    input_list_tmp = iu._prepend_string_size(input_list) if (dtype == np.object) else input_list
+                    input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
+                    shape_input_byte_size = sum([i0.nbytes for i0 in shape_input_list])
+                    dummy_input_byte_size = sum([i0.nbytes for i0 in dummy_input_list])
+                    shape_output_byte_size = shape_input_byte_size
+                    output_byte_size = np.dtype(np.int32).itemsize + 2
+                    resized_output_byte_size = 32 * shape_value
+
+                    # create shared memory regions and copy data for input values
+                    if _test_system_shared_memory:
+                        shm_ip_handle = shm.create_shared_memory_region(
+                            'ip{}{}_data'.format(i,j), '/ip{}{}'.format(i,j), input_byte_size)
+                        shm_shape_ip_handle = shm.create_shared_memory_region(
+                            'shape_ip{}{}_data'.format(i,j), '/shape_ip{}{}'.format(i,j), shape_input_byte_size)
+                        shm_dummy_ip_handle = shm.create_shared_memory_region(
+                            'dummy_ip{}{}_data'.format(i,j), '/dummy_ip{}{}'.format(i,j), dummy_input_byte_size)
+                        shm_shape_op_handle = shm.create_shared_memory_region(
+                            'shape_op{}{}_data'.format(i,j), '/shape_op{}{}'.format(i,j), shape_output_byte_size)
+                        shm_op_handle = shm.create_shared_memory_region(
+                            'op{}{}_data'.format(i,j), '/op{}{}'.format(i,j), output_byte_size)
+                        shm_resized_op_handle = shm.create_shared_memory_region(
+                            'resized_op{}{}_data'.format(i,j), '/resized_op{}{}'.format(i,j), resized_output_byte_size)
+                        shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
+                        shm.set_shared_memory_region(shm_shape_ip_handle, shape_input_list)
+                        shm.set_shared_memory_region(shm_dummy_ip_handle, dummy_input_list)
+                        shared_memory_ctx.register(shm_ip_handle)
+                        shared_memory_ctx.register(shm_shape_ip_handle)
+                        shared_memory_ctx.register(shm_dummy_ip_handle)
+                        shared_memory_ctx.register(shm_shape_op_handle)
+                        shared_memory_ctx.register(shm_op_handle)
+                        shared_memory_ctx.register(shm_resized_op_handle)
+                    elif _test_cuda_shared_memory:
+                        shm_ip_handle = cudashm.create_shared_memory_region(
+                            'ip{}{}_data'.format(i,j), input_byte_size, 0)
+                        shm_shape_ip_handle = cudashm.create_shared_memory_region(
+                            'shape_ip{}{}_data'.format(i,j), shape_input_byte_size, 0)
+                        shm_dummy_ip_handle = cudashm.create_shared_memory_region(
+                            'dummy_ip{}{}_data'.format(i,j), dummy_input_byte_size, 0)
+                        shm_shape_op_handle = cudashm.create_shared_memory_region(
+                            'shape_op{}{}_data'.format(i,j), shape_output_byte_size, 0)
+                        shm_op_handle = cudashm.create_shared_memory_region(
+                            'op{}{}_data'.format(i,j), output_byte_size, 0)
+                        shm_resized_op_handle = cudashm.create_shared_memory_region(
+                            'resized_op{}{}_data'.format(i,j), resized_output_byte_size, 0)
+                        cudashm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
+                        cudashm.set_shared_memory_region(shm_shape_ip_handle, shape_input_list)
+                        cudashm.set_shared_memory_region(shm_dummy_ip_handle, dummy_input_list)
+                        shared_memory_ctx.cuda_register(shm_ip_handle)
+                        shared_memory_ctx.cuda_register(shm_shape_ip_handle)
+                        shared_memory_ctx.cuda_register(shm_dummy_ip_handle)
+                        shared_memory_ctx.cuda_register(shm_shape_op_handle)
+                        shared_memory_ctx.cuda_register(shm_op_handle)
+                        shared_memory_ctx.cuda_register(shm_resized_op_handle)
+                    shm_region_handles.append(shm_ip_handle)
+                    shm_region_handles.append(shm_shape_ip_handle)
+                    shm_region_handles.append(shm_dummy_ip_handle)
+                    shm_region_handles.append(shm_shape_op_handle)
+                    shm_region_handles.append(shm_op_handle)
+                    shm_region_handles.append(shm_resized_op_handle)
+            else:
+                return []
             return shm_region_handles
         else:
             return []
@@ -398,6 +556,158 @@ class SequenceBatcherTestUtil(unittest.TestCase):
             except Exception as ex:
                 self.add_deferred_exception(ex)
 
+    def check_sequence_shape_tensor_io(self, model_name, input_dtype, correlation_id,
+                             sequence_thresholds, values, expected_result,
+                             protocol, shm_region_handles, using_dynamic_batcher=False,
+                             batch_size=1, sequence_name="<unknown>"):
+
+        """Perform sequence of inferences using async run. The 'values' holds
+        a list of tuples, one for each inference with format:
+
+        (flag_str, shape_value, value, pre_delay_ms)
+
+        """
+        tensor_shape = (1,)
+        self.assertFalse(_test_system_shared_memory and _test_cuda_shared_memory,
+                        "Cannot set both System and CUDA shared memory flags to 1")
+
+        # Can only send the request exactly once since it is a
+        # sequence model with state
+        configs = []
+        if protocol == "http":
+            configs.append(("localhost:8000", ProtocolType.HTTP, False))
+        if protocol == "grpc":
+            configs.append(("localhost:8001", ProtocolType.GRPC, False))
+        if protocol == "streaming":
+            configs.append(("localhost:8001", ProtocolType.GRPC, True))
+        self.assertEqual(len(configs), 1)
+
+        for config in configs:
+            ctx = InferContext(config[0], config[1], model_name,
+                               correlation_id=correlation_id, streaming=config[2],
+                               verbose=True)
+            # Execute the sequence of inference...
+            try:
+                seq_start_ms = int(round(time.time() * 1000))
+                user_data = UserData()
+
+                sent_count = 0
+                shape_values = list()
+                for flag_str, shape_value, value, pre_delay_ms in values:
+                    flags = InferRequestHeader.FLAG_NONE
+                    if flag_str is not None:
+                        if "start" in flag_str:
+                            flags = flags | InferRequestHeader.FLAG_SEQUENCE_START
+                        if "end" in flag_str:
+                            flags = flags | InferRequestHeader.FLAG_SEQUENCE_END
+                    
+                    shape_values.append(np.full(tensor_shape, shape_value, dtype=np.int32))
+                    if not (_test_system_shared_memory or _test_cuda_shared_memory):
+                        input_list = list()
+                        shape_input_list = list()
+                        dummy_input_list = list()
+
+                        for b in range(batch_size):
+                            if using_dynamic_batcher:
+                                if input_dtype == np.object:
+                                    dummy_in0 = np.full(tensor_shape, value, dtype=np.int32)
+                                    dummy_in0n = np.array([str(x) for x in in0.reshape(dummy_in0.size)], dtype=object)
+                                    dummy_in0 = dummy_in0n.reshape(tensor_shape)
+                                else:
+                                    dummy_in0 = np.full(tensor_shape, value, dtype=input_dtype)
+                                dummy_input_list.append(dummy_in0)
+
+                                in0 = np.full(tensor_shape, value, dtype=np.int32)
+                                input_list.append(in0)
+                            else:
+                                if input_dtype == np.object:
+                                    in0 = np.full(tensor_shape, value, dtype=np.int32)
+                                    in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+                                    in0 = in0n.reshape(tensor_shape)
+                                else:
+                                    in0 = np.full(tensor_shape, value, dtype=input_dtype)
+                                input_list.append(in0)
+                            
+
+                        input_info = input_list
+                        dummy_input_info = dummy_input_list
+                        # Only one shape tensor input per batch
+                        shape_input_list.append(shape_values[sent_count])
+                        shape_input_info = shape_input_list
+
+                        output_info = InferContext.ResultFormat.RAW
+                        shape_output_info = InferContext.ResultFormat.RAW
+                        resized_output_info = InferContext.ResultFormat.RAW
+                    else:
+                        if using_dynamic_batcher:
+                            input_info = (shm_region_handles[6*sent_count], tensor_shape)
+                            shape_input_info = (shm_region_handles[6*sent_count+1], tensor_shape)
+                            dummy_input_info = (shm_region_handles[6*sent_count+2], tensor_shape)
+                            shape_output_info = (InferContext.ResultFormat.RAW, shm_region_handles[6*sent_count+3])
+                            output_info = (InferContext.ResultFormat.RAW, shm_region_handles[6*sent_count+4])
+                            resized_output_info = (InferContext.ResultFormat.RAW, shm_region_handles[6*sent_count+5])
+                        else:
+                            input_info = (shm_region_handles[5*sent_count], tensor_shape)
+                            shape_input_info = (shm_region_handles[5*sent_count+1], tensor_shape)
+                            shape_output_info = (InferContext.ResultFormat.RAW, shm_region_handles[5*sent_count+2])
+                            output_info = (InferContext.ResultFormat.RAW, shm_region_handles[5*sent_count+3])
+                            resized_output_info = (InferContext.ResultFormat.RAW, shm_region_handles[5*sent_count+4])
+
+                    if pre_delay_ms is not None:
+                        time.sleep(pre_delay_ms / 1000.0)
+
+                    INPUT = "INPUT"
+                    OUTPUT = "OUTPUT"
+                    if using_dynamic_batcher:
+                        ctx.async_run(partial(completion_callback, user_data),
+                            { INPUT : input_info, "SHAPE_INPUT" :shape_input_info, "DUMMY_INPUT" :dummy_input_info },
+                            { OUTPUT : output_info,"SHAPE_OUTPUT" :shape_output_info, "RESIZED_OUTPUT" :resized_output_info},
+                            batch_size=batch_size, flags=flags)
+                    else:
+                        ctx.async_run(partial(completion_callback, user_data),
+                            { INPUT : input_info, "SHAPE_INPUT" :shape_input_info },
+                            { OUTPUT : output_info,"SHAPE_OUTPUT" :shape_output_info, "RESIZED_OUTPUT" :resized_output_info},
+                            batch_size=batch_size, flags=flags)
+                    sent_count+=1
+
+                # Wait for the results in the order sent
+                result = None
+                processed_count = 0
+                while processed_count < sent_count:
+                    id = user_data._completed_requests.get()
+                    results = ctx.get_async_run_results(id)
+                    self.assertEqual(len(results), 3)
+                    self.assertTrue(OUTPUT in results)
+                    result = results[OUTPUT][0][0]
+                    # Validate the shape of the resized output match with the shape input values
+                    self.assertTrue(np.array_equal(results["RESIZED_OUTPUT"][0].shape, shape_values[processed_count]),
+                                  "{}, {}, slot {}, expected: {}, got {}".format(
+                                  model_name, "RESIZED_OUTPUT", processed_count, shape_values[processed_count],
+                                  results["RESIZED_OUTPUT"][0].shape))
+                    print("{}: {}".format(sequence_name, result))
+                    processed_count+=1
+
+                seq_end_ms = int(round(time.time() * 1000))
+
+                if input_dtype == np.object:
+                    self.assertEqual(int(result), expected_result)
+                else:
+                    self.assertEqual(result, expected_result)
+
+                if sequence_thresholds is not None:
+                    lt_ms = sequence_thresholds[0]
+                    gt_ms = sequence_thresholds[1]
+                    if lt_ms is not None:
+                        self.assertTrue((seq_end_ms - seq_start_ms) < lt_ms,
+                                        "sequence expected less than " + str(lt_ms) +
+                                        "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
+                    if gt_ms is not None:
+                        self.assertTrue((seq_end_ms - seq_start_ms) > gt_ms,
+                                        "sequence expected greater than " + str(gt_ms) +
+                                        "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
+            except Exception as ex:
+                self.add_deferred_exception(ex)
+    
     def check_setup(self, model_name):
         # Make sure test.sh set up the correct batcher settings
         ctx = ServerStatusContext("localhost:8000", ProtocolType.HTTP, model_name, True)
