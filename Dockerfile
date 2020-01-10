@@ -197,6 +197,7 @@ ARG TRTIS_CONTAINER_VERSION=20.01dev
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl4-openSSL-dev is needed for GCS
+# libh2o-dev is needed for h2o variant of HTTP server
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             software-properties-common \
@@ -209,7 +210,12 @@ RUN apt-get update && \
             libre2-dev \
             libssl-dev \
             libtool \
-            libboost-dev && \
+            libboost-dev \
+            libh2o-dev \
+            libh2o-evloop-dev \
+            libnuma-dev \
+            libwslay-dev \
+            libuv1-dev && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
                 libcurl3-dev; \
@@ -382,17 +388,22 @@ RUN apt-get update && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
                 libcurl3-dev \
-                libgoogle-glog0v5 \
                 libre2-1v5; \
     elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
                 libcurl4-openssl-dev \
-                libgoogle-glog0v5 \
                 libre2-4; \
     else \
         echo "Ubuntu version must be either 16.04 or 18.04" && \
         exit 1; \
     fi && \
+    # Install common libraries for 18.04 and 16.04 (Including h2o dependencies)
+    apt-get install -y --no-install-recommends \
+            libgoogle-glog0v5 \
+            libh2o0.13 \
+            libh2o-evloop0.13 \
+            libnuma1 \
+            libwslay1 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/tensorrtserver
