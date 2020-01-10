@@ -103,12 +103,10 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
     set(
       HTTP_ENDPOINT_SRCS
       http_h2o_server.cc
-      ${H2O_C}
     )
     set(
       HTTP_ENDPOINT_HDRS
       http_server.h
-      ${H2O_H}
     )
   endif() # TRTIS_ENABLE_HTTP_H2O
 
