@@ -520,17 +520,20 @@ SharedMemoryControlContextGetStatus(
 }
 
 nic::Error*
-SharedMemoryControlContextGetSharedMemoryHandle(
-    void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd,
+SharedMemoryControlContextGetSharedMemoryHandleInfo(
+    void* shm_handle, char** shm_addr, const char** shm_key, int* shm_fd,
     size_t* offset, size_t* byte_size)
 {
   SharedMemoryHandle* handle =
       reinterpret_cast<SharedMemoryHandle*>(shm_handle);
   if (handle->shm_key_ == "") {
 #ifdef TRTIS_ENABLE_GPU
-    char* tmp_addr = new char[handle->byte_size_];
+    // Must call SharedMemoryControlContextReleaseBuffer to destroy 'new' object
+    // after writing into results. Numpy cannot read buffer from GPU and hence
+    // this is needed to maintain a copy of the data on GPU shared memory.
+    *shm_addr = new char[handle->byte_size_];
     cudaError_t err = cudaMemcpy(
-        tmp_addr, handle->base_addr_, handle->byte_size_,
+        *shm_addr, handle->base_addr_, handle->byte_size_,
         cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) {
       return new nic::Error(
@@ -538,10 +541,9 @@ SharedMemoryControlContextGetSharedMemoryHandle(
           "failed to read GPU shared memory results: " +
               std::string(cudaGetErrorString(err)));
     }
-    *shm_addr = tmp_addr;
 #endif  // TRTIS_ENABLE_GPU
   } else {
-    *shm_addr = handle->base_addr_;
+    *shm_addr = reinterpret_cast<char*>(handle->base_addr_);
   }
   *shm_key = handle->shm_key_.c_str();
   *shm_fd = handle->shm_fd_;
@@ -550,19 +552,19 @@ SharedMemoryControlContextGetSharedMemoryHandle(
   return nullptr;
 }
 
-#ifdef TRTIS_ENABLE_GPU
 nic::Error*
-SharedMemoryControlContextGetCudaSharedMemoryHandle(
-    void* cuda_shm_handle, void** shm_addr, size_t* byte_size, int* device_id)
+SharedMemoryControlContextReleaseBuffer(void* shm_handle, char* ptr)
 {
   SharedMemoryHandle* handle =
-      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle);
-  *shm_addr = handle->base_addr_;
-  *device_id = handle->device_id_;
-  *byte_size = handle->byte_size_;
+      reinterpret_cast<SharedMemoryHandle*>(shm_handle);
+  // Only destroy in case of GPU shared memory since it is a temporary buffer
+  if (handle->shm_key_ == "") {
+    if (ptr) {
+      delete ptr;
+    }
+  }
   return nullptr;
 }
-#endif  // TRTIS_ENABLE_GPU
 
 //==============================================================================
 struct InferContextCtx {
@@ -751,25 +753,6 @@ InferContextOptionsAddSharedMemory(
 
   return new nic::Error(err);
 }
-
-#ifdef TRTIS_ENABLE_GPU
-nic::Error*
-InferContextOptionsAddCudaSharedMemory(
-    InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
-    const char* output_name, void* cuda_shm_handle)
-{
-  std::shared_ptr<nic::InferContext::Output> output;
-  nic::Error err = infer_ctx->ctx->GetOutput(std::string(output_name), &output);
-  SharedMemoryHandle* handle =
-      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle);
-  if (err.IsOk()) {
-    err = ctx->AddSharedMemoryResult(
-        output, handle->trtis_shm_name_, 0, handle->byte_size_);
-  }
-
-  return new nic::Error(err);
-}
-#endif  // TRTIS_ENABLE_GPU
 
 ni::CorrelationID
 CorrelationId(InferContextCtx* infer_ctx)
