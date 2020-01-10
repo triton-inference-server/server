@@ -485,26 +485,45 @@ PlanBackend::CreateExecutionContext(
   // CUDA 10.1 starts to support CUDA graphs.
   // If enabled, build CUDA graphs for a default set of graph
   // sizes. Graphs are most likely to help for small batch sizes so by
-  // default build for batch sizes 1, 2, 3, 4, 6, 8, 12, 16. If any
+  // default build for batch sizes 1, 2, 3, 4, 6, 8, 12, 16, 'max_batch_size'.
+  // If preferred batch size is specified, then the batch sizes will be
+  // 1, preferred batch sizes, 'max_batch_size'. If any
   // build fails don't attempt for any larger batch sizes.
 #ifdef TRTIS_ENABLE_CUDA_GRAPH
   const bool use_cuda_graphs = Config().optimization().cuda().graphs();
   if (use_cuda_graphs) {
-    std::set<int> cuda_graph_batch_sizes{1, 2, 3, 4, 6, 8, 12, 16};
+    std::set<int> cuda_graph_batch_sizes{1};
     if (Config().has_dynamic_batching()) {
       for (const auto bs : Config().dynamic_batching().preferred_batch_size()) {
         cuda_graph_batch_sizes.emplace(bs);
       }
+    } else if (
+        Config().has_sequence_batching() &&
+        Config().sequence_batching().has_oldest()) {
+      for (const auto bs :
+           Config().sequence_batching().oldest().preferred_batch_size()) {
+        cuda_graph_batch_sizes.emplace(bs);
+      }
+    } else {
+      cuda_graph_batch_sizes = {1, 2, 3, 4, 6, 8, 12, 16};
     }
+    if (Config().max_batch_size() > 0) {
+      cuda_graph_batch_sizes.emplace(Config().max_batch_size());
+    }
+
     // CUDA graph will be captured for every TRT contexts as CUDA graph is
-    // merely capturing GPU activities for a given execution. And the
-    // executions might be different for different optimization profiles
-    for (auto& trt_context : context->trt_contexts_) {
-      for (int bs : cuda_graph_batch_sizes) {
-        // 1 is special case as non-batching model has 'max_batch_size == 0'
-        if ((bs <= Config().max_batch_size()) || (bs == 1)) {
-          if (!context->BuildCudaGraph(&(trt_context.second), bs)) {
-            break;
+    // merely capturing GPU activities for a given execution.
+    // But CUDA graph will only be captured for fixed shape model as it only
+    // captures activities for the shapes used, so it may misbehave for other
+    // shapes.
+    if (!context->is_dynamic_) {
+      for (auto& trt_context : context->trt_contexts_) {
+        for (int bs : cuda_graph_batch_sizes) {
+          // 1 is special case as non-batching model has 'max_batch_size == 0'
+          if ((bs <= Config().max_batch_size()) || (bs == 1)) {
+            if (!context->BuildCudaGraph(&(trt_context.second), bs)) {
+              break;
+            }
           }
         }
       }
@@ -891,12 +910,10 @@ bool
 PlanBackend::Context::BuildCudaGraph(
     TensorRTContext* trt_context, const int batch_size)
 {
-  // [DLIS-947] Need extra care for dynamic shape
   bool captured = true;
-  cudaError_t cuerr;
 
   cudaGraph_t graph;
-  cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeGlobal);
+  auto cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeGlobal);
   if (cuerr != cudaSuccess) {
     LOG_ERROR << "unable to start CUDA graph for " << name_ << ": "
               << cudaGetErrorString(cuerr);
