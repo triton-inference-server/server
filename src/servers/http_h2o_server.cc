@@ -63,6 +63,11 @@
 #define USE_MEMCACHED 0
 #define DEFAULT_CACHE_LINE_SIZE 128
 
+// #ifdef H2O_USE_LIBUV
+// #undef H2O_USE_LIBUV
+// #define H2O_USE_LIBUV 0
+// #endif
+
 namespace nvidia { namespace inferenceserver {
 
 // Generic HTTP server
@@ -178,11 +183,19 @@ class HTTPAPIServer : public HTTPServer {
       size_t byte_size, TRTSERVER_Memory_Type memory_type,
       int64_t memory_type_id);
 
+  int create_listener(int32_t port);
+#if H2O_USE_LIBUV
+  static void on_accept(uv_stream_t* listener, int status);
+#else
+  static void on_accept(h2o_socket_t* listener, const char* err);
+#endif
+
   int setup_ssl(
       const char* cert_file, const char* key_file, const char* ciphers);
   h2o_pathconf_t* register_handler(
       h2o_hostconf_t* hostconf, const char* path,
       int (*on_req)(h2o_handler_t*, h2o_req_t*));
+
   static int post_test(h2o_handler_t* self, h2o_req_t* req);
   static int health(h2o_handler_t* self, h2o_req_t* req);
   static int status(h2o_handler_t* self, h2o_req_t* req);
@@ -205,6 +218,19 @@ class HTTPAPIServer : public HTTPServer {
   //   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   //   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
 
+  h2o_globalconf_t config;
+  h2o_context_t ctx;
+  h2o_accept_ctx_t accept_ctx;
+
+#if H2O_USE_LIBUV
+  uv_tcp_t listener;
+#else
+  h2o_socket_t* listener_socket;
+#endif
+
+  h2o_multithread_receiver_t libmemcached_receiver;
+  bool exit_loop = true;
+
   std::shared_ptr<TRTSERVER_Server> server_;
   const char* server_id_;
 
@@ -219,16 +245,17 @@ class HTTPAPIServer : public HTTPServer {
   int thread_cnt_;
 };
 
-static h2o_globalconf_t config;
-static h2o_context_t ctx;
-static h2o_multithread_receiver_t libmemcached_receiver;
-static h2o_accept_ctx_t accept_ctx;
+struct h2o_custom_req_handler_t {
+  h2o_handler_t super;
+  HTTPAPIServer* http_server;
+};
 
 #if H2O_USE_LIBUV
 
-static void
-on_accept(uv_stream_t* listener, int status)
+void
+HTTPAPIServer::on_accept(uv_stream_t* listener, int status)
 {
+  HTTPAPIServer* http_server = reinterpret_cast<HTTPAPIServer*>(listener->data);
   uv_tcp_t* conn;
   h2o_socket_t* sock;
 
@@ -244,13 +271,12 @@ on_accept(uv_stream_t* listener, int status)
   }
 
   sock = h2o_uv_socket_create((uv_stream_t*)conn, (uv_close_cb)free);
-  h2o_accept(&accept_ctx, sock);
+  h2o_accept(&http_server->accept_ctx, sock);
 }
 
-static int
-create_listener(int32_t port)
+int
+HTTPAPIServer::create_listener(int32_t port)
 {
-  static uv_tcp_t listener;
   struct sockaddr_in addr;
   int r;
 
@@ -265,6 +291,8 @@ create_listener(int32_t port)
     goto Error;
   }
 
+  listener.data = this;
+
   return 0;
 Error:
   uv_close((uv_handle_t*)&listener, NULL);
@@ -273,9 +301,10 @@ Error:
 
 #else
 
-static void
-on_accept(h2o_socket_t* listener, const char* err)
+void
+HTTPAPIServer::on_accept(h2o_socket_t* listener, const char* err)
 {
+  HTTPAPIServer* http_server = reinterpret_cast<HTTPAPIServer*>(listener->data);
   h2o_socket_t* sock;
 
   if (err != NULL) {
@@ -284,15 +313,14 @@ on_accept(h2o_socket_t* listener, const char* err)
 
   if ((sock = h2o_evloop_socket_accept(listener)) == NULL)
     return;
-  h2o_accept(&accept_ctx, sock);
+  h2o_accept(&http_server->accept_ctx, sock);
 }
 
-static int
-create_listener(int32_t port)
+int
+HTTPAPIServer::create_listener(int32_t port)
 {
   struct sockaddr_in addr;
   int fd, reuseaddr_flag = 1;
-  h2o_socket_t* sock;
 
   memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
@@ -308,12 +336,13 @@ create_listener(int32_t port)
     return -1;
   }
 
-  sock = h2o_evloop_socket_create(ctx.loop, fd, H2O_SOCKET_FLAG_DONT_READ);
-  h2o_socket_read_start(sock, on_accept);
+  listener_socket =
+      h2o_evloop_socket_create(ctx.loop, fd, H2O_SOCKET_FLAG_DONT_READ);
+  listener_socket->data = this;
+  h2o_socket_read_start(listener_socket, on_accept);
 
   return 0;
 }
-
 #endif
 
 int
@@ -369,8 +398,11 @@ HTTPAPIServer::register_handler(
     int (*on_req)(h2o_handler_t*, h2o_req_t*))
 {
   h2o_pathconf_t* pathconf = h2o_config_register_path(hostconf, path, 0);
-  h2o_handler_t* handler = h2o_create_handler(pathconf, sizeof(*handler));
-  handler->on_req = on_req;
+  h2o_custom_req_handler_t* handler =
+      reinterpret_cast<h2o_custom_req_handler_t*>(
+          h2o_create_handler(pathconf, sizeof(*handler)));
+  handler->http_server = this;
+  handler->super.on_req = on_req;
   return pathconf;
 }
 
@@ -397,8 +429,9 @@ HTTPAPIServer::post_test(h2o_handler_t* self, h2o_req_t* req)
 }
 
 int
-HTTPAPIServer::health(h2o_handler_t* self, h2o_req_t* req)
+HTTPAPIServer::health(h2o_handler_t* _self, h2o_req_t* req)
 {
+  h2o_custom_req_handler_t* self = (h2o_custom_req_handler_t*)_self;
   LOG_VERBOSE(1) << "url: " << std::string(req->path_normalized.base);
   if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET")))
     return -1;
@@ -417,15 +450,13 @@ HTTPAPIServer::health(h2o_handler_t* self, h2o_req_t* req)
   }
   LOG_VERBOSE(1) << "mode: " << mode;
 
-  req->res.status = 400;
-  req->res.reason = "Bad Request";
   TRTSERVER_Error* err = nullptr;
   bool health = false;
 
   if (mode == "live") {
-    err = TRTSERVER_ServerIsLive(server_.get(), &health);
+    err = TRTSERVER_ServerIsLive(self->http_server->server_.get(), &health);
   } else if (mode == "ready") {
-    err = TRTSERVER_ServerIsReady(server_.get(), &health);
+    err = TRTSERVER_ServerIsReady(self->http_server->server_.get(), &health);
   } else {
     err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_UNKNOWN,
@@ -435,24 +466,30 @@ HTTPAPIServer::health(h2o_handler_t* self, h2o_req_t* req)
   RequestStatus request_status;
   RequestStatusUtil::Create(
       &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
-      server_id_);
+      self->http_server->server_id_);
 
   if (health && (err == nullptr)) {
     req->res.status = 200;
     req->res.reason = "OK";
+  } else {
+    req->res.status = 400;
+    req->res.reason = request_status.ShortDebugString().c_str();
   }
 
   h2o_add_header(
       &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
       H2O_STRLIT("text/plain"));
-  h2o_send_inline(req, H2O_STRLIT(request_status.ShortDebugString().c_str()));
-
+  h2o_generator_t generator = {NULL, NULL};
+  h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+  h2o_start_response(req, &generator);
+  h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
   return 0;
 }
 
 int
-HTTPAPIServer::status(h2o_handler_t* self, h2o_req_t* req)
+HTTPAPIServer::status(h2o_handler_t* _self, h2o_req_t* req)
 {
+  h2o_custom_req_handler_t* self = (h2o_custom_req_handler_t*)_self;
   re2::RE2 status_regex(R"(/api/status(/(.*)?))");
   LOG_VERBOSE(1) << "url: " << std::string(req->path_normalized.base);
   if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET"))) {
@@ -479,9 +516,11 @@ HTTPAPIServer::status(h2o_handler_t* self, h2o_req_t* req)
   TRTSERVER_Protobuf* server_status_protobuf = nullptr;
   TRTSERVER_Error* err =
       (model_name.empty())
-          ? TRTSERVER_ServerStatus(server_.get(), &server_status_protobuf)
+          ? TRTSERVER_ServerStatus(
+                self->http_server->server_.get(), &server_status_protobuf)
           : TRTSERVER_ServerModelStatus(
-                server_.get(), model_name.c_str(), &server_status_protobuf);
+                self->http_server->server_.get(), model_name.c_str(),
+                &server_status_protobuf);
 
   h2o_generator_t generator;
   memset(&generator, 0, sizeof(generator));
@@ -522,7 +561,7 @@ HTTPAPIServer::status(h2o_handler_t* self, h2o_req_t* req)
   RequestStatus request_status;
   RequestStatusUtil::Create(
       &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
-      server_id_);
+      self->http_server->server_id_);
 
   std::string status_header = std::string(kStatusHTTPHeader);
   h2o_add_header_by_str(
@@ -559,10 +598,11 @@ HTTPAPIServer::Start()
   hostconf = h2o_config_register_host(
       &config, h2o_iovec_init(H2O_STRLIT("default")), 65535);
 
-  pathconf = register_handler(hostconf, "/post-test", post_test);
-  if (logfh != NULL)
-    h2o_access_log_register(pathconf, logfh);
+  // pathconf = register_handler(hostconf, "/post-test", post_test);
+  // if (logfh != NULL)
+  //   h2o_access_log_register(pathconf, logfh);
 
+  // handler->on_req(st_h2o_handler_t(health));
   pathconf = register_handler(hostconf, "/api/health", health);
   if (logfh != NULL)
     h2o_access_log_register(pathconf, logfh);
@@ -579,7 +619,7 @@ HTTPAPIServer::Start()
     h2o_multithread_register_receiver(
         ctx.queue, &libmemcached_receiver, h2o_memcached_receiver);
 
-  // Add server.crt and key files
+  // TODO Add server.crt and key files
   if (USE_HTTPS && setup_ssl(
                        "h2o/server.crt", "h2o/server.key",
                        "DEFAULT:!MD5:!DSS:!DES:!RC4:!RC2:!SEED:!IDEA:!NULL:!"
@@ -595,12 +635,14 @@ HTTPAPIServer::Start()
     goto Error;
   }
 
+  exit_loop = false;
+  while (!exit_loop) {
 #if H2O_USE_LIBUV
-  uv_run(ctx.loop, UV_RUN_DEFAULT);
+    uv_run(ctx.loop, UV_RUN_DEFAULT);
 #else
-  while (h2o_evloop_run(ctx.loop, INT32_MAX) == 0)
-    ;
+    h2o_evloop_run(ctx.loop, INT32_MAX);
 #endif
+  }
 
   return nullptr;
 
@@ -612,21 +654,22 @@ Error:
 TRTSERVER_Error*
 HTTPAPIServer::Stop()
 {
-  // if (worker_.joinable()) {
-  //   // Notify event loop to break via fd write
-  //   send(fds_[1], &evbase_, sizeof(event_base*), 0);
-  //   worker_.join();
-  //   event_free(break_ev_);
-  //   evutil_closesocket(fds_[0]);
-  //   evutil_closesocket(fds_[1]);
-  //   evhtp_unbind_socket(htp_);
-  //   evhtp_free(htp_);
-  //   event_base_free(evbase_);
-  //   return nullptr;
-  // }
+  if (!exit_loop) {
+#if H2O_USE_LIBUV
+    uv_close((uv_handle_t*)&listener, NULL);
+#else
+    h2o_socket_read_stop(listener_socket);
+    h2o_socket_close(listener_socket);
+#endif
 
-  return TRTSERVER_ErrorNew(
-      TRTSERVER_ERROR_UNAVAILABLE, "HTTP h2o server is not running.");
+    // this will break the event loop
+    exit_loop = true;
+  } else {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_UNAVAILABLE, "HTTP h2o server is not running.");
+  }
+
+  return nullptr;
 }
 
 TRTSERVER_Error*
