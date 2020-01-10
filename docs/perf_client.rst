@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -235,44 +235,20 @@ type INT32: ::
     "data" :
      [
         {
-          "INPUT0" :
-                {
-                    "content": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-                },
-          "INPUT1" :
-                {
-                    "content": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-                }
+          "INPUT0" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "INPUT1" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         },
         {
-          "INPUT0" :
-                {
-                    "content": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-                },
-          "INPUT1" :
-                {
-                    "content": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-                }
+          "INPUT0" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "INPUT1" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         },
         {
-          "INPUT0" :
-                {
-                    "content": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-                },
-          "INPUT1" :
-                {
-                    "content": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-                }
+          "INPUT0" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "INPUT1" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         },
         {
-          "INPUT0" :
-                {
-                    "content": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-                },
-          "INPUT1" :
-                {
-                    "content": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-                }
+          "INPUT0" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "INPUT1" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         }
         .
         .
@@ -290,34 +266,16 @@ example highlights how this can be acheived: ::
     "data" :
      [
         {
-          "INPUT0" :
-                {
-                    "content": {"b64": "YmFzZTY0IGRlY29kZXI="}
-                },
-          "INPUT1" :
-                {
-                    "content": {"b64": "YmFzZTY0IGRlY29kZXI="}
-                }
+          "INPUT0" : {"b64": "YmFzZTY0IGRlY29kZXI="},
+          "INPUT1" : {"b64": "YmFzZTY0IGRlY29kZXI="}
         },
         {
-          "INPUT0" :
-                {
-                    "content": {"b64": "YmFzZTY0IGRlY29kZXI="}
-                },
-          "INPUT1" :
-                {
-                    "content": {"b64": "YmFzZTY0IGRlY29kZXI="}
-                }
+          "INPUT0" : {"b64": "YmFzZTY0IGRlY29kZXI="},
+          "INPUT1" : {"b64": "YmFzZTY0IGRlY29kZXI="}
         },
         {
-          "INPUT0" :
-                {
-                    "content": {"b64": "YmFzZTY0IGRlY29kZXI="}
-                },
-          "INPUT1" :
-                {
-                    "content": {"b64": "YmFzZTY0IGRlY29kZXI="}
-                }
+          "INPUT0" : {"b64": "YmFzZTY0IGRlY29kZXI="},
+          "INPUT1" : {"b64": "YmFzZTY0IGRlY29kZXI="}
         },
         .
         .
@@ -337,62 +295,35 @@ multiple streams for a sequence model with a single input named INPUT, shape [1]
       [
         [
           {
-            "INPUT" :
-                {
-                    "content": ["1"]
-                }
+            "INPUT" : ["1"]
           },
           {
-            "INPUT" :
-                {
-                    "content": ["2"]
-                }
+            "INPUT" : ["2"]
           },
           {
-            "INPUT" :
-                {
-                    "content": ["3"]
-                }
+            "INPUT" : ["3"]
           },
           {
-            "INPUT" :
-                {
-                    "content": ["4"]
-                }
+            "INPUT" : ["4"]
           }
         ],
         [
           {
-            "INPUT" :
-                {
-                    "content": ["1"]
-                }
+            "INPUT" : ["1"]
           },
           {
-            "INPUT" :
-                {
-                    "content": ["1"]
-                }
+            "INPUT" : ["1"]
           },
           {
-            "INPUT" :
-                {
-                    "content": ["1"]
-                }
+            "INPUT" : ["1"]
           }
         ],
         [
           {
-            "INPUT" :
-                {
-                    "content": ["1"]
-                }
+            "INPUT" : ["1"]
           },
           {
-            "INPUT" :
-                {
-                    "content": ["1"]
-                }
+            "INPUT" : ["1"]
           }
         ]
       ]
