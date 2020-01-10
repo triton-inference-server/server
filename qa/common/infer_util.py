@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -560,7 +560,7 @@ def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values,
                                   "{}, {}, slot {}, expected: {}, got {}".format(
                                   model_name, result_name, b, expected, result_val[b]))
                 elif result_name == dummy_output_name:
-                    # The shape of the dummy output shpuld be equal to the shape values
+                    # The shape of the dummy output should be equal to the shape values
                     # specified in the shape tensor
                     tester.assertTrue(np.array_equal(result_val[b].shape, expected),
                                   "{}, {}, slot {}, expected: {}, got {}".format(

@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -1197,11 +1197,28 @@ OldestSequenceBatch::OldestSequenceBatch(
     preferred_batch_sizes.insert(size);
   }
 
+  // Need to enforce equal shape batches (i.e. non-ragged batches)
+  // if the model allows one or more variable-size input tensors or
+  // has shape-tensor inputs. This is not needed if all input shapes
+  // are non-variable and if there are no shape tensors... so we
+  // don't enable it in that case for efficiency reasons.
+  std::unordered_map<std::string, bool> enforce_equal_shape_tensors;
+  for (const auto input : config.input()) {
+    if (input.is_shape_tensor()) {
+      enforce_equal_shape_tensors.insert({input.name(), true});
+    } else if (GetElementCount(input) == -1) {
+      // This should be "true" but some existing custom backend
+      // implementations rely on ragged batches being allowed.
+      // Hence, setting to "false" until DLIS-904 is fixed.
+      enforce_equal_shape_tensors.insert({input.name(), false});
+    }
+  }
+
   Status status = DynamicBatchScheduler::Create(
       batcher_idx_, 1 /* runner_cnt */, GetCpuNiceLevel(config), OnInit,
       OnWarmup, OnSchedule, OnPeek, true /* dynamic_batching_enabled */,
-      std::unordered_map<std::string, bool>() /* enforce_equal_shape_tensors */,
-      true /* preserve_ordering */, preferred_batch_sizes,
+      enforce_equal_shape_tensors, true /* preserve_ordering */,
+      preferred_batch_sizes,
       config.sequence_batching().oldest().max_queue_delay_microseconds(),
       &dynamic_batcher_);
   if (!status.IsOk()) {

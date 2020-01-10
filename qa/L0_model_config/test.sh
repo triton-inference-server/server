@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -73,9 +73,10 @@ done
 # Copy TensorRT plans with shape tensor into the test model repositories.
 for modelpath in \
         autofill_noplatform/tensorrt/mixed_batch_hint_dims/1 \
-        autofill_noplatform/tensorrt/mixed_batch_hint_shape_values/1 ; do
+        autofill_noplatform/tensorrt/mixed_batch_hint_shape_values/1 \
+        autofill_noplatform_success/tensorrt/no_config_shape_tensor/1 ; do
     mkdir -p $modelpath
-    cp /data/inferenceserver/${REPO_VERSION}/qa_identity_shapetensor_model_repository/plan_zero_1_float32/1/model.plan \
+    cp /data/inferenceserver/${REPO_VERSION}/qa_shapetensor_model_repository/plan_zero_1_float32/1/model.plan \
        $modelpath/.
 done
 
@@ -271,7 +272,8 @@ for TARGET_DIR in `ls -d autofill_noplatform_success/*/*`; do
     # assume that the directory is a single model. Otherwise assume
     # that the directory is an entire model repository.
     rm -fr models && mkdir models
-    if [ -f ${TARGET_DIR}/config.pbtxt ] || [ "$TARGET" = "no_config" ]  || [ "$TARGET" = "no_config_variable" ]; then
+    if [ -f ${TARGET_DIR}/config.pbtxt ] || [ "$TARGET" = "no_config" ] \
+            || [ "$TARGET" = "no_config_variable" ] || [ "$TARGET" = "no_config_shape_tensor" ] ; then
         cp -r ${TARGET_DIR} models/.
     else
         cp -r ${TARGET_DIR}/* models/.
