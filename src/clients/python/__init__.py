@@ -178,9 +178,6 @@ _crequest_infer_ctx_options_add_class.argtypes = [c_void_p, c_void_p, _utf8, c_u
 _crequest_infer_ctx_options_add_shared_memory = _crequest.InferContextOptionsAddSharedMemory
 _crequest_infer_ctx_options_add_shared_memory.restype = c_void_p
 _crequest_infer_ctx_options_add_shared_memory.argtypes = [c_void_p, c_void_p, _utf8, c_void_p]
-_crequest_infer_ctx_options_add_cuda_shared_memory = _crequest.InferContextOptionsAddCudaSharedMemory
-_crequest_infer_ctx_options_add_cuda_shared_memory.restype = c_void_p
-_crequest_infer_ctx_options_add_cuda_shared_memory.argtypes = [c_void_p, c_void_p, _utf8, c_void_p]
 _crequest_correlation_id = _crequest.CorrelationId
 _crequest_correlation_id.restype = c_uint64
 _crequest_correlation_id.argtypes = [c_void_p]
@@ -236,9 +233,13 @@ _crequest_infer_ctx_result_next_class = _crequest.InferContextResultNextClass
 _crequest_infer_ctx_result_next_class.restype = c_void_p
 _crequest_infer_ctx_result_next_class.argtypes = [c_void_p, c_uint64, POINTER(c_uint64),
                                                   POINTER(c_float), POINTER(c_char_p)]
-_crequest_get_shared_memory_handle_info = _crequest.SharedMemoryControlContextGetSharedMemoryHandle
+_crequest_get_shared_memory_handle_info = _crequest.SharedMemoryControlContextGetSharedMemoryHandleInfo
 _crequest_get_shared_memory_handle_info.restype = c_void_p
-_crequest_get_shared_memory_handle_info.argtypes = [c_void_p, POINTER(c_void_p), POINTER(c_char_p), POINTER(c_int), POINTER(c_uint64), POINTER(c_uint64)]
+_crequest_get_shared_memory_handle_info.argtypes = [c_void_p, POINTER(c_char_p), POINTER(c_char_p),
+                                                    POINTER(c_int), POINTER(c_uint64), POINTER(c_uint64)]
+_crequest_shared_memory_handle_release_buffer = _crequest.SharedMemoryControlContextReleaseBuffer
+_crequest_shared_memory_handle_release_buffer.restype = c_void_p
+_crequest_shared_memory_handle_release_buffer.argtypes = [c_void_p, c_char_p]
 
 _crequest_infer_ctx_get_stat = _crequest.InferContextGetStat
 _crequest_infer_ctx_get_stat.restype = c_void_p
@@ -1416,53 +1417,62 @@ class InferContext:
                     shm_fd = c_int()
                     offset = c_uint64()
                     byte_size = c_uint64()
-                    shm_addr = c_void_p()
+                    shm_addr = c_char_p()
                     shm_key = c_char_p()
-                    _raise_if_error(
-                        c_void_p(_crequest_get_shared_memory_handle_info(output_format[1], \
-                                byref(shm_addr), byref(shm_key), byref(shm_fd), \
-                                byref(offset), byref(byte_size))))
-                    if (np.prod(shape) * np.dtype(result_dtype).itemsize) < int(byte_size.value/batch_size):
-                        element_byte_size = np.prod(shape) * np.dtype(result_dtype).itemsize
-                    else:
-                        element_byte_size = int(byte_size.value/batch_size)
-                    start_pos = offset.value
-                    if result_dtype != np.object:
-                        cval = shm_addr
-                        for b in range(batch_size):
-                            cval_len = start_pos + element_byte_size
-                            if cval_len == 0:
-                                val = np.empty(shape, dtype=result_dtype)
-                                results[output_name].append(val)
-                            else:
-                                val_buf = cast(cval, POINTER(c_byte * cval_len))[0]
-                                val = np.frombuffer(val_buf, dtype=result_dtype, offset=start_pos)
+                    try:
+                        _raise_if_error(
+                            c_void_p(_crequest_get_shared_memory_handle_info(output_format[1], \
+                                    byref(shm_addr), byref(shm_key), byref(shm_fd), \
+                                    byref(offset), byref(byte_size))))
+                        if (np.prod(shape) * np.dtype(result_dtype).itemsize) < int(byte_size.value/batch_size):
+                            element_byte_size = np.prod(shape) * np.dtype(result_dtype).itemsize
+                        else:
+                            element_byte_size = int(byte_size.value/batch_size)
+                        start_pos = offset.value
+                        if result_dtype != np.object:
+                            cval = shm_addr
+                            for b in range(batch_size):
+                                cval_len = start_pos + element_byte_size
+                                if cval_len == 0:
+                                    val = np.empty(shape, dtype=result_dtype)
+                                    results[output_name].append(val)
+                                else:
+                                    val_buf = cast(cval, POINTER(c_byte * cval_len))[0]
+                                    val = np.frombuffer(val_buf, dtype=result_dtype, offset=start_pos)
+                                start_pos += element_byte_size
 
-                            # Reshape the result to the appropriate shape
-                            start_pos += element_byte_size
-                            shaped = np.reshape(val, shape)
-                            results[output_name].append(shaped)
-                    else:
-                        cval = shm_addr
-                        str_offset = start_pos
-                        val_buf = cast(cval, POINTER(c_byte * byte_size.value))[0]
-                        b = 0
-                        while b < batch_size:
-                            ii = 0
-                            strs = list()
-                            while (ii % np.prod(shape) != 0) or (ii == 0):
-                                l = struct.unpack_from("<I", val_buf, str_offset)[0]
-                                str_offset += 4
-                                sb = struct.unpack_from("<{}s".format(l), val_buf, str_offset)[0]
-                                str_offset += l
-                                strs.append(sb)
-                                ii+=1
-                            b+=1
+                                # Reshape the result to the appropriate shape.
+                                # This copy is only needed for CUDA shared memory
+                                # since the temporary CPU buffer is cleared later
+                                # by _crequest_shared_memory_handle_release_buffer
+                                shaped = np.reshape(np.copy(val), shape)
 
-                            # Reshape the result to the appropriate shape
-                            val = np.array(strs, dtype=object)
-                            shaped = np.reshape(val, shape)
-                            results[output_name].append(shaped)
+                                results[output_name].append(shaped)
+                        else:
+                            cval = shm_addr
+                            str_offset = start_pos
+                            val_buf = cast(cval, POINTER(c_byte * byte_size.value))[0]
+                            b = 0
+                            while b < batch_size:
+                                ii = 0
+                                strs = list()
+                                while (ii % np.prod(shape) != 0) or (ii == 0):
+                                    l = struct.unpack_from("<I", val_buf, str_offset)[0]
+                                    str_offset += 4
+                                    sb = struct.unpack_from("<{}s".format(l), val_buf, str_offset)[0]
+                                    str_offset += l
+                                    strs.append(sb)
+                                    ii+=1
+                                b+=1
+                                val = np.array(strs, dtype=object)
+
+                                # Reshape the result to the appropriate shape.
+                                shaped = np.reshape(val, shape)
+
+                                results[output_name].append(shaped)
+                    finally:
+                        _raise_if_error(
+                            c_void_p(_crequest_shared_memory_handle_release_buffer(output_format[1], shm_addr)))
                 else:
                     _raise_error("unrecognized output format")
             finally:
