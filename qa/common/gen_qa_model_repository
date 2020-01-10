@@ -60,7 +60,7 @@ HOST_DESTDIR=/tmp/$TRTIS_VERSION/qa_model_repository
 HOST_VARDESTDIR=/tmp/$TRTIS_VERSION/qa_variable_model_repository
 HOST_IDENTITYDESTDIR=/tmp/$TRTIS_VERSION/qa_identity_model_repository
 HOST_IDENTITYBIGDESTDIR=/tmp/$TRTIS_VERSION/qa_identity_big_model_repository
-HOST_IDENTITYSHAPEDESTDIR=/tmp/$TRTIS_VERSION/qa_identity_shapetensor_model_repository
+HOST_SHAPEDESTDIR=/tmp/$TRTIS_VERSION/qa_shapetensor_model_repository
 HOST_RESHAPEDESTDIR=/tmp/$TRTIS_VERSION/qa_reshape_model_repository
 HOST_SEQDESTDIR=/tmp/$TRTIS_VERSION/qa_sequence_model_repository
 HOST_DYNASEQDESTDIR=/tmp/$TRTIS_VERSION/qa_dyna_sequence_model_repository
@@ -70,7 +70,7 @@ HOST_NOSHAPEDESTDIR=/tmp/$TRTIS_VERSION/qa_noshape_model_repository
 HOST_PLGDESTDIR=/tmp/$TRTIS_VERSION/qa_trt_plugin_model_repository
 
 rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR
-rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_IDENTITYSHAPEDESTDIR
+rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR
 rm -fr $HOST_SEQDESTDIR $HOST_DYNASEQDESTDIR $HOST_VARSEQDESTDIR
 rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR
 rm -fr $HOST_PLGDESTDIR $HOST_RESHAPEDESTDIR
@@ -79,7 +79,7 @@ mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
 mkdir -p $HOST_IDENTITYDESTDIR
 mkdir -p $HOST_IDENTITYBIGDESTDIR
-mkdir -p $HOST_IDENTITYSHAPEDESTDIR
+mkdir -p $HOST_SHAPEDESTDIR
 mkdir -p $HOST_RESHAPEDESTDIR
 mkdir -p $HOST_SEQDESTDIR
 mkdir -p $HOST_DYNASEQDESTDIR
@@ -120,7 +120,7 @@ DESTDIR=/tmp/models
 VARDESTDIR=/tmp/varmodels
 IDENTITYDESTDIR=/tmp/zeromodels
 IDENTITYBIGDESTDIR=/tmp/zerobigmodels
-IDENTITYSHAPEDESTDIR=/tmp/zeroshapetensormodels
+SHAPEDESTDIR=/tmp/shapetensormodels
 RESHAPEDESTDIR=/tmp/reshapemodels
 SEQDESTDIR=/tmp/seqmodels
 DYNASEQDESTDIR=/tmp/dynaseqmodels
@@ -232,6 +232,11 @@ cat >$HOST_SRCDIR/$TRTSCRIPT <<EOF
 set -e
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
 cd $SRCDIR
+# Models using shape tensor i/o
+python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
+python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
+python3 $SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
+chown -R $(id -u):$(id -g) $SHAPEDESTDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
@@ -240,8 +245,6 @@ python3 $SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$IDENTITYDESTD
 chown -R $(id -u):$(id -g) $IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$IDENTITYBIGDESTDIR
 chown -R $(id -u):$(id -g) $IDENTITYBIGDESTDIR
-python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$IDENTITYSHAPEDESTDIR
-chown -R $(id -u):$(id -g) $IDENTITYSHAPEDESTDIR
 python3 $SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$RESHAPEDESTDIR
 chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$SEQDESTDIR
@@ -270,7 +273,7 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
        --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
        --mount type=bind,source=$HOST_IDENTITYBIGDESTDIR,target=$IDENTITYBIGDESTDIR \
-       --mount type=bind,source=$HOST_IDENTITYSHAPEDESTDIR,target=$IDENTITYSHAPEDESTDIR \
+       --mount type=bind,source=$HOST_SHAPEDESTDIR,target=$SHAPEDESTDIR \
        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \

@@ -186,6 +186,9 @@ InferenceBackend::SetConfiguredScheduler(
       if (input.is_shape_tensor()) {
         enforce_equal_shape_tensors.insert({input.name(), true});
       } else if (GetElementCount(input) == -1) {
+        // This should be "true" but some existing custom backend
+        // implementations rely on ragged batches being allowed.
+        // Hence, setting to "false" until DLIS-904 is fixed.
         enforce_equal_shape_tensors.insert({input.name(), false});
       }
     }
