@@ -85,31 +85,42 @@ class SequenceBatcherTestUtil(unittest.TestCase):
     def check_failure(self):
         # Check securely whether a failure has been registered
         # This is generic because the failure behavior is undefined
-        # for rugged batches. 
+        # for rugged batches.
         with _deferred_exceptions_lock:
             if len(_deferred_exceptions) == 0:
                 raise Exception("Unexpected inference success")
 
-    def precreate_register_regions(self, value_list, dtype, i, batch_size=1, model_type="normal"):
+    def precreate_register_regions(self, value_list, dtype, i, batch_size=1,
+                                   model_type="normal",tensor_shape=(1,)):
         if _test_system_shared_memory or _test_cuda_shared_memory:
-            shared_memory_ctx = SharedMemoryControlContext("localhost:8000",  ProtocolType.HTTP, verbose=True)
+            shared_memory_ctx = SharedMemoryControlContext("localhost:8000",
+                                                           ProtocolType.HTTP, verbose=True)
             shm_region_handles = []
             if model_type == "normal":
                 for j, value in enumerate(value_list):
+                    # For string we can't know the size of the output
+                    # so we conservatively assume 64 bytes for each
+                    # element of the output
+                    if dtype == np.object:
+                        output_byte_size = 4 # size of empty string
+                    else:
+                        output_byte_size = 0
+
                     # create data
                     input_list = list()
                     for b in range(batch_size):
                         if dtype == np.object:
-                            in0 = np.full((1,), value, dtype=np.int32)
+                            in0 = np.full(tensor_shape, value, dtype=np.int32)
                             in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
-                            in0 = in0n.reshape((1,))
+                            in0 = in0n.reshape(tensor_shape)
+                            output_byte_size += 64 * in0.size
                         else:
-                            in0 = np.full((1,), value, dtype=dtype)
+                            in0 = np.full(tensor_shape, value, dtype=dtype)
+                            output_byte_size += np.dtype(dtype).itemsize * in0.size
                         input_list.append(in0)
 
                     input_list_tmp = iu._prepend_string_size(input_list) if (dtype == np.object) else input_list
                     input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
-                    output_byte_size = np.dtype(dtype).itemsize + 2
 
                     # create shared memory regions and copy data for input values
                     if _test_system_shared_memory:
@@ -138,16 +149,16 @@ class SequenceBatcherTestUtil(unittest.TestCase):
 
                     for b in range(batch_size):
                         if dtype == np.object:
-                            in0 = np.full((1,), value, dtype=np.int32)
+                            in0 = np.full(tensor_shape, value, dtype=np.int32)
                             in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
-                            in0 = in0n.reshape(1,)
+                            in0 = in0n.reshape(tensor_shape)
                         else:
-                            in0 = np.full((1,), value, dtype=dtype)
+                            in0 = np.full(tensor_shape, value, dtype=dtype)
                         input_list.append(in0)
 
                     # Only one shape tensor input per batch
-                    shape_input_list.append(np.full((1,), shape_value, dtype=np.int32))
-                
+                    shape_input_list.append(np.full(tensor_shape, shape_value, dtype=np.int32))
+
                     input_list_tmp = iu._prepend_string_size(input_list) if (dtype == np.object) else input_list
                     input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
                     shape_input_byte_size = sum([i0.nbytes for i0 in shape_input_list])
@@ -206,18 +217,18 @@ class SequenceBatcherTestUtil(unittest.TestCase):
 
                     for b in range(batch_size):
                         if dtype == np.object:
-                            dummy_in0 = np.full((1,), value, dtype=np.int32)
+                            dummy_in0 = np.full(tensor_shape, value, dtype=np.int32)
                             dummy_in0n = np.array([str(x) for x in dummy_in0.reshape(in0.size)], dtype=object)
-                            dummy_in0 = in0n.reshape(1,)
+                            dummy_in0 = in0n.reshape(tensor_shape)
                         else:
-                            dummy_in0 = np.full((1,), value, dtype=dtype)
+                            dummy_in0 = np.full(tensor_shape, value, dtype=dtype)
                         dummy_input_list.append(dummy_in0)
-                        in0 =  np.full((1,), value, dtype=np.int32)
+                        in0 =  np.full(tensor_shape, value, dtype=np.int32)
                         input_list.append(in0)
 
                     # Only one shape tensor input per batch
-                    shape_input_list.append(np.full((1,), shape_value, dtype=np.int32))
-                
+                    shape_input_list.append(np.full(tensor_shape, shape_value, dtype=np.int32))
+
                     input_list_tmp = iu._prepend_string_size(input_list) if (dtype == np.object) else input_list
                     input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
                     shape_input_byte_size = sum([i0.nbytes for i0 in shape_input_list])
@@ -295,19 +306,17 @@ class SequenceBatcherTestUtil(unittest.TestCase):
 
     def check_sequence(self, trial, model_name, input_dtype, correlation_id,
                        sequence_thresholds, values, expected_result,
-                       protocol, batch_size=1, sequence_name="<unknown>"):
+                       protocol, batch_size=1, sequence_name="<unknown>", tensor_shape=(1,)):
         """Perform sequence of inferences. The 'values' holds a list of
         tuples, one for each inference with format:
 
         (flag_str, value, (ls_ms, gt_ms), (pre_delay_ms, post_delay_ms)
 
         """
-        if (("savedmodel" in trial) or ("graphdef" in trial) or
-            ("netdef" in trial) or ("custom" in trial) or
-            ("onnx" in trial) or ("libtorch" in trial) or
-	        ("plan" in trial)):
-            tensor_shape = (1,)
-        else:
+        if (("savedmodel" not in trial) and ("graphdef" not in trial) and
+            ("netdef" not in trial) and ("custom" not in trial) and
+            ("onnx" not in trial) and ("libtorch" not in trial) and
+	    ("plan" not in trial)):
             self.assertFalse(True, "unknown trial type: " + trial)
 
         # Can only send the request exactly once since it is a
@@ -327,7 +336,8 @@ class SequenceBatcherTestUtil(unittest.TestCase):
 
         # create and register shared memory output region in advance
         if _test_system_shared_memory or _test_cuda_shared_memory:
-            shared_memory_ctx = SharedMemoryControlContext("localhost:8000",  ProtocolType.HTTP, verbose=True)
+            shared_memory_ctx = SharedMemoryControlContext("localhost:8000",
+                                                           ProtocolType.HTTP, verbose=True)
             output_byte_size = 512
             if _test_system_shared_memory:
                 shm_op_handle = shm.create_shared_memory_region("output_data", "/output", output_byte_size)
@@ -448,19 +458,18 @@ class SequenceBatcherTestUtil(unittest.TestCase):
 
     def check_sequence_async(self, trial, model_name, input_dtype, correlation_id,
                              sequence_thresholds, values, expected_result,
-                             protocol, shm_region_handles, batch_size=1, sequence_name="<unknown>"):
+                             protocol, shm_region_handles, batch_size=1,
+                             sequence_name="<unknown>", tensor_shape=(1,)):
         """Perform sequence of inferences using async run. The 'values' holds
         a list of tuples, one for each inference with format:
 
         (flag_str, value, pre_delay_ms)
 
         """
-        if (("savedmodel" in trial) or ("graphdef" in trial) or
-            ("netdef" in trial) or ("custom" in trial) or
-            ("onnx" in trial) or ("libtorch" in trial) or
-            ("plan" in trial)):
-            tensor_shape = (1,)
-        else:
+        if (("savedmodel" not in trial) and ("graphdef" not in trial) and
+            ("netdef" not in trial) and ("custom" not in trial) and
+            ("onnx" not in trial) and ("libtorch" not in trial) and
+	    ("plan" not in trial)):
             self.assertFalse(True, "unknown trial type: " + trial)
 
         self.assertFalse(_test_system_shared_memory and _test_cuda_shared_memory,
@@ -600,7 +609,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                             flags = flags | InferRequestHeader.FLAG_SEQUENCE_START
                         if "end" in flag_str:
                             flags = flags | InferRequestHeader.FLAG_SEQUENCE_END
-                    
+
                     shape_values.append(np.full(tensor_shape, shape_value, dtype=np.int32))
                     if not (_test_system_shared_memory or _test_cuda_shared_memory):
                         input_list = list()
@@ -627,7 +636,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                                 else:
                                     in0 = np.full(tensor_shape, value, dtype=input_dtype)
                                 input_list.append(in0)
-                            
+
 
                         input_info = input_list
                         dummy_input_info = dummy_input_list
@@ -707,7 +716,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                                         "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
             except Exception as ex:
                 self.add_deferred_exception(ex)
-    
+
     def check_setup(self, model_name):
         # Make sure test.sh set up the correct batcher settings
         ctx = ServerStatusContext("localhost:8000", ProtocolType.HTTP, model_name, True)

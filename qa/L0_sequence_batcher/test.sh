@@ -195,6 +195,7 @@ for model_trial in v 0 1 2 4; do
             test_half_batch \
             test_skip_batch \
             test_full_batch \
+            test_ragged_batch \
             test_backlog ; do
         export TRTSERVER_BACKLOG_DELAY_SCHEDULER=3 &&
             [[ "$i" != "test_backlog_fill_no_end" ]] && export TRTSERVER_BACKLOG_DELAY_SCHEDULER=2 &&

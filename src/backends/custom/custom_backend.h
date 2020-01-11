@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -146,6 +146,13 @@ class CustomBackend : public InferenceBackend {
 
     // The version of the custom interface.
     int custom_version_;
+
+    // The shape for input tensors that have fixed size. These are
+    // collected at init time as a performance optimization. Input
+    // tensors with variable size must have their shape determine for
+    // each inference request and so are not included here.
+    std::unordered_map<std::string, std::unique_ptr<std::vector<int64_t>>>
+        fixed_input_shapes_;
   };
 
   std::vector<std::string> server_params_;

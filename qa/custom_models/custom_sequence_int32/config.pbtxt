@@ -55,14 +55,14 @@ input [
   {
     name: "INPUT"
     data_type: TYPE_INT32
-    dims: [ 1 ]
+    dims: [ -1 ]
   }
 ]
 output [
   {
     name: "OUTPUT"
     data_type: TYPE_INT32
-    dims: [ 1 ]
+    dims: [ -1 ]
   }
 ]
 parameters [
