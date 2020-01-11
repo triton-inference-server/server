@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -35,19 +35,24 @@
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
 
-// This custom backend takes three one-element input tensors, two
-// INT32 control values and one an INT32 value input; and produces a
-// one-element output tensor. The input tensors must be named "START",
-// "READY" and "INPUT". The output tensor must be named "OUTPUT".
+// This custom backend takes three input tensors, two INT32 [ 1 ]
+// control values and one variable-size INT32 [ -1 ] value input; and
+// produces an output tensor with the same shape as the input
+// tensor. The input tensors must be named "START", "READY" and
+// "INPUT". The output tensor must be named "OUTPUT".
 //
 // The backend maintains an INT32 accumulator which is updated based
 // on the control values in "START" and "READY":
 //
 //   READY=0, START=x: Ignore value input, do not change accumulator value.
-//   READY=1, START=1: Start accumulating. Set accumulator equal to value input.
-//   READY=1, START=0: Add value input to accumulator.
 //
-// When READY=1, the accumulator is returned in the output.
+//   READY=1, START=1: Start accumulating. Set accumulator equal to sum of input
+//   tensor.
+//
+//   READY=1, START=0: Add input tensor values to accumulator.
+//
+// When READY=1, the accumulator is returned in every element of the
+// output.
 //
 
 namespace nvidia { namespace inferenceserver { namespace custom {
@@ -68,7 +73,7 @@ class Context : public CustomInstance {
   // Perform custom execution on the payloads.
   int Execute(
       const uint32_t payload_cnt, CustomPayload* payloads,
-      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
+      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn) override;
 
  private:
   int GetInputTensor(
@@ -87,8 +92,10 @@ class Context : public CustomInstance {
       RegisterError("model configuration must configure sequence batcher");
   const int kModelControl = RegisterError(
       "'START' and 'READY' must be configured as the control inputs");
-  const int kInputOutput =
-      RegisterError("model must have two inputs and one output with shape [1]");
+  const int kInput = RegisterError(
+      "model must have input 'INPUT' with vector shape, any length");
+  const int kOutput = RegisterError(
+      "model must have output 'OUTPUT' with shape matching 'INPUT'");
   const int kInputName = RegisterError("model input must be named 'INPUT'");
   const int kOutputName = RegisterError("model output must be named 'OUTPUT'");
   const int kInputOutputDataType =
@@ -148,13 +155,10 @@ Context::Init()
   }
 
   // There must be one INT32 input called INPUT defined in the model
-  // configuration with shape [1].
-  if (model_config_.input_size() != 1) {
-    return kInputOutput;
-  }
-  if ((model_config_.input(0).dims().size() != 1) ||
-      (model_config_.input(0).dims(0) != 1)) {
-    return kInputOutput;
+  // configuration and it must be a 1D vector (of any length).
+  if ((model_config_.input_size() != 1) ||
+      (model_config_.input(0).dims().size() != 1)) {
+    return kInput;
   }
   if (model_config_.input(0).data_type() != DataType::TYPE_INT32) {
     return kInputOutputDataType;
@@ -163,14 +167,12 @@ Context::Init()
     return kInputName;
   }
 
-  // There must be one INT32 output with shape [1]. The output must be
-  // named OUTPUT.
-  if (model_config_.output_size() != 1) {
-    return kInputOutput;
-  }
-  if ((model_config_.output(0).dims().size() != 1) ||
-      (model_config_.output(0).dims(0) != 1)) {
-    return kInputOutput;
+  // There must be one INT32 output with shape that matches the
+  // input. The output must be named OUTPUT.
+  if ((model_config_.output_size() != 1) ||
+      (model_config_.output(0).dims().size() != 1) ||
+      (model_config_.output(0).dims(0) != model_config_.input(0).dims(0))) {
+    return kOutput;
   }
   if (model_config_.output(0).data_type() != DataType::TYPE_INT32) {
     return kInputOutputDataType;
@@ -235,8 +237,8 @@ Context::Execute(
 {
   std::cout << "Sequence executing " << payload_cnt << " payloads" << std::endl;
 
-  // Each payload represents different sequence, which corresponds to
-  // the accumulator at the same index. Each payload must have
+  // Each payload represents a different sequence, which corresponds
+  // to the accumulator at the same index. Each payload must have
   // batch-size 1 inputs which is the next timestep for that
   // sequence. The total number of payloads will not exceed the
   // max-batch-size specified in the model configuration.
@@ -259,6 +261,15 @@ Context::Execute(
     }
 
     const size_t batch1_byte_size = GetDataTypeByteSize(TYPE_INT32);
+    int64_t input_element_cnt = 0;
+
+    // Get the number of elements in the input tensor.
+    for (uint32_t input_idx = 0; input_idx < payload.input_cnt; ++input_idx) {
+      if (!strcmp(payload.input_names[input_idx], "INPUT")) {
+        input_element_cnt = payload.input_shape_dims[input_idx][0];
+        break;
+      }
+    }
 
     // Get the input tensors.
     std::vector<uint8_t> start_buffer, ready_buffer, input_buffer;
@@ -279,8 +290,8 @@ Context::Execute(
     }
 
     err = GetInputTensor(
-        input_fn, payload.input_context, "INPUT", batch1_byte_size,
-        &input_buffer);
+        input_fn, payload.input_context, "INPUT",
+        input_element_cnt * batch1_byte_size, &input_buffer);
     if (err != ErrorCodes::Success) {
       payload.error_code = err;
       continue;
@@ -295,32 +306,36 @@ Context::Execute(
     if (ready[0] != 0) {
       if (start[0] == 0) {
         // Update accumulator.
-        accumulator_[pidx] += input[0];
+        for (int64_t e = 0; e < input_element_cnt; ++e) {
+          accumulator_[pidx] += input[e];
+        }
       } else {
         // Set accumulator.
         accumulator_[pidx] = input[0];
+        for (int64_t e = 1; e < input_element_cnt; ++e) {
+          accumulator_[pidx] += input[e];
+        }
       }
-
-      const int32_t output = accumulator_[pidx];
 
       // If the output is requested, copy the calculated output value
       // into the output buffer.
       if ((payload.error_code == 0) && (payload.output_cnt > 0)) {
         const char* output_name = payload.required_output_names[0];
 
-        // The output shape is [1, 1] if the model configuration
-        // supports batching, or just [1] if the model configuration
-        // does not support batching.
+        // The output shape is [1, input_element_cnt] if the model
+        // configuration supports batching, or just
+        // [input_element_cnt] if the model configuration does not
+        // support batching.
         std::vector<int64_t> shape;
         if (model_config_.max_batch_size() != 0) {
           shape.push_back(1);
         }
-        shape.push_back(1);
+        shape.push_back(input_element_cnt);
 
         void* obuffer;
         if (!output_fn(
                 payload.output_context, output_name, shape.size(), &shape[0],
-                batch1_byte_size, &obuffer)) {
+                input_element_cnt * batch1_byte_size, &obuffer)) {
           payload.error_code = kOutputBuffer;
           continue;
         }
@@ -328,7 +343,10 @@ Context::Execute(
         // If no error but the 'obuffer' is returned as nullptr, then
         // skip writing this output.
         if (obuffer != nullptr) {
-          memcpy(obuffer, &output, batch1_byte_size);
+          int32_t* obuffer_int = reinterpret_cast<int32_t*>(obuffer);
+          for (int64_t i = 0; i < input_element_cnt; ++i) {
+            obuffer_int[i] = accumulator_[pidx];
+          }
         }
       }
     }
