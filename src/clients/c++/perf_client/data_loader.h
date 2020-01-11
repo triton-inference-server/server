@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -30,7 +30,10 @@
 
 class DataLoader {
  public:
-  DataLoader(size_t batch_size);
+  DataLoader(
+      size_t batch_size,
+      const std::unordered_map<std::string, std::vector<int64_t>>&
+          default_input_shapes);
 
   /// Returns the total number of data steps that can be supported by a
   /// non-sequence model.
@@ -92,6 +95,16 @@ class DataLoader {
       std::shared_ptr<nic::InferContext::Input> input, const int stream_id,
       const int step_id, const uint8_t** data_ptr, size_t* batch1_size);
 
+  /// Helper function to get the shape values to the input
+  /// \param input The target input
+  /// \param stream_id The data stream_id to use for retrieving input shape.
+  /// \param step_id The data step_id to use for retrieving input shape.
+  /// \param shape returns the pointer to the vector containing the shape
+  /// values.
+  /// Returns error object indicating status
+  nic::Error GetInputShape(
+      std::shared_ptr<nic::InferContext::Input> input, const int stream_id,
+      const int step_id, const std::vector<int64_t>** shape);
 
  private:
   /// Helper function to read data for the specified input from json
@@ -110,13 +123,18 @@ class DataLoader {
   size_t batch_size_;
   // The total number of data streams available.
   size_t data_stream_cnt_;
-  // A vector containing the supported step number for respective stream ids.
+  // A vector containing the supported step number for respective stream
+  // ids.
   std::vector<size_t> step_num_;
   // The maximum supported data step id for non-sequence model.
   size_t max_non_sequence_step_id_;
 
   // User provided input data, it will be preferred over synthetic data
   std::unordered_map<std::string, std::vector<char>> input_data_;
+  std::unordered_map<std::string, std::vector<int64_t>> input_shapes_;
+
+  // The default shapes to use if json doesn't provide shapes
+  std::unordered_map<std::string, std::vector<int64_t>> default_input_shapes_;
 
   // Placeholder for generated input data, which will be used for all inputs
   // except string
