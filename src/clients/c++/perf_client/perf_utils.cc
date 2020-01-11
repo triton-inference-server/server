@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -393,6 +393,23 @@ GetRandomString(const int string_length)
     return character_set[dist(gen)];
   });
   return random_string;
+}
+
+std::string
+ShapeVecToString(const std::vector<int64_t> shape_vec)
+{
+  bool first = true;
+  std::string str("[");
+  for (const auto& value : shape_vec) {
+    if (!first) {
+      str += ",";
+    }
+    str += std::to_string(value);
+    first = false;
+  }
+
+  str += "]";
+  return str;
 }
 
 template <>

@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -31,8 +31,12 @@
 #include <fstream>
 #include "rapidjson/filereadstream.h"
 
-DataLoader::DataLoader(size_t batch_size)
-    : batch_size_(batch_size), data_stream_cnt_(0)
+DataLoader::DataLoader(
+    size_t batch_size,
+    const std::unordered_map<std::string, std::vector<int64_t>>&
+        default_input_shapes)
+    : batch_size_(batch_size), data_stream_cnt_(0),
+      default_input_shapes_(default_input_shapes)
 {
 }
 
@@ -233,6 +237,7 @@ DataLoader::GetInputData(
     std::string key_name(
         input->Name() + "_" + std::to_string(stream_id) + "_" +
         std::to_string(step_id));
+    // Get the data and the corresponding byte-size
     auto it = input_data_.find(key_name);
     if (it != input_data_.end()) {
       if (input->DType() != ni::DataType::TYPE_STRING) {
@@ -263,6 +268,29 @@ DataLoader::GetInputData(
 }
 
 nic::Error
+DataLoader::GetInputShape(
+    std::shared_ptr<nic::InferContext::Input> input, const int stream_id,
+    const int step_id, const std::vector<int64_t>** provided_shape)
+{
+  std::string key_name(
+      input->Name() + "_" + std::to_string(stream_id) + "_" +
+      std::to_string(step_id));
+
+  // Prefer the values read from file over the ones provided from
+  // CLI
+  auto it = input_shapes_.find(key_name);
+  if (it != input_shapes_.end()) {
+    *provided_shape = &it->second;
+  } else {
+    auto it = default_input_shapes_.find(input->Name());
+    if (it != default_input_shapes_.end()) {
+      *provided_shape = &it->second;
+    }
+  }
+  return nic::Error::Success;
+}
+
+nic::Error
 DataLoader::ReadInputTensorData(
     const rapidjson::Value& step,
     std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
@@ -277,24 +305,75 @@ DataLoader::ReadInputTensorData(
       auto it = input_data_.emplace(key_name, std::vector<char>()).first;
 
       const rapidjson::Value& tensor = step[(input->Name()).c_str()];
+
+      const rapidjson::Value* content;
+
       if (tensor.IsArray()) {
+        content = &tensor;
+      } else if (tensor.HasMember("b64")) {
+        content = &tensor;
+      } else {
+        // Populate the shape values first if available
+        if (tensor.HasMember("shape")) {
+          auto shape_it =
+              input_shapes_.emplace(key_name, std::vector<int64_t>()).first;
+          for (const auto& value : tensor["shape"].GetArray()) {
+            if (!value.IsInt()) {
+              return nic::Error(
+                  ni::RequestStatusCode::INVALID_ARG,
+                  "shape values must be integers.");
+            }
+            shape_it->second.push_back(value.GetInt());
+          }
+          const auto& dims = shape_it->second;
+          const auto& config_dims = input->Dims();
+          if (!ni::CompareDimsWithWildcard(config_dims, dims)) {
+            return nic::Error(
+                ni::RequestStatusCode::INVALID_ARG,
+                "input '" + input->Name() + "' expects shape " +
+                    ni::DimsListToString(config_dims) +
+                    " and user supplied shape " + ni::DimsListToString(dims) +
+                    " in the json data file");
+          }
+        }
+
+        // Setting the read values to properly validate the user data
+        const std::vector<int64_t>* shape = nullptr;
+        RETURN_IF_ERROR(GetInputShape(input, stream_index, step_index, &shape));
+        if (shape != nullptr) {
+          input->SetShape(*shape);
+        }
+
+        if (!tensor.HasMember("content")) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "missing content field. ( Location stream id: " +
+                  std::to_string(stream_index) +
+                  ", step id: " + std::to_string(step_index) + ")");
+        }
+
+        content = &tensor["content"];
+      }
+
+
+      if (content->IsArray()) {
         const size_t batch1_element_cnt = GetElementCount(input);
-        if (batch1_element_cnt != tensor.Size()) {
+        if (batch1_element_cnt != content->Size()) {
           return nic::Error(
               ni::RequestStatusCode::INVALID_ARG,
               "mismatch in the number of elements of provided. Expected: " +
                   std::to_string(batch1_element_cnt) +
-                  ", Got: " + std::to_string(tensor.Size()) +
+                  ", Got: " + std::to_string(content->Size()) +
                   " ( Location stream id: " + std::to_string(stream_index) +
                   ", step id: " + std::to_string(step_index) + ")");
         }
         RETURN_IF_ERROR(
-            SerializeExplicitTensor(tensor, input->DType(), &it->second));
+            SerializeExplicitTensor(*content, input->DType(), &it->second));
       } else {
-        if (tensor.HasMember("b64")) {
-          if (tensor["b64"].IsString()) {
+        if (content->HasMember("b64")) {
+          if ((*content)["b64"].IsString()) {
             RETURN_IF_ERROR(
-                DecodeFromBase64(tensor["b64"].GetString(), &it->second));
+                DecodeFromBase64((*content)["b64"].GetString(), &it->second));
             size_t batch1_byte = input->ByteSize();
             if (batch1_byte != it->second.size()) {
               return nic::Error(

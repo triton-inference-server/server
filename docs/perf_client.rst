@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -331,6 +331,52 @@ multiple streams for a sequence model with a single input named INPUT, shape [1]
 
 The above example describes three data streams with lengths 4, 3 and 2 respectively.
 The perf_client will hence produce sequences of length 4, 3 and 2 in this case.
+
+Users can also provide an optional "shape" field to the tensors. This is especially
+useful while profiling the models with variable-sized tensors as input. The
+specified shape values are treated as an override and client still expects
+default input shapes to be provided as a command line option (see --shape) for
+variable-sized inputs. In the absence of "shape" field, the provided defaults
+will be used. Below is an example json file for a model with single input "INPUT",
+shape [-1,-1] and data type INT32: ::
+
+  {
+    "data" :
+     [
+        {
+          "INPUT" :
+                {
+                    "content": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    "shape": [2,8]
+                }
+        },
+        {
+          "INPUT" :
+                {
+                    "content": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    "shape": [8,2]
+                }
+        },
+        {
+          "INPUT" :
+                {
+                    "content": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+                }
+        },
+        {
+          "INPUT" :
+                {
+                    "content": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    "shape": [4,4]
+                }
+        }
+        .
+        .
+        .
+      ]
+  }
+
+
 
 
 Shared Memory

@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -158,7 +158,7 @@ class LoadManager {
  protected:
   bool async_;
   // User provided input shape
-  std::unordered_map<std::string, std::vector<int64_t>> input_shapes_;
+  std::unordered_map<std::string, std::vector<int64_t>> default_input_shapes_;
   size_t batch_size_;
   size_t max_threads_;
   size_t sequence_length_;

@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -176,8 +176,9 @@ LoadManager::LoadManager(
     const size_t sequence_length, const SharedMemoryType shared_memory_type,
     const size_t output_shm_size,
     const std::shared_ptr<ContextFactory>& factory)
-    : async_(async), input_shapes_(input_shapes), batch_size_(batch_size),
-      max_threads_(max_threads), sequence_length_(sequence_length),
+    : async_(async), default_input_shapes_(input_shapes),
+      batch_size_(batch_size), max_threads_(max_threads),
+      sequence_length_(sequence_length),
       shared_memory_type_(shared_memory_type),
       output_shm_size_(output_shm_size), factory_(factory),
       using_json_data_(false), next_corr_id_(1)
@@ -186,7 +187,7 @@ LoadManager::LoadManager(
       ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
        (factory_->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE));
 
-  data_loader_.reset(new DataLoader(batch_size));
+  data_loader_.reset(new DataLoader(batch_size, input_shapes));
 }
 
 nic::Error
@@ -199,9 +200,9 @@ LoadManager::InitManagerInputs(
 
   for (const auto& input : ctx->Inputs()) {
     // Validate user provided shape
-    if (!input_shapes_.empty()) {
-      auto it = input_shapes_.find(input->Name());
-      if (it != input_shapes_.end()) {
+    if (!default_input_shapes_.empty()) {
+      auto it = default_input_shapes_.find(input->Name());
+      if (it != default_input_shapes_.end()) {
         const auto& dims = it->second;
         const auto& config_dims = input->Dims();
         if (!ni::CompareDimsWithWildcard(config_dims, dims)) {
@@ -216,8 +217,8 @@ LoadManager::InitManagerInputs(
 
     // For variable shape, set the shape if specified
     if (input->Shape().empty()) {
-      auto it = input_shapes_.find(input->Name());
-      if (it != input_shapes_.end()) {
+      auto it = default_input_shapes_.find(input->Name());
+      if (it != default_input_shapes_.end()) {
         input->SetShape(it->second);
       }
     }
@@ -341,15 +342,6 @@ LoadManager::InitSharedMemory()
     }
   }
 
-  // Set the provided shape for variable shape tensor
-  for (const auto& input : ctx->Inputs()) {
-    if (input->Shape().empty()) {
-      auto it = input_shapes_.find(input->Name());
-      if (it != input_shapes_.end()) {
-        input->SetShape(it->second);
-      }
-    }
-  }
 
   for (const auto& input : ctx->Inputs()) {
     for (int i = 0; i < (int)data_loader_->GetDataStreamsCount(); i++) {
@@ -363,6 +355,28 @@ LoadManager::InitSharedMemory()
         while (count < batch_size_) {
           const uint8_t* data_ptr;
           size_t batch1_bytesize;
+
+          const std::vector<int64_t>* shape = nullptr;
+          RETURN_IF_ERROR(data_loader_->GetInputShape(
+              input, i, (j + count) % data_loader_->GetTotalSteps(i), &shape));
+          if (shape != nullptr) {
+            if (count == 0) {
+              input->SetShape(*shape);
+            } else {
+              if (!std::equal(
+                      shape->begin(), shape->end(), input->Shape().begin())) {
+                return nic::Error(
+                    ni::RequestStatusCode::INVALID_ARG,
+                    "can not batch tensors with different shapes together "
+                    "(input '" +
+                        input->Name() + "' expected shape " +
+                        ShapeVecToString(input->Shape()) + " and received " +
+                        ShapeVecToString(*shape) + ")");
+              }
+            }
+          }
+
+
           RETURN_IF_ERROR(data_loader_->GetInputData(
               input, i, (j + count) % data_loader_->GetTotalSteps(i), &data_ptr,
               &batch1_bytesize));
@@ -485,22 +499,19 @@ LoadManager::PrepareInfer(
 
   RETURN_IF_ERROR((*ctx)->SetRunOptions(*(*options)));
 
-  // Set the provided shape for variable shape tensor
-  for (const auto& input : (*ctx)->Inputs()) {
-    if (input->Shape().empty()) {
-      auto it = input_shapes_.find(input->Name());
-      if (it != input_shapes_.end()) {
-        input->SetShape(it->second);
-      }
-    }
-  }
-
   // Initialize inputs
   for (const auto& input : (*ctx)->Inputs()) {
     RETURN_IF_ERROR(input->Reset());
 
     const uint8_t* data_ptr;
     size_t batch1_bytesize;
+    // Set input shape before getting the input data
+    const std::vector<int64_t>* shape = nullptr;
+    RETURN_IF_ERROR(data_loader_->GetInputShape(input, 0, 0, &shape));
+    if (shape != nullptr) {
+      input->SetShape(*shape);
+    }
+
     RETURN_IF_ERROR(
         data_loader_->GetInputData(input, 0, 0, &data_ptr, &batch1_bytesize));
 
@@ -556,14 +567,14 @@ LoadManager::PrepareSharedMemoryInfer(
   for (const auto& input : (*ctx)->Inputs()) {
     std::string key_name(
         input->Name() + "_" + std::to_string(0) + "_" + std::to_string(0));
+    // Set input shape before getting the input data
+    const std::vector<int64_t>* shape = nullptr;
+    RETURN_IF_ERROR(data_loader_->GetInputShape(input, 0, 0, &shape));
+    if (shape != nullptr) {
+      input->SetShape(*shape);
+    }
     RETURN_IF_ERROR(input->SetSharedMemory(
         key_name, 0, shared_memory_regions_[key_name].second));
-    if (input->Shape().empty()) {
-      auto it = input_shapes_.find(input->Name());
-      if (it != input_shapes_.end()) {
-        input->SetShape(it->second);
-      }
-    }
   }
 
   return nic::Error::Success;
@@ -611,17 +622,33 @@ LoadManager::SetInputs(
     const uint8_t* data_ptr;
     size_t batch1_bytesize;
 
-    if (!on_sequence_model_) {
-      for (size_t i = 0; i < batch_size_; ++i) {
-        RETURN_IF_ERROR(data_loader_->GetInputData(
-            input, 0, (step_index + i) % data_loader_->GetTotalSteps(0),
-            &data_ptr, &batch1_bytesize));
-        RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
+    for (size_t i = 0; i < batch_size_; ++i) {
+      const std::vector<int64_t>* shape = nullptr;
+      RETURN_IF_ERROR(data_loader_->GetInputShape(
+          input, stream_index,
+          (step_index + i) % data_loader_->GetTotalSteps(stream_index),
+          &shape));
+      if (shape != nullptr) {
+        if (i == 0) {
+          input->SetShape(*shape);
+        } else {
+          if (!std::equal(
+                  shape->begin(), shape->end(), input->Shape().begin())) {
+            return nic::Error(
+                ni::RequestStatusCode::INVALID_ARG,
+                "can not batch tensors with different shapes together "
+                "(input '" +
+                    input->Name() + "' expected shape " +
+                    ShapeVecToString(input->Shape()) + " and received " +
+                    ShapeVecToString(*shape));
+          }
+        }
       }
-    } else {
-      // Sequence models only support single batch_size_
+
       RETURN_IF_ERROR(data_loader_->GetInputData(
-          input, stream_index, step_index, &data_ptr, &batch1_bytesize));
+          input, stream_index,
+          (step_index + i) % data_loader_->GetTotalSteps(stream_index),
+          &data_ptr, &batch1_bytesize));
       RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
     }
   }
@@ -641,6 +668,12 @@ LoadManager::SetInputsSharedMemory(
         input->Name() + '_' + std::to_string(stream_index) + "_" +
         std::to_string(step_index));
 
+    const std::vector<int64_t>* shape = nullptr;
+    RETURN_IF_ERROR(
+        data_loader_->GetInputShape(input, stream_index, step_index, &shape));
+    if (shape != nullptr) {
+      input->SetShape(*shape);
+    }
     RETURN_IF_ERROR(input->SetSharedMemory(
         region_name, 0, shared_memory_regions_[region_name].second));
   }
