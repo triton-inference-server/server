@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -103,8 +103,7 @@ def create_shared_memory_region(trtis_shm_name, shm_key, byte_size):
     return shm_handle
 
 def set_shared_memory_region(shm_handle, input_values):
-    """Copy the contents of the numpy array into a shared memory region with
-    the specified identifier, offset and size.
+    """Copy the contents of the numpy array into a shared memory region.
 
     Parameters
     ----------
@@ -120,10 +119,10 @@ def set_shared_memory_region(shm_handle, input_values):
     """
 
     if not isinstance(input_values, (list,tuple)):
-        _raise_error("input_values must be specified as a numpy array")
+        _raise_error("input_values must be specified as a list/tuple of numpy arrays")
     for input_value in input_values:
-        if not isinstance(input_value, (np.ndarray,)):
-            _raise_error("input_values must be specified as a list/tuple of numpy arrays")
+        if not isinstance(input_value, np.ndarray):
+            _raise_error("each element of input_values must be a numpy array")
 
     offset_current = 0
     for input_value in input_values:
