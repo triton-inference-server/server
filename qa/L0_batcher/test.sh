@@ -179,7 +179,6 @@ export BATCHER_TYPE=VARIABLE
 for i in \
         test_multi_batch_not_preferred_different_shape \
         test_multi_batch_preferred_different_shape \
-        test_multi_batch_different_shape_allow_ragged \
         test_multi_batch_different_shape ; do
     SERVER_ARGS="--model-repository=`pwd`/var_models"
     SERVER_LOG="./$i.VARIABLE.serverlog"
@@ -234,6 +233,45 @@ for i in \
     kill $SERVER_PID
     wait $SERVER_PID
 done
+
+# Workaround to avoid the deeply condition on environment variable in
+# test utils. Thus code should be removed and
+# test_multi_batch_different_shape_allow_ragged should be added above
+# to test_multi_batch_different_shape loop
+SHARED_MEMORY_SET=0
+if [[ ! -z $TEST_SYSTEM_SHARED_MEMORY ]] && [[ "$TEST_SYSTEM_SHARED_MEMORY" != "0" ]] ; then
+    SHARED_MEMORY_SET=1
+fi
+if [[ ! -z $TEST_CUDA_SHARED_MEMORY ]] && [[ "$TEST_CUDA_SHARED_MEMORY" != "0" ]] ; then
+    SHARED_MEMORY_SET=1
+fi
+if [[ "$SHARED_MEMORY_SET" == "0" ]]; then
+    export BATCHER_TYPE=VARIABLE
+    for i in \
+            test_multi_batch_different_shape_allow_ragged ; do
+        SERVER_ARGS="--model-repository=`pwd`/var_models"
+        SERVER_LOG="./$i.VARIABLE.serverlog"
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
+
+        echo "Test: $i" >>$CLIENT_LOG
+
+        set +e
+        python $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+
+        kill $SERVER_PID
+        wait $SERVER_PID
+    done
+fi
 
 # Workaround to avoid the deeply condition on environment variable in test utils
 SHARED_MEMORY_SET=0
