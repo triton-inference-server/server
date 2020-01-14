@@ -697,10 +697,11 @@ OnnxBackend::Context::SetInputTensor(
       total_byte_size + ((data_type != TYPE_STRING) ? 0 : 1);
   input_buffers->back().reset((new char[buffer_size]));
   char* buffer = input_buffers->back().get();
+  constexpr auto buffer_memory_type = TRTSERVER_MEMORY_CPU;
 
   // Store data into input buffer
   SetInputBuffer(
-      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, 0, buffer);
+      name, expected_byte_sizes, payloads, buffer_memory_type, 0, buffer);
 
   if (data_type != TYPE_STRING) {
     const OrtMemoryInfo* allocator_info;
@@ -921,7 +922,7 @@ OnnxBackend::Context::SetStringOutputBuffer(
           data_byte_size + sizeof(uint32_t) * expected_element_cnt;
 
       void* buffer;
-      TRTSERVER_Memory_Type preferred_memory_type = TRTSERVER_MEMORY_CPU;
+      TRTSERVER_Memory_Type preferred_memory_type = TRTSERVER_MEMORY_CPU_PINNED;
       TRTSERVER_Memory_Type actual_memory_type;
       int64_t actual_memory_type_id;
       Status status = payload.response_provider_->AllocateOutputBuffer(

@@ -467,16 +467,16 @@ BaseBackend::Context::SetStringInputTensor(
 
     // For string data type, we always need to copy the data to CPU so that
     // we can read string length and construct the string properly.
-    auto src_memory_type = TRTSERVER_MEMORY_CPU;
-    int64_t src_memory_type_id = 0;
+    auto buffer_memory_type = TRTSERVER_MEMORY_CPU;
+    int64_t buffer_memory_type_id = 0;
     const char* content;
     size_t content_byte_size = expected_element_cnt * sizeof(uint32_t);
     // If contiguous buffer is created, it needs to live until tensor is filled
     std::unique_ptr<AllocatedSystemMemory> contiguous_buffer;
     bool cuda_copy = false;
     payload.status_ = GetContiguousInputContent(
-        input_name, src_memory_type, src_memory_type_id, payload, &content,
-        &content_byte_size, &contiguous_buffer, &cuda_copy);
+        input_name, buffer_memory_type, buffer_memory_type_id, payload,
+        &content, &content_byte_size, &contiguous_buffer, &cuda_copy);
 
     if (!payload.status_.IsOk()) {
       FillStringTensor(
@@ -607,13 +607,13 @@ BaseBackend::Context::ReadStringOutputTensor(
       int64_t actual_memory_type_id;
       Status status = payload.response_provider_->AllocateOutputBuffer(
           output_name, &content, serialized.size(), shape,
-          TRTSERVER_MEMORY_CPU /* preferred_memory_type */,
+          TRTSERVER_MEMORY_CPU_PINNED /* preferred_memory_type */,
           0 /* preferred_memory_type_id */, &actual_memory_type,
           &actual_memory_type_id);
       if (status.IsOk()) {
         bool cuda_used = false;
         status = CopyBuffer(
-            output_name, TRTSERVER_MEMORY_CPU /* src_memory_type */,
+            output_name, TRTSERVER_MEMORY_CPU_PINNED /* src_memory_type */,
             0 /* src_memory_type_id */, actual_memory_type,
             actual_memory_type_id, serialized.size(),
             reinterpret_cast<const void*>(serialized.c_str()), content, stream_,

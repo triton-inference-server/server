@@ -65,7 +65,8 @@ struct TRTSERVER_TraceManager;
 /// Types of memory recognized by TRTSERVER.
 typedef enum trtserver_memorytype_enum {
   TRTSERVER_MEMORY_CPU,
-  TRTSERVER_MEMORY_GPU
+  TRTSERVER_MEMORY_GPU,
+  TRTSERVER_MEMORY_CPU_PINNED
 } TRTSERVER_Memory_Type;
 
 /// TRTSERVER_Error

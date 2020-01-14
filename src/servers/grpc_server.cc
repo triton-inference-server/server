@@ -815,9 +815,9 @@ InferResponseAlloc(
       // Can't allocate for any memory type other than CPU. If asked to
       // allocate on GPU memory then force allocation on CPU instead.
       if (*actual_memory_type != TRTSERVER_MEMORY_CPU) {
-        LOG_VERBOSE(1)
-            << "GRPC: unable to provide '" << tensor_name
-            << "' in TRTSERVER_MEMORY_GPU, will use type TRTSERVER_MEMORY_CPU";
+        LOG_VERBOSE(1) << "GRPC: unable to provide '" << tensor_name << "' in "
+                       << MemoryTypeString(*actual_memory_type) << ", will use "
+                       << MemoryTypeString(TRTSERVER_MEMORY_CPU);
         *actual_memory_type = TRTSERVER_MEMORY_CPU;
         *actual_memory_type_id = 0;
       }

@@ -354,6 +354,7 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
   // entire dynamic batched input.
   input_buffers->emplace_back(new char[total_byte_size]);
   char* buffer = input_buffers->back().get();
+  constexpr auto buffer_memory_type = TRTSERVER_MEMORY_CPU;
 
   // Visit the payloads in order and copy the input tensors to
   // 'buffer'.
@@ -366,7 +367,7 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
   }
 
   *cuda_copy |= SetInputBuffer(
-      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, 0, buffer);
+      name, expected_byte_sizes, payloads, buffer_memory_type, 0, buffer);
 
   Caffe2Workspace::Error err = workspace_->SetInputTensor(
       name, shape, dtype, static_cast<const char*>(buffer), total_byte_size);
