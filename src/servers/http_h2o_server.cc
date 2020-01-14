@@ -27,6 +27,7 @@
 #include "src/servers/http_server.h"
 
 #include <errno.h>
+#include <google/protobuf/util/json_util.h>
 #include <h2o.h>
 #include <h2o/cache.h>
 #include <h2o/memcached.h>
@@ -196,10 +197,8 @@ class HTTPAPIServer : public HTTPServer {
       h2o_hostconf_t* hostconf, const char* path,
       int (*on_req)(h2o_handler_t*, h2o_req_t*));
 
-  static int post_test(h2o_handler_t* self, h2o_req_t* req);
   static int health(h2o_handler_t* self, h2o_req_t* req);
   static int status(h2o_handler_t* self, h2o_req_t* req);
-  // void HandleStatus(evhtp_request_t* req, const std::string& model_name);
   // void HandleInfer(evhtp_request_t* req, const std::string& model_name);
 
   // #ifdef TRTIS_ENABLE_GPU
@@ -214,9 +213,6 @@ class HTTPAPIServer : public HTTPServer {
   //           std::string,
   //           std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
   //           output_shm_map);
-  //
-  //   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
-  //   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
 
   h2o_globalconf_t config;
   h2o_context_t ctx;
@@ -407,47 +403,41 @@ HTTPAPIServer::register_handler(
 }
 
 int
-HTTPAPIServer::post_test(h2o_handler_t* self, h2o_req_t* req)
-{
-  if (h2o_memis(req->method.base, req->method.len, H2O_STRLIT("POST")) &&
-      h2o_memis(
-          req->path_normalized.base, req->path_normalized.len,
-          H2O_STRLIT("/post-test/"))) {
-    LOG_VERBOSE(1) << "Hit here";
-    static h2o_generator_t generator = {NULL, NULL};
-    req->res.status = 200;
-    req->res.reason = "OK";
-    h2o_add_header(
-        &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
-        H2O_STRLIT("text/plain; charset=utf-8"));
-    h2o_start_response(req, &generator);
-    h2o_send(req, &req->entity, 1, h2o_send_state_t(1));
-    return 0;
-  }
-
-  return -1;
-}
-
-int
 HTTPAPIServer::health(h2o_handler_t* _self, h2o_req_t* req)
 {
   h2o_custom_req_handler_t* self = (h2o_custom_req_handler_t*)_self;
   LOG_VERBOSE(1) << "url: " << std::string(req->path_normalized.base);
-  if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET")))
-    return -1;
-
-  if (!h2o_memis(
-          req->path_normalized.base, req->path_normalized.len,
-          H2O_STRLIT("/api/health")))
-    return -1;
-
-  std::string mode;
-  size_t query_len = req->path.len - req->query_at;
-  if (req->query_at != SIZE_MAX && (query_len > 1)) {
-    if (h2o_memis(&req->path.base[req->query_at], 0, "", 6)) {
-      mode = std::string(&req->path.base[req->query_at], query_len);
-    }
+  if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET"))) {
+    req->res.status = 400;
+    req->res.reason = "Only GET method is allowed";
+    h2o_add_header(
+        &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+        H2O_STRLIT("text/plain"));
+    h2o_generator_t generator = {NULL, NULL};
+    h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+    h2o_start_response(req, &generator);
+    h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+    return 0;
   }
+
+  re2::RE2 health_regex_(R"(/api/health/(live|ready))");
+  std::string health_uri =
+      std::string(req->path_normalized.base, req->path_normalized.len);
+  std::string mode;
+  if ((health_uri.empty()) ||
+      (!RE2::FullMatch(health_uri, health_regex_, &mode))) {
+    req->res.status = 400;
+    req->res.reason = "Bad request";
+    h2o_add_header(
+        &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+        H2O_STRLIT("text/plain"));
+    h2o_generator_t generator = {NULL, NULL};
+    h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+    h2o_start_response(req, &generator);
+    h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+    return 0;
+  }
+
   LOG_VERBOSE(1) << "mode: " << mode;
 
   TRTSERVER_Error* err = nullptr;
@@ -457,10 +447,6 @@ HTTPAPIServer::health(h2o_handler_t* _self, h2o_req_t* req)
     err = TRTSERVER_ServerIsLive(self->http_server->server_.get(), &health);
   } else if (mode == "ready") {
     err = TRTSERVER_ServerIsReady(self->http_server->server_.get(), &health);
-  } else {
-    err = TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_UNKNOWN,
-        std::string("unknown health mode '" + mode + "'").c_str());
   }
 
   RequestStatus request_status;
@@ -490,10 +476,19 @@ int
 HTTPAPIServer::status(h2o_handler_t* _self, h2o_req_t* req)
 {
   h2o_custom_req_handler_t* self = (h2o_custom_req_handler_t*)_self;
-  re2::RE2 status_regex(R"(/api/status(/(.*)?))");
+  re2::RE2 status_regex(R"(/api/status(/(.*))?)");
   LOG_VERBOSE(1) << "url: " << std::string(req->path_normalized.base);
   if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET"))) {
-    return -1;
+    req->res.status = 400;
+    req->res.reason = "Only GET method is allowed";
+    h2o_add_header(
+        &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+        H2O_STRLIT("text/plain"));
+    h2o_generator_t generator = {NULL, NULL};
+    h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+    h2o_start_response(req, &generator);
+    h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+    return 0;
   }
 
   std::string status_uri =
@@ -501,15 +496,36 @@ HTTPAPIServer::status(h2o_handler_t* _self, h2o_req_t* req)
   std::string model_name, format = "text";
   if (!status_uri.empty()) {
     if (!RE2::FullMatch(status_uri, status_regex, &model_name)) {
-      return -1;
+      req->res.status = 400;
+      req->res.reason = "Bad request";
+      h2o_add_header(
+          &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+          H2O_STRLIT("text/plain"));
+      h2o_generator_t generator = {NULL, NULL};
+      h2o_iovec_t body = h2o_strdup(&req->pool, status_uri.c_str(), SIZE_MAX);
+      h2o_start_response(req, &generator);
+      h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+      return 0;
     }
   }
   LOG_VERBOSE(1) << "model_name: " << model_name;
 
   size_t query_len = req->path.len - req->query_at;
   if (req->query_at != SIZE_MAX && (query_len > 1)) {
-    if (h2o_memis(&req->path.base[req->query_at], 8, "?format=", 6)) {
-      format = std::string(&req->path.base[req->query_at], query_len);
+    if (h2o_memis(&req->path.base[req->query_at], 8, "?format=", 8)) {
+      format = std::string(&req->path.base[req->query_at + 8]);
+      format = format.substr(0, format.find(' '));
+    } else {
+      req->res.status = 400;
+      req->res.reason = "Bad request";
+      h2o_add_header(
+          &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+          H2O_STRLIT("text/plain"));
+      h2o_generator_t generator = {NULL, NULL};
+      h2o_iovec_t body = h2o_strdup(&req->pool, status_uri.c_str(), SIZE_MAX);
+      h2o_start_response(req, &generator);
+      h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+      return 0;
     }
   }
 
@@ -522,8 +538,7 @@ HTTPAPIServer::status(h2o_handler_t* _self, h2o_req_t* req)
                 self->http_server->server_.get(), model_name.c_str(),
                 &server_status_protobuf);
 
-  h2o_generator_t generator;
-  memset(&generator, 0, sizeof(generator));
+  h2o_generator_t generator = {NULL, NULL};
   h2o_iovec_t body;
 
   if (err == nullptr) {
@@ -545,12 +560,23 @@ HTTPAPIServer::status(h2o_handler_t* _self, h2o_req_t* req)
           err = TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
         } else {
-          std::string server_status_str = server_status.DebugString();
-          h2o_add_header(
-              &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
-              H2O_STRLIT("text/plain"));
-          body.base = const_cast<char*>(server_status_str.c_str());
-          body.len = server_status_str.size();
+          if (format == "json") {
+            std::string server_status_json;
+            ::google::protobuf::util::MessageToJsonString(
+                server_status, &server_status_json);
+            h2o_add_header(
+                &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+                H2O_STRLIT("application/json"));
+            body.base = const_cast<char*>(server_status_json.c_str());
+            body.len = server_status_json.size();
+          } else {
+            std::string server_status_str = server_status.DebugString();
+            h2o_add_header(
+                &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+                H2O_STRLIT("text/plain"));
+            body.base = const_cast<char*>(server_status_str.c_str());
+            body.len = server_status_str.size();
+          }
         }
       }
     }
@@ -590,20 +616,24 @@ HTTPAPIServer::Start()
   h2o_hostconf_t* hostconf;
   h2o_access_log_filehandle_t* logfh = h2o_access_log_open_handle(
       "/dev/stdout", NULL, H2O_LOGCONF_ESCAPE_APACHE);
-  h2o_pathconf_t* pathconf;
 
   signal(SIGPIPE, SIG_IGN);
+
+  // necessary to zero these structs before using them!
+  memset(&accept_ctx, 0, sizeof(accept_ctx));
+  memset(&ctx, 0, sizeof(ctx));
+  memset(&config, 0, sizeof(config));
 
   h2o_config_init(&config);
   hostconf = h2o_config_register_host(
       &config, h2o_iovec_init(H2O_STRLIT("default")), 65535);
 
-  // pathconf = register_handler(hostconf, "/post-test", post_test);
-  // if (logfh != NULL)
-  //   h2o_access_log_register(pathconf, logfh);
-
   // handler->on_req(st_h2o_handler_t(health));
-  pathconf = register_handler(hostconf, "/api/health", health);
+  h2o_pathconf_t* pathconf = register_handler(hostconf, "/api/health", health);
+  if (logfh != NULL)
+    h2o_access_log_register(pathconf, logfh);
+
+  pathconf = register_handler(hostconf, "/api/status", status);
   if (logfh != NULL)
     h2o_access_log_register(pathconf, logfh);
 
