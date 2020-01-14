@@ -285,26 +285,14 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
             self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
             self.assertEqual(
                 int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
-            precreated_shm0_handles = self.precreate_register_regions(
-                ((2, 1), (4, 2), (8, 3)),
-                dtype,
-                0,
-                model_type="sequence_shape_tensor")
-            precreated_shm1_handles = self.precreate_register_regions(
-                ((2, 11), (4, 12), (8, 13)),
-                dtype,
-                1,
-                model_type="sequence_shape_tensor")
-            precreated_shm2_handles = self.precreate_register_regions(
-                ((2, 111), (4, 112), (8, 113)),
-                dtype,
-                2,
-                model_type="sequence_shape_tensor")
-            precreated_shm3_handles = self.precreate_register_regions(
-                ((2, 1111), (4, 1112), (8, 1113)),
-                dtype,
-                3,
-                model_type="sequence_shape_tensor")
+            precreated_shm0_handles = self.precreate_register_shape_tensor_regions(
+                ((2, 1), (4, 2), (8, 3)), dtype, 0)
+            precreated_shm1_handles = self.precreate_register_shape_tensor_regions(
+                ((2, 11), (4, 12), (8, 13)), dtype, 1)
+            precreated_shm2_handles = self.precreate_register_shape_tensor_regions(
+                ((2, 111), (4, 112), (8, 113)), dtype, 2)
+            precreated_shm3_handles = self.precreate_register_shape_tensor_regions(
+                ((2, 1111), (4, 1112), (8, 1113)), dtype, 3)
             threads = []
             threads.append(
                 threading.Thread(
@@ -404,26 +392,14 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
         self.clear_deferred_exceptions()
         dtype = np.float32
 
-        precreated_shm0_handles = self.precreate_register_regions(
-            ((1, 1), (1, 2), (1, 3)),
-            dtype,
-            0,
-            model_type="sequence_shape_tensor")
-        precreated_shm1_handles = self.precreate_register_regions(
-            ((32, 11), (32, 12), (32, 13)),
-            dtype,
-            1,
-            model_type="sequence_shape_tensor")
-        precreated_shm2_handles = self.precreate_register_regions(
-            ((16, 111), (16, 112), (16, 113)),
-            dtype,
-            2,
-            model_type="sequence_shape_tensor")
-        precreated_shm3_handles = self.precreate_register_regions(
-            ((1, 1111), (1, 1112), (1, 1113)),
-            dtype,
-            3,
-            model_type="sequence_shape_tensor")
+        precreated_shm0_handles = self.precreate_register_shape_tensor_regions(
+            ((1, 1), (1, 2), (1, 3)), dtype, 0)
+        precreated_shm1_handles = self.precreate_register_shape_tensor_regions(
+            ((32, 11), (32, 12), (32, 13)), dtype, 1)
+        precreated_shm2_handles = self.precreate_register_shape_tensor_regions(
+            ((16, 111), (16, 112), (16, 113)), dtype, 2)
+        precreated_shm3_handles = self.precreate_register_shape_tensor_regions(
+            ((1, 1111), (1, 1112), (1, 1113)), dtype, 3)
         try:
             model_name = tu.get_sequence_model_name("plan", dtype)
             protocol = "streaming"
@@ -544,26 +520,14 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         self.clear_deferred_exceptions()
         dtype = np.float32
 
-        precreated_shm0_handles = self.precreate_register_regions(
-            ((1, 1), (12, 2), (2, 3)),
-            dtype,
-            0,
-            model_type="dynaseq_shape_tensor")
-        precreated_shm1_handles = self.precreate_register_regions(
-            ((3, 11), (4, 12), (5, 13)),
-            dtype,
-            1,
-            model_type="dynaseq_shape_tensor")
-        precreated_shm2_handles = self.precreate_register_regions(
-            ((6, 111), (7, 112), (8, 113)),
-            dtype,
-            2,
-            model_type="dynaseq_shape_tensor")
-        precreated_shm3_handles = self.precreate_register_regions(
-            ((9, 1111), (10, 1112), (11, 1113)),
-            dtype,
-            3,
-            model_type="dynaseq_shape_tensor")
+        precreated_shm0_handles = self.precreate_register_dynaseq_shape_tensor_regions(
+            ((1, 1), (12, 2), (2, 3)), dtype, 0)
+        precreated_shm1_handles = self.precreate_register_dynaseq_shape_tensor_regions(
+            ((3, 11), (4, 12), (5, 13)), dtype, 1)
+        precreated_shm2_handles = self.precreate_register_dynaseq_shape_tensor_regions(
+            ((6, 111), (7, 112), (8, 113)), dtype, 2)
+        precreated_shm3_handles = self.precreate_register_dynaseq_shape_tensor_regions(
+            ((9, 1111), (10, 1112), (11, 1113)), dtype, 3)
 
         try:
             model_name = tu.get_dyna_sequence_model_name("plan", dtype)
@@ -685,26 +649,14 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         self.clear_deferred_exceptions()
         dtype = np.float32
 
-        precreated_shm0_handles = self.precreate_register_regions(
-            ((2, 1), (4, 2), (8, 3)),
-            dtype,
-            0,
-            model_type="dynaseq_shape_tensor")
-        precreated_shm1_handles = self.precreate_register_regions(
-            ((2, 11), (4, 12), (8, 13)),
-            dtype,
-            1,
-            model_type="dynaseq_shape_tensor")
-        precreated_shm2_handles = self.precreate_register_regions(
-            ((2, 111), (4, 112), (8, 113)),
-            dtype,
-            2,
-            model_type="dynaseq_shape_tensor")
-        precreated_shm3_handles = self.precreate_register_regions(
-            ((2, 1111), (4, 1112), (8, 1113)),
-            dtype,
-            3,
-            model_type="dynaseq_shape_tensor")
+        precreated_shm0_handles = self.precreate_register_dynaseq_shape_tensor_regions(
+            ((2, 1), (4, 2), (8, 3)), dtype, 0)
+        precreated_shm1_handles = self.precreate_register_dynaseq_shape_tensor_regions(
+            ((2, 11), (4, 12), (8, 13)), dtype, 1)
+        precreated_shm2_handles = self.precreate_register_dynaseq_shape_tensor_regions(
+            ((2, 111), (4, 112), (8, 113)), dtype, 2)
+        precreated_shm3_handles = self.precreate_register_dynaseq_shape_tensor_regions(
+            ((2, 1111), (4, 1112), (8, 1113)), dtype, 3)
 
         try:
             model_name = tu.get_dyna_sequence_model_name("plan", dtype)
