@@ -502,13 +502,12 @@ HTTPAPIServer::status(h2o_handler_t* _self, h2o_req_t* req)
           &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
           H2O_STRLIT("text/plain"));
       h2o_generator_t generator = {NULL, NULL};
-      h2o_iovec_t body = h2o_strdup(&req->pool, status_uri.c_str(), SIZE_MAX);
+      h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
       h2o_start_response(req, &generator);
       h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
       return 0;
     }
   }
-  LOG_VERBOSE(1) << "model_name: " << model_name;
 
   size_t query_len = req->path.len - req->query_at;
   if (req->query_at != SIZE_MAX && (query_len > 1)) {
@@ -522,10 +521,21 @@ HTTPAPIServer::status(h2o_handler_t* _self, h2o_req_t* req)
           &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
           H2O_STRLIT("text/plain"));
       h2o_generator_t generator = {NULL, NULL};
-      h2o_iovec_t body = h2o_strdup(&req->pool, status_uri.c_str(), SIZE_MAX);
+      h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
       h2o_start_response(req, &generator);
       h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
       return 0;
+    }
+  }
+
+  // if accept: application/json then override format from query
+  ssize_t accept_cursor =
+      h2o_find_header_by_str(&req->headers, H2O_STRLIT("accept"), -1);
+  if (accept_cursor != -1) {
+    h2o_iovec_t* slot = &req->headers.entries[accept_cursor].value;
+    std::string accept_header = std::string(slot->base, slot->len);
+    if (accept_header == "application/json") {
+      format = "json";
     }
   }
 
@@ -547,13 +557,12 @@ HTTPAPIServer::status(h2o_handler_t* _self, h2o_req_t* req)
     err = TRTSERVER_ProtobufSerialize(
         server_status_protobuf, &status_buffer, &status_byte_size);
     if (err == nullptr) {
-      // Request text or binary format for status?
+      // Request text, binary or json format for status
       if (format == "binary") {
         h2o_add_header(
             &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
             H2O_STRLIT("application/octet-stream"));
-        body.base = const_cast<char*>(status_buffer);
-        body.len = status_byte_size;
+        body = h2o_strdup(&req->pool, status_buffer, SIZE_MAX);
       } else {
         ServerStatus server_status;
         if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
@@ -567,15 +576,13 @@ HTTPAPIServer::status(h2o_handler_t* _self, h2o_req_t* req)
             h2o_add_header(
                 &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
                 H2O_STRLIT("application/json"));
-            body.base = const_cast<char*>(server_status_json.c_str());
-            body.len = server_status_json.size();
+            body = h2o_strdup(&req->pool, server_status_json.c_str(), SIZE_MAX);
           } else {
             std::string server_status_str = server_status.DebugString();
             h2o_add_header(
                 &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
                 H2O_STRLIT("text/plain"));
-            body.base = const_cast<char*>(server_status_str.c_str());
-            body.len = server_status_str.size();
+            body = h2o_strdup(&req->pool, server_status_str.c_str(), SIZE_MAX);
           }
         }
       }
@@ -589,15 +596,17 @@ HTTPAPIServer::status(h2o_handler_t* _self, h2o_req_t* req)
       &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
       self->http_server->server_id_);
 
-  std::string status_header = std::string(kStatusHTTPHeader);
-  h2o_add_header_by_str(
-      &req->pool, &req->res.headers, status_header.c_str(),
-      status_header.size(), 0, NULL,
-      H2O_STRLIT(request_status.ShortDebugString().c_str()));
+  // TODO Fix NV-Status header
+  // std::string status_header = std::string(kStatusHTTPHeader);
+  // h2o_add_header_by_str(
+  //     &req->pool, &req->res.headers, status_header.c_str(),
+  //     status_header.size(), 0, NULL,
+  //     H2O_STRLIT(request_status.ShortDebugString().c_str()));
 
   if (err == nullptr) {
     req->res.status = 200;
     req->res.reason = "OK";
+    req->res.content_length = body.len;
   } else {
     req->res.status = 400;
     req->res.reason = "Bad Request";

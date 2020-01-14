@@ -570,7 +570,7 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
     err = TRTSERVER_ProtobufSerialize(
         server_status_protobuf, &status_buffer, &status_byte_size);
     if (err == nullptr) {
-      // Request text or binary format for status?
+      // Request text, binary or json format for status
       std::string format;
       const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
       if (format_c_str != NULL) {
