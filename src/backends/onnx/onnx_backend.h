@@ -94,7 +94,7 @@ class OnnxBackend : public InferenceBackend {
     Status SetInputTensor(
         const std::string& name, const DataType data_type, const DimsList& dims,
         size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-        std::vector<std::unique_ptr<char[]>>* input_buffers,
+        std::vector<AllocatedSystemMemory>* input_buffers,
         std::vector<const char*>* input_names);
 
     // Helper function to modify 'input_buffer' into format needed for creating

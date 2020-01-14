@@ -467,7 +467,7 @@ BaseBackend::Context::SetStringInputTensor(
 
     // For string data type, we always need to copy the data to CPU so that
     // we can read string length and construct the string properly.
-    auto buffer_memory_type = TRTSERVER_MEMORY_CPU;
+    auto buffer_memory_type = TRTSERVER_MEMORY_CPU_PINNED;
     int64_t buffer_memory_type_id = 0;
     const char* content;
     size_t content_byte_size = expected_element_cnt * sizeof(uint32_t);
@@ -613,7 +613,7 @@ BaseBackend::Context::ReadStringOutputTensor(
       if (status.IsOk()) {
         bool cuda_used = false;
         status = CopyBuffer(
-            output_name, TRTSERVER_MEMORY_CPU_PINNED /* src_memory_type */,
+            output_name, TRTSERVER_MEMORY_CPU /* src_memory_type */,
             0 /* src_memory_type_id */, actual_memory_type,
             actual_memory_type_id, serialized.size(),
             reinterpret_cast<const void*>(serialized.c_str()), content, stream_,

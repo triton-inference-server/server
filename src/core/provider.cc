@@ -112,11 +112,8 @@ AllocatedSystemMemory::AllocatedSystemMemory(
       }
 
       default: {
-        // [TODO] set memory type to pinned if true, currently always return as
-        // non-pinned until all parts are aware of the new memory type
-        auto tmp_type = memory_type_;
         auto status = PinnedMemoryManager::Alloc(
-            (void**)&buffer_, byte_size, &tmp_type, true);
+            (void**)&buffer_, byte_size, &memory_type_, true);
         if (!status.IsOk()) {
           LOG_ERROR << status.Message();
           buffer_ = nullptr;
