@@ -115,4 +115,6 @@ TRTSERVER_Error* SetTRTSERVER_InferenceRequestOptions(
     TRTSERVER_InferenceRequestOptions* request_options,
     InferRequestHeader request_header_protobuf);
 
+std::string MemoryTypeString(TRTSERVER_Memory_Type memory_type);
+
 }}  // namespace nvidia::inferenceserver

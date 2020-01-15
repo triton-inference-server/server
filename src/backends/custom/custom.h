@@ -54,7 +54,8 @@ extern "C" {
 /// Types of memory recognized by TRTSERVER and custom backend.
 typedef enum custom_memorytype_enum {
   CUSTOM_MEMORY_CPU,
-  CUSTOM_MEMORY_GPU
+  CUSTOM_MEMORY_GPU,
+  CUSTOM_MEMORY_CPU_PINNED
 } CustomMemoryType;
 
 /// The server parameter values provided to custom backends. New

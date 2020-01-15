@@ -56,7 +56,8 @@ class PinnedMemoryManager {
   // be allocated.
   // Return true on success, false otherwise.
   static Status Alloc(
-      void** ptr, uint64_t size, bool allow_nonpinned_fallback = false);
+      void** ptr, uint64_t size, TRTSERVER_Memory_Type* allocated_type,
+      bool allow_nonpinned_fallback = false);
 
   // Free the memory allocated by the pinned memory manager.
   static Status Free(void* ptr);
@@ -65,7 +66,8 @@ class PinnedMemoryManager {
   PinnedMemoryManager(void* pinned_memory_buffer, uint64_t size);
 
   Status AllocInternal(
-      void** ptr, uint64_t size, bool allow_nonpinned_fallback = false);
+      void** ptr, uint64_t size, TRTSERVER_Memory_Type* allocated_type,
+      bool allow_nonpinned_fallback = false);
   Status FreeInternal(void* ptr);
 
  private:

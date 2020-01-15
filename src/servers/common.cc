@@ -134,4 +134,19 @@ SetTRTSERVER_InferenceRequestOptions(
   return nullptr;  // Success
 }
 
+std::string
+MemoryTypeString(TRTSERVER_Memory_Type memory_type)
+{
+  switch (memory_type) {
+    case TRTSERVER_MEMORY_CPU:
+      return "CPU memory";
+    case TRTSERVER_MEMORY_CPU_PINNED:
+      return "Pinned CPU memory";
+    case TRTSERVER_MEMORY_GPU:
+      return "GPU memory";
+    default:
+      return "unknown memory type";
+  }
+}
+
 }}  // namespace nvidia::inferenceserver

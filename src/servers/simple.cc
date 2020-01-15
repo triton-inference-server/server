@@ -73,12 +73,6 @@ Usage(char** argv, const std::string& msg = std::string())
   exit(1);
 }
 
-std::string
-MemoryTypeString(TRTSERVER_Memory_Type memory_type)
-{
-  return (memory_type == TRTSERVER_MEMORY_CPU) ? "CPU memory" : "GPU memory";
-}
-
 TRTSERVER_Error*
 ResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -136,7 +130,7 @@ ResponseAlloc(
       *buffer = allocated_ptr;
       *buffer_userp = new std::string(tensor_name);
       std::cout << "allocated " << byte_size << " bytes in "
-                << MemoryTypeString(*actual_memory_type)
+                << ni::MemoryTypeString(*actual_memory_type)
                 << " for result tensor " << tensor_name << std::endl;
     }
   }
@@ -157,7 +151,7 @@ ResponseRelease(
   }
 
   std::cout << "Releasing buffer " << buffer << " of size " << byte_size
-            << " in " << MemoryTypeString(memory_type) << " for result '"
+            << " in " << ni::MemoryTypeString(memory_type) << " for result '"
             << *name << "'" << std::endl;
   if (memory_type == TRTSERVER_MEMORY_CPU) {
     free(buffer);
@@ -605,8 +599,8 @@ main(int argc, char** argv)
     FAIL(
         "unexpected output0 memory type, expected to be allocated "
         "in " +
-        MemoryTypeString(TRTSERVER_MEMORY_CPU) + ", got " +
-        MemoryTypeString(output0_memory_type) + ", id " +
+        ni::MemoryTypeString(TRTSERVER_MEMORY_CPU) + ", got " +
+        ni::MemoryTypeString(output0_memory_type) + ", id " +
         std::to_string(output0_memory_type_id));
   }
 
@@ -629,8 +623,8 @@ main(int argc, char** argv)
     FAIL(
         "unexpected output1 memory type, expected to be allocated "
         "in " +
-        MemoryTypeString(TRTSERVER_MEMORY_CPU) + ", got " +
-        MemoryTypeString(output1_memory_type) + ", id " +
+        ni::MemoryTypeString(TRTSERVER_MEMORY_CPU) + ", got " +
+        ni::MemoryTypeString(output1_memory_type) + ", id " +
         std::to_string(output1_memory_type_id));
   }
 

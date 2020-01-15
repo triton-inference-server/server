@@ -80,16 +80,19 @@ CopyBuffer(
 {
   *cuda_used = false;
 
-  if ((src_memory_type == TRTSERVER_MEMORY_CPU) &&
-      (dst_memory_type == TRTSERVER_MEMORY_CPU)) {
+  // For CUDA memcpy, all host to host copy will be blocked in respect to the
+  // host, so use memcpy() directly. In this case, need to be careful on whether
+  // the src buffer is valid.
+  if ((src_memory_type != TRTSERVER_MEMORY_GPU) &&
+      (dst_memory_type != TRTSERVER_MEMORY_GPU)) {
     memcpy(dst, src, byte_size);
   } else {
 #ifdef TRTIS_ENABLE_GPU
     // [TODO] use cudaMemcpyDefault if UVM is supported for the device
     auto copy_kind = cudaMemcpyDeviceToDevice;
-    if (src_memory_type == TRTSERVER_MEMORY_CPU) {
+    if (src_memory_type != TRTSERVER_MEMORY_GPU) {
       copy_kind = cudaMemcpyHostToDevice;
-    } else if (dst_memory_type == TRTSERVER_MEMORY_CPU) {
+    } else if (dst_memory_type != TRTSERVER_MEMORY_GPU) {
       copy_kind = cudaMemcpyDeviceToHost;
     }
 

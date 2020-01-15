@@ -47,6 +47,8 @@ ToCustomMemoryType(TRTSERVER_Memory_Type memory_type)
   switch (memory_type) {
     case TRTSERVER_MEMORY_GPU:
       return CUSTOM_MEMORY_GPU;
+    case TRTSERVER_MEMORY_CPU_PINNED:
+      return CUSTOM_MEMORY_CPU_PINNED;
     default:
       break;
   }
@@ -59,6 +61,8 @@ ToTRTServerMemoryType(CustomMemoryType memory_type)
   switch (memory_type) {
     case CUSTOM_MEMORY_GPU:
       return TRTSERVER_MEMORY_GPU;
+    case CUSTOM_MEMORY_CPU_PINNED:
+      return TRTSERVER_MEMORY_CPU_PINNED;
     default:
       break;
   }
