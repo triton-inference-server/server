@@ -45,7 +45,6 @@ option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" OFF)
 option(TRTIS_ENABLE_HTTP "Include HTTP API in server" ON)
 option(TRTIS_ENABLE_GRPC "Include GRPC API in server" ON)
 option(TRTIS_ENABLE_HTTP_V2 "Enable version 2 of the HTTP API in server" OFF)
-option(TRTIS_ENABLE_HTTP_H2O "Enable h2o version of the HTTP API in server" OFF)
 option(TRTIS_ENABLE_METRICS "Include metrics support in server" ON)
 
 # Cloud storage
@@ -74,10 +73,6 @@ endif()
 
 if(TRTIS_ENABLE_TENSORRT AND NOT TRTIS_ENABLE_GPU)
   message(FATAL_ERROR "TRTIS_ENABLE_TENSORRT=ON requires TRTIS_ENABLE_GPU=ON")
-endif()
-
-if(TRTIS_ENABLE_HTTP_V2 AND TRTIS_ENABLE_HTTP_H2O)
-  message(FATAL_ERROR "TRTIS_ENABLE_HTTP_V2=ON requires TRTIS_ENABLE_HTTP_H2O=OFF")
 endif()
 
 if(TRTIS_ENABLE_HTTP_V2 AND NOT TRTIS_ENABLE_HTTP)
@@ -212,32 +207,6 @@ ExternalProject_Add(libevent
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
     -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install
-)
-
-#
-# Build libevhtp
-#
-# Need to patch due to https://github.com/criticalstack/libevhtp/issues/135
-#
-ExternalProject_Add(libevhtp
-  PREFIX libevhtp
-  URL "https://github.com/criticalstack/libevhtp/archive/1.2.18.zip"
-  URL_HASH SHA256=3194dc6eb4e8d6aa1e7dd3dc60bfbe066f38f9a0b5881463f0e149badd82a7bb
-  PATCH_COMMAND sed -i "s/LibEvent/Libevent/g" ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/CMakeLists.txt
-  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/evhtp.c.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/evhtp.c
-  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/evhtp.h.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/include/evhtp/evhtp.h
-  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/config.h.in.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/include/evhtp/config.h.in
-  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp"
-  CMAKE_CACHE_ARGS
-    -DEVHTP_DISABLE_REGEX:BOOL=ON
-    -DEVHTP_DISABLE_SSL:BOOL=ON
-    -DEVHTP_TRTIS_ENABLE_HTTP_CONTIGUOUS:BOOL=ON
-    -DEVHTP_TRTIS_ENABLE_TRACING:BOOL=${TRTIS_ENABLE_TRACING}
-    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
-    -DLibevent_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install/lib/cmake/libevent
-    -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
-    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevhtp/install
-  DEPENDS libevent
 )
 
 #
@@ -421,9 +390,6 @@ endif() # TRTIS_ENABLE_GCS
 if(${TRTIS_ENABLE_S3})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} aws-sdk-cpp)
 endif() # TRTIS_ENABLE_S3
-if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
-  set(TRTIS_DEPENDS ${TRTIS_DEPENDS} libevent libevhtp)
-endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 if(${TRTIS_ENABLE_GRPC})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} grpc)
 endif() # TRTIS_ENABLE_GRPC
@@ -441,8 +407,6 @@ ExternalProject_Add(trtis
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
-    -DLibevent_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install/lib/cmake/libevent
-    -Dlibevhtp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevhtp/install/lib/cmake/libevhtp
     -Dprometheus-cpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/install/lib/cmake/prometheus-cpp
     -Dstorage_client_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/storage_client
     -Dgoogle_cloud_cpp_common_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/google_cloud_cpp_common
@@ -464,7 +428,6 @@ ExternalProject_Add(trtis
     -DTRTIS_ENABLE_HTTP:BOOL=${TRTIS_ENABLE_HTTP}
     -DTRTIS_ENABLE_GRPC:BOOL=${TRTIS_ENABLE_GRPC}
     -DTRTIS_ENABLE_HTTP_V2:BOOL=${TRTIS_ENABLE_HTTP_V2}
-    -DTRTIS_ENABLE_HTTP_H2O:BOOL=${TRTIS_ENABLE_HTTP_H2O}
     -DTRTIS_MIN_COMPUTE_CAPABILITY:STRING=${TRTIS_MIN_COMPUTE_CAPABILITY}
     -DTRTIS_ENABLE_METRICS:BOOL=${TRTIS_ENABLE_METRICS}
     -DTRTIS_ENABLE_GCS:BOOL=${TRTIS_ENABLE_GCS}

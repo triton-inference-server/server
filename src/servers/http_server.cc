@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,12 +25,23 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "src/servers/http_server.h"
-
-#include <event2/buffer.h>
-#include <evhtp/evhtp.h>
-#include <google/protobuf/text_format.h>
+#include <errno.h>
 #include <google/protobuf/util/json_util.h>
+#include <h2o.h>
+#include <h2o/cache.h>
+#include <h2o/memcached.h>
+#include <h2o/serverutil.h>
+#include <openssl/ssl.h>
+#include <pthread.h>
 #include <re2/re2.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/resource.h>
+#include <sys/signalfd.h>
+#include <sys/time.h>
+#include <unistd.h>
 #include <algorithm>
 #include <thread>
 #include "src/core/api.pb.h"
@@ -47,154 +58,14 @@
 #include "src/servers/tracer.h"
 #endif  // TRTIS_ENABLE_TRACING
 
+#define USE_HTTPS 0
+#define USE_MEMCACHED 0
+#define DEFAULT_CACHE_LINE_SIZE 128
+
 namespace nvidia { namespace inferenceserver {
 
-// Generic HTTP server using evhtp
-class HTTPServerImpl : public HTTPServer {
- public:
-  explicit HTTPServerImpl(const int32_t port, const int thread_cnt)
-      : port_(port), thread_cnt_(thread_cnt)
-  {
-  }
-
-  virtual ~HTTPServerImpl() { Stop(); }
-
-  static void Dispatch(evhtp_request_t* req, void* arg);
-
-  TRTSERVER_Error* Start() override;
-  TRTSERVER_Error* Stop() override;
-
- protected:
-  virtual void Handle(evhtp_request_t* req) = 0;
-
-  static void StopCallback(int sock, short events, void* arg);
-
-  int32_t port_;
-  int thread_cnt_;
-
-  evhtp_t* htp_;
-  struct event_base* evbase_;
-  std::thread worker_;
-  int fds_[2];
-  event* break_ev_;
-};
-
-TRTSERVER_Error*
-HTTPServerImpl::Start()
-{
-  if (!worker_.joinable()) {
-    evbase_ = event_base_new();
-    htp_ = evhtp_new(evbase_, NULL);
-    evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_NODELAY);
-    evhtp_set_gencb(htp_, HTTPServerImpl::Dispatch, this);
-    evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
-    evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024);
-    // Set listening event for breaking event loop
-    evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, fds_);
-    break_ev_ = event_new(evbase_, fds_[0], EV_READ, StopCallback, evbase_);
-    event_add(break_ev_, NULL);
-    worker_ = std::thread(event_base_loop, evbase_, 0);
-    return nullptr;
-  }
-
-  return TRTSERVER_ErrorNew(
-      TRTSERVER_ERROR_ALREADY_EXISTS, "HTTP server is already running.");
-}
-
-TRTSERVER_Error*
-HTTPServerImpl::Stop()
-{
-  if (worker_.joinable()) {
-    // Notify event loop to break via fd write
-    send(fds_[1], &evbase_, sizeof(event_base*), 0);
-    worker_.join();
-    event_free(break_ev_);
-    evutil_closesocket(fds_[0]);
-    evutil_closesocket(fds_[1]);
-    evhtp_unbind_socket(htp_);
-    evhtp_free(htp_);
-    event_base_free(evbase_);
-    return nullptr;
-  }
-
-  return TRTSERVER_ErrorNew(
-      TRTSERVER_ERROR_UNAVAILABLE, "HTTP server is not running.");
-}
-
-void
-HTTPServerImpl::StopCallback(int sock, short events, void* arg)
-{
-  struct event_base* base = (struct event_base*)arg;
-  event_base_loopbreak(base);
-}
-
-void
-HTTPServerImpl::Dispatch(evhtp_request_t* req, void* arg)
-{
-  (static_cast<HTTPServerImpl*>(arg))->Handle(req);
-}
-
-#ifdef TRTIS_ENABLE_METRICS
-
-// Handle HTTP requests to obtain prometheus metrics
-class HTTPMetricsServer : public HTTPServerImpl {
- public:
-  explicit HTTPMetricsServer(
-      const std::shared_ptr<TRTSERVER_Server>& server, const int32_t port,
-      const int thread_cnt)
-      : HTTPServerImpl(port, thread_cnt), server_(server),
-        api_regex_(R"(/metrics/?)")
-  {
-  }
-
-  ~HTTPMetricsServer() = default;
-
- private:
-  void Handle(evhtp_request_t* req) override;
-
-  std::shared_ptr<TRTSERVER_Server> server_;
-  re2::RE2 api_regex_;
-};
-
-void
-HTTPMetricsServer::Handle(evhtp_request_t* req)
-{
-  LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
-                 << req->uri->path->full;
-
-  if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  evhtp_res res = EVHTP_RES_BADREQ;
-
-  // Call to metric endpoint should not have any trailing string
-  if (RE2::FullMatch(std::string(req->uri->path->full), api_regex_)) {
-    TRTSERVER_Metrics* metrics = nullptr;
-    TRTSERVER_Error* err = TRTSERVER_ServerMetrics(server_.get(), &metrics);
-    if (err == nullptr) {
-      const char* base;
-      size_t byte_size;
-      err = TRTSERVER_MetricsFormatted(
-          metrics, TRTSERVER_METRIC_PROMETHEUS, &base, &byte_size);
-      if (err == nullptr) {
-        res = EVHTP_RES_OK;
-        evbuffer_add(req->buffer_out, base, byte_size);
-      }
-    }
-
-    TRTSERVER_MetricsDelete(metrics);
-    TRTSERVER_ErrorDelete(err);
-  }
-
-  evhtp_send_reply(req, res);
-}
-
-#endif  // TRTIS_ENABLE_METRICS
-
 // Handle HTTP requests to inference server APIs
-class HTTPAPIServer : public HTTPServerImpl {
+class HTTPAPIServer : public HTTPServer {
  public:
   explicit HTTPAPIServer(
       const std::shared_ptr<TRTSERVER_Server>& server,
@@ -203,17 +74,9 @@ class HTTPAPIServer : public HTTPServerImpl {
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
       const std::vector<std::string>& endpoints, const int32_t port,
       const int thread_cnt)
-      : HTTPServerImpl(port, thread_cnt), server_(server),
-        trace_manager_(trace_manager), smb_manager_(smb_manager),
-        endpoint_names_(endpoints), allocator_(nullptr),
-        api_regex_(
-            R"(/api/(health|infer|status|modelcontrol|sharedmemorycontrol|repository)(.*))"),
-        health_regex_(R"(/(live|ready))"),
-        infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
-        modelcontrol_regex_(R"(/(load|unload)/([^/]+))"),
-        sharedmemorycontrol_regex_(
-            R"(/(register|cudaregister|unregister|status)(.*))"),
-        repository_regex_(R"(/(index))")
+      : server_(server), trace_manager_(trace_manager),
+        smb_manager_(smb_manager), endpoint_names_(endpoints),
+        allocator_(nullptr), port_(port), thread_cnt_(thread_cnt)
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -229,49 +92,16 @@ class HTTPAPIServer : public HTTPServerImpl {
 
   ~HTTPAPIServer()
   {
+    Stop();
     LOG_IF_ERR(
         TRTSERVER_ResponseAllocatorDelete(allocator_),
         "deleting response allocator");
   }
 
-  using EVBufferPair = std::pair<
-      evbuffer*,
-      std::unordered_map<
-          std::string,
-          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>>;
-
-  // Class object associated to evhtp thread, requests received are bounded
-  // with the thread that accepts it. Need to keep track of that and let the
-  // corresponding thread send back the reply
-  class InferRequest {
-   public:
-    InferRequest(
-        evhtp_request_t* req, uint64_t request_id, const char* server_id,
-        uint64_t unique_id);
-    ~InferRequest() = default;
-
-    evhtp_request_t* EvHtpRequest() const { return req_; }
-
-    static void InferComplete(
-        TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
-        TRTSERVER_InferenceResponse* response, void* userp);
-    evhtp_res FinalizeResponse(TRTSERVER_InferenceResponse* response);
-
-#ifdef TRTIS_ENABLE_TRACING
-    std::unique_ptr<TraceMetaData> trace_meta_data_;
-#endif  // TRTIS_ENABLE_TRACING
-
-    std::unique_ptr<EVBufferPair> response_pair_;
-
-   private:
-    evhtp_request_t* req_;
-    evthr_t* thread_;
-    const uint64_t request_id_;
-    const char* const server_id_;
-    const uint64_t unique_id_;
-  };
-
  private:
+  TRTSERVER_Error* Start() override;
+  TRTSERVER_Error* Stop() override;
+
   static TRTSERVER_Error* ResponseAlloc(
       TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
       size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
@@ -283,32 +113,23 @@ class HTTPAPIServer : public HTTPServerImpl {
       size_t byte_size, TRTSERVER_Memory_Type memory_type,
       int64_t memory_type_id);
 
-  void Handle(evhtp_request_t* req) override;
-  void HandleHealth(evhtp_request_t* req, const std::string& health_uri);
-  void HandleInfer(evhtp_request_t* req, const std::string& infer_uri);
-  void HandleStatus(evhtp_request_t* req, const std::string& status_uri);
-  void HandleRepository(
-      evhtp_request_t* req, const std::string& repository_uri);
-  void HandleModelControl(
-      evhtp_request_t* req, const std::string& modelcontrol_uri);
-  void HandleSharedMemoryControl(
-      evhtp_request_t* req, const std::string& sharedmemorycontrol_uri);
+  int create_listener(int32_t port);
+  static void on_accept(uv_stream_t* listener, int status);
+  int setup_ssl(
+      const char* cert_file, const char* key_file, const char* ciphers);
+  h2o_pathconf_t* register_handler(
+      h2o_hostconf_t* hostconf, const char* path,
+      int (*on_req)(h2o_handler_t*, h2o_req_t*));
 
-#ifdef TRTIS_ENABLE_GPU
-  TRTSERVER_Error* EVBufferToCudaHandle(
-      evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle);
-#endif  // TRTIS_ENABLE_GPU
-  TRTSERVER_Error* EVBufferToInput(
-      const std::string& model_name, const InferRequestHeader& request_header,
-      evbuffer* input_buffer,
-      TRTSERVER_InferenceRequestProvider* request_provider,
-      std::unordered_map<
-          std::string,
-          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
-          output_shm_map);
+  static int Health(h2o_handler_t* handler_self, h2o_req_t* req);
+  static int Status(h2o_handler_t* handler_self, h2o_req_t* req);
 
-  static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
-  static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
+  h2o_globalconf_t config;
+  h2o_context_t ctx;
+  h2o_accept_ctx_t accept_ctx;
+  h2o_multithread_receiver_t libmemcached_receiver;
+  uv_tcp_t listener;
+  bool exit_loop = true;
 
   std::shared_ptr<TRTSERVER_Server> server_;
   const char* server_id_;
@@ -321,249 +142,279 @@ class HTTPAPIServer : public HTTPServerImpl {
   // inference result tensors.
   TRTSERVER_ResponseAllocator* allocator_;
 
-  re2::RE2 api_regex_;
-  re2::RE2 health_regex_;
-  re2::RE2 infer_regex_;
-  re2::RE2 status_regex_;
-  re2::RE2 modelcontrol_regex_;
-  re2::RE2 sharedmemorycontrol_regex_;
-  re2::RE2 repository_regex_;
+  int32_t port_;
+  int thread_cnt_;
 };
 
-TRTSERVER_Error*
-HTTPAPIServer::ResponseAlloc(
-    TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
-    size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
-    int64_t preferred_memory_type_id, void* userp, void** buffer,
-    void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
-    int64_t* actual_memory_type_id)
-{
-  auto userp_pair = reinterpret_cast<EVBufferPair*>(userp);
-  evbuffer* evhttp_buffer = reinterpret_cast<evbuffer*>(userp_pair->first);
-  const std::unordered_map<
-      std::string,
-      std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
-      output_shm_map = userp_pair->second;
-
-  *buffer = nullptr;
-  *buffer_userp = nullptr;
-  *actual_memory_type = preferred_memory_type;
-  *actual_memory_type_id = preferred_memory_type_id;
-
-  // Don't need to do anything if no memory was requested.
-  if (byte_size > 0) {
-    auto pr = output_shm_map.find(tensor_name);
-    if (pr != output_shm_map.end()) {
-      // If the output is in shared memory then check that the expected buffer
-      // size is at least the byte size of the output.
-      if (byte_size > std::get<1>(pr->second)) {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INTERNAL,
-            std::string(
-                "expected buffer size to be at least " +
-                std::to_string(std::get<1>(pr->second)) + " bytes but gets " +
-                std::to_string(byte_size) + " bytes in output tensor")
-                .c_str());
-      }
-
-      *buffer = const_cast<void*>(std::get<0>(pr->second));
-      *actual_memory_type = std::get<2>(pr->second);
-      *actual_memory_type_id = std::get<3>(pr->second);
-    } else {
-      // Can't allocate for any memory type other than CPU.
-      if (preferred_memory_type != TRTSERVER_MEMORY_CPU) {
-        LOG_VERBOSE(1) << "HTTP: unable to provide '" << tensor_name << "' in "
-                       << MemoryTypeString(preferred_memory_type)
-                       << ", will use "
-                       << MemoryTypeString(TRTSERVER_MEMORY_CPU);
-        *actual_memory_type = TRTSERVER_MEMORY_CPU;
-        *actual_memory_type_id = 0;
-      }
-
-      // Reserve requested space in evbuffer...
-      struct evbuffer_iovec output_iovec;
-      if (evbuffer_reserve_space(evhttp_buffer, byte_size, &output_iovec, 1) !=
-          1) {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INTERNAL,
-            std::string(
-                "failed to reserve " + std::to_string(byte_size) +
-                " bytes in output tensor buffer")
-                .c_str());
-      }
-
-      if (output_iovec.iov_len < byte_size) {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INTERNAL,
-            std::string(
-                "reserved " + std::to_string(output_iovec.iov_len) +
-                " bytes in output tensor buffer, need " +
-                std::to_string(byte_size))
-                .c_str());
-      }
-
-      output_iovec.iov_len = byte_size;
-      *buffer = output_iovec.iov_base;
-
-      // Immediately commit the buffer space. We are relying on evbuffer
-      // not to relocate this space. Because we request a contiguous
-      // chunk every time (above by allowing only a single entry in
-      // output_iovec), this seems to be a valid assumption.
-      if (evbuffer_commit_space(evhttp_buffer, &output_iovec, 1) != 0) {
-        *buffer = nullptr;
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INTERNAL,
-            "failed to commit output tensors to output buffer");
-      }
-    }
-  }
-
-  LOG_VERBOSE(1) << "HTTP allocation: '" << tensor_name
-                 << "', size: " << byte_size << ", addr: " << *buffer;
-
-  return nullptr;  // Success
-}
-
-TRTSERVER_Error*
-HTTPAPIServer::ResponseRelease(
-    TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
-    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
-{
-  LOG_VERBOSE(1) << "HTTP release: "
-                 << "size " << byte_size << ", addr " << buffer;
-
-  // Don't do anything when releasing a buffer since ResponseAlloc
-  // wrote directly into the response ebvuffer.
-  return nullptr;  // Success
-}
+struct h2o_custom_req_handler_t {
+  h2o_handler_t super;
+  HTTPAPIServer* http_server;
+};
 
 void
-HTTPAPIServer::Handle(evhtp_request_t* req)
+HTTPAPIServer::on_accept(uv_stream_t* listener, int status)
 {
-  LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
-                 << req->uri->path->full;
+  HTTPAPIServer* http_server = reinterpret_cast<HTTPAPIServer*>(listener->data);
+  uv_tcp_t* conn;
+  h2o_socket_t* sock;
 
-  std::string endpoint, rest;
-  if (RE2::FullMatch(
-          std::string(req->uri->path->full), api_regex_, &endpoint, &rest)) {
-    // status
-    if (endpoint == "status" &&
-        (std::find(endpoint_names_.begin(), endpoint_names_.end(), "status") !=
-         endpoint_names_.end())) {
-      HandleStatus(req, rest);
-      return;
-    }
-    // health
-    if (endpoint == "health" &&
-        (std::find(endpoint_names_.begin(), endpoint_names_.end(), "health") !=
-         endpoint_names_.end())) {
-      HandleHealth(req, rest);
-      return;
-    }
-    // infer
-    if (endpoint == "infer" &&
-        (std::find(endpoint_names_.begin(), endpoint_names_.end(), "infer") !=
-         endpoint_names_.end())) {
-      HandleInfer(req, rest);
-      return;
-    }
-    // modelcontrol
-    if (endpoint == "modelcontrol" &&
-        (std::find(
-             endpoint_names_.begin(), endpoint_names_.end(), "modelcontrol") !=
-         endpoint_names_.end())) {
-      HandleModelControl(req, rest);
-      return;
-    }
-    // sharedmemorycontrol
-    if (endpoint == "sharedmemorycontrol" &&
-        (std::find(
-             endpoint_names_.begin(), endpoint_names_.end(),
-             "sharedmemorycontrol") != endpoint_names_.end())) {
-      HandleSharedMemoryControl(req, rest);
-      return;
-    }
-    // repository
-    if (endpoint == "repository" &&
-        (std::find(
-             endpoint_names_.begin(), endpoint_names_.end(), "repository") !=
-         endpoint_names_.end())) {
-      HandleRepository(req, rest);
-      return;
-    }
-  }
+  if (status != 0)
+    return;
 
-  LOG_VERBOSE(1) << "HTTP error: " << req->method << " " << req->uri->path->full
-                 << " - " << static_cast<int>(EVHTP_RES_BADREQ);
-  evhtp_send_reply(req, EVHTP_RES_BADREQ);
-}
+  conn = reinterpret_cast<uv_tcp_t*>(h2o_mem_alloc(sizeof(*conn)));
+  uv_tcp_init(listener->loop, conn);
 
-void
-HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& health_uri)
-{
-  if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+  if (uv_accept(listener, (uv_stream_t*)conn) != 0) {
+    uv_close((uv_handle_t*)conn, (uv_close_cb)free);
     return;
   }
 
+  sock = h2o_uv_socket_create((uv_stream_t*)conn, (uv_close_cb)free);
+  h2o_accept(&http_server->accept_ctx, sock);
+}
+
+int
+HTTPAPIServer::create_listener(int32_t port)
+{
+  struct sockaddr_in addr;
+  int r;
+
+  uv_tcp_init(ctx.loop, &listener);
+  uv_ip4_addr("0.0.0.0", port, &addr);
+  if ((r = uv_tcp_bind(&listener, (struct sockaddr*)&addr, 0)) != 0) {
+    LOG_VERBOSE(1) << stderr << "uv_tcp_bind:" << uv_strerror(r);
+    goto Error;
+  }
+  if ((r = uv_listen((uv_stream_t*)&listener, 128, on_accept)) != 0) {
+    LOG_VERBOSE(1) << stderr << "uv_listen:" << uv_strerror(r);
+    goto Error;
+  }
+
+  listener.data = this;
+
+  return 0;
+Error:
+  uv_close((uv_handle_t*)&listener, NULL);
+  return r;
+}
+
+int
+HTTPAPIServer::setup_ssl(
+    const char* cert_file, const char* key_file, const char* ciphers)
+{
+  SSL_load_error_strings();
+  SSL_library_init();
+  OpenSSL_add_all_algorithms();
+
+  accept_ctx.ssl_ctx = SSL_CTX_new(SSLv23_server_method());
+  SSL_CTX_set_options(accept_ctx.ssl_ctx, SSL_OP_NO_SSLv2);
+
+#ifdef SSL_CTX_set_ecdh_auto
+  SSL_CTX_set_ecdh_auto(accept_ctx.ssl_ctx, 1);
+#endif
+
+  /* load certificate and private key */
+  if (SSL_CTX_use_certificate_chain_file(accept_ctx.ssl_ctx, cert_file) != 1) {
+    fprintf(
+        stderr,
+        "an error occurred while trying to load server certificate file:%s\n",
+        cert_file);
+    return -1;
+  }
+  if (SSL_CTX_use_PrivateKey_file(
+          accept_ctx.ssl_ctx, key_file, SSL_FILETYPE_PEM) != 1) {
+    fprintf(
+        stderr, "an error occurred while trying to load private key file:%s\n",
+        key_file);
+    return -1;
+  }
+
+  if (SSL_CTX_set_cipher_list(accept_ctx.ssl_ctx, ciphers) != 1) {
+    fprintf(stderr, "ciphers could not be set: %s\n", ciphers);
+    return -1;
+  }
+
+  /* setup protocol negotiation methods */
+#if H2O_USE_NPN
+  h2o_ssl_register_npn_protocols(accept_ctx.ssl_ctx, h2o_http2_npn_protocols);
+#endif
+#if H2O_USE_ALPN
+  h2o_ssl_register_alpn_protocols(accept_ctx.ssl_ctx, h2o_http2_alpn_protocols);
+#endif
+
+  return 0;
+}
+
+h2o_pathconf_t*
+HTTPAPIServer::register_handler(
+    h2o_hostconf_t* hostconf, const char* path,
+    int (*on_req)(h2o_handler_t*, h2o_req_t*))
+{
+  h2o_pathconf_t* pathconf = h2o_config_register_path(hostconf, path, 0);
+  h2o_custom_req_handler_t* handler =
+      reinterpret_cast<h2o_custom_req_handler_t*>(
+          h2o_create_handler(pathconf, sizeof(*handler)));
+  handler->http_server = this;
+  handler->super.on_req = on_req;
+  return pathconf;
+}
+
+int
+HTTPAPIServer::Health(h2o_handler_t* handler_self, h2o_req_t* req)
+{
+  h2o_custom_req_handler_t* self = (h2o_custom_req_handler_t*)handler_self;
+  if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET"))) {
+    req->res.status = 400;
+    req->res.reason = "Only GET method is allowed";
+    h2o_add_header(
+        &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+        H2O_STRLIT("text/plain"));
+    h2o_generator_t generator = {NULL, NULL};
+    h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+    h2o_start_response(req, &generator);
+    h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+    return 0;
+  }
+
+  re2::RE2 health_regex_(R"(/api/health/(live|ready))");
+  std::string health_uri =
+      std::string(req->path_normalized.base, req->path_normalized.len);
   std::string mode;
   if ((health_uri.empty()) ||
       (!RE2::FullMatch(health_uri, health_regex_, &mode))) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
+    req->res.status = 400;
+    req->res.reason = "Bad request";
+    h2o_add_header(
+        &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+        H2O_STRLIT("text/plain"));
+    h2o_generator_t generator = {NULL, NULL};
+    h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+    h2o_start_response(req, &generator);
+    h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+    return 0;
   }
 
   TRTSERVER_Error* err = nullptr;
   bool health = false;
 
   if (mode == "live") {
-    err = TRTSERVER_ServerIsLive(server_.get(), &health);
+    err = TRTSERVER_ServerIsLive(self->http_server->server_.get(), &health);
   } else if (mode == "ready") {
-    err = TRTSERVER_ServerIsReady(server_.get(), &health);
-  } else {
-    err = TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_UNKNOWN,
-        std::string("unknown health mode '" + mode + "'").c_str());
+    err = TRTSERVER_ServerIsReady(self->http_server->server_.get(), &health);
   }
+
+  h2o_generator_t generator = {NULL, NULL};
+  h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
 
   RequestStatus request_status;
   RequestStatusUtil::Create(
       &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
-      server_id_);
+      self->http_server->server_id_);
 
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
+  // Add NV-Status header
+  std::string status_header = std::string(kStatusHTTPHeader);
+  h2o_iovec_t status_header_content = h2o_strdup(
+      &req->pool, request_status.ShortDebugString().c_str(), SIZE_MAX);
+  h2o_add_header_by_str(
+      &req->pool, &req->res.headers, status_header.c_str(),
+      status_header.size(), 0, NULL, status_header_content.base,
+      status_header_content.len);
+  h2o_add_header(
+      &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+      H2O_STRLIT("text/plain"));
 
-  evhtp_send_reply(
-      req, (health && (err == nullptr)) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
-
-  TRTSERVER_ErrorDelete(err);
-}
-
-void
-HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
-{
-  if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+  if (health && (err == nullptr)) {
+    req->res.status = 200;
+    req->res.reason = "OK";
+    req->res.content_length = body.len;
+  } else {
+    req->res.status = 400;
+    req->res.reason = "Bad request";
   }
 
-  std::string model_name;
+  h2o_start_response(req, &generator);
+  h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+  return 0;
+}
+
+int
+HTTPAPIServer::Status(h2o_handler_t* handler_self, h2o_req_t* req)
+{
+  h2o_custom_req_handler_t* self = (h2o_custom_req_handler_t*)handler_self;
+  re2::RE2 status_regex(R"(/api/status(/(.*))?)");
+  if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET"))) {
+    req->res.status = 400;
+    req->res.reason = "Only GET method is allowed";
+    h2o_add_header(
+        &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+        H2O_STRLIT("text/plain"));
+    h2o_generator_t generator = {NULL, NULL};
+    h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+    h2o_start_response(req, &generator);
+    h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+    return 0;
+  }
+
+  std::string status_uri =
+      std::string(req->path_normalized.base, req->path_normalized.len);
+  std::string model_name, format = "text";
   if (!status_uri.empty()) {
-    if (!RE2::FullMatch(status_uri, status_regex_, &model_name)) {
-      evhtp_send_reply(req, EVHTP_RES_BADREQ);
-      return;
+    if (!RE2::FullMatch(status_uri, status_regex, &model_name)) {
+      req->res.status = 400;
+      req->res.reason = "Bad request";
+      h2o_add_header(
+          &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+          H2O_STRLIT("text/plain"));
+      h2o_generator_t generator = {NULL, NULL};
+      h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+      h2o_start_response(req, &generator);
+      h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+      return 0;
+    }
+  }
+
+  size_t query_len = req->path.len - req->query_at;
+  if (req->query_at != SIZE_MAX && (query_len > 1)) {
+    if (h2o_memis(&req->path.base[req->query_at], 8, "?format=", 8)) {
+      format = std::string(&req->path.base[req->query_at + 8]);
+      format = format.substr(0, format.find(' '));
+    } else {
+      req->res.status = 400;
+      req->res.reason = "Bad request";
+      h2o_add_header(
+          &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+          H2O_STRLIT("text/plain"));
+      h2o_generator_t generator = {NULL, NULL};
+      h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+      h2o_start_response(req, &generator);
+      h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+      return 0;
+    }
+  }
+
+  // if accept: application/json then override format from query
+  ssize_t accept_cursor =
+      h2o_find_header_by_str(&req->headers, H2O_STRLIT("accept"), -1);
+  if (accept_cursor != -1) {
+    h2o_iovec_t* slot = &req->headers.entries[accept_cursor].value;
+    std::string accept_header = std::string(slot->base, slot->len);
+    if (accept_header == "application/json") {
+      format = "json";
     }
   }
 
   TRTSERVER_Protobuf* server_status_protobuf = nullptr;
   TRTSERVER_Error* err =
       (model_name.empty())
-          ? TRTSERVER_ServerStatus(server_.get(), &server_status_protobuf)
+          ? TRTSERVER_ServerStatus(
+                self->http_server->server_.get(), &server_status_protobuf)
           : TRTSERVER_ServerModelStatus(
-                server_.get(), model_name.c_str(), &server_status_protobuf);
+                self->http_server->server_.get(), model_name.c_str(),
+                &server_status_protobuf);
+
+  h2o_generator_t generator = {NULL, NULL};
+  h2o_iovec_t body;
+
   if (err == nullptr) {
     const char* status_buffer;
     size_t status_byte_size;
@@ -571,31 +422,11 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
         server_status_protobuf, &status_buffer, &status_byte_size);
     if (err == nullptr) {
       // Request text, binary or json format for status
-      std::string format;
-      const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
-      if (format_c_str != NULL) {
-        format = std::string(format_c_str);
-      } else {
-        // If format empty, Accept: application/json in header then return json
-        const char* header_accept_c_str =
-            evhtp_kv_find(req->headers_in, "Accept");
-        if (header_accept_c_str != NULL) {
-          std::string header_accept = std::string(header_accept_c_str);
-          if (header_accept == "application/json") {
-            format = "json";
-          } else {
-            format = "text";
-          }
-        } else {
-          format = "text";
-        }
-      }
-
       if (format == "binary") {
-        evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
-        evhtp_headers_add_header(
-            req->headers_out,
-            evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
+        h2o_add_header(
+            &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+            H2O_STRLIT("application/octet-stream"));
+        body = h2o_strdup(&req->pool, status_buffer, SIZE_MAX);
       } else {
         ServerStatus server_status;
         if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
@@ -606,14 +437,16 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
             std::string server_status_json;
             ::google::protobuf::util::MessageToJsonString(
                 server_status, &server_status_json);
-            evbuffer_add(
-                req->buffer_out, server_status_json.c_str(),
-                server_status_json.size());
+            h2o_add_header(
+                &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+                H2O_STRLIT("application/json"));
+            body = h2o_strdup(&req->pool, server_status_json.c_str(), SIZE_MAX);
           } else {
             std::string server_status_str = server_status.DebugString();
-            evbuffer_add(
-                req->buffer_out, server_status_str.c_str(),
-                server_status_str.size());
+            h2o_add_header(
+                &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+                H2O_STRLIT("text/plain"));
+            body = h2o_strdup(&req->pool, server_status_str.c_str(), SIZE_MAX);
           }
         }
       }
@@ -625,791 +458,140 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
   RequestStatus request_status;
   RequestStatusUtil::Create(
       &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
-      server_id_);
+      self->http_server->server_id_);
 
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
+  // Add NV-Status header
+  std::string status_header = std::string(kStatusHTTPHeader);
+  h2o_iovec_t status_header_content = h2o_strdup(
+      &req->pool, request_status.ShortDebugString().c_str(), SIZE_MAX);
+  h2o_add_header_by_str(
+      &req->pool, &req->res.headers, status_header.c_str(),
+      status_header.size(), 0, NULL, status_header_content.base,
+      status_header_content.len);
 
-  evhtp_send_reply(
-      req, (request_status.code() == RequestStatusCode::SUCCESS)
-               ? EVHTP_RES_OK
-               : EVHTP_RES_BADREQ);
+  if (err == nullptr) {
+    req->res.status = 200;
+    req->res.reason = "OK";
+    req->res.content_length = body.len;
+  } else {
+    req->res.status = 400;
+    req->res.reason = "Bad Request";
+  }
 
+  h2o_start_response(req, &generator);
+  h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
   TRTSERVER_ErrorDelete(err);
-}
 
-void
-HTTPAPIServer::HandleRepository(
-    evhtp_request_t* req, const std::string& repository_uri)
-{
-  if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  // For now, type is "index", but may be expanded to do more
-  std::string query_type_str;
-  if ((repository_uri.empty()) ||
-      (!RE2::FullMatch(repository_uri, repository_regex_, &query_type_str))) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  }
-
-  LOG_VERBOSE(1) << "parsed: " << query_type_str;
-
-  TRTSERVER_Error* err = nullptr;
-  if (query_type_str == "index") {
-    TRTSERVER_Protobuf* repository_index_protobuf = nullptr;
-    err = TRTSERVER_ServerModelRepositoryIndex(
-        server_.get(), &repository_index_protobuf);
-    if (err == nullptr) {
-      const char* serialized_buffer;
-      size_t serialized_byte_size;
-      err = TRTSERVER_ProtobufSerialize(
-          repository_index_protobuf, &serialized_buffer, &serialized_byte_size);
-      if (err == nullptr) {
-        // Request text or binary format for status?
-        std::string format;
-        const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
-        if (format_c_str != NULL) {
-          format = std::string(format_c_str);
-        } else {
-          format = "text";
-        }
-
-        if (format == "binary") {
-          evbuffer_add(
-              req->buffer_out, serialized_buffer, serialized_byte_size);
-          evhtp_headers_add_header(
-              req->headers_out,
-              evhtp_header_new(
-                  "Content-Type", "application/octet-stream", 1, 1));
-        } else {
-          ModelRepositoryIndex repository_index;
-          if (!repository_index.ParseFromArray(
-                  serialized_buffer, serialized_byte_size)) {
-            err = TRTSERVER_ErrorNew(
-                TRTSERVER_ERROR_UNKNOWN,
-                "failed to parse model repository index");
-          } else {
-            std::string repository_index_str = repository_index.DebugString();
-            evbuffer_add(
-                req->buffer_out, repository_index_str.c_str(),
-                repository_index_str.size());
-          }
-        }
-      }
-    }
-
-    TRTSERVER_ProtobufDelete(repository_index_protobuf);
-  } else {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  }
-
-  RequestStatus request_status;
-  RequestStatusUtil::Create(
-      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
-      server_id_);
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (request_status.code() == RequestStatusCode::SUCCESS)
-               ? EVHTP_RES_OK
-               : EVHTP_RES_BADREQ);
-
-  TRTSERVER_ErrorDelete(err);
-}
-
-void
-HTTPAPIServer::HandleModelControl(
-    evhtp_request_t* req, const std::string& modelcontrol_uri)
-{
-  if (req->method != htp_method_POST) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  std::string action_type_str, model_name;
-  if ((modelcontrol_uri.empty()) || (!RE2::FullMatch(
-                                        modelcontrol_uri, modelcontrol_regex_,
-                                        &action_type_str, &model_name))) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  }
-
-  TRTSERVER_Error* err = nullptr;
-  if (action_type_str == "load") {
-    err = TRTSERVER_ServerLoadModel(server_.get(), model_name.c_str());
-  } else if (action_type_str == "unload") {
-    err = TRTSERVER_ServerUnloadModel(server_.get(), model_name.c_str());
-  } else {
-    err = TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_UNKNOWN,
-        std::string("unknown action type '" + action_type_str + "'").c_str());
-  }
-
-  RequestStatus request_status;
-  RequestStatusUtil::Create(
-      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
-      server_id_);
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (request_status.code() == RequestStatusCode::SUCCESS)
-               ? EVHTP_RES_OK
-               : EVHTP_RES_BADREQ);
-
-  TRTSERVER_ErrorDelete(err);
-}
-
-#ifdef TRTIS_ENABLE_GPU
-TRTSERVER_Error*
-HTTPAPIServer::EVBufferToCudaHandle(
-    evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle)
-{
-  // Extract serialzied cuda IPC handle from HTTP body and store in
-  // 'cuda_shm_handle'.
-  struct evbuffer_iovec* v = nullptr;
-  *cuda_shm_handle = nullptr;
-  size_t byte_size = sizeof(cudaIpcMemHandle_t);
-
-  int n = evbuffer_peek(handle_buffer, -1, NULL, NULL, 0);
-  if (n > 0) {
-    v = static_cast<struct evbuffer_iovec*>(
-        alloca(sizeof(struct evbuffer_iovec) * n));
-    if (evbuffer_peek(handle_buffer, -1, NULL, v, n) != n) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INTERNAL, "unexpected error getting input buffers ");
-    }
-  }
-
-  if (byte_size != v[0].iov_len) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "unexpected size for CUDA shared-memory handle, expecting " +
-            std::to_string(byte_size) + " bytes")
-            .c_str());
-  }
-
-  // Deserialize the cuda IPC handle
-  *cuda_shm_handle = reinterpret_cast<cudaIpcMemHandle_t*>(v[0].iov_base);
-
-  return nullptr;  // success
-}
-#endif  // TRTIS_ENABLE_GPU
-
-void
-HTTPAPIServer::HandleSharedMemoryControl(
-    evhtp_request_t* req, const std::string& sharedmemorycontrol_uri)
-{
-  if (sharedmemorycontrol_uri == "/status") {
-    if (req->method != htp_method_GET) {
-      evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-      return;
-    }
-  } else {
-    if (req->method != htp_method_POST) {
-      evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-      return;
-    }
-  }
-
-  re2::RE2 register_regex_(R"(/([^/]+)/(/[^/]+)/([0-9]+)/([0-9]+))");
-  re2::RE2 cudaregister_regex_(R"(/([^/]+)/([0-9]+)/([0-9]+))");
-  re2::RE2 unregister_regex_(R"(/([^/]+))");
-
-  std::string action_type_str, remaining, name, shm_key;
-  std::string offset_str, byte_size_str, device_id_str;
-  if ((sharedmemorycontrol_uri.empty()) ||
-      (!RE2::FullMatch(
-          sharedmemorycontrol_uri, sharedmemorycontrol_regex_, &action_type_str,
-          &remaining))) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  } else {
-    if (remaining.empty()) {
-      if (action_type_str != "status") {
-        evhtp_send_reply(req, EVHTP_RES_BADREQ);
-        return;
-      }
-    } else {
-      if (action_type_str == "register" &&
-          (!RE2::FullMatch(
-              remaining, register_regex_, &name, &shm_key, &offset_str,
-              &byte_size_str))) {
-        evhtp_send_reply(req, EVHTP_RES_BADREQ);
-        return;
-      } else if (
-          action_type_str == "cudaregister" &&
-          (!RE2::FullMatch(
-              remaining, cudaregister_regex_, &name, &byte_size_str,
-              &device_id_str))) {
-        evhtp_send_reply(req, EVHTP_RES_BADREQ);
-        return;
-      } else if (action_type_str == "unregister") {
-        if ((remaining != "all") &&
-            (!RE2::FullMatch(remaining, unregister_regex_, &name))) {
-          evhtp_send_reply(req, EVHTP_RES_BADREQ);
-          return;
-        }
-      }
-    }
-  }
-
-  size_t offset = std::atoll(offset_str.c_str());
-  size_t byte_size = std::atoll(byte_size_str.c_str());
-
-  TRTSERVER_Error* err = nullptr;
-  TRTSERVER_SharedMemoryBlock* smb = nullptr;
-
-  if (action_type_str == "register") {
-    err = smb_manager_->CpuCreate(
-        &smb, name.c_str(), shm_key.c_str(), offset, byte_size);
-    if (err == nullptr) {
-      err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
-    }
-  } else if (action_type_str == "cudaregister") {
-#ifdef TRTIS_ENABLE_GPU
-    int device_id = std::atoll(device_id_str.c_str());
-
-    // Get cuda ipc handle from raw bytes in http body
-    cudaIpcMemHandle_t* cuda_shm_handle;
-    err = EVBufferToCudaHandle(req->buffer_in, &cuda_shm_handle);
-    if (err == nullptr) {
-      err = smb_manager_->GpuCreate(
-          &smb, name.c_str(), cuda_shm_handle, byte_size, device_id);
-      if (err == nullptr) {
-        err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
-      }
-    }
-#else
-    err = TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "failed to register CUDA shared memory region: '" + name +
-            "', GPUs not supported")
-            .c_str());
-#endif  // TRTIS_ENABLE_GPU
-  } else if ((action_type_str == "unregister") && (remaining == "all")) {
-    err = smb_manager_->Clear();
-    if (err == nullptr) {
-      err = TRTSERVER_ServerUnregisterAllSharedMemory(server_.get());
-    }
-  } else if (action_type_str == "unregister") {
-    err = smb_manager_->Remove(&smb, name.c_str());
-    if ((err == nullptr) && (smb != nullptr)) {
-      err = TRTSERVER_ServerUnregisterSharedMemory(server_.get(), smb);
-      TRTSERVER_Error* del_err = TRTSERVER_SharedMemoryBlockDelete(smb);
-      if (del_err != nullptr) {
-        LOG_ERROR << "failed to delete shared memory block: "
-                  << TRTSERVER_ErrorMessage(del_err);
-      }
-    }
-  } else if (action_type_str == "status") {
-    TRTSERVER_Protobuf* shm_status_protobuf = nullptr;
-    TRTSERVER_Error* err =
-        TRTSERVER_ServerSharedMemoryStatus(server_.get(), &shm_status_protobuf);
-    if (err == nullptr) {
-      const char* status_buffer;
-      size_t status_byte_size;
-      err = TRTSERVER_ProtobufSerialize(
-          shm_status_protobuf, &status_buffer, &status_byte_size);
-      if (err == nullptr) {
-        std::string format;
-        const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
-        if (format_c_str != NULL) {
-          format = std::string(format_c_str);
-        } else {
-          format = "text";
-        }
-
-        if (format == "binary") {
-          evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
-          evhtp_headers_add_header(
-              req->headers_out,
-              evhtp_header_new(
-                  "Content-Type", "application/octet-stream", 1, 1));
-        } else {
-          SharedMemoryStatus shm_status;
-          if (!shm_status.ParseFromArray(status_buffer, status_byte_size)) {
-            err = TRTSERVER_ErrorNew(
-                TRTSERVER_ERROR_UNKNOWN,
-                "failed to parse shared memory status");
-          } else {
-            std::string shm_status_str = shm_status.DebugString();
-            evbuffer_add(
-                req->buffer_out, shm_status_str.c_str(), shm_status_str.size());
-          }
-        }
-      }
-    }
-    TRTSERVER_ProtobufDelete(shm_status_protobuf);
-  } else {
-    err = TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_UNKNOWN,
-        std::string("unknown action type '" + action_type_str + "'").c_str());
-  }
-
-  RequestStatus request_status;
-  RequestStatusUtil::Create(
-      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
-      server_id_);
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (request_status.code() == RequestStatusCode::SUCCESS)
-               ? EVHTP_RES_OK
-               : EVHTP_RES_BADREQ);
-
-  TRTSERVER_ErrorDelete(err);
+  return 0;
 }
 
 TRTSERVER_Error*
-HTTPAPIServer::EVBufferToInput(
-    const std::string& model_name, const InferRequestHeader& request_header,
-    evbuffer* input_buffer,
-    TRTSERVER_InferenceRequestProvider* request_provider,
-    std::unordered_map<
-        std::string,
-        std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
-        output_shm_map)
+HTTPAPIServer::Start()
 {
-  // Extract individual input data from HTTP body and register in
-  // 'request_provider'. The input data from HTTP body is not
-  // necessarily contiguous so may need to register multiple input
-  // "blocks" for a given input.
-  //
-  // Get the addr and size of each chunk of input data from the
-  // evbuffer.
-  struct evbuffer_iovec* v = nullptr;
-  int v_idx = 0;
+  h2o_hostconf_t* hostconf;
+  h2o_pathconf_t* pathconf;
+  h2o_access_log_filehandle_t* logfh = h2o_access_log_open_handle(
+      "/dev/stdout", NULL, H2O_LOGCONF_ESCAPE_APACHE);
 
-  int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
-  if (n > 0) {
-    v = static_cast<struct evbuffer_iovec*>(
-        alloca(sizeof(struct evbuffer_iovec) * n));
-    if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INTERNAL, "unexpected error getting input buffers ");
-    }
+  signal(SIGPIPE, SIG_IGN);
+
+  // necessary to zero these structs before using them!
+  memset(&accept_ctx, 0, sizeof(accept_ctx));
+  memset(&ctx, 0, sizeof(ctx));
+  memset(&config, 0, sizeof(config));
+
+  h2o_config_init(&config);
+  hostconf = h2o_config_register_host(
+      &config, h2o_iovec_init(H2O_STRLIT("default")), 65535);
+
+  if (std::find(endpoint_names_.begin(), endpoint_names_.end(), "health") !=
+      endpoint_names_.end()) {
+    pathconf = register_handler(hostconf, "/api/health", Health);
+    if (logfh != NULL)
+      h2o_access_log_register(pathconf, logfh);
   }
 
-  // Get the byte-size for each input and from that get the blocks
-  // holding the data for that input
-  for (const auto& io : request_header.input()) {
-    uint64_t byte_size = 0;
-    RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
-        request_provider, io.name().c_str(), &byte_size));
-
-    // If 'byte_size' is zero then need to add an empty input data
-    // block... the provider expects at least one data block for every
-    // input.
-    if (byte_size == 0) {
-      RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, io.name().c_str(), nullptr, 0 /* byte_size */,
-          TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
-    } else {
-      // If input is in shared memory then verify that the size is
-      // correct and set input from the shared memory.
-      if (io.has_shared_memory()) {
-        if (byte_size != io.shared_memory().byte_size()) {
-          return TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INVALID_ARG,
-              std::string(
-                  "unexpected shared-memory size " +
-                  std::to_string(io.shared_memory().byte_size()) +
-                  " for input '" + io.name() + "', expecting " +
-                  std::to_string(byte_size) + " for model '" + model_name + "'")
-                  .c_str());
-        }
-
-        void* base;
-        TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
-        int64_t memory_type_id;
-        TRTSERVER_SharedMemoryBlock* smb = nullptr;
-        RETURN_IF_ERR(smb_manager_->Get(&smb, io.shared_memory().name()));
-        RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
-            server_.get(), smb, io.shared_memory().offset(),
-            io.shared_memory().byte_size(), &base));
-        TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
-        TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
-        RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-            request_provider, io.name().c_str(), base, byte_size, memory_type,
-            memory_type_id));
-      } else {
-        while ((byte_size > 0) && (v_idx < n)) {
-          char* base = static_cast<char*>(v[v_idx].iov_base);
-          size_t base_size;
-          if (v[v_idx].iov_len > byte_size) {
-            base_size = byte_size;
-            v[v_idx].iov_base = static_cast<void*>(base + byte_size);
-            v[v_idx].iov_len -= byte_size;
-            byte_size = 0;
-          } else {
-            base_size = v[v_idx].iov_len;
-            byte_size -= v[v_idx].iov_len;
-            v_idx++;
-          }
-
-          RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-              request_provider, io.name().c_str(), base, base_size,
-              TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
-        }
-
-        if (byte_size != 0) {
-          return TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INVALID_ARG,
-              std::string(
-                  "unexpected size for input '" + io.name() + "', expecting " +
-                  std::to_string(byte_size) + " bytes for model '" +
-                  model_name + "'")
-                  .c_str());
-        }
-      }
-    }
+  if (std::find(endpoint_names_.begin(), endpoint_names_.end(), "status") !=
+      endpoint_names_.end()) {
+    pathconf = register_handler(hostconf, "/api/status", Status);
+    if (logfh != NULL)
+      h2o_access_log_register(pathconf, logfh);
   }
 
-  if (v_idx != n) {
+  uv_loop_t loop;
+  uv_loop_init(&loop);
+  h2o_context_init(&ctx, &loop, &config);
+
+  if (USE_MEMCACHED)
+    h2o_multithread_register_receiver(
+        ctx.queue, &libmemcached_receiver, h2o_memcached_receiver);
+
+  // TODO Add server.crt and key files
+  if (USE_HTTPS && setup_ssl(
+                       "h2o/server.crt", "h2o/server.key",
+                       "DEFAULT:!MD5:!DSS:!DES:!RC4:!RC2:!SEED:!IDEA:!NULL:!"
+                       "ADH:!EXP:!SRP:!PSK") != 0)
+    goto Error;
+
+  accept_ctx.ctx = &ctx;
+  accept_ctx.hosts = config.hosts;
+
+  if (create_listener(port_) != 0) {
+    LOG_VERBOSE(1) << stderr << "failed to listen to 0.0.0.0:" << port_ << ":"
+                   << strerror(errno);
+    goto Error;
+  }
+
+  exit_loop = false;
+  while (!exit_loop) {
+    uv_run(ctx.loop, UV_RUN_DEFAULT);
+  }
+
+  return nullptr;
+
+Error:
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_INTERNAL, "HTTP h2o server failed to run.");
+}
+
+TRTSERVER_Error*
+HTTPAPIServer::Stop()
+{
+  if (!exit_loop) {
+    uv_close((uv_handle_t*)&listener, NULL);
+
+    // this will break the event loop
+    exit_loop = true;
+  } else {
     return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "unexpected additional input data for model '" + model_name + "'")
-            .c_str());
+        TRTSERVER_ERROR_UNAVAILABLE, "HTTP h2o server is not running.");
   }
 
-  // Initialize System Memory for Output if it uses shared memory
-  for (const auto& io : request_header.output()) {
-    if (io.has_shared_memory()) {
-      void* base;
-      TRTSERVER_SharedMemoryBlock* smb = nullptr;
-      RETURN_IF_ERR(smb_manager_->Get(&smb, io.shared_memory().name()));
-      RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
-          server_.get(), smb, io.shared_memory().offset(),
-          io.shared_memory().byte_size(), &base));
-
-      TRTSERVER_Memory_Type memory_type;
-      int64_t memory_type_id;
-      TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
-      TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
-      output_shm_map.emplace(
-          io.name(),
-          std::make_tuple(
-              static_cast<const void*>(base), io.shared_memory().byte_size(),
-              memory_type, memory_type_id));
-    }
-  }
-
-  return nullptr;  // success
+  return nullptr;
 }
 
-void
-HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
+TRTSERVER_Error*
+HTTPAPIServer::ResponseAlloc(
+    TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
+    int64_t preferred_memory_type_id, void* userp, void** buffer,
+    void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
+    int64_t* actual_memory_type_id)
 {
-  if (req->method != htp_method_POST) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  std::string model_name, model_version_str;
-  if ((infer_uri.empty()) ||
-      (!RE2::FullMatch(
-          infer_uri, infer_regex_, &model_name, &model_version_str))) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  }
-
-  int64_t model_version = -1;
-  if (!model_version_str.empty()) {
-    model_version = std::atoll(model_version_str.c_str());
-  }
-
-#ifdef TRTIS_ENABLE_TRACING
-  // Timestamps from evhtp are capture in 'req'. We record here since
-  // this is the first place where we have a tracer.
-  std::unique_ptr<TraceMetaData> trace_meta_data;
-  if (trace_manager_ != nullptr) {
-    trace_meta_data.reset(trace_manager_->SampleTrace());
-    if (trace_meta_data != nullptr) {
-      trace_meta_data->tracer_->SetModel(model_name, model_version);
-      trace_meta_data->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "http recv start",
-          TIMESPEC_TO_NANOS(req->recv_start_ts));
-      trace_meta_data->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "http recv end",
-          TIMESPEC_TO_NANOS(req->recv_end_ts));
-    }
-  }
-#endif  // TRTIS_ENABLE_TRACING
-
-  std::string infer_request_header(
-      evhtp_kv_find(req->headers_in, kInferRequestHTTPHeader));
-
-  InferRequestHeader request_header_protobuf;
-  if (!google::protobuf::TextFormat::ParseFromString(
-          infer_request_header, &request_header_protobuf)) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  }
-
-  uint64_t unique_id = RequestStatusUtil::NextUniqueRequestId();
-
-  // Create the inference request provider which provides all the
-  // input information needed for an inference.
-  TRTSERVER_InferenceRequestOptions* request_options = nullptr;
-  TRTSERVER_Error* err = TRTSERVER_InferenceRequestOptionsNew(
-      &request_options, model_name.c_str(), model_version);
-  if (err == nullptr) {
-    err = SetTRTSERVER_InferenceRequestOptions(
-        request_options, request_header_protobuf);
-  }
-  TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
-  if (err == nullptr) {
-    err = TRTSERVER_InferenceRequestProviderNewV2(
-        &request_provider, server_.get(), request_options);
-  }
-
-  if (err == nullptr) {
-    EVBufferPair* response_pair(new EVBufferPair());
-    err = EVBufferToInput(
-        model_name, request_header_protobuf, req->buffer_in, request_provider,
-        response_pair->second);
-    if (err == nullptr) {
-      InferRequest* infer_request = new InferRequest(
-          req, request_header_protobuf.id(), server_id_, unique_id);
-
-      response_pair->first = req->buffer_out;
-      infer_request->response_pair_.reset(response_pair);
-
-      // Provide the trace manager object to use for this request, if nullptr
-      // then no tracing will be performed.
-      TRTSERVER_TraceManager* trace_manager = nullptr;
-#ifdef TRTIS_ENABLE_TRACING
-      if (trace_meta_data != nullptr) {
-        infer_request->trace_meta_data_ = std::move(trace_meta_data);
-        TRTSERVER_TraceManagerNew(
-            &trace_manager, TraceManager::CreateTrace,
-            TraceManager::ReleaseTrace, infer_request->trace_meta_data_.get());
-      }
-#endif  // TRTIS_ENABLE_TRACING
-
-      err = TRTSERVER_ServerInferAsync(
-          server_.get(), trace_manager, request_provider, allocator_,
-          reinterpret_cast<void*>(response_pair), InferRequest::InferComplete,
-          reinterpret_cast<void*>(infer_request));
-      if (err != nullptr) {
-        delete infer_request;
-        infer_request = nullptr;
-      }
-    }
-  }
-
-  // The request provider can be deleted before ServerInferAsync
-  // callback completes.
-  TRTSERVER_InferenceRequestProviderDelete(request_provider);
-  TRTSERVER_InferenceRequestOptionsDelete(request_options);
-
-  if (err != nullptr) {
-    RequestStatus request_status;
-    RequestStatusUtil::Create(&request_status, err, unique_id, server_id_);
-
-    InferResponseHeader response_header;
-    response_header.set_id(request_header_protobuf.id());
-    evhtp_headers_add_header(
-        req->headers_out,
-        evhtp_header_new(
-            kInferResponseHTTPHeader,
-            response_header.ShortDebugString().c_str(), 1, 1));
-    LOG_VERBOSE(1) << "Infer failed: " << request_status.msg();
-
-    evhtp_headers_add_header(
-        req->headers_out, evhtp_header_new(
-                              kStatusHTTPHeader,
-                              request_status.ShortDebugString().c_str(), 1, 1));
-    evhtp_headers_add_header(
-        req->headers_out,
-        evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
-
-    evhtp_send_reply(
-        req, (request_status.code() == RequestStatusCode::SUCCESS)
-                 ? EVHTP_RES_OK
-                 : EVHTP_RES_BADREQ);
-  }
-
-  TRTSERVER_ErrorDelete(err);
+  return nullptr;  // Success
 }
 
-void
-HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
+TRTSERVER_Error*
+HTTPAPIServer::ResponseRelease(
+    TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
 {
-  HTTPAPIServer::InferRequest* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequest*>(arg);
+  LOG_VERBOSE(1) << "HTTP h2o release: "
+                 << "size " << byte_size << ", addr " << buffer;
 
-  evhtp_request_t* request = infer_request->EvHtpRequest();
-  evhtp_send_reply(request, EVHTP_RES_OK);
-  evhtp_request_resume(request);
-
-#ifdef TRTIS_ENABLE_TRACING
-  if (infer_request->trace_meta_data_ != nullptr) {
-    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRTSERVER_TRACE_LEVEL_MIN, "http send start",
-        TIMESPEC_TO_NANOS(request->send_start_ts));
-    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRTSERVER_TRACE_LEVEL_MIN, "http send end",
-        TIMESPEC_TO_NANOS(request->send_end_ts));
-  }
-#endif  // TRTIS_ENABLE_TRACING
-
-  delete infer_request;
-}
-
-void
-HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
-{
-  HTTPAPIServer::InferRequest* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequest*>(arg);
-
-  evhtp_request_t* request = infer_request->EvHtpRequest();
-  evhtp_send_reply(request, EVHTP_RES_BADREQ);
-  evhtp_request_resume(request);
-
-#ifdef TRTIS_ENABLE_TRACING
-  if (infer_request->trace_meta_data_ != nullptr) {
-    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRTSERVER_TRACE_LEVEL_MIN, "http send start",
-        TIMESPEC_TO_NANOS(request->send_start_ts));
-    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRTSERVER_TRACE_LEVEL_MIN, "http send end",
-        TIMESPEC_TO_NANOS(request->send_end_ts));
-  }
-#endif  // TRTIS_ENABLE_TRACING
-
-  delete infer_request;
-}
-
-HTTPAPIServer::InferRequest::InferRequest(
-    evhtp_request_t* req, uint64_t request_id, const char* server_id,
-    uint64_t unique_id)
-    : req_(req), request_id_(request_id), server_id_(server_id),
-      unique_id_(unique_id)
-{
-  evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
-  thread_ = htpconn->thread;
-  evhtp_request_pause(req);
-}
-
-void
-HTTPAPIServer::InferRequest::InferComplete(
-    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
-    TRTSERVER_InferenceResponse* response, void* userp)
-{
-  HTTPAPIServer::InferRequest* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequest*>(userp);
-  if (infer_request->FinalizeResponse(response) == EVHTP_RES_OK) {
-    evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
-  } else {
-    evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
-  }
-
-  // Don't need to explicitly delete 'trace_manager'. It will be deleted by
-  // the TraceMetaData object in 'infer_request'.
-  LOG_IF_ERR(
-      TRTSERVER_InferenceResponseDelete(response), "deleting HTTP response");
-}
-
-evhtp_res
-HTTPAPIServer::InferRequest::FinalizeResponse(
-    TRTSERVER_InferenceResponse* response)
-{
-  InferResponseHeader response_header;
-
-  TRTSERVER_Error* response_status =
-      TRTSERVER_InferenceResponseStatus(response);
-  if (response_status == nullptr) {
-    TRTSERVER_Protobuf* response_protobuf = nullptr;
-    response_status =
-        TRTSERVER_InferenceResponseHeader(response, &response_protobuf);
-    if (response_status == nullptr) {
-      const char* buffer;
-      size_t byte_size;
-      response_status =
-          TRTSERVER_ProtobufSerialize(response_protobuf, &buffer, &byte_size);
-      if (response_status == nullptr) {
-        if (!response_header.ParseFromArray(buffer, byte_size)) {
-          response_status = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INTERNAL, "failed to parse response header");
-        }
-      }
-
-      TRTSERVER_ProtobufDelete(response_protobuf);
-    }
-  }
-
-  if (response_status == nullptr) {
-    std::string format;
-    const char* format_c_str = evhtp_kv_find(req_->uri->query, "format");
-    if (format_c_str != NULL) {
-      format = std::string(format_c_str);
-    } else {
-      format = "text";
-    }
-
-    // The description of the raw outputs needs to go in the
-    // kInferResponseHTTPHeader since it is needed to interpret the
-    // body. The entire response (including classifications) is
-    // serialized at the end of the body.
-    response_header.set_id(request_id_);
-
-    std::string rstr;
-    if (format == "binary") {
-      response_header.SerializeToString(&rstr);
-    } else {
-      rstr = response_header.DebugString();
-    }
-
-    evbuffer_add(req_->buffer_out, rstr.c_str(), rstr.size());
-  } else {
-    evbuffer_drain(req_->buffer_out, -1);
-    response_header.Clear();
-    response_header.set_id(request_id_);
-  }
-
-  RequestStatus request_status;
-  RequestStatusUtil::Create(
-      &request_status, response_status, unique_id_, server_id_);
-
-  evhtp_headers_add_header(
-      req_->headers_out, evhtp_header_new(
-                             kInferResponseHTTPHeader,
-                             response_header.ShortDebugString().c_str(), 1, 1));
-  evhtp_headers_add_header(
-      req_->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-  evhtp_headers_add_header(
-      req_->headers_out,
-      evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
-
-  TRTSERVER_ErrorDelete(response_status);
-
-  return (request_status.code() == RequestStatusCode::SUCCESS)
-             ? EVHTP_RES_OK
-             : EVHTP_RES_BADREQ;
+  // Don't do anything when releasing a buffer since ResponseAlloc
+  // wrote directly into the response ebvuffer.
+  return nullptr;  // Success
 }
 
 TRTSERVER_Error*
@@ -1423,8 +605,8 @@ HTTPServer::CreateAPIServer(
   if (port_map.empty()) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INVALID_ARG,
-        "HTTP is enabled but none of the service endpoints have a valid port "
-        "assignment");
+        "HTTP is enabled but none of the service endpoints have a valid "
+        "port assignment");
   }
   http_servers->clear();
   for (auto const& ep_map : port_map) {
@@ -1436,25 +618,6 @@ HTTPServer::CreateAPIServer(
   }
 
   return nullptr;
-}
-
-TRTSERVER_Error*
-HTTPServer::CreateMetricsServer(
-    const std::shared_ptr<TRTSERVER_Server>& server, const int32_t port,
-    const int thread_cnt, std::unique_ptr<HTTPServer>* metrics_server)
-{
-  std::string addr = "0.0.0.0:" + std::to_string(port);
-  LOG_INFO << "Starting Metrics Service at " << addr;
-
-#ifndef TRTIS_ENABLE_METRICS
-  return TRTSERVER_ErrorNew(
-      TRTSERVER_ERROR_UNAVAILABLE, "Metrics support is disabled");
-#endif  // !TRTIS_ENABLE_METRICS
-
-#ifdef TRTIS_ENABLE_METRICS
-  metrics_server->reset(new HTTPMetricsServer(server, port, thread_cnt));
-  return nullptr;
-#endif  // TRTIS_ENABLE_METRICS
 }
 
 }}  // namespace nvidia::inferenceserver
