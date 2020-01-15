@@ -142,6 +142,7 @@ set(
   pinned_memory_manager.cc
   provider.cc
   provider_utils.cc
+  scheduler_utils.cc
   sequence_batch_scheduler.cc
   server.cc
   server_status.cc
@@ -174,6 +175,7 @@ set(
   provider_utils.h
   sync_queue.h
   scheduler.h
+  scheduler_utils.h
   sequence_batch_scheduler.h
   server.h
   server_status.h

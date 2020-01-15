@@ -102,8 +102,8 @@ SequenceBatchScheduler::Create(
     } else {
       sb.reset(new DirectSequenceBatch(
           sched.get(), c, seq_slot_cnt, config, OnInit, OnWarmup, OnSchedule,
-          enforce_equal_shape_tensors, start, end, startend, cont, notready,
-          &init_state));
+          OnPeek, enforce_equal_shape_tensors, start, end, startend, cont,
+          notready, &init_state));
     }
 
     if (init_state.get_future().get()) {
@@ -835,6 +835,7 @@ DirectSequenceBatch::DirectSequenceBatch(
     const Scheduler::StandardInitFunc& OnInit,
     const Scheduler::StandardWarmupFunc& OnWarmup,
     const Scheduler::StandardRunFunc& OnSchedule,
+    const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         start_input_overrides,
@@ -852,7 +853,7 @@ DirectSequenceBatch::DirectSequenceBatch(
           start_input_overrides, end_input_overrides, startend_input_overrides,
           continue_input_overrides, notready_input_overrides),
       OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
-      scheduler_thread_exit_(false), scheduler_idle_(false),
+      OnPeek_(OnPeek), scheduler_thread_exit_(false), scheduler_idle_(false),
       queues_(seq_slot_cnt), seq_slot_correlation_ids_(seq_slot_cnt, 0),
       max_active_seq_slot_(-1)
 {
@@ -908,17 +909,6 @@ DirectSequenceBatch::Enqueue(
 
   {
     std::lock_guard<std::mutex> lock(mu_);
-
-    // All requests in this SequenceBatch must have the same shape for
-    // all inputs (since they are going to be executed together in a
-    // batch). If this is the first request into this SequenceBatch
-    // then grab a copy of the request header that is needed to create
-    // NULL version request providers that can stand in as
-    // representative when inference is issuing and there is no
-    // request available in one or more sequence slots.
-    if ((max_active_seq_slot_ == -1) && (request_provider != nullptr)) {
-      null_request_header_ = request_provider->RequestHeader();
-    }
 
     queues_[seq_slot].emplace_back(
         stats, request_provider, response_provider, OnComplete);
@@ -1020,6 +1010,8 @@ DirectSequenceBatch::SchedulerThread(
                  << delay_cnt
                  << " queued payloads, current total = " << total_size;
       } else {
+        PendingBatchShapes pending_batch_shapes;
+
         // Make sure there is at least one request that needs to be
         // handled. Find the largest sequence slot index that has a
         // payload available...
@@ -1031,6 +1023,20 @@ DirectSequenceBatch::SchedulerThread(
         if (max_seq_slot < 0) {
           wait_microseconds = default_wait_microseconds;
         } else {
+          // For NULL requests need a header that matches the shapes
+          // of the inputs that are being used for the batch. This is
+          // grabbed from the first request added to the batch.
+          InferRequestHeader null_request_header;
+          for (int32_t seq_slot = 0; seq_slot <= max_seq_slot; ++seq_slot) {
+            std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
+            if (!queue.empty() &&
+                (queue.front().request_provider_ != nullptr)) {
+              null_request_header =
+                  queue.front().request_provider_->RequestHeader();
+              break;
+            }
+          }
+
           // Collect payloads from slot 0 to max_seq_slot.
           for (int32_t seq_slot = 0; seq_slot <= max_seq_slot; ++seq_slot) {
             bool end_of_sequence = false;
@@ -1057,12 +1063,42 @@ DirectSequenceBatch::SchedulerThread(
               }
             }
 
+            // If there are one or more tensors that don't support
+            // ragged batch, then don't allow a payload into an existing
+            // batch if shape differs.
+            if (!use_null_provider && !enforce_equal_shape_tensors_.empty()) {
+              // If this is the first non-null payload capture the
+              // shape of the tensors that don't support ragged so we
+              // can compare them to later payloads.
+              if (pending_batch_shapes.empty()) {
+                Status status = InitPendingShape(
+                    batcher_idx_, queue.front(), enforce_equal_shape_tensors_,
+                    OnPeek_, &pending_batch_shapes);
+                if (!status.IsOk()) {
+                  LOG_ERROR
+                      << "internal: unexpecting failure initializing shape: "
+                      << status.Message();
+                  use_null_provider = true;
+                  pending_batch_shapes.clear();
+                }
+              } else {
+                // There is already a payload in the batch that set
+                // shapes... if this payload doesn't match those
+                // shapes then don't allow it into the batch.
+                if (!CompareWithPendingShape(
+                        batcher_idx_, queue.front(), OnPeek_,
+                        pending_batch_shapes)) {
+                  use_null_provider = true;
+                }
+              }
+            }
+
             // Use null-provider if necessary otherwise use the next
             // payload in the queue...
             if (use_null_provider) {
               auto null_request_provider =
                   std::make_shared<NULLInferRequestProvider>(
-                      null_request_header_);
+                      null_request_header);
               null_request_provider->AddInputOverrides(
                   notready_input_overrides_);
 

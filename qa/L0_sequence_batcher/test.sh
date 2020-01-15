@@ -234,6 +234,51 @@ for model_trial in v 0 1 2 4; do
     done
 done
 
+# ragged models
+rm -fr ragged_models && mkdir ragged_models
+cp -r ../custom_models/custom_dyna_sequence_int32 ragged_models/.
+(cd ragged_models/custom_dyna_sequence_int32 && \
+        sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
+
+export NO_BATCHING=0
+export MODEL_INSTANCES=1
+export BATCHER_TYPE="VARIABLE"
+MODEL_DIR=ragged_models
+
+# Need to launch the server for each test so that the model status
+# is reset (which is used to make sure the correct batch size was
+# used for execution). Test everything with fixed-tensor-size
+# models and variable-tensor-size models.
+for i in test_ragged_batch_allowed ; do
+    export TRTSERVER_BACKLOG_DELAY_SCHEDULER=3
+    export TRTSERVER_DELAY_SCHEDULER=12
+
+    SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
+    SERVER_LOG="./$i.$MODEL_DIR.serverlog"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    echo "Test: $i, repository $MODEL_DIR" >>$CLIENT_LOG
+
+    set +e
+    python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+        echo -e "\n***\n*** Test $i Failed\n***"
+        RET=1
+    fi
+    set -e
+
+    unset TRTSERVER_DELAY_SCHEDULER
+    unset TRTSERVER_BACKLOG_DELAY_SCHEDULER
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
+
 # python unittest seems to swallow ImportError and still return 0 exit
 # code. So need to explicitly check CLIENT_LOG to make sure we see
 # some running tests

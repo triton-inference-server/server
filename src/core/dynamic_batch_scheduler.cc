@@ -417,68 +417,6 @@ DynamicBatchScheduler::SchedulerThread(
                  << "...";
 }
 
-Status
-DynamicBatchScheduler::InitPendingShape(
-    const int64_t runner_id, const Scheduler::Payload& payload)
-{
-  pending_batch_shapes_.clear();
-
-  const InferRequestHeader& request =
-      payload.request_provider_->RequestHeader();
-  for (const auto& input : request.input()) {
-    const auto itr = enforce_equal_shape_tensors_.find(input.name());
-    if (itr != enforce_equal_shape_tensors_.end()) {
-      std::pair<DimsList, std::vector<int64_t>> shapes;
-      shapes.first = input.dims();
-
-      // For shape tensors must compare the contents of the tensor in
-      // addition to the tensor shape itself.
-      if (itr->second) {
-        RETURN_IF_ERROR(OnPeek_(runner_id, input, payload, &shapes.second));
-      }
-
-      pending_batch_shapes_.emplace(
-          std::make_pair(input.name(), std::move(shapes)));
-    }
-  }
-
-  return Status::Success;
-}
-
-bool
-DynamicBatchScheduler::CompareWithPendingShape(
-    const int64_t runner_id, const Scheduler::Payload& payload) const
-{
-  const InferRequestHeader& request =
-      payload.request_provider_->RequestHeader();
-
-  for (const auto& input : request.input()) {
-    const auto itr = pending_batch_shapes_.find(input.name());
-    if (itr != pending_batch_shapes_.end()) {
-      if (!CompareDims(itr->second.first, input.dims())) {
-        return false;
-      }
-
-      // If there are shape-tensor contents then compare those as
-      // well.
-      if (!itr->second.second.empty()) {
-        std::vector<int64_t> shape;
-
-        // If fail getting the tensor shape then conservatively return
-        // false to indicate that the shapes don't match.
-        if (!OnPeek_(runner_id, input, payload, &shape).IsOk()) {
-          return false;
-        }
-        if (!CompareDims(itr->second.second, shape)) {
-          return false;
-        }
-      }
-    }
-  }
-
-  return true;
-}
-
 uint64_t
 DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
 {
@@ -504,7 +442,10 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
     if (search_batch_cnt == 0) {
       // Get the shape of the new batch that is being started...
       if (!enforce_equal_shape_tensors_.empty()) {
-        if (!InitPendingShape(runner_id, queue_[idx]).IsOk()) {
+        if (!InitPendingShape(
+                 runner_id, queue_[idx], enforce_equal_shape_tensors_, OnPeek_,
+                 &pending_batch_shapes_)
+                 .IsOk()) {
           send_now = true;
           break;
         }
@@ -520,7 +461,8 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
       // There is a pending batch and it has a different shape then
       // this request, so send the pending batch as it is.
       if (!enforce_equal_shape_tensors_.empty() &&
-          !CompareWithPendingShape(runner_id, queue_[idx])) {
+          !CompareWithPendingShape(
+              runner_id, queue_[idx], OnPeek_, pending_batch_shapes_)) {
         send_now = true;
         break;
       }
