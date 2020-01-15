@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -56,7 +56,7 @@ class OutputValidationTest(unittest.TestCase):
         headers = {'NV-InferRequest': 'batch_size: 1 input { name: "INPUT__0" } output { name: "OUTPUT__0"}'}
         r = requests.post(url_, data=input0_data.tobytes(), headers=headers)
         print(r.headers)
-        self.assertTrue(str(r.headers).find("unexpected shape for output") != -1)
+        self.assertTrue(str(r.headers).find("the model expects 4 dimensions (shape [1,1,1,1]) but the model configuration specifies 4 dimensions (an initial batch dimension because max_batch_size > 0 followed by the explicit tensor shape, making complete shape [-1,2,1,1])") != -1)
 
     # for reshape mismatch
     def test_reshape(self):
@@ -65,7 +65,7 @@ class OutputValidationTest(unittest.TestCase):
         headers = {'NV-InferRequest': 'batch_size: 1 input { name: "INPUT__0" } output { name: "OUTPUT__0"}'}
         r = requests.post(url_, data=input0_data.tobytes(), headers=headers)
         print(r.headers)
-        self.assertTrue(str(r.headers).find("model configuration specifies shape") != -1)
+        self.assertTrue(str(r.headers).find("the model expects 4 dimensions (shape [1,1,1,1]) but the model configuration specifies 3 dimensions (an initial batch dimension because max_batch_size > 0 followed by the explicit tensor shape, making complete shape [-1,1,1])") != -1)
 
     # for naming convention violation
     def test_name(self):

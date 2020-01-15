@@ -652,7 +652,7 @@ PlanBackend::Context::InitializeInputBinding(
             RequestStatusCode::INVALID_ARG,
             "unexpected shape " + DimsDebugString(engine_dims) +
                 " for control input '" + input_name + "' for model " + name_ +
-                ". Error details: " + status.Message());
+                ": " + status.Message());
       }
     }
 

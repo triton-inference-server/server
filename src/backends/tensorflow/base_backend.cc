@@ -810,20 +810,9 @@ BaseBackend::Context::Run(
                                       : output_config->dims();
 
     // verify shape of output matches shape from model config
-    const int batch_offset = ((max_batch_size_ == NO_BATCHING) ? 0 : 1);
-
-    for (int i = 0; i < output_dims.size(); i++) {
-      if (output_dims[i] != -1) {
-        if (output_dims[i] != shapevec[i + batch_offset]) {
-          return Status(
-              RequestStatusCode::INVALID_ARG,
-              "unexpected shape for output '" + name +
-                  "', model configuration shape is " +
-                  DimsListToString(output_dims) + ", inference shape is " +
-                  DimsListToString(shapevec));
-        }
-      }
-    }
+    RETURN_IF_ERROR(CompareOutputDims(
+        name, shapevec, output_dims,
+        max_batch_size_ != NO_BATCHING /* supports_batching */));
 
     TRTISTF_DataType dtype = ConvertDataType(output_config->data_type());
     if (dtype != TRTISTF_TensorDataType(output_tensor)) {
