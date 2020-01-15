@@ -36,6 +36,7 @@
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
+#include "src/core/scheduler_utils.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -81,11 +82,6 @@ class DynamicBatchScheduler : public Scheduler {
       const uint32_t runner_id, const int nice,
       const std::shared_ptr<std::atomic<bool>>& rthread_exit,
       std::promise<bool>* is_initialized);
-  Status InitPendingShape(
-      const int64_t runner_id, const Scheduler::Payload& request_provider);
-  bool CompareWithPendingShape(
-      const int64_t runner_id,
-      const Scheduler::Payload& request_provider) const;
   uint64_t GetDynamicBatch(const int64_t runner_id);
 
   // Function the scheduler will call to initialize a runner.
@@ -126,6 +122,7 @@ class DynamicBatchScheduler : public Scheduler {
   uint64_t pending_batch_delay_ns_;
   size_t pending_batch_size_;
   size_t pending_batch_queue_cnt_;
+  PendingBatchShapes pending_batch_shapes_;
 
   size_t queued_batch_size_;
   size_t next_preferred_batch_size_;
@@ -138,9 +135,9 @@ class DynamicBatchScheduler : public Scheduler {
   // contained in the shape tensor must match same tensor already in
   // the batch.
   const std::unordered_map<std::string, bool> enforce_equal_shape_tensors_;
-  std::unordered_map<std::string, std::pair<DimsList, std::vector<int64_t>>>
-      pending_batch_shapes_;
 
+  // If true the ordering of responses matches the order of requests
+  // even when there are multiple scheduler threads.
   const bool preserve_ordering_;
 
   // The runner that is currently processing payloads

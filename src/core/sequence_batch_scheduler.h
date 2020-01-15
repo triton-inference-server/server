@@ -38,6 +38,7 @@
 #include "src/core/model_config.pb.h"
 #include "src/core/provider.h"
 #include "src/core/scheduler.h"
+#include "src/core/scheduler_utils.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -250,6 +251,7 @@ class DirectSequenceBatch : public SequenceBatch {
       const Scheduler::StandardInitFunc& OnInit,
       const Scheduler::StandardWarmupFunc& OnWarmup,
       const Scheduler::StandardRunFunc& OnSchedule,
+      const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
           start_input_overrides,
@@ -285,6 +287,9 @@ class DirectSequenceBatch : public SequenceBatch {
   // Function to call to execute this batch of requests.
   const Scheduler::StandardRunFunc OnSchedule_;
 
+  // Function the scheduler will call to peek at shape tensors.
+  const Scheduler::StandardShapeTensorPeekFunc OnPeek_;
+
   // The thread scheduling payloads queued in this batch.
   std::unique_ptr<std::thread> scheduler_thread_;
   bool scheduler_thread_exit_;
@@ -293,11 +298,6 @@ class DirectSequenceBatch : public SequenceBatch {
   // Mutex protecting correlation queues, etc.
   std::mutex mu_;
   std::condition_variable cv_;
-
-  // The request header needed to create a null provider to use when
-  // an inference is issuing and there is no request available in a
-  // sequence slot.
-  InferRequestHeader null_request_header_;
 
   // Queues holding inference requests. There are 'seq_slot_cnt'
   // queues, one for each sequence slot where requests assigned to
