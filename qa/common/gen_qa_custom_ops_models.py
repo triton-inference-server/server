@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -165,7 +165,6 @@ output [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
-
 def create_busyop_modelfile(create_savedmodel, models_dir, model_version):
     # Load the busy_loop custom operator
     _busy_op_module = tf.load_op_library(os.path.join(FLAGS.busy_op_lib_path))
@@ -233,7 +232,86 @@ output [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
+def create_moduloop_modelfile(models_dir, model_version):
+    model_name = "libtorch_modulo"
 
+    op_source = """
+    #include <torch/script.h>
+    torch::Tensor custom_modulo(torch::Tensor input1, torch::Tensor input2) {
+      torch::Tensor output = torch::fmod(input1, input2);
+      return output.clone();
+    }
+    static auto registry =
+      torch::RegisterOperators("my_ops::custom_modulo", &custom_modulo);
+    """
+
+    torch.utils.cpp_extension.load_inline(
+        name="custom_modulo",
+        cpp_sources=op_source,
+        is_python_module=False,
+        verbose=True,
+    )
+
+    class ModuloCustomNet(nn.Module):
+        def __init__(self):
+            super(ModuloCustomNet, self).__init__()
+        def forward(self, input0, input1):
+            return torch.ops.my_ops.custom_modulo(input0, input1)
+
+    moduloCustomModel = ModuloCustomNet()
+    example_input0 = torch.arange(1, 11, dtype=torch.float32)
+    example_input1 = torch.tensor([2] * 10, dtype=torch.float32)
+    traced = torch.jit.trace(moduloCustomModel, (example_input0, example_input1))
+
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    traced.save(model_version_dir + "/model.pt")
+
+def create_moduloop_modelconfig(models_dir, model_version):
+    model_name = "libtorch_modulo"
+    config_dir = models_dir + "/" + model_name
+    config = '''
+name: "{}"
+platform: "pytorch_libtorch"
+max_batch_size: 0
+input [
+  {{
+    name: "INPUT__0"
+    data_type: TYPE_FP32
+    dims: [ 10 ]
+  }},
+  {{
+    name: "INPUT__1"
+    data_type: TYPE_FP32
+    dims: [ 10 ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT__0"
+    data_type: TYPE_FP32
+    dims: [ 10 ]
+  }},
+  {{
+    name: "OUTPUT__1"
+    data_type: TYPE_FP32
+    dims: [ 10 ]
+  }}
+]
+'''.format(model_name)
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
 
 def create_zero_out_models(models_dir):
     model_version = 1
@@ -268,6 +346,12 @@ def create_busy_op_models(models_dir):
         create_busyop_modelconfig(True, models_dir, model_version)
         create_busyop_modelfile(True, models_dir, model_version)
 
+def create_modulo_op_models(models_dir):
+    model_version = 1
+
+    if FLAGS.libtorch:
+        create_moduloop_modelconfig(models_dir, model_version)
+        create_moduloop_modelfile(models_dir, model_version)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -286,13 +370,19 @@ if __name__ == '__main__':
                         help='Generate GraphDef models')
     parser.add_argument('--savedmodel', required=False, action='store_true',
                         help='Generate SavedModel models')
+    parser.add_argument('--libtorch', required=False, action='store_true',
+                        help='Generate Pytorch LibTorch models')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
         from tensorflow.python.framework import graph_io, graph_util
+        create_zero_out_models(FLAGS.models_dir)
+        create_cuda_op_models(FLAGS.models_dir)
+        create_busy_op_models(FLAGS.models_dir)
 
-    create_zero_out_models(FLAGS.models_dir)
-    create_cuda_op_models(FLAGS.models_dir)
-    create_busy_op_models(FLAGS.models_dir)
-
+    if FLAGS.libtorch:
+        import torch
+        from torch import nn
+        import torch.utils.cpp_extension
+        create_modulo_op_models(FLAGS.models_dir)
