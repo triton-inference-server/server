@@ -449,24 +449,35 @@ HTTPAPIServer::health(h2o_handler_t* _self, h2o_req_t* req)
     err = TRTSERVER_ServerIsReady(self->http_server->server_.get(), &health);
   }
 
+  h2o_generator_t generator = {NULL, NULL};
+  h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+
   RequestStatus request_status;
   RequestStatusUtil::Create(
       &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
       self->http_server->server_id_);
 
-  if (health && (err == nullptr)) {
-    req->res.status = 200;
-    req->res.reason = "OK";
-  } else {
-    req->res.status = 400;
-    req->res.reason = request_status.ShortDebugString().c_str();
-  }
-
+  // Add NV-Status header
+  std::string status_header = std::string(kStatusHTTPHeader);
+  h2o_iovec_t status_header_content = h2o_strdup(
+      &req->pool, request_status.ShortDebugString().c_str(), SIZE_MAX);
+  h2o_add_header_by_str(
+      &req->pool, &req->res.headers, status_header.c_str(),
+      status_header.size(), 0, NULL, status_header_content.base,
+      status_header_content.len);
   h2o_add_header(
       &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
       H2O_STRLIT("text/plain"));
-  h2o_generator_t generator = {NULL, NULL};
-  h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+
+  if (health && (err == nullptr)) {
+    req->res.status = 200;
+    req->res.reason = "OK";
+    req->res.content_length = body.len;
+  } else {
+    req->res.status = 400;
+    req->res.reason = "Bad request";
+  }
+
   h2o_start_response(req, &generator);
   h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
   return 0;
@@ -596,12 +607,14 @@ HTTPAPIServer::status(h2o_handler_t* _self, h2o_req_t* req)
       &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
       self->http_server->server_id_);
 
-  // TODO Fix NV-Status header
-  // std::string status_header = std::string(kStatusHTTPHeader);
-  // h2o_add_header_by_str(
-  //     &req->pool, &req->res.headers, status_header.c_str(),
-  //     status_header.size(), 0, NULL,
-  //     H2O_STRLIT(request_status.ShortDebugString().c_str()));
+  // Add NV-Status header
+  std::string status_header = std::string(kStatusHTTPHeader);
+  h2o_iovec_t status_header_content = h2o_strdup(
+      &req->pool, request_status.ShortDebugString().c_str(), SIZE_MAX);
+  h2o_add_header_by_str(
+      &req->pool, &req->res.headers, status_header.c_str(),
+      status_header.size(), 0, NULL, status_header_content.base,
+      status_header_content.len);
 
   if (err == nullptr) {
     req->res.status = 200;
