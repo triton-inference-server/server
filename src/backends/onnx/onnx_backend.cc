@@ -572,8 +572,8 @@ OnnxBackend::Context::Run(
   // Hold reference to each buffer of input data so that it stays
   // until the inference has completed.
   std::vector<std::unique_ptr<AllocatedSystemMemory>> input_buffers;
-
   std::vector<const char*> input_names;
+  bool cuda_used = false;
 
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
@@ -586,7 +586,7 @@ OnnxBackend::Context::Run(
     // into the corresponding tensor.
     RETURN_IF_ERROR(SetInputTensor(
         name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, &input_buffers, &input_names));
+        payloads, &input_buffers, &input_names, &cuda_used));
   }
 
   // Additional inputs added to the provider...
@@ -599,7 +599,7 @@ OnnxBackend::Context::Run(
 
       RETURN_IF_ERROR(SetInputTensor(
           name, override.datatype_, override.dims_, total_batch_size, payloads,
-          &input_buffers, &input_names));
+          &input_buffers, &input_names, &cuda_used));
     }
   }
 
@@ -610,6 +610,12 @@ OnnxBackend::Context::Run(
     output_names.emplace_back(output.name().c_str());
     output_tensors_.emplace_back(nullptr);
   }
+
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_used) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
 
 #ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
@@ -645,7 +651,7 @@ OnnxBackend::Context::SetInputTensor(
     const std::string& name, const DataType data_type, const DimsList& dims,
     size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
     std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
-    std::vector<const char*>* input_names)
+    std::vector<const char*>* input_names, bool* cuda_used)
 {
   input_names->emplace_back(name.c_str());
   input_tensors_.emplace_back(nullptr);
@@ -701,8 +707,9 @@ OnnxBackend::Context::SetInputTensor(
   char* buffer = input_buffers->back()->MutableBuffer(
       &buffer_memory_type, &buffer_memory_id);
 
-  // Store data into input buffer
-  SetInputBuffer(
+  // Store data into input buffer. Note that 'cuda_used' will be updated only
+  // for non-string data type. For string, the data must be ready to proceed.
+  auto tmp_cuda_used = SetInputBuffer(
       name, expected_byte_sizes, payloads, buffer_memory_type, buffer_memory_id,
       buffer);
 
@@ -713,7 +720,14 @@ OnnxBackend::Context::SetInputTensor(
         allocator_info, (void*)buffer, total_byte_size, input_dims.data(),
         input_dims.size(), ConvertToOnnxDataType(data_type),
         &input_tensors_.back()));
+    *cuda_used |= tmp_cuda_used;
   } else {
+#ifdef TRTIS_ENABLE_GPU
+    if (tmp_cuda_used) {
+      cudaStreamSynchronize(stream_);
+    }
+#endif  // TRTIS_ENABLE_GPU
+
     std::vector<const char*> string_data;
     // Onnx String tensor is created by passing array of C strings,
     // set such array and modify data in input buffer to be C strings
