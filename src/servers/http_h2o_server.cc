@@ -77,8 +77,8 @@ class HTTPAPIServer : public HTTPServer {
       const std::vector<std::string>& endpoints, const int32_t port,
       const int thread_cnt)
       : server_(server), trace_manager_(trace_manager),
-        smb_manager_(smb_manager), allocator_(nullptr), port_(port),
-        thread_cnt_(thread_cnt)
+        smb_manager_(smb_manager), endpoint_names_(endpoints),
+        allocator_(nullptr), port_(port), thread_cnt_(thread_cnt)
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -116,32 +116,21 @@ class HTTPAPIServer : public HTTPServer {
       int64_t memory_type_id);
 
   int create_listener(int32_t port);
-#if H2O_USE_LIBUV
   static void on_accept(uv_stream_t* listener, int status);
-#else
-  static void on_accept(h2o_socket_t* listener, const char* err);
-#endif
-
   int setup_ssl(
       const char* cert_file, const char* key_file, const char* ciphers);
   h2o_pathconf_t* register_handler(
       h2o_hostconf_t* hostconf, const char* path,
       int (*on_req)(h2o_handler_t*, h2o_req_t*));
 
-  static int health(h2o_handler_t* self, h2o_req_t* req);
-  static int status(h2o_handler_t* self, h2o_req_t* req);
+  static int Health(h2o_handler_t* handler_self, h2o_req_t* req);
+  static int Status(h2o_handler_t* handler_self, h2o_req_t* req);
 
   h2o_globalconf_t config;
   h2o_context_t ctx;
   h2o_accept_ctx_t accept_ctx;
-
-#if H2O_USE_LIBUV
-  uv_tcp_t listener;
-#else
-  h2o_socket_t* listener_socket;
-#endif
-
   h2o_multithread_receiver_t libmemcached_receiver;
+  uv_tcp_t listener;
   bool exit_loop = true;
 
   std::shared_ptr<TRTSERVER_Server> server_;
@@ -149,6 +138,7 @@ class HTTPAPIServer : public HTTPServer {
 
   std::shared_ptr<TraceManager> trace_manager_;
   std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
+  std::vector<std::string> endpoint_names_;
 
   // The allocator that will be used to allocate buffers for the
   // inference result tensors.
@@ -162,8 +152,6 @@ struct h2o_custom_req_handler_t {
   h2o_handler_t super;
   HTTPAPIServer* http_server;
 };
-
-#if H2O_USE_LIBUV
 
 void
 HTTPAPIServer::on_accept(uv_stream_t* listener, int status)
@@ -212,52 +200,6 @@ Error:
   return r;
 }
 
-#else
-
-void
-HTTPAPIServer::on_accept(h2o_socket_t* listener, const char* err)
-{
-  HTTPAPIServer* http_server = reinterpret_cast<HTTPAPIServer*>(listener->data);
-  h2o_socket_t* sock;
-
-  if (err != NULL) {
-    return;
-  }
-
-  if ((sock = h2o_evloop_socket_accept(listener)) == NULL)
-    return;
-  h2o_accept(&http_server->accept_ctx, sock);
-}
-
-int
-HTTPAPIServer::create_listener(int32_t port)
-{
-  struct sockaddr_in addr;
-  int fd, reuseaddr_flag = 1;
-
-  memset(&addr, 0, sizeof(addr));
-  addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = htonl(0x7f000001);
-  addr.sin_port = htons(port);
-
-  if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1 ||
-      setsockopt(
-          fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_flag,
-          sizeof(reuseaddr_flag)) != 0 ||
-      bind(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0 ||
-      listen(fd, SOMAXCONN) != 0) {
-    return -1;
-  }
-
-  listener_socket =
-      h2o_evloop_socket_create(ctx.loop, fd, H2O_SOCKET_FLAG_DONT_READ);
-  listener_socket->data = this;
-  h2o_socket_read_start(listener_socket, on_accept);
-
-  return 0;
-}
-#endif
-
 int
 HTTPAPIServer::setup_ssl(
     const char* cert_file, const char* key_file, const char* ciphers)
@@ -294,7 +236,7 @@ HTTPAPIServer::setup_ssl(
     return -1;
   }
 
-/* setup protocol negotiation methods */
+  /* setup protocol negotiation methods */
 #if H2O_USE_NPN
   h2o_ssl_register_npn_protocols(accept_ctx.ssl_ctx, h2o_http2_npn_protocols);
 #endif
@@ -320,9 +262,9 @@ HTTPAPIServer::register_handler(
 }
 
 int
-HTTPAPIServer::health(h2o_handler_t* _self, h2o_req_t* req)
+HTTPAPIServer::Health(h2o_handler_t* handler_self, h2o_req_t* req)
 {
-  h2o_custom_req_handler_t* self = (h2o_custom_req_handler_t*)_self;
+  h2o_custom_req_handler_t* self = (h2o_custom_req_handler_t*)handler_self;
   if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET"))) {
     req->res.status = 400;
     req->res.reason = "Only GET method is allowed";
@@ -398,9 +340,9 @@ HTTPAPIServer::health(h2o_handler_t* _self, h2o_req_t* req)
 }
 
 int
-HTTPAPIServer::status(h2o_handler_t* _self, h2o_req_t* req)
+HTTPAPIServer::Status(h2o_handler_t* handler_self, h2o_req_t* req)
 {
-  h2o_custom_req_handler_t* self = (h2o_custom_req_handler_t*)_self;
+  h2o_custom_req_handler_t* self = (h2o_custom_req_handler_t*)handler_self;
   re2::RE2 status_regex(R"(/api/status(/(.*))?)");
   if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("GET"))) {
     req->res.status = 400;
@@ -549,6 +491,7 @@ TRTSERVER_Error*
 HTTPAPIServer::Start()
 {
   h2o_hostconf_t* hostconf;
+  h2o_pathconf_t* pathconf;
   h2o_access_log_filehandle_t* logfh = h2o_access_log_open_handle(
       "/dev/stdout", NULL, H2O_LOGCONF_ESCAPE_APACHE);
 
@@ -563,22 +506,23 @@ HTTPAPIServer::Start()
   hostconf = h2o_config_register_host(
       &config, h2o_iovec_init(H2O_STRLIT("default")), 65535);
 
-  // handler->on_req(st_h2o_handler_t(health));
-  h2o_pathconf_t* pathconf = register_handler(hostconf, "/api/health", health);
-  if (logfh != NULL)
-    h2o_access_log_register(pathconf, logfh);
+  if (std::find(endpoint_names_.begin(), endpoint_names_.end(), "health") !=
+      endpoint_names_.end()) {
+    pathconf = register_handler(hostconf, "/api/health", Health);
+    if (logfh != NULL)
+      h2o_access_log_register(pathconf, logfh);
+  }
 
-  pathconf = register_handler(hostconf, "/api/status", status);
-  if (logfh != NULL)
-    h2o_access_log_register(pathconf, logfh);
+  if (std::find(endpoint_names_.begin(), endpoint_names_.end(), "status") !=
+      endpoint_names_.end()) {
+    pathconf = register_handler(hostconf, "/api/status", Status);
+    if (logfh != NULL)
+      h2o_access_log_register(pathconf, logfh);
+  }
 
-#if H2O_USE_LIBUV
   uv_loop_t loop;
   uv_loop_init(&loop);
   h2o_context_init(&ctx, &loop, &config);
-#else
-  h2o_context_init(&ctx, h2o_evloop_create(), &config);
-#endif
 
   if (USE_MEMCACHED)
     h2o_multithread_register_receiver(
@@ -602,11 +546,7 @@ HTTPAPIServer::Start()
 
   exit_loop = false;
   while (!exit_loop) {
-#if H2O_USE_LIBUV
     uv_run(ctx.loop, UV_RUN_DEFAULT);
-#else
-    h2o_evloop_run(ctx.loop, INT32_MAX);
-#endif
   }
 
   return nullptr;
@@ -620,12 +560,7 @@ TRTSERVER_Error*
 HTTPAPIServer::Stop()
 {
   if (!exit_loop) {
-#if H2O_USE_LIBUV
     uv_close((uv_handle_t*)&listener, NULL);
-#else
-    h2o_socket_read_stop(listener_socket);
-    h2o_socket_close(listener_socket);
-#endif
 
     // this will break the event loop
     exit_loop = true;
