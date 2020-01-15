@@ -198,11 +198,17 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       false_override.content_.assign(false_p, false_p + sizeof(float));
       false_override.dims_.Add(1);
       false_override.datatype_ = tensor_datatype;
+      false_override.content_ref_.AddBuffer(
+          (const char*)false_override.content_.data(),
+          false_override.content_.size(), TRTSERVER_MEMORY_CPU, 0);
 
       InferRequestProvider::InputOverride true_override;
       true_override.content_.assign(true_p, true_p + sizeof(float));
       true_override.dims_.Add(1);
       true_override.datatype_ = tensor_datatype;
+      true_override.content_ref_.AddBuffer(
+          (const char*)true_override.content_.data(),
+          true_override.content_.size(), TRTSERVER_MEMORY_CPU, 0);
 
       (*start_input_overrides)
           ->insert(std::make_pair(tensor_name, true_override));
@@ -238,11 +244,17 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       false_override.content_.assign(false_p, false_p + sizeof(float));
       false_override.dims_.Add(1);
       false_override.datatype_ = tensor_datatype;
+      false_override.content_ref_.AddBuffer(
+          (const char*)false_override.content_.data(),
+          false_override.content_.size(), TRTSERVER_MEMORY_CPU, 0);
 
       InferRequestProvider::InputOverride true_override;
       true_override.content_.assign(true_p, true_p + sizeof(float));
       true_override.dims_.Add(1);
       true_override.datatype_ = tensor_datatype;
+      true_override.content_ref_.AddBuffer(
+          (const char*)true_override.content_.data(),
+          true_override.content_.size(), TRTSERVER_MEMORY_CPU, 0);
 
       (*start_input_overrides)
           ->insert(std::make_pair(tensor_name, false_override));
@@ -278,11 +290,17 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       false_override.content_.assign(false_p, false_p + sizeof(float));
       false_override.dims_.Add(1);
       false_override.datatype_ = tensor_datatype;
+      false_override.content_ref_.AddBuffer(
+          (const char*)false_override.content_.data(),
+          false_override.content_.size(), TRTSERVER_MEMORY_CPU, 0);
 
       InferRequestProvider::InputOverride true_override;
       true_override.content_.assign(true_p, true_p + sizeof(float));
       true_override.dims_.Add(1);
       true_override.datatype_ = tensor_datatype;
+      true_override.content_ref_.AddBuffer(
+          (const char*)true_override.content_.data(),
+          true_override.content_.size(), TRTSERVER_MEMORY_CPU, 0);
 
       (*start_input_overrides)
           ->insert(std::make_pair(tensor_name, true_override));
@@ -718,6 +736,9 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
       ovr.dims_.Add(1);
       ovr.datatype_ = correlation_id_datatype;
       ovr.content_.resize(GetDataTypeByteSize(correlation_id_datatype));
+      ovr.content_ref_.AddBuffer(
+          (const char*)ovr.content_.data(), ovr.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
 
       seq_slot_corrid_overrides_.push_back(&ovr);
     }
