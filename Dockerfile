@@ -77,6 +77,13 @@ RUN git clone -b rel-${ONNX_RUNTIME_VERSION} --recursive https://github.com/Micr
 ENV PATH="/opt/cmake/bin:${PATH}"
 ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
 
+# Copy patches into container...
+COPY build/onnxruntime /tmp/trtis/build/onnxruntime
+
+# Patch for cudnn.
+RUN patch -i /tmp/trtis/build/onnxruntime/cudnn.patch \
+    /workspace/onnxruntime/onnxruntime/core/providers/cuda/rnn/cudnn_rnn_base.h
+
 RUN sed -i "s/backend-test-tools.*//" ${SCRIPT_DIR}/install_onnx.sh
 RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
     ${SCRIPT_DIR}/install_ubuntu.sh -p 3.6 -o 18.04 && ${SCRIPT_DIR}/install_deps.sh -p 3.6
