@@ -571,9 +571,9 @@ OnnxBackend::Context::Run(
 
   // Hold reference to each buffer of input data so that it stays
   // until the inference has completed.
-  std::vector<std::unique_ptr<char[]>> input_buffers;
-
+  std::vector<std::unique_ptr<AllocatedSystemMemory>> input_buffers;
   std::vector<const char*> input_names;
+  bool cuda_used = false;
 
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
@@ -586,7 +586,7 @@ OnnxBackend::Context::Run(
     // into the corresponding tensor.
     RETURN_IF_ERROR(SetInputTensor(
         name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, &input_buffers, &input_names));
+        payloads, &input_buffers, &input_names, &cuda_used));
   }
 
   // Additional inputs added to the provider...
@@ -599,7 +599,7 @@ OnnxBackend::Context::Run(
 
       RETURN_IF_ERROR(SetInputTensor(
           name, override.datatype_, override.dims_, total_batch_size, payloads,
-          &input_buffers, &input_names));
+          &input_buffers, &input_names, &cuda_used));
     }
   }
 
@@ -610,6 +610,12 @@ OnnxBackend::Context::Run(
     output_names.emplace_back(output.name().c_str());
     output_tensors_.emplace_back(nullptr);
   }
+
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_used) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
 
 #ifdef TRTIS_ENABLE_STATS
   for (auto& payload : *payloads) {
@@ -644,12 +650,11 @@ Status
 OnnxBackend::Context::SetInputTensor(
     const std::string& name, const DataType data_type, const DimsList& dims,
     size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<char[]>>* input_buffers,
-    std::vector<const char*>* input_names)
+    std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
+    std::vector<const char*>* input_names, bool* cuda_used)
 {
   input_names->emplace_back(name.c_str());
   input_tensors_.emplace_back(nullptr);
-  input_buffers->emplace_back();
 
   size_t batch1_element_cnt = 1;
   std::vector<int64_t> input_dims;
@@ -695,21 +700,34 @@ OnnxBackend::Context::SetInputTensor(
   // of String data can become valid C string.
   const size_t buffer_size =
       total_byte_size + ((data_type != TYPE_STRING) ? 0 : 1);
-  input_buffers->back().reset((new char[buffer_size]));
-  char* buffer = input_buffers->back().get();
+  input_buffers->emplace_back(
+      new AllocatedSystemMemory(buffer_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
+  TRTSERVER_Memory_Type buffer_memory_type;
+  int64_t buffer_memory_id;
+  char* buffer = input_buffers->back()->MutableBuffer(
+      &buffer_memory_type, &buffer_memory_id);
 
-  // Store data into input buffer
-  SetInputBuffer(
-      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, 0, buffer);
+  // Store data into input buffer. Note that 'cuda_used' will be updated only
+  // for non-string data type. For string, the data must be ready to proceed.
+  auto tmp_cuda_used = SetInputBuffer(
+      name, expected_byte_sizes, payloads, buffer_memory_type, buffer_memory_id,
+      buffer);
 
   if (data_type != TYPE_STRING) {
     const OrtMemoryInfo* allocator_info;
     RETURN_IF_ORT_ERROR(ort_api->AllocatorGetInfo(allocator_, &allocator_info));
     RETURN_IF_ORT_ERROR(ort_api->CreateTensorWithDataAsOrtValue(
-        allocator_info, (void*)input_buffers->back().get(), total_byte_size,
-        input_dims.data(), input_dims.size(), ConvertToOnnxDataType(data_type),
+        allocator_info, (void*)buffer, total_byte_size, input_dims.data(),
+        input_dims.size(), ConvertToOnnxDataType(data_type),
         &input_tensors_.back()));
+    *cuda_used |= tmp_cuda_used;
   } else {
+#ifdef TRTIS_ENABLE_GPU
+    if (tmp_cuda_used) {
+      cudaStreamSynchronize(stream_);
+    }
+#endif  // TRTIS_ENABLE_GPU
+
     std::vector<const char*> string_data;
     // Onnx String tensor is created by passing array of C strings,
     // set such array and modify data in input buffer to be C strings
@@ -921,7 +939,7 @@ OnnxBackend::Context::SetStringOutputBuffer(
           data_byte_size + sizeof(uint32_t) * expected_element_cnt;
 
       void* buffer;
-      TRTSERVER_Memory_Type preferred_memory_type = TRTSERVER_MEMORY_CPU;
+      TRTSERVER_Memory_Type preferred_memory_type = TRTSERVER_MEMORY_CPU_PINNED;
       TRTSERVER_Memory_Type actual_memory_type;
       int64_t actual_memory_type_id;
       Status status = payload.response_provider_->AllocateOutputBuffer(

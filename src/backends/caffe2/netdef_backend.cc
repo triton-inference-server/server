@@ -347,13 +347,18 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
     const std::string& name, const std::vector<int64_t>& shape,
     const Caffe2Workspace::DataType dtype, const size_t batch1_byte_size,
     const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy)
+    std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
+    bool* cuda_copy)
 {
   // The entire input tensor must be delivered as a single
   // contiguous chunk so create a buffer large enough to hold the
   // entire dynamic batched input.
-  input_buffers->emplace_back(new char[total_byte_size]);
-  char* buffer = input_buffers->back().get();
+  input_buffers->emplace_back(new AllocatedSystemMemory(
+      total_byte_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
+  TRTSERVER_Memory_Type buffer_memory_type;
+  int64_t buffer_memory_id;
+  char* buffer = input_buffers->back()->MutableBuffer(
+      &buffer_memory_type, &buffer_memory_id);
 
   // Visit the payloads in order and copy the input tensors to
   // 'buffer'.
@@ -366,7 +371,8 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
   }
 
   *cuda_copy |= SetInputBuffer(
-      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, 0, buffer);
+      name, expected_byte_sizes, payloads, buffer_memory_type, buffer_memory_id,
+      buffer);
 
   Caffe2Workspace::Error err = workspace_->SetInputTensor(
       name, shape, dtype, static_cast<const char*>(buffer), total_byte_size);
@@ -438,7 +444,8 @@ Status
 NetDefBackend::Context::SetInput(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy)
+    std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
+    bool* cuda_copy)
 {
   // Get the shape of the input. The provider has already checked that
   // the request shape is valid so don't need to do it here.
@@ -515,7 +522,7 @@ NetDefBackend::Context::Run(
 
   // Hold reference to each buffer of input data to that it stays
   // until the inference has completed.
-  std::vector<std::unique_ptr<char[]>> input_buffers;
+  std::vector<std::unique_ptr<AllocatedSystemMemory>> input_buffers;
 
   // Create a tensor for each input sized correctly for the total
   // payload batch size. Concatenate input values from each payload

@@ -321,13 +321,13 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
     TRTSERVER_Memory_Type type;
     int64_t type_id;
     warmup_data.zero_data_.reset(new AllocatedSystemMemory(
-        max_zero_byte_size, TRTSERVER_MEMORY_CPU /* memory_type */,
+        max_zero_byte_size, TRTSERVER_MEMORY_CPU_PINNED /* memory_type */,
         0 /* memory_type_id */));
     char* zero_buffer = warmup_data.zero_data_->MutableBuffer(&type, &type_id);
     memset(zero_buffer, 0, max_zero_byte_size);
 
     warmup_data.random_data_.reset(new AllocatedSystemMemory(
-        max_random_byte_size, TRTSERVER_MEMORY_CPU /* memory_type */,
+        max_random_byte_size, TRTSERVER_MEMORY_CPU_PINNED /* memory_type */,
         0 /* memory_type_id */));
     char* random_buffer =
         warmup_data.random_data_->MutableBuffer(&type, &type_id);

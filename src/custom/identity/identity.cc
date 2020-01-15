@@ -299,14 +299,29 @@ Context::Execute(
         }
 
         auto copy_type = cudaMemcpyHostToHost;
-        if (src_memory_type == dst_memory_type) {
-          if (src_memory_type == CUSTOM_MEMORY_GPU) {
-            copy_type = cudaMemcpyDeviceToDevice;
+        switch (src_memory_type) {
+          case CUSTOM_MEMORY_GPU: {
+            switch (dst_memory_type) {
+              case CUSTOM_MEMORY_GPU:
+                copy_type = cudaMemcpyDeviceToDevice;
+                break;
+              default:
+                copy_type = cudaMemcpyDeviceToHost;
+                break;
+            }
+            break;
           }
-        } else {
-          copy_type = (src_memory_type == CUSTOM_MEMORY_CPU)
-                          ? cudaMemcpyHostToDevice
-                          : cudaMemcpyDeviceToHost;
+          default: {
+            switch (dst_memory_type) {
+              case CUSTOM_MEMORY_GPU:
+                copy_type = cudaMemcpyHostToDevice;
+                break;
+              default:
+                // default 'copy_type' value: cudaMemcpyHostToHost
+                break;
+            }
+            break;
+          }
         }
 
         if (copy_type == cudaMemcpyHostToHost) {

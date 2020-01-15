@@ -349,9 +349,9 @@ LibTorchBackend::Context::SetInputTensor(
       meta_data.input_buffer_->MutableBuffer(&memory_type, &memory_type_id);
 
   torch::TensorOptions options{meta_data.torch_type_};
-  auto updated_options = (memory_type == TRTSERVER_MEMORY_CPU)
-                             ? options.device(torch::kCPU)
-                             : options.device(torch::kCUDA, memory_type_id);
+  auto updated_options = (memory_type == TRTSERVER_MEMORY_GPU)
+                             ? options.device(torch::kCUDA, memory_type_id)
+                             : options.device(torch::kCPU);
   torch::Tensor input_tensor =
       torch::from_blob(buffer, meta_data.shape_, updated_options);
 
@@ -506,8 +506,9 @@ LibTorchBackend::Context::SetFixedSizedInputBuffer(
   // The entire input tensor must be delivered as a single
   // contiguous chunk so create a buffer large enough to hold the
   // entire dynamic batched input.
-  auto memory_type = (gpu_device_ == NO_GPU_DEVICE) ? TRTSERVER_MEMORY_CPU
-                                                    : TRTSERVER_MEMORY_GPU;
+  auto memory_type = (gpu_device_ == NO_GPU_DEVICE)
+                         ? TRTSERVER_MEMORY_CPU_PINNED
+                         : TRTSERVER_MEMORY_GPU;
   int64_t memory_type_id = (gpu_device_ == NO_GPU_DEVICE) ? 0 : gpu_device_;
   meta_data->input_buffer_.reset(
       new AllocatedSystemMemory(total_byte_size, memory_type, memory_type_id));

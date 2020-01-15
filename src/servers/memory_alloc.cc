@@ -81,12 +81,6 @@ Usage(char** argv, const std::string& msg = std::string())
   exit(1);
 }
 
-std::string
-MemoryTypeString(TRTSERVER_Memory_Type memory_type)
-{
-  return (memory_type == TRTSERVER_MEMORY_CPU) ? "CPU memory" : "GPU memory";
-}
-
 TRTSERVER_Error*
 ResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -128,16 +122,16 @@ ResponseAlloc(
           TRTSERVER_ERROR_INTERNAL,
           std::string(
               "failed to allocate " + std::to_string(byte_size) + " bytes in " +
-              MemoryTypeString(io_spec.output_type_) + " for result tensor " +
-              tensor_name)
+              ni::MemoryTypeString(io_spec.output_type_) +
+              " for result tensor " + tensor_name)
               .c_str());
     }
 
     *buffer = allocated_ptr;
     *buffer_userp = new std::string(tensor_name);
     std::cout << "allocated " << byte_size << " bytes in "
-              << MemoryTypeString(io_spec.output_type_) << " for result tensor "
-              << tensor_name << std::endl;
+              << ni::MemoryTypeString(io_spec.output_type_)
+              << " for result tensor " << tensor_name << std::endl;
   }
 
   *actual_memory_type = io_spec.output_type_;
@@ -158,7 +152,7 @@ ResponseRelease(
   }
 
   std::cout << "Releasing buffer " << buffer << " of size " << byte_size
-            << " in " << MemoryTypeString(memory_type) << " for result '"
+            << " in " << ni::MemoryTypeString(memory_type) << " for result '"
             << *name << "'" << std::endl;
   if (memory_type == TRTSERVER_MEMORY_CPU) {
     free(buffer);
@@ -757,9 +751,9 @@ main(int argc, char** argv)
     FAIL(
         "unexpected output0 memory type (id), expected to be allocated "
         "in " +
-        MemoryTypeString(io_spec.output_type_) + " with id " +
+        ni::MemoryTypeString(io_spec.output_type_) + " with id " +
         std::to_string(io_spec.output_type_id_) + ", got " +
-        MemoryTypeString(output0_memory_type) + " with id " +
+        ni::MemoryTypeString(output0_memory_type) + " with id " +
         std::to_string(output0_memory_type_id));
   }
 
@@ -791,9 +785,9 @@ main(int argc, char** argv)
     FAIL(
         "unexpected output1 memory type (id), expected to be allocated "
         "in " +
-        MemoryTypeString(io_spec.output_type_) + " with id " +
+        ni::MemoryTypeString(io_spec.output_type_) + " with id " +
         std::to_string(io_spec.output_type_id_) + ", got " +
-        MemoryTypeString(output1_memory_type) + " with id " +
+        ni::MemoryTypeString(output1_memory_type) + " with id " +
         std::to_string(output1_memory_type_id));
   }
 
