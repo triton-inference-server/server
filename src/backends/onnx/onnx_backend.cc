@@ -571,7 +571,7 @@ OnnxBackend::Context::Run(
 
   // Hold reference to each buffer of input data so that it stays
   // until the inference has completed.
-  std::vector<AllocatedSystemMemory> input_buffers;
+  std::vector<std::unique_ptr<AllocatedSystemMemory>> input_buffers;
 
   std::vector<const char*> input_names;
 
@@ -644,7 +644,7 @@ Status
 OnnxBackend::Context::SetInputTensor(
     const std::string& name, const DataType data_type, const DimsList& dims,
     size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<AllocatedSystemMemory>* input_buffers,
+    std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
     std::vector<const char*>* input_names)
 {
   input_names->emplace_back(name.c_str());
@@ -694,10 +694,11 @@ OnnxBackend::Context::SetInputTensor(
   // of String data can become valid C string.
   const size_t buffer_size =
       total_byte_size + ((data_type != TYPE_STRING) ? 0 : 1);
-  input_buffers->emplace_back(buffer_size, TRTSERVER_MEMORY_CPU_PINNED, 0);
+  input_buffers->emplace_back(
+      new AllocatedSystemMemory(buffer_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
   TRTSERVER_Memory_Type buffer_memory_type;
   int64_t buffer_memory_id;
-  char* buffer = input_buffers->back().MutableBuffer(
+  char* buffer = input_buffers->back()->MutableBuffer(
       &buffer_memory_type, &buffer_memory_id);
 
   // Store data into input buffer

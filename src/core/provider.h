@@ -29,6 +29,7 @@
 #include <event2/buffer.h>
 #endif
 #include "src/core/api.pb.h"
+#include "src/core/constants.h"
 #include "src/core/grpc_service.pb.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
@@ -105,6 +106,8 @@ class AllocatedSystemMemory : public Memory {
   AllocatedSystemMemory(
       size_t byte_size, TRTSERVER_Memory_Type memory_type,
       int64_t memory_type_id);
+
+  DISALLOW_COPY_AND_ASSIGN(AllocatedSystemMemory);
 
   ~AllocatedSystemMemory();
 
