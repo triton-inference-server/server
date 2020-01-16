@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -381,19 +381,9 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
       outputs_, op_index, name, dtype, &content, &byte_size, &content_shape));
 
   // verify shape of output matches shape from model config
-  const int batch_offset = ((max_batch_size_ == NO_BATCHING) ? 0 : 1);
-
-  for (int i = 0; i < dims.size(); i++) {
-    if (dims[i] != -1) {
-      if (dims[i] != content_shape[i + batch_offset]) {
-        return Status(
-            RequestStatusCode::INVALID_ARG,
-            "unexpected shape for output '" + name +
-                "', model configuration shape is " + DimsListToString(dims) +
-                ", inference shape is " + DimsListToString(content_shape));
-      }
-    }
-  }
+  RETURN_IF_ERROR(CompareOutputDims(
+      name, content_shape, dims,
+      max_batch_size_ != NO_BATCHING /* supports_batching */));
 
   const size_t total_byte_size =
       GetElementCount(content_shape) * dtype_byte_size;

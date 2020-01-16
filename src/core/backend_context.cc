@@ -300,4 +300,66 @@ BackendContext::GetContiguousInputContent(
   return Status::Success;
 }
 
+Status
+BackendContext::CompareOutputDims(
+    const std::string& tensor_name, const std::vector<int64_t>& model_shape,
+    const DimsList& dims, const bool supports_batching)
+{
+  if (supports_batching) {
+    DimsList full_dims;
+    full_dims.Add(WILDCARD_DIM);
+    for (int i = 0; i < dims.size(); ++i) {
+      full_dims.Add(dims[i]);
+    }
+
+    bool succ = (model_shape.size() == (size_t)full_dims.size());
+    if (succ) {
+      for (int i = 0; i < full_dims.size(); ++i) {
+        const int64_t model_dim = model_shape[i];
+        if (full_dims[i] != WILDCARD_DIM) {
+          succ &= (model_dim == full_dims[i]);
+        }
+      }
+    }
+
+    if (!succ) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "tensor '" + tensor_name + "': the model expects " +
+              std::to_string(model_shape.size()) + " dimensions (shape " +
+              DimsListToString(model_shape) +
+              ") but the model configuration specifies " +
+              std::to_string(full_dims.size()) +
+              " dimensions (an initial batch dimension because max_batch_size "
+              "> 0 followed by the explicit tensor shape, making complete "
+              "shape " +
+              DimsListToString(full_dims) + ")");
+    }
+  } else {
+    // ! supports_batching
+    bool succ = (model_shape.size() == (size_t)dims.size());
+    if (succ) {
+      for (int i = 0; i < dims.size(); ++i) {
+        const int64_t model_dim = model_shape[i];
+        if (dims[i] != WILDCARD_DIM) {
+          succ &= (model_dim == dims[i]);
+        }
+      }
+    }
+
+    if (!succ) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "tensor '" + tensor_name + "': the model expects " +
+              std::to_string(model_shape.size()) + " dimensions (shape " +
+              DimsListToString(model_shape) +
+              ") but the model configuration specifies " +
+              std::to_string(dims.size()) + " dimensions (shape " +
+              DimsListToString(dims) + ")");
+    }
+  }
+
+  return Status::Success;
+}
+
 }}  // namespace nvidia::inferenceserver

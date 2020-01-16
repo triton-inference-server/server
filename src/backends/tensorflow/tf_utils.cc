@@ -37,7 +37,7 @@ CompareDims(
   // If the model configuration expects batching support in the model,
   // then the tensorflow shape first dimension must be -1.
   if (supports_batching) {
-    if ((model_shape->rank_ == 0) || (model_shape->dims_[0] != -1)) {
+    if ((model_shape->rank_ == 0) || (model_shape->dims_[0] != WILDCARD_DIM)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "model '" + model_name + "', tensor '" + tensor_name +
@@ -48,7 +48,7 @@ CompareDims(
     }
 
     DimsList full_dims;
-    full_dims.Add(-1);
+    full_dims.Add(WILDCARD_DIM);
     for (int i = 0; i < dims.size(); ++i) {
       full_dims.Add(dims[i]);
     }
@@ -57,7 +57,7 @@ CompareDims(
     if (succ) {
       for (int i = 0; i < full_dims.size(); ++i) {
         const int64_t model_dim = model_shape->dims_[i];
-        if (compare_exact || (model_dim != -1)) {
+        if (compare_exact || (model_dim != WILDCARD_DIM)) {
           succ &= (model_dim == full_dims[i]);
         }
       }
@@ -82,7 +82,7 @@ CompareDims(
     if (succ) {
       for (int i = 0; i < dims.size(); ++i) {
         const int64_t model_dim = model_shape->dims_[i];
-        if (compare_exact || (model_dim != -1)) {
+        if (compare_exact || (model_dim != WILDCARD_DIM)) {
           succ &= (model_dim == dims[i]);
         }
       }

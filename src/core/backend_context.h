@@ -27,6 +27,7 @@
 
 #include <string>
 #include <vector>
+#include "src/core/model_config.h"
 #include "src/core/scheduler.h"
 
 #ifdef TRTIS_ENABLE_GPU
@@ -115,6 +116,18 @@ struct BackendContext {
       const char** content, size_t* content_byte_size,
       std::unique_ptr<AllocatedSystemMemory>* contiguous_buffer,
       bool* cuda_copy);
+
+  // Check if output tensor produced by a model is compatible with the
+  // model configuration.  Dimensions with variable size in the model
+  // configuration can support any size in the corresponding output
+  // tensor dimension.
+  //
+  // \param supports_batching If True then the configuration expects
+  // the model to support batching and so the shape must have the
+  // appropriate batch dimension.
+  Status CompareOutputDims(
+      const std::string& tensor_name, const std::vector<int64_t>& model_shape,
+      const DimsList& dims, const bool supports_batching);
 
   // Name of the model instance
   std::string name_;
