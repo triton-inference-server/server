@@ -57,7 +57,7 @@ cp ./gen_qa_custom_ops_models.py $HOST_SRCDIR/.
 cp ./cuda_op_kernel.cu.cc.patch $HOST_SRCDIR/.
 cp ./busy_op_kernel.* $HOST_SRCDIR/.
 TFSCRIPT=tf_gen.cmds
-C2SCRIPT=c2_gen.cmds
+PYTSCRIPT=pyt_gen.cmds
 
 SRCDIR=/tmp/src
 DESTDIR=/tmp/custom_ops
@@ -112,7 +112,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # PyTorch
-cat >$HOST_SRCDIR/$C2SCRIPT <<EOF
+cat >$HOST_SRCDIR/$PYTSCRIPT <<EOF
 #!/bin/bash -x
 set -e
 
@@ -124,14 +124,14 @@ chown -R $(id -u):$(id -g) $DESTDIR
 cp /tmp/torch_extensions/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
 EOF
 
-chmod a+x $HOST_SRCDIR/$C2SCRIPT
+chmod a+x $HOST_SRCDIR/$PYTSCRIPT
 if [ $? -ne 0 ]; then
     echo -e "Failed: chmod"
     exit 1
 fi
 
 docker pull $PYTORCH_IMAGE
-docker run --gpus=1 --rm --entrypoint $SRCDIR/$C2SCRIPT \
+docker run --gpus=1 --rm --entrypoint $SRCDIR/$PYTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        -u $(id -u):$(id -g) $PYTORCH_IMAGE
