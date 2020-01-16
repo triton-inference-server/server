@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "src/servers/http_server.h"
+
 #include <errno.h>
 #include <google/protobuf/util/json_util.h>
 #include <h2o.h>
@@ -58,45 +59,19 @@
 #include "src/servers/tracer.h"
 #endif  // TRTIS_ENABLE_TRACING
 
-#define USE_HTTPS 0
-#define USE_MEMCACHED 0
-#define DEFAULT_CACHE_LINE_SIZE 128
-
 namespace nvidia { namespace inferenceserver {
 
 // Handle HTTP requests to inference server APIs
 class HTTPAPIServer : public HTTPServer {
  public:
-  explicit HTTPAPIServer(
+  HTTPAPIServer(
       const std::shared_ptr<TRTSERVER_Server>& server,
       const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
           trace_manager,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
       const std::vector<std::string>& endpoints, const int32_t port,
-      const int thread_cnt)
-      : server_(server), trace_manager_(trace_manager),
-        smb_manager_(smb_manager), endpoint_names_(endpoints),
-        allocator_(nullptr), port_(port), thread_cnt_(thread_cnt)
-  {
-    TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
-    if (err != nullptr) {
-      server_id_ = "unknown:0";
-      TRTSERVER_ErrorDelete(err);
-    }
-
-    FAIL_IF_ERR(
-        TRTSERVER_ResponseAllocatorNew(
-            &allocator_, ResponseAlloc, ResponseRelease),
-        "creating response allocator");
-  }
-
-  ~HTTPAPIServer()
-  {
-    Stop();
-    LOG_IF_ERR(
-        TRTSERVER_ResponseAllocatorDelete(allocator_),
-        "deleting response allocator");
-  }
+      const int thread_cnt);
+  ~HTTPAPIServer();
 
  private:
   TRTSERVER_Error* Start() override;
@@ -113,23 +88,23 @@ class HTTPAPIServer : public HTTPServer {
       size_t byte_size, TRTSERVER_Memory_Type memory_type,
       int64_t memory_type_id);
 
-  int create_listener(int32_t port);
-  static void on_accept(uv_stream_t* listener, int status);
-  int setup_ssl(
-      const char* cert_file, const char* key_file, const char* ciphers);
-  h2o_pathconf_t* register_handler(
+  int CreateListener(int32_t port);
+  static void OnAccept(uv_stream_t* listener, int status);
+  int SetupSsl(
+      const std::string& cert_file, const std::string& key_file,
+      const std::string& ciphers);
+  h2o_pathconf_t* RegisterHandler(
       h2o_hostconf_t* hostconf, const char* path,
       int (*on_req)(h2o_handler_t*, h2o_req_t*));
 
   static int Health(h2o_handler_t* handler_self, h2o_req_t* req);
   static int Status(h2o_handler_t* handler_self, h2o_req_t* req);
 
-  h2o_globalconf_t config;
-  h2o_context_t ctx;
-  h2o_accept_ctx_t accept_ctx;
-  h2o_multithread_receiver_t libmemcached_receiver;
-  uv_tcp_t listener;
-  bool exit_loop = true;
+  h2o_globalconf_t config_;
+  h2o_context_t ctx_;
+  h2o_accept_ctx_t accept_ctx_;
+  uv_tcp_t listener_;
+  bool exit_loop_ = true;
 
   std::shared_ptr<TRTSERVER_Server> server_;
   const char* server_id_;
@@ -146,13 +121,68 @@ class HTTPAPIServer : public HTTPServer {
   int thread_cnt_;
 };
 
+HTTPAPIServer::HTTPAPIServer(
+    const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
+    const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
+    const std::vector<std::string>& endpoints, const int32_t port,
+    const int thread_cnt)
+    : server_(server), trace_manager_(trace_manager), smb_manager_(smb_manager),
+      endpoint_names_(endpoints), allocator_(nullptr), port_(port),
+      thread_cnt_(thread_cnt)
+{
+  TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
+  if (err != nullptr) {
+    server_id_ = "unknown:0";
+    TRTSERVER_ErrorDelete(err);
+  }
+
+  FAIL_IF_ERR(
+      TRTSERVER_ResponseAllocatorNew(
+          &allocator_, ResponseAlloc, ResponseRelease),
+      "creating response allocator");
+}
+
+HTTPAPIServer::~HTTPAPIServer()
+{
+  Stop();
+  LOG_IF_ERR(
+      TRTSERVER_ResponseAllocatorDelete(allocator_),
+      "deleting response allocator");
+}
+
 struct h2o_custom_req_handler_t {
   h2o_handler_t super;
   HTTPAPIServer* http_server;
 };
 
+int
+HTTPAPIServer::CreateListener(int32_t port)
+{
+  struct sockaddr_in addr;
+  int r;
+
+  uv_tcp_init(ctx_.loop, &listener_);
+  uv_ip4_addr("0.0.0.0", port, &addr);
+  if ((r = uv_tcp_bind(&listener_, (struct sockaddr*)&addr, 0)) != 0) {
+    LOG_VERBOSE(1) << stderr << "uv_tcp_bind:" << uv_strerror(r);
+    goto Error;
+  }
+  if ((r = uv_listen((uv_stream_t*)&listener_, 128, OnAccept)) != 0) {
+    LOG_VERBOSE(1) << stderr << "uv_listen:" << uv_strerror(r);
+    goto Error;
+  }
+
+  listener_.data = this;
+
+  return 0;
+Error:
+  uv_close((uv_handle_t*)&listener_, NULL);
+  return r;
+}
+
 void
-HTTPAPIServer::on_accept(uv_stream_t* listener, int status)
+HTTPAPIServer::OnAccept(uv_stream_t* listener, int status)
 {
   HTTPAPIServer* http_server = reinterpret_cast<HTTPAPIServer*>(listener->data);
   uv_tcp_t* conn;
@@ -170,83 +200,63 @@ HTTPAPIServer::on_accept(uv_stream_t* listener, int status)
   }
 
   sock = h2o_uv_socket_create((uv_stream_t*)conn, (uv_close_cb)free);
-  h2o_accept(&http_server->accept_ctx, sock);
+  h2o_accept(&http_server->accept_ctx_, sock);
 }
 
+#ifdef USE_HTTPS
 int
-HTTPAPIServer::create_listener(int32_t port)
-{
-  struct sockaddr_in addr;
-  int r;
-
-  uv_tcp_init(ctx.loop, &listener);
-  uv_ip4_addr("0.0.0.0", port, &addr);
-  if ((r = uv_tcp_bind(&listener, (struct sockaddr*)&addr, 0)) != 0) {
-    LOG_VERBOSE(1) << stderr << "uv_tcp_bind:" << uv_strerror(r);
-    goto Error;
-  }
-  if ((r = uv_listen((uv_stream_t*)&listener, 128, on_accept)) != 0) {
-    LOG_VERBOSE(1) << stderr << "uv_listen:" << uv_strerror(r);
-    goto Error;
-  }
-
-  listener.data = this;
-
-  return 0;
-Error:
-  uv_close((uv_handle_t*)&listener, NULL);
-  return r;
-}
-
-int
-HTTPAPIServer::setup_ssl(
-    const char* cert_file, const char* key_file, const char* ciphers)
+HTTPAPIServer::SetupSsl(
+    const std::string& cert_file, const std::string& key_file,
+    const std::string& ciphers)
 {
   SSL_load_error_strings();
   SSL_library_init();
   OpenSSL_add_all_algorithms();
 
-  accept_ctx.ssl_ctx = SSL_CTX_new(SSLv23_server_method());
-  SSL_CTX_set_options(accept_ctx.ssl_ctx, SSL_OP_NO_SSLv2);
+  accept_ctx_.ssl_ctx = SSL_CTX_new(SSLv23_server_method());
+  SSL_CTX_set_options(accept_ctx_.ssl_ctx, SSL_OP_NO_SSLv2);
 
 #ifdef SSL_CTX_set_ecdh_auto
-  SSL_CTX_set_ecdh_auto(accept_ctx.ssl_ctx, 1);
+  SSL_CTX_set_ecdh_auto(accept_ctx_.ssl_ctx, 1);
 #endif
 
   /* load certificate and private key */
-  if (SSL_CTX_use_certificate_chain_file(accept_ctx.ssl_ctx, cert_file) != 1) {
+  if (SSL_CTX_use_certificate_chain_file(
+          accept_ctx_.ssl_ctx, cert_file.c_str()) != 1) {
     fprintf(
         stderr,
         "an error occurred while trying to load server certificate file:%s\n",
-        cert_file);
+        cert_file.c_str());
     return -1;
   }
   if (SSL_CTX_use_PrivateKey_file(
-          accept_ctx.ssl_ctx, key_file, SSL_FILETYPE_PEM) != 1) {
+          accept_ctx_.ssl_ctx, key_file.c_str(), SSL_FILETYPE_PEM) != 1) {
     fprintf(
         stderr, "an error occurred while trying to load private key file:%s\n",
-        key_file);
+        key_file.c_str());
     return -1;
   }
 
-  if (SSL_CTX_set_cipher_list(accept_ctx.ssl_ctx, ciphers) != 1) {
-    fprintf(stderr, "ciphers could not be set: %s\n", ciphers);
+  if (SSL_CTX_set_cipher_list(accept_ctx_.ssl_ctx, ciphers.c_str()) != 1) {
+    fprintf(stderr, "ciphers could not be set: %s\n", ciphers.c_str());
     return -1;
   }
 
   /* setup protocol negotiation methods */
 #if H2O_USE_NPN
-  h2o_ssl_register_npn_protocols(accept_ctx.ssl_ctx, h2o_http2_npn_protocols);
+  h2o_ssl_register_npn_protocols(accept_ctx_.ssl_ctx, h2o_http2_npn_protocols);
 #endif
 #if H2O_USE_ALPN
-  h2o_ssl_register_alpn_protocols(accept_ctx.ssl_ctx, h2o_http2_alpn_protocols);
+  h2o_ssl_register_alpn_protocols(
+      accept_ctx_.ssl_ctx, h2o_http2_alpn_protocols);
 #endif
 
   return 0;
 }
+#endif  // USE_HTTPS
 
 h2o_pathconf_t*
-HTTPAPIServer::register_handler(
+HTTPAPIServer::RegisterHandler(
     h2o_hostconf_t* hostconf, const char* path,
     int (*on_req)(h2o_handler_t*, h2o_req_t*))
 {
@@ -272,7 +282,7 @@ HTTPAPIServer::Health(h2o_handler_t* handler_self, h2o_req_t* req)
     h2o_generator_t generator = {NULL, NULL};
     h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
     h2o_start_response(req, &generator);
-    h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+    h2o_send(req, &body, 1 /* buffer count */, H2O_SEND_STATE_FINAL);
     return 0;
   }
 
@@ -290,7 +300,7 @@ HTTPAPIServer::Health(h2o_handler_t* handler_self, h2o_req_t* req)
     h2o_generator_t generator = {NULL, NULL};
     h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
     h2o_start_response(req, &generator);
-    h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+    h2o_send(req, &body, 1 /* buffer count */, H2O_SEND_STATE_FINAL);
     return 0;
   }
 
@@ -333,7 +343,7 @@ HTTPAPIServer::Health(h2o_handler_t* handler_self, h2o_req_t* req)
   }
 
   h2o_start_response(req, &generator);
-  h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+  h2o_send(req, &body, 1 /* buffer count */, H2O_SEND_STATE_FINAL);
   return 0;
 }
 
@@ -351,7 +361,7 @@ HTTPAPIServer::Status(h2o_handler_t* handler_self, h2o_req_t* req)
     h2o_generator_t generator = {NULL, NULL};
     h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
     h2o_start_response(req, &generator);
-    h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+    h2o_send(req, &body, 1 /* buffer count */, H2O_SEND_STATE_FINAL);
     return 0;
   }
 
@@ -368,7 +378,7 @@ HTTPAPIServer::Status(h2o_handler_t* handler_self, h2o_req_t* req)
       h2o_generator_t generator = {NULL, NULL};
       h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
       h2o_start_response(req, &generator);
-      h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+      h2o_send(req, &body, 1 /* buffer count */, H2O_SEND_STATE_FINAL);
       return 0;
     }
   }
@@ -387,7 +397,7 @@ HTTPAPIServer::Status(h2o_handler_t* handler_self, h2o_req_t* req)
       h2o_generator_t generator = {NULL, NULL};
       h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
       h2o_start_response(req, &generator);
-      h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+      h2o_send(req, &body, 1 /* buffer count */, H2O_SEND_STATE_FINAL);
       return 0;
     }
   }
@@ -479,7 +489,7 @@ HTTPAPIServer::Status(h2o_handler_t* handler_self, h2o_req_t* req)
   }
 
   h2o_start_response(req, &generator);
-  h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+  h2o_send(req, &body, 1 /* buffer count */, H2O_SEND_STATE_FINAL);
   TRTSERVER_ErrorDelete(err);
 
   return 0;
@@ -496,55 +506,54 @@ HTTPAPIServer::Start()
   signal(SIGPIPE, SIG_IGN);
 
   // necessary to zero these structs before using them!
-  memset(&accept_ctx, 0, sizeof(accept_ctx));
-  memset(&ctx, 0, sizeof(ctx));
-  memset(&config, 0, sizeof(config));
+  memset(&accept_ctx_, 0, sizeof(accept_ctx_));
+  memset(&ctx_, 0, sizeof(ctx_));
+  memset(&config_, 0, sizeof(config_));
 
-  h2o_config_init(&config);
+  h2o_config_init(&config_);
   hostconf = h2o_config_register_host(
-      &config, h2o_iovec_init(H2O_STRLIT("default")), 65535);
+      &config_, h2o_iovec_init(H2O_STRLIT("default")), 65535);
 
   if (std::find(endpoint_names_.begin(), endpoint_names_.end(), "health") !=
       endpoint_names_.end()) {
-    pathconf = register_handler(hostconf, "/api/health", Health);
+    pathconf = RegisterHandler(hostconf, "/api/health", Health);
     if (logfh != NULL)
       h2o_access_log_register(pathconf, logfh);
   }
 
   if (std::find(endpoint_names_.begin(), endpoint_names_.end(), "status") !=
       endpoint_names_.end()) {
-    pathconf = register_handler(hostconf, "/api/status", Status);
+    pathconf = RegisterHandler(hostconf, "/api/status", Status);
     if (logfh != NULL)
       h2o_access_log_register(pathconf, logfh);
   }
 
   uv_loop_t loop;
   uv_loop_init(&loop);
-  h2o_context_init(&ctx, &loop, &config);
-
-  if (USE_MEMCACHED)
-    h2o_multithread_register_receiver(
-        ctx.queue, &libmemcached_receiver, h2o_memcached_receiver);
+  h2o_context_init(&ctx_, &loop, &config_);
 
   // TODO Add server.crt and key files
-  if (USE_HTTPS && setup_ssl(
-                       "h2o/server.crt", "h2o/server.key",
-                       "DEFAULT:!MD5:!DSS:!DES:!RC4:!RC2:!SEED:!IDEA:!NULL:!"
-                       "ADH:!EXP:!SRP:!PSK") != 0)
+#ifdef USE_HTTPS
+  if (SetupSsl(
+          "h2o/server.crt", "h2o/server.key",
+          "DEFAULT:!MD5:!DSS:!DES:!RC4:!RC2:!SEED:!IDEA:!NULL:!"
+          "ADH:!EXP:!SRP:!PSK") != 0) {
     goto Error;
+  }
+#endif
 
-  accept_ctx.ctx = &ctx;
-  accept_ctx.hosts = config.hosts;
+  accept_ctx_.ctx = &ctx_;
+  accept_ctx_.hosts = config_.hosts;
 
-  if (create_listener(port_) != 0) {
+  if (CreateListener(port_) != 0) {
     LOG_VERBOSE(1) << stderr << "failed to listen to 0.0.0.0:" << port_ << ":"
                    << strerror(errno);
     goto Error;
   }
 
-  exit_loop = false;
-  while (!exit_loop) {
-    uv_run(ctx.loop, UV_RUN_DEFAULT);
+  exit_loop_ = false;
+  while (!exit_loop_) {
+    uv_run(ctx_.loop, UV_RUN_DEFAULT);
   }
 
   return nullptr;
@@ -557,11 +566,11 @@ Error:
 TRTSERVER_Error*
 HTTPAPIServer::Stop()
 {
-  if (!exit_loop) {
-    uv_close((uv_handle_t*)&listener, NULL);
+  if (!exit_loop_) {
+    uv_close((uv_handle_t*)&listener_, NULL);
 
     // this will break the event loop
-    exit_loop = true;
+    exit_loop_ = true;
   } else {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_UNAVAILABLE, "HTTP h2o server is not running.");

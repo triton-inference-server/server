@@ -145,15 +145,6 @@ message(STATUS "Using Boost ${Boost_VERSION}")
 include_directories(${Boost_INCLUDE_DIRS})
 
 #
-# libevent
-#
-if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
-  find_package(Libevent CONFIG REQUIRED)
-  message(STATUS "Using libevent ${Libevent_VERSION}")
-  include_directories(${LIBEVENT_INCLUDE_DIRS})
-endif()
-
-#
 # Protobuf
 #
 set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)

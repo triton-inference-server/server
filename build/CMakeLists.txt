@@ -196,20 +196,6 @@ ExternalProject_Add(curl
 )
 
 #
-# Build libevent
-#
-ExternalProject_Add(libevent
-  PREFIX libevent
-  GIT_REPOSITORY "https://github.com/libevent/libevent.git"
-  GIT_TAG "release-2.1.8-stable"
-  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/libevent/src/libevent"
-  CMAKE_CACHE_ARGS
-    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
-    -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
-    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install
-)
-
-#
 # Build Prometheus C++ library
 #
 ExternalProject_Add(prometheus-cpp

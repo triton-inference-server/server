@@ -109,8 +109,8 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
 
   target_include_directories(
     http-endpoint-library
-    PRIVATE -lh2o
-    PRIVATE -luv
+    PRIVATE h2o
+    PRIVATE uv
   )
 
   set(
