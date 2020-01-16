@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -27,8 +27,8 @@
 
 |License|
 
-TensorRT Inference Server Helm Chart
-====================================
+Helm Chart To Deploy Inference Server Cluster
+=============================================
 
     **NOTE: Some versions of Google Kubernetes Engine (GKE) contain a
     regression in the handling of LD_LIBRARY_PATH that prevents the
@@ -37,12 +37,15 @@ TensorRT Inference Server Helm Chart
     or earlier version or a GKE 1.14.6 or later version to avoid this
     issue.**
 
-Simple helm chart for installing a single instance of the NVIDIA
-TensorRT Inference Server. This guide assumes you already have a
-functional Kubernetes cluster and helm installed (see below for
-instructions on installing helm). Your cluster must be configured with
-support for the NVIDIA driver and CUDA version required by the version
-of the inference server you are using.
+Simple helm chart for installing a single cluster of the NVIDIA
+TensorRT Inference Server. By default the cluster contains a single
+instance of the inference server but the *replicaCount* configuration
+parameter can be set to create a cluster of any size, as described
+below. This guide assumes you already have a functional Kubernetes
+cluster and helm installed (see below for instructions on installing
+helm). If you want TRTIS to use GPUs for inferencing, your cluster
+must be configured with support for the NVIDIA driver and CUDA version
+required by the version of the inference server you are using.
 
 This helm chart is available from `TensorRT Inference Server GitHub
 <https://github.com/NVIDIA/tensorrt-inference-server>`_ or from the
@@ -51,6 +54,20 @@ This helm chart is available from `TensorRT Inference Server GitHub
 The steps below describe how to set-up a model repository, use helm to
 launch the inference server, and then send inference requests to the
 running server.
+
+Installing Helm
+---------------
+
+If you do not already have Helm installed in your Kubernetes cluster,
+executing the following steps from the `official helm install guide
+<https://github.com/helm/helm/blob/master/docs/install.md>`_ will give
+you a quick setup::
+
+  $ curl https://raw.githubusercontent.com/helm/helm/master/scripts/get | bash
+  $ kubectl create serviceaccount -n kube-system tiller
+  serviceaccount/tiller created
+  $ kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
+  $ helm init --service-account tiller --wait
 
 Model Repository
 ----------------
@@ -118,9 +135,8 @@ following steps:
 Running The Inference Server
 ----------------------------
 
-Once you have helm installed (see below if you need help installing
-helm) and your model repository ready, you can deploy the inference
-server using the default configuration with::
+Once you have your model repository ready, you can deploy the
+inference server using the default configuration with::
 
   $ cd <directory containing Chart.yaml>
   $ helm install .
@@ -135,14 +151,15 @@ There are several ways of overriding the default configuration as
 described in this `helm documentation
 <https://helm.sh/docs/using_helm/#customizing-the-chart-before-installing>`_.
 
-For example, you can edit the values.yaml file directly or you can use
-the `--set` option to override a single parameter with the CLI, for
-example::
+You can edit the values.yaml file directly or you can use the `--set`
+option to override a single parameter with the CLI. For example, to
+deploy a cluster of four inference servers use `--set` to set the
+replicaCount parameter::
 
-  helm install tensorrt-inference-server --set image.imageName="nvcr.io/nvidia/tensorrtserver:custom-tag"
+  $ helm install . --set replicaCount=4
 
-You can also use a file by writing your own "values.yaml" file with
-the values you want to override and pass it to helm::
+You can also write your own "config.yaml" file with the values you
+want to override and pass it to helm::
 
   $ cat << EOF > config.yaml
   namespace: MyCustomNamespace
@@ -151,7 +168,7 @@ the values you want to override and pass it to helm::
     modelRepositoryPath: gs://my_model_repository
   EOF
 
-  $ helm install -f config.yaml tensorrt-inference-server
+  $ helm install -f config.yaml .
 
 Using the TensorRT Inference Server
 -----------------------------------
@@ -200,19 +217,6 @@ Once you've finished using the inference server you should use helm to delete th
 You may also want to delete the GCS bucket you created to hold the model repository::
 
   $ gsutil rm -r gs://tensorrt-inference-server-repository
-
-Installing Helm
----------------
-
-The following steps from the `official helm install guide
-<https://github.com/helm/helm/blob/master/docs/install.md>`_ will give
-you a quick setup::
-
-  $ curl https://raw.githubusercontent.com/helm/helm/master/scripts/get | bash
-  $ kubectl create serviceaccount -n kube-system tiller
-  serviceaccount/tiller created
-  $ kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-  $ helm init --service-account tiller --wait
 
 .. |License| image:: https://img.shields.io/badge/License-BSD3-lightgrey.svg
    :target: https://opensource.org/licenses/BSD-3-Clause
