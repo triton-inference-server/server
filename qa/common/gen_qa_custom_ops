@@ -30,8 +30,8 @@
 ## tensorrtserver CI tests. Generating these custom operations
 ## requires using the TensorFlow container.
 ##
-## 1. Update TENSORFLOW_IMAGE to match what is being used by the
-## tensorrtserver release being tested.
+## 1. Update TENSORFLOW_IMAGE and PYTORCH_IMAGE to match what is being used
+## by the tensorrtserver release being tested.
 ##
 ## 2. Run this script to create /tmp/qa_custom_ops.
 ##
@@ -39,6 +39,7 @@
 
 TRTIS_VERSION=19.12
 TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRTIS_VERSION-tf1-py3}
+PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRTIS_VERSION-py3}
 
 CUDA_DEVICE=0
 
@@ -56,11 +57,12 @@ cp ./gen_qa_custom_ops_models.py $HOST_SRCDIR/.
 cp ./cuda_op_kernel.cu.cc.patch $HOST_SRCDIR/.
 cp ./busy_op_kernel.* $HOST_SRCDIR/.
 TFSCRIPT=tf_gen.cmds
+C2SCRIPT=c2_gen.cmds
 
 SRCDIR=/tmp/src
 DESTDIR=/tmp/custom_ops
 
-# Tensorflow
+Tensorflow
 cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 #!/bin/bash -x
 set -e
@@ -104,6 +106,35 @@ docker run --gpus=1 --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        $TENSORFLOW_IMAGE
+if [ $? -ne 0 ]; then
+    echo -e "Failed"
+    exit 1
+fi
+
+# PyTorch
+cat >$HOST_SRCDIR/$C2SCRIPT <<EOF
+#!/bin/bash -x
+set -e
+
+export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
+
+python3 $SRCDIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$DESTDIR
+chown -R $(id -u):$(id -g) $DESTDIR
+
+cp /tmp/torch_extensions/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
+EOF
+
+chmod a+x $HOST_SRCDIR/$C2SCRIPT
+if [ $? -ne 0 ]; then
+    echo -e "Failed: chmod"
+    exit 1
+fi
+
+docker pull $PYTORCH_IMAGE
+docker run --gpus=1 --rm --entrypoint $SRCDIR/$C2SCRIPT \
+       --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
+       --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
+       -u $(id -u):$(id -g) $PYTORCH_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
     exit 1

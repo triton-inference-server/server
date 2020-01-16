@@ -296,11 +296,6 @@ output [
     name: "OUTPUT__0"
     data_type: TYPE_FP32
     dims: [ 10 ]
-  }},
-  {{
-    name: "OUTPUT__1"
-    data_type: TYPE_FP32
-    dims: [ 10 ]
   }}
 ]
 '''.format(model_name)
