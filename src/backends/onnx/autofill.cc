@@ -26,7 +26,6 @@
 
 #include "src/backends/onnx/autofill.h"
 
-#include <NvInfer.h>
 #include "src/backends/onnx/loader.h"
 #include "src/backends/onnx/onnx_utils.h"
 #include "src/core/autofill.h"
