@@ -48,7 +48,7 @@ HOST_SRCDIR=/tmp/gen_srcdir
 HOST_DESTDIR=/tmp/$TRTIS_VERSION/qa_custom_ops
 
 rm -fr $HOST_DESTDIR
-mkdir -p $HOST_DESTDIR
+mkdir -p $HOST_DESTDIR/tf_custom_ops $HOST_DESTDIR/libtorch_custom_ops
 
 rm -fr $HOST_SRCDIR
 mkdir -p $HOST_SRCDIR
@@ -62,7 +62,7 @@ PYTSCRIPT=pyt_gen.cmds
 SRCDIR=/tmp/src
 DESTDIR=/tmp/custom_ops
 
-Tensorflow
+# Tensorflow
 cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 #!/bin/bash -x
 set -e
@@ -104,7 +104,7 @@ fi
 docker pull $TENSORFLOW_IMAGE
 docker run --gpus=1 --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
-       --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
+       --mount type=bind,source=$HOST_DESTDIR/tf_custom_ops,target=$DESTDIR \
        $TENSORFLOW_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -133,7 +133,7 @@ fi
 docker pull $PYTORCH_IMAGE
 docker run --gpus=1 --rm --entrypoint $SRCDIR/$PYTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
-       --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
+       --mount type=bind,source=$HOST_DESTDIR/libtorch_custom_ops,target=$DESTDIR \
        -u $(id -u):$(id -g) $PYTORCH_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
