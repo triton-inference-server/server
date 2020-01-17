@@ -38,7 +38,7 @@ fi
 CLIENT_LOG_BASE="./client"
 
 DATADIR=`pwd`/models
-MODEL_SRCDIR=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops
+MODEL_SRCDIR=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 # Allow more time to exit. Ensemble brings in too many models
@@ -59,7 +59,7 @@ NUM_DELAY_CYCLES=${NUM_DELAY_CYCLES:=2100000000}
 
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
-SERVER_LD_PRELOAD=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libbusyop.so
+SERVER_LD_PRELOAD=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libbusyop.so
 
 for NUM_GPUS in $(seq 1 $TOTAL_GPUS); do
   export CUDA_VISIBLE_DEVICES=$(seq -s, 0 $(( NUM_GPUS - 1 )))
