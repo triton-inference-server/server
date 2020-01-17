@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,5 +26,18 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-add_subdirectory(library)
-add_subdirectory(examples)
+install(
+  PROGRAMS
+    image_client.py
+    ensemble_image_client.py
+    grpc_image_client.py
+    simple_client.py
+    simple_callback_client.py
+    simple_string_client.py
+    simple_sequence_client.py
+    simple_shm_client.py
+    simple_shm_string_client.py
+    simple_cuda_shm_client.py
+    simple_cuda_shm_string_client.py
+  DESTINATION python
+)

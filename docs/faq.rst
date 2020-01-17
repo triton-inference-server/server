@@ -82,7 +82,7 @@ GRPC. We provide two examples of this:
   `https://github.com/NVIDIA/tensorrt-inference-server/tree/master/src/clients/go`_.
 
 - Python:
-  `https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/grpc_image_client.py`_.
+  `https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/examples/grpc_image_client.py`_.
 
 In general the client libraries (and client examples) are meant to be
 just that, examples. We feel the client libraries are well written and
