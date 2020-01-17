@@ -24,11 +24,11 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/clients/python/cuda_shared_memory/cuda_shared_memory.h"
+#include "src/clients/python/library/cuda_shared_memory/cuda_shared_memory.h"
 
 #include <cuda_runtime_api.h>
 #include <iostream>
-#include "src/clients/python/shared_memory/shared_memory_handle.h"
+#include "src/clients/python/library/shared_memory/shared_memory_handle.h"
 
 //==============================================================================
 // SharedMemoryControlContext
