@@ -98,11 +98,12 @@ BackendContext::SetInputBuffer(
     const std::string& name, const std::vector<size_t>& expected_byte_sizes,
     std::vector<Scheduler::Payload>* payloads,
     TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
-    char* input_buffer)
+    char* input_buffer,
+    std::vector<std::unique_ptr<AllocatedSystemMemory>>* indirect_buffers)
 {
   return SetInputBuffer(
       name, expected_byte_sizes, payloads, dst_memory_type, dst_memory_type_id,
-      stream_, input_buffer);
+      stream_, input_buffer, indirect_buffers);
 }
 
 bool
@@ -110,28 +111,46 @@ BackendContext::SetInputBuffer(
     const std::string& name, const std::vector<size_t>& expected_byte_sizes,
     std::vector<Scheduler::Payload>* payloads,
     TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
-    cudaStream_t stream, char* input_buffer)
+    cudaStream_t stream, char* input_buffer,
+    std::vector<std::unique_ptr<AllocatedSystemMemory>>* indirect_buffers)
 {
   bool cuda_copy = false;
+  // Peek payload to generate meta-data intermediate pinned memory buffer
+  // for reducing non-pinned from / to device copy
+  // src   \ dest | non-pinned    | pinned     | device
+  // non-pinned   | memcpy        | memcpy     | buffer needed
+  // pinned       | memcpy        | memcpy     | cudaMemcpy
+  // device       | buffer needed | cudaMemcpy | cudaMemcpy
+  bool need_buffer = (dst_memory_type != TRTSERVER_MEMORY_CPU_PINNED);
+  auto need_buffer_type = dst_memory_type == TRTSERVER_MEMORY_CPU
+                              ? TRTSERVER_MEMORY_GPU
+                              : TRTSERVER_MEMORY_CPU;
+
   // Visit the payloads in order and copy the input tensors to
   // 'buffer'.
   size_t buffer_copy_offset = 0;
+
+  // Meta data for constructing an intermediate pinned memory buffer
+  // <offset in input buffer,
+  //  intermediate buffer size,
+  //  vector of <index of the payload (for status update),
+  //             memory block of the provider's input,
+  //             index in the memory block>>
+  BufferInfo pinned_buffer_info{0, 0, {}};
   for (size_t idx = 0; idx < expected_byte_sizes.size(); idx++) {
     auto& payload = (*payloads)[idx];
     const size_t expected_byte_size = expected_byte_sizes[idx];
 
+    const Memory* data;
+    payload.status_ = payload.request_provider_->GetMemory(name, &data);
     size_t copied_byte_size = 0;
+    size_t data_idx = 0;
     while (payload.status_.IsOk()) {
       auto src_memory_type = dst_memory_type;
       auto src_memory_type_id = dst_memory_type_id;
-      const void* content;
       size_t content_byte_size = expected_byte_size - copied_byte_size;
-      payload.status_ = payload.request_provider_->GetNextInputContent(
-          name, &content, &content_byte_size, &src_memory_type,
-          &src_memory_type_id);
-      if (!payload.status_.IsOk()) {
-        break;
-      }
+      const void* content = data->BufferAt(
+          data_idx, &content_byte_size, &src_memory_type, &src_memory_type_id);
 
       // No more input content available then done with copying...
       if (content == nullptr) {
@@ -139,6 +158,17 @@ BackendContext::SetInputBuffer(
       }
 
       if ((copied_byte_size + content_byte_size) > expected_byte_size) {
+        if (std::get<1>(pinned_buffer_info) > 0) {
+          // Set indirect buffer copy as it won't be contiguous
+          indirect_buffers->emplace_back();
+          cuda_copy |= IssueIndirectInputBufferCopy(
+              name, pinned_buffer_info, payloads, dst_memory_type,
+              dst_memory_type_id, stream, input_buffer,
+              &indirect_buffers->back());
+
+          // reset 'pinned_buffer_info'
+          pinned_buffer_info = {buffer_copy_offset + expected_byte_size, 0, {}};
+        }
         payload.status_ = Status(
             RequestStatusCode::INVALID_ARG,
             "unexpected size " +
@@ -149,15 +179,39 @@ BackendContext::SetInputBuffer(
       }
 
       if (content_byte_size > 0) {
-        bool cuda_used = false;
-        payload.status_ = CopyBuffer(
-            name, src_memory_type, src_memory_type_id, dst_memory_type,
-            dst_memory_type_id, content_byte_size, content,
-            input_buffer + buffer_copy_offset + copied_byte_size, stream,
-            &cuda_used);
-        cuda_copy |= cuda_used;
+        // Defer memory copy for the buffer if it's better put into an
+        // intermediate buffer first.
+        if (need_buffer && (src_memory_type == need_buffer_type)) {
+          std::get<1>(pinned_buffer_info) += content_byte_size;
+          std::get<2>(pinned_buffer_info).emplace_back(idx, data, data_idx);
+        } else {
+          // If copy should be perform directly, two steps to be done:
+          // 1. issue copy for the current buffer
+          // 2. Settle the existing intermediate buffer
+          bool cuda_used = false;
+          payload.status_ = CopyBuffer(
+              name, src_memory_type, src_memory_type_id, dst_memory_type,
+              dst_memory_type_id, content_byte_size, content,
+              input_buffer + buffer_copy_offset + copied_byte_size, stream,
+              &cuda_used);
+          cuda_copy |= cuda_used;
+
+          if (std::get<1>(pinned_buffer_info) > 0) {
+            indirect_buffers->emplace_back();
+            cuda_copy |= IssueIndirectInputBufferCopy(
+                name, pinned_buffer_info, payloads, dst_memory_type,
+                dst_memory_type_id, stream, input_buffer,
+                &indirect_buffers->back());
+            // reset 'pinned_buffer_info'
+            pinned_buffer_info = {
+                buffer_copy_offset + copied_byte_size + content_byte_size,
+                0,
+                {}};
+          }
+        }
       }
       copied_byte_size += content_byte_size;
+      data_idx++;
     }
 
     if (payload.status_.IsOk() && (copied_byte_size != expected_byte_size)) {
@@ -171,6 +225,69 @@ BackendContext::SetInputBuffer(
     buffer_copy_offset += expected_byte_size;
   }
 
+  // last check
+  if (std::get<1>(pinned_buffer_info) > 0) {
+    // Set indirect buffer copy as it won't be contiguous
+    indirect_buffers->emplace_back();
+    cuda_copy |= IssueIndirectInputBufferCopy(
+        name, pinned_buffer_info, payloads, dst_memory_type, dst_memory_type_id,
+        stream, input_buffer, &indirect_buffers->back());
+  }
+
+  return cuda_copy;
+}
+
+bool
+BackendContext::IssueIndirectInputBufferCopy(
+    const std::string& name,
+    const BackendContext::BufferInfo& pinned_buffer_info,
+    std::vector<Scheduler::Payload>* payloads,
+    TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
+    cudaStream_t stream, char* input_buffer,
+    std::unique_ptr<AllocatedSystemMemory>* indirect_buffer)
+{
+  bool cuda_copy = false;
+  bool cuda_used = false;
+  auto mem_type = TRTSERVER_MEMORY_CPU_PINNED;
+  int64_t mem_id = 0;
+  const auto pinned_buffer_size = std::get<1>(pinned_buffer_info);
+  indirect_buffer->reset(
+      new AllocatedSystemMemory(pinned_buffer_size, mem_type, mem_id));
+  char* buffer = (*indirect_buffer)->MutableBuffer(&mem_type, &mem_id);
+  // If can't reserve the intermediate buffer, the copy should be
+  // perform directly to input buffer
+  bool direct_copy = (mem_type != TRTSERVER_MEMORY_CPU_PINNED);
+  if (direct_copy) {
+    buffer = input_buffer + std::get<0>(pinned_buffer_info);
+    mem_type = dst_memory_type;
+    mem_id = dst_memory_type_id;
+    indirect_buffer->reset();
+  }
+  auto src_mem_type = dst_memory_type;
+  auto src_mem_type_id = dst_memory_type_id;
+  size_t src_byte_size;
+  size_t buffer_offset = 0;
+  for (const auto& data_info : std::get<2>(pinned_buffer_info)) {
+    const void* src_data = std::get<1>(data_info)->BufferAt(
+        std::get<2>(data_info), &src_byte_size, &src_mem_type,
+        &src_mem_type_id);
+    (*payloads)[std::get<0>(data_info)].status_ = CopyBuffer(
+        name, src_mem_type, src_mem_type_id, mem_type, mem_id, src_byte_size,
+        src_data, buffer + buffer_offset, stream, &cuda_used);
+    buffer_offset += src_byte_size;
+    cuda_copy |= cuda_used;
+  }
+  if (!direct_copy) {
+    auto status = CopyBuffer(
+        name, mem_type, mem_id, dst_memory_type, dst_memory_type_id,
+        pinned_buffer_size, buffer,
+        input_buffer + std::get<0>(pinned_buffer_info), stream, &cuda_used);
+    if (!status.IsOk()) {
+      for (const auto& data_info : std::get<2>(pinned_buffer_info)) {
+        (*payloads)[std::get<0>(data_info)].status_ = status;
+      }
+    }
+  }
   return cuda_copy;
 }
 

@@ -25,9 +25,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 #include "src/core/model_config.h"
+#include "src/core/provider.h"
 #include "src/core/scheduler.h"
 
 #ifdef TRTIS_ENABLE_GPU
@@ -84,7 +86,8 @@ struct BackendContext {
       const std::string& name, const std::vector<size_t>& expected_byte_sizes,
       std::vector<Scheduler::Payload>* payloads,
       TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
-      char* input_buffer);
+      char* input_buffer,
+      std::vector<std::unique_ptr<AllocatedSystemMemory>>* indirect_buffers);
 
   // Overload of SetInputBuffer() which issues the CUDA copies on 'stream'
   // instead of 'stream_'.
@@ -92,7 +95,8 @@ struct BackendContext {
       const std::string& name, const std::vector<size_t>& expected_byte_sizes,
       std::vector<Scheduler::Payload>* payloads,
       TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
-      cudaStream_t stream, char* input_buffer);
+      cudaStream_t stream, char* input_buffer,
+      std::vector<std::unique_ptr<AllocatedSystemMemory>>* indirect_buffers);
 
   // Helper function to set output buffer of fixed size data type to payloads
   // Return true if cudaMemcpyAsync is called, and the caller should call
@@ -128,6 +132,16 @@ struct BackendContext {
   Status CompareOutputDims(
       const std::string& tensor_name, const std::vector<int64_t>& model_shape,
       const DimsList& dims, const bool supports_batching);
+
+  using BufferInfo = std::tuple<
+      size_t, size_t, std::vector<std::tuple<size_t, const Memory*, size_t>>>;
+
+  bool IssueIndirectInputBufferCopy(
+      const std::string& name, const BufferInfo& pinned_buffer_info,
+      std::vector<Scheduler::Payload>* payloads,
+      TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
+      cudaStream_t stream, char* input_buffer,
+      std::unique_ptr<AllocatedSystemMemory>* indirect_buffer);
 
   // Name of the model instance
   std::string name_;
