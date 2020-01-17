@@ -113,7 +113,7 @@ by default it is
 addition to that, you also need to install the tensorrtserver Python
 package and other packages required by the examples::
 
-  $ pip install trtis-clients/install/python/tensorrtserver-*.whl numpy pillow
+  $ pip install trtis-clients/install/python/tensorrtserver*.whl numpy pillow
 
 Windows 10
 ..........
@@ -125,7 +125,7 @@ can use the Python examples to test if the build is successful. To use
 the Python examples, you need to install the tensorrtserver Python
 package and other packages required by the examples::
 
-  > pip install trtis-clients/install/python/tensorrtserver-*.whl numpy pillow
+  > pip install trtis-clients/install/python/tensorrtserver*.whl numpy pillow
 
 Download From GitHub
 ^^^^^^^^^^^^^^^^^^^^
@@ -149,7 +149,7 @@ The Python examples require that you additionally install the wheel
 file and some other dependencies::
 
   $ apt-get install python python-pip
-  $ pip install --user --upgrade python/tensorrtserver-*.whl numpy pillow
+  $ pip install --user --upgrade python/tensorrtserver*.whl numpy pillow
 
 The C++ image_client example uses OpenCV for image manipulation so for
 that example you must install the following::
