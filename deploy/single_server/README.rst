@@ -27,7 +27,7 @@
 
 |License|
 
-Helm Chart To Deploy Inference Server Cluster
+Kubernetes Deploy of Inference Server Cluster
 =============================================
 
     **NOTE: Some versions of Google Kubernetes Engine (GKE) contain a
@@ -37,8 +37,8 @@ Helm Chart To Deploy Inference Server Cluster
     or earlier version or a GKE 1.14.6 or later version to avoid this
     issue.**
 
-Simple helm chart for installing a single cluster of the NVIDIA
-TensorRT Inference Server. By default the cluster contains a single
+A helm chart for installing a single cluster of the NVIDIA TensorRT
+Inference Server is provided. By default the cluster contains a single
 instance of the inference server but the *replicaCount* configuration
 parameter can be set to create a cluster of any size, as described
 below. This guide assumes you already have a functional Kubernetes
@@ -53,7 +53,8 @@ This helm chart is available from `TensorRT Inference Server GitHub
 
 The steps below describe how to set-up a model repository, use helm to
 launch the inference server, and then send inference requests to the
-running server.
+running server. You can access a Grafana endpoint to see real-time
+metrics reported by the inference server.
 
 Installing Helm
 ---------------
@@ -132,20 +133,43 @@ following steps:
       secret:
         secretName: gcpcreds
 
-Running The Inference Server
-----------------------------
+Deploy Prometheus and Grafana
+-----------------------------
 
-Once you have your model repository ready, you can deploy the
-inference server using the default configuration with::
+The inference server metrics are collected by Prometheus and viewable
+by Grafana. Use the prometheus-operator to install these
+components. The `serviceMonitorSelectorNilUsesHelmValues` flag is
+needed so that Prometheus can find the inference server metrics in the
+*example* release deployed below::
+
+  $ helm install --name example-metrics --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false stable/prometheus-operator
+
+Then port-forward to the Grafana service so you can access it from
+your local browser::
+
+  $ kubectl port-forward service/example-metrics-grafana 8080:80
+
+Now you should be able to navigate in your browser to localhost:8080
+and see the Grafana login page. Use username=admin and
+password=prom-operator to login.
+
+An example Grafana dashboard is available in dashboard.json. Use the
+import function in Grafana to import and view this dashboard.
+
+Deploy the Inference Server
+---------------------------
+
+Deploy the inference server using the default configuration with::
 
   $ cd <directory containing Chart.yaml>
-  $ helm install .
+  $ helm install --name example .
 
-Use kubectl to wait until the inference server pod is running::
+Use kubectl to see status and wait until the inference server pods are
+running::
 
   $ kubectl get pods
-  NAME                                                       READY   STATUS    RESTARTS   AGE
-  wobbley-coral-tensorrt-inference-server-5f74b55885-n6lt7   1/1     Running   0          2m21s
+  NAME                                                 READY   STATUS    RESTARTS   AGE
+  example-tensorrt-inference-server-5f74b55885-n6lt7   1/1     Running   0          2m21s
 
 There are several ways of overriding the default configuration as
 described in this `helm documentation
@@ -156,7 +180,7 @@ option to override a single parameter with the CLI. For example, to
 deploy a cluster of four inference servers use `--set` to set the
 replicaCount parameter::
 
-  $ helm install . --set replicaCount=4
+  $ helm install --name example --set replicaCount=4 .
 
 You can also write your own "config.yaml" file with the values you
 want to override and pass it to helm::
@@ -168,7 +192,7 @@ want to override and pass it to helm::
     modelRepositoryPath: gs://my_model_repository
   EOF
 
-  $ helm install -f config.yaml .
+  $ helm install --name example -f config.yaml .
 
 Using the TensorRT Inference Server
 -----------------------------------
@@ -177,19 +201,19 @@ Now that the inference server is running you can send HTTP or GRPC
 requests to it to perform inferencing. By default, the inferencing
 service is exposed with a LoadBalancer service type. Use the following
 to find the external IP for the inference server. In this case it is
-35.232.176.113::
+34.83.9.133::
 
   $ kubectl get services
-  NAME         TYPE           CLUSTER-IP    EXTERNAL-IP      PORT(S)                                        AGE
-  inference-se LoadBalancer   10.7.241.36   35.232.176.113   8000:31220/TCP,8001:32107/TCP,8002:31682/TCP   1m
-  kubernetes   ClusterIP      10.7.240.1    <none>           443/TCP                                        1h
+  NAME                               TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)                                        AGE
+  ...
+  example-tensorrt-inference-server  LoadBalancer   10.18.13.28    34.83.9.133   8000:30249/TCP,8001:30068/TCP,8002:32723/TCP   47m
 
 The inference server exposes an HTTP endpoint on port 8000, and GRPC
 endpoint on port 8001 and a Prometheus metrics endpoint on
 port 8002. You can use curl to get the status of the inference server
 from the HTTP endpoint::
 
-  $ curl 35.232.176.113:8000/api/status
+  $ curl 34.83.9.133:8000/api/status
 
 Follow the `instructions
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/client.html#getting-the-client-examples>`_
@@ -197,24 +221,35 @@ to get the example image classification client that can be used to
 perform inferencing using image classification models being served by
 the inference server. For example::
 
-  $ image_client -u 35.232.176.113:8000 -m resnet50_netdef -s INCEPTION -c3 mug.jpg
-  Output probabilities:
-  batch 0: 504 (COFFEE MUG) = 0.777365267277
-  batch 0: 968 (CUP) = 0.213909029961
-  batch 0: 967 (ESPRESSO) = 0.00294389552437
+  $ image_client -u 34.83.9.133:8000 -m resnet50_netdef -s INCEPTION -c3 mug.jpg
+  Request 0, batch size 1
+  Image 'images/mug.jpg':
+      504 (COFFEE MUG) = 0.723992
+      968 (CUP) = 0.270953
+      967 (ESPRESSO) = 0.00115997
 
 Cleanup
 -------
 
-Once you've finished using the inference server you should use helm to delete the deployment::
+Once you've finished using the inference server you should use helm to
+delete the deployment::
 
   $ helm list
-  NAME            REVISION        UPDATED                         STATUS          CHART                           APP VERSION     NAMESPACE
-  wobbly-coral    1               Wed Feb 27 22:16:55 2019        DEPLOYED        tensorrt-inference-server-1.0.0   1.0             default
+  NAME            REVISION  UPDATED                   STATUS    CHART                            APP VERSION   NAMESPACE
+  example         1         Wed Feb 27 22:16:55 2019  DEPLOYED  tensorrt-inference-server-1.0.0  1.0           default
+  example-metrics	1       	Tue Jan 21 12:24:07 2020	DEPLOYED	prometheus-operator-6.18.0     	 0.32.0     	 default
 
-  $ helm delete wobbly-coral
+  $ helm delete --purge example
+  $ helm delete --purge example-metrics
 
-You may also want to delete the GCS bucket you created to hold the model repository::
+For the Prometheus and Grafana services you should explicitly delete
+CRDs as described in
+https://github.com/helm/charts/tree/master/stable/prometheus-operator#uninstalling-the-chart::
+
+  $ kubectl delete crd alertmanagers.monitoring.coreos.com servicemonitors.monitoring.coreos.com podmonitors.monitoring.coreos.com prometheuses.monitoring.coreos.com prometheusrules.monitoring.coreos.com
+
+You may also want to delete the GCS bucket you created to hold the
+model repository::
 
   $ gsutil rm -r gs://tensorrt-inference-server-repository
 

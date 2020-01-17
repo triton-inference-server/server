@@ -1,5 +1,5 @@
 {{/*
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,7 +28,7 @@
 
 {{/* vim: set filetype=mustache: */}}
 {{/*
-Expand the name of the chart.
+Create inference server name.
 */}}
 {{- define "tensorrt-inference-server.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
@@ -50,6 +50,38 @@ If release name contains chart name it will be used as a full name.
 {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 {{- end -}}
+{{- end -}}
+
+{{/*
+  Create inference server metrics service name and fullname derived from above and
+  truncated appropriately.
+*/}}
+{{- define "tensorrt-inference-server-metrics.name" -}}
+{{- $basename := include "tensorrt-inference-server.name" . -}}
+{{- $basename_trimmed := $basename | trunc 55 | trimSuffix "-" -}}
+{{- printf "%s-%s" $basename_trimmed "metrics" -}}
+{{- end -}}
+
+{{- define "tensorrt-inference-server-metrics.fullname" -}}
+{{- $basename := include "tensorrt-inference-server.fullname" . -}}
+{{- $basename_trimmed := $basename | trunc 55 | trimSuffix "-" -}}
+{{- printf "%s-%s" $basename_trimmed "metrics" -}}
+{{- end -}}
+
+{{/*
+  Create inference server metrics monitor name and fullname derived from
+  above and truncated appropriately.
+*/}}
+{{- define "tensorrt-inference-server-metrics-monitor.name" -}}
+{{- $basename := include "tensorrt-inference-server.name" . -}}
+{{- $basename_trimmed := $basename | trunc 47 | trimSuffix "-" -}}
+{{- printf "%s-%s" $basename_trimmed "metrics-monitor" -}}
+{{- end -}}
+
+{{- define "tensorrt-inference-server-metrics-monitor.fullname" -}}
+{{- $basename := include "tensorrt-inference-server.fullname" . -}}
+{{- $basename_trimmed := $basename | trunc 47 | trimSuffix "-" -}}
+{{- printf "%s-%s" $basename_trimmed "metrics-monitor" -}}
 {{- end -}}
 
 {{/*
