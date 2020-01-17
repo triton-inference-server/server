@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,7 +26,6 @@
 
 #include "src/backends/onnx/autofill.h"
 
-#include <NvInfer.h>
 #include "src/backends/onnx/loader.h"
 #include "src/backends/onnx/onnx_utils.h"
 #include "src/core/autofill.h"
