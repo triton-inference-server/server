@@ -115,28 +115,15 @@ BackendContext::SetInputBuffer(
     std::vector<std::unique_ptr<AllocatedSystemMemory>>* indirect_buffers)
 {
   bool cuda_copy = false;
-  // Peek payload to generate meta-data intermediate pinned memory buffer
-  // for reducing non-pinned from / to device copy
-  // src   \ dest | non-pinned    | pinned     | device
-  // non-pinned   | memcpy        | memcpy     | buffer needed
-  // pinned       | memcpy        | memcpy     | cudaMemcpy
-  // device       | buffer needed | cudaMemcpy | cudaMemcpy
-  bool need_buffer = (dst_memory_type != TRTSERVER_MEMORY_CPU_PINNED);
-  auto need_buffer_type = dst_memory_type == TRTSERVER_MEMORY_CPU
-                              ? TRTSERVER_MEMORY_GPU
-                              : TRTSERVER_MEMORY_CPU;
+
+  bool need_buffer;
+  TRTSERVER_Memory_Type candidate_type;
+  GetIndirectBufferRequirement(dst_memory_type, &candidate_type, &need_buffer);
+  BufferInfo pinned_buffer_info{0, 0, {}};
 
   // Visit the payloads in order and copy the input tensors to
   // 'buffer'.
   size_t buffer_copy_offset = 0;
-
-  // Meta data for constructing an intermediate pinned memory buffer
-  // <offset in input buffer,
-  //  intermediate buffer size,
-  //  vector of <index of the payload (for status update),
-  //             memory block of the provider's input,
-  //             index in the memory block>>
-  BufferInfo pinned_buffer_info{0, 0, {}};
   for (size_t idx = 0; idx < expected_byte_sizes.size(); idx++) {
     auto& payload = (*payloads)[idx];
     const size_t expected_byte_size = expected_byte_sizes[idx];
@@ -181,7 +168,7 @@ BackendContext::SetInputBuffer(
       if (content_byte_size > 0) {
         // Defer memory copy for the buffer if it's better put into an
         // intermediate buffer first.
-        if (need_buffer && (src_memory_type == need_buffer_type)) {
+        if (need_buffer && (src_memory_type == candidate_type)) {
           std::get<1>(pinned_buffer_info) += content_byte_size;
           std::get<2>(pinned_buffer_info).emplace_back(idx, data, data_idx);
         } else {
@@ -235,6 +222,23 @@ BackendContext::SetInputBuffer(
   }
 
   return cuda_copy;
+}
+
+void
+BackendContext::GetIndirectBufferRequirement(TRTSERVER_Memory_Type ref_buffer_type, TRTSERVER_Memory_Type* candidate_type, bool* need_indirect_buffer)
+{
+  // The following matrix is used for both input and output, but we may want
+  // to handle the two cases separately, because it is not symmetric when the
+  // 'ref_buffer' is used as dst v.s. when it is used as src.
+  // src   \ dest | non-pinned    | pinned     | device
+  // non-pinned   | memcpy        | memcpy     | buffer needed
+  // pinned       | memcpy        | memcpy     | cudaMemcpy
+  // device       | buffer needed | cudaMemcpy | cudaMemcpy
+  *need_indirect_buffer = (ref_buffer_type != TRTSERVER_MEMORY_CPU_PINNED);
+  *candidate_type = ref_buffer_type == TRTSERVER_MEMORY_CPU
+                              ? TRTSERVER_MEMORY_GPU
+                              : TRTSERVER_MEMORY_CPU;
+  return;
 }
 
 bool

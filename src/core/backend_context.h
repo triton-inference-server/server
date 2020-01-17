@@ -133,15 +133,29 @@ struct BackendContext {
       const std::string& tensor_name, const std::vector<int64_t>& model_shape,
       const DimsList& dims, const bool supports_batching);
 
+  // Meta data for constructing an indirect pinned memory buffer
+  // <offset in input buffer,
+  //  indirect buffer size,
+  //  vector of <index of the payload (for status update),
+  //             memory block of the provider's input,
+  //             index in the memory block>>
   using BufferInfo = std::tuple<
       size_t, size_t, std::vector<std::tuple<size_t, const Memory*, size_t>>>;
 
+  // Helper function to construct an 'indirect_buffer', and to copy data in
+  // 'payloads' to the indirect buffer first, then to copy the indirect buffer
+  // to proper location in 'input_buffer', according to 'pinned_buffer_info'.
   bool IssueIndirectInputBufferCopy(
       const std::string& name, const BufferInfo& pinned_buffer_info,
       std::vector<Scheduler::Payload>* payloads,
       TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
       cudaStream_t stream, char* input_buffer,
       std::unique_ptr<AllocatedSystemMemory>* indirect_buffer);
+
+  // Helper function to return whether an indirect buffer is needed in
+  // 'need_indirect_buffer', and the memory type that should utilize the
+  // indirect buffer in 'candiate_type'.
+  void GetIndirectBufferRequirement(TRTSERVER_Memory_Type ref_buffer_type, TRTSERVER_Memory_Type* candidate_type, bool* need_indirect_buffer);
 
   // Name of the model instance
   std::string name_;
