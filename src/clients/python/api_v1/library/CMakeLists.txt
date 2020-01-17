@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -66,7 +66,7 @@ endif() # NOT WIN32
 # Wheel file
 #
 set(wheel_stamp_file "stamp.whl")
-configure_file(../../../../VERSION VERSION COPYONLY)
+configure_file(../../../../../VERSION VERSION COPYONLY)
 configure_file(__init__.py __init__.py COPYONLY)
 if(NOT WIN32)
   configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
@@ -97,8 +97,8 @@ add_custom_target(
 
 file(
   GLOB generated-py
-  ${CMAKE_CURRENT_BINARY_DIR}/../../core/*_pb2.py
-  ${CMAKE_CURRENT_BINARY_DIR}/../../core/*_grpc.py
+  ${CMAKE_CURRENT_BINARY_DIR}/../../../core/*_pb2.py
+  ${CMAKE_CURRENT_BINARY_DIR}/../../../core/*_grpc.py
 )
 
 install(

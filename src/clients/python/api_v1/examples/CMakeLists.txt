@@ -26,9 +26,18 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-if(TRTIS_ENABLE_PYCLIENT_V2)
-    message(STATUS "Version 2 for the python client detected")
-else()
-    add_subdirectory(api_v1/library)
-    add_subdirectory(api_v1/examples)
-endif()
+install(
+  PROGRAMS
+    image_client.py
+    ensemble_image_client.py
+    grpc_image_client.py
+    simple_client.py
+    simple_callback_client.py
+    simple_string_client.py
+    simple_sequence_client.py
+    simple_shm_client.py
+    simple_shm_string_client.py
+    simple_cuda_shm_client.py
+    simple_cuda_shm_string_client.py
+  DESTINATION python
+)

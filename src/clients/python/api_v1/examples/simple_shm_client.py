@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@ import numpy as np
 import os
 from builtins import range
 from tensorrtserver.api import *
-import tensorrtserver.cuda_shared_memory as cudashm
+import tensorrtserver.shared_memory as shm
 from ctypes import *
 
 FLAGS = None
@@ -90,24 +90,24 @@ if __name__ == '__main__':
     output_byte_size = input_byte_size
 
     # Create Output0 and Output1 in Shared Memory and store shared memory handles
-    shm_op0_handle = cudashm.create_shared_memory_region("output0_data", output_byte_size, 0)
-    shm_op1_handle = cudashm.create_shared_memory_region("output1_data", output_byte_size, 0)
+    shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0_simple", output_byte_size)
+    shm_op1_handle = shm.create_shared_memory_region("output1_data", "/output1_simple", output_byte_size)
 
     # Register Output0 and Output1 shared memory with TRTIS
-    shared_memory_ctx.cuda_register(shm_op0_handle)
-    shared_memory_ctx.cuda_register(shm_op1_handle)
+    shared_memory_ctx.register(shm_op0_handle)
+    shared_memory_ctx.register(shm_op1_handle)
 
     # Create Input0 and Input1 in Shared Memory and store shared memory handles
-    shm_ip0_handle = cudashm.create_shared_memory_region("input0_data", input_byte_size, 0)
-    shm_ip1_handle = cudashm.create_shared_memory_region("input1_data", input_byte_size, 0)
+    shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0_simple", input_byte_size)
+    shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1_simple", input_byte_size)
 
     # Put input data values into shared memory
-    cudashm.set_shared_memory_region(shm_ip0_handle, [input0_data])
-    cudashm.set_shared_memory_region(shm_ip1_handle, [input1_data])
+    shm.set_shared_memory_region(shm_ip0_handle, [input0_data])
+    shm.set_shared_memory_region(shm_ip1_handle, [input1_data])
 
     # Register Input0 and Input1 shared memory with TRTIS
-    shared_memory_ctx.cuda_register(shm_ip0_handle)
-    shared_memory_ctx.cuda_register(shm_ip1_handle)
+    shared_memory_ctx.register(shm_ip0_handle)
+    shared_memory_ctx.register(shm_ip1_handle)
 
     # Send inference request to the inference server. Get results for both
     # output tensors. Passing shape of input tensors is optional for
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     del results
     print(shared_memory_ctx.get_shared_memory_status())
     shared_memory_ctx.unregister_all()
-    cudashm.destroy_shared_memory_region(shm_ip0_handle)
-    cudashm.destroy_shared_memory_region(shm_ip1_handle)
-    cudashm.destroy_shared_memory_region(shm_op0_handle)
-    cudashm.destroy_shared_memory_region(shm_op1_handle)
+    shm.destroy_shared_memory_region(shm_ip0_handle)
+    shm.destroy_shared_memory_region(shm_ip1_handle)
+    shm.destroy_shared_memory_region(shm_op0_handle)
+    shm.destroy_shared_memory_region(shm_op1_handle)

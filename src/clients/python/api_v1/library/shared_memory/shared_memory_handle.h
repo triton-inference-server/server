@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -23,25 +23,22 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #pragma once
 
-#include <stddef.h>
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-//==============================================================================
-// SharedMemoryControlContext
-int CudaSharedMemoryRegionCreate(
-    const char* trtis_shm_name, size_t byte_size, int device_id,
-    void** cuda_shm_handle);
-int CudaSharedMemoryRegionSet(
-    void* cuda_shm_handle, size_t offset, size_t byte_size, const void* data);
-int CudaSharedMemoryRegionDestroy(void* cuda_shm_handle);
-
-//==============================================================================
-
-#ifdef __cplusplus
-}
-#endif
+struct SharedMemoryHandle {
+  std::string trtis_shm_name_;
+  std::string shm_key_;
+#ifdef TRTIS_ENABLE_GPU
+  cudaIpcMemHandle_t cuda_shm_handle_;
+  int device_id_;
+#endif  // TRTIS_ENABLE_GPU
+  void* base_addr_;
+  int shm_fd_;
+  size_t offset_;
+  size_t byte_size_;
+};

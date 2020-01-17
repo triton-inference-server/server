@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -57,6 +57,7 @@ set(TRTIS_PYTORCH_INCLUDE_PATHS "" CACHE PATH "Paths to PyTorch includes")
 set(TRTIS_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for TRTIS build")
 
 # Client
+option(TRTIS_ENABLE_PYCLIENT_V2 "Enable version 2 of the python client" OFF)
 set(TRTIS_CLIENT_CMAKE_DIR "" CACHE PATH "Path to TRTIS client library cmake configuration")
 
 option(TRTIS_ENABLE_LOGGING "Include logging support in server" ON)
@@ -395,6 +396,7 @@ ExternalProject_Add(trtis-clients
     -DTRTIS_ENABLE_HTTP_V2:BOOL=${TRTIS_ENABLE_HTTP_V2}
     -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
     -DTRTIS_ENABLE_GPU:BOOL=${TRTIS_ENABLE_GPU}
+    -DTRTIS_ENABLE_PYCLIENT_V2:BOOL=${TRTIS_ENABLE_PYCLIENT_V2}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_CLIENTS_INSTALL_PREFIX}
     -DTRTIS_VERSION:STRING=${TRTIS_VERSION}
   DEPENDS curl protobuf grpc

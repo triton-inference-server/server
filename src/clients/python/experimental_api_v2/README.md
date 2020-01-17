@@ -1,4 +1,5 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+<!--
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,21 +24,9 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
 
-cmake_minimum_required (VERSION 3.5)
 
-install(
-  PROGRAMS
-    image_client.py
-    ensemble_image_client.py
-    grpc_image_client.py
-    simple_client.py
-    simple_callback_client.py
-    simple_string_client.py
-    simple_sequence_client.py
-    simple_shm_client.py
-    simple_shm_string_client.py
-    simple_cuda_shm_client.py
-    simple_cuda_shm_string_client.py
-  DESTINATION python
-)
+This directory  will hold the experimental implementation of
+new python client library and examples that will directly
+communicate with server.
