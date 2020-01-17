@@ -713,11 +713,13 @@ OnnxBackend::Context::SetInputTensor(
   char* buffer = input_buffers->back()->MutableBuffer(
       &buffer_memory_type, &buffer_memory_id);
 
+  // [FIXME] Abusing the use of 'input_buffers' here by knowing it's
+  // serving as placeholder for data and will be clean up after execution
   // Store data into input buffer. Note that 'cuda_used' will be updated only
   // for non-string data type. For string, the data must be ready to proceed.
   auto tmp_cuda_used = SetInputBuffer(
       name, expected_byte_sizes, payloads, buffer_memory_type, buffer_memory_id,
-      buffer);
+      buffer, input_buffers);
 
   if (data_type != TYPE_STRING) {
     const OrtMemoryInfo* allocator_info;

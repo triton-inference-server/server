@@ -370,9 +370,11 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size);
   }
 
+  // [FIXME] Abusing the use of 'input_buffers' here by knowing it's
+  // serving as placeholder for data and will be clean up after execution
   *cuda_copy |= SetInputBuffer(
       name, expected_byte_sizes, payloads, buffer_memory_type, buffer_memory_id,
-      buffer);
+      buffer, input_buffers);
 
   Caffe2Workspace::Error err = workspace_->SetInputTensor(
       name, shape, dtype, static_cast<const char*>(buffer), total_byte_size);

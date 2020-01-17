@@ -1045,6 +1045,10 @@ PlanBackend::Context::Run(
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
 
+  // keep indirect buffers from previous run until now as scheduler
+  // thread doesn't check when 'input_ready' event is triggered.
+  indirect_buffers_.clear();
+
   cudaSetDevice(gpu_device_);
 
   std::shared_ptr<InferRequestProvider> input_request_provider;
@@ -1169,7 +1173,8 @@ PlanBackend::Context::Run(
 
     SetInputBuffer(
         name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_GPU, gpu_device_,
-        input_copy_stream_, static_cast<char*>(buffers_[bindex]));
+        input_copy_stream_, static_cast<char*>(buffers_[bindex]),
+        &indirect_buffers_);
   }
 
   cudaEventRecord(events_[next_set_].input_ready_, input_copy_stream_);

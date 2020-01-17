@@ -356,6 +356,7 @@ Status
 BaseBackend::Context::SetInput(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
+    std::vector<std::unique_ptr<AllocatedSystemMemory>>* indirect_buffers,
     TRTISTF_TensorList** input_tensors, bool* cuda_copy)
 {
   // Get the shape of the input. The provider has already checked
@@ -409,7 +410,7 @@ BaseBackend::Context::SetInput(
               std::to_string(TRTISTF_TensorDataByteSize(tensor)));
     }
     SetFixedSizedInputTensor(
-        tensor, name, batch1_byte_size, payloads, cuda_copy);
+        tensor, name, batch1_byte_size, payloads, indirect_buffers, cuda_copy);
   } else {
     SetStringInputTensor(tensor, name, batch1_element_cnt, payloads);
   }
@@ -421,6 +422,7 @@ void
 BaseBackend::Context::SetFixedSizedInputTensor(
     TRTISTF_Tensor* tensor, const std::string& input_name,
     const size_t batch1_byte_size, std::vector<Scheduler::Payload>* payloads,
+    std::vector<std::unique_ptr<AllocatedSystemMemory>>* indirect_buffers,
     bool* cuda_copy)
 {
   char* buffer = TRTISTF_TensorData(tensor);
@@ -445,7 +447,7 @@ BaseBackend::Context::SetFixedSizedInputTensor(
                  << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
   *cuda_copy |= SetInputBuffer(
       input_name, expected_byte_sizes, payloads, content_memory_type,
-      content_memory_type_id, buffer);
+      content_memory_type_id, buffer, indirect_buffers);
 }
 
 void
@@ -689,6 +691,7 @@ BaseBackend::Context::Run(
       &input_head_ptr, input_deleter);
 
   // Inputs from the request...
+  std::vector<std::unique_ptr<AllocatedSystemMemory>> indirect_buffers;
   bool cuda_copy = false;
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
@@ -698,7 +701,7 @@ BaseBackend::Context::Run(
 
     RETURN_IF_ERROR(SetInput(
         name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, input_tensors.get(), &cuda_copy));
+        payloads, &indirect_buffers, input_tensors.get(), &cuda_copy));
   }
 
   // Additional inputs added to the provider...
@@ -710,7 +713,7 @@ BaseBackend::Context::Run(
       const InferRequestProvider::InputOverride& override = pr.second;
       RETURN_IF_ERROR(SetInput(
           name, override.datatype_, override.dims_, total_batch_size, payloads,
-          input_tensors.get(), &cuda_copy));
+          &indirect_buffers, input_tensors.get(), &cuda_copy));
     }
   }
 

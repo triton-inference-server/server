@@ -449,6 +449,7 @@ Status
 LibTorchBackend::Context::SetInputMetaData(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
+    std::vector<std::unique_ptr<AllocatedSystemMemory>>* indirect_buffers,
     InputMetaData* meta_data, bool* cuda_copy)
 {
   meta_data->name_ = name;
@@ -484,13 +485,15 @@ LibTorchBackend::Context::SetInputMetaData(
   const auto total_byte_size = total_batch_size * batch1_byte_size;
 
   return SetFixedSizedInputBuffer(
-      name, batch1_byte_size, total_byte_size, payloads, meta_data, cuda_copy);
+      name, batch1_byte_size, total_byte_size, payloads, indirect_buffers,
+      meta_data, cuda_copy);
 }
 
 Status
 LibTorchBackend::Context::SetFixedSizedInputBuffer(
     const std::string& name, const size_t batch1_byte_size,
     const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
+    std::vector<std::unique_ptr<AllocatedSystemMemory>>* indirect_buffers,
     InputMetaData* meta_data, bool* cuda_copy)
 {
   // The entire input tensor must be delivered as a single
@@ -515,7 +518,8 @@ LibTorchBackend::Context::SetFixedSizedInputBuffer(
   }
 
   *cuda_copy |= SetInputBuffer(
-      name, expected_byte_sizes, payloads, memory_type, memory_type_id, buffer);
+      name, expected_byte_sizes, payloads, memory_type, memory_type_id, buffer,
+      indirect_buffers);
 
   return Status::Success;
 }
@@ -581,6 +585,7 @@ LibTorchBackend::Context::Run(
   // Store input and output tensors
   std::vector<torch::jit::IValue> inputs_(input_count);
   std::vector<torch::Tensor> outputs_;
+  std::vector<std::unique_ptr<AllocatedSystemMemory>> indirect_buffers;
 
   // Inputs from the request...
   bool cuda_copy = false;
@@ -592,7 +597,7 @@ LibTorchBackend::Context::Run(
 
     RETURN_IF_ERROR(SetInputMetaData(
         name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, &(input_meta_data[ip_index]), &cuda_copy));
+        payloads, &indirect_buffers, &(input_meta_data[ip_index]), &cuda_copy));
   }
 
   std::string deliminator = "__";
@@ -621,7 +626,7 @@ LibTorchBackend::Context::Run(
       input_index_map_[name] = ip_index;
       RETURN_IF_ERROR(SetInputMetaData(
           name, override.datatype_, override.dims_, total_batch_size, payloads,
-          &(input_meta_data[ip_index]), &cuda_copy));
+          &indirect_buffers, &(input_meta_data[ip_index]), &cuda_copy));
     }
   }
 #ifdef TRTIS_ENABLE_GPU
