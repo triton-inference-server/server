@@ -49,7 +49,8 @@ rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
 
-LD_PRELOAD=$DATADIR/libclipplugin.so run_server
+SERVER_LD_PRELOAD=$DATADIR/libclipplugin.so
+run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG

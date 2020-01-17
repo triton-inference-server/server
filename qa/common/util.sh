@@ -26,6 +26,7 @@
 
 SERVER_LOG=${SERVER_LOG:=./server.log}
 SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
+SERVER_LD_PRELOAD=${SERVER_LD_PRELOAD:=""}
 MONITOR_FILE_TIMEOUT=${MONITOR_FILE_TIMEOUT:=10}
 
 # Sets WAIT_RET to 0 on success, 1 on failure
@@ -160,8 +161,13 @@ function run_server () {
         return
     fi
 
-    echo "=== Running $SERVER $SERVER_ARGS"
-    $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    if [ -z "$SERVER_LD_PRELOAD" ]; then
+      echo "=== Running $SERVER $SERVER_ARGS"
+    else
+      echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
+    fi
+
+    LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
     wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
@@ -187,8 +193,13 @@ function run_server_tolive () {
         return
     fi
 
-    echo "=== Running $SERVER $SERVER_ARGS"
-    $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    if [ -z "$SERVER_LD_PRELOAD" ]; then
+      echo "=== Running $SERVER $SERVER_ARGS"
+    else
+      echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
+    fi
+
+    LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
     wait_for_server_live $SERVER_PID $SERVER_TIMEOUT
@@ -213,8 +224,13 @@ function run_server_nowait () {
         return
     fi
 
-    echo "=== Running $SERVER $SERVER_ARGS"
-    $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    if [ -z "$SERVER_LD_PRELOAD" ]; then
+      echo "=== Running $SERVER $SERVER_ARGS"
+    else
+      echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
+    fi
+
+    LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 }
 

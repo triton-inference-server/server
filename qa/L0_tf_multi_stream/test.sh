@@ -38,7 +38,7 @@ fi
 CLIENT_LOG_BASE="./client"
 
 DATADIR=`pwd`/models
-MODEL_SRCDIR=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops
+MODEL_SRCDIR=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 # Allow more time to exit. Ensemble brings in too many models
@@ -59,7 +59,7 @@ NUM_DELAY_CYCLES=${NUM_DELAY_CYCLES:=2100000000}
 
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
-export LD_PRELOAD=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libbusyop.so
+SERVER_LD_PRELOAD=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libbusyop.so
 
 for NUM_GPUS in $(seq 1 $TOTAL_GPUS); do
   export CUDA_VISIBLE_DEVICES=$(seq -s, 0 $(( NUM_GPUS - 1 )))
@@ -123,7 +123,7 @@ for NUM_GPUS in $(seq 1 $TOTAL_GPUS); do
         kill $SERVER_PID
         wait $SERVER_PID
 
-        SCALE_FACTOR=$(grep -i "Completion time for ${INSTANCE_CNT}" $CLIENT_LOG | awk '{printf "%s ",$6}' | awk '{print $1/$2}') 
+        SCALE_FACTOR=$(grep -i "Completion time for ${INSTANCE_CNT}" $CLIENT_LOG | awk '{printf "%s ",$6}' | awk '{print $1/$2}')
         if [ $(awk -v a="$SCALE_FACTOR" -v b="$INSTANCE_CNT" 'BEGIN{print(a<b-1)}') -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -133,5 +133,4 @@ for NUM_GPUS in $(seq 1 $TOTAL_GPUS); do
   done
 done
 echo -e "\n***\n*** Test Passed\n***"
-unset LD_PRELOAD
 unset CUDA_VISIBLE_DEVICES
