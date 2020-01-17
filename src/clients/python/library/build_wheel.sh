@@ -46,22 +46,22 @@ function main() {
   mkdir -p ${WHLDIR}/tensorrtserver/api
 
   echo "Adding package files"
-  cp ../../core/*_pb2.py \
+  cp ../../../core/*_pb2.py \
     "${WHLDIR}/tensorrtserver/api/."
 
-  cp ../../core/*_grpc.py \
+  cp ../../../core/*_grpc.py \
     "${WHLDIR}/tensorrtserver/api/."
 
   # library are compiled in different location and extension based on OS
   if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
     cp libcrequest.so \
       "${WHLDIR}/tensorrtserver/api/."
-    cp ../c++/library/librequest.so \
+    cp ../../c++/library/librequest.so \
       "${WHLDIR}/tensorrtserver/api/."
   else
     cp Release/crequest.dll \
       "${WHLDIR}/tensorrtserver/api/."
-    cp ../c++/Release/request.dll \
+    cp ../../c++/Release/request.dll \
       "${WHLDIR}/tensorrtserver/api/."
   fi
 
