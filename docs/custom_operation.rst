@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -63,7 +63,7 @@ TensorFlow
 Tensorflow allows users to `add custom operations
 <https://www.tensorflow.org/guide/extend/op>`_ which can then be used
 in TensorFlow models. By using LD_PRELOAD you can load your custom
-TensorFlow operations into the inference server.  For example,
+TensorFlow operations into the inference server. For example,
 assuming your TensorFlow custom operations are compiled into
 libtfcustom.so, starting the inference server with the following
 command makes those operations available to all TensorFlow models
@@ -75,3 +75,25 @@ A limitation of this approach is that the custom operations must be
 managed separately from the model repository itself. And more
 seriously, if there are custom layer name conflicts across multiple
 shared libraries there is currently no way to handle it.
+
+PyTorch
+----------
+
+Torchscript allows users to `add custom operations
+<https://pytorch.org/tutorials/advanced/torch_script_custom_ops.html>`_
+which can then be used in Torchscript models. By using LD_PRELOAD you
+can load your custom C++ operations into the inference server. For example,
+if you follow the instructions in the `pytorch/extension-script
+<https://github.com/pytorch/extension-script>`_ repository and
+your Torchscript custom operations are compiled into (say)
+libpytcustom.so, starting the inference server with the following
+command makes those operations available to all PyTorch models
+loaded into the server::
+
+  $ LD_PRELOAD=libpytcustom.so trtserver --model-repository=/tmp/models ...
+
+A limitation of this approach is that the custom operations must be
+managed separately from the model repository itself. And more
+seriously, if there are custom layer name conflicts across multiple
+shared libraries or the handles used to register them in PyTorch
+there is currently no way to handle it.
