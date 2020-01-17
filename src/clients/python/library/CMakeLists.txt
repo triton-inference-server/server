@@ -105,3 +105,8 @@ install(
   FILES ${generated-py}
   DESTINATION python
 )
+
+install(
+  CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/tensorrtserver*.whl\")"
+  CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
+)

@@ -28,8 +28,3 @@ cmake_minimum_required (VERSION 3.5)
 
 add_subdirectory(library)
 add_subdirectory(examples)
-
-install(
-  CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/tensorrtserver*.whl\")"
-  CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
-)

@@ -41,7 +41,3 @@ install(
     simple_cuda_shm_string_client.py
   DESTINATION python
 )
-
-install(
-  CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
-)
