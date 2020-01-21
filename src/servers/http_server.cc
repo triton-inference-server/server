@@ -69,8 +69,7 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
           trace_manager,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
-      const std::vector<std::string>& endpoints, const int32_t port,
-      const int thread_cnt);
+      const std::vector<std::string>& endpoints, const int32_t port);
   ~HTTPAPIServer();
 
  private:
@@ -88,7 +87,6 @@ class HTTPAPIServer : public HTTPServer {
       size_t byte_size, TRTSERVER_Memory_Type memory_type,
       int64_t memory_type_id);
 
-  int CreateListener(int32_t port);
   static void OnAccept(uv_stream_t* listener, int status);
   int SetupSsl(
       const std::string& cert_file, const std::string& key_file,
@@ -118,18 +116,16 @@ class HTTPAPIServer : public HTTPServer {
   TRTSERVER_ResponseAllocator* allocator_;
 
   int32_t port_;
-  int thread_cnt_;
+  std::thread worker_;
 };
 
 HTTPAPIServer::HTTPAPIServer(
     const std::shared_ptr<TRTSERVER_Server>& server,
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
-    const std::vector<std::string>& endpoints, const int32_t port,
-    const int thread_cnt)
+    const std::vector<std::string>& endpoints, const int32_t port)
     : server_(server), trace_manager_(trace_manager), smb_manager_(smb_manager),
-      endpoint_names_(endpoints), allocator_(nullptr), port_(port),
-      thread_cnt_(thread_cnt)
+      endpoint_names_(endpoints), allocator_(nullptr), port_(port)
 {
   TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
   if (err != nullptr) {
@@ -156,50 +152,25 @@ struct h2o_custom_req_handler_t {
   HTTPAPIServer* http_server;
 };
 
-int
-HTTPAPIServer::CreateListener(int32_t port)
-{
-  struct sockaddr_in addr;
-  int r;
-
-  uv_tcp_init(ctx_.loop, &listener_);
-  uv_ip4_addr("0.0.0.0", port, &addr);
-  if ((r = uv_tcp_bind(&listener_, (struct sockaddr*)&addr, 0)) != 0) {
-    LOG_VERBOSE(1) << stderr << "uv_tcp_bind:" << uv_strerror(r);
-    goto Error;
-  }
-  if ((r = uv_listen((uv_stream_t*)&listener_, 128, OnAccept)) != 0) {
-    LOG_VERBOSE(1) << stderr << "uv_listen:" << uv_strerror(r);
-    goto Error;
-  }
-
-  listener_.data = this;
-
-  return 0;
-Error:
-  uv_close((uv_handle_t*)&listener_, NULL);
-  return r;
-}
-
 void
 HTTPAPIServer::OnAccept(uv_stream_t* listener, int status)
 {
   HTTPAPIServer* http_server = reinterpret_cast<HTTPAPIServer*>(listener->data);
-  uv_tcp_t* conn;
-  h2o_socket_t* sock;
 
-  if (status != 0)
+  if (status != 0) {
     return;
+  }
 
-  conn = reinterpret_cast<uv_tcp_t*>(h2o_mem_alloc(sizeof(*conn)));
-  uv_tcp_init(listener->loop, conn);
+  uv_tcp_t* conn = reinterpret_cast<uv_tcp_t*>(h2o_mem_alloc(sizeof(*conn)));
+  uv_tcp_init(http_server->ctx_.loop, conn);
 
   if (uv_accept(listener, (uv_stream_t*)conn) != 0) {
     uv_close((uv_handle_t*)conn, (uv_close_cb)free);
     return;
   }
 
-  sock = h2o_uv_socket_create((uv_stream_t*)conn, (uv_close_cb)free);
+  h2o_socket_t* sock =
+      h2o_uv_socket_create((uv_stream_t*)conn, (uv_close_cb)free);
   h2o_accept(&http_server->accept_ctx_, sock);
 }
 
@@ -498,85 +469,97 @@ HTTPAPIServer::Status(h2o_handler_t* handler_self, h2o_req_t* req)
 TRTSERVER_Error*
 HTTPAPIServer::Start()
 {
-  h2o_hostconf_t* hostconf;
-  h2o_pathconf_t* pathconf;
-  h2o_access_log_filehandle_t* logfh = h2o_access_log_open_handle(
-      "/dev/stdout", NULL, H2O_LOGCONF_ESCAPE_APACHE);
+  if (!worker_.joinable()) {
+    h2o_hostconf_t* hostconf;
+    h2o_pathconf_t* pathconf;
+    h2o_access_log_filehandle_t* logfh = h2o_access_log_open_handle(
+        "/dev/stdout", NULL, H2O_LOGCONF_ESCAPE_APACHE);
 
-  signal(SIGPIPE, SIG_IGN);
+    // Needed by h2o to know when to terminate
+    signal(SIGPIPE, SIG_IGN);
 
-  // necessary to zero these structs before using them!
-  memset(&accept_ctx_, 0, sizeof(accept_ctx_));
-  memset(&ctx_, 0, sizeof(ctx_));
-  memset(&config_, 0, sizeof(config_));
+    // necessary to zero these structs before using them!
+    memset(&accept_ctx_, 0, sizeof(accept_ctx_));
+    memset(&ctx_, 0, sizeof(ctx_));
+    memset(&config_, 0, sizeof(config_));
 
-  h2o_config_init(&config_);
-  hostconf = h2o_config_register_host(
-      &config_, h2o_iovec_init(H2O_STRLIT("default")), 65535);
+    h2o_config_init(&config_);
+    hostconf = h2o_config_register_host(
+        &config_, h2o_iovec_init(H2O_STRLIT("default")), 65535);
 
-  if (std::find(endpoint_names_.begin(), endpoint_names_.end(), "health") !=
-      endpoint_names_.end()) {
-    pathconf = RegisterHandler(hostconf, "/api/health", Health);
-    if (logfh != NULL)
-      h2o_access_log_register(pathconf, logfh);
-  }
+    if (std::find(endpoint_names_.begin(), endpoint_names_.end(), "health") !=
+        endpoint_names_.end()) {
+      pathconf = RegisterHandler(hostconf, "/api/health", Health);
+      if (logfh != NULL)
+        h2o_access_log_register(pathconf, logfh);
+    }
 
-  if (std::find(endpoint_names_.begin(), endpoint_names_.end(), "status") !=
-      endpoint_names_.end()) {
-    pathconf = RegisterHandler(hostconf, "/api/status", Status);
-    if (logfh != NULL)
-      h2o_access_log_register(pathconf, logfh);
-  }
+    if (std::find(endpoint_names_.begin(), endpoint_names_.end(), "status") !=
+        endpoint_names_.end()) {
+      pathconf = RegisterHandler(hostconf, "/api/status", Status);
+      if (logfh != NULL)
+        h2o_access_log_register(pathconf, logfh);
+    }
 
-  uv_loop_t loop;
-  uv_loop_init(&loop);
-  h2o_context_init(&ctx_, &loop, &config_);
+    exit_loop_ = false;
+    worker_ = std::thread([&] {
+      uv_loop_t loop;
+      uv_loop_init(&loop);
+      h2o_context_init(&ctx_, &loop, &config_);
 
-  // TODO Add server.crt and key files
 #ifdef USE_HTTPS
-  if (SetupSsl(
-          "h2o/server.crt", "h2o/server.key",
-          "DEFAULT:!MD5:!DSS:!DES:!RC4:!RC2:!SEED:!IDEA:!NULL:!"
-          "ADH:!EXP:!SRP:!PSK") != 0) {
-    goto Error;
-  }
+      // TODO Add server.crt and key files
+      if (SetupSsl(
+              "h2o/server.crt", "h2o/server.key",
+              "DEFAULT:!MD5:!DSS:!DES:!RC4:!RC2:!SEED:!IDEA:!NULL:!"
+              "ADH:!EXP:!SRP:!PSK") != 0) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INTERNAL, "HTTP h2o server failed to run.");
+      }
 #endif
 
-  accept_ctx_.ctx = &ctx_;
-  accept_ctx_.hosts = config_.hosts;
+      accept_ctx_.ctx = &ctx_;
+      accept_ctx_.hosts = config_.hosts;
 
-  if (CreateListener(port_) != 0) {
-    LOG_VERBOSE(1) << stderr << "failed to listen to 0.0.0.0:" << port_ << ":"
-                   << strerror(errno);
-    goto Error;
+      // Create listener
+      struct sockaddr_in addr;
+      uv_tcp_init(ctx_.loop, &listener_);
+      uv_ip4_addr("0.0.0.0", port_, &addr);
+      int r = uv_tcp_bind(&listener_, (struct sockaddr*)&addr, 0);
+      if (r != 0) {
+        uv_close((uv_handle_t*)&listener_, NULL);
+        return;
+      }
+
+      if ((r = uv_listen((uv_stream_t*)&listener_, 128, OnAccept)) != 0) {
+        uv_close((uv_handle_t*)&listener_, NULL);
+        return;
+      }
+
+      listener_.data = this;
+      uv_run(ctx_.loop, UV_RUN_DEFAULT);
+    });
+
+    return nullptr;
   }
 
-  exit_loop_ = false;
-  while (!exit_loop_) {
-    uv_run(ctx_.loop, UV_RUN_DEFAULT);
-  }
-
-  return nullptr;
-
-Error:
   return TRTSERVER_ErrorNew(
-      TRTSERVER_ERROR_INTERNAL, "HTTP h2o server failed to run.");
+      TRTSERVER_ERROR_INTERNAL, "HTTP h2o server is already running.");
 }
 
 TRTSERVER_Error*
 HTTPAPIServer::Stop()
 {
-  if (!exit_loop_) {
-    uv_close((uv_handle_t*)&listener_, NULL);
-
-    // this will break the event loop
-    exit_loop_ = true;
-  } else {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_UNAVAILABLE, "HTTP h2o server is not running.");
+  exit_loop_ = true;
+  if (worker_.joinable()) {
+    uv_stop(ctx_.loop);
+    uv_loop_close(uv_default_loop());
+    worker_.join();
+    return nullptr;
   }
 
-  return nullptr;
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNAVAILABLE, "HTTP h2o server is not running.");
 }
 
 TRTSERVER_Error*
@@ -608,7 +591,7 @@ HTTPServer::CreateAPIServer(
     const std::shared_ptr<TRTSERVER_Server>& server,
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
-    const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
+    const std::map<int32_t, std::vector<std::string>>& port_map,
     std::vector<std::unique_ptr<HTTPServer>>* http_servers)
 {
   if (port_map.empty()) {
@@ -622,8 +605,7 @@ HTTPServer::CreateAPIServer(
     std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
     LOG_INFO << "Starting HTTPService at " << addr;
     http_servers->emplace_back(new HTTPAPIServer(
-        server, trace_manager, smb_manager, ep_map.second, ep_map.first,
-        thread_cnt));
+        server, trace_manager, smb_manager, ep_map.second, ep_map.first));
   }
 
   return nullptr;
