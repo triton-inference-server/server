@@ -198,28 +198,42 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       false_override.content_.assign(false_p, false_p + sizeof(float));
       false_override.dims_.Add(1);
       false_override.datatype_ = tensor_datatype;
-      false_override.content_ref_.AddBuffer(
-          (const char*)false_override.content_.data(),
-          false_override.content_.size(), TRTSERVER_MEMORY_CPU, 0);
 
       InferRequestProvider::InputOverride true_override;
       true_override.content_.assign(true_p, true_p + sizeof(float));
       true_override.dims_.Add(1);
       true_override.datatype_ = tensor_datatype;
-      true_override.content_ref_.AddBuffer(
-          (const char*)true_override.content_.data(),
-          true_override.content_.size(), TRTSERVER_MEMORY_CPU, 0);
 
-      (*start_input_overrides)
-          ->insert(std::make_pair(tensor_name, true_override));
-      (*end_input_overrides)
-          ->insert(std::make_pair(tensor_name, false_override));
-      (*startend_input_overrides)
-          ->insert(std::make_pair(tensor_name, true_override));
-      (*continue_input_overrides)
-          ->insert(std::make_pair(tensor_name, false_override));
-      (*notready_input_overrides)
-          ->insert(std::make_pair(tensor_name, false_override));
+      auto oit = (*start_input_overrides)
+                     ->insert(std::make_pair(tensor_name, true_override))
+                     .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
+      oit = (*end_input_overrides)
+                ->insert(std::make_pair(tensor_name, false_override))
+                .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
+      oit = (*startend_input_overrides)
+                ->insert(std::make_pair(tensor_name, true_override))
+                .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
+      oit = (*continue_input_overrides)
+                ->insert(std::make_pair(tensor_name, false_override))
+                .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
+      oit = (*notready_input_overrides)
+                ->insert(std::make_pair(tensor_name, false_override))
+                .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
     }
   }
 
@@ -244,28 +258,42 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       false_override.content_.assign(false_p, false_p + sizeof(float));
       false_override.dims_.Add(1);
       false_override.datatype_ = tensor_datatype;
-      false_override.content_ref_.AddBuffer(
-          (const char*)false_override.content_.data(),
-          false_override.content_.size(), TRTSERVER_MEMORY_CPU, 0);
 
       InferRequestProvider::InputOverride true_override;
       true_override.content_.assign(true_p, true_p + sizeof(float));
       true_override.dims_.Add(1);
       true_override.datatype_ = tensor_datatype;
-      true_override.content_ref_.AddBuffer(
-          (const char*)true_override.content_.data(),
-          true_override.content_.size(), TRTSERVER_MEMORY_CPU, 0);
 
-      (*start_input_overrides)
-          ->insert(std::make_pair(tensor_name, false_override));
-      (*end_input_overrides)
-          ->insert(std::make_pair(tensor_name, true_override));
-      (*startend_input_overrides)
-          ->insert(std::make_pair(tensor_name, true_override));
-      (*continue_input_overrides)
-          ->insert(std::make_pair(tensor_name, false_override));
-      (*notready_input_overrides)
-          ->insert(std::make_pair(tensor_name, false_override));
+      auto oit = (*start_input_overrides)
+                     ->insert(std::make_pair(tensor_name, false_override))
+                     .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
+      oit = (*end_input_overrides)
+                ->insert(std::make_pair(tensor_name, true_override))
+                .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
+      oit = (*startend_input_overrides)
+                ->insert(std::make_pair(tensor_name, true_override))
+                .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
+      oit = (*continue_input_overrides)
+                ->insert(std::make_pair(tensor_name, false_override))
+                .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
+      oit = (*notready_input_overrides)
+                ->insert(std::make_pair(tensor_name, false_override))
+                .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
     }
   }
 
@@ -290,28 +318,42 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       false_override.content_.assign(false_p, false_p + sizeof(float));
       false_override.dims_.Add(1);
       false_override.datatype_ = tensor_datatype;
-      false_override.content_ref_.AddBuffer(
-          (const char*)false_override.content_.data(),
-          false_override.content_.size(), TRTSERVER_MEMORY_CPU, 0);
 
       InferRequestProvider::InputOverride true_override;
       true_override.content_.assign(true_p, true_p + sizeof(float));
       true_override.dims_.Add(1);
       true_override.datatype_ = tensor_datatype;
-      true_override.content_ref_.AddBuffer(
-          (const char*)true_override.content_.data(),
-          true_override.content_.size(), TRTSERVER_MEMORY_CPU, 0);
 
-      (*start_input_overrides)
-          ->insert(std::make_pair(tensor_name, true_override));
-      (*end_input_overrides)
-          ->insert(std::make_pair(tensor_name, true_override));
-      (*startend_input_overrides)
-          ->insert(std::make_pair(tensor_name, true_override));
-      (*continue_input_overrides)
-          ->insert(std::make_pair(tensor_name, true_override));
-      (*notready_input_overrides)
-          ->insert(std::make_pair(tensor_name, false_override));
+      auto oit = (*start_input_overrides)
+                     ->insert(std::make_pair(tensor_name, true_override))
+                     .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
+      oit = (*end_input_overrides)
+                ->insert(std::make_pair(tensor_name, true_override))
+                .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
+      oit = (*startend_input_overrides)
+                ->insert(std::make_pair(tensor_name, true_override))
+                .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
+      oit = (*continue_input_overrides)
+                ->insert(std::make_pair(tensor_name, true_override))
+                .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
+      oit = (*notready_input_overrides)
+                ->insert(std::make_pair(tensor_name, false_override))
+                .first;
+      oit->second.content_ref_.AddBuffer(
+          (const char*)oit->second.content_.data(), oit->second.content_.size(),
+          TRTSERVER_MEMORY_CPU, 0);
     }
   }
 
