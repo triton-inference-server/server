@@ -316,7 +316,7 @@ InferRequestProvider::GetMemory(
 }
 
 Status
-InferRequestProvider::GetMemory(
+InferRequestProvider::GetMemoryWithOverride(
     const std::string& name, const Memory** input_buffer)
 {
   auto it = input_buffer_.find(name);

@@ -185,7 +185,8 @@ class InferRequestProvider {
 
   // Similar to above, but the function caller does not own the Memory object,
   // nor extend its lifetime. This function will check input override.
-  Status GetMemory(const std::string& name, const Memory** input_buffer);
+  Status GetMemoryWithOverride(
+      const std::string& name, const Memory** input_buffer);
 
   // Set content for named inputs. If the input already has content,
   // this content will be used in-place of existing content.

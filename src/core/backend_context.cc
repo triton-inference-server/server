@@ -123,7 +123,8 @@ BackendContext::SetInputBuffer(
     const size_t expected_byte_size = expected_byte_sizes[idx];
 
     const Memory* data;
-    payload.status_ = payload.request_provider_->GetMemory(name, &data);
+    payload.status_ =
+        payload.request_provider_->GetMemoryWithOverride(name, &data);
     size_t copied_byte_size = 0;
     size_t data_idx = 0;
     while (payload.status_.IsOk()) {
