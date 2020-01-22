@@ -41,20 +41,6 @@
 namespace nvidia { namespace inferenceserver {
 
 Status
-InferenceBackend::ValidateOutputName(const std::string& name) const
-{
-  const auto itr = output_map_.find(name);
-  if (itr == output_map_.end()) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "unexpected requested inference output '" + name + "' for model '" +
-            Name() + "'");
-  }
-
-  return Status::Success;
-}
-
-Status
 InferenceBackend::GetInput(
     const std::string& name, const ModelInput** input) const
 {

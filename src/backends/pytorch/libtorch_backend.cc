@@ -542,12 +542,6 @@ LibTorchBackend::Context::Run(
               name_ + "'");
     }
 
-    // Check if all the requested output names in the request header are valid
-    for (const auto& output :
-         payload.request_provider_->RequestHeader().output()) {
-      RETURN_IF_ERROR(base->ValidateOutputName(output.name()));
-    }
-
     total_batch_size += payload.request_provider_->RequestHeader().batch_size();
 
     // All payloads must have equally-sized input tensors so use any

@@ -56,9 +56,6 @@ class InferenceBackend {
   // Get the configuration of model being served.
   const ModelConfig& Config() const { return config_; }
 
-  // Validates whether the requested output name is in the model configuration
-  Status ValidateOutputName(const std::string& name) const;
-
   // Get the metric reportoer for the model being served.
   const std::shared_ptr<MetricModelReporter>& MetricReporter() const
   {

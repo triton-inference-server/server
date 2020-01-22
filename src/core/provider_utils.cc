@@ -63,6 +63,12 @@ NormalizeRequestHeader(
             model_name + "'");
   }
 
+  // Validate if the requested output name exists in the model configuration
+  for (const auto& io : request_header.output()) {
+    const ModelOutput* output_config;
+    RETURN_IF_ERROR(is.GetOutput(io.name(), &output_config));
+  }
+
   // Make sure that the request is providing the same number of inputs
   // as is expected by the model.
   if (request_header.input_size() != model_config.input_size()) {
