@@ -241,6 +241,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               swig && \
     rm -rf /var/lib/apt/lists/*
 
+# CI/QA expects "python" executable (not python3).
+RUN rm -f /usr/bin/python && \
+    ln -s /usr/bin/python3 /usr/bin/python
+
 RUN pip3 install --upgrade numpy pillow future grpcio requests gsutil awscli six
 
 # CI expects tests in /opt/tensorrtserver/qa. The tensorrt-server
