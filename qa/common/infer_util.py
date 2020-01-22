@@ -32,7 +32,6 @@ import tensorrtserver.shared_memory as shm
 import tensorrtserver.cuda_shared_memory as cudashm
 import test_util as tu
 import shm_util as su
-from sets import Set
 from ctypes import *
 
 # unicode() doesn't exist on python3, for how we use it the
@@ -40,7 +39,7 @@ from ctypes import *
 if sys.version_info.major == 3:
     unicode = bytes
 
-_seen_request_ids = Set()
+_seen_request_ids = set()
 
 def _range_repr_dtype(dtype):
     if dtype == np.float64:
@@ -279,7 +278,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 # zero-sized input/output tensor.
 def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes,
                model_version=None, use_http=True, use_grpc=True,
-               use_streaming=True, shm_region_name_prefix=None, 
+               use_streaming=True, shm_region_name_prefix=None,
                use_system_shared_memory=False, use_cuda_shared_memory=False):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
@@ -338,8 +337,8 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         output_byte_size = tu.shape_element_count(output_shapes[io_num]) *\
                             np.dtype(tensor_dtype).itemsize * batch_size
         # create and register shared memory region for inputs and outputs
-        shm_io_handle = su.create_register_set_either_shm_region([shm_region_name_prefix[0]+str(io_num), 
-                                                shm_region_name_prefix[1]+str(io_num)], input_list, 
+        shm_io_handle = su.create_register_set_either_shm_region([shm_region_name_prefix[0]+str(io_num),
+                                                shm_region_name_prefix[1]+str(io_num)], input_list,
                                                 input_byte_size, output_byte_size, shared_memory_ctx,
                                                 use_system_shared_memory, use_cuda_shared_memory)
         if len(shm_io_handle) != 0:
