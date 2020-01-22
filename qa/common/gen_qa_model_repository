@@ -130,7 +130,6 @@ PLGDESTDIR=/tmp/pluginmodels
 cat >$HOST_SRCDIR/$C2SCRIPT <<EOF
 #!/bin/bash
 set -e
-export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
 cd $SRCDIR
 python3 $SRCDIR/gen_qa_models.py --onnx --netdef --libtorch --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
@@ -155,7 +154,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $PYTORCH_IMAGE
-docker run --gpus=1 --rm --entrypoint $SRCDIR/$C2SCRIPT \
+docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$C2SCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
@@ -174,7 +173,6 @@ fi
 cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 #!/bin/bash
 set -e
-export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
 cd $SRCDIR
 python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
@@ -208,7 +206,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $TENSORFLOW_IMAGE
-docker run --gpus=1 --rm --entrypoint $SRCDIR/$TFSCRIPT \
+docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
@@ -229,7 +227,6 @@ fi
 cat >$HOST_SRCDIR/$TRTSCRIPT <<EOF
 #!/bin/bash
 set -e
-export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
 cd $SRCDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --models_dir=$DESTDIR
@@ -262,7 +259,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $TENSORRT_IMAGE
-docker run --gpus=1 --rm --entrypoint $SRCDIR/$TRTSCRIPT \
+docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
