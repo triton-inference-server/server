@@ -31,6 +31,7 @@
 #include "src/backends/tensorrt/loader.h"
 #include "src/backends/tensorrt/plan_utils.h"
 #include "src/core/constants.h"
+#include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_cuda.h"
 #include "src/core/model_config_utils.h"
@@ -1047,7 +1048,7 @@ PlanBackend::Context::Run(
 
   // keep indirect buffers from previous run until now as scheduler
   // thread doesn't check when 'input_ready' event is triggered.
-  indirect_buffers_.clear();
+  inputs_.clear();
 
   cudaSetDevice(gpu_device_);
 
@@ -1171,10 +1172,40 @@ PlanBackend::Context::Run(
           request_header.batch_size() * batch1_byte_size);
     }
 
+    inputs_.emplace_back();
+    auto& input = inputs_.back();
+    input.input_buffer_ = static_cast<char*>(buffers_[bindex]);
+    input.memory_type_ = TRTSERVER_MEMORY_GPU;
+    input.memory_type_id_ = gpu_device_;
     SetInputBuffer(
-        name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_GPU, gpu_device_,
-        input_copy_stream_, static_cast<char*>(buffers_[bindex]),
-        &indirect_buffers_);
+        name, expected_byte_sizes, payloads, input_copy_stream_, &input);
+  }
+
+  // No synchronization here as we know that the below copies will be using
+  // 'input_copy_stream_', thus the copies issued above will be done.
+  // i.e. if used 'input_copy_stream_', then the order is preserved. Otherwise,
+  // the copy is h2h and it is synchronized anyway.
+  for (auto& input : inputs_) {
+    for (auto& indirect_buffer : input.indirect_buffers_) {
+      bool cuda_used;
+      TRTSERVER_Memory_Type buffer_memory_type;
+      int64_t buffer_memory_id;
+      size_t buffer_byte_size;
+      auto buffer =
+          std::get<0>(indirect_buffer)
+              ->BufferAt(
+                  0, &buffer_byte_size, &buffer_memory_type, &buffer_memory_id);
+      auto status = CopyBuffer(
+          "indirect buffer", buffer_memory_type, buffer_memory_id,
+          input.memory_type_, input.memory_type_id_, buffer_byte_size, buffer,
+          input.input_buffer_ + std::get<1>(indirect_buffer),
+          input_copy_stream_, &cuda_used);
+      if (!status.IsOk()) {
+        for (const auto& payload_idx : std::get<2>(indirect_buffer)) {
+          (*payloads)[payload_idx].status_ = status;
+        }
+      }
+    }
   }
 
   cudaEventRecord(events_[next_set_].input_ready_, input_copy_stream_);

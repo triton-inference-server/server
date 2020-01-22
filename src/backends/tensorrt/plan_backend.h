@@ -206,7 +206,7 @@ class PlanBackend : public InferenceBackend {
     // The array size is equal to Context::total_bindings_
     std::vector<void*> buffer_bindings_;
 
-    std::vector<std::unique_ptr<AllocatedSystemMemory>> indirect_buffers_;
+    std::vector<InputInfo> inputs_;
   };
 
   // CUDA engine shared across all model instances on the same device.

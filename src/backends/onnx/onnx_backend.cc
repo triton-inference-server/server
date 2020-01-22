@@ -578,8 +578,9 @@ OnnxBackend::Context::Run(
   // Hold reference to each buffer of input data so that it stays
   // until the inference has completed.
   std::vector<std::unique_ptr<AllocatedSystemMemory>> input_buffers;
+  std::vector<InputInfo> inputs;
   std::vector<const char*> input_names;
-  bool cuda_used = false;
+  bool cuda_copy = false;
 
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
@@ -592,7 +593,7 @@ OnnxBackend::Context::Run(
     // into the corresponding tensor.
     RETURN_IF_ERROR(SetInputTensor(
         name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, &input_buffers, &input_names, &cuda_used));
+        payloads, &input_buffers, &inputs, &input_names, &cuda_copy));
   }
 
   // Additional inputs added to the provider...
@@ -605,7 +606,7 @@ OnnxBackend::Context::Run(
 
       RETURN_IF_ERROR(SetInputTensor(
           name, override.datatype_, override.dims_, total_batch_size, payloads,
-          &input_buffers, &input_names, &cuda_used));
+          &input_buffers, &inputs, &input_names, &cuda_copy));
     }
   }
 
@@ -618,7 +619,35 @@ OnnxBackend::Context::Run(
   }
 
 #ifdef TRTIS_ENABLE_GPU
-  if (cuda_used) {
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+  cuda_copy = false;
+  for (auto& input : inputs) {
+    for (auto& indirect_buffer : input.indirect_buffers_) {
+      bool cuda_used;
+      TRTSERVER_Memory_Type buffer_memory_type;
+      int64_t buffer_memory_id;
+      size_t buffer_byte_size;
+      auto buffer =
+          std::get<0>(indirect_buffer)
+              ->BufferAt(
+                  0, &buffer_byte_size, &buffer_memory_type, &buffer_memory_id);
+      auto status = CopyBuffer(
+          "indirect buffer", buffer_memory_type, buffer_memory_id,
+          input.memory_type_, input.memory_type_id_, buffer_byte_size, buffer,
+          input.input_buffer_ + std::get<1>(indirect_buffer), stream_,
+          &cuda_used);
+      if (!status.IsOk()) {
+        for (const auto& payload_idx : std::get<2>(indirect_buffer)) {
+          (*payloads)[payload_idx].status_ = status;
+        }
+      } else {
+        cuda_copy |= cuda_copy;
+      }
+    }
+  }
+  if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
 #endif  // TRTIS_ENABLE_GPU
@@ -657,7 +686,8 @@ OnnxBackend::Context::SetInputTensor(
     const std::string& name, const DataType data_type, const DimsList& dims,
     size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
     std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
-    std::vector<const char*>* input_names, bool* cuda_used)
+    std::vector<InputInfo>* inputs, std::vector<const char*>* input_names,
+    bool* cuda_used)
 {
   input_names->emplace_back(name.c_str());
   input_tensors_.emplace_back(nullptr);
@@ -708,25 +738,22 @@ OnnxBackend::Context::SetInputTensor(
       total_byte_size + ((data_type != TYPE_STRING) ? 0 : 1);
   input_buffers->emplace_back(
       new AllocatedSystemMemory(buffer_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
-  TRTSERVER_Memory_Type buffer_memory_type;
-  int64_t buffer_memory_id;
-  char* buffer = input_buffers->back()->MutableBuffer(
-      &buffer_memory_type, &buffer_memory_id);
+  inputs->emplace_back();
+  auto& input = inputs->back();
+  input.input_buffer_ = input_buffers->back()->MutableBuffer(
+      &input.memory_type_, &input.memory_type_id_);
 
-  // [FIXME] Abusing the use of 'input_buffers' here by knowing it's
-  // serving as placeholder for data and will be clean up after execution
-  // Store data into input buffer. Note that 'cuda_used' will be updated only
+  // Note that 'cuda_used' will be updated only
   // for non-string data type. For string, the data must be ready to proceed.
-  auto tmp_cuda_used = SetInputBuffer(
-      name, expected_byte_sizes, payloads, buffer_memory_type, buffer_memory_id,
-      buffer, input_buffers);
+  auto tmp_cuda_used =
+      SetInputBuffer(name, expected_byte_sizes, payloads, &input);
 
   if (data_type != TYPE_STRING) {
     const OrtMemoryInfo* allocator_info;
     RETURN_IF_ORT_ERROR(ort_api->AllocatorGetInfo(allocator_, &allocator_info));
     RETURN_IF_ORT_ERROR(ort_api->CreateTensorWithDataAsOrtValue(
-        allocator_info, (void*)buffer, total_byte_size, input_dims.data(),
-        input_dims.size(), ConvertToOnnxDataType(data_type),
+        allocator_info, (void*)input.input_buffer_, total_byte_size,
+        input_dims.data(), input_dims.size(), ConvertToOnnxDataType(data_type),
         &input_tensors_.back()));
     *cuda_used |= tmp_cuda_used;
   } else {
@@ -740,10 +767,10 @@ OnnxBackend::Context::SetInputTensor(
     // Onnx String tensor is created by passing array of C strings,
     // set such array and modify data in input buffer to be C strings
     SetStringInputBuffer(
-        name, expected_byte_sizes, expected_element_cnts, payloads, buffer,
-        &string_data);
+        name, expected_byte_sizes, expected_element_cnts, payloads,
+        input.input_buffer_, &string_data);
     // Make sure to make the last string data valid C string
-    buffer[total_byte_size] = 0;
+    input.input_buffer_[total_byte_size] = 0;
 
     RETURN_IF_ORT_ERROR(ort_api->CreateTensorAsOrtValue(
         allocator_, input_dims.data(), input_dims.size(),

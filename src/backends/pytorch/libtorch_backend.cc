@@ -39,6 +39,7 @@
 #ifdef TRTIS_ENABLE_GPU
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <cuda_runtime_api.h>
+#include "src/core/cuda_utils.h"
 #endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
@@ -449,8 +450,7 @@ Status
 LibTorchBackend::Context::SetInputMetaData(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<AllocatedSystemMemory>>* indirect_buffers,
-    InputMetaData* meta_data, bool* cuda_copy)
+    std::vector<InputInfo>* inputs, InputMetaData* meta_data, bool* cuda_copy)
 {
   meta_data->name_ = name;
   // Get the shape of the input. The provider has already checked that
@@ -484,8 +484,10 @@ LibTorchBackend::Context::SetInputMetaData(
       batch1_element_cnt * GetDataTypeByteSize(datatype);
   const auto total_byte_size = total_batch_size * batch1_byte_size;
 
+  inputs->emplace_back();
+
   return SetFixedSizedInputBuffer(
-      name, batch1_byte_size, total_byte_size, payloads, indirect_buffers,
+      name, batch1_byte_size, total_byte_size, payloads, &inputs->back(),
       meta_data, cuda_copy);
 }
 
@@ -493,8 +495,7 @@ Status
 LibTorchBackend::Context::SetFixedSizedInputBuffer(
     const std::string& name, const size_t batch1_byte_size,
     const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<AllocatedSystemMemory>>* indirect_buffers,
-    InputMetaData* meta_data, bool* cuda_copy)
+    InputInfo* input, InputMetaData* meta_data, bool* cuda_copy)
 {
   // The entire input tensor must be delivered as a single
   // contiguous chunk so create a buffer large enough to hold the
@@ -505,8 +506,8 @@ LibTorchBackend::Context::SetFixedSizedInputBuffer(
   int64_t memory_type_id = (gpu_device_ == NO_GPU_DEVICE) ? 0 : gpu_device_;
   meta_data->input_buffer_.reset(
       new AllocatedSystemMemory(total_byte_size, memory_type, memory_type_id));
-  char* buffer =
-      meta_data->input_buffer_->MutableBuffer(&memory_type, &memory_type_id);
+  input->input_buffer_ = meta_data->input_buffer_->MutableBuffer(
+      &input->memory_type_, &input->memory_type_id_);
 
   // Visit the payloads in order and copy the input tensors to 'buffer'.
   std::vector<size_t> expected_byte_sizes;
@@ -517,9 +518,7 @@ LibTorchBackend::Context::SetFixedSizedInputBuffer(
         request_header.batch_size() * batch1_byte_size);
   }
 
-  *cuda_copy |= SetInputBuffer(
-      name, expected_byte_sizes, payloads, memory_type, memory_type_id, buffer,
-      indirect_buffers);
+  *cuda_copy |= SetInputBuffer(name, expected_byte_sizes, payloads, input);
 
   return Status::Success;
 }
@@ -585,7 +584,7 @@ LibTorchBackend::Context::Run(
   // Store input and output tensors
   std::vector<torch::jit::IValue> inputs_(input_count);
   std::vector<torch::Tensor> outputs_;
-  std::vector<std::unique_ptr<AllocatedSystemMemory>> indirect_buffers;
+  std::vector<InputInfo> inputs;
 
   // Inputs from the request...
   bool cuda_copy = false;
@@ -597,7 +596,7 @@ LibTorchBackend::Context::Run(
 
     RETURN_IF_ERROR(SetInputMetaData(
         name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, &indirect_buffers, &(input_meta_data[ip_index]), &cuda_copy));
+        payloads, &inputs, &(input_meta_data[ip_index]), &cuda_copy));
   }
 
   std::string deliminator = "__";
@@ -626,10 +625,38 @@ LibTorchBackend::Context::Run(
       input_index_map_[name] = ip_index;
       RETURN_IF_ERROR(SetInputMetaData(
           name, override.datatype_, override.dims_, total_batch_size, payloads,
-          &indirect_buffers, &(input_meta_data[ip_index]), &cuda_copy));
+          &inputs, &(input_meta_data[ip_index]), &cuda_copy));
     }
   }
 #ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+  cuda_copy = false;
+  for (auto& input : inputs) {
+    for (auto& indirect_buffer : input.indirect_buffers_) {
+      bool cuda_used;
+      TRTSERVER_Memory_Type buffer_memory_type;
+      int64_t buffer_memory_id;
+      size_t buffer_byte_size;
+      auto buffer =
+          std::get<0>(indirect_buffer)
+              ->BufferAt(
+                  0, &buffer_byte_size, &buffer_memory_type, &buffer_memory_id);
+      auto status = CopyBuffer(
+          "indirect buffer", buffer_memory_type, buffer_memory_id,
+          input.memory_type_, input.memory_type_id_, buffer_byte_size, buffer,
+          input.input_buffer_ + std::get<1>(indirect_buffer), stream_,
+          &cuda_used);
+      if (!status.IsOk()) {
+        for (const auto& payload_idx : std::get<2>(indirect_buffer)) {
+          (*payloads)[payload_idx].status_ = status;
+        }
+      } else {
+        cuda_copy |= cuda_used;
+      }
+    }
+  }
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
