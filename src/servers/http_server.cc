@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -102,7 +102,6 @@ class HTTPAPIServer : public HTTPServer {
   h2o_context_t ctx_;
   h2o_accept_ctx_t accept_ctx_;
   uv_tcp_t listener_;
-  bool exit_loop_ = true;
 
   std::shared_ptr<TRTSERVER_Server> server_;
   const char* server_id_;
@@ -501,7 +500,6 @@ HTTPAPIServer::Start()
         h2o_access_log_register(pathconf, logfh);
     }
 
-    exit_loop_ = false;
     worker_ = std::thread([&] {
       uv_loop_t loop;
       uv_loop_init(&loop);
@@ -550,7 +548,6 @@ HTTPAPIServer::Start()
 TRTSERVER_Error*
 HTTPAPIServer::Stop()
 {
-  exit_loop_ = true;
   if (worker_.joinable()) {
     uv_stop(ctx_.loop);
     uv_loop_close(uv_default_loop());
