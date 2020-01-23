@@ -35,6 +35,8 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+export CUDA_VISIBLE_DEVICES=0
+
 LARGE_PAYLOAD_TEST_PY=large_payload_test.py
 CLIENT_LOG_BASE="./client.log"
 DATADIR=`pwd`/models
