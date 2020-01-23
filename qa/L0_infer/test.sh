@@ -63,14 +63,10 @@ if [ "$TENSORRT_SERVER_CPU_ONLY" == "1" ]; then
 fi
 
 # If BACKENDS not specified, set to all
-if [ -z "$BACKENDS" ]; then
-    BACKENDS="graphdef savedmodel netdef onnx libtorch plan custom"
-fi
+BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
 
 # If ENSEMBLES not specified, set to 1
-if [ -z "$ENSEMBLES" ]; then
-    ENSEMBLES="1"
-fi
+ENSEMBLES=${ENSEMBLES:="1"}
 
 for TARGET in cpu gpu; do
     if [ "$TENSORRT_SERVER_CPU_ONLY" == "1" ]; then
