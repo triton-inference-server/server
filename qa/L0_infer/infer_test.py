@@ -39,6 +39,11 @@ import os
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
 CPU_ONLY = (os.environ.get('TENSORRT_SERVER_CPU_ONLY') is not None)
+BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel netdef onnx libtorch plan custom")
+ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
+
+if ENSEMBLES:
+    BACKENDS="graphdef savedmodel netdef onnx libtorch plan custom"
 
 np_dtype_string = np.dtype(object)
 
@@ -78,62 +83,69 @@ class InferTest(unittest.TestCase):
 
         all_ensemble_prefix = ["simple_", "sequence_", "fan_"]
         ensemble_prefix = [""]
-        for prefix in all_ensemble_prefix:
-            if tu.validate_for_ensemble_model(prefix,
-                                    input_dtype, output0_dtype, output1_dtype,
-                                    (input_size,), (input_size,), (input_size,)):
-                ensemble_prefix.append(prefix)
+        if ENSEMBLES:
+            for prefix in all_ensemble_prefix:
+                if tu.validate_for_ensemble_model(prefix,
+                                        input_dtype, output0_dtype, output1_dtype,
+                                        (input_size,), (input_size,), (input_size,)):
+                    ensemble_prefix.append(prefix)
 
         if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
             for prefix in ensemble_prefix:
                 for pf in ["graphdef", "savedmodel"]:
-                    _infer_exact_helper(self, prefix + pf, (input_size,), 8,
-                                    input_dtype, output0_dtype, output1_dtype,
-                                    output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+                    if pf in BACKENDS:
+                        _infer_exact_helper(self, prefix + pf, (input_size,), 8,
+                                        input_dtype, output0_dtype, output1_dtype,
+                                        output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
 
         if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
             for prefix in ensemble_prefix:
-                _infer_exact_helper(self, prefix + 'netdef', (input_size,), 8,
-                                input_dtype, output0_dtype, output1_dtype,
-                                output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+                if 'netdef' in BACKENDS:
+                    _infer_exact_helper(self, prefix + 'netdef', (input_size,), 8,
+                                    input_dtype, output0_dtype, output1_dtype,
+                                    output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
         if not CPU_ONLY and tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,1,1), (input_size,1,1), (input_size,1,1)):
             for prefix in ensemble_prefix:
-                if input_dtype == np.int8:
-                    _infer_exact_helper(self, prefix + 'plan', (input_size, 1, 1), 8,
-                                    input_dtype, output0_dtype, output1_dtype,
-                                    output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
-                else:
-                    _infer_exact_helper(self, prefix + 'plan', (input_size,), 8,
-                                    input_dtype, output0_dtype, output1_dtype,
-                                    output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+                if 'plan' in BACKENDS:
+                    if input_dtype == np.int8:
+                        _infer_exact_helper(self, prefix + 'plan', (input_size, 1, 1), 8,
+                                        input_dtype, output0_dtype, output1_dtype,
+                                        output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+                    else:
+                        _infer_exact_helper(self, prefix + 'plan', (input_size,), 8,
+                                        input_dtype, output0_dtype, output1_dtype,
+                                        output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
         # the custom model is src/custom/addsub... it does not swap
         # the inputs so always set to False
         if tu.validate_for_custom_model(input_dtype, output0_dtype, output1_dtype,
                                         (input_size,), (input_size,), (input_size,)):
             # No basic ensemble models are created against custom models
-            _infer_exact_helper(self, 'custom', (input_size,), 8,
-                            input_dtype, output0_dtype, output1_dtype,
-                            output0_raw=output0_raw, output1_raw=output1_raw, swap=False)
+            if 'custom' in BACKENDS:
+                _infer_exact_helper(self, 'custom', (input_size,), 8,
+                                input_dtype, output0_dtype, output1_dtype,
+                                output0_raw=output0_raw, output1_raw=output1_raw, swap=False)
 
         if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
             for prefix in ensemble_prefix:
-                _infer_exact_helper(self, prefix + 'onnx', (input_size,), 8,
-                                input_dtype, output0_dtype, output1_dtype,
-                                output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+                if 'onnx' in BACKENDS:
+                    _infer_exact_helper(self, prefix + 'onnx', (input_size,), 8,
+                                    input_dtype, output0_dtype, output1_dtype,
+                                    output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
         if tu.validate_for_libtorch_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
             for prefix in ensemble_prefix:
-                _infer_exact_helper(self, prefix + 'libtorch', (input_size,), 8,
-                                input_dtype, output0_dtype, output1_dtype,
-                                output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+                if 'libtorch' in BACKENDS:
+                    _infer_exact_helper(self, prefix + 'libtorch', (input_size,), 8,
+                                    input_dtype, output0_dtype, output1_dtype,
+                                    output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
     def test_raw_bbb(self):
         self._full_exact(np.int8, np.int8, np.int8,
@@ -244,6 +256,8 @@ class InferTest(unittest.TestCase):
         # There are 3 versions of graphdef_int8_int8_int8 but
         # only version 3 should be available
         for platform in ('graphdef', 'savedmodel'):
+            if platform not in BACKENDS:
+                continue
             try:
                 iu.infer_exact(self, platform, tensor_shape, 1,
                                np.int8, np.int8, np.int8,
@@ -279,6 +293,8 @@ class InferTest(unittest.TestCase):
         # There are 3 versions of graphdef_int16_int16_int16 but only
         # versions 2 and 3 should be available
         for platform in ('graphdef', 'savedmodel'):
+            if platform not in BACKENDS:
+                continue
             try:
                 iu.infer_exact(self, platform, tensor_shape, 1,
                                np.int16, np.int16, np.int16,
@@ -308,6 +324,8 @@ class InferTest(unittest.TestCase):
         # There are 3 versions of *_int32_int32_int32 and all should
         # be available.
         for platform in ('graphdef', 'savedmodel', 'netdef'):
+            if platform not in BACKENDS:
+                continue
             iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int32, np.int32, np.int32,
                            model_version=1, swap=False,
@@ -331,6 +349,8 @@ class InferTest(unittest.TestCase):
         # There are 3 versions of *_float16_float16_float16 but only
         # version 1 should be available.
         for platform in ('graphdef', 'savedmodel'):
+            if platform not in BACKENDS:
+                continue
             iu.infer_exact(self, platform, tensor_shape, 1,
                            np.float16, np.float16, np.float16,
                            model_version=1, swap=False,
@@ -367,6 +387,8 @@ class InferTest(unittest.TestCase):
         for platform in ('graphdef', 'savedmodel', 'netdef', 'plan'):
             if platform == 'plan' and CPU_ONLY:
                 continue
+            if platform not in BACKENDS:
+                continue
             tensor_shape = (input_size,)
             iu.infer_exact(self, platform, tensor_shape, 1,
                            np.float32, np.float32, np.float32,
@@ -391,49 +413,50 @@ class InferTest(unittest.TestCase):
                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-    def test_ensemble_mix_platform(self):
-        # Skip on CPU only machine as TensorRT model is used in this ensemble
-        if CPU_ONLY:
-            return
-        for bs in (1, 8):
-            iu.infer_exact(self, "mix_platform", (16,), bs,
-                np.float32, np.float32, np.float32,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-
-    def test_ensemble_mix_type(self):
-        for bs in (1, 8):
-            iu.infer_exact(self, "mix_type", (16,), bs,
-                np.int32, np.float32, np.float32,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-
-    def test_ensemble_mix_ensemble(self):
-        for bs in (1, 8):
-            iu.infer_exact(self, "mix_ensemble", (16,), bs,
-                np.int32, np.float32, np.float32,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-
-    def test_ensemble_mix_batch_nobatch(self):
-        base_names = ["batch_to_nobatch", "nobatch_to_batch"]
-        for name in base_names:
+    if ENSEMBLES:
+        def test_ensemble_mix_platform(self):
+            # Skip on CPU only machine as TensorRT model is used in this ensemble
+            if CPU_ONLY:
+                return
             for bs in (1, 8):
-                iu.infer_exact(self, name, (16,), bs,
+                iu.infer_exact(self, "mix_platform", (16,), bs,
                     np.float32, np.float32, np.float32,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            iu.infer_exact(self, name + "_nobatch", (8, 16,), 1,
-                np.float32, np.float32, np.float32,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-        # batch -> nobatch -> batch
-        for bs in (1, 8):
-            iu.infer_exact(self, "mix_nobatch_batch", (16,), bs,
-                np.float32, np.float32, np.float32,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+        def test_ensemble_mix_type(self):
+            for bs in (1, 8):
+                iu.infer_exact(self, "mix_type", (16,), bs,
+                    np.int32, np.float32, np.float32,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+
+        def test_ensemble_mix_ensemble(self):
+            for bs in (1, 8):
+                iu.infer_exact(self, "mix_ensemble", (16,), bs,
+                    np.int32, np.float32, np.float32,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+
+        def test_ensemble_mix_batch_nobatch(self):
+            base_names = ["batch_to_nobatch", "nobatch_to_batch"]
+            for name in base_names:
+                for bs in (1, 8):
+                    iu.infer_exact(self, name, (16,), bs,
+                        np.float32, np.float32, np.float32,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                iu.infer_exact(self, name + "_nobatch", (8, 16,), 1,
+                    np.float32, np.float32, np.float32,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+
+            # batch -> nobatch -> batch
+            for bs in (1, 8):
+                iu.infer_exact(self, "mix_nobatch_batch", (16,), bs,
+                    np.float32, np.float32, np.float32,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
     if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
         def test_ensemble_label_lookup(self):
