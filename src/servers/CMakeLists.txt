@@ -439,8 +439,8 @@ if(${TRTIS_ENABLE_S3})
   target_link_libraries(
     trtserver
     PRIVATE aws-cpp-sdk-s3
+    PRIVATE -lre2
   )
-
 endif() # TRTIS_ENABLE_S3
 
 if(${TRTIS_ENABLE_GPU})
