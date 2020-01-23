@@ -42,6 +42,7 @@
 #endif  // TRTIS_ENABLE_S3
 
 #include <google/protobuf/text_format.h>
+#include <re2/re2.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -572,7 +573,7 @@ namespace s3 = Aws::S3;
 
 class S3FileSystem : public FileSystem {
  public:
-  S3FileSystem(const Aws::SDKOptions& options);
+  S3FileSystem(const Aws::SDKOptions& options, const std::string& local_path);
   ~S3FileSystem();
   Status FileExists(const std::string& path, bool* exists) override;
   Status IsDirectory(const std::string& path, bool* is_dir) override;
@@ -624,15 +625,22 @@ S3FileSystem::ParsePath(
 }
 
 
-S3FileSystem::S3FileSystem(const Aws::SDKOptions& options) : options_(options)
+S3FileSystem::S3FileSystem(
+    const Aws::SDKOptions& options, const std::string& local_path)
+    : options_(options)
 {
+  Aws::Client::ClientConfiguration config;
   if (const char* profile_name = std::getenv("AWS_PROFILE")) {
-    Aws::Client::ClientConfiguration config(profile_name);
-    client_ = s3::S3Client(config);
+    config = Aws::Client::ClientConfiguration(profile_name);
   } else {
-    Aws::Client::ClientConfiguration config("default");
-    client_ = s3::S3Client(config);
+    config = Aws::Client::ClientConfiguration("default");
   }
+
+  if (local_path != ":") {
+    config.endpointOverride = local_path;
+  }
+
+  client_ = s3::S3Client(config);
 }
 
 S3FileSystem::~S3FileSystem()
@@ -1015,9 +1023,18 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
         "s3:// file-system not supported. To enable, build with "
         "-DTRTIS_ENABLE_S3=ON.");
 #else
+    re2::RE2 s3_regex("s3://((([a-z]+):([0-9]+)/)?)([0-9a-z.-]+)");
+    std::string host_name, host_port, remaining;
+    if (!RE2::FullMatch(path, s3_regex, &host_name, &host_port, &remaining)) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "s3:// file-system invalid. Must be of the form s3://<bucket_name> "
+          "or s3://<host_name>:<host_port>/<bucket_name>");
+    }
+
     Aws::SDKOptions options;
     Aws::InitAPI(options);
-    static S3FileSystem s3_fs(options);
+    static S3FileSystem s3_fs(options, host_name + ":" + host_port);
     // RETURN_IF_ERROR(s3_fs.CheckClient());
     *file_system = &s3_fs;
     return Status::Success;
