@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -235,15 +235,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               libopencv-dev \
                               libopencv-core-dev \
                               libzmq3-dev \
-                              python-dev \
-                              python-protobuf \
+                              python3-dev \
+                              python3-pip \
+                              python3-protobuf \
                               swig && \
     rm -rf /var/lib/apt/lists/*
 
-RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
-    python get-pip.py && \
-    rm get-pip.py
-RUN pip install --upgrade numpy pillow future grpcio requests gsutil awscli six
+# CI/QA expects "python" executable (not python3).
+RUN rm -f /usr/bin/python && \
+    ln -s /usr/bin/python3 /usr/bin/python
+
+RUN pip3 install --upgrade numpy pillow future grpcio requests gsutil awscli six
 
 # CI expects tests in /opt/tensorrtserver/qa. The tensorrt-server
 # (1000) user should own all artifacts in case CI is run using
@@ -254,6 +256,6 @@ COPY --chown=1000:1000 --from=cbe /workspace/qa/ qa/
 # Remove CI tests that are meant to run only on build image and
 # install the tensorrtserver python client APIs.
 RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
-    pip install --upgrade qa/pkgs/tensorrtserver-*.whl
+    pip3 install --upgrade qa/pkgs/tensorrtserver-*.whl
 
 ENV LD_LIBRARY_PATH /opt/tensorrtserver/qa/clients:${LD_LIBRARY_PATH}

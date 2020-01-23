@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -445,17 +445,19 @@ class ServerHealthContext:
         self._last_request_id = 0
         self._ctx = c_void_p()
 
-        if http_headers is None:
-            http_headers = list()
+        b_http_headers = list()
+        if http_headers is not None:
+            for hh in http_headers:
+                b_http_headers.append(hh.encode('utf-8'))
 
-        http_headers_arr = (c_char_p * len(http_headers))()
-        http_headers_arr[:] = http_headers
+        http_headers_arr = (c_char_p * len(b_http_headers))()
+        http_headers_arr[:] = b_http_headers
 
         _raise_if_error(
             c_void_p(
                 _crequest_health_ctx_new(
                     byref(self._ctx), url, int(protocol),
-                    http_headers_arr, len(http_headers), verbose)))
+                    http_headers_arr, len(b_http_headers), verbose)))
 
     def __del__(self):
         # when module is unloading may get called after
@@ -567,16 +569,18 @@ class ServerStatusContext:
         self._last_request_id = 0
         self._ctx = c_void_p()
 
-        if http_headers is None:
-            http_headers = list()
+        b_http_headers = list()
+        if http_headers is not None:
+            for hh in http_headers:
+                b_http_headers.append(hh.encode('utf-8'))
 
-        http_headers_arr = (c_char_p * len(http_headers))()
-        http_headers_arr[:] = http_headers
+        http_headers_arr = (c_char_p * len(b_http_headers))()
+        http_headers_arr[:] = b_http_headers
 
         _raise_if_error(
             c_void_p(
                 _crequest_status_ctx_new(
-                    byref(self._ctx), url, int(protocol), http_headers_arr, len(http_headers),
+                    byref(self._ctx), url, int(protocol), http_headers_arr, len(b_http_headers),
                     model_name, verbose)))
 
     def __del__(self):
@@ -666,16 +670,18 @@ class ModelRepositoryContext:
         self._last_request_id = 0
         self._ctx = c_void_p()
 
-        if http_headers is None:
-            http_headers = list()
+        b_http_headers = list()
+        if http_headers is not None:
+            for hh in http_headers:
+                b_http_headers.append(hh.encode('utf-8'))
 
-        http_headers_arr = (c_char_p * len(http_headers))()
-        http_headers_arr[:] = http_headers
+        http_headers_arr = (c_char_p * len(b_http_headers))()
+        http_headers_arr[:] = b_http_headers
 
         _raise_if_error(
             c_void_p(
                 _crequest_repository_ctx_new(
-                    byref(self._ctx), url, int(protocol), http_headers_arr, len(http_headers), verbose)))
+                    byref(self._ctx), url, int(protocol), http_headers_arr, len(b_http_headers), verbose)))
 
     def __del__(self):
         # when module is unloading may get called after
@@ -762,17 +768,19 @@ class ModelControlContext:
         self._last_request_id = 0
         self._ctx = c_void_p()
 
-        if http_headers is None:
-            http_headers = list()
+        b_http_headers = list()
+        if http_headers is not None:
+            for hh in http_headers:
+                b_http_headers.append(hh.encode('utf-8'))
 
-        http_headers_arr = (c_char_p * len(http_headers))()
-        http_headers_arr[:] = http_headers
+        http_headers_arr = (c_char_p * len(b_http_headers))()
+        http_headers_arr[:] = b_http_headers
 
         _raise_if_error(
             c_void_p(
                 _crequest_model_control_ctx_new(
                     byref(self._ctx), url, int(protocol),
-                    http_headers_arr, len(http_headers), verbose)))
+                    http_headers_arr, len(b_http_headers), verbose)))
 
     def __del__(self):
         # when module is unloading may get called after
@@ -875,17 +883,19 @@ class SharedMemoryControlContext:
         self._last_request_id = 0
         self._ctx = c_void_p()
 
-        if http_headers is None:
-            http_headers = list()
+        b_http_headers = list()
+        if http_headers is not None:
+            for hh in http_headers:
+                b_http_headers.append(hh.encode('utf-8'))
 
-        http_headers_arr = (c_char_p * len(http_headers))()
-        http_headers_arr[:] = http_headers
+        http_headers_arr = (c_char_p * len(b_http_headers))()
+        http_headers_arr[:] = b_http_headers
 
         _raise_if_error(
             c_void_p(
                 _crequest_shm_control_ctx_new(
                     byref(self._ctx), url, int(protocol),
-                    http_headers_arr, len(http_headers), verbose)))
+                    http_headers_arr, len(b_http_headers), verbose)))
 
     def __del__(self):
         if _crequest_shm_control_ctx_del is not None:
@@ -1100,18 +1110,20 @@ class InferContext:
         # Lock for the thread-safety across asynchronous requests
         self._lock = threading.Lock()
 
-        if http_headers is None:
-            http_headers = list()
+        b_http_headers = list()
+        if http_headers is not None:
+            for hh in http_headers:
+                b_http_headers.append(hh.encode('utf-8'))
 
-        http_headers_arr = (c_char_p * len(http_headers))()
-        http_headers_arr[:] = http_headers
+        http_headers_arr = (c_char_p * len(b_http_headers))()
+        http_headers_arr[:] = b_http_headers
 
         imodel_version = -1 if model_version is None else model_version
         _raise_if_error(
             c_void_p(
                 _crequest_infer_ctx_new(
                     byref(self._ctx), url, int(protocol),
-                    http_headers_arr, len(http_headers),
+                    http_headers_arr, len(b_http_headers),
                     model_name, imodel_version, correlation_id,
                     streaming, verbose)))
 
