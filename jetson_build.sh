@@ -64,6 +64,17 @@ apt-get update && \
     fi && \
     rm -rf /var/lib/apt/lists/*
 
+# TensorFlow libraries. Install the monolithic libtensorflow_trtis and
+# create a link libtensorflow_framework.so -> libtensorflow_trtis.so so
+# that custom tensorflow operations work correctly. Custom TF
+# operations link against libtensorflow_framework.so so it must be
+# present (and its functionality is provided by libtensorflow_trtis.so).
+(cd /opt/tensorrtserver/lib && \
+    ln -sf libtensorflow_trtis.so.1 libtensorflow_framework.so.1 && \
+    ln -sf libtensorflow_trtis.so.1 libtensorflow_framework.so && \
+    ln -sf libtensorflow_trtis.so.1 libtensorflow_trtis.so && \
+    ln -sf libtensorflow_trtis.so.1 libtensorflow_cc.so)
+
 LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcuda.so | wc -l) && \
     if [[ "$LIBCUDA_FOUND" -eq 0 ]]; then \
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/stubs; \
@@ -78,12 +89,13 @@ LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcuda.s
                   -DTRTIS_ENABLE_GCS=OFF \
                   -DTRTIS_ENABLE_S3=OFF \
                   -DTRTIS_ENABLE_CUSTOM=ON \
-                  -DTRTIS_ENABLE_TENSORFLOW=OFF \
+                  -DTRTIS_ENABLE_TENSORFLOW=ON \
                   -DTRTIS_ENABLE_TENSORRT=OFF \
                   -DTRTIS_ENABLE_CAFFE2=OFF \
                   -DTRTIS_ENABLE_ONNXRUNTIME=OFF \
                   -DTRTIS_ENABLE_ONNXRUNTIME_OPENVINO=OFF \
                   -DTRTIS_ENABLE_PYTORCH=OFF \
+                  -DTRTIS_EXTRA_LIB_PATHS="/opt/tensorrtserver/lib" \
                   ../build && \
             make -j16 trtis && \
             mkdir -p /opt/tensorrtserver/include && \
