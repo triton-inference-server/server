@@ -27,10 +27,10 @@
 TRTIS_VERSION=1.10.0jetson-dev
 
 # Git clone repo from github
-cd ${HOME}/trtis && \
-  git clone git clone --recursive \
+mkdir $HOME/trtis && cd ${HOME}/trtis && \
+  git clone --recursive \
     https://github.com/NVIDIA/tensorrt-inference-server && \
-    cd tensorrt-inference-server
+  cd tensorrt-inference-server
 
 # Install dependencies
 apt-get update && \
@@ -69,6 +69,7 @@ apt-get update && \
 # that custom tensorflow operations work correctly. Custom TF
 # operations link against libtensorflow_framework.so so it must be
 # present (and its functionality is provided by libtensorflow_trtis.so).
+# TODO Copy libtensorflow_trtis.so.1 from artifact store
 (cd /opt/tensorrtserver/lib && \
     ln -sf libtensorflow_trtis.so.1 libtensorflow_framework.so.1 && \
     ln -sf libtensorflow_trtis.so.1 libtensorflow_framework.so && \
@@ -81,6 +82,7 @@ LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcuda.s
         ln -fs /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1; \
     fi && \
     echo $LD_LIBRARY_PATH && \
+    cd ${HOME}/trtis/tensorrt-inference-server
     rm -fr builddir && mkdir -p builddir && \
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
@@ -103,4 +105,5 @@ LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcuda.s
             cp -r trtis/install/lib /opt/tensorrtserver/. && \
             cp -r trtis/install/include /opt/tensorrtserver/include/trtserver)
 
+# TODO publish this to a fixed data repository 
 tar -zcvf tensorrtserver${TRTIS_VERSION}.tgz /opt/tensorrtserver
