@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -48,8 +48,7 @@ try:
             self.root_is_pure = False
         def get_tag(self):
             pyver, abi, plat = _bdist_wheel.get_tag(self)
-            # Client Python code is compatible with both Python 2 and 3
-            pyver, abi = 'py2.py3', 'none'
+            pyver, abi = 'py3', 'none'
             return pyver, abi, plat
 except ImportError:
     bdist_wheel = None

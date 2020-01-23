@@ -27,6 +27,7 @@
 import sys
 sys.path.append("../common")
 
+import math
 import unittest
 import numpy as np
 from tensorrtserver.api import *
@@ -36,7 +37,7 @@ class LargePayLoadTest(unittest.TestCase):
     def setUp(self):
         self.data_type_ = np.float32
         # n GB divided by element size
-        self.input_size_ = 6 * (1024 * 1024 * 1024) / np.dtype(self.data_type_).itemsize
+        self.input_size_ = math.trunc(6 * (1024 * 1024 * 1024) / np.dtype(self.data_type_).itemsize)
         self.protocols_ = ((ProtocolType.HTTP, 'localhost:8000'),
                         (ProtocolType.GRPC, 'localhost:8001'))
 
@@ -69,7 +70,7 @@ class LargePayLoadTest(unittest.TestCase):
         for protocol, url in self.protocols_:
             model_name = tu.get_zero_model_name("graphdef_nobatch", 1, self.data_type_)
             ctx = InferContext(url, protocol, model_name, None, True)
-            self._test_helper(ctx, tensor_shape, small_tensor_shape)            
+            self._test_helper(ctx, tensor_shape, small_tensor_shape)
 
     def test_savedmodel(self):
         tensor_shape = (self.input_size_,)

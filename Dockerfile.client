@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -86,8 +86,12 @@ COPY qa/images/mug.jpg images/mug.jpg
 # be used to run the client examples. The special upgrade and handling
 # of pip is needed to get numpy to install correctly with python2 on
 # ubuntu 16.04.
-RUN python -m pip install --user --upgrade pip && \
-    python -m pip install --upgrade install/python/tensorrtserver-*.whl numpy pillow
+RUN if [ "$PYVER" = "2" ]; then \
+        python -m pip install --user --upgrade pip; \
+        python -m pip install --upgrade install/python/tensorrtserver-*.whl numpy pillow; \
+    else \
+        pip3 install --upgrade install/python/tensorrtserver-*.whl numpy pillow; \
+    fi
 
 ENV PATH //workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
