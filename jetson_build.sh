@@ -80,7 +80,6 @@ LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcuda.s
         ln -fs /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1; \
     fi && \
     echo $LD_LIBRARY_PATH && \
-    cd ${HOME}/trtis/tensorrt-inference-server
     rm -fr builddir && mkdir -p builddir && \
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
