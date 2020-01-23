@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -1509,6 +1509,32 @@ TRTSERVER_ServerId(TRTSERVER_Server* server, const char** id)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
   *id = lserver->Id().c_str();
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerVersion(TRTSERVER_Server* server, const char** version)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  *version = lserver->Version().c_str();
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerExtensions(
+    TRTSERVER_Server* server, const char* const** extensions,
+    uint64_t* extensions_count)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  const std::vector<const char*>& exts = lserver->Extensions();
+  if (exts.empty()) {
+    *extensions_count = 0;
+    *extensions = nullptr;
+  } else {
+    *extensions_count = exts.size();
+    *extensions = &(lserver->Extensions()[0]);
+  }
+
   return nullptr;  // Success
 }
 

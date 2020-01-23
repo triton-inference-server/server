@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -75,18 +75,21 @@ class ScopedAtomicIncrement {
 // InferenceServer
 //
 InferenceServer::InferenceServer()
-    : ready_state_(ServerReadyState::SERVER_INVALID)
+    : version_(TRTIS_VERSION), ready_state_(ServerReadyState::SERVER_INVALID)
 {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
   start_time_ns_ = TIMESPEC_TO_NANOS(ts);
 
-  const char* vstr = getenv("TENSORRT_SERVER_VERSION");
-  if (vstr != nullptr) {
-    version_.assign(vstr);
-  }
-
   id_ = "inference:0";
+  extensions_.push_back("classification");
+  extensions_.push_back("flat_tensor_format");
+  extensions_.push_back("model_configuration");
+  extensions_.push_back("model_control");
+  extensions_.push_back("sequence");
+  extensions_.push_back("shared_memory_tensor_format");
+  extensions_.push_back("statistics");
+
   strict_model_config_ = true;
   strict_readiness_ = true;
   exit_timeout_secs_ = 30;
@@ -95,7 +98,6 @@ InferenceServer::InferenceServer()
   tf_soft_placement_enabled_ = true;
   tf_gpu_memory_fraction_ = 0.0;
   tf_vgpu_memory_limits_ = {};
-
 
   inflight_request_counter_ = 0;
 

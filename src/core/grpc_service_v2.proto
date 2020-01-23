@@ -141,7 +141,8 @@ message ModelReadyRequest
   //@@  .. cpp:var:: int64 version
   //@@
   //@@     The version of the model to check for readiness. If -1
-  //@@     the latest/most-recent version of the model is checked.
+  //@@     the version of the model is selected automatically based
+  //@@     on the version policy.
   //@@
   int64 version = 2;
 }
@@ -213,8 +214,8 @@ message ModelMetadataRequest
 
   //@@  .. cpp:var:: int64 version
   //@@
-  //@@     The version of the model. If -1 the latest/most-recent
-  //@@     version of the model is checked.
+  //@@     The version of the model. If -1 the version of the model
+  //@@     is selected automatically based on the version policy.
   //@@
   int64 version = 2;
 }

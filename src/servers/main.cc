@@ -57,6 +57,9 @@ static_assert(
 #ifdef TRTIS_ENABLE_GRPC
 #include "src/servers/grpc_server.h"
 #endif  // TRTIS_ENABLE_GRPC
+#ifdef TRTIS_ENABLE_GRPC_V2
+#include "src/servers/grpc_server_v2.h"
+#endif  // TRTIS_ENABLE_GRPC_V2
 
 namespace {
 
@@ -94,9 +97,15 @@ std::vector<std::string> endpoint_names = {
 
 #ifdef TRTIS_ENABLE_GRPC
 std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
-bool allow_grpc_ = true;
-int32_t grpc_port_ = 8001;
 #endif  // TRTIS_ENABLE_GRPC
+#ifdef TRTIS_ENABLE_GRPC_V2
+std::unique_ptr<nvidia::inferenceserver::GRPCServerV2> grpc_service_v2_;
+#endif  // TRTIS_ENABLE_GRPC_V2
+#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
+bool allow_grpc_ = true;
+int32_t grpc_api_version_ = 1;
+int32_t grpc_port_ = 8001;
+#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 
 #ifdef TRTIS_ENABLE_METRICS
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
@@ -110,7 +119,7 @@ TRTSERVER_Trace_Level trace_level_ = TRTSERVER_TRACE_LEVEL_DISABLED;
 int32_t trace_rate_ = 1000;
 #endif  // TRTIS_ENABLE_TRACING
 
-#ifdef TRTIS_ENABLE_GRPC
+#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
 // The number of threads to initialize for handling GRPC infer
 // requests.
 int grpc_infer_thread_cnt_ = 1;
@@ -124,7 +133,7 @@ int grpc_stream_infer_thread_cnt_ = 1;
 // requests doesn't exceed this value there will be no
 // allocation/deallocation of request/response objects.
 int grpc_infer_allocation_pool_size_ = 8;
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 
 #ifdef TRTIS_ENABLE_HTTP
 // The number of threads to initialize for the HTTP front-end.
@@ -151,13 +160,14 @@ enum OptionId {
   OPTION_HTTP_HEALTH_PORT,
   OPTION_HTTP_THREAD_COUNT,
 #endif  // TRTIS_ENABLE_HTTP
-#ifdef TRTIS_ENABLE_GRPC
+#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
   OPTION_ALLOW_GRPC,
+  OPTION_GRPC_API_VERSION,
   OPTION_GRPC_PORT,
   OPTION_GRPC_INFER_THREAD_COUNT,
   OPTION_GRPC_STREAM_INFER_THREAD_COUNT,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 #ifdef TRTIS_ENABLE_METRICS
   OPTION_ALLOW_METRICS,
   OPTION_ALLOW_GPU_METRICS,
@@ -200,138 +210,146 @@ struct Option {
   const bool has_arg_;
 };
 
-std::vector<Option> options_{
-    {OPTION_HELP, "help", "Print usage", false},
+std::vector<Option> options_
+{
+  {OPTION_HELP, "help", "Print usage", false},
 #ifdef TRTIS_ENABLE_LOGGING
-    {OPTION_LOG_VERBOSE, "log-verbose",
-     "Set verbose logging level. Zero (0) disables verbose logging and values "
-     ">= 1 enable verbose logging"},
-    {OPTION_LOG_INFO, "log-info", "Enable/disable info-level logging"},
-    {OPTION_LOG_WARNING, "log-warning", "Enable/disable warning-level logging"},
-    {OPTION_LOG_ERROR, "log-error", "Enable/disable error-level logging"},
+      {OPTION_LOG_VERBOSE, "log-verbose",
+       "Set verbose logging level. Zero (0) disables verbose logging and "
+       "values >= 1 enable verbose logging"},
+      {OPTION_LOG_INFO, "log-info", "Enable/disable info-level logging"},
+      {OPTION_LOG_WARNING, "log-warning",
+       "Enable/disable warning-level logging"},
+      {OPTION_LOG_ERROR, "log-error", "Enable/disable error-level logging"},
 #endif  // TRTIS_ENABLE_LOGGING
-    {OPTION_ID, "id", "Identifier for this server"},
-    {OPTION_MODEL_REPOSITORY, "model-store",
-     "Path to model repository directory. It may be specified multiple times "
-     "to add multiple model repositories. Note that if a model is not unique "
-     "across all model repositories at any time, the model will not be "
-     "available."
-     "This option is deprecated, the preferred usage is --model-repository"},
-    {OPTION_MODEL_REPOSITORY, "model-repository",
-     "Path to model repository directory. It may be specified multiple times "
-     "to add multiple model repositories. Note that if a model is not unique "
-     "across all model repositories at any time, the model will not be "
-     "available."},
-    {OPTION_EXIT_ON_ERROR, "exit-on-error",
-     "Exit the inference server if an error occurs during initialization."},
-    {OPTION_STRICT_MODEL_CONFIG, "strict-model-config",
-     "If true model configuration files must be provided and all required "
-     "configuration settings must be specified. If false the model "
-     "configuration may be absent or only partially specified and the "
-     "server will attempt to derive the missing required configuration."},
-    {OPTION_STRICT_READINESS, "strict-readiness",
-     "If true /api/health/ready endpoint indicates ready if the server "
-     "is responsive and all models are available. If false "
-     "/api/health/ready endpoint indicates ready if server is responsive "
-     "even if some/all models are unavailable."},
+      {OPTION_ID, "id", "Identifier for this server"},
+      {OPTION_MODEL_REPOSITORY, "model-store",
+       "Path to model repository directory. It may be specified multiple times "
+       "to add multiple model repositories. Note that if a model is not unique "
+       "across all model repositories at any time, the model will not be "
+       "available. This option is deprecated, the preferred usage is "
+       "--model-repository"},
+      {OPTION_MODEL_REPOSITORY, "model-repository",
+       "Path to model repository directory. It may be specified multiple times "
+       "to add multiple model repositories. Note that if a model is not unique "
+       "across all model repositories at any time, the model will not be "
+       "available."},
+      {OPTION_EXIT_ON_ERROR, "exit-on-error",
+       "Exit the inference server if an error occurs during initialization."},
+      {OPTION_STRICT_MODEL_CONFIG, "strict-model-config",
+       "If true model configuration files must be provided and all required "
+       "configuration settings must be specified. If false the model "
+       "configuration may be absent or only partially specified and the "
+       "server will attempt to derive the missing required configuration."},
+      {OPTION_STRICT_READINESS, "strict-readiness",
+       "If true /api/health/ready endpoint indicates ready if the server "
+       "is responsive and all models are available. If false "
+       "/api/health/ready endpoint indicates ready if server is responsive "
+       "even if some/all models are unavailable."},
 #ifdef TRTIS_ENABLE_HTTP
-    {OPTION_ALLOW_HTTP, "allow-http",
-     "Allow the server to listen for HTTP requests."},
-    {OPTION_HTTP_PORT, "http-port",
-     "The port for the server to listen on for HTTP requests."},
-    {OPTION_HTTP_HEALTH_PORT, "http-health-port",
-     "The port for the server to listen on for HTTP Health requests."},
-    {OPTION_HTTP_THREAD_COUNT, "http-thread-count",
-     "Number of threads handling HTTP requests."},
+      {OPTION_ALLOW_HTTP, "allow-http",
+       "Allow the server to listen for HTTP requests."},
+      {OPTION_HTTP_PORT, "http-port",
+       "The port for the server to listen on for HTTP requests."},
+      {OPTION_HTTP_HEALTH_PORT, "http-health-port",
+       "The port for the server to listen on for HTTP Health requests."},
+      {OPTION_HTTP_THREAD_COUNT, "http-thread-count",
+       "Number of threads handling HTTP requests."},
 #endif  // TRTIS_ENABLE_HTTP
-#ifdef TRTIS_ENABLE_GRPC
-    {OPTION_ALLOW_GRPC, "allow-grpc",
-     "Allow the server to listen for GRPC requests."},
-    {OPTION_GRPC_PORT, "grpc-port",
-     "The port for the server to listen on for GRPC requests."},
-    {OPTION_GRPC_INFER_THREAD_COUNT, "grpc-infer-thread-count",
-     "Number of threads handling GRPC inference requests."},
-    {OPTION_GRPC_STREAM_INFER_THREAD_COUNT, "grpc-stream-infer-thread-count",
-     "Number of threads handling GRPC stream inference requests."},
-    {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE, "grpc-infer-allocation-pool-size",
-     "The maximum number of inference request/response objects that remain "
-     "allocated for reuse. As long as the number of in-flight requests doesn't "
-     "exceed this value there will be no allocation/deallocation of "
-     "request/response objects."},
-#endif  // TRTIS_ENABLE_GRPC
+#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
+      {OPTION_ALLOW_GRPC, "allow-grpc",
+       "Allow the server to listen for GRPC requests."},
+      {OPTION_GRPC_API_VERSION, "grpc-api-version",
+       "Version of the GRPC API to use. Default is version 1. Allowed versions are 1 and 2."},
+      {OPTION_GRPC_PORT, "grpc-port",
+       "The port for the server to listen on for GRPC requests."},
+      {OPTION_GRPC_INFER_THREAD_COUNT, "grpc-infer-thread-count",
+       "Number of threads handling GRPC inference requests."},
+      {OPTION_GRPC_STREAM_INFER_THREAD_COUNT, "grpc-stream-infer-thread-count",
+       "Number of threads handling GRPC stream inference requests."},
+      {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
+       "grpc-infer-allocation-pool-size",
+       "The maximum number of inference request/response objects that remain "
+       "allocated for reuse. As long as the number of in-flight requests "
+       "doesn't exceed this value there will be no allocation/deallocation of "
+       "request/response objects."},
+#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 #ifdef TRTIS_ENABLE_METRICS
-    {OPTION_ALLOW_METRICS, "allow-metrics",
-     "Allow the server to provide prometheus metrics."},
-    {OPTION_ALLOW_GPU_METRICS, "allow-gpu-metrics",
-     "Allow the server to provide GPU metrics. Ignored unless --allow-metrics "
-     "is true."},
-    {OPTION_METRICS_PORT, "metrics-port",
-     "The port reporting prometheus metrics."},
+      {OPTION_ALLOW_METRICS, "allow-metrics",
+       "Allow the server to provide prometheus metrics."},
+      {OPTION_ALLOW_GPU_METRICS, "allow-gpu-metrics",
+       "Allow the server to provide GPU metrics. Ignored unless "
+       "--allow-metrics is true."},
+      {OPTION_METRICS_PORT, "metrics-port",
+       "The port reporting prometheus metrics."},
 #endif  // TRTIS_ENABLE_METRICS
 #ifdef TRTIS_ENABLE_TRACING
-    {OPTION_TRACE_FILEPATH, "trace-file",
-     "Set the file where trace output will be saved."},
-    {OPTION_TRACE_LEVEL, "trace-level",
-     "Set the trace level. OFF to disable tracing, MIN for minimal tracing, "
-     "MAX for maximal tracing. Default is OFF."},
-    {OPTION_TRACE_RATE, "trace-rate",
-     "Set the trace sampling rate. Default is 1000."},
+      {OPTION_TRACE_FILEPATH, "trace-file",
+       "Set the file where trace output will be saved."},
+      {OPTION_TRACE_LEVEL, "trace-level",
+       "Set the trace level. OFF to disable tracing, MIN for minimal tracing, "
+       "MAX for maximal tracing. Default is OFF."},
+      {OPTION_TRACE_RATE, "trace-rate",
+       "Set the trace sampling rate. Default is 1000."},
 #endif  // TRTIS_ENABLE_TRACING
-    {OPTION_MODEL_CONTROL_MODE, "model-control-mode",
-     "Specify the mode for model management. Options are \"none\", \"poll\" "
-     "and \"explicit\". The default is \"poll\". "
-     "For \"none\", the server will load all models in the model repositories "
-     "only once at startup. For \"poll\", the server will poll the model "
-     "repository to detect changes. The poll rate is controlled by "
-     "'repository-poll-secs'. For \"explicit\", the model load and unload is "
-     "initiated by using the model control APIs, and the models in the model "
-     "repository will not be loaded at startup, unless the model is specified "
-     "by --load-model."},
-    {OPTION_ALLOW_POLL_REPO, "allow-poll-model-repository",
-     "[DEPRECATED] Poll the model repository to detect changes. The poll rate "
-     "is controlled by 'repository-poll-secs'. This option is deprecated by "
-     "--model-control-mode, this option can not be specified if "
-     "--model-control-mode is specified."},
-    {OPTION_POLL_REPO_SECS, "repository-poll-secs",
-     "Interval in seconds between each poll of the model repository to check "
-     "for changes. Valid only when "
-     "--allow-poll-model-repository=true is specified."},
-    {OPTION_ALLOW_MODEL_CONTROL, "allow-model-control",
-     "[DEPRECATED] Allow to load or to unload models explicitly using model "
-     "control API. If true the models in the model repository will not be "
-     "loaded at startup, unless the model is specified by --load-model. Cannot "
-     "be specified if --allow-poll-model-repository is true. This option is "
-     "deprecated by --model-control-mode, this option can not be specified if "
-     "--model-control-mode is specified."},
-    {OPTION_STARTUP_MODEL, "load-model",
-     "Name of the model to be loaded on server startup. It may be specified "
-     "multiple times to add multiple models. Note that this option will only "
-     "take affect if --allow-model-control is true."},
-    {OPTION_PINNED_MEMORY_POOL_BYTE_SIZE, "pinned-memory-pool-byte-size",
-     "The total byte size that can be allocated as pinned system memory. "
-     "If GPU support is enabled, the server will allocate pinned system memory "
-     "to accelerate data transfer between host and devices until it exceeds "
-     "the specified byte size. This option will not affect the allocation "
-     "conducted by the backend frameworks. Default is 256 MB."},
-    {OPTION_EXIT_TIMEOUT_SECS, "exit-timeout-secs",
-     "Timeout (in seconds) when exiting to wait for in-flight inferences to "
-     "finish. After the timeout expires the server exits even if inferences "
-     "are still in flight."},
-    {OPTION_TF_ALLOW_SOFT_PLACEMENT, "tf-allow-soft-placement",
-     "Instruct TensorFlow to use CPU implementation of an operation when "
-     "a GPU implementation is not available."},
-    {OPTION_TF_GPU_MEMORY_FRACTION, "tf-gpu-memory-fraction",
-     "Reserve a portion of GPU memory for TensorFlow models. Default "
-     "value 0.0 indicates that TensorFlow should dynamically allocate "
-     "memory as needed. Value of 1.0 indicates that TensorFlow should "
-     "allocate all of GPU memory."},
-    {OPTION_TF_ADD_VGPU, "tf-add-vgpu",
-     "Add a tensorflow virtual GPU instances on a physical GPU. Input "
-     "should be 2 integers and 1 float separated by semicolons in the format "
-     "<physical GPU>;<number of virtual GPUs>;<memory limit per VGPU in "
-     "megabytes>. This option can be used multiple times, but only once per "
-     "physical GPU device. Subsequent uses will overwrite previous uses with "
-     "the same physical device. By default, no VGPUs are enabled."}};
+      {OPTION_MODEL_CONTROL_MODE, "model-control-mode",
+       "Specify the mode for model management. Options are \"none\", \"poll\" "
+       "and \"explicit\". The default is \"poll\". "
+       "For \"none\", the server will load all models in the model "
+       "repositories only once at startup. For \"poll\", the server will poll "
+       "the model repository to detect changes. The poll rate is controlled by "
+       "'repository-poll-secs'. For \"explicit\", the model load and unload is "
+       "initiated by using the model control APIs, and the models in the model "
+       "repository will not be loaded at startup, unless the model is "
+       "specified by --load-model."},
+      {OPTION_ALLOW_POLL_REPO, "allow-poll-model-repository",
+       "[DEPRECATED] Poll the model repository to detect changes. The poll "
+       "rate is controlled by 'repository-poll-secs'. This option is "
+       "deprecated by --model-control-mode, this option can not be specified "
+       "if --model-control-mode is specified."},
+      {OPTION_POLL_REPO_SECS, "repository-poll-secs",
+       "Interval in seconds between each poll of the model repository to check "
+       "for changes. Valid only when --allow-poll-model-repository=true is "
+       "specified."},
+      {OPTION_ALLOW_MODEL_CONTROL, "allow-model-control",
+       "[DEPRECATED] Allow to load or to unload models explicitly using model "
+       "control API. If true the models in the model repository will not be "
+       "loaded at startup, unless the model is specified by --load-model. "
+       "Cannot be specified if --allow-poll-model-repository is true. This "
+       "option is deprecated by --model-control-mode, this option can not be "
+       "specified if --model-control-mode is specified."},
+      {OPTION_STARTUP_MODEL, "load-model",
+       "Name of the model to be loaded on server startup. It may be specified "
+       "multiple times to add multiple models. Note that this option will only "
+       "take affect if --allow-model-control is true."},
+      {OPTION_PINNED_MEMORY_POOL_BYTE_SIZE, "pinned-memory-pool-byte-size",
+       "The total byte size that can be allocated as pinned system memory. "
+       "If GPU support is enabled, the server will allocate pinned system "
+       "memory to accelerate data transfer between host and devices until it "
+       "exceeds the specified byte size. This option will not affect the "
+       "allocation conducted by the backend frameworks. Default is 256 MB."},
+      {OPTION_EXIT_TIMEOUT_SECS, "exit-timeout-secs",
+       "Timeout (in seconds) when exiting to wait for in-flight inferences to "
+       "finish. After the timeout expires the server exits even if inferences "
+       "are still in flight."},
+      {OPTION_TF_ALLOW_SOFT_PLACEMENT, "tf-allow-soft-placement",
+       "Instruct TensorFlow to use CPU implementation of an operation when "
+       "a GPU implementation is not available."},
+      {OPTION_TF_GPU_MEMORY_FRACTION, "tf-gpu-memory-fraction",
+       "Reserve a portion of GPU memory for TensorFlow models. Default "
+       "value 0.0 indicates that TensorFlow should dynamically allocate "
+       "memory as needed. Value of 1.0 indicates that TensorFlow should "
+       "allocate all of GPU memory."},
+  {
+    OPTION_TF_ADD_VGPU, "tf-add-vgpu",
+        "Add a tensorflow virtual GPU instances on a physical GPU. Input "
+        "should be 2 integers and 1 float separated by semicolons in the "
+        "format <physical GPU>;<number of virtual GPUs>;<memory limit per VGPU "
+        "in megabytes>. This option can be used multiple times, but only once "
+        "per physical GPU device. Subsequent uses will overwrite previous uses "
+        "with the same physical device. By default, no VGPUs are enabled."
+  }
+};
 
 void
 SignalHandler(int signum)
@@ -355,7 +373,8 @@ SignalHandler(int signum)
 bool
 CheckPortCollision()
 {
-#if defined(TRTIS_ENABLE_HTTP) && defined(TRTIS_ENABLE_GRPC)
+#if defined(TRTIS_ENABLE_HTTP) && \
+    (defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2))
   // Check if HTTP and GRPC have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), grpc_port_) !=
        http_ports_.end()) &&
@@ -364,9 +383,10 @@ CheckPortCollision()
               << "and GRPC requests at the same port" << std::endl;
     return true;
   }
-#endif  // TRTIS_ENABLE_HTTP && TRTIS_ENABLE_GRPC
+#endif  // TRTIS_ENABLE_HTTP && (TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2)
 
-#if defined(TRTIS_ENABLE_GRPC) && defined(TRTIS_ENABLE_METRICS)
+#if (defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)) && \
+    defined(TRTIS_ENABLE_METRICS)
   // Check if Metric and GRPC have shared ports
   if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1) && allow_grpc_ &&
       allow_metrics_) {
@@ -374,7 +394,7 @@ CheckPortCollision()
               << "GRPC requests" << std::endl;
     return true;
   }
-#endif  // TRTIS_ENABLE_GRPC && TRTIS_ENABLE_METRICS
+#endif  // (TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2) && TRTIS_ENABLE_METRICS
 
 #if defined(TRTIS_ENABLE_HTTP) && defined(TRTIS_ENABLE_METRICS)
   // Check if Metric and HTTP have shared ports
@@ -413,6 +433,30 @@ StartGrpcService(
   return err;
 }
 #endif  // TRTIS_ENABLE_GRPC
+
+#ifdef TRTIS_ENABLE_GRPC_V2
+TRTSERVER_Error*
+StartGrpcServiceV2(
+    std::unique_ptr<nvidia::inferenceserver::GRPCServerV2>* service,
+    const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
+    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>&
+        smb_manager)
+{
+  TRTSERVER_Error* err = nvidia::inferenceserver::GRPCServerV2::Create(
+      server, trace_manager, smb_manager, grpc_port_, grpc_infer_thread_cnt_,
+      grpc_stream_infer_thread_cnt_, grpc_infer_allocation_pool_size_, service);
+  if (err == nullptr) {
+    err = (*service)->Start();
+  }
+
+  if (err != nullptr) {
+    service->reset();
+  }
+
+  return err;
+}
+#endif  // TRTIS_ENABLE_GRPC_V2
 
 #ifdef TRTIS_ENABLE_HTTP
 TRTSERVER_Error*
@@ -479,7 +523,7 @@ StartEndpoints(
 
 #ifdef TRTIS_ENABLE_GRPC
   // Enable GRPC endpoints if requested...
-  if (allow_grpc_ && (grpc_port_ != -1)) {
+  if (allow_grpc_ && (grpc_api_version_ == 1) && (grpc_port_ != -1)) {
     TRTSERVER_Error* err =
         StartGrpcService(&grpc_service_, server, trace_manager, smb_manager);
     if (err != nullptr) {
@@ -488,6 +532,18 @@ StartEndpoints(
     }
   }
 #endif  // TRTIS_ENABLE_GRPC
+
+#ifdef TRTIS_ENABLE_GRPC_V2
+  // Enable GRPC V2 endpoints if requested...
+  if (allow_grpc_ && (grpc_api_version_ == 2) && (grpc_port_ != -1)) {
+    TRTSERVER_Error* err = StartGrpcServiceV2(
+        &grpc_service_v2_, server, trace_manager, smb_manager);
+    if (err != nullptr) {
+      LOG_TRTSERVER_ERROR(err, "failed to start GRPC V2 service");
+      return false;
+    }
+  }
+#endif  // TRTIS_ENABLE_GRPC_V2
 
 #ifdef TRTIS_ENABLE_HTTP
   // Enable HTTP endpoints if requested...
@@ -554,6 +610,18 @@ StopEndpoints()
     grpc_service_.reset();
   }
 #endif  // TRTIS_ENABLE_GRPC
+
+#ifdef TRTIS_ENABLE_GRPC_V2
+  if (grpc_service_v2_) {
+    TRTSERVER_Error* err = grpc_service_v2_->Stop();
+    if (err != nullptr) {
+      LOG_TRTSERVER_ERROR(err, "failed to stop GRPC V2 service");
+      ret = false;
+    }
+
+    grpc_service_v2_.reset();
+  }
+#endif  // TRTIS_ENABLE_GRPC_V2
 
 #ifdef TRTIS_ENABLE_METRICS
   if (metrics_service_) {
@@ -789,12 +857,17 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   int32_t http_health_port = http_port_;
 #endif  // TRTIS_ENABLE_HTTP
 
+#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
 #ifdef TRTIS_ENABLE_GRPC
+  int32_t grpc_api_version = 1;
+#else
+  int32_t grpc_api_version = 2;
+#endif  // TRTIS_ENABLE_GRPC
   int32_t grpc_port = grpc_port_;
   int32_t grpc_infer_thread_cnt = grpc_infer_thread_cnt_;
   int32_t grpc_stream_infer_thread_cnt = grpc_stream_infer_thread_cnt_;
   int32_t grpc_infer_allocation_pool_size = grpc_infer_allocation_pool_size_;
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 
 #ifdef TRTIS_ENABLE_METRICS
   int32_t metrics_port = metrics_port_;
@@ -883,9 +956,12 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
         break;
 #endif  // TRTIS_ENABLE_HTTP
 
-#ifdef TRTIS_ENABLE_GRPC
+#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
       case OPTION_ALLOW_GRPC:
         allow_grpc_ = ParseBoolOption(optarg);
+        break;
+      case OPTION_GRPC_API_VERSION:
+        grpc_api_version = ParseIntOption(optarg);
         break;
       case OPTION_GRPC_PORT:
         grpc_port = ParseIntOption(optarg);
@@ -899,7 +975,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       case OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE:
         grpc_infer_allocation_pool_size = ParseIntOption(optarg);
         break;
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 
 #ifdef TRTIS_ENABLE_METRICS
       case OPTION_ALLOW_METRICS:
@@ -1042,12 +1118,13 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   http_thread_cnt_ = http_thread_cnt;
 #endif  // TRTIS_ENABLE_HTTP
 
-#ifdef TRTIS_ENABLE_GRPC
+#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
+  grpc_api_version_ = grpc_api_version;
   grpc_port_ = grpc_port;
   grpc_infer_thread_cnt_ = grpc_infer_thread_cnt;
   grpc_stream_infer_thread_cnt_ = grpc_stream_infer_thread_cnt;
   grpc_infer_allocation_pool_size_ = grpc_infer_allocation_pool_size;
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 
 #ifdef TRTIS_ENABLE_METRICS
   metrics_port_ = allow_metrics_ ? metrics_port : -1;
@@ -1123,7 +1200,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetGpuMetrics(server_options, allow_gpu_metrics),
       "setting GPU metrics enable");
-#endif  // TRTIS_ENABLE_GRPC
+#endif  // TRTIS_ENABLE_METRICS
 
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetTensorFlowSoftPlacement(

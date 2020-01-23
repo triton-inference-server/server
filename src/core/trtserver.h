@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -933,6 +933,29 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerStop(
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerId(
     TRTSERVER_Server* server, const char** id);
+
+/// Get the version of the server. The caller does not own the
+/// returned string and must not modify or delete it. The lifetime of
+/// the returned string extends only as long as 'server' and must not
+/// be accessed once 'server' is deleted.
+/// \param server The inference server object.
+/// \param version Returns the server version as a string.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerVersion(
+    TRTSERVER_Server* server, const char** version);
+
+/// Get the extensions supported by the server. The caller does not
+/// own the returned strings and must not modify or delete them. The
+/// lifetime of the returned strings extends only as long as 'server'
+/// and must not be accessed once 'server' is deleted.
+/// \param server The inference server object.
+/// \param extensions Returns the server extensions as an array of
+/// pointers to the name of each extension.
+/// \param extensions_count Returns the number of server extensions.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerExtensions(
+    TRTSERVER_Server* server, const char* const** extensions,
+    uint64_t* extensions_count);
 
 /// Check the model repository for changes and update server state
 /// based on those changes.

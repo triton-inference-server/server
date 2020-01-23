@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -126,6 +126,9 @@ class InferenceServer {
   // Return the server version.
   const std::string& Version() const { return version_; }
 
+  // Return the server extensions.
+  const std::vector<const char*>& Extensions() const { return extensions_; }
+
   // Get / set the ID of the server.
   const std::string& Id() const { return id_; }
   void SetId(const std::string& id) { id_ = id; }
@@ -214,8 +217,10 @@ class InferenceServer {
   // Return the uptime of the server in nanoseconds.
   uint64_t UptimeNs() const;
 
-  std::string version_;
+  const std::string version_;
   std::string id_;
+  std::vector<const char*> extensions_;
+
   uint64_t start_time_ns_;
 
   std::set<std::string> model_repository_paths_;

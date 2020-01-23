@@ -27,6 +27,7 @@
 
 #include <iostream>
 #include "src/core/api.pb.h"
+#include "src/core/model_config.pb.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/trtserver.h"
 
@@ -105,5 +106,7 @@ TRTSERVER_Error* SetTRTSERVER_InferenceRequestOptions(
     InferRequestHeader request_header_protobuf);
 
 std::string MemoryTypeString(TRTSERVER_Memory_Type memory_type);
+
+const char* GetDataTypeProtocolString(const DataType dtype);
 
 }}  // namespace nvidia::inferenceserver

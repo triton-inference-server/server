@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -147,6 +147,43 @@ MemoryTypeString(TRTSERVER_Memory_Type memory_type)
     default:
       return "unknown memory type";
   }
+}
+
+const char*
+GetDataTypeProtocolString(const DataType dtype)
+{
+  switch (dtype) {
+    case TYPE_BOOL:
+      return "BOOL";
+    case TYPE_UINT8:
+      return "UINT8";
+    case TYPE_UINT16:
+      return "UINT16";
+    case TYPE_UINT32:
+      return "UINT32";
+    case TYPE_UINT64:
+      return "UINT64";
+    case TYPE_INT8:
+      return "INT8";
+    case TYPE_INT16:
+      return "INT16";
+    case TYPE_INT32:
+      return "INT32";
+    case TYPE_INT64:
+      return "INT64";
+    case TYPE_FP16:
+      return "FP16";
+    case TYPE_FP32:
+      return "FP32";
+    case TYPE_FP64:
+      return "FP64";
+    case TYPE_STRING:
+      return "STRING";
+    default:
+      break;
+  }
+
+  return "";
 }
 
 }}  // namespace nvidia::inferenceserver
