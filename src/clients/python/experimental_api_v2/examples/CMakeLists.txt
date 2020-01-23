@@ -26,10 +26,8 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-if(TRTIS_ENABLE_PYCLIENT_V2)
-    add_subdirectory(experimental_api_v2/library)
-    add_subdirectory(experimental_api_v2/examples)
-else()
-    add_subdirectory(api_v1/library)
-    add_subdirectory(api_v1/examples)
-endif()
+install(
+  PROGRAMS
+    simple_client.py
+  DESTINATION python
+)

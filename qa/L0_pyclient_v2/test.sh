@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,12 +25,57 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.5)
+REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
 
-if(TRTIS_ENABLE_PYCLIENT_V2)
-    add_subdirectory(experimental_api_v2/library)
-    add_subdirectory(experimental_api_v2/examples)
-else()
-    add_subdirectory(api_v1/library)
-    add_subdirectory(api_v1/examples)
-endif()
+DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository/
+
+CLIENT_LOG="./client.log"
+SIMPLE_CLIENT=../clients/simple_client.py
+
+SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./inference_server.log"
+source ../common/util.sh
+
+rm -f ./*.log
+rm -fr models && mkdir -p models
+cp -r $DATADIR/savedmodel_float32_float32_float32 models/
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+RET=0
+
+set +e
+python3 $SIMPLE_CLIENT  -u 127.0.0.1:8000 -i http >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG | grep "SUCCESS" | wc -l) -ne 2 ]; then
+        RET=1
+    fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** Test Passed\n***"
+else
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+exit $RET
