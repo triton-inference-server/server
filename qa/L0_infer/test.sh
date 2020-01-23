@@ -70,9 +70,6 @@ fi
 # If ENSEMBLES not specified, set to 1
 if [ -z "$ENSEMBLES" ]; then
     ENSEMBLES="1"
-    echo -e "\n***\n*** ENSEMBLES must be 0 when not using all BACKENDS\n***"
-    echo -e "\n***\n*** Enabling all BACKENDS\n***"
-    BACKENDS="graphdef savedmodel netdef onnx libtorch plan custom"
 fi
 
 for TARGET in cpu gpu; do
@@ -102,15 +99,23 @@ for TARGET in cpu gpu; do
     done
 
     if [ "$ENSEMBLES" == "1" ]; then
-      cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/* \
-        models/.
-
-      create_nop_modelfile `pwd`/libidentity.so `pwd`/models
-
-      for EM in `ls ../ensemble_models`; do
-          mkdir -p ../ensemble_models/$EM/1
+      for BACKEND in $BACKENDS; do
+        if [ "$BACKEND" != "custom" ]; then
+            cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
+              models/.
+        fi
       done
-      cp -r ../ensemble_models/* models/.
+
+      if [[ $BACKENDS == *"custom"* ]]; then
+        create_nop_modelfile `pwd`/libidentity.so `pwd`/models
+
+        if [[ $BACKENDS == *"graphdef"* ]]; then
+          for EM in `ls ../ensemble_models`; do
+              mkdir -p ../ensemble_models/$EM/1
+          done
+          cp -r ../ensemble_models/* models/.
+        fi
+      fi
     fi
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"

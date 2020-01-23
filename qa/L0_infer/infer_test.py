@@ -42,9 +42,6 @@ CPU_ONLY = (os.environ.get('TENSORRT_SERVER_CPU_ONLY') is not None)
 BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel netdef onnx libtorch plan custom")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 
-if ENSEMBLES:
-    BACKENDS="graphdef savedmodel netdef onnx libtorch plan custom"
-
 np_dtype_string = np.dtype(object)
 
 class InferTest(unittest.TestCase):
@@ -83,7 +80,7 @@ class InferTest(unittest.TestCase):
 
         all_ensemble_prefix = ["simple_", "sequence_", "fan_"]
         ensemble_prefix = [""]
-        if ENSEMBLES:
+        if ENSEMBLES and ("custom" in BACKENDS):
             for prefix in all_ensemble_prefix:
                 if tu.validate_for_ensemble_model(prefix,
                                         input_dtype, output0_dtype, output1_dtype,
@@ -414,82 +411,90 @@ class InferTest(unittest.TestCase):
                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
     if ENSEMBLES:
-        def test_ensemble_mix_platform(self):
-            # Skip on CPU only machine as TensorRT model is used in this ensemble
-            if CPU_ONLY:
-                return
-            for bs in (1, 8):
-                iu.infer_exact(self, "mix_platform", (16,), bs,
-                    np.float32, np.float32, np.float32,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-
-        def test_ensemble_mix_type(self):
-            for bs in (1, 8):
-                iu.infer_exact(self, "mix_type", (16,), bs,
-                    np.int32, np.float32, np.float32,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-
-        def test_ensemble_mix_ensemble(self):
-            for bs in (1, 8):
-                iu.infer_exact(self, "mix_ensemble", (16,), bs,
-                    np.int32, np.float32, np.float32,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-
-        def test_ensemble_mix_batch_nobatch(self):
-            base_names = ["batch_to_nobatch", "nobatch_to_batch"]
-            for name in base_names:
+        if all(x in BACKENDS for x in ['graphdef', 'netdef', 'savedmodel']):
+            def test_ensemble_mix_platform(self):
+                # Skip on CPU only machine as TensorRT model is used in this ensemble
+                if CPU_ONLY:
+                    return
                 for bs in (1, 8):
-                    iu.infer_exact(self, name, (16,), bs,
+                    iu.infer_exact(self, "mix_platform", (16,), bs,
                         np.float32, np.float32, np.float32,
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-                iu.infer_exact(self, name + "_nobatch", (8, 16,), 1,
-                    np.float32, np.float32, np.float32,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-            # batch -> nobatch -> batch
-            for bs in (1, 8):
-                iu.infer_exact(self, "mix_nobatch_batch", (16,), bs,
-                    np.float32, np.float32, np.float32,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+        if "graphdef" in BACKENDS:
+            def test_ensemble_mix_type(self):
+                for bs in (1, 8):
+                    iu.infer_exact(self, "mix_type", (16,), bs,
+                        np.int32, np.float32, np.float32,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+
+        if all(x in BACKENDS for x in ['graphdef', 'netdef', 'savedmodel']):
+            def test_ensemble_mix_ensemble(self):
+                for bs in (1, 8):
+                    iu.infer_exact(self, "mix_ensemble", (16,), bs,
+                        np.int32, np.float32, np.float32,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+
+        if all(x in BACKENDS for x in ['graphdef', 'custom']):
+            def test_ensemble_mix_batch_nobatch(self):
+                base_names = ["batch_to_nobatch", "nobatch_to_batch"]
+                for name in base_names:
+                    for bs in (1, 8):
+                        iu.infer_exact(self, name, (16,), bs,
+                            np.float32, np.float32, np.float32,
+                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                    iu.infer_exact(self, name + "_nobatch", (8, 16,), 1,
+                        np.float32, np.float32, np.float32,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+
+                # batch -> nobatch -> batch
+                for bs in (1, 8):
+                    iu.infer_exact(self, "mix_nobatch_batch", (16,), bs,
+                        np.float32, np.float32, np.float32,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
     if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
         def test_ensemble_label_lookup(self):
-            # Ensemble needs to look up label from the actual model
-            for bs in (1, 8):
-                iu.infer_exact(self, "mix_platform", (16,), bs,
-                    np.float32, np.float32, np.float32, output0_raw=False, output1_raw=False,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+            if all(x in BACKENDS for x in ['graphdef', 'netdef', 'savedmodel']):
+                # Ensemble needs to look up label from the actual model
+                for bs in (1, 8):
+                    iu.infer_exact(self, "mix_platform", (16,), bs,
+                        np.float32, np.float32, np.float32, output0_raw=False, output1_raw=False,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-            # Label from the actual model will be passed along the nested ensemble
-            for bs in (1, 8):
-                iu.infer_exact(self, "mix_ensemble", (16,), bs,
-                    np.int32, np.float32, np.float32, output0_raw=False, output1_raw=False,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+            if all(x in BACKENDS for x in ['graphdef', 'netdef', 'savedmodel']):
+                # Label from the actual model will be passed along the nested ensemble
+                for bs in (1, 8):
+                    iu.infer_exact(self, "mix_ensemble", (16,), bs,
+                        np.int32, np.float32, np.float32, output0_raw=False, output1_raw=False,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-            # If label file is provided, it will use the provided label file directly
-            try:
-                iu.infer_exact(self, "wrong_label", (16,), 1,
-                    np.int32, np.float32, np.float32, output0_raw=False, output1_raw=False,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            except AssertionError:
-                # Sanity check that infer_exact failed since this ensemble is provided
-                # with unexpected labels
-                pass
+            if "graphdef" in BACKENDS:
+                # If label file is provided, it will use the provided label file directly
+                try:
+                    iu.infer_exact(self, "wrong_label", (16,), 1,
+                        np.int32, np.float32, np.float32, output0_raw=False, output1_raw=False,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                except AssertionError:
+                    # Sanity check that infer_exact failed since this ensemble is provided
+                    # with unexpected labels
+                    pass
 
-            for bs in (1, 8):
-                iu.infer_exact(self, "label_override", (16,), bs,
-                    np.int32, np.float32, np.float32, output0_raw=False, output1_raw=False,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+            if "graphdef" in BACKENDS:
+                for bs in (1, 8):
+                    iu.infer_exact(self, "label_override", (16,), bs,
+                        np.int32, np.float32, np.float32, output0_raw=False, output1_raw=False,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
 
 if __name__ == '__main__':
