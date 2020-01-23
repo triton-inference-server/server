@@ -25,9 +25,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
-#include <event2/buffer.h>
-#endif
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
 #include "src/core/grpc_service.pb.h"
