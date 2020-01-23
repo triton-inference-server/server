@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -206,46 +206,6 @@ ExternalProject_Add(curl
 )
 
 #
-# Build libevent
-#
-ExternalProject_Add(libevent
-  PREFIX libevent
-  GIT_REPOSITORY "https://github.com/libevent/libevent.git"
-  GIT_TAG "release-2.1.8-stable"
-  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/libevent/src/libevent"
-  CMAKE_CACHE_ARGS
-    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
-    -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
-    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install
-)
-
-#
-# Build libevhtp
-#
-# Need to patch due to https://github.com/criticalstack/libevhtp/issues/135
-#
-ExternalProject_Add(libevhtp
-  PREFIX libevhtp
-  URL "https://github.com/criticalstack/libevhtp/archive/1.2.18.zip"
-  URL_HASH SHA256=3194dc6eb4e8d6aa1e7dd3dc60bfbe066f38f9a0b5881463f0e149badd82a7bb
-  PATCH_COMMAND sed -i "s/LibEvent/Libevent/g" ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/CMakeLists.txt
-  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/evhtp.c.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/evhtp.c
-  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/evhtp.h.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/include/evhtp/evhtp.h
-  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/config.h.in.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/include/evhtp/config.h.in
-  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp"
-  CMAKE_CACHE_ARGS
-    -DEVHTP_DISABLE_REGEX:BOOL=ON
-    -DEVHTP_DISABLE_SSL:BOOL=ON
-    -DEVHTP_TRTIS_ENABLE_HTTP_CONTIGUOUS:BOOL=ON
-    -DEVHTP_TRTIS_ENABLE_TRACING:BOOL=${TRTIS_ENABLE_TRACING}
-    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
-    -DLibevent_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install/lib/cmake/libevent
-    -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
-    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevhtp/install
-  DEPENDS libevent
-)
-
-#
 # Build Prometheus C++ library
 #
 ExternalProject_Add(prometheus-cpp
@@ -426,9 +386,6 @@ endif() # TRTIS_ENABLE_GCS
 if(${TRTIS_ENABLE_S3})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} aws-sdk-cpp)
 endif() # TRTIS_ENABLE_S3
-if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
-  set(TRTIS_DEPENDS ${TRTIS_DEPENDS} libevent libevhtp)
-endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 if(${TRTIS_ENABLE_GRPC})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} grpc)
 endif() # TRTIS_ENABLE_GRPC
@@ -446,8 +403,6 @@ ExternalProject_Add(trtis
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
-    -DLibevent_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install/lib/cmake/libevent
-    -Dlibevhtp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevhtp/install/lib/cmake/libevhtp
     -Dprometheus-cpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/install/lib/cmake/prometheus-cpp
     -Dstorage_client_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/storage_client
     -Dgoogle_cloud_cpp_common_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/google_cloud_cpp_common

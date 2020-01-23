@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -43,7 +43,6 @@ class HTTPServer {
           trace_manager,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
       const std::map<int32_t, std::vector<std::string>>& port_map,
-      const int thread_cnt,
       std::vector<std::unique_ptr<HTTPServer>>* http_servers);
 
   static TRTSERVER_Error* CreateMetricsServer(

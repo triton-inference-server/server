@@ -126,11 +126,6 @@ int grpc_stream_infer_thread_cnt_ = 1;
 int grpc_infer_allocation_pool_size_ = 8;
 #endif  // TRTIS_ENABLE_GRPC
 
-#ifdef TRTIS_ENABLE_HTTP
-// The number of threads to initialize for the HTTP front-end.
-int http_thread_cnt_ = 8;
-#endif  // TRTIS_ENABLE_HTTP
-
 // Command-line options
 enum OptionId {
   OPTION_HELP = 1000,
@@ -425,7 +420,7 @@ StartHttpService(
     std::map<int32_t, std::vector<std::string>>& port_map)
 {
   TRTSERVER_Error* err = nvidia::inferenceserver::HTTPServer::CreateAPIServer(
-      server, trace_manager, smb_manager, port_map, http_thread_cnt_, services);
+      server, trace_manager, smb_manager, port_map, services);
   if (err == nullptr) {
     for (auto& http_eps : *services) {
       if (http_eps != nullptr) {
@@ -785,7 +780,6 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 
 #ifdef TRTIS_ENABLE_HTTP
   int32_t http_port = http_port_;
-  int32_t http_thread_cnt = http_thread_cnt_;
   int32_t http_health_port = http_port_;
 #endif  // TRTIS_ENABLE_HTTP
 
@@ -879,7 +873,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
         http_health_port = ParseIntOption(optarg);
         break;
       case OPTION_HTTP_THREAD_COUNT:
-        http_thread_cnt = ParseIntOption(optarg);
+        // Currently unused since thread count is not manually set for h2o;
         break;
 #endif  // TRTIS_ENABLE_HTTP
 
@@ -1039,7 +1033,6 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   http_ports_ = {http_port_, http_health_port_, http_port_,
                  http_port_, http_port_,        http_port_};
 #endif  // TRTIS_ENABLE_HTTP_V2
-  http_thread_cnt_ = http_thread_cnt;
 #endif  // TRTIS_ENABLE_HTTP
 
 #ifdef TRTIS_ENABLE_GRPC
