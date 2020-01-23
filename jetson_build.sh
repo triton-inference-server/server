@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,13 +25,13 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-TRTIS_VERSION=1.10.0jetson-dev
-
 # Git clone repo from github
-mkdir $HOME/trtis && cd ${HOME}/trtis && \
-  git clone --recursive \
+mkdir ${HOME}/trtis && cd ${HOME}/trtis && \
+  git clone --single-branch --depth=1 \
     https://github.com/NVIDIA/tensorrt-inference-server && \
   cd tensorrt-inference-server
+
+TRTIS_VERSION=`cat VERSION`
 
 # Install dependencies
 apt-get update && \
@@ -51,15 +52,12 @@ apt-get update && \
             libnuma-dev \
             libwslay-dev \
             libuv1-dev && \
-    if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
-        apt-get install -y --no-install-recommends \
-                libcurl3-dev; \
-    elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
+    if [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
                 libcurl4-openssl-dev \
                 zlib1g-dev; \
     else \
-        echo "Ubuntu version must be either 16.04 or 18.04" && \
+        echo "Ubuntu version must be 18.04" && \
         exit 1; \
     fi && \
     rm -rf /var/lib/apt/lists/*
@@ -82,7 +80,6 @@ LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcuda.s
         ln -fs /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1; \
     fi && \
     echo $LD_LIBRARY_PATH && \
-    cd ${HOME}/trtis/tensorrt-inference-server
     rm -fr builddir && mkdir -p builddir && \
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
@@ -105,5 +102,43 @@ LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcuda.s
             cp -r trtis/install/lib /opt/tensorrtserver/. && \
             cp -r trtis/install/include /opt/tensorrtserver/include/trtserver)
 
-# TODO publish this to a fixed data repository 
-tar -zcvf tensorrtserver${TRTIS_VERSION}.tgz /opt/tensorrtserver
+# Write version of jetpack installed
+if [ -f /etc/nv_tegra_release ]; then
+  JETSON_L4T_STRING=$(head -n 1 /etc/nv_tegra_release)
+  JETSON_L4T_RELEASE=$(echo $JETSON_L4T_STRING | cut -f 2 -d ' ' | grep -Po '(?<=R)[^;]+')
+  JETSON_L4T_REVISION=$(echo $JETSON_L4T_STRING | cut -f 2 -d ',' | grep -Po '(?<=REVISION: )[^;]+')
+  JETSON_L4T="$JETSON_L4T_RELEASE.$JETSON_L4T_REVISION"
+else
+  JETSON_L4T_STRING=$(dpkg-query --showformat='${Version}' --show nvidia-l4t-core)
+  JETSON_L4T=$(echo $JETSON_L4T_STRING | cut -f 1 -d '-')
+fi
+
+# https://developer.nvidia.com/embedded/jetpack-archive
+case $JETSON_L4T in
+    "32.3.1") JETPACK_VERSION="4.3" ;;
+    "32.2.1") JETPACK_VERSION="4.2.2" ;;
+    "32.2.0" | "32.2") JETPACK_VERSION="4.2.1" ;;
+    "32.1.0" | "32.1") JETPACK_VERSION="4.2" ;;
+    "31.1.0" | "31.1") JETPACK_VERSION="4.1.1" ;;
+    "31.0.2") JETPACK_VERSION="4.1" ;;
+    "31.0.1") JETPACK_VERSION="4.0" ;;
+    "28.2.1") JETPACK_VERSION="3.3 | 3.2.1" ;;
+    "28.2.0" | "28.2") JETPACK_VERSION="3.2" ;;
+    "28.1.0" | "28.1") JETPACK_VERSION="3.1" ;;
+    "27.1.0" | "27.1") JETPACK_VERSION="3.0" ;;
+    "24.2.1") JETPACK_VERSION="3.0 | 2.3.1" ;;
+    "24.2.0" | "24.2") JETPACK_VERSION="2.3" ;;
+    "24.1.0" | "24.1") JETPACK_VERSION="2.2.1 | 2.2" ;;
+    "23.2.0" | "23.2") JETPACK_VERSION="2.1" ;;
+    "23.1.0" | "23.1") JETPACK_VERSION="2.0" ;;
+    "21.5.0" | "21.5") JETPACK_VERSION="2.3.1 | 2.3" ;;
+    "21.4.0" | "21.4") JETPACK_VERSION="2.2 | 2.1 | 2.0 | DP 1.2" ;;
+    "21.3.0" | "21.3") JETPACK_VERSION="DP 1.1" ;;
+    "21.2.0" | "21.2") JETPACK_VERSION="DP 1.0" ;;
+    *) JETPACK_VERSION="UNKNOWN" ;;
+esac
+# Export Jetson Jetpack installed
+export JETPACK_VERSION
+
+# TODO publish this to a fixed data repository
+tar -zcvf tensorrtserver${TRTIS_VERSION}-jetpack-${JETPACK_VERSION}.tgz /opt/tensorrtserver
