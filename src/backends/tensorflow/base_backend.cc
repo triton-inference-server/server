@@ -556,16 +556,20 @@ BaseBackend::Context::ReadFixedSizedOutputTensor(
     const std::vector<int64_t>& shape, const size_t batch1_byte_size,
     std::vector<Scheduler::Payload>* payloads, bool* cuda_copy)
 {
-  auto content_memory_type = (TRTISTF_TensorIsGPUTensor(tensor))
-                                 ? TRTSERVER_MEMORY_GPU
-                                 : TRTSERVER_MEMORY_CPU;
+  // [TODO] make it live longer, currently okay as it is not holding anything
+  OutputInfo output;
+  output.output_buffer_ = TRTISTF_TensorData(tensor);
+  // [TODO] avoid shape copy
+  output.output_shape_ = shape;
+  output.memory_type_ = (TRTISTF_TensorIsGPUTensor(tensor))
+                            ? TRTSERVER_MEMORY_GPU
+                            : TRTSERVER_MEMORY_CPU;
+  output.memory_type_id_ =
+      (TRTISTF_TensorIsGPUTensor(tensor)) ? gpu_device_ : 0;
   LOG_VERBOSE(1) << "output '" << output_name
                  << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
-  int64_t memory_type_id =
-      (TRTISTF_TensorIsGPUTensor(tensor)) ? gpu_device_ : 0;
   *cuda_copy |= SetFixedSizeOutputBuffer(
-      output_name, batch1_byte_size, TRTISTF_TensorData(tensor), shape,
-      content_memory_type, memory_type_id, payloads);
+      output_name, batch1_byte_size, &output, payloads);
 }
 
 void

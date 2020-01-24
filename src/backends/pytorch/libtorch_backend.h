@@ -108,7 +108,7 @@ class LibTorchBackend : public InferenceBackend {
 
     Status GetOutputTensor(
         std::vector<torch::Tensor>* outputs_, const int& op_index,
-        const std::string& name, const DataType dtype, void** content,
+        const std::string& name, const DataType dtype, const char** content,
         size_t* byte_size, std::vector<int64_t>* content_shape);
 
     Status Execute(

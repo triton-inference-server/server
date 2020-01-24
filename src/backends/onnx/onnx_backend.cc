@@ -881,15 +881,17 @@ OnnxBackend::Context::ReadOutputTensors(
     RETURN_IF_ORT_ERROR(
         ort_api->CastTypeInfoToTensorInfo(typeinfo, &type_and_shape));
 
-    std::vector<int64_t> content_shape;
 
     size_t num_dims;
     RETURN_IF_ORT_ERROR(ort_api->GetDimensionsCount(type_and_shape, &num_dims));
 
-    content_shape.resize(num_dims);
+    // [TODO] make it live longer, currently okay as it is not holding anything
+    OutputInfo output;
+    output.output_shape_.resize(num_dims);
     RETURN_IF_ORT_ERROR(ort_api->GetDimensions(
-        type_and_shape, content_shape.data(), content_shape.size()));
-    const size_t element_count = GetElementCount(content_shape);
+        type_and_shape, output.output_shape_.data(),
+        output.output_shape_.size()));
+    const size_t element_count = GetElementCount(output.output_shape_);
 
     ONNXTensorElementDataType type;
     RETURN_IF_ORT_ERROR(ort_api->GetTensorElementType(type_and_shape, &type));
@@ -900,6 +902,9 @@ OnnxBackend::Context::ReadOutputTensors(
       RETURN_IF_ORT_ERROR(
           ort_api->GetStringTensorDataLength(output_tensor, &total_length));
 
+      // [TODO] FIXME this needs to be living longer than this function as
+      // it may go out of scope before async copies from SetStringOutputBuffer()
+      // finish
       char content[total_length];
       size_t offsets[element_count + 1];
       RETURN_IF_ORT_ERROR(ort_api->GetStringTensorContent(
@@ -908,7 +913,8 @@ OnnxBackend::Context::ReadOutputTensors(
       offsets[element_count] = total_length;
 
       cuda_copy |= SetStringOutputBuffer(
-          name, batch1_element_cnt, content, content_shape, offsets, payloads);
+          name, batch1_element_cnt, content, output.output_shape_, offsets,
+          payloads);
     } else {
       // Fixed size data type...
       const size_t actual_byte_size =
@@ -925,17 +931,15 @@ OnnxBackend::Context::ReadOutputTensors(
                 std::to_string(batch1_byte_size));
       }
 
-      char* content = nullptr;
-      RETURN_IF_ORT_ERROR(
-          ort_api->GetTensorMutableData(output_tensor, (void**)&content));
+      RETURN_IF_ORT_ERROR(ort_api->GetTensorMutableData(
+          output_tensor, (void**)&output.output_buffer_));
 
       // [TODO] currently ONNX output data are always on CPU
       // https://github.com/microsoft/onnxruntime/issues/1621
-      auto content_memory_type = TRTSERVER_MEMORY_CPU;
-      int64_t memory_type_id = 0;
-      cuda_copy |= SetFixedSizeOutputBuffer(
-          name, batch1_byte_size, content, content_shape, content_memory_type,
-          memory_type_id, payloads);
+      output.memory_type_ = TRTSERVER_MEMORY_CPU;
+      output.memory_type_id_ = 0;
+      cuda_copy |=
+          SetFixedSizeOutputBuffer(name, batch1_byte_size, &output, payloads);
     }
   }
 

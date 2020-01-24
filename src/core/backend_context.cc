@@ -291,13 +291,15 @@ BackendContext::IssueIndirectInputBufferCopy(
 
 bool
 BackendContext::SetFixedSizeOutputBuffer(
-    const std::string& name, const size_t batch1_byte_size, const char* content,
-    const std::vector<int64_t>& content_shape,
-    TRTSERVER_Memory_Type src_memory_type, int64_t src_memory_type_id,
+    const std::string& name, const size_t batch1_byte_size, OutputInfo* output,
     std::vector<Scheduler::Payload>* payloads)
 {
   bool cuda_copy = false;
-  size_t content_offset = 0;
+  size_t output_offset = 0;
+  bool need_buffer;
+  TRTSERVER_Memory_Type candidate_type;
+  GetIndirectBufferRequirement(
+      output->memory_type_, &candidate_type, &need_buffer);
   for (auto& payload : *payloads) {
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
@@ -306,37 +308,44 @@ BackendContext::SetFixedSizeOutputBuffer(
 
     // If 'payload' should have valid output (status ok) and
     // if 'payload' requested this output then copy it from
-    // 'content'. If it did not request this output then just
-    // skip it in the 'content'.
+    // 'output->output_buffer_'. If it did not request this output then just
+    // skip it in the 'output->output_buffer_'.
     if (payload.status_.IsOk() && (payload.response_provider_ != nullptr) &&
         payload.response_provider_->RequiresOutput(name)) {
-      auto dst_memory_type = src_memory_type;
+      TRTSERVER_Memory_Type dst_memory_type;
       int64_t dst_memory_type_id;
       void* buffer = nullptr;
 
       // try to get buffer with the same memory type as the output tensor
       Status status = payload.response_provider_->AllocateOutputBuffer(
-          name, &buffer, expected_byte_size, content_shape, src_memory_type,
-          src_memory_type_id, &dst_memory_type, &dst_memory_type_id);
+          name, &buffer, expected_byte_size, output->output_shape_,
+          output->memory_type_, output->memory_type_id_, &dst_memory_type,
+          &dst_memory_type_id);
       if (status.IsOk() && (expected_byte_size != 0)) {
         if (buffer == nullptr) {
           status = Status(
               RequestStatusCode::INTERNAL,
               "failed to allocate buffer for output '" + name + "'");
         } else {
-          bool cuda_used = false;
-          status = CopyBuffer(
-              name, src_memory_type, src_memory_type_id, dst_memory_type,
-              dst_memory_type_id, expected_byte_size, content + content_offset,
-              buffer, stream_, &cuda_used);
-          cuda_copy |= cuda_used;
+          // [TODO] prepare indirect_buffer here
+          if (false /*need_buffer && (dst_memory_type == candidate_type)*/) {
+            return false;
+          } else {
+            bool cuda_used = false;
+            status = CopyBuffer(
+                name, output->memory_type_, output->memory_type_id_,
+                dst_memory_type, dst_memory_type_id, expected_byte_size,
+                output->output_buffer_ + output_offset, buffer, stream_,
+                &cuda_used);
+            cuda_copy |= cuda_used;
+          }
         }
       }
 
       payload.status_ = status;
     }
 
-    content_offset += expected_byte_size;
+    output_offset += expected_byte_size;
   }
 
   return cuda_copy;

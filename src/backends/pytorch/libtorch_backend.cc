@@ -375,19 +375,20 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
     const size_t total_batch_size, const DimsList& dims,
     std::vector<Scheduler::Payload>* payloads, bool* cuda_copy)
 {
-  std::vector<int64_t> content_shape;
-  void* content = nullptr;
+  // [TODO] make it live longer, currently okay as it is not holding anything
+  OutputInfo output;
   size_t byte_size = 0;
   RETURN_IF_ERROR(GetOutputTensor(
-      outputs_, op_index, name, dtype, &content, &byte_size, &content_shape));
+      outputs_, op_index, name, dtype, &output.output_buffer_, &byte_size,
+      &output.output_shape_));
 
   // verify shape of output matches shape from model config
   RETURN_IF_ERROR(CompareOutputDims(
-      name, content_shape, dims,
+      name, output.output_shape_, dims,
       max_batch_size_ != NO_BATCHING /* supports_batching */));
 
   const size_t total_byte_size =
-      GetElementCount(content_shape) * dtype_byte_size;
+      GetElementCount(output.output_shape_) * dtype_byte_size;
   const size_t batch1_byte_size = total_byte_size / total_batch_size;
 
   if (byte_size != total_byte_size) {
@@ -399,12 +400,11 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
             std::to_string(batch1_byte_size));
   }
 
-  auto content_memory_type =
+  output.memory_type_ =
       (device_ == torch::kCPU) ? TRTSERVER_MEMORY_CPU : TRTSERVER_MEMORY_GPU;
-  int64_t memory_type_id = (device_ == torch::kCPU) ? 0 : gpu_device_;
-  *cuda_copy |= SetFixedSizeOutputBuffer(
-      name, batch1_byte_size, (char*)content, content_shape,
-      content_memory_type, memory_type_id, payloads);
+  output.memory_type_id_ = (device_ == torch::kCPU) ? 0 : gpu_device_;
+  *cuda_copy |=
+      SetFixedSizeOutputBuffer(name, batch1_byte_size, &output, payloads);
 
   return Status::Success;
 }
@@ -412,7 +412,7 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
 Status
 LibTorchBackend::Context::GetOutputTensor(
     std::vector<torch::Tensor>* outputs_, const int& op_index,
-    const std::string& name, const DataType dtype, void** content,
+    const std::string& name, const DataType dtype, const char** content,
     size_t* byte_size, std::vector<int64_t>* content_shape)
 {
   try {
@@ -429,9 +429,7 @@ LibTorchBackend::Context::GetOutputTensor(
     }
 
     *byte_size = output_flat.nbytes();
-
-    // Copy output into buffer
-    *content = output_flat.data_ptr();
+    *content = static_cast<const char*>(output_flat.data_ptr());
 
     //  Set content shape
     auto shape = (*outputs_)[op_index].sizes();

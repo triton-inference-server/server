@@ -379,22 +379,29 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
     const DimsList& dims, std::vector<Scheduler::Payload>* payloads,
     bool* cuda_copy)
 {
-  std::vector<int64_t> content_shape;
-  const char* content = nullptr;
+  // [TODO] make it live longer, currently okay as it is not holding anything
+  OutputInfo output;
+  // [TODO] use the following statement. Right now we always create
+  // netdef workspace with inputs / outputs on CPU node
+  // auto content_memory_type = (gpu_device_ == NO_GPU_DEVICE)
+  //                                ? TRTSERVER_MEMORY_CPU
+  //                                : TRTSERVER_MEMORY_GPU;
+  output.memory_type_ = TRTSERVER_MEMORY_CPU;
+  output.memory_type_id_ = 0;
   size_t byte_size = 0;
   Caffe2Workspace::Error err = workspace_->GetOutputTensor(
-      name, dtype, &content, &byte_size, &content_shape);
+      name, dtype, &output.output_buffer_, &byte_size, &output.output_shape_);
   if (!err.IsOk()) {
     return Status(RequestStatusCode::INTERNAL, err.Message());
   }
 
   // verify shape of output matches shape from model config
   RETURN_IF_ERROR(CompareOutputDims(
-      name, content_shape, dims,
+      name, output.output_shape_, dims,
       max_batch_size_ != NO_BATCHING /* supports_batching */));
 
   const size_t total_byte_size =
-      GetElementCount(content_shape) * dtype_byte_size;
+      GetElementCount(output.output_shape_) * dtype_byte_size;
   const size_t batch1_byte_size = total_byte_size / total_batch_size;
 
   if (byte_size != total_byte_size) {
@@ -406,16 +413,8 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
             std::to_string(batch1_byte_size));
   }
 
-  // [TODO] use the following statement. Right now we always create
-  // netdef workspace with inputs / outputs on CPU node
-  // auto content_memory_type = (gpu_device_ == NO_GPU_DEVICE)
-  //                                ? TRTSERVER_MEMORY_CPU
-  //                                : TRTSERVER_MEMORY_GPU;
-  auto content_memory_type = TRTSERVER_MEMORY_CPU;
-  int64_t memory_type_id = 0;
-  *cuda_copy |= SetFixedSizeOutputBuffer(
-      name, batch1_byte_size, content, content_shape, content_memory_type,
-      memory_type_id, payloads);
+  *cuda_copy |=
+      SetFixedSizeOutputBuffer(name, batch1_byte_size, &output, payloads);
   return Status::Success;
 }
 

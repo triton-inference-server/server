@@ -52,6 +52,19 @@ struct InputInfo {
       indirect_buffers_;
 };
 
+// [TODO] can we unify with InputInfo?
+struct OutputInfo {
+  const char* output_buffer_;
+  std::vector<int64_t> output_shape_;
+  TRTSERVER_Memory_Type memory_type_;
+  int64_t memory_type_id_;
+  // indirect pinned memory buffers, and the memory references appointing to
+  // the destinations in payloads [TODO] payload idx for reporting error?
+  std::vector<std::pair<
+      std::unique_ptr<AllocatedSystemMemory>, std::vector<MemoryReference>>>
+      indirect_buffers_;
+};
+
 struct BackendContext {
  public:
 #ifndef TRTIS_ENABLE_GPU
@@ -109,9 +122,7 @@ struct BackendContext {
   // cudaStreamSynchronize before using the data. Otherwise, return false.
   bool SetFixedSizeOutputBuffer(
       const std::string& name, const size_t batch1_byte_size,
-      const char* content, const std::vector<int64_t>& content_shape,
-      TRTSERVER_Memory_Type src_memory_type, int64_t src_memory_type_id,
-      std::vector<Scheduler::Payload>* payloads);
+      OutputInfo* output, std::vector<Scheduler::Payload>* payloads);
 
   // Helper function for handling string input. This function will return the
   // requested input content within a payload in a contiguous chunk. In some

@@ -1313,20 +1313,24 @@ PlanBackend::Context::Run(
       dims = engine_->getBindingDimensions(binding_offset + bindex);
     }
 
-    std::vector<int64_t> shape;
+    OutputInfo output;
+    output.output_buffer_ = static_cast<const char*>(buffers_[bindex]);
+    output.memory_type_ = TRTSERVER_MEMORY_GPU;
+    output.memory_type_id_ = gpu_device_;
 
     if (!is_dynamic_ && max_batch_size_ != NO_BATCHING) {
-      shape.insert(shape.begin(), total_batch_size);
+      output.output_shape_.insert(
+          output.output_shape_.begin(), total_batch_size);
     }
 
     for (int i = 0; i < dims.nbDims; ++i) {
-      shape.push_back(dims.d[i]);
+      output.output_shape_.push_back(dims.d[i]);
     }
 
     DataType dt = ConvertTrtTypeToDataType(
         engine_->getBindingDataType(binding_offset + bindex));
 
-    size_t batch1_byte_size = GetByteSize(dt, shape);
+    size_t batch1_byte_size = GetByteSize(dt, output.output_shape_);
     if (max_batch_size_ != NO_BATCHING) {
       batch1_byte_size /= total_batch_size;
     }
@@ -1340,9 +1344,8 @@ PlanBackend::Context::Run(
               std::to_string(batch1_byte_size));
     }
 
-    cuda_copy |= SetFixedSizeOutputBuffer(
-        name, batch1_byte_size, static_cast<char*>(buffers_[bindex]), shape,
-        TRTSERVER_MEMORY_GPU /* src_memory_type */, gpu_device_, payloads);
+    cuda_copy |=
+        SetFixedSizeOutputBuffer(name, batch1_byte_size, &output, payloads);
   }
 
   cudaEventRecord(events_[next_set_].output_ready_, stream_);
