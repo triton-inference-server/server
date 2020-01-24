@@ -27,7 +27,7 @@
 
 import sys
 import argparse
-from tensorrtserver.api import *
+from tensorrtserverV2.api import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -54,13 +54,15 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        trtis_context = InferenceServerContext(FLAGS.url, FLAGS.protocol)
+        TRTISClient = InferenceServerClient(FLAGS.url, FLAGS.protocol)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()
 
-    if trtis_context.is_server_live():
+    if TRTISClient.is_server_live():
         print("SUCCESS: is_server_live")
 
-    if trtis_context.is_server_ready():
+    if TRTISClient.is_server_ready():
         print("SUCCESS: is_server_ready")
+
+    TRTISClient.close()

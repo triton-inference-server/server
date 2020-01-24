@@ -28,6 +28,6 @@ cmake_minimum_required (VERSION 3.5)
 
 install(
   PROGRAMS
-    simple_client.py
+    simple_client_v2.py
   DESTINATION python
 )

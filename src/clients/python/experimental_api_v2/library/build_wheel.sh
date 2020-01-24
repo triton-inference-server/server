@@ -43,13 +43,13 @@ function main() {
   WHLDIR="$DEST/wheel"
 
   echo $(date) : "=== Using builddir: ${WHLDIR}"
-  mkdir -p ${WHLDIR}/tensorrtserver/api
+  mkdir -p ${WHLDIR}/tensorrtserverV2/api
 
   cp __init__.py \
-    "${WHLDIR}/tensorrtserver/api/."
+    "${WHLDIR}/tensorrtserverV2/api/."
 
   cp setup.py "${WHLDIR}"
-	touch ${WHLDIR}/tensorrtserver/__init__.py
+	touch ${WHLDIR}/tensorrtserverV2/__init__.py
 
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"

@@ -45,12 +45,12 @@ add_custom_command(
 )
 
 add_custom_target(
-  client-wheel ALL
+  client-wheel-2 ALL
   DEPENDS
     "${wheel_stamp_file}"
 )
 
 install(
-  CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/tensorrtserver*.whl\")"
+  CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/tensorrtserverV2*.whl\")"
   CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
 )

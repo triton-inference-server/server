@@ -52,7 +52,7 @@ except ImportError:
     bdist_wheel = None
 
 setup(
-    name='tensorrtserver',
+    name='tensorrtserverV2',
     version=VERSION,
     author='NVIDIA Inc.',
     author_email='tanmayv@nvidia.com',

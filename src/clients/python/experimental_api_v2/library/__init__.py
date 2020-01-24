@@ -27,8 +27,8 @@
 from geventhttpclient import HTTPClient
 from geventhttpclient.url import URL
 
-class InferenceServerContext:
-    """An InferenceServerContext object is used to perform any kind of
+class InferenceServerClient:
+    """An InferenceServerClient object is used to perform any kind of
     communication with the InferenceServer from client side.
 
     Parameters
@@ -38,17 +38,19 @@ class InferenceServerContext:
 
     protocol : str
         The protocol used to communicate with the server.
+        Default value is 'http'.
 
     connection_count : int
-        The number of connections to create for this context
+        The number of connections to create for this context.
+        Default valus is 1.
 
     verbose : bool
-        If True generate verbose output.
+        If True generate verbose output. Default value is False.
 
     Raises
         ------
         Exception
-            If unable to create a context.
+            If unable to create a client.
 
     """
 
@@ -61,6 +63,15 @@ class InferenceServerContext:
             raise ValueError("unexpected protocol: " + protocol +
                                   ", expecting HTTP")
         self.verbose = verbose
+    
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def close(self):
+        """Closes the interaction of client with the server. Any future
+        calls to api that contacts server will fail.
+        """
+        self.client_stub.close()
 
 
     def is_server_live(self):

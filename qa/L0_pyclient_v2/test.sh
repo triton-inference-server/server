@@ -38,7 +38,7 @@ fi
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository/
 
 CLIENT_LOG="./client.log"
-SIMPLE_CLIENT=../clients/simple_client.py
+SIMPLE_CLIENT=../clients/simple_client_v2.py
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS="--model-repository=`pwd`/models"
