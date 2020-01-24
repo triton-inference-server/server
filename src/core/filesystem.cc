@@ -605,16 +605,21 @@ S3FileSystem::ParsePath(
     const std::string& path, std::string* bucket, std::string* object)
 {
   // Get the bucket name and the object path. Return error if input is malformed
-  int bucket_start = path.find("s3://") + strlen("s3://");
-  int bucket_end = path.find("/", bucket_start);
+  re2::RE2 s3_regex(
+      "s3://([a-z]+):([0-9]+)/([0-9a-z.-]+)(((/[0-9a-z.-_]+)*)?)");
+  std::string host_name, host_port;
+  if (!RE2::FullMatch(path, s3_regex, &host_name, &host_port, bucket, object)) {
+    int bucket_start = path.find("s3://") + strlen("s3://");
+    int bucket_end = path.find("/", bucket_start);
 
-  // If there isn't a second slash, the address has only the bucket
-  if (bucket_end > bucket_start) {
-    *bucket = path.substr(bucket_start, bucket_end - bucket_start);
-    *object = path.substr(bucket_end + 1);
-  } else {
-    *bucket = path.substr(bucket_start);
-    *object = "";
+    // If there isn't a second slash, the address has only the bucket
+    if (bucket_end > bucket_start) {
+      *bucket = path.substr(bucket_start, bucket_end - bucket_start);
+      *object = path.substr(bucket_end + 1);
+    } else {
+      *bucket = path.substr(bucket_start);
+      *object = "";
+    }
   }
 
   if (bucket->empty()) {
@@ -638,10 +643,13 @@ S3FileSystem::S3FileSystem(
   }
 
   if (local_path != ":") {
-    config.endpointOverride = local_path;
+    config.endpointOverride = Aws::String(local_path);
+    config.scheme = Aws::Http::Scheme::HTTP;
   }
 
-  client_ = s3::S3Client(config);
+  client_ = s3::S3Client(
+      config, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
+      /*useVirtualAdressing*/ false);
 }
 
 S3FileSystem::~S3FileSystem()
@@ -754,6 +762,7 @@ S3FileSystem::GetDirectoryContents(
   // Parse bucket and dir_path
   std::string bucket, dir_path, full_dir;
   RETURN_IF_ERROR(ParsePath(path, &bucket, &dir_path));
+  std::string true_path = "s3://" + bucket + '/' + dir_path;
 
   // Capture the full path to facilitate content listing
   full_dir = AppendSlash(dir_path);
@@ -786,7 +795,7 @@ S3FileSystem::GetDirectoryContents(
   } else {
     return Status(
         RequestStatusCode::INTERNAL,
-        "Failed to list directory contents with at " + path);
+        "Could not list contents of directory at " + true_path);
   }
   return Status::Success;
 }
@@ -795,12 +804,17 @@ Status
 S3FileSystem::GetDirectorySubdirs(
     const std::string& path, std::set<std::string>* subdirs)
 {
-  RETURN_IF_ERROR(GetDirectoryContents(path, subdirs));
+  // Parse bucket and dir_path
+  std::string bucket, dir_path;
+  RETURN_IF_ERROR(ParsePath(path, &bucket, &dir_path));
+  std::string true_path = "s3://" + bucket + '/' + dir_path;
+
+  RETURN_IF_ERROR(GetDirectoryContents(true_path, subdirs));
 
   // Erase non-directory entries...
   for (auto iter = subdirs->begin(); iter != subdirs->end();) {
     bool is_dir;
-    RETURN_IF_ERROR(IsDirectory(JoinPath({path, *iter}), &is_dir));
+    RETURN_IF_ERROR(IsDirectory(JoinPath({true_path, *iter}), &is_dir));
     if (!is_dir) {
       iter = subdirs->erase(iter);
     } else {
@@ -814,12 +828,16 @@ Status
 S3FileSystem::GetDirectoryFiles(
     const std::string& path, std::set<std::string>* files)
 {
-  RETURN_IF_ERROR(GetDirectoryContents(path, files));
+  // Parse bucket and dir_path
+  std::string bucket, dir_path;
+  RETURN_IF_ERROR(ParsePath(path, &bucket, &dir_path));
+  std::string true_path = "s3://" + bucket + '/' + dir_path;
+  RETURN_IF_ERROR(GetDirectoryContents(true_path, files));
 
   // Erase directory entries...
   for (auto iter = files->begin(); iter != files->end();) {
     bool is_dir;
-    RETURN_IF_ERROR(IsDirectory(JoinPath({path, *iter}), &is_dir));
+    RETURN_IF_ERROR(IsDirectory(JoinPath({true_path, *iter}), &is_dir));
     if (is_dir) {
       iter = files->erase(iter);
     } else {
@@ -1024,13 +1042,13 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
         "s3:// file-system not supported. To enable, build with "
         "-DTRTIS_ENABLE_S3=ON.");
 #else
-    re2::RE2 s3_regex("s3://((([a-z]+):([0-9]+)/)?)([0-9a-z.-]+)");
-    std::string host_name, host_port, remaining;
-    if (!RE2::FullMatch(path, s3_regex, &host_name, &host_port, &remaining)) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "s3:// file-system invalid. Must be of the form s3://<bucket_name> "
-          "or s3://<host_name>:<host_port>/<bucket_name>");
+    re2::RE2 s3_regex(
+        "s3://([a-z]+):([0-9]+)/([0-9a-z.-]+)(((/[0-9a-zA-Z.-_]+)*)?)");
+    std::string host_name, host_port, bucket, object;
+    if (!RE2::FullMatch(
+            path, s3_regex, &host_name, &host_port, &bucket, &object)) {
+      host_name = "";
+      host_port = "";
     }
 
     Aws::SDKOptions options;
