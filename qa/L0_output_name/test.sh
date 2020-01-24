@@ -37,10 +37,15 @@ fi
 
 OP_NAME_TEST_PY=output_name_test.py
 CLIENT_LOG="./client.log"
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
+DATADIR=`pwd`/models
+
+rm -rf $DATADIR
+mkdir $DATADIR
+
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/*_nobatch_zero_1_float32 $DATADIR
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-repository=$DATADIR
+SERVER_ARGS="--model-repository=$DATADIR"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
