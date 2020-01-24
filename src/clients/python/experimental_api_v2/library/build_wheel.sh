@@ -45,11 +45,25 @@ function main() {
   echo $(date) : "=== Using builddir: ${WHLDIR}"
   mkdir -p ${WHLDIR}/tensorrtserverV2/api
 
+  echo "Adding package files"
+  cp ../../../../core/*_pb2.py \
+    "${WHLDIR}/tensorrtserverV2/api/."
+
+  cp ../../../../core/*_grpc.py \
+  "${WHLDIR}/tensorrtserverV2/api/."
+
   cp __init__.py \
     "${WHLDIR}/tensorrtserverV2/api/."
 
   cp setup.py "${WHLDIR}"
 	touch ${WHLDIR}/tensorrtserverV2/__init__.py
+
+  # Use 'sed' command to fix protoc compiled imports (see
+  # https://github.com/google/protobuf/issues/1491).
+	sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tensorrtserverV2.api import \1_pb2 as \2/" \
+    ${WHLDIR}/tensorrtserverV2/api/*_pb2.py
+	sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tensorrtserverV2.api import \1_pb2 as \2/" \
+    ${WHLDIR}/tensorrtserverV2/api/*_pb2_grpc.py
 
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"

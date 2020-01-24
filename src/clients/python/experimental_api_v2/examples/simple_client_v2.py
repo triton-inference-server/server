@@ -43,26 +43,55 @@ if __name__ == '__main__':
                         required=False,
                         default='localhost:8000',
                         help='Inference server URL. Default is localhost:8000.')
-    parser.add_argument(
-        '-i',
-        '--protocol',
-        type=str,
-        required=False,
-        default='http',
-        help='Protocol ("http"/"grpc") used to ' +
-        'communicate with inference service. Default is "http".')
 
     FLAGS = parser.parse_args()
     try:
-        TRTISClient = InferenceServerClient(FLAGS.url, FLAGS.protocol)
+        TRTISClient = InferenceServerHTTPClient(FLAGS.url)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()
 
+    model_name = 'savedmodel_float32_float32_float32'
+    model_name_2 = 'savedmodel_object_object_object'
+
+    ### Model Control API ###
+    TRTISClient.load(model_name)
+    if TRTISClient.is_model_ready(model_name, 1):
+        print("PASS: load")
+
+    TRTISClient.load(model_name_2)
+    if TRTISClient.is_model_ready(model_name_2, 1):
+        print("PASS: load_2")
+
+    ### Health API ###
     if TRTISClient.is_server_live():
-        print("SUCCESS: is_server_live")
+        print("PASS: is_server_live")
 
     if TRTISClient.is_server_ready():
-        print("SUCCESS: is_server_ready")
+        print("PASS: is_server_ready")
+
+    if TRTISClient.is_model_ready(model_name, 1):
+        print("PASS: is_model_ready")
+
+    ### Status API ###
+    status = TRTISClient.get_server_status()
+    if 'id' in status.keys() and status['id'] == 'inference:0':
+        print("PASS: get_server_status")
+
+    status = TRTISClient.get_model_status(model_name)
+    if 'modelStatus' in status.keys() and len(status['modelStatus']) == 1:
+        print("PASS: get_model_status")
+
+    # Passing incorrect model name
+    try:
+        status = TRTISClient.get_model_status("wrong_model_name")
+    except InferenceServerException as ex:
+        if "inference:0" == ex.server_id() and \
+            "no status available for unknown model" in ex.message():
+            print("PASS: detected wrong model")
+
+    TRTISClient.unload(model_name_2)
+    if not TRTISClient.is_model_ready(model_name_2, 1):
+        print("PASS: unload")
 
     TRTISClient.close()

@@ -42,12 +42,25 @@ add_custom_command(
     ${CMAKE_CURRENT_BINARY_DIR}/VERSION
     ${CMAKE_CURRENT_BINARY_DIR}/__init__.py
     ${CMAKE_CURRENT_BINARY_DIR}/setup.py
+    proto-py-library
+    grpc-py-library
 )
 
 add_custom_target(
   client-wheel-2 ALL
   DEPENDS
     "${wheel_stamp_file}"
+)
+
+file(
+  GLOB generated-py
+  ${CMAKE_CURRENT_BINARY_DIR}/../../../core/*_pb2.py
+  ${CMAKE_CURRENT_BINARY_DIR}/../../../core/*_grpc.py
+)
+
+install(
+  FILES ${generated-py}
+  DESTINATION python
 )
 
 install(

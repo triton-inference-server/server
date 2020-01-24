@@ -33,7 +33,9 @@ if 'VERSION' not in os.environ:
 
 VERSION = os.environ['VERSION']
 
-REQUIRED = ['numpy', 'geventhttpclient']
+REQUIRED = [
+    'numpy', 'geventhttpclient', 'python-rapidjson', 'protobuf>=3.5.0', 'grpcio'
+]
 
 try:
     from wheel.bdist_wheel import bdist_wheel as _bdist_wheel

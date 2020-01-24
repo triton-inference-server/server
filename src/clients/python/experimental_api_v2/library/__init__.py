@@ -25,24 +25,104 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from geventhttpclient import HTTPClient
+from geventhttpclient.connectionpool import ConnectionPool
 from geventhttpclient.url import URL
+from google.protobuf import text_format
+import rapidjson as json
 
-class InferenceServerClient:
-    """An InferenceServerClient object is used to perform any kind of
-    communication with the InferenceServer from client side.
+import tensorrtserver.api.request_status_pb2 as request_status
+
+
+def _raise_if_error(nv_status):
+    """
+    Raise InferenceServerException if 'nv_status' is non-success.
+    Otherwise return the request ID.
+    """
+    rstatus = text_format.Parse(nv_status, request_status.RequestStatus())
+    if not rstatus.code == request_status.RequestStatusCode.SUCCESS:
+        raise InferenceServerException(rstatus)
+    else:
+        return rstatus.request_id
+
+
+class InferenceServerException(Exception):
+    """Exception indicating non-Success status.
+
+    Parameters
+    ----------
+    err : RequestStatus Protobuf
+        The protobuf message describing the error
+
+    """
+
+    def __init__(self, err):
+        self._msg = err.msg
+        self._server_id = err.server_id
+        self._request_id = err.request_id
+
+    def __str__(self):
+        msg = super().__str__() if self._msg is None else self._msg
+        if self._server_id is not None:
+            msg = '[' + self._server_id + ' ' + str(
+                self._request_id) + '] ' + msg
+        return msg
+
+    def message(self):
+        """Get the exception message.
+
+        Returns
+        -------
+        str
+            The message associated with this exception, or None if no message.
+
+        """
+        return self._msg
+
+    def server_id(self):
+        """Get the ID of the server associated with this exception.
+
+        Returns
+        -------
+        str
+            The ID of the server associated with this exception, or
+            None if no server is associated.
+
+        """
+        return self._server_id
+
+    def request_id(self):
+        """Get the ID of the request with this exception.
+
+        Returns
+        -------
+        int
+            The ID of the request associated with this exception, or
+            0 (zero) if no request is associated.
+
+        """
+        return self._request_id
+
+
+class InferenceServerHTTPClient:
+    """An InferenceServerHTTPClient object is used to perform any kind of
+    communication with the InferenceServer using http protocol.
 
     Parameters
     ----------
     url : str
-        The inference server URL, e.g. localhost:8000.
-
-    protocol : str
-        The protocol used to communicate with the server.
-        Default value is 'http'.
+        The inference server URL, e.g. 'localhost:8000'.
 
     connection_count : int
-        The number of connections to create for this context.
-        Default valus is 1.
+        The number of connections to create for this client.
+        Default value is 1.
+
+    connection_timeout : float
+        The timeout value for the connection. Default value
+        is 60.0 sec.
+    
+    network_timeout : float
+        The timeout value for the network. Default value is
+        60.0 sec
 
     verbose : bool
         If True generate verbose output. Default value is False.
@@ -54,25 +134,48 @@ class InferenceServerClient:
 
     """
 
-    def __init__(self, url, protocol="http", connection_count=1, verbose=False):
-        if protocol.lower() == "http":
-            self.parsed_url = URL("http://" + url)
-            self.client_stub = HTTPClient.from_url(self.parsed_url,
-                                                   concurrency=connection_count)
-        else:
-            raise ValueError("unexpected protocol: " + protocol +
-                                  ", expecting HTTP")
+    def __init__(self,
+                 url,
+                 connection_count=1,
+                 connection_timeout=60.0,
+                 network_timeout=60.0,
+                 verbose=False):
+        self._last_request_id = None
+        self._parsed_url = URL("http://" + url)
+        self._client_stub = HTTPClient.from_url(
+            self._parsed_url,
+            concurrency=connection_count,
+            connection_timeout=connection_timeout,
+            network_timeout=network_timeout)
         self.verbose = verbose
-    
+
+    def __enter__(self):
+        return self
+
     def __exit__(self, type, value, traceback):
         self.close()
 
-    def close(self):
-        """Closes the interaction of client with the server. Any future
-        calls to api that contacts server will fail.
-        """
-        self.client_stub.close()
+    def __del__(self):
+        self.close()
 
+    def close(self):
+        """Close the client. Any future calls to server
+        will result in an Error.
+
+        """
+        self._client_stub.close()
+
+    def get_last_request_id(self):
+        """Get the request ID of the most recent request.
+
+        Returns
+        -------
+        int
+            The request ID, or None if a request has not yet been made
+            or if the last request was not successful.
+
+        """
+        return self._last_request_id
 
     def is_server_live(self):
         """Contact the inference server and get liveness.
@@ -88,7 +191,8 @@ class InferenceServerClient:
             If unable to get liveness.
 
         """
-        self.response = self.client_stub.get("/api/health/live")
+        self.response = self._client_stub.get("/api/health/live")
+        self._last_request_id = _raise_if_error(self.response['NV-Status'])
         return self.response.status_code == 200
 
     def is_server_ready(self):
@@ -105,5 +209,126 @@ class InferenceServerClient:
             If unable to get readiness.
 
         """
-        self.response = self.client_stub.get("/api/health/ready")
+        self.response = self._client_stub.get("/api/health/ready")
+        self._last_request_id = _raise_if_error(self.response['NV-Status'])
         return self.response.status_code == 200
+
+    def is_model_ready(self, model_name, model_version):
+        """Contact the inference server and get the readiness of specified model.
+
+         Parameters
+        ----------
+        model_name: str
+            The name of the model
+
+        model_version: int
+            The version of the model
+
+        Returns
+        -------
+        bool
+            True if the model is ready to be served, False if otherwise.
+
+        Raises
+        ------
+        Exception
+            If unable to get model readiness.
+
+        """
+        self.response = self._client_stub.get("/api/status/" + model_name +
+                                              "?format=json")
+        self._last_request_id = _raise_if_error(self.response['NV-Status'])
+
+        status = json.loads(self.response.read())
+        if model_name in status['modelStatus'].keys() and \
+               str(model_version) in status['modelStatus']\
+               [model_name]['versionStatus'].keys() and \
+               status['modelStatus'][model_name]['versionStatus'] \
+               [str(model_version)]["readyState"] == 'MODEL_READY':
+            return True
+        else:
+            return False
+
+    def get_server_status(self):
+        """Contact the inference server and get its status.
+
+        Returns
+        -------
+        object
+            The JSON object holding the status
+
+        Raises
+        ------
+        Exception
+            If unable to get status.
+
+        """
+
+        self.response = self._client_stub.get("/api/status?format=json")
+        self._last_request_id = _raise_if_error(self.response['NV-Status'])
+
+        status = json.loads(self.response.read())
+        return status
+
+    def get_model_status(self, model_name):
+        """Contact the inference server and get the status for specified model.
+
+        Parameters
+        ----------
+        model_name: str
+        The name of the model
+
+        Returns
+        -------
+        object
+            The JSON object holding the model status
+
+        Raises
+        ------
+        Exception
+            If unable to get model status.
+
+        """
+
+        self.response = self._client_stub.get("/api/status/" + model_name +
+                                              "?format=json")
+        self._last_request_id = _raise_if_error(self.response['NV-Status'])
+
+        status = json.loads(self.response.read())
+        return status
+
+    def load(self, model_name):
+        """Request the inference server to load specified model.
+
+        Parameters
+        ----------
+        model_name : str
+            The name of the model to be loaded.
+
+        Raises
+        ------
+        Exception
+            If unable to load the model.
+
+        """
+        self.response = self._client_stub.post("/api/modelcontrol/load/" +
+                                               model_name)
+        self._last_request_id = _raise_if_error(self.response['NV-Status'])
+
+    def unload(self, model_name):
+        """Request the inference server to unload specified model.
+
+        Parameters
+        ----------
+        model_name : str
+            The name of the model to be unloaded.
+
+        Raises
+        ------
+        Exception
+            If unable to unload the model.
+
+        """
+        self.response = self._client_stub.post("/api/modelcontrol/unload/" +
+                                               model_name)
+        self._last_request_id = _raise_if_error(self.response['NV-Status'])

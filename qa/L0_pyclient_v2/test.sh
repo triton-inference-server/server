@@ -41,13 +41,13 @@ CLIENT_LOG="./client.log"
 SIMPLE_CLIENT=../clients/simple_client_v2.py
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 rm -f ./*.log
 rm -fr models && mkdir -p models
-cp -r $DATADIR/savedmodel_float32_float32_float32 models/
+cp -r $DATADIR/savedmodel_* models/
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -59,11 +59,11 @@ fi
 RET=0
 
 set +e
-python3 $SIMPLE_CLIENT  -u 127.0.0.1:8000 -i http >> $CLIENT_LOG 2>&1
+python3 $SIMPLE_CLIENT >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
-if [ $(cat $CLIENT_LOG | grep "SUCCESS" | wc -l) -ne 2 ]; then
+if [ $(cat $CLIENT_LOG | grep "PASS" | wc -l) -ne 9 ]; then
         RET=1
     fi
 set -e
