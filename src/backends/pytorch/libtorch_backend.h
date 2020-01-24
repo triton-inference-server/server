@@ -80,7 +80,8 @@ class LibTorchBackend : public InferenceBackend {
     Status SetInputMetaData(
         const std::string& name, const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
-        std::vector<Scheduler::Payload>* payloads, InputMetaData* meta_data,
+        std::vector<Scheduler::Payload>* payloads,
+        std::vector<InputInfo>* inputs, InputMetaData* meta_data,
         bool* cuda_copy);
 
     // See BackendContext::Run()
@@ -92,7 +93,7 @@ class LibTorchBackend : public InferenceBackend {
     Status SetFixedSizedInputBuffer(
         const std::string& name, const size_t batch1_byte_size,
         const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-        InputMetaData* meta_data, bool* cuda_copy);
+        InputInfo* input, InputMetaData* meta_data, bool* cuda_copy);
 
     // Read an output tensor into one or more payloads.
     Status ReadFixedSizedOutputTensor(

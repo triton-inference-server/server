@@ -178,9 +178,15 @@ class InferRequestProvider {
       const std::string& name, const void** content, size_t* content_byte_size,
       TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
 
-  // Retrieve the data buffer of input 'name'.
+  // Retrieve the data buffer of input 'name'. This function will not check
+  // input override.
   Status GetMemory(
       const std::string& name, std::shared_ptr<Memory>* input_buffer);
+
+  // Similar to above, but the function caller does not own the Memory object,
+  // nor extend its lifetime. This function will check input override.
+  Status GetMemoryWithOverride(
+      const std::string& name, const Memory** input_buffer);
 
   // Set content for named inputs. If the input already has content,
   // this content will be used in-place of existing content.
@@ -188,6 +194,8 @@ class InferRequestProvider {
     std::vector<uint8_t> content_;
     DimsList dims_;
     DataType datatype_;
+    // Alternative representation of 'content_' in the form of Memory class
+    MemoryReference content_ref_;
   };
 
   using InputOverrideMap = std::unordered_map<std::string, InputOverride>;

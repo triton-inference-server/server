@@ -356,7 +356,8 @@ Status
 BaseBackend::Context::SetInput(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    TRTISTF_TensorList** input_tensors, bool* cuda_copy)
+    std::vector<InputInfo>* inputs, TRTISTF_TensorList** input_tensors,
+    bool* cuda_copy)
 {
   // Get the shape of the input. The provider has already checked
   // that the request shape is valid so don't need to do it here.
@@ -408,8 +409,9 @@ BaseBackend::Context::SetInput(
               std::to_string(batch1_byte_size * total_batch_size) + ", got " +
               std::to_string(TRTISTF_TensorDataByteSize(tensor)));
     }
+    inputs->emplace_back();
     SetFixedSizedInputTensor(
-        tensor, name, batch1_byte_size, payloads, cuda_copy);
+        tensor, name, batch1_byte_size, payloads, &inputs->back(), cuda_copy);
   } else {
     SetStringInputTensor(tensor, name, batch1_element_cnt, payloads);
   }
@@ -421,9 +423,9 @@ void
 BaseBackend::Context::SetFixedSizedInputTensor(
     TRTISTF_Tensor* tensor, const std::string& input_name,
     const size_t batch1_byte_size, std::vector<Scheduler::Payload>* payloads,
-    bool* cuda_copy)
+    InputInfo* input, bool* cuda_copy)
 {
-  char* buffer = TRTISTF_TensorData(tensor);
+  input->input_buffer_ = TRTISTF_TensorData(tensor);
 
   // Visit the payloads in order and copy the input values into the
   // input tensor. Skip payloads that had errors since they are not
@@ -436,16 +438,15 @@ BaseBackend::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size);
   }
 
-  auto content_memory_type = (TRTISTF_TensorIsGPUTensor(tensor))
-                                 ? TRTSERVER_MEMORY_GPU
-                                 : TRTSERVER_MEMORY_CPU;
-  int64_t content_memory_type_id =
+  input->memory_type_ = (TRTISTF_TensorIsGPUTensor(tensor))
+                            ? TRTSERVER_MEMORY_GPU
+                            : TRTSERVER_MEMORY_CPU;
+  input->memory_type_id_ =
       (TRTISTF_TensorIsGPUTensor(tensor)) ? gpu_device_ : 0;
   LOG_VERBOSE(1) << "input '" << input_name
                  << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
-  *cuda_copy |= SetInputBuffer(
-      input_name, expected_byte_sizes, payloads, content_memory_type,
-      content_memory_type_id, buffer);
+  *cuda_copy |=
+      SetInputBuffer(input_name, expected_byte_sizes, payloads, input);
 }
 
 void
@@ -689,6 +690,7 @@ BaseBackend::Context::Run(
       &input_head_ptr, input_deleter);
 
   // Inputs from the request...
+  std::vector<InputInfo> inputs;
   bool cuda_copy = false;
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
@@ -698,7 +700,7 @@ BaseBackend::Context::Run(
 
     RETURN_IF_ERROR(SetInput(
         name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, input_tensors.get(), &cuda_copy));
+        payloads, &inputs, input_tensors.get(), &cuda_copy));
   }
 
   // Additional inputs added to the provider...
@@ -710,7 +712,7 @@ BaseBackend::Context::Run(
       const InferRequestProvider::InputOverride& override = pr.second;
       RETURN_IF_ERROR(SetInput(
           name, override.datatype_, override.dims_, total_batch_size, payloads,
-          input_tensors.get(), &cuda_copy));
+          &inputs, input_tensors.get(), &cuda_copy));
     }
   }
 
@@ -744,6 +746,34 @@ BaseBackend::Context::Run(
   }
 
 #ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+  cuda_copy = false;
+  for (auto& input : inputs) {
+    for (auto& indirect_buffer : input.indirect_buffers_) {
+      bool cuda_used;
+      TRTSERVER_Memory_Type buffer_memory_type;
+      int64_t buffer_memory_id;
+      size_t buffer_byte_size;
+      auto buffer =
+          std::get<0>(indirect_buffer)
+              ->BufferAt(
+                  0, &buffer_byte_size, &buffer_memory_type, &buffer_memory_id);
+      auto status = CopyBuffer(
+          "indirect buffer", buffer_memory_type, buffer_memory_id,
+          input.memory_type_, input.memory_type_id_, buffer_byte_size, buffer,
+          input.input_buffer_ + std::get<1>(indirect_buffer), stream_,
+          &cuda_used);
+      if (!status.IsOk()) {
+        for (const auto& payload_idx : std::get<2>(indirect_buffer)) {
+          (*payloads)[payload_idx].status_ = status;
+        }
+      } else {
+        cuda_copy |= cuda_used;
+      }
+    }
+  }
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }

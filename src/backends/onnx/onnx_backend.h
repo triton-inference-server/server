@@ -96,7 +96,8 @@ class OnnxBackend : public InferenceBackend {
         const std::string& name, const DataType data_type, const DimsList& dims,
         size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
         std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
-        std::vector<const char*>* input_names, bool* cuda_used);
+        std::vector<InputInfo>* inputs, std::vector<const char*>* input_names,
+        bool* cuda_used);
 
     // Helper function to modify 'input_buffer' into format needed for creating
     // Onnx String tensor and to set meta data 'string_data'

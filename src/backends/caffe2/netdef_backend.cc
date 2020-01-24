@@ -36,6 +36,7 @@
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
+#include "src/core/cuda_utils.h"
 #endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
@@ -347,19 +348,8 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
     const std::string& name, const std::vector<int64_t>& shape,
     const Caffe2Workspace::DataType dtype, const size_t batch1_byte_size,
     const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
-    bool* cuda_copy)
+    InputInfo* input, bool* cuda_copy)
 {
-  // The entire input tensor must be delivered as a single
-  // contiguous chunk so create a buffer large enough to hold the
-  // entire dynamic batched input.
-  input_buffers->emplace_back(new AllocatedSystemMemory(
-      total_byte_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
-  TRTSERVER_Memory_Type buffer_memory_type;
-  int64_t buffer_memory_id;
-  char* buffer = input_buffers->back()->MutableBuffer(
-      &buffer_memory_type, &buffer_memory_id);
-
   // Visit the payloads in order and copy the input tensors to
   // 'buffer'.
   std::vector<size_t> expected_byte_sizes;
@@ -370,12 +360,11 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size);
   }
 
-  *cuda_copy |= SetInputBuffer(
-      name, expected_byte_sizes, payloads, buffer_memory_type, buffer_memory_id,
-      buffer);
+  *cuda_copy |= SetInputBuffer(name, expected_byte_sizes, payloads, input);
 
   Caffe2Workspace::Error err = workspace_->SetInputTensor(
-      name, shape, dtype, static_cast<const char*>(buffer), total_byte_size);
+      name, shape, dtype, static_cast<const char*>(input->input_buffer_),
+      total_byte_size);
   if (!err.IsOk()) {
     return Status(RequestStatusCode::INTERNAL, err.Message());
   }
@@ -435,7 +424,7 @@ NetDefBackend::Context::SetInput(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
     std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
-    bool* cuda_copy)
+    std::vector<InputInfo>* inputs, bool* cuda_copy)
 {
   // Get the shape of the input. The provider has already checked that
   // the request shape is valid so don't need to do it here.
@@ -460,9 +449,19 @@ NetDefBackend::Context::SetInput(
       batch1_element_cnt * GetDataTypeByteSize(datatype);
   const size_t total_byte_size = total_batch_size * batch1_byte_size;
 
+  // The entire input tensor must be delivered as a single
+  // contiguous chunk so create a buffer large enough to hold the
+  // entire dynamic batched input.
+  input_buffers->emplace_back(new AllocatedSystemMemory(
+      total_byte_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
+  inputs->emplace_back();
+  auto& input = inputs->back();
+  input.input_buffer_ = input_buffers->back()->MutableBuffer(
+      &input.memory_type_, &input.memory_type_id_);
+
   return SetFixedSizedInputTensor(
-      name, shape, dtype, batch1_byte_size, total_byte_size, payloads,
-      input_buffers, cuda_copy);
+      name, shape, dtype, batch1_byte_size, total_byte_size, payloads, &input,
+      cuda_copy);
 }
 
 Status
@@ -513,6 +512,7 @@ NetDefBackend::Context::Run(
   // Hold reference to each buffer of input data to that it stays
   // until the inference has completed.
   std::vector<std::unique_ptr<AllocatedSystemMemory>> input_buffers;
+  std::vector<InputInfo> inputs;
 
   // Create a tensor for each input sized correctly for the total
   // payload batch size. Concatenate input values from each payload
@@ -525,10 +525,9 @@ NetDefBackend::Context::Run(
 
     const ModelInput* input_config;
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
-
     RETURN_IF_ERROR(SetInput(
         name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, &input_buffers, &cuda_copy));
+        payloads, &input_buffers, &inputs, &cuda_copy));
   }
 
   // Additional inputs added to the provider...
@@ -540,10 +539,40 @@ NetDefBackend::Context::Run(
       const InferRequestProvider::InputOverride& override = pr.second;
       RETURN_IF_ERROR(SetInput(
           name, override.datatype_, override.dims_, total_batch_size, payloads,
-          &input_buffers, &cuda_copy));
+          &input_buffers, &inputs, &cuda_copy));
     }
   }
 #ifdef TRTIS_ENABLE_GPU
+  // Two pass synchronization, one to make sure indirect buffers are filled if
+  // any, the other to make sure the input buffer for execution is ready.
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+  cuda_copy = false;
+  for (auto& input : inputs) {
+    for (auto& indirect_buffer : input.indirect_buffers_) {
+      bool cuda_used;
+      TRTSERVER_Memory_Type buffer_memory_type;
+      int64_t buffer_memory_id;
+      size_t buffer_byte_size;
+      auto buffer =
+          std::get<0>(indirect_buffer)
+              ->BufferAt(
+                  0, &buffer_byte_size, &buffer_memory_type, &buffer_memory_id);
+      auto status = CopyBuffer(
+          "indirect buffer", buffer_memory_type, buffer_memory_id,
+          input.memory_type_, input.memory_type_id_, buffer_byte_size, buffer,
+          input.input_buffer_ + std::get<1>(indirect_buffer), stream_,
+          &cuda_used);
+      if (!status.IsOk()) {
+        for (const auto& payload_idx : std::get<2>(indirect_buffer)) {
+          (*payloads)[payload_idx].status_ = status;
+        }
+      } else {
+        cuda_copy |= cuda_used;
+      }
+    }
+  }
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
