@@ -1083,7 +1083,33 @@ JoinPath(std::initializer_list<std::string> segments)
 
   for (const auto& seg : segments) {
     if (joined.empty()) {
+#ifdef TRTIS_ENABLE_S3
+      // Check if this is an S3 path (s3://$BUCKET_NAME)
+      if (!seg.empty() && !seg.rfind("s3://", 0)) {
+        re2::RE2 s3_regex(
+            "s3://([a-z]+):([0-9]+)/([0-9a-z.-]+)(((/[0-9a-zA-Z.-_]+)*)?)");
+        std::string host_name, host_port, bucket, object;
+        if (!RE2::FullMatch(
+                seg, s3_regex, &host_name, &host_port, &bucket, &object)) {
+          int bucket_start = seg.find("s3://") + 5;
+          int bucket_end = seg.find("/", bucket_start);
+
+          // If there isn't a second slash, the address has only the bucket
+          if (bucket_end > bucket_start) {
+            bucket = seg.substr(bucket_start, bucket_end - bucket_start);
+            object = seg.substr(bucket_end + 1);
+          } else {
+            bucket = seg.substr(bucket_start);
+            object = "";
+          }
+          joined = seg;
+        } else {
+          joined = "s3://" + bucket + '/' + object;
+        }
+      }
+#elif
       joined = seg;
+#endif  // TRTIS_ENABLE_S3
     } else if (IsAbsolutePath(seg)) {
       if (joined[joined.size() - 1] == '/') {
         joined.append(seg.substr(1));
