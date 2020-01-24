@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -304,8 +304,8 @@ if __name__ == '__main__':
                 FLAGS.batch_size))
             result_filenames.append(input_filenames)
         else:
-            ctx.async_run(partial(completion_callback, input_filenames, user_data), 
-                            { input_name :input_batch }, 
+            ctx.async_run(partial(completion_callback, input_filenames, user_data),
+                            { input_name :input_batch },
                             { output_name : (InferContext.ResultFormat.CLASS, FLAGS.classes) },
                             FLAGS.batch_size)
             sent_count += 1
@@ -314,11 +314,11 @@ if __name__ == '__main__':
     if FLAGS.async_set:
         processed_count = 0
         while processed_count < sent_count:
-            (input_filenames, request_id) = user_data._completed_requests.get()
+            (request_id, input_filenames) = user_data._completed_requests.get()
             results.append(ctx.get_async_run_results(request_id))
             result_filenames.append(input_filenames)
             processed_count += 1
-    else:
-        for idx in range(len(results)):
-            print("Request {}, batch size {}".format(idx, FLAGS.batch_size))
-            postprocess(results[idx], result_filenames[idx], FLAGS.batch_size)
+
+    for idx in range(len(results)):
+        print("Request {}, batch size {}".format(idx, FLAGS.batch_size))
+        postprocess(results[idx], result_filenames[idx], FLAGS.batch_size)
