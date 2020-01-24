@@ -40,6 +40,7 @@ import tensorrtserver.api.model_config_pb2 as model_config
 
 import unittest
 FLAGS = None
+_trials = ("graphdef", "libtorch", "netdef", "onnx", "plan", "savedmodel")
 
 class OutputNameValidationTest(unittest.TestCase):
     def TestGRPC(self):
@@ -49,7 +50,7 @@ class OutputNameValidationTest(unittest.TestCase):
         request_ = self.requestGenerator("DUMMY", FLAGS)
         # Send request
         response_ = grpc_stub.Infer(request_)
-        return response_.request_status.code==3
+        return response_.request_status.code==5
 
     def requestGenerator(self, output_name, FLAGS):
         # Prepare request for Infer gRPC
@@ -72,9 +73,10 @@ class OutputNameValidationTest(unittest.TestCase):
         return request
 
     def test_grpc(self):
-        self.model_name = 'savedmodel_zero_1_float32'
-        self.url = "localhost:8001"
-        self.assertTrue(self.TestGRPC())
+        for trial in _trials:
+            self.model_name = "{}_nobatch_zero_1_float32".format(trial)
+            self.url = "localhost:8001"
+            self.assertTrue(self.TestGRPC())
 
 if __name__ == '__main__':
     unittest.main()
