@@ -25,9 +25,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 #include "src/core/model_config.h"
+#include "src/core/provider.h"
 #include "src/core/scheduler.h"
 
 #ifdef TRTIS_ENABLE_GPU
@@ -38,6 +40,17 @@ namespace nvidia { namespace inferenceserver {
 
 class AllocatedSystemMemory;
 class InferenceBackend;
+
+struct InputInfo {
+  char* input_buffer_;
+  TRTSERVER_Memory_Type memory_type_;
+  int64_t memory_type_id_;
+  // indirect pinned memory buffers, their locations in 'input_buffer_',
+  // and the payloads that are associated with this buffer (for reporting error)
+  std::vector<std::tuple<
+      std::unique_ptr<AllocatedSystemMemory>, size_t, std::vector<size_t>>>
+      indirect_buffers_;
+};
 
 struct BackendContext {
  public:
@@ -82,17 +95,14 @@ struct BackendContext {
   // cudaStreamSynchronize before using the data. Otherwise, return false.
   bool SetInputBuffer(
       const std::string& name, const std::vector<size_t>& expected_byte_sizes,
-      std::vector<Scheduler::Payload>* payloads,
-      TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
-      char* input_buffer);
+      std::vector<Scheduler::Payload>* payloads, InputInfo* input);
 
   // Overload of SetInputBuffer() which issues the CUDA copies on 'stream'
   // instead of 'stream_'.
   bool SetInputBuffer(
       const std::string& name, const std::vector<size_t>& expected_byte_sizes,
-      std::vector<Scheduler::Payload>* payloads,
-      TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
-      cudaStream_t stream, char* input_buffer);
+      std::vector<Scheduler::Payload>* payloads, cudaStream_t stream,
+      InputInfo* input);
 
   // Helper function to set output buffer of fixed size data type to payloads
   // Return true if cudaMemcpyAsync is called, and the caller should call
@@ -128,6 +138,30 @@ struct BackendContext {
   Status CompareOutputDims(
       const std::string& tensor_name, const std::vector<int64_t>& model_shape,
       const DimsList& dims, const bool supports_batching);
+
+  // Meta data for constructing an indirect pinned memory buffer
+  // <offset in input buffer,
+  //  indirect buffer size,
+  //  vector of <index of the payload (for status update),
+  //             memory block of the provider's input,
+  //             index in the memory block>>
+  using BufferInfo = std::tuple<
+      size_t, size_t, std::vector<std::tuple<size_t, const Memory*, size_t>>>;
+
+  // Helper function to construct an 'indirect_buffer', and to copy data in
+  // 'payloads' to the indirect buffer first, then to copy the indirect buffer
+  // to proper location in 'input_buffer', according to 'pinned_buffer_info'.
+  bool IssueIndirectInputBufferCopy(
+      const std::string& name, const BufferInfo& pinned_buffer_info,
+      std::vector<Scheduler::Payload>* payloads, cudaStream_t stream,
+      InputInfo* input);
+
+  // Helper function to return whether an indirect buffer is needed in
+  // 'need_indirect_buffer', and the memory type that should utilize the
+  // indirect buffer in 'candiate_type'.
+  void GetIndirectBufferRequirement(
+      TRTSERVER_Memory_Type ref_buffer_type,
+      TRTSERVER_Memory_Type* candidate_type, bool* need_indirect_buffer);
 
   // Name of the model instance
   std::string name_;

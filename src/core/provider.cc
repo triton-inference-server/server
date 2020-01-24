@@ -315,6 +315,37 @@ InferRequestProvider::GetMemory(
   return Status::Success;
 }
 
+Status
+InferRequestProvider::GetMemoryWithOverride(
+    const std::string& name, const Memory** input_buffer)
+{
+  auto it = input_buffer_.find(name);
+  if (it != input_buffer_.end()) {
+    *input_buffer = it->second.first.get();
+  } else {
+    // check input overrides
+    auto found = false;
+    for (const auto& override_map : overrides_maps_) {
+      const auto& pr = override_map->find(name);
+      if (pr != override_map->end()) {
+        const InputOverride& override = pr->second;
+        *input_buffer = &override.content_ref_;
+
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "input '" + name + "' is not found in the provider");
+    }
+  }
+
+  return Status::Success;
+}
+
 //
 // NULLInferRequestProvider
 //
