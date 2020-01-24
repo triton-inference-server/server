@@ -140,14 +140,6 @@ BackendContext::SetInputBuffer(
       }
 
       if ((copied_byte_size + content_byte_size) > expected_byte_size) {
-        if (std::get<1>(pinned_buffer_info) > 0) {
-          // Set indirect buffer copy as it won't be contiguous
-          cuda_copy |= IssueIndirectInputBufferCopy(
-              name, pinned_buffer_info, payloads, stream, input);
-
-          // reset 'pinned_buffer_info'
-          pinned_buffer_info = {buffer_copy_offset + expected_byte_size, 0, {}};
-        }
         payload.status_ = Status(
             RequestStatusCode::INVALID_ARG,
             "unexpected size " +
@@ -196,6 +188,18 @@ BackendContext::SetInputBuffer(
           "expected " + std::to_string(expected_byte_size) +
               " bytes of data for inference input '" + name + "', got " +
               std::to_string(copied_byte_size));
+    }
+
+    // When the payload has unexpected status, maintain a new indirect buffer
+    // as the contiguousity ends here. And there are pending indirect buffer
+    // copies, issue them.
+    if (!payload.status_.IsOk()) {
+      if (std::get<1>(pinned_buffer_info) > 0) {
+        cuda_copy |= IssueIndirectInputBufferCopy(
+            name, pinned_buffer_info, payloads, stream, input);
+      }
+      // reset 'pinned_buffer_info'
+      pinned_buffer_info = {buffer_copy_offset + expected_byte_size, 0, {}};
     }
 
     buffer_copy_offset += expected_byte_size;
