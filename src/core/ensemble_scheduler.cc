@@ -587,9 +587,12 @@ EnsembleContext::ReshapeTensorDims(
         batch_size = *bit;
         mutable_dims->erase(bit);
       } else {
-        // insert batch size as first dim
+        // insert batch size as first dim. Protobuf only allows appending to the
+        // back, so have to move batch size forward one by one
         mutable_dims->Add(tensor_batch_size);
-        mutable_dims->SwapElements(0, (mutable_dims->size() - 1));
+        for (size_t bidx = mutable_dims->size() - 1; bidx >= 1; bidx--) {
+          mutable_dims->SwapElements(bidx - 1, bidx);
+        }
         batch_size = 0;
       }
     }
