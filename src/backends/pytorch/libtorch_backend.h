@@ -39,7 +39,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class AllocatedSystemMemory;
+class AllocatedMemory;
 
 class LibTorchBackend : public InferenceBackend {
  public:

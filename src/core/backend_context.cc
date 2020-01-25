@@ -250,8 +250,8 @@ BackendContext::IssueIndirectInputBufferCopy(
   int64_t mem_id = 0;
   const auto input_offset = std::get<0>(pinned_buffer_info);
   const auto pinned_buffer_size = std::get<1>(pinned_buffer_info);
-  std::unique_ptr<AllocatedSystemMemory> local_indirect_buffer(
-      new AllocatedSystemMemory(pinned_buffer_size, mem_type, mem_id));
+  std::unique_ptr<AllocatedMemory> local_indirect_buffer(
+      new AllocatedMemory(pinned_buffer_size, mem_type, mem_id));
   char* buffer = local_indirect_buffer->MutableBuffer(&mem_type, &mem_id);
   std::vector<size_t> payload_idxs;
 
@@ -300,6 +300,7 @@ BackendContext::SetFixedSizeOutputBuffer(
   TRTSERVER_Memory_Type candidate_type;
   GetIndirectBufferRequirement(
       output->memory_type_, &candidate_type, &need_buffer);
+  //BufferInfo pinned_buffer_info{0, 0, {}};
   for (auto& payload : *payloads) {
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
@@ -329,6 +330,8 @@ BackendContext::SetFixedSizeOutputBuffer(
         } else {
           // [TODO] prepare indirect_buffer here
           if (false /*need_buffer && (dst_memory_type == candidate_type)*/) {
+            // std::get<1>(pinned_buffer_info) += content_byte_size;
+            // std::get<2>(pinned_buffer_info).emplace_back(idx, data, data_idx);
             return false;
           } else {
             bool cuda_used = false;
@@ -356,7 +359,7 @@ BackendContext::GetContiguousInputContent(
     const std::string& name, TRTSERVER_Memory_Type memory_type,
     int64_t memory_type_id, const Scheduler::Payload& payload,
     const char** content, size_t* content_byte_size,
-    std::unique_ptr<AllocatedSystemMemory>* contiguous_buffer, bool* cuda_copy)
+    std::unique_ptr<AllocatedMemory>* contiguous_buffer, bool* cuda_copy)
 {
   contiguous_buffer->reset();
 
@@ -393,7 +396,7 @@ BackendContext::GetContiguousInputContent(
     *content = input_buffers.BufferAt(
         0, content_byte_size, &memory_type, &memory_type_id);
   } else {
-    contiguous_buffer->reset(new AllocatedSystemMemory(
+    contiguous_buffer->reset(new AllocatedMemory(
         input_buffers.TotalByteSize(), memory_type, memory_type_id));
     auto dst_ptr =
         (*contiguous_buffer)->MutableBuffer(&memory_type, &memory_type_id);

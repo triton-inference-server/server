@@ -422,7 +422,7 @@ Status
 NetDefBackend::Context::SetInput(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
+    std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
     std::vector<InputInfo>* inputs, bool* cuda_copy)
 {
   // Get the shape of the input. The provider has already checked that
@@ -451,7 +451,7 @@ NetDefBackend::Context::SetInput(
   // The entire input tensor must be delivered as a single
   // contiguous chunk so create a buffer large enough to hold the
   // entire dynamic batched input.
-  input_buffers->emplace_back(new AllocatedSystemMemory(
+  input_buffers->emplace_back(new AllocatedMemory(
       total_byte_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
   inputs->emplace_back();
   auto& input = inputs->back();
@@ -510,7 +510,7 @@ NetDefBackend::Context::Run(
 
   // Hold reference to each buffer of input data to that it stays
   // until the inference has completed.
-  std::vector<std::unique_ptr<AllocatedSystemMemory>> input_buffers;
+  std::vector<std::unique_ptr<AllocatedMemory>> input_buffers;
   std::vector<InputInfo> inputs;
 
   // Create a tensor for each input sized correctly for the total

@@ -80,7 +80,7 @@ class NetDefBackend : public InferenceBackend {
         const std::string& name, const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads,
-        std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
+        std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
         std::vector<InputInfo>* inputs, bool* cuda_copy);
 
     // See BackendContext::Run()

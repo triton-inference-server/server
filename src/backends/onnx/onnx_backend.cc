@@ -577,7 +577,7 @@ OnnxBackend::Context::Run(
 
   // Hold reference to each buffer of input data so that it stays
   // until the inference has completed.
-  std::vector<std::unique_ptr<AllocatedSystemMemory>> input_buffers;
+  std::vector<std::unique_ptr<AllocatedMemory>> input_buffers;
   std::vector<InputInfo> inputs;
   std::vector<const char*> input_names;
   bool cuda_copy = false;
@@ -685,7 +685,7 @@ Status
 OnnxBackend::Context::SetInputTensor(
     const std::string& name, const DataType data_type, const DimsList& dims,
     size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
+    std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
     std::vector<InputInfo>* inputs, std::vector<const char*>* input_names,
     bool* cuda_used)
 {
@@ -737,7 +737,7 @@ OnnxBackend::Context::SetInputTensor(
   const size_t buffer_size =
       total_byte_size + ((data_type != TYPE_STRING) ? 0 : 1);
   input_buffers->emplace_back(
-      new AllocatedSystemMemory(buffer_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
+      new AllocatedMemory(buffer_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
   inputs->emplace_back();
   auto& input = inputs->back();
   input.input_buffer_ = input_buffers->back()->MutableBuffer(

@@ -48,7 +48,7 @@ struct LibTorchBackend::Context::InputMetaData {
   std::string name_;
   std::vector<int64_t> shape_;
   torch::ScalarType torch_type_;
-  std::unique_ptr<AllocatedSystemMemory> input_buffer_;
+  std::unique_ptr<AllocatedMemory> input_buffer_;
 };
 
 LibTorchBackend::Context::Context(
@@ -503,7 +503,7 @@ LibTorchBackend::Context::SetFixedSizedInputBuffer(
                          : TRTSERVER_MEMORY_GPU;
   int64_t memory_type_id = (gpu_device_ == NO_GPU_DEVICE) ? 0 : gpu_device_;
   meta_data->input_buffer_.reset(
-      new AllocatedSystemMemory(total_byte_size, memory_type, memory_type_id));
+      new AllocatedMemory(total_byte_size, memory_type, memory_type_id));
   input->input_buffer_ = meta_data->input_buffer_->MutableBuffer(
       &input->memory_type_, &input->memory_type_id_);
 

@@ -38,7 +38,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class AllocatedSystemMemory;
+class AllocatedMemory;
 class InferenceBackend;
 
 struct InputInfo {
@@ -48,7 +48,7 @@ struct InputInfo {
   // indirect pinned memory buffers, their locations in 'input_buffer_',
   // and the payloads that are associated with this buffer (for reporting error)
   std::vector<std::tuple<
-      std::unique_ptr<AllocatedSystemMemory>, size_t, std::vector<size_t>>>
+      std::unique_ptr<AllocatedMemory>, size_t, std::vector<size_t>>>
       indirect_buffers_;
 };
 
@@ -61,7 +61,7 @@ struct OutputInfo {
   // indirect pinned memory buffers, and the memory references appointing to
   // the destinations in payloads [TODO] payload idx for reporting error?
   std::vector<std::pair<
-      std::unique_ptr<AllocatedSystemMemory>, std::vector<MemoryReference>>>
+      std::unique_ptr<AllocatedMemory>, std::vector<MemoryReference>>>
       indirect_buffers_;
 };
 
@@ -135,7 +135,7 @@ struct BackendContext {
       const std::string& name, TRTSERVER_Memory_Type memory_type,
       int64_t memory_type_id, const Scheduler::Payload& payload,
       const char** content, size_t* content_byte_size,
-      std::unique_ptr<AllocatedSystemMemory>* contiguous_buffer,
+      std::unique_ptr<AllocatedMemory>* contiguous_buffer,
       bool* cuda_copy);
 
   // Check if output tensor produced by a model is compatible with the
@@ -150,7 +150,7 @@ struct BackendContext {
       const std::string& tensor_name, const std::vector<int64_t>& model_shape,
       const DimsList& dims, const bool supports_batching);
 
-  // Meta data for constructing an indirect pinned memory buffer
+  // Meta data for constructing an indirect pinned memory buffer for input
   // <offset in input buffer,
   //  indirect buffer size,
   //  vector of <index of the payload (for status update),
@@ -158,6 +158,16 @@ struct BackendContext {
   //             index in the memory block>>
   using BufferInfo = std::tuple<
       size_t, size_t, std::vector<std::tuple<size_t, const Memory*, size_t>>>;
+
+  // Meta data for constructing an indirect pinned memory buffer for output
+  // <offset in output buffer,
+  //  indirect buffer size,
+  //  vector of <index of the payload (for status update),
+  //             memory block of the provider's output,
+  //             index in the memory block>>
+  // [TODO] group the memory info above as a derived class of Memory
+  using OutputBufferInfo = std::tuple<
+      size_t, size_t, std::vector<std::tuple<size_t, MutableMemory*, size_t>>>;
 
   // Helper function to construct an 'indirect_buffer', and to copy data in
   // 'payloads' to the indirect buffer first, then to copy the indirect buffer

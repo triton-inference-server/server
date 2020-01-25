@@ -95,7 +95,7 @@ class OnnxBackend : public InferenceBackend {
     Status SetInputTensor(
         const std::string& name, const DataType data_type, const DimsList& dims,
         size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-        std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
+        std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
         std::vector<InputInfo>* inputs, std::vector<const char*>* input_names,
         bool* cuda_used);
 

@@ -473,7 +473,7 @@ BaseBackend::Context::SetStringInputTensor(
     const char* content;
     size_t content_byte_size = expected_element_cnt * sizeof(uint32_t);
     // If contiguous buffer is created, it needs to live until tensor is filled
-    std::unique_ptr<AllocatedSystemMemory> contiguous_buffer;
+    std::unique_ptr<AllocatedMemory> contiguous_buffer;
     bool cuda_copy = false;
     payload.status_ = GetContiguousInputContent(
         input_name, buffer_memory_type, buffer_memory_type_id, payload,
