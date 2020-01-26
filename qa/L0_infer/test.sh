@@ -82,11 +82,11 @@ for TARGET in cpu gpu; do
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log
     CLIENT_LOG=$CLIENT_LOG_BASE.${TARGET}.log
 
-    rm -fr models
+    rm -fr models && mkdir models
     for BACKEND in $BACKENDS; do
       if [ "$BACKEND" != "custom" ]; then
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${BACKEND}* \
-          models
+          models/.
       else
         cp -r ../custom_models/custom_float32_* models/. && \
         cp -r ../custom_models/custom_int32_* models/. && \
@@ -95,28 +95,40 @@ for TARGET in cpu gpu; do
     done
 
     if [ "$ENSEMBLES" == "1" ]; then
-      for BACKEND in $BACKENDS; do
-        if [ "$BACKEND" != "custom" ]; then
-            cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
-              models/.
-        fi
-      done
-
       if [[ $BACKENDS == *"custom"* ]]; then
-        create_nop_modelfile `pwd`/libidentity.so `pwd`/models
+        for BACKEND in $BACKENDS; do
+          if [ "$BACKEND" != "custom" ]; then
+              cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
+                models/.
+          else
+            cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/nop_* \
+              models/.
+          fi
+        done
 
-        if [[ $BACKENDS == *"graphdef"* ]]; then
-          for EM in `ls ../ensemble_models`; do
-              mkdir -p ../ensemble_models/$EM/1
-          done
-          cp -r ../ensemble_models/* models/.
+        create_nop_modelfile `pwd`/libidentity.so `pwd`/models
+      fi
+
+      if [[ $BACKENDS == *"graphdef"* ]]; then
+        ENSEMBLE_MODELS="wrong_label_int32_float32_float32 label_override_int32_float32_float32 mix_type_int32_float32_float32"
+
+        if [[ $BACKENDS == *"custom"* ]]; then
+          ENSEMBLE_MODELS="${ENSEMBLE_MODELS} batch_to_nobatch_float32_float32_float32 batch_to_nobatch_nobatch_float32_float32_float32 nobatch_to_batch_float32_float32_float32 nobatch_to_batch_nobatch_float32_float32_float32 mix_nobatch_batch_float32_float32_float32"
         fi
+
+        if [[ $BACKENDS == *"savedmodel"* ]] && [[ $BACKENDS == *"netdef"* ]] ; then
+          ENSEMBLE_MODELS="${ENSEMBLE_MODELS} mix_platform_float32_float32_float32 mix_ensemble_int32_float32_float32"
+        fi
+
+        for EM in $ENSEMBLE_MODELS; do
+          mkdir -p ../ensemble_models/$EM/1 && cp -r ../ensemble_models/$EM models/.
+        done
       fi
     fi
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in $BACKENDS; do
-      if [ "$BACKEND" != "plan" ]; then
+      if [ "$FW" != "plan" ]; then
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
         done

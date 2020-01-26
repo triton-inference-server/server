@@ -459,42 +459,42 @@ class InferTest(unittest.TestCase):
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-    if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
-        def test_ensemble_label_lookup(self):
-            if all(x in BACKENDS for x in ['graphdef', 'netdef', 'savedmodel']):
-                # Ensemble needs to look up label from the actual model
-                for bs in (1, 8):
-                    iu.infer_exact(self, "mix_platform", (16,), bs,
-                        np.float32, np.float32, np.float32, output0_raw=False, output1_raw=False,
-                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+        if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
+            def test_ensemble_label_lookup(self):
+                if all(x in BACKENDS for x in ['graphdef', 'netdef', 'savedmodel']):
+                    # Ensemble needs to look up label from the actual model
+                    for bs in (1, 8):
+                        iu.infer_exact(self, "mix_platform", (16,), bs,
+                            np.float32, np.float32, np.float32, output0_raw=False, output1_raw=False,
+                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-            if all(x in BACKENDS for x in ['graphdef', 'netdef', 'savedmodel']):
-                # Label from the actual model will be passed along the nested ensemble
-                for bs in (1, 8):
-                    iu.infer_exact(self, "mix_ensemble", (16,), bs,
-                        np.int32, np.float32, np.float32, output0_raw=False, output1_raw=False,
-                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                if all(x in BACKENDS for x in ['graphdef', 'netdef', 'savedmodel']):
+                    # Label from the actual model will be passed along the nested ensemble
+                    for bs in (1, 8):
+                        iu.infer_exact(self, "mix_ensemble", (16,), bs,
+                            np.int32, np.float32, np.float32, output0_raw=False, output1_raw=False,
+                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-            if "graphdef" in BACKENDS:
-                # If label file is provided, it will use the provided label file directly
-                try:
-                    iu.infer_exact(self, "wrong_label", (16,), 1,
-                        np.int32, np.float32, np.float32, output0_raw=False, output1_raw=False,
-                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-                except AssertionError:
-                    # Sanity check that infer_exact failed since this ensemble is provided
-                    # with unexpected labels
-                    pass
+                if "graphdef" in BACKENDS:
+                    # If label file is provided, it will use the provided label file directly
+                    try:
+                        iu.infer_exact(self, "wrong_label", (16,), 1,
+                            np.int32, np.float32, np.float32, output0_raw=False, output1_raw=False,
+                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                    except AssertionError:
+                        # Sanity check that infer_exact failed since this ensemble is provided
+                        # with unexpected labels
+                        pass
 
-            if "graphdef" in BACKENDS:
-                for bs in (1, 8):
-                    iu.infer_exact(self, "label_override", (16,), bs,
-                        np.int32, np.float32, np.float32, output0_raw=False, output1_raw=False,
-                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                if "graphdef" in BACKENDS:
+                    for bs in (1, 8):
+                        iu.infer_exact(self, "label_override", (16,), bs,
+                            np.int32, np.float32, np.float32, output0_raw=False, output1_raw=False,
+                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
 
 if __name__ == '__main__':
