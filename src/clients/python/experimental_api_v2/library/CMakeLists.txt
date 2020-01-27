@@ -26,11 +26,31 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-add_subdirectory(api_v1/library)
-add_subdirectory(api_v1/examples)
+#
+# Wheel file
+#
+set(wheel_stamp_file "stamp.whl")
+configure_file(../../../../../VERSION VERSION COPYONLY)
+configure_file(__init__.py __init__.py COPYONLY)
+configure_file(setup.py setup.py COPYONLY)
 
-# Build V2 api if required
-if(TRTIS_ENABLE_PYCLIENT_V2)
-    add_subdirectory(experimental_api_v2/library)
-    add_subdirectory(experimental_api_v2/examples)
-endif()
+add_custom_command(
+  OUTPUT "${wheel_stamp_file}"
+  COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/build_wheel.sh"
+  ARGS "${CMAKE_CURRENT_BINARY_DIR}"
+  DEPENDS
+    ${CMAKE_CURRENT_BINARY_DIR}/VERSION
+    ${CMAKE_CURRENT_BINARY_DIR}/__init__.py
+    ${CMAKE_CURRENT_BINARY_DIR}/setup.py
+)
+
+add_custom_target(
+  client-wheel-2 ALL
+  DEPENDS
+    "${wheel_stamp_file}"
+)
+
+install(
+  CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/tensorrtserverV2*.whl\")"
+  CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
+)

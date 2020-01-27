@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,13 +25,44 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.5)
+import sys
+import argparse
+from tensorrtserverV2.api import *
 
-add_subdirectory(api_v1/library)
-add_subdirectory(api_v1/examples)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-v',
+                        '--verbose',
+                        action="store_true",
+                        required=False,
+                        default=False,
+                        help='Enable verbose output')
+    parser.add_argument('-u',
+                        '--url',
+                        type=str,
+                        required=False,
+                        default='localhost:8000',
+                        help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument(
+        '-i',
+        '--protocol',
+        type=str,
+        required=False,
+        default='http',
+        help='Protocol ("http"/"grpc") used to ' +
+        'communicate with inference service. Default is "http".')
 
-# Build V2 api if required
-if(TRTIS_ENABLE_PYCLIENT_V2)
-    add_subdirectory(experimental_api_v2/library)
-    add_subdirectory(experimental_api_v2/examples)
-endif()
+    FLAGS = parser.parse_args()
+    try:
+        TRTISClient = InferenceServerClient(FLAGS.url, FLAGS.protocol)
+    except Exception as e:
+        print("context creation failed: " + str(e))
+        sys.exit()
+
+    if TRTISClient.is_server_live():
+        print("SUCCESS: is_server_live")
+
+    if TRTISClient.is_server_ready():
+        print("SUCCESS: is_server_ready")
+
+    TRTISClient.close()
