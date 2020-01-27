@@ -25,13 +25,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Git clone repo from github
+# Git clone github repo
 mkdir ${HOME}/trtis && cd ${HOME}/trtis && \
   git clone --single-branch --depth=1 \
     https://github.com/NVIDIA/tensorrt-inference-server && \
   cd tensorrt-inference-server
 
 TRTIS_VERSION=`cat VERSION`
+
+# Maps to dlcluster:/mnt/shared/dldata/inferenceserver/Jetson
+DLCLUSTER_DIR="/mnt/shared/data/dldata/inferenceserver/Jetson"
 
 # Install dependencies
 apt-get update && \
@@ -67,7 +70,10 @@ apt-get update && \
 # that custom tensorflow operations work correctly. Custom TF
 # operations link against libtensorflow_framework.so so it must be
 # present (and its functionality is provided by libtensorflow_trtis.so).
-# TODO Copy libtensorflow_trtis.so.1 from artifact store
+# Copy from dlcluster
+mkdir -p /opt/tensorrtserver/lib && \
+  cp ${DLCLUSTER_DIR}/tensorflow_artifacts/libtensorflow_trtis.so.1 \
+    /opt/tensorrtserver/lib/.
 (cd /opt/tensorrtserver/lib && \
     ln -sf libtensorflow_trtis.so.1 libtensorflow_framework.so.1 && \
     ln -sf libtensorflow_trtis.so.1 libtensorflow_framework.so && \
@@ -140,5 +146,8 @@ esac
 # Export Jetson Jetpack installed
 export JETPACK_VERSION
 
-# TODO publish this to a fixed data repository
-tar -zcvf tensorrtserver${TRTIS_VERSION}-jetpack-${JETPACK_VERSION}.tgz /opt/tensorrtserver
+# Tar contents of /opt/tensorrtserver and copy into /mnt/dldata
+tar -zcvf tensorrtserver${TRTIS_VERSION}-jetpack${JETPACK_VERSION}.tgz \
+  /opt/tensorrtserver
+cp tensorrtserver${TRTIS_VERSION}-jetpack${JETPACK_VERSION}.tgz \
+  /mnt/dldata/trtis_jetson/.
