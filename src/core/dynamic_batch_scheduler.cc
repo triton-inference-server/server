@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,6 +34,7 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
+#include "src/core/nvtx.h"
 #include "src/core/provider.h"
 #include "src/core/server_status.h"
 
@@ -244,6 +245,8 @@ DynamicBatchScheduler::SchedulerThread(
   const uint64_t default_wait_microseconds = 500 * 1000;
 
   while (!thread_exit->load()) {
+    NVTX_RANGE(nvtx_, "DynamicBatchScheduler " + runner_id);
+
     std::shared_ptr<std::vector<Scheduler::Payload>> payloads;
     bool wake_thread = false;
     uint64_t wait_microseconds = 0;
