@@ -74,8 +74,8 @@ MemoryReference::AddBuffer(
 }
 
 MutableMemory::MutableMemory(
-    char* buffer, size_t byte_size,
-    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
+    char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+    int64_t memory_type_id)
     : Memory(), buffer_(buffer), memory_type_(memory_type),
       memory_type_id_(memory_type_id)
 {

@@ -103,8 +103,8 @@ class MutableMemory : public Memory {
  public:
   // Create a mutable data buffer referrencing to other data buffer.
   MutableMemory(
-      char* buffer, size_t byte_size,
-      TRTSERVER_Memory_Type memory_type, int64_t memory_type_id);
+      char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+      int64_t memory_type_id);
 
   virtual ~MutableMemory() {}
 
@@ -112,7 +112,7 @@ class MutableMemory : public Memory {
   const char* BufferAt(
       size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
       int64_t* memory_type_id) const override;
-  
+
   // 'memory_type' returns the memory type of the chunk of bytes.
   // 'memory_type_id' returns the memory type id of the chunk of bytes.
   // Return the mutable buffer
@@ -136,7 +136,7 @@ class AllocatedMemory : public MutableMemory {
   AllocatedMemory(
       size_t byte_size, TRTSERVER_Memory_Type memory_type,
       int64_t memory_type_id);
-  
+
   ~AllocatedMemory() override;
 };
 
