@@ -95,7 +95,7 @@ FROM ${BASE_IMAGE} AS trtserver_onnx
 # needs to be built from source
 
 # Onnx Runtime release version
-ARG ONNX_RUNTIME_VERSION=1.0.0
+ARG ONNX_RUNTIME_VERSION=1.1.1
 
 # Get release version of Onnx Runtime
 WORKDIR /workspace
@@ -116,24 +116,17 @@ RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
 
 # Install OpenVINO
 # https://github.com/microsoft/onnxruntime/blob/master/tools/ci_build/github/linux/docker/Dockerfile.ubuntu_openvino
-ARG OPENVINO_VERSION=2019_R1.1
+ARG OPENVINO_VERSION=2019_R3.1
 RUN /tmp/scripts/install_openvino.sh -o ${OPENVINO_VERSION}
-ENV INTEL_CVSDK_DIR /data/dldt/openvino_2019.1.144
-ENV INTEL_OPENVINO_DIR /data/dldt/openvino_2019.1.144
+ENV INTEL_CVSDK_DIR /data/dldt/openvino_2019.3.376
+ENV INTEL_OPENVINO_DIR /data/dldt/openvino_2019.3.376
+ENV InferenceEngine_DIR /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/build
 
 ENV LD_LIBRARY_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64:$INTEL_CVSDK_DIR/deployment_tools/inference_engine/temp/omp/lib:$INTEL_CVSDK_DIR/deployment_tools/inference_engine/external/tbb/lib:/usr/local/openblas/lib:$LD_LIBRARY_PATH
 
 ENV PATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$PATH
 ENV PYTHONPATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
 ENV IE_PLUGINS_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64
-
-# [DLIS-816] Patch OpenVINO dependency (networkx) to fixed version until
-# the incompatible change is addressed:
-# https://github.com/microsoft/onnxruntime/issues/2169
-COPY build/onnxruntime /tmp/trtis/build/onnxruntime
-RUN sha1sum -c /tmp/trtis/build/onnxruntime/checksums && \
-    patch -i /tmp/trtis/build/onnxruntime/requirements_onnx.txt.patch \
-          $INTEL_OPENVINO_DIR/deployment_tools/model_optimizer/requirements_onnx.txt
 
 RUN wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-gmmlib_19.1.1_amd64.deb && \
     wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-igc-core_1.0.2-1787_amd64.deb && \
@@ -270,7 +263,7 @@ RUN cd /opt/tensorrtserver/lib/pytorch && \
 # Onnx Runtime headers and library
 # Put include files to same directory as ONNX Runtime changed the include path
 # https://github.com/microsoft/onnxruntime/pull/1461
-ARG ONNX_RUNTIME_VERSION=1.0.0
+ARG ONNX_RUNTIME_VERSION=1.1.1
 COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/session/onnxruntime_c_api.h \
      /opt/tensorrtserver/include/onnxruntime/
 COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cpu/cpu_provider_factory.h \
@@ -288,11 +281,13 @@ RUN cd /opt/tensorrtserver/lib/onnx && \
 
 # Minimum OpenVINO libraries required by ONNX Runtime to link and to run
 # with OpenVINO Execution Provider
-COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
      /opt/tensorrtserver/lib/onnx/
-COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libcpu_extension.so \
      /opt/tensorrtserver/lib/onnx/
-COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
+     /opt/tensorrtserver/lib/onnx/
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
      /opt/tensorrtserver/lib/onnx/
 RUN cd /opt/tensorrtserver/lib/onnx && \
     ln -sf libtbb.so.2 libtbb.so && \
@@ -412,7 +407,7 @@ RUN apt-get update && \
 WORKDIR /opt/tensorrtserver
 RUN rm -fr /opt/tensorrtserver/*
 COPY --chown=1000:1000 LICENSE .
-COPY --chown=1000:1000 --from=trtserver_onnx /data/dldt/openvino_2019.1.144/LICENSE LICENSE.openvino
+COPY --chown=1000:1000 --from=trtserver_onnx /data/dldt/openvino_2019.3.376/LICENSE LICENSE.openvino
 COPY --chown=1000:1000 --from=trtserver_onnx /workspace/onnxruntime/LICENSE LICENSE.onnxruntime
 COPY --chown=1000:1000 --from=trtserver_tf /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
 COPY --chown=1000:1000 --from=trtserver_pytorch /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
@@ -423,11 +418,11 @@ COPY --chown=1000:1000 --from=trtserver_build /opt/tensorrtserver/include includ
 # Install ONNX-Runtime-OpenVINO dependencies to use it in base container
 COPY --chown=1000:1000 --from=trtserver_onnx /workspace/build/Release/openvino_* \
      /opt/openvino_scripts/
-COPY --chown=1000:1000 --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/model_optimizer \
-     /opt/openvino_scripts/openvino_2019.1.144/deployment_tools/model_optimizer/
-COPY --chown=1000:1000 --from=trtserver_onnx /data/dldt/openvino_2019.1.144/tools \
-     /opt/openvino_scripts/openvino_2019.1.144/tools
-ENV INTEL_CVSDK_DIR /opt/openvino_scripts/openvino_2019.1.144
+COPY --chown=1000:1000 --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/model_optimizer \
+     /opt/openvino_scripts/openvino_2019.3.376/deployment_tools/model_optimizer/
+COPY --chown=1000:1000 --from=trtserver_onnx /data/dldt/openvino_2019.3.376/tools \
+     /opt/openvino_scripts/openvino_2019.3.376/tools
+ENV INTEL_CVSDK_DIR /opt/openvino_scripts/openvino_2019.3.376
 ENV PYTHONPATH /opt/openvino_scripts:$INTEL_CVSDK_DIR:$INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
 
 # ONNX Runtime requires Python3 to convert ONNX models to OpenVINO models
