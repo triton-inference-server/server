@@ -208,7 +208,7 @@ RUN apt-get update && \
             libh2o-evloop-dev \
             libnuma-dev \
             libwslay-dev \
-            libuv1-dev && \
+            libuv1-dev \
             patchelf \
             software-properties-common && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
