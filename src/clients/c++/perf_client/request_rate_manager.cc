@@ -294,7 +294,7 @@ RequestRateManager::Infer(
       Request(ctx, flags, delayed, start_time, thread_stat);
     }
 
-    if (early_exit) {
+    if (early_exit || (!thread_stat->cb_status_.IsOk())) {
       if (on_sequence_model_) {
         // Finish off all the ongoing sequences for graceful exit
         for (size_t i = thread_config->id_; i < sequence_stat_.size();
@@ -344,16 +344,21 @@ RequestRateManager::Request(
             std::shared_ptr<nic::InferContext::Request> request) {
           std::map<std::string, std::unique_ptr<nic::InferContext::Result>>
               results;
-          context->ctx_->GetAsyncRunResults(request, &results);
-          struct timespec end_time_async;
-          clock_gettime(CLOCK_MONOTONIC, &end_time_async);
-          {
-            // Add the request timestamp to thread Timestamp vector with
-            // proper locking
-            std::lock_guard<std::mutex> lock(thread_stat->mu_);
-            thread_stat->request_timestamps_.emplace_back(
-                std::make_tuple(start_time, end_time_async, flags, delayed));
-            context->ctx_->GetStat(&(thread_stat->contexts_stat_[0]));
+          nic::Error callback_error =
+              context->ctx_->GetAsyncRunResults(request, &results);
+          if (callback_error.IsOk()) {
+            struct timespec end_time_async;
+            clock_gettime(CLOCK_MONOTONIC, &end_time_async);
+            {
+              // Add the request timestamp to thread Timestamp vector with
+              // proper locking
+              std::lock_guard<std::mutex> lock(thread_stat->mu_);
+              thread_stat->request_timestamps_.emplace_back(
+                  std::make_tuple(start_time, end_time_async, flags, delayed));
+              context->ctx_->GetStat(&(thread_stat->contexts_stat_[0]));
+            }
+          } else if (thread_stat->cb_status_.IsOk()) {
+            thread_stat->cb_status_ = callback_error;
           }
           context->inflight_request_cnt_--;
         });

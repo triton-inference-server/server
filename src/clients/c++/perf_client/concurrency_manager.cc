@@ -277,18 +277,24 @@ ConcurrencyManager::Infer(
                 std::shared_ptr<nic::InferContext::Request> request) {
               std::map<std::string, std::unique_ptr<nic::InferContext::Result>>
                   results;
-              ctxs[ctx_id]->ctx_->GetAsyncRunResults(request, &results);
-              struct timespec end_time_async;
-              clock_gettime(CLOCK_MONOTONIC, &end_time_async);
-              {
-                // Add the request timestamp to thread Timestamp vector with
-                // proper locking
-                std::lock_guard<std::mutex> lock(thread_stat->mu_);
-                thread_stat->request_timestamps_.emplace_back(std::make_tuple(
-                    start_time_async, end_time_async, flags,
-                    false /* delayed */));
-                ctxs[ctx_id]->ctx_->GetStat(
-                    &(thread_stat->contexts_stat_[ctx_id]));
+              nic::Error callback_error =
+                  ctxs[ctx_id]->ctx_->GetAsyncRunResults(request, &results);
+              if (callback_error.IsOk()) {
+                struct timespec end_time_async;
+                clock_gettime(CLOCK_MONOTONIC, &end_time_async);
+                {
+                  // Add the request timestamp to thread Timestamp vector with
+                  // proper locking
+                  std::lock_guard<std::mutex> lock(thread_stat->mu_);
+                  thread_stat->request_timestamps_.emplace_back(std::make_tuple(
+                      start_time_async, end_time_async, flags,
+                      false /* delayed */));
+                  ctxs[ctx_id]->ctx_->GetStat(
+                      &(thread_stat->contexts_stat_[ctx_id]));
+                }
+              } else if (thread_stat->cb_status_.IsOk()) {
+                // Record the callback error if not already recorded
+                thread_stat->cb_status_ = callback_error;
               }
 
               // avoid competition over 'cb_mtx'
@@ -344,7 +350,7 @@ ConcurrencyManager::Infer(
       total_ongoing_requests = 0;
     }
 
-    if (early_exit) {
+    if (early_exit || (!thread_stat->cb_status_.IsOk())) {
       if (async_) {
         // Wait for all callbacks to complete.
         // Loop to ensure all the inflight requests have been completed.
