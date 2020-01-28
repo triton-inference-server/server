@@ -1442,9 +1442,7 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
   ni::InferenceServer* lserver = new ni::InferenceServer();
   TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
 
-#ifdef TRTIS_ENABLE_NVTX
-  nvtxInitialize(nullptr);
-#endif  // TRTIS_ENABLE_NVTX
+  NVTX_INITIALIZE;
 
 #ifdef TRTIS_ENABLE_METRICS
   if (loptions->Metrics() && loptions->GpuMetrics()) {
