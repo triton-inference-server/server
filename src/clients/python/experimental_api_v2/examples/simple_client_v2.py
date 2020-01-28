@@ -54,26 +54,20 @@ if __name__ == '__main__':
     model_name = 'savedmodel_float32_float32_float32'
     model_name_2 = 'savedmodel_object_object_object'
 
-    ### Model Control API ###
-    TRTISClient.load(model_name)
-    if TRTISClient.is_model_ready(model_name, 1):
-        print("PASS: load")
-
-    TRTISClient.load(model_name_2)
-    if TRTISClient.is_model_ready(model_name_2, 1):
-        print("PASS: load_2")
-
-    ### Health API ###
     if TRTISClient.is_server_live():
         print("PASS: is_server_live")
 
     if TRTISClient.is_server_ready():
         print("PASS: is_server_ready")
 
+    TRTISClient.load_model(model_name)
     if TRTISClient.is_model_ready(model_name, 1):
-        print("PASS: is_model_ready")
+        print("PASS: load_model")
 
-    ### Status API ###
+    TRTISClient.load_model(model_name_2)
+    if TRTISClient.is_model_ready(model_name_2, 1):
+        print("PASS: load_model_2")
+
     status = TRTISClient.get_server_status()
     if 'id' in status.keys() and status['id'] == 'inference:0':
         print("PASS: get_server_status")
@@ -90,8 +84,8 @@ if __name__ == '__main__':
             "no status available for unknown model" in ex.message():
             print("PASS: detected wrong model")
 
-    TRTISClient.unload(model_name_2)
+    TRTISClient.unload_model(model_name_2)
     if not TRTISClient.is_model_ready(model_name_2, 1):
-        print("PASS: unload")
+        print("PASS: unload_model")
 
     TRTISClient.close()

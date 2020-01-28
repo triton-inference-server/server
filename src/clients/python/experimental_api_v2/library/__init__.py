@@ -32,6 +32,13 @@ import rapidjson as json
 
 import tensorrtserver.api.request_status_pb2 as request_status
 
+def _raise_error(msg):
+    """
+    Raise error with the provided message
+    """
+    rstatus = request_status.RequestStatus()
+    rstatus.msg = msg
+    raise InferenceServerException(rstatus, msg_only=True)
 
 def _raise_if_error(nv_status):
     """
@@ -55,10 +62,14 @@ class InferenceServerException(Exception):
 
     """
 
-    def __init__(self, err):
+    def __init__(self, err, msg_only=False):
         self._msg = err.msg
-        self._server_id = err.server_id
-        self._request_id = err.request_id
+        if msg_only:
+            self._server_id = None
+            self._request_id = 0
+        else:
+            self._server_id = err.server_id
+            self._request_id = err.request_id
 
     def __str__(self):
         msg = super().__str__() if self._msg is None else self._msg
@@ -187,7 +198,7 @@ class InferenceServerHTTPClient:
 
         Raises
         ------
-        Exception
+        InferenceServerException
             If unable to get liveness.
 
         """
@@ -205,7 +216,7 @@ class InferenceServerHTTPClient:
 
         Raises
         ------
-        Exception
+        InferenceServerException
             If unable to get readiness.
 
         """
@@ -213,7 +224,7 @@ class InferenceServerHTTPClient:
         self._last_request_id = _raise_if_error(self.response['NV-Status'])
         return self.response.status_code == 200
 
-    def is_model_ready(self, model_name, model_version):
+    def is_model_ready(self, model_name, model_version=-1):
         """Contact the inference server and get the readiness of specified model.
 
          Parameters
@@ -222,7 +233,9 @@ class InferenceServerHTTPClient:
             The name of the model
 
         model_version: int
-            The version of the model
+            The version of the model. The default value is -1 which means by default
+            the server will choose the model version based on its version policy
+            for the model.
 
         Returns
         -------
@@ -231,7 +244,7 @@ class InferenceServerHTTPClient:
 
         Raises
         ------
-        Exception
+        InferenceServerException
             If unable to get model readiness.
 
         """
@@ -240,14 +253,17 @@ class InferenceServerHTTPClient:
         self._last_request_id = _raise_if_error(self.response['NV-Status'])
 
         status = json.loads(self.response.read())
-        if model_name in status['modelStatus'].keys() and \
-               str(model_version) in status['modelStatus']\
-               [model_name]['versionStatus'].keys() and \
-               status['modelStatus'][model_name]['versionStatus'] \
-               [str(model_version)]["readyState"] == 'MODEL_READY':
-            return True
+        if model_version == -1:
+            _raise_error('Currently not supported. Will be implemented as part of HTTP V2 API')
         else:
-            return False
+            if model_name in status['modelStatus'].keys() and \
+                str(model_version) in status['modelStatus']\
+                [model_name]['versionStatus'].keys() and \
+                status['modelStatus'][model_name]['versionStatus'] \
+                [str(model_version)]["readyState"] == 'MODEL_READY':
+                return True
+            else:
+                return False
 
     def get_server_status(self):
         """Contact the inference server and get its status.
@@ -259,7 +275,7 @@ class InferenceServerHTTPClient:
 
         Raises
         ------
-        Exception
+        InferenceServerException
             If unable to get status.
 
         """
@@ -285,7 +301,7 @@ class InferenceServerHTTPClient:
 
         Raises
         ------
-        Exception
+        InferenceServerException
             If unable to get model status.
 
         """
@@ -297,8 +313,8 @@ class InferenceServerHTTPClient:
         status = json.loads(self.response.read())
         return status
 
-    def load(self, model_name):
-        """Request the inference server to load specified model.
+    def load_model(self, model_name):
+        """Request the inference server to load or reload specified model.
 
         Parameters
         ----------
@@ -307,7 +323,7 @@ class InferenceServerHTTPClient:
 
         Raises
         ------
-        Exception
+        InferenceServerException
             If unable to load the model.
 
         """
@@ -315,7 +331,7 @@ class InferenceServerHTTPClient:
                                                model_name)
         self._last_request_id = _raise_if_error(self.response['NV-Status'])
 
-    def unload(self, model_name):
+    def unload_model(self, model_name):
         """Request the inference server to unload specified model.
 
         Parameters
@@ -325,7 +341,7 @@ class InferenceServerHTTPClient:
 
         Raises
         ------
-        Exception
+        InferenceServerException
             If unable to unload the model.
 
         """

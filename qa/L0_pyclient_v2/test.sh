@@ -63,7 +63,7 @@ python3 $SIMPLE_CLIENT >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
-if [ $(cat $CLIENT_LOG | grep "PASS" | wc -l) -ne 9 ]; then
+if [ $(cat $CLIENT_LOG | grep "PASS" | wc -l) -ne 8 ]; then
         RET=1
     fi
 set -e
