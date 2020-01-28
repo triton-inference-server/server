@@ -285,6 +285,8 @@ COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/infer
      /opt/tensorrtserver/lib/onnx/
 COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libcpu_extension.so \
      /opt/tensorrtserver/lib/onnx/
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/plugins.xml \
+     /opt/tensorrtserver/lib/onnx/
 COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
      /opt/tensorrtserver/lib/onnx/
 COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
