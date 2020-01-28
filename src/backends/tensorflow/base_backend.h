@@ -112,7 +112,8 @@ class BaseBackend : public InferenceBackend {
     void ReadFixedSizedOutputTensor(
         TRTISTF_Tensor* tensor, const std::string& output_name,
         const std::vector<int64_t>& shape, const size_t batch1_byte_size,
-        std::vector<Scheduler::Payload>* payloads, bool* cuda_copy);
+        std::vector<Scheduler::Payload>* payloads, OutputInfo* output,
+        bool* cuda_copy);
 
     // Helper function to set the output with String data type in payload
     void ReadStringOutputTensor(

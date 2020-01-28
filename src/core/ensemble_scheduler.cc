@@ -48,8 +48,7 @@ struct Step {
   std::shared_ptr<InferenceBackend> backend_;
   std::shared_ptr<InferRequestProvider> request_provider_;
   std::shared_ptr<InferResponseProvider> response_provider_;
-  std::unordered_map<std::string, std::shared_ptr<AllocatedMemory>>
-      output_map_;
+  std::unordered_map<std::string, std::shared_ptr<AllocatedMemory>> output_map_;
   Status infer_status_;
 
   size_t step_idx_;

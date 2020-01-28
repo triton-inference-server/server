@@ -100,7 +100,8 @@ class LibTorchBackend : public InferenceBackend {
         std::vector<torch::Tensor>* outputs_, const std::string& name,
         const int& op_index, const DataType dtype, const size_t dtype_byte_size,
         const size_t total_batch_size, const DimsList& dims,
-        std::vector<Scheduler::Payload>* payloads, bool* cuda_copy);
+        std::vector<Scheduler::Payload>* payloads, OutputInfo* output,
+        bool* cuda_copy);
 
     // Set the input tensor given the meta data of the input.
     Status SetInputTensor(

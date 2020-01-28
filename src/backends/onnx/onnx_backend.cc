@@ -858,7 +858,10 @@ OnnxBackend::Context::ReadOutputTensors(
     std::vector<Scheduler::Payload>* payloads)
 {
   bool cuda_copy = false;
+  std::vector<OutputInfo> outputs;
   for (size_t idx = 0; idx < output_names.size(); idx++) {
+    outputs.emplace_back();
+    auto& output = outputs.back();
     std::string name = std::string(output_names[idx]);
 
     const ModelOutput* output_config;
@@ -885,8 +888,6 @@ OnnxBackend::Context::ReadOutputTensors(
     size_t num_dims;
     RETURN_IF_ORT_ERROR(ort_api->GetDimensionsCount(type_and_shape, &num_dims));
 
-    // [TODO] make it live longer, currently okay as it is not holding anything
-    OutputInfo output;
     output.output_shape_.resize(num_dims);
     RETURN_IF_ORT_ERROR(ort_api->GetDimensions(
         type_and_shape, output.output_shape_.data(),
@@ -944,6 +945,34 @@ OnnxBackend::Context::ReadOutputTensors(
   }
 
 #ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+  cuda_copy = false;
+  for (auto& output : outputs) {
+    for (auto& indirect_buffer : output.indirect_buffers_) {
+      bool cuda_used;
+      TRTSERVER_Memory_Type src_memory_type;
+      int64_t src_memory_type_id;
+      // placeholder, copy byte size is determined by dst_byte_size
+      size_t src_byte_size;
+      auto src = indirect_buffer.first->BufferAt(
+          0, &src_byte_size, &src_memory_type, &src_memory_type_id);
+      TRTSERVER_Memory_Type dst_memory_type;
+      int64_t dst_memory_type_id;
+      for (auto& payload_output : indirect_buffer.second) {
+        char* dst = payload_output.second->MutableBuffer(
+            &dst_memory_type, &dst_memory_type_id);
+        auto dst_byte_size = payload_output.second->TotalByteSize();
+        (*payloads)[payload_output.first].status_ = CopyBuffer(
+            "indirect buffer", src_memory_type, src_memory_type_id,
+            dst_memory_type, dst_memory_type_id, dst_byte_size, src, dst,
+            stream_, &cuda_used);
+        cuda_copy |= cuda_used;
+        src += dst_byte_size;
+      }
+    }
+  }
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }

@@ -373,22 +373,21 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
     std::vector<torch::Tensor>* outputs_, const std::string& name,
     const int& op_index, const DataType dtype, const size_t dtype_byte_size,
     const size_t total_batch_size, const DimsList& dims,
-    std::vector<Scheduler::Payload>* payloads, bool* cuda_copy)
+    std::vector<Scheduler::Payload>* payloads, OutputInfo* output,
+    bool* cuda_copy)
 {
-  // [TODO] make it live longer, currently okay as it is not holding anything
-  OutputInfo output;
   size_t byte_size = 0;
   RETURN_IF_ERROR(GetOutputTensor(
-      outputs_, op_index, name, dtype, &output.output_buffer_, &byte_size,
-      &output.output_shape_));
+      outputs_, op_index, name, dtype, &output->output_buffer_, &byte_size,
+      &output->output_shape_));
 
   // verify shape of output matches shape from model config
   RETURN_IF_ERROR(CompareOutputDims(
-      name, output.output_shape_, dims,
+      name, output->output_shape_, dims,
       max_batch_size_ != NO_BATCHING /* supports_batching */));
 
   const size_t total_byte_size =
-      GetElementCount(output.output_shape_) * dtype_byte_size;
+      GetElementCount(output->output_shape_) * dtype_byte_size;
   const size_t batch1_byte_size = total_byte_size / total_batch_size;
 
   if (byte_size != total_byte_size) {
@@ -400,11 +399,11 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
             std::to_string(batch1_byte_size));
   }
 
-  output.memory_type_ =
+  output->memory_type_ =
       (device_ == torch::kCPU) ? TRTSERVER_MEMORY_CPU : TRTSERVER_MEMORY_GPU;
-  output.memory_type_id_ = (device_ == torch::kCPU) ? 0 : gpu_device_;
+  output->memory_type_id_ = (device_ == torch::kCPU) ? 0 : gpu_device_;
   *cuda_copy |=
-      SetFixedSizeOutputBuffer(name, batch1_byte_size, &output, payloads);
+      SetFixedSizeOutputBuffer(name, batch1_byte_size, output, payloads);
 
   return Status::Success;
 }
@@ -710,8 +709,10 @@ LibTorchBackend::Context::Run(
   }
 
   // Ensure outputs have the expected size and copy it to the payload responses.
+  std::vector<OutputInfo> outputs;
   cuda_copy = false;
   for (const auto& name : required_outputs) {
+    outputs.emplace_back();
     int op_index = output_index_map_[name];
     const ModelOutput* output_config;
     RETURN_IF_ERROR(base->GetOutput(name, &output_config));
@@ -729,10 +730,38 @@ LibTorchBackend::Context::Run(
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
         &outputs_, name, op_index, dtype,
         GetDataTypeByteSize(output_config->data_type()), total_batch_size,
-        output_dims, payloads, &cuda_copy));
+        output_dims, payloads, &outputs.back(), &cuda_copy));
   }
 
 #ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+  cuda_copy = false;
+  for (auto& output : outputs) {
+    for (auto& indirect_buffer : output.indirect_buffers_) {
+      bool cuda_used;
+      TRTSERVER_Memory_Type src_memory_type;
+      int64_t src_memory_type_id;
+      // placeholder, copy byte size is determined by dst_byte_size
+      size_t src_byte_size;
+      auto src = indirect_buffer.first->BufferAt(
+          0, &src_byte_size, &src_memory_type, &src_memory_type_id);
+      TRTSERVER_Memory_Type dst_memory_type;
+      int64_t dst_memory_type_id;
+      for (auto& payload_output : indirect_buffer.second) {
+        char* dst = payload_output.second->MutableBuffer(
+            &dst_memory_type, &dst_memory_type_id);
+        auto dst_byte_size = payload_output.second->TotalByteSize();
+        (*payloads)[payload_output.first].status_ = CopyBuffer(
+            "indirect buffer", src_memory_type, src_memory_type_id,
+            dst_memory_type, dst_memory_type_id, dst_byte_size, src, dst,
+            stream_, &cuda_used);
+        cuda_copy |= cuda_used;
+        src += dst_byte_size;
+      }
+    }
+  }
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }

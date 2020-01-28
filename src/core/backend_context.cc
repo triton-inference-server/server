@@ -315,10 +315,10 @@ BackendContext::SetFixedSizeOutputBuffer(
     // if 'payload' requested this output then copy it from
     // 'output->output_buffer_'. If it did not request this output then just
     // skip it in the 'output->output_buffer_'.
-    auto skip_payload = payload.status_.IsOk() &&
-                        (payload.response_provider_ != nullptr) &&
-                        payload.response_provider_->RequiresOutput(name);
-    if (skip_payload) {
+    auto process_payload = payload.status_.IsOk() &&
+                           (payload.response_provider_ != nullptr) &&
+                           payload.response_provider_->RequiresOutput(name);
+    if (process_payload) {
       TRTSERVER_Memory_Type dst_memory_type;
       int64_t dst_memory_type_id;
       void* buffer = nullptr;
@@ -343,7 +343,7 @@ BackendContext::SetFixedSizeOutputBuffer(
             std::get<2>(pinned_buffer_info)
                 .emplace_back(idx, local_mutable_buffer.get());
             output->indirect_buffers_.back().second.emplace_back(
-                std::move(local_mutable_buffer));
+                idx, std::move(local_mutable_buffer));
           } else {
             bool cuda_used = false;
             status = CopyBuffer(
@@ -364,16 +364,16 @@ BackendContext::SetFixedSizeOutputBuffer(
       }
 
       if (!status.IsOk()) {
-        skip_payload = true;
+        process_payload = false;
       }
 
       payload.status_ = status;
     }
 
-    // If the payload is skipped due to unexpected status or output is not
+    // If the payload is not processed due to unexpected status or output is not
     // required for it, maintain a new indirect buffer as the contiguousity ends
     // here. And there are pending indirect buffer copies, issue them.
-    if (skip_payload) {
+    if (!process_payload) {
       if (std::get<1>(pinned_buffer_info) > 0) {
         cuda_copy |= IssueIndirectOutputBufferCopy(
             name, pinned_buffer_info, payloads, stream_, output);
@@ -390,6 +390,11 @@ BackendContext::SetFixedSizeOutputBuffer(
     cuda_copy |= IssueIndirectOutputBufferCopy(
         name, pinned_buffer_info, payloads, stream_, output);
   }
+
+  // The last element in 'indirect_buffers_' is always a placeholder for next
+  // possible indirect buffer, side-affect from IssueIndirectOutputBufferCopy(),
+  // so we should always remove it to avoid accessing nullptr
+  output->indirect_buffers_.pop_back();
 
   return cuda_copy;
 }
@@ -417,7 +422,7 @@ BackendContext::IssueIndirectOutputBufferCopy(
   if (!direct_copy) {
     auto indirect_copy_status = CopyBuffer(
         name, output->memory_type_, output->memory_type_id_, mem_type, mem_id,
-        pinned_buffer_size, output_buffer, buffer, stream_, &cuda_used);
+        pinned_buffer_size, output_buffer, buffer, stream, &cuda_used);
     // Fail back to direct copy
     if (!indirect_copy_status.IsOk()) {
       direct_copy = true;
@@ -433,7 +438,7 @@ BackendContext::IssueIndirectOutputBufferCopy(
       auto byte_size = data_info.second->TotalByteSize();
       (*payloads)[data_info.first].status_ = CopyBuffer(
           name, output->memory_type_, output->memory_type_id_, mem_type, mem_id,
-          byte_size, output_buffer + buffer_offset, dst_buffer, stream_,
+          byte_size, output_buffer + buffer_offset, dst_buffer, stream,
           &cuda_used);
       buffer_offset += byte_size;
       cuda_copy |= cuda_used;

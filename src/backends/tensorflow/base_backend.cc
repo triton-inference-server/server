@@ -554,22 +554,21 @@ void
 BaseBackend::Context::ReadFixedSizedOutputTensor(
     TRTISTF_Tensor* tensor, const std::string& output_name,
     const std::vector<int64_t>& shape, const size_t batch1_byte_size,
-    std::vector<Scheduler::Payload>* payloads, bool* cuda_copy)
+    std::vector<Scheduler::Payload>* payloads, OutputInfo* output,
+    bool* cuda_copy)
 {
-  // [TODO] make it live longer, currently okay as it is not holding anything
-  OutputInfo output;
-  output.output_buffer_ = TRTISTF_TensorData(tensor);
+  output->output_buffer_ = TRTISTF_TensorData(tensor);
   // [TODO] avoid shape copy
-  output.output_shape_ = shape;
-  output.memory_type_ = (TRTISTF_TensorIsGPUTensor(tensor))
-                            ? TRTSERVER_MEMORY_GPU
-                            : TRTSERVER_MEMORY_CPU;
-  output.memory_type_id_ =
+  output->output_shape_ = shape;
+  output->memory_type_ = (TRTISTF_TensorIsGPUTensor(tensor))
+                             ? TRTSERVER_MEMORY_GPU
+                             : TRTSERVER_MEMORY_CPU;
+  output->memory_type_id_ =
       (TRTISTF_TensorIsGPUTensor(tensor)) ? gpu_device_ : 0;
   LOG_VERBOSE(1) << "output '" << output_name
                  << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
-  *cuda_copy |= SetFixedSizeOutputBuffer(
-      output_name, batch1_byte_size, &output, payloads);
+  *cuda_copy |=
+      SetFixedSizeOutputBuffer(output_name, batch1_byte_size, output, payloads);
 }
 
 void
@@ -816,8 +815,10 @@ BaseBackend::Context::Run(
   // Make sure each output is of the expected size and copy it into
   // the appropriate response providers.
   cuda_copy = false;
+  std::vector<OutputInfo> outputs;
   TRTISTF_TensorList* output_tensor_itr = output_tensors.get();
   for (const auto& name : model_output_names) {
+    outputs.emplace_back();
     const ModelOutput* output_config;
     RETURN_IF_ERROR(base->GetOutput(name, &output_config));
 
@@ -873,7 +874,7 @@ BaseBackend::Context::Run(
       }
       ReadFixedSizedOutputTensor(
           output_tensor, name, shapevec, batch1_byte_size, payloads,
-          &cuda_copy);
+          &outputs.back(), &cuda_copy);
     } else {
       ReadStringOutputTensor(
           output_tensor, name, shapevec, batch1_element_cnt, payloads,
@@ -884,6 +885,34 @@ BaseBackend::Context::Run(
   }
 
 #ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+  cuda_copy = false;
+  for (auto& output : outputs) {
+    for (auto& indirect_buffer : output.indirect_buffers_) {
+      bool cuda_used;
+      TRTSERVER_Memory_Type src_memory_type;
+      int64_t src_memory_type_id;
+      // placeholder, copy byte size is determined by dst_byte_size
+      size_t src_byte_size;
+      auto src = indirect_buffer.first->BufferAt(
+          0, &src_byte_size, &src_memory_type, &src_memory_type_id);
+      TRTSERVER_Memory_Type dst_memory_type;
+      int64_t dst_memory_type_id;
+      for (auto& payload_output : indirect_buffer.second) {
+        char* dst = payload_output.second->MutableBuffer(
+            &dst_memory_type, &dst_memory_type_id);
+        auto dst_byte_size = payload_output.second->TotalByteSize();
+        (*payloads)[payload_output.first].status_ = CopyBuffer(
+            "indirect buffer", src_memory_type, src_memory_type_id,
+            dst_memory_type, dst_memory_type_id, dst_byte_size, src, dst,
+            stream_, &cuda_used);
+        cuda_copy |= cuda_used;
+        src += dst_byte_size;
+      }
+    }
+  }
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }

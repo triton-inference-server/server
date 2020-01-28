@@ -100,7 +100,7 @@ class NetDefBackend : public InferenceBackend {
         const std::string& name, const Caffe2Workspace::DataType dtype,
         const size_t dtype_byte_size, const size_t total_batch_size,
         const DimsList& dims, std::vector<Scheduler::Payload>* payloads,
-        bool* cuda_copy);
+        OutputInfo* output, bool* cuda_copy);
 
     // Caffe2 workspace.
     std::unique_ptr<Caffe2Workspace> workspace_;

@@ -58,11 +58,11 @@ struct OutputInfo {
   std::vector<int64_t> output_shape_;
   TRTSERVER_Memory_Type memory_type_;
   int64_t memory_type_id_;
-  // indirect pinned memory buffers, and the memory references appointing to
-  // the destinations in payloads [TODO] payload idx for reporting error?
+  // indirect pinned memory buffers, the memory references appointing to
+  // the destinations in payloads and the payload's index
   std::vector<std::pair<
       std::unique_ptr<AllocatedMemory>,
-      std::vector<std::unique_ptr<MutableMemory>>>>
+      std::vector<std::pair<size_t, std::unique_ptr<MutableMemory>>>>>
       indirect_buffers_;
 };
 
