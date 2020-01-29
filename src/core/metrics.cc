@@ -145,9 +145,7 @@ Metrics::InitializeNvmlMetrics()
 {
 #ifndef TRTIS_ENABLE_METRICS_GPU
   return false;
-#endif  // !TRTIS_ENABLE_METRICS_GPU
-
-#ifdef TRTIS_ENABLE_METRICS_GPU
+#else
   nvmlReturn_t nvmlerr = nvmlInit();
   if (nvmlerr != NVML_SUCCESS) {
     LOG_ERROR << "failed to initialize NVML: NVML_ERROR " << nvmlerr;
@@ -336,9 +334,7 @@ Metrics::UUIDForCudaDevice(int cuda_device, std::string* uuid)
   // If GPU metrics is not enabled just silently fail.
 #ifndef TRTIS_ENABLE_METRICS_GPU
   return false;
-#endif  // !TRTIS_ENABLE_METRICS_GPU
-
-#ifdef TRTIS_ENABLE_METRICS_GPU
+#else
   char pcibusid_str[64];
   cudaError_t cuerr = cudaDeviceGetPCIBusId(
       pcibusid_str, sizeof(pcibusid_str) - 1, cuda_device);
