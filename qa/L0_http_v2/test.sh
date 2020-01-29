@@ -83,6 +83,7 @@ fi
     cmake -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install \
         -DTRTIS_ENABLE_METRICS=OFF \
+        -DTRTIS_ENABLE_METRICS_GPU=OFF \
         -DTRTIS_ENABLE_GPU=OFF \
         -DTRTIS_ENABLE_HTTP_V2=ON && \
     make -j16 trtis-clients)
