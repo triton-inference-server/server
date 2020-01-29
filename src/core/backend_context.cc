@@ -28,6 +28,7 @@
 
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
+#include "src/core/nvtx.h"
 #include "src/core/provider.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -151,14 +152,14 @@ BackendContext::SetInputBuffer(
 
       if (content_byte_size > 0) {
         // Defer memory copy for the buffer if it's better put into an
-        // intermediate buffer first.
+        // intermediate pinned buffer first.
         if (need_buffer && (src_memory_type == candidate_type)) {
           std::get<1>(pinned_buffer_info) += content_byte_size;
           std::get<2>(pinned_buffer_info).emplace_back(idx, data, data_idx);
         } else {
           // If copy should be perform directly, two steps to be done:
-          // 1. issue copy for the current buffer
-          // 2. Settle the existing intermediate buffer
+          // 1. Issue copy for the current buffer
+          // 2. Finalize the existing intermediate buffer
           bool cuda_used = false;
           payload.status_ = CopyBuffer(
               name, src_memory_type, src_memory_type_id, input->memory_type_,
@@ -178,6 +179,7 @@ BackendContext::SetInputBuffer(
           }
         }
       }
+
       copied_byte_size += content_byte_size;
       data_idx++;
     }
@@ -240,6 +242,8 @@ BackendContext::IssueIndirectInputBufferCopy(
     std::vector<Scheduler::Payload>* payloads, cudaStream_t stream,
     InputInfo* input)
 {
+  NVTX_RANGE(nvtx_, "IndirectInputBufferCopy");
+
   bool cuda_copy = false;
   bool cuda_used = false;
   auto mem_type = TRTSERVER_MEMORY_CPU_PINNED;
@@ -250,6 +254,7 @@ BackendContext::IssueIndirectInputBufferCopy(
       new AllocatedSystemMemory(pinned_buffer_size, mem_type, mem_id));
   char* buffer = local_indirect_buffer->MutableBuffer(&mem_type, &mem_id);
   std::vector<size_t> payload_idxs;
+
   // If can't reserve the intermediate buffer, the copy should be
   // perform directly to input buffer
   bool direct_copy = (mem_type != TRTSERVER_MEMORY_CPU_PINNED);
@@ -258,6 +263,7 @@ BackendContext::IssueIndirectInputBufferCopy(
     mem_type = input->memory_type_;
     mem_id = input->memory_type_id_;
   }
+
   auto src_mem_type = input->memory_type_;
   auto src_mem_type_id = input->memory_type_id_;
   size_t src_byte_size;
@@ -279,6 +285,7 @@ BackendContext::IssueIndirectInputBufferCopy(
         std::move(local_indirect_buffer), input_offset,
         std::move(payload_idxs));
   }
+
   return cuda_copy;
 }
 

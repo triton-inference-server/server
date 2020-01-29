@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,6 +27,7 @@
 #include "src/core/cuda_utils.h"
 
 #include "src/core/model_config_utils.h"
+#include "src/core/nvtx.h"
 #include "src/core/request_status.pb.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -78,6 +79,8 @@ CopyBuffer(
     const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
     void* dst, cudaStream_t cuda_stream, bool* cuda_used)
 {
+  NVTX_RANGE(nvtx_, "CopyBuffer");
+
   *cuda_used = false;
 
   // For CUDA memcpy, all host to host copy will be blocked in respect to the

@@ -31,6 +31,7 @@
 #include "src/core/backend.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
+#include "src/core/nvtx.h"
 #include "src/core/provider_utils.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/server.h"
@@ -1440,6 +1441,8 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
 {
   ni::InferenceServer* lserver = new ni::InferenceServer();
   TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+
+  NVTX_INITIALIZE;
 
 #ifdef TRTIS_ENABLE_METRICS
   if (loptions->Metrics() && loptions->GpuMetrics()) {
