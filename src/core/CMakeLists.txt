@@ -167,6 +167,7 @@ set(
   metrics.h
   model_config_utils.h
   model_repository_manager.h
+  nvtx.h
   tracing.h
   pinned_memory_manager.h
   provider.h

@@ -62,6 +62,7 @@ set(TRTIS_CLIENT_CMAKE_DIR "" CACHE PATH "Path to TRTIS client library cmake con
 option(TRTIS_ENABLE_LOGGING "Include logging support in server" ON)
 option(TRTIS_ENABLE_STATS "Include statistics collections in server" ON)
 option(TRTIS_ENABLE_TRACING "Include tracing support in server" OFF)
+option(TRTIS_ENABLE_NVTX "Include NVTX support in server" OFF)
 option(TRTIS_ENABLE_ASAN "Build with address sanitizer" OFF)
 option(TRTIS_ENABLE_GPU "Enable GPU support in server/client" ON)
 set(TRTIS_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING
@@ -452,6 +453,7 @@ ExternalProject_Add(trtis
     -DTRTIS_PYTORCH_INCLUDE_PATHS:PATH=${TRTIS_PYTORCH_INCLUDE_PATHS}
     -DTRTIS_EXTRA_LIB_PATHS:PATH=${TRTIS_EXTRA_LIB_PATHS}
     -DTRTIS_ENABLE_ASAN:BOOL=${TRTIS_ENABLE_ASAN}
+    -DTRTIS_ENABLE_NVTX:BOOL=${TRTIS_ENABLE_NVTX}
     -DTRTIS_ENABLE_TRACING:BOOL=${TRTIS_ENABLE_TRACING}
     -DTRTIS_ENABLE_LOGGING:BOOL=${TRTIS_ENABLE_LOGGING}
     -DTRTIS_ENABLE_STATS:BOOL=${TRTIS_ENABLE_STATS}
