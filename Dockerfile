@@ -428,11 +428,13 @@ ENV INTEL_CVSDK_DIR /opt/openvino_scripts/openvino_2019.3.376
 ENV PYTHONPATH /opt/openvino_scripts:$INTEL_CVSDK_DIR:$INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
 
 # ONNX Runtime requires Python3 to convert ONNX models to OpenVINO models
-# in its OpenVINO execution accelerator
+# in its OpenVINO execution accelerator.
+# [DLIS-1049] Needed to explicitly add test-generator==0.1.1 due to
+# OnnxRuntime 1.1.1 issue.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends python3-pip && \
     rm -rf /var/lib/apt/lists/* && \
-    pip3 install --upgrade wheel setuptools && \
+    pip3 install --upgrade wheel setuptools test-generator==0.1.1 && \
     (cd $INTEL_CVSDK_DIR/deployment_tools/model_optimizer && \
         pip3 install -r requirements_onnx.txt)
 
