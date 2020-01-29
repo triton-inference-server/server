@@ -36,6 +36,7 @@ RET=0
     rm -fr trtis && \
     cmake -DCMAKE_BUILD_TYPE=Release \
         -DTRTIS_ENABLE_METRICS=OFF \
+        -DTRTIS_ENABLE_METRICS_GPU=OFF \
         -DTRTIS_ENABLE_GCS=OFF \
         -DTRTIS_ENABLE_S3=OFF \
         -DTRTIS_ENABLE_CUSTOM=ON \

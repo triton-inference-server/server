@@ -303,6 +303,8 @@ These additional options may be specified:
 * **TRTIS_ENABLE_METRICS**: By default the inference server reports
   :ref:`Prometheus metrics<section-metrics>` on an HTTP endpoint. Use
   -DTRTIS_ENABLE_METRICS=OFF to disable both CPU and GPU metrics.
+  When disabling metrics must use -DTRTIS_ENABLE_METRICS_GPU=OFF to
+  disable GPU metrics.
 
 * **TRTIS_ENABLE_METRICS_GPU**: By default the inference server reports
   :ref:`Prometheus GPU metrics<section-metrics>` on an HTTP endpoint. Use
@@ -323,8 +325,8 @@ These additional options may be specified:
   NVIDIA GPUs. Use -DTRTIS_ENABLE_GPU=OFF to disable GPU support. When
   GPUs are disable the inference server will :ref:`run models on CPU
   when possible <section-running-the-inference-server-without-gpu>`.
-  When disabling GPU support, use -DTRTIS_ENABLE_METRICS_GPU=OFF to
-  disable GPU metrics as well.
+  When disabling GPU support must use -DTRTIS_ENABLE_METRICS_GPU=OFF
+  to disable GPU metrics.
 
 * **TRTIS_MIN_COMPUTE_CAPABILITY**: By default, the inference server
   supports NVIDIA GPUs with CUDA compute capability 6.0 or higher. If
