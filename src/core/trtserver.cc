@@ -354,9 +354,9 @@ TrtServerOptions::TrtServerOptions()
   gpu_metrics_ = false;
 #endif  // TRTIS_ENABLE_METRICS
 
-#ifndef TRTIS_ENABLE_GPU_METRICS
+#ifndef TRTIS_ENABLE_METRICS_GPU
   gpu_metrics_ = false;
-#endif  // TRTIS_ENABLE_GPU_METRICS
+#endif  // TRTIS_ENABLE_METRICS_GPU
 }
 
 //
@@ -1448,11 +1448,11 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
 
   NVTX_INITIALIZE;
 
-#ifdef TRTIS_ENABLE_GPU_METRICS
+#ifdef TRTIS_ENABLE_METRICS_GPU
   if (loptions->Metrics() && loptions->GpuMetrics()) {
     ni::Metrics::EnableGPUMetrics();
   }
-#endif  // TRTIS_ENABLE_GPU_METRICS
+#endif  // TRTIS_ENABLE_METRICS_GPU
 
   lserver->SetId(loptions->ServerId());
   lserver->SetModelRepositoryPaths(loptions->ModelRepositoryPaths());

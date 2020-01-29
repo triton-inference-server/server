@@ -304,9 +304,9 @@ These additional options may be specified:
   :ref:`Prometheus metrics<section-metrics>` on an HTTP endpoint. Use
   -DTRTIS_ENABLE_METRICS=OFF to disable both CPU and GPU metrics.
 
-* **TRTIS_ENABLE_GPU_METRICS**: By default the inference server reports
+* **TRTIS_ENABLE_METRICS_GPU**: By default the inference server reports
   :ref:`Prometheus GPU metrics<section-metrics>` on an HTTP endpoint. Use
-  -DTRTIS_ENABLE_GPU_METRICS=OFF to disable GPU metrics.
+  -DTRTIS_ENABLE_METRICS_GPU=OFF to disable GPU metrics.
 
 * **TRTIS_ENABLE_TRACING**: By default the inference server does not
   enable detailed :ref:`tracing of individual inference requests
