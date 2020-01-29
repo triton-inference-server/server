@@ -38,8 +38,9 @@ class GraphDefBackend : public BaseBackend {
   Status CreateTRTISTFModel(
       const GraphDefBackendFactory::Config* backend_config, const int device_id,
       const bool has_graph_level, const int graph_level,
-      const std::string& model_path, TRTISTFModelHandle* trtistf_model,
-      IONameMap* input_name_map, IONameMap* output_name_map,
+      const std::string& model_name, const std::string& model_buffer,
+      TRTISTFModelHandle* trtistf_model, IONameMap* input_name_map,
+      IONameMap* output_name_map,
       const TRTISTF_TFTRTConfig* tftrt_config) override;
 
  private:

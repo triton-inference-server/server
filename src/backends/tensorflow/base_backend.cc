@@ -71,13 +71,6 @@ Status
 BaseBackend::CreateExecutionContexts(
     const std::unordered_map<std::string, std::string>& paths)
 {
-  if (LOG_VERBOSE_IS_ON(1)) {
-    LOG_INFO << "Creating execution contexts for:";
-    for (const auto p : paths) {
-      LOG_INFO << "  " << p.first << ": " << p.second;
-    }
-  }
-
   uint32_t total_context_cnt = 0;
 
   for (const auto& group : Config().instance_group()) {
@@ -277,9 +270,11 @@ BaseBackend::CreateExecutionContext(
     tftrt_config_ptr = &tftrt_config;
   }
 
+  // gdp_itr->second is the tensorflow model serialized to string
+  // gdp_itr->first is the tensorflow model name
   RETURN_IF_ERROR(CreateTRTISTFModel(
       backend_config_, vgpu_device, Config().optimization().has_graph(),
-      Config().optimization().graph().level(), gdp_itr->second,
+      Config().optimization().graph().level(), gdp_itr->first, gdp_itr->second,
       &context->trtistf_model_, &context->input_name_map_,
       &context->output_name_map_, tftrt_config_ptr));
 
