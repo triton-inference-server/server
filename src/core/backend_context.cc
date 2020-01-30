@@ -171,14 +171,10 @@ BackendContext::SetInputBuffer(
           if (std::get<1>(pinned_buffer_info) > 0) {
             cuda_copy |= IssueIndirectInputBufferCopy(
                 name, pinned_buffer_info, payloads, stream, input);
-            // [TODO] FIXME, this should be reset regardless of
-            // pinned_buffer_size to maintain proper input offset
-            // reset 'pinned_buffer_info'
-            pinned_buffer_info = {
-                buffer_copy_offset + copied_byte_size + content_byte_size,
-                0,
-                {}};
           }
+          // always reset 'pinned_buffer_info' to maintain proper input offset
+          pinned_buffer_info = {
+              buffer_copy_offset + copied_byte_size + content_byte_size, 0, {}};
         }
       }
 

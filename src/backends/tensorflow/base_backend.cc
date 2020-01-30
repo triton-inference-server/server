@@ -553,13 +553,10 @@ BaseBackend::Context::SetStringInputTensor(
 void
 BaseBackend::Context::ReadFixedSizedOutputTensor(
     TRTISTF_Tensor* tensor, const std::string& output_name,
-    const std::vector<int64_t>& shape, const size_t batch1_byte_size,
-    std::vector<Scheduler::Payload>* payloads, OutputInfo* output,
-    bool* cuda_copy)
+    const size_t batch1_byte_size, std::vector<Scheduler::Payload>* payloads,
+    OutputInfo* output, bool* cuda_copy)
 {
   output->output_buffer_ = TRTISTF_TensorData(tensor);
-  // [TODO] avoid shape copy
-  output->output_shape_ = shape;
   output->memory_type_ = (TRTISTF_TensorIsGPUTensor(tensor))
                              ? TRTSERVER_MEMORY_GPU
                              : TRTSERVER_MEMORY_CPU;
@@ -827,13 +824,12 @@ BaseBackend::Context::Run(
     // Get the shape and datatype of the output from the output
     // tensor.
     TRTISTF_Shape* shape = TRTISTF_TensorShape(output_tensor);
-    std::vector<int64_t> shapevec;
 
     bool skip_element_cnt = (max_batch_size_ != NO_BATCHING);
     size_t batch1_element_cnt = 1;
     for (size_t itr = 0; itr < shape->rank_; itr++) {
       const int64_t dim = shape->dims_[itr];
-      shapevec.push_back(dim);
+      outputs.back().output_shape_.push_back(dim);
       if (!skip_element_cnt) {
         batch1_element_cnt *= dim;
       }
@@ -846,7 +842,7 @@ BaseBackend::Context::Run(
 
     // verify shape of output matches shape from model config
     RETURN_IF_ERROR(CompareOutputDims(
-        name, shapevec, output_dims,
+        name, outputs.back().output_shape_, output_dims,
         max_batch_size_ != NO_BATCHING /* supports_batching */));
 
     TRTISTF_DataType dtype = ConvertDataType(output_config->data_type());
@@ -873,12 +869,12 @@ BaseBackend::Context::Run(
                 std::to_string(batch1_byte_size));
       }
       ReadFixedSizedOutputTensor(
-          output_tensor, name, shapevec, batch1_byte_size, payloads,
-          &outputs.back(), &cuda_copy);
+          output_tensor, name, batch1_byte_size, payloads, &outputs.back(),
+          &cuda_copy);
     } else {
       ReadStringOutputTensor(
-          output_tensor, name, shapevec, batch1_element_cnt, payloads,
-          &cuda_copy);
+          output_tensor, name, outputs.back().output_shape_, batch1_element_cnt,
+          payloads, &cuda_copy);
     }
 
     output_tensor_itr = output_tensor_itr->next_;

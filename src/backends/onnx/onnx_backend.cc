@@ -859,6 +859,7 @@ OnnxBackend::Context::ReadOutputTensors(
 {
   bool cuda_copy = false;
   std::vector<OutputInfo> outputs;
+  std::vector<std::vector<char>> string_buffers;
   for (size_t idx = 0; idx < output_names.size(); idx++) {
     outputs.emplace_back();
     auto& output = outputs.back();
@@ -903,10 +904,8 @@ OnnxBackend::Context::ReadOutputTensors(
       RETURN_IF_ORT_ERROR(
           ort_api->GetStringTensorDataLength(output_tensor, &total_length));
 
-      // [TODO] FIXME this needs to be living longer than this function as
-      // it may go out of scope before async copies from SetStringOutputBuffer()
-      // finish
-      char content[total_length];
+      string_buffers.emplace_back(std::vector<char>(total_length));
+      auto content = string_buffers.back().data();
       size_t offsets[element_count + 1];
       RETURN_IF_ORT_ERROR(ort_api->GetStringTensorContent(
           output_tensor, content, total_length, offsets, element_count));

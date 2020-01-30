@@ -38,7 +38,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class AllocatedMemory;
 class InferenceBackend;
 
 struct InputInfo {
@@ -52,7 +51,6 @@ struct InputInfo {
       indirect_buffers_;
 };
 
-// [TODO] can we unify with InputInfo?
 struct OutputInfo {
   const char* output_buffer_;
   std::vector<int64_t> output_shape_;
@@ -164,7 +162,6 @@ struct BackendContext {
   //  indirect buffer size,
   //  vector of <index of the payload (for status update),
   //             memory block of the provider's output>>
-  // [TODO] group the memory info above as a derived class of Memory
   using OutputBufferInfo = std::tuple<
       size_t, size_t, std::vector<std::pair<size_t, MutableMemory*>>>;
 
