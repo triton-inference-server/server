@@ -169,8 +169,8 @@ class HTTPAPIServer : public HTTPServerImpl {
         "deleting response allocator");
   }
 
-  using EVBufferTuple = std::tuple<
-      evbuffer*,
+  using ResponseMetaData = std::tuple<
+      std::vector<evbuffer*>,
       std::unordered_map<
           std::string,
           std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>,
@@ -184,7 +184,15 @@ class HTTPAPIServer : public HTTPServerImpl {
     InferRequestClass(
         evhtp_request_t* req, uint64_t request_id, const char* server_id,
         uint64_t unique_id);
-    ~InferRequestClass() = default;
+
+    ~InferRequestClass()
+    {
+      for (auto buffer : std::get<0>(response_meta_data_)) {
+        if (buffer != nullptr) {
+          evbuffer_free(buffer);
+        }
+      }
+    }
 
     evhtp_request_t* EvHtpRequest() const { return req_; }
 
@@ -197,7 +205,7 @@ class HTTPAPIServer : public HTTPServerImpl {
     std::unique_ptr<TraceMetaData> trace_meta_data_;
 #endif  // TRTIS_ENABLE_TRACING
 
-    std::unique_ptr<EVBufferTuple> response_tuple_;
+    ResponseMetaData response_meta_data_;
 
    private:
     evhtp_request_t* req_;
@@ -261,13 +269,20 @@ HTTPAPIServer::ResponseAlloc(
     void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
-  auto userp_tuple = reinterpret_cast<EVBufferTuple*>(userp);
-  evbuffer* evhttp_buffer =
-      reinterpret_cast<evbuffer*>(std::get<0>(*userp_tuple));
+  auto response_meta_data = reinterpret_cast<ResponseMetaData*>(userp);
+  evbuffer* evhttp_buffer = evbuffer_new();
+  if (evhttp_buffer == nullptr) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INTERNAL,
+        std::string("failed to create evbuffer for output tensor").c_str());
+  } else {
+    std::get<0>(*response_meta_data).push_back(evhttp_buffer);
+  }
+
   const std::unordered_map<
       std::string,
       std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
-      output_shm_map = std::get<1>(*userp_tuple);
+      output_shm_map = std::get<1>(*response_meta_data);
 
   *buffer = nullptr;
   *buffer_userp = nullptr;
@@ -680,20 +695,6 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& model_name)
     return;
   }
 
-  // Convert the json string to protobuf message
-  EVBufferTuple* response_tuple(new EVBufferTuple());
-  size_t buffer_length = evbuffer_get_length(req->buffer_in);
-  char* request_buffer = (char*)malloc(sizeof(char) * buffer_length);
-  evbuffer_copyout(req->buffer_in, request_buffer, buffer_length);
-  std::string json_request_string = std::string(request_buffer, buffer_length);
-  if (google::protobuf::util::JsonStringToMessage(
-          json_request_string, &std::get<2>(*response_tuple)) !=
-      google::protobuf::util::Status::OK) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  }
-  free(request_buffer);
-
   uint64_t unique_id = RequestStatusUtil::NextUniqueRequestId();
 
   // Create the inference request provider which provides all the
@@ -711,16 +712,31 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& model_name)
         &request_provider, server_.get(), request_options);
   }
   if (err == nullptr) {
+    std::unique_ptr<InferRequestClass> infer_request(new InferRequestClass(
+        req, request_header_protobuf.id(), server_id_, unique_id));
+
+    // FIXME seems to have too many copies below, should be fixed automatically
+    // once the protobuf dependency is dropped.
+    // 
+    // Convert the json string to protobuf message
+    size_t buffer_length = evbuffer_get_length(req->buffer_in);
+    std::vector<char> request_buffer(buffer_length);
+    evbuffer_copyout(req->buffer_in, request_buffer.data(), buffer_length);
+    std::string json_request_string =
+        std::string(request_buffer.data(), buffer_length);
+    if (google::protobuf::util::JsonStringToMessage(
+            json_request_string,
+            &std::get<2>(infer_request->response_meta_data_)) !=
+        google::protobuf::util::Status::OK) {
+      evhtp_send_reply(req, EVHTP_RES_BADREQ);
+      return;
+    }
+
     err = EVBufferToInput(
-        model_name, request_header_protobuf, std::get<2>(*response_tuple),
-        request_provider, std::get<1>(*response_tuple));
+        model_name, request_header_protobuf,
+        std::get<2>(infer_request->response_meta_data_), request_provider,
+        std::get<1>(infer_request->response_meta_data_));
     if (err == nullptr) {
-      InferRequestClass* infer_request = new InferRequestClass(
-          req, request_header_protobuf.id(), server_id_, unique_id);
-
-      std::get<0>(*response_tuple) = req->buffer_out;
-      infer_request->response_tuple_.reset(response_tuple);
-
       // Provide the trace manager object to use for this request, if nullptr
       // then no tracing will be performed.
       TRTSERVER_TraceManager* trace_manager = nullptr;
@@ -735,12 +751,11 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& model_name)
 
       err = TRTSERVER_ServerInferAsync(
           server_.get(), trace_manager, request_provider, allocator_,
-          reinterpret_cast<void*>(response_tuple),
+          reinterpret_cast<void*>(&infer_request->response_meta_data_),
           InferRequestClass::InferComplete,
-          reinterpret_cast<void*>(infer_request));
-      if (err != nullptr) {
-        delete infer_request;
-        infer_request = nullptr;
+          reinterpret_cast<void*>(infer_request.get()));
+      if (err == nullptr) {
+        infer_request.release();
       }
     }
   }
