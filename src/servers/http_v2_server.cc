@@ -861,6 +861,9 @@ HTTPAPIServer::InferRequestClass::InferComplete(
 {
   HTTPAPIServer::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequestClass*>(userp);
+  for (auto buffer : std::get<0>(infer_request->response_meta_data_)) {
+    evbuffer_add_buffer(infer_request->req_->buffer_out, buffer);
+  }
   if (infer_request->FinalizeResponse(response) == EVHTP_RES_OK) {
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
