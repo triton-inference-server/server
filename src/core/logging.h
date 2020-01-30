@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -141,6 +141,17 @@ extern Logger gLogger_;
       (char*)__FILE__, __LINE__,                         \
       nvidia::inferenceserver::LogMessage::Level::kINFO) \
       .stream()
+
+#define LOG_TRTSERVER_ERROR(X, MSG)                                           \
+  do {                                                                        \
+    TRTSERVER_Error* err__ = (X);                                             \
+    if (err__ != nullptr) {                                                   \
+      LOG_ERROR << (MSG) << ": " << TRTSERVER_ErrorCodeString(err__) << " - " \
+                << TRTSERVER_ErrorMessage(err__);                             \
+      TRTSERVER_ErrorDelete(err__);                                           \
+    }                                                                         \
+  } while (false)
+
 
 #define LOG_FLUSH nvidia::inferenceserver::gLogger_.Flush()
 
