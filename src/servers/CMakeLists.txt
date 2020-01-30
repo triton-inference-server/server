@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -226,12 +226,11 @@ install(
 #
 set(
   SIMPLE_SRCS
-  simple.cc common.cc ../core/logging.cc
+  simple.cc common.cc
 )
 
 set(
   SIMPLE_HDRS
-  common.h ../core/logging.h
 )
 
 add_executable(
@@ -239,7 +238,6 @@ add_executable(
   ${SIMPLE_SRCS}
   ${SIMPLE_HDRS}
   $<TARGET_OBJECTS:proto-library>
-  ${TRACING_OBJECTS}
 )
 set_target_properties(
   simple
@@ -253,7 +251,6 @@ target_link_libraries(
   simple
   PRIVATE trtserver
   PRIVATE protobuf::libprotobuf
-  ${TRACING_LIBRARIES}
 )
 if(${TRTIS_ENABLE_GPU})
 target_include_directories(simple PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -275,12 +272,11 @@ install(
 if(${TRTIS_ENABLE_GPU})
 set(
   MEMORY_ALLOC_SRCS
-  memory_alloc.cc common.cc ../core/logging.cc
+  memory_alloc.cc common.cc
 )
 
 set(
   MEMORY_ALLOC_HDRS
-  common.h ../core/logging.h
 )
 
 add_executable(
@@ -288,7 +284,6 @@ add_executable(
   ${MEMORY_ALLOC_SRCS}
   ${MEMORY_ALLOC_HDRS}
   $<TARGET_OBJECTS:proto-library>
-  ${TRACING_OBJECTS}
 )
 target_include_directories(memory_alloc PRIVATE ${CUDA_INCLUDE_DIRS})
 set_target_properties(
@@ -306,7 +301,6 @@ target_link_libraries(
   PRIVATE ${CUDA_LIBRARIES}
   PRIVATE trtserver
   PRIVATE protobuf::libprotobuf
-  ${TRACING_LIBRARIES}
 )
 install(
   TARGETS memory_alloc

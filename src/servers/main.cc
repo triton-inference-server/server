@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -38,6 +38,7 @@
 #include <sanitizer/lsan_interface.h>
 #endif  // TRTIS_ENABLE_ASAN
 
+#include "src/core/logging.h"
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
 #include "src/servers/shared_memory_block_manager.h"
@@ -482,7 +483,7 @@ StartEndpoints(
     TRTSERVER_Error* err =
         StartGrpcService(&grpc_service_, server, trace_manager, smb_manager);
     if (err != nullptr) {
-      LOG_IF_ERR(err, "failed to start GRPC service");
+      LOG_TRTSERVER_ERROR(err, "failed to start GRPC service");
       return false;
     }
   }
@@ -503,7 +504,7 @@ StartEndpoints(
     TRTSERVER_Error* err = StartHttpService(
         &http_services_, server, trace_manager, smb_manager, port_map);
     if (err != nullptr) {
-      LOG_IF_ERR(err, "failed to start HTTP service");
+      LOG_TRTSERVER_ERROR(err, "failed to start HTTP service");
       return false;
     }
   }
@@ -514,7 +515,7 @@ StartEndpoints(
   if (metrics_port_ != -1) {
     TRTSERVER_Error* err = StartMetricsService(&metrics_service_, server);
     if (err != nullptr) {
-      LOG_IF_ERR(err, "failed to start Metrics service");
+      LOG_TRTSERVER_ERROR(err, "failed to start Metrics service");
       return false;
     }
   }
@@ -533,7 +534,7 @@ StopEndpoints()
     if (http_eps != nullptr) {
       TRTSERVER_Error* err = http_eps->Stop();
       if (err != nullptr) {
-        LOG_IF_ERR(err, "failed to stop HTTP service");
+        LOG_TRTSERVER_ERROR(err, "failed to stop HTTP service");
         ret = false;
       }
     }
@@ -546,7 +547,7 @@ StopEndpoints()
   if (grpc_service_) {
     TRTSERVER_Error* err = grpc_service_->Stop();
     if (err != nullptr) {
-      LOG_IF_ERR(err, "failed to stop GRPC service");
+      LOG_TRTSERVER_ERROR(err, "failed to stop GRPC service");
       ret = false;
     }
 
@@ -558,7 +559,7 @@ StopEndpoints()
   if (metrics_service_) {
     TRTSERVER_Error* err = metrics_service_->Stop();
     if (err != nullptr) {
-      LOG_IF_ERR(err, "failed to stop Metrics service");
+      LOG_TRTSERVER_ERROR(err, "failed to stop Metrics service");
       ret = false;
     }
 
@@ -592,7 +593,7 @@ StartTracing(
   }
 
   if (err != nullptr) {
-    LOG_IF_ERR(err, "failed to configure tracing");
+    LOG_TRTSERVER_ERROR(err, "failed to configure tracing");
     trace_manager->reset();
     return false;
   }
@@ -986,6 +987,16 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
     return false;
   }
 
+#ifdef TRTIS_ENABLE_LOGGING
+  // Initialize our own logging instance since it is used by GRPC and
+  // HTTP endpoints. This logging instance is separate from the one in
+  // libtrtserver so we must initialize explicitly.
+  LOG_ENABLE_INFO(log_info);
+  LOG_ENABLE_WARNING(log_warn);
+  LOG_ENABLE_ERROR(log_error);
+  LOG_SET_VERBOSE(log_verbose);
+#endif  // TRTIS_ENABLE_LOGGING
+
   repository_poll_secs_ =
       (allow_poll_model_repository) ? std::max(0, repository_poll_secs) : 0;
 
@@ -1175,7 +1186,7 @@ main(int argc, char** argv)
     // If enabled, poll the model repository to see if there have been
     // any changes.
     if (repository_poll_secs_ > 0) {
-      LOG_IF_ERR(
+      LOG_TRTSERVER_ERROR(
           TRTSERVER_ServerPollModelRepository(server.get()),
           "failed to poll model repository");
     }
@@ -1190,7 +1201,7 @@ main(int argc, char** argv)
 
   TRTSERVER_Error* stop_err = TRTSERVER_ServerStop(server.get());
   const int ret = (stop_err != nullptr) ? 1 : 0;
-  LOG_IF_ERR(stop_err, "failed to stop server");
+  LOG_TRTSERVER_ERROR(stop_err, "failed to stop server");
 
   // Stop tracing and the HTTP, GRPC, and metrics endpoints.
   StopTracing(trace_manager);

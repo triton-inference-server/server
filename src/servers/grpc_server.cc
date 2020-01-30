@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -39,12 +39,9 @@
 #include "grpc++/support/status.h"
 #include "grpc/grpc.h"
 #include "src/core/constants.h"
+#include "src/core/logging.h"
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
-
-// The GRPC frontend logging is closely related to the server, thus keep it
-// using the server logging utils
-#include "src/core/logging.h"
 
 #ifdef TRTIS_ENABLE_TRACING
 #include "src/servers/tracer.h"
@@ -1207,7 +1204,7 @@ InferHandler::InferComplete(
 
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'state'.
-  LOG_IF_ERR(
+  LOG_TRTSERVER_ERROR(
       TRTSERVER_InferenceResponseDelete(trtserver_response),
       "deleting GRPC response");
   TRTSERVER_ErrorDelete(response_status);
@@ -1575,7 +1572,7 @@ StreamInferHandler::StreamInferComplete(
 
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'state'.
-  LOG_IF_ERR(
+  LOG_TRTSERVER_ERROR(
       TRTSERVER_InferenceResponseDelete(trtserver_response),
       "deleting GRPC response");
   TRTSERVER_ErrorDelete(response_status);
