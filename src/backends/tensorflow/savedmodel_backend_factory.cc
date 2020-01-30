@@ -70,12 +70,13 @@ SavedModelBackendFactory::CreateBackend(
   std::unordered_map<std::string, std::string> models;
   for (const auto& filename : savedmodel_files) {
     const auto savedmodel_path = JoinPath({path, filename});
-    std::string model_data_str;
+    std::string local_savedmodel_path;
 
-    RETURN_IF_ERROR(ReadTextFile(savedmodel_path, &model_data_str));
+    RETURN_IF_ERROR(
+        DownloadFileFolder(savedmodel_path, &local_savedmodel_path));
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(std::move(model_data_str)));
+        std::make_tuple(std::move(local_savedmodel_path)));
   }
 
   // Create the backend for the model and all the execution contexts

@@ -70,12 +70,12 @@ GraphDefBackendFactory::CreateBackend(
   std::unordered_map<std::string, std::string> models;
   for (const auto& filename : graphdef_files) {
     const auto graphdef_path = JoinPath({path, filename});
-    std::string model_data_str;
+    std::string local_graphdef_path;
 
-    RETURN_IF_ERROR(ReadTextFile(graphdef_path, &model_data_str));
+    RETURN_IF_ERROR(DownloadFileFolder(graphdef_path, &local_graphdef_path));
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(std::move(model_data_str)));
+        std::make_tuple(std::move(local_graphdef_path)));
   }
 
   // Create the backend for the model and all the execution contexts

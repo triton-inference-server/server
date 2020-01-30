@@ -66,6 +66,8 @@ class FileSystem {
       const std::string& path, std::set<std::string>* files) = 0;
   virtual Status ReadTextFile(
       const std::string& path, std::string* contents) = 0;
+  virtual Status DownloadFileFolder(
+      const std::string& path, std::string* local_path) = 0;
   virtual Status WriteTextFile(
       const std::string& path, const std::string& contents) = 0;
 };
@@ -83,6 +85,8 @@ class LocalFileSystem : public FileSystem {
   Status GetDirectoryFiles(
       const std::string& path, std::set<std::string>* files) override;
   Status ReadTextFile(const std::string& path, std::string* contents) override;
+  Status DownloadFileFolder(
+      const std::string& path, std::string* local_path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 };
@@ -205,6 +209,14 @@ LocalFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 }
 
 Status
+LocalFileSystem::DownloadFileFolder(
+    const std::string& path, std::string* local_path)
+{
+  *local_path = path;
+  return Status::Success;
+}
+
+Status
 LocalFileSystem::WriteTextFile(
     const std::string& path, const std::string& contents)
 {
@@ -240,6 +252,8 @@ class GCSFileSystem : public FileSystem {
   Status GetDirectoryFiles(
       const std::string& path, std::set<std::string>* files) override;
   Status ReadTextFile(const std::string& path, std::string* contents) override;
+  Status DownloadFileFolder(
+      const std::string& path, std::string* local_path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -511,6 +525,15 @@ GCSFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 }
 
 Status
+GCSFileSystem::DownloadFileFolder(
+    const std::string& path, std::string* local_path)
+{
+  *local_path = path;
+  return Status::Success;
+}
+
+
+Status
 GCSFileSystem::WriteTextFile(
     const std::string& path, const std::string& contents)
 {
@@ -540,6 +563,8 @@ class S3FileSystem : public FileSystem {
   Status GetDirectoryFiles(
       const std::string& path, std::set<std::string>* files) override;
   Status ReadTextFile(const std::string& path, std::string* contents) override;
+  Status DownloadFileFolder(
+      const std::string& path, std::string* local_path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -689,6 +714,7 @@ S3FileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   }
   return Status::Success;
 }
+
 Status
 S3FileSystem::GetDirectoryContents(
     const std::string& path, std::set<std::string>* contents)
@@ -732,6 +758,7 @@ S3FileSystem::GetDirectoryContents(
   }
   return Status::Success;
 }
+
 Status
 S3FileSystem::GetDirectorySubdirs(
     const std::string& path, std::set<std::string>* subdirs)
@@ -770,6 +797,7 @@ S3FileSystem::GetDirectoryFiles(
 
   return Status::Success;
 }
+
 Status
 S3FileSystem::ReadTextFile(const std::string& path, std::string* contents)
 {
@@ -807,6 +835,89 @@ S3FileSystem::ReadTextFile(const std::string& path, std::string* contents)
 
   return Status::Success;
 }
+
+Status
+S3FileSystem::DownloadFileFolder(
+    const std::string& path, std::string* local_path)
+{
+  bool exists;
+  RETURN_IF_ERROR(FileExists(path, &exists));
+
+  if (!exists) {
+    return Status(
+        RequestStatusCode::INTERNAL, "File does not exist at " + path);
+  }
+
+  bool is_dir = false;
+  std::set<std::string> contents, files;
+  IsDirectory(path, &is_dir);
+  if (is_dir) {
+    RETURN_IF_ERROR(GetDirectoryContents(path, &contents));
+
+    for (auto iter = contents.begin(); iter != contents.end();) {
+      bool is_sub_dir;
+      RETURN_IF_ERROR(IsDirectory(JoinPath({path, *iter}), &is_sub_dir));
+      if (is_sub_dir) {
+        std::set<std::string> subdir_files;
+        RETURN_IF_ERROR(
+            GetDirectoryFiles(JoinPath({path, *iter}), &subdir_files));
+        iter = contents.erase(iter);
+        std::merge(
+            contents.begin(), contents.end(), subdir_files.begin(),
+            subdir_files.end(), std::inserter(files, files.begin()));
+      } else {
+        ++iter;
+      }
+    }
+
+    *local_path = "/PATH/FILE_NAME";
+    for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
+      std::string local_file_path = JoinPath({*local_path, *iter});
+      std::string bucket, object;
+      RETURN_IF_ERROR(ParsePath(JoinPath({path, *iter}), &bucket, &object));
+
+      // Send a request for the objects metadata
+      s3::Model::GetObjectRequest object_request;
+      object_request.SetBucket(bucket.c_str());
+      object_request.SetKey(object.c_str());
+
+      auto get_object_outcome = client_.GetObject(object_request);
+      if (get_object_outcome.IsSuccess()) {
+        auto& retrieved_file =
+            get_object_outcome.GetResultWithOwnership().GetBody();
+        std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
+        output_file << retrieved_file.rdbuf();
+        output_file.close();
+      } else {
+        return Status(
+            RequestStatusCode::INTERNAL, "Failed to get object at " + path);
+      }
+    }
+  } else {
+    *local_path = "/PATH/FILE_NAME";
+    std::string bucket, object;
+    RETURN_IF_ERROR(ParsePath(path, &bucket, &object));
+
+    // Send a request for the objects metadata
+    s3::Model::GetObjectRequest object_request;
+    object_request.SetBucket(bucket.c_str());
+    object_request.SetKey(object.c_str());
+
+    auto get_object_outcome = client_.GetObject(object_request);
+    if (get_object_outcome.IsSuccess()) {
+      auto& retrieved_file =
+          get_object_outcome.GetResultWithOwnership().GetBody();
+      std::ofstream output_file(local_path->c_str(), std::ios::binary);
+      output_file << retrieved_file.rdbuf();
+      output_file.close();
+    } else {
+      return Status(
+          RequestStatusCode::INTERNAL, "Failed to get object at " + path);
+    }
+  }
+  return Status::Success;
+}
+
 Status
 S3FileSystem::WriteTextFile(
     const std::string& path, const std::string& contents)
@@ -1027,6 +1138,14 @@ ReadTextProto(const std::string& path, google::protobuf::Message* msg)
   }
 
   return Status::Success;
+}
+
+Status
+DownloadFileFolder(const std::string& path, std::string* local_path)
+{
+  FileSystem* fs;
+  RETURN_IF_ERROR(GetFileSystem(path, &fs));
+  return fs->DownloadFileFolder(path, local_path);
 }
 
 Status

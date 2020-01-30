@@ -802,9 +802,8 @@ TRTISTF_TensorSetString(
 TRTISTF_Error*
 TRTISTF_ModelCreateFromGraphDef(
     TRTISTF_Model** trtistf_model, const char* model_name,
-    const char* model_buffer, size_t buffer_size, const int device_id,
-    const bool has_graph_level, const int graph_level,
-    const bool allow_gpu_memory_growth,
+    const char* model_path, const int device_id, const bool has_graph_level,
+    const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
     const std::map<int, std::vector<float>>& memory_limit_mb,
@@ -820,16 +819,16 @@ TRTISTF_ModelCreateFromGraphDef(
   RETURN_IF_TF_ERROR(tensorflow::NewSession(session_options, &session));
 
   // Write contents of model in local file
-  std::ofstream outfile("tmp.graphdef", std::ofstream::binary);
-  outfile.write(model_buffer, buffer_size);
-  outfile.close();
+  // std::ofstream outfile("tmp.graphdef", std::ofstream::binary);
+  // outfile.write(model_buffer, buffer_size);
+  // outfile.close();
 
   tensorflow::GraphDef graph_def;
   RETURN_IF_TF_ERROR(tensorflow::ReadBinaryProto(
-      tensorflow::Env::Default(), "tmp.graphdef", &graph_def));
+      tensorflow::Env::Default(), model_path, &graph_def));
 
   // Remove temp file
-  std::remove("tmp.graphdef");
+  // std::remove("tmp.graphdef");
 
   if (graph_def.node_size() == 0) {
     return TRTISTF_ErrorNew(
@@ -891,9 +890,8 @@ TRTISTF_ModelCreateFromGraphDef(
 TRTISTF_Error*
 TRTISTF_ModelCreateFromSavedModel(
     TRTISTF_Model** trtistf_model, const char* model_name,
-    const char* model_buffer, size_t buffer_size, const int device_id,
-    const bool has_graph_level, const int graph_level,
-    const bool allow_gpu_memory_growth,
+    const char* model_path, const int device_id, const bool has_graph_level,
+    const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
     const std::map<int, std::vector<float>>& memory_limit_mb,
@@ -935,17 +933,17 @@ TRTISTF_ModelCreateFromSavedModel(
   saved_model_tags.insert(tensorflow::kSavedModelTagServe);
 
   // Write contents of model in local file
-  std::ofstream outfile("tmp.savedmodel", std::ofstream::binary);
-  outfile.write(model_buffer, buffer_size);
-  outfile.close();
+  // std::ofstream outfile("tmp.savedmodel", std::ofstream::binary);
+  // outfile.write(model_buffer, buffer_size);
+  // outfile.close();
 
   tensorflow::RunOptions run_options;
   RETURN_IF_TF_ERROR(tensorflow::LoadSavedModel(
-      session_options, run_options, "tmp.savedmodel", saved_model_tags,
+      session_options, run_options, model_path, saved_model_tags,
       bundle.get()));
 
   // Remove temp file
-  std::remove("tmp.savedmodel");
+  // std::remove("tmp.savedmodel");
 
   // Verify that the bundle has the "serve" tag
   bool found_serve_tag = false;
