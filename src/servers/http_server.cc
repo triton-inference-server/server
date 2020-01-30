@@ -234,8 +234,8 @@ class HTTPAPIServer : public HTTPServerImpl {
         "deleting response allocator");
   }
 
-  using EVBufferPair = std::pair<
-      evbuffer*,
+  using ResponseMetaData = std::pair<
+      std::vector<evbuffer*>,
       std::unordered_map<
           std::string,
           std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>>;
@@ -248,7 +248,15 @@ class HTTPAPIServer : public HTTPServerImpl {
     InferRequest(
         evhtp_request_t* req, uint64_t request_id, const char* server_id,
         uint64_t unique_id);
-    ~InferRequest() = default;
+
+    ~InferRequest()
+    {
+      for (auto buffer : response_meta_data_.first) {
+        if (buffer != nullptr) {
+          evbuffer_free(buffer);
+        }
+      }
+    }
 
     evhtp_request_t* EvHtpRequest() const { return req_; }
 
@@ -261,7 +269,7 @@ class HTTPAPIServer : public HTTPServerImpl {
     std::unique_ptr<TraceMetaData> trace_meta_data_;
 #endif  // TRTIS_ENABLE_TRACING
 
-    std::unique_ptr<EVBufferPair> response_pair_;
+    ResponseMetaData response_meta_data_;
 
    private:
     evhtp_request_t* req_;
@@ -338,12 +346,20 @@ HTTPAPIServer::ResponseAlloc(
     void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
-  auto userp_pair = reinterpret_cast<EVBufferPair*>(userp);
-  evbuffer* evhttp_buffer = reinterpret_cast<evbuffer*>(userp_pair->first);
+  auto response_meta_data = reinterpret_cast<ResponseMetaData*>(userp);
+  evbuffer* evhttp_buffer = evbuffer_new();
+  if (evhttp_buffer == nullptr) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INTERNAL,
+        std::string("failed to create evbuffer for output tensor").c_str());
+  } else {
+    response_meta_data->first.push_back(evhttp_buffer);
+  }
+
   const std::unordered_map<
       std::string,
       std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
-      output_shm_map = userp_pair->second;
+      output_shm_map = response_meta_data->second;
 
   *buffer = nullptr;
   *buffer_userp = nullptr;
@@ -1185,17 +1201,12 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   }
 
   if (err == nullptr) {
-    EVBufferPair* response_pair(new EVBufferPair());
+    std::unique_ptr<InferRequest> infer_request(new InferRequest(
+        req, request_header_protobuf.id(), server_id_, unique_id));
     err = EVBufferToInput(
         model_name, request_header_protobuf, req->buffer_in, request_provider,
-        response_pair->second);
+        infer_request->response_meta_data_.second);
     if (err == nullptr) {
-      InferRequest* infer_request = new InferRequest(
-          req, request_header_protobuf.id(), server_id_, unique_id);
-
-      response_pair->first = req->buffer_out;
-      infer_request->response_pair_.reset(response_pair);
-
       // Provide the trace manager object to use for this request, if nullptr
       // then no tracing will be performed.
       TRTSERVER_TraceManager* trace_manager = nullptr;
@@ -1210,11 +1221,11 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
 
       err = TRTSERVER_ServerInferAsync(
           server_.get(), trace_manager, request_provider, allocator_,
-          reinterpret_cast<void*>(response_pair), InferRequest::InferComplete,
-          reinterpret_cast<void*>(infer_request));
-      if (err != nullptr) {
-        delete infer_request;
-        infer_request = nullptr;
+          reinterpret_cast<void*>(&infer_request->response_meta_data_),
+          InferRequest::InferComplete,
+          reinterpret_cast<void*>(infer_request.get()));
+      if (err == nullptr) {
+        infer_request.release();
       }
     }
   }
@@ -1320,6 +1331,9 @@ HTTPAPIServer::InferRequest::InferComplete(
 {
   HTTPAPIServer::InferRequest* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequest*>(userp);
+  for (auto buffer : infer_request->response_meta_data_.first) {
+    evbuffer_add_buffer(infer_request->req_->buffer_out, buffer);
+  }
   if (infer_request->FinalizeResponse(response) == EVHTP_RES_OK) {
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
