@@ -128,6 +128,7 @@ class Metrics {
   prometheus::Family<prometheus::Counter>& inf_queue_duration_us_family_;
   prometheus::Family<prometheus::Histogram>& inf_load_ratio_family_;
 #endif  // TRTIS_ENABLE_STATS
+#ifdef TRTIS_ENABLE_METRICS_GPU
   prometheus::Family<prometheus::Gauge>& gpu_utilization_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_total_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_used_family_;
@@ -142,9 +143,10 @@ class Metrics {
   std::vector<prometheus::Gauge*> gpu_power_limit_;
   std::vector<prometheus::Counter*> gpu_energy_consumption_;
 
-  bool gpu_metrics_enabled_;
   std::unique_ptr<std::thread> nvml_thread_;
   std::atomic<bool> nvml_thread_exit_;
+#endif  // TRTIS_ENABLE_METRICS_GPU
+  bool gpu_metrics_enabled_;
 };
 
 }}  // namespace nvidia::inferenceserver
