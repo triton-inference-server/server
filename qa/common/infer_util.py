@@ -391,7 +391,8 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
 # return the shape of the resized tensor.
 def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values, dummy_input_shapes,
                model_version=None, use_http=True, use_grpc=True,
-               use_streaming=True, shm_suffix=""):
+               use_streaming=True, shm_suffix="", use_system_shared_memory=False,
+               use_cuda_shared_memory=False):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
@@ -403,7 +404,7 @@ def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values,
     tester.assertEqual(len(input_shape_values), len(dummy_input_shapes))
     io_cnt = len(input_shape_values)
 
-    if TEST_CUDA_SHARED_MEMORY and TEST_SYSTEM_SHARED_MEMORY:
+    if use_system_shared_memory and use_cuda_shared_memory:
         raise ValueError("Cannot set both System and CUDA shared memory flags to 1")
 
     input_dict = {}
@@ -460,7 +461,7 @@ def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values,
                             np.dtype(tensor_dtype).itemsize * batch_size
         
         # create and register shared memory region for inputs and outputs
-        if TEST_CUDA_SHARED_MEMORY:
+        if use_cuda_shared_memory:
             shm_ip_handles.append(cudashm.create_shared_memory_region("input"+str(io_num)+"_data"+shm_suffix,
                                                                 input_byte_size, 0))
             shm_ip_handles.append(cudashm.create_shared_memory_region("dummy_input"+str(io_num)+"_data"+shm_suffix,
@@ -478,7 +479,7 @@ def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values,
             # copy data into shared memory region for input values
             cudashm.set_shared_memory_region(shm_ip_handles[2 * io_num], input_list)
             cudashm.set_shared_memory_region(shm_ip_handles[2 * io_num + 1], dummy_input_list)
-        elif TEST_SYSTEM_SHARED_MEMORY:
+        elif use_system_shared_memory:
             shm_ip_handles.append(shm.create_shared_memory_region("input"+str(io_num)+"_data"+shm_suffix,\
                                         "/input"+str(io_num)+shm_suffix, input_byte_size))
             shm_ip_handles.append(shm.create_shared_memory_region("dumy_input"+str(io_num)+"_data"+shm_suffix,\
@@ -494,7 +495,7 @@ def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values,
             # copy data into shared memory region for input values
             shm.set_shared_memory_region(shm_ip_handles[2 * io_num], input_list)
             shm.set_shared_memory_region(shm_ip_handles[2 * io_num + 1], dummy_input_list)
-        if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+        if use_system_shared_memory or use_cuda_shared_memory:
             input_dict[input_name] = (shm_ip_handles[2 * io_num], [len(input_shape_values[0])])
             input_dict[dummy_input_name] = (shm_ip_handles[2 * io_num + 1], dummy_input_shapes[io_num])
             output_dict[output_name] = (InferContext.ResultFormat.RAW, shm_op_handles[2 * io_num])
@@ -535,11 +536,11 @@ def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values,
                                   "{}, {}, slot {}, expected: {}, got {}".format(
                                   model_name, result_name, b, expected, result_val[b]))
 
-    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+    if use_cuda_shared_memory or use_system_shared_memory:
         for io_num in range(2 * io_cnt):
             shared_memory_ctx.unregister(shm_ip_handles[io_num])
             shared_memory_ctx.unregister(shm_op_handles[io_num])
-            if TEST_CUDA_SHARED_MEMORY:
+            if use_cuda_shared_memory:
                 cudashm.destroy_shared_memory_region(shm_ip_handles[io_num])
                 cudashm.destroy_shared_memory_region(shm_op_handles[io_num])
             else:

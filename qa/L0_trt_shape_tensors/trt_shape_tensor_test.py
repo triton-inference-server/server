@@ -41,10 +41,10 @@ import sequence_util as su
 from tensorrtserver.api import *
 import os
 
-_test_system_shared_memory = bool(
+TEST_SYSTEM_SHARED_MEMORY = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-_test_cuda_shared_memory = bool(
-    int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
+                                                  0)))
 
 _model_instances = 1
 _max_queue_delay_ms = 10000
@@ -82,15 +82,18 @@ class InferShapeTensorTest(unittest.TestCase):
         try:
             start_ms = int(round(time.time() * 1000))
 
-            iu.infer_shape_tensor(self,
-                                  'plan',
-                                  bs,
-                                  np.float32,
-                                  shape_values,
-                                  dummy_input_shapes,
-                                  use_grpc=False,
-                                  use_streaming=False,
-                                  shm_suffix=shm_suffix)
+            iu.infer_shape_tensor(
+                self,
+                'plan',
+                bs,
+                np.float32,
+                shape_values,
+                dummy_input_shapes,
+                use_grpc=False,
+                use_streaming=False,
+                shm_suffix=shm_suffix,
+                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
             end_ms = int(round(time.time() * 1000))
 
@@ -150,23 +153,62 @@ class InferShapeTensorTest(unittest.TestCase):
             str(vs[1].model_inference_count))
 
     def test_static_batch(self):
-        iu.infer_shape_tensor(self, 'plan', 8, np.float32, [[32, 32]], [[4, 4]])
-        iu.infer_shape_tensor(self, 'plan', 8, np.float32, [[4, 4]], [[32, 32]])
-        iu.infer_shape_tensor(self, 'plan', 8, np.float32, [[4, 4]], [[4, 4]])
+        iu.infer_shape_tensor(
+            self,
+            'plan',
+            8,
+            np.float32, [[32, 32]], [[4, 4]],
+            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+        iu.infer_shape_tensor(
+            self,
+            'plan',
+            8,
+            np.float32, [[4, 4]], [[32, 32]],
+            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+        iu.infer_shape_tensor(
+            self,
+            'plan',
+            8,
+            np.float32, [[4, 4]], [[4, 4]],
+            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
     def test_nobatch(self):
-        iu.infer_shape_tensor(self, 'plan_nobatch', 1, np.float32, [[32, 32]],
-                              [[4, 4]])
-        iu.infer_shape_tensor(self, 'plan_nobatch', 1, np.float32, [[4, 4]],
-                              [[32, 32]])
-        iu.infer_shape_tensor(self, 'plan_nobatch', 1, np.float32, [[4, 4]],
-                              [[4, 4]])
+        iu.infer_shape_tensor(
+            self,
+            'plan_nobatch',
+            1,
+            np.float32, [[32, 32]], [[4, 4]],
+            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+        iu.infer_shape_tensor(
+            self,
+            'plan_nobatch',
+            1,
+            np.float32, [[4, 4]], [[32, 32]],
+            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+        iu.infer_shape_tensor(
+            self,
+            'plan_nobatch',
+            1,
+            np.float32, [[4, 4]], [[4, 4]],
+            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
     def test_wrong_shape_values(self):
         over_shape_values = [[32, 33]]
         try:
-            iu.infer_shape_tensor(self, 'plan', 8, np.float32,
-                                  over_shape_values, [[4, 4]])
+            iu.infer_shape_tensor(
+                self,
+                'plan',
+                8,
+                np.float32,
+                over_shape_values, [[4, 4]],
+                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
         except InferenceServerException as ex:
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
@@ -376,7 +418,7 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
-            if _test_system_shared_memory or _test_cuda_shared_memory:
+            if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                 self.cleanup_shm_regions(precreated_shm0_handles)
                 self.cleanup_shm_regions(precreated_shm1_handles)
                 self.cleanup_shm_regions(precreated_shm2_handles)
@@ -497,7 +539,7 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
-            if _test_system_shared_memory or _test_cuda_shared_memory:
+            if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                 self.cleanup_shm_regions(precreated_shm0_handles)
                 self.cleanup_shm_regions(precreated_shm1_handles)
                 self.cleanup_shm_regions(precreated_shm2_handles)
@@ -639,7 +681,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
-            if _test_system_shared_memory or _test_cuda_shared_memory:
+            if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                 self.cleanup_shm_regions(precreated_shm0_handles)
                 self.cleanup_shm_regions(precreated_shm1_handles)
                 self.cleanup_shm_regions(precreated_shm2_handles)
@@ -768,7 +810,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
-            if _test_system_shared_memory or _test_cuda_shared_memory:
+            if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                 self.cleanup_shm_regions(precreated_shm0_handles)
                 self.cleanup_shm_regions(precreated_shm1_handles)
                 self.cleanup_shm_regions(precreated_shm2_handles)

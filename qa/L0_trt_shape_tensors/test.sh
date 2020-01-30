@@ -120,6 +120,7 @@ for i in \
         set +e
         python $SHAPE_TENSOR_TEST InferShapeTensorTest.$i >>$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
             echo -e "\n***\n*** Test Failed $i\n***"
             RET=1
         fi
@@ -148,6 +149,7 @@ for i in \
         set +e
         python $SHAPE_TENSOR_TEST SequenceBatcherShapeTensorTest.$i >>$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
             echo -e "\n***\n*** Test Failed $i\n***"
             RET=1
         fi
@@ -172,7 +174,7 @@ for i in \
     test_dynaseq_different_shape_values_series \
     test_dynaseq_different_shape_values_parallel \
     ;do
-
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
     SERVER_LOG="./$i.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -184,7 +186,7 @@ for i in \
     echo "Test: $i" >>$CLIENT_LOG
 
     set +e
-   python $SHAPE_TENSOR_TEST DynaSequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+    python $SHAPE_TENSOR_TEST DynaSequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
         echo -e "\n***\n*** Test $i Failed\n***"
