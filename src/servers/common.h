@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -51,17 +51,6 @@ namespace nvidia { namespace inferenceserver {
                 << TRTSERVER_ErrorMessage(err__) << std::endl; \
       TRTSERVER_ErrorDelete(err__);                            \
       exit(1);                                                 \
-    }                                                          \
-  } while (false)
-
-#define LOG_IF_ERR(X, MSG)                                     \
-  do {                                                         \
-    TRTSERVER_Error* err__ = (X);                              \
-    if (err__ != nullptr) {                                    \
-      std::cerr << "error: " << (MSG) << ": "                  \
-                << TRTSERVER_ErrorCodeString(err__) << " - "   \
-                << TRTSERVER_ErrorMessage(err__) << std::endl; \
-      TRTSERVER_ErrorDelete(err__);                            \
     }                                                          \
   } while (false)
 

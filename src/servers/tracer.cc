@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,7 +28,6 @@
 
 #include "src/core/constants.h"
 #include "src/core/logging.h"
-#include "src/servers/common.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -178,13 +177,13 @@ TraceManager::ReleaseTrace(
     // Gather trace info
     const char* model_name;
     int64_t model_version, id, parent_id;
-    LOG_IF_ERR(
+    LOG_TRTSERVER_ERROR(
         TRTSERVER_TraceModelName(trace, &model_name), "getting model name");
-    LOG_IF_ERR(
+    LOG_TRTSERVER_ERROR(
         TRTSERVER_TraceModelVersion(trace, &model_version),
         "getting model version");
-    LOG_IF_ERR(TRTSERVER_TraceId(trace, &id), "getting trace id");
-    LOG_IF_ERR(
+    LOG_TRTSERVER_ERROR(TRTSERVER_TraceId(trace, &id), "getting trace id");
+    LOG_TRTSERVER_ERROR(
         TRTSERVER_TraceParentId(trace, &parent_id), "getting trace parent id");
 
     auto tracer = reinterpret_cast<Tracer*>(activity_userp);
@@ -195,7 +194,7 @@ TraceManager::ReleaseTrace(
       delete tracer;
     } else {
       // If the tracer is not tied with a trace, then only delete the trace.
-      LOG_IF_ERR(TRTSERVER_TraceDelete(trace), "deleting trace");
+      LOG_TRTSERVER_ERROR(TRTSERVER_TraceDelete(trace), "deleting trace");
     }
   }
 }
@@ -241,7 +240,7 @@ Tracer::~Tracer()
   manager_->WriteTrace(tout_);
 
   if (trace_ != nullptr) {
-    LOG_IF_ERR(TRTSERVER_TraceDelete(trace_), "deleting trace");
+    LOG_TRTSERVER_ERROR(TRTSERVER_TraceDelete(trace_), "deleting trace");
   }
 }
 
