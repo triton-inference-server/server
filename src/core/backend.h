@@ -126,8 +126,8 @@ class InferenceBackend {
     std::shared_ptr<InferRequestProvider::InputOverrideMap> input_override_;
 
     // Placeholder for input data
-    std::unique_ptr<AllocatedSystemMemory> zero_data_;
-    std::unique_ptr<AllocatedSystemMemory> random_data_;
+    std::unique_ptr<AllocatedMemory> zero_data_;
+    std::unique_ptr<AllocatedMemory> random_data_;
     std::vector<std::string> provided_data_;
   };
 

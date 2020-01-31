@@ -176,7 +176,8 @@ class PlanBackend : public InferenceBackend {
     // Assume that the lifetime of the payload is extended until the completion
     // callback is called
     SyncQueue<std::tuple<
-        std::function<void(Status)>, std::vector<Scheduler::Payload>*, size_t>>
+        std::function<void(Status)>, std::vector<Scheduler::Payload>*, size_t,
+        std::shared_ptr<std::vector<OutputInfo>>>>
         completion_queue_;
 
     // Map from profile index to the corresponding TensorRT context. Use map
@@ -207,6 +208,7 @@ class PlanBackend : public InferenceBackend {
     std::vector<void*> buffer_bindings_;
 
     std::vector<InputInfo> inputs_;
+    std::vector<OutputInfo> outputs_;
   };
 
   // CUDA engine shared across all model instances on the same device.

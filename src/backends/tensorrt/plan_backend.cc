@@ -133,7 +133,7 @@ PlanBackend::Context::~Context()
   DestroyEventSet();
 
   // Notify the completion thread to exit
-  completion_queue_.Put(std::make_tuple(nullptr, nullptr, 0));
+  completion_queue_.Put(std::make_tuple(nullptr, nullptr, 0, nullptr));
   if (completion_thread_.joinable()) {
     completion_thread_.join();
   }
@@ -1060,8 +1060,10 @@ PlanBackend::Run(
         static_cast<Context*>(contexts_[next_context_[runner_idx]].get());
     auto event_set_idx = context->next_set_;
     context->next_set_ = (event_set_idx + 1) % context->EVENT_SET_COUNT;
-    context->completion_queue_.Put(
-        std::make_tuple(OnCompleteQueuedPayloads, payloads, event_set_idx));
+    auto outputs = std::make_shared<std::vector<OutputInfo>>();
+    outputs->swap(context->outputs_);
+    context->completion_queue_.Put(std::make_tuple(
+        OnCompleteQueuedPayloads, payloads, event_set_idx, std::move(outputs)));
   }
 
   // Set the next context to be executed on this runner, will block
@@ -1080,6 +1082,7 @@ PlanBackend::Context::Run(
   // keep indirect buffers from previous run until now as scheduler
   // thread doesn't check when 'input_ready' event is triggered.
   inputs_.clear();
+  outputs_.clear();
 
   cudaSetDevice(gpu_device_);
 
@@ -1303,6 +1306,9 @@ PlanBackend::Context::Run(
       continue;
     }
 
+    outputs_.emplace_back();
+    auto& output = outputs_.back();
+
     const std::string& name = engine_->getBindingName(bindex);
 
     nvinfer1::Dims dims;
@@ -1313,20 +1319,23 @@ PlanBackend::Context::Run(
       dims = engine_->getBindingDimensions(binding_offset + bindex);
     }
 
-    std::vector<int64_t> shape;
+    output.output_buffer_ = static_cast<const char*>(buffers_[bindex]);
+    output.memory_type_ = TRTSERVER_MEMORY_GPU;
+    output.memory_type_id_ = gpu_device_;
 
     if (!is_dynamic_ && max_batch_size_ != NO_BATCHING) {
-      shape.insert(shape.begin(), total_batch_size);
+      output.output_shape_.insert(
+          output.output_shape_.begin(), total_batch_size);
     }
 
     for (int i = 0; i < dims.nbDims; ++i) {
-      shape.push_back(dims.d[i]);
+      output.output_shape_.push_back(dims.d[i]);
     }
 
     DataType dt = ConvertTrtTypeToDataType(
         engine_->getBindingDataType(binding_offset + bindex));
 
-    size_t batch1_byte_size = GetByteSize(dt, shape);
+    size_t batch1_byte_size = GetByteSize(dt, output.output_shape_);
     if (max_batch_size_ != NO_BATCHING) {
       batch1_byte_size /= total_batch_size;
     }
@@ -1340,9 +1349,8 @@ PlanBackend::Context::Run(
               std::to_string(batch1_byte_size));
     }
 
-    cuda_copy |= SetFixedSizeOutputBuffer(
-        name, batch1_byte_size, static_cast<char*>(buffers_[bindex]), shape,
-        TRTSERVER_MEMORY_GPU /* src_memory_type */, gpu_device_, payloads);
+    cuda_copy |=
+        SetFixedSizeOutputBuffer(name, batch1_byte_size, &output, payloads);
   }
 
   cudaEventRecord(events_[next_set_].output_ready_, stream_);
@@ -1361,10 +1369,8 @@ PlanBackend::Context::ProcessResponse(
       break;
     }
     auto& event_set = events_[std::get<2>(OnCompleteMetaData)];
-#ifdef TRTIS_ENABLE_STATS
-    // Only need to access payload when stats is being recorded
     auto& payloads = std::get<1>(OnCompleteMetaData);
-
+#ifdef TRTIS_ENABLE_STATS
     // Only need to wait for input copy for recording stats
     cudaEventSynchronize(event_set.input_ready_);
     for (auto& payload : *payloads) {
@@ -1392,6 +1398,36 @@ PlanBackend::Context::ProcessResponse(
 #endif  // TRTIS_ENABLE_STATS
 
     cudaEventSynchronize(event_set.output_ready_);
+    // Issue the last steps here if outputs are placed in indirect buffer
+    // Note that the copies are expected to be HtoH if any.
+    for (auto& output : *(std::get<3>(OnCompleteMetaData))) {
+      for (auto& indirect_buffer : output.indirect_buffers_) {
+        bool cuda_used;
+        TRTSERVER_Memory_Type src_memory_type;
+        int64_t src_memory_type_id;
+        // placeholder, copy byte size is determined by dst_byte_size
+        size_t src_byte_size;
+        auto src = indirect_buffer.first->BufferAt(
+            0, &src_byte_size, &src_memory_type, &src_memory_type_id);
+        TRTSERVER_Memory_Type dst_memory_type;
+        int64_t dst_memory_type_id;
+        for (auto& payload_output : indirect_buffer.second) {
+          char* dst = payload_output.second->MutableBuffer(
+              &dst_memory_type, &dst_memory_type_id);
+          auto dst_byte_size = payload_output.second->TotalByteSize();
+          (*payloads)[payload_output.first].status_ = CopyBuffer(
+              "indirect buffer", src_memory_type, src_memory_type_id,
+              dst_memory_type, dst_memory_type_id, dst_byte_size, src, dst,
+              stream_, &cuda_used);
+          src += dst_byte_size;
+          if (cuda_used) {
+            (*payloads)[payload_output.first].status_ = Status(
+                RequestStatusCode::INTERNAL,
+                "unexpected cuda copy from indirect buffer to output buffer");
+          }
+        }
+      }
+    }
 
 #ifdef TRTIS_ENABLE_STATS
     // Stop compute timers.

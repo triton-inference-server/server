@@ -48,8 +48,7 @@ struct Step {
   std::shared_ptr<InferenceBackend> backend_;
   std::shared_ptr<InferRequestProvider> request_provider_;
   std::shared_ptr<InferResponseProvider> response_provider_;
-  std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>
-      output_map_;
+  std::unordered_map<std::string, std::shared_ptr<AllocatedMemory>> output_map_;
   Status infer_status_;
 
   size_t step_idx_;
@@ -324,13 +323,13 @@ EnsembleContext::ResponseAlloc(
     int64_t* allocated_memory_type_id)
 {
   auto tensor_data_map = reinterpret_cast<
-      std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>*>(
+      std::unordered_map<std::string, std::shared_ptr<AllocatedMemory>>*>(
       userp);
 
   *buffer = nullptr;
   *buffer_userp = nullptr;
 
-  auto allocated_buffer = std::make_shared<AllocatedSystemMemory>(
+  auto allocated_buffer = std::make_shared<AllocatedMemory>(
       byte_size, preferred_memory_type, preferred_memory_type_id);
 
   auto mutable_buffer = allocated_buffer->MutableBuffer(
