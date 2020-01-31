@@ -300,6 +300,7 @@ AutoFillSavedModel::Create(
         graphdef_backend_config->allow_soft_placement,
         graphdef_backend_config->memory_limit_mb, nullptr /* tftrt_config */);
 
+    RETURN_IF_ERROR(DestroyFileFolder(local_savedmodel_path));
     if (err == nullptr) {
       savedmodel_dir = dir;
       found = true;
@@ -316,6 +317,7 @@ AutoFillSavedModel::Create(
 
   autofill->reset(
       new AutoFillSavedModelImpl(model_name, savedmodel_dir, trtistf_model));
+
   return Status::Success;
 }
 

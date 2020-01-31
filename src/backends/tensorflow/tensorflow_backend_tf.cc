@@ -26,7 +26,6 @@
 
 #include "tensorflow/tensorflow_backend_tf.h"
 
-#include <fstream>
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/cc/saved_model/tag_constants.h"
 #include "tensorflow/core/common_runtime/device.h"

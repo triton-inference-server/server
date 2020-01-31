@@ -98,11 +98,16 @@ Status GetDirectoryFiles(
 /// \return Error status
 Status ReadTextFile(const std::string& path, std::string* contents);
 
-/// Read a text file into a string.
+/// Create a local copy of the file (if needed).
 /// \param path The path of the file.
-/// \param contents Returns the contents of the file.
+/// \param local_path Returns the local path of the file.
 /// \return Error status
 Status DownloadFileFolder(const std::string& path, std::string* local_path);
+
+/// Delete the local copy of the file (if needed).
+/// \param path The path of the file.
+/// \return Error status
+Status DestroyFileFolder(const std::string& path);
 
 /// Write a string to a file.
 /// \param path The path of the file.

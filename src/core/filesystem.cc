@@ -47,6 +47,8 @@
 #include <cerrno>
 #include <fstream>
 #include "src/core/constants.h"
+#include <stdlib.h>
+#include <stdio.h>
 
 namespace nvidia { namespace inferenceserver {
 
@@ -68,6 +70,7 @@ class FileSystem {
       const std::string& path, std::string* contents) = 0;
   virtual Status DownloadFileFolder(
       const std::string& path, std::string* local_path) = 0;
+  virtual Status DestroyFileFolder(const std::string& path) = 0;
   virtual Status WriteTextFile(
       const std::string& path, const std::string& contents) = 0;
 };
@@ -87,6 +90,7 @@ class LocalFileSystem : public FileSystem {
   Status ReadTextFile(const std::string& path, std::string* contents) override;
   Status DownloadFileFolder(
       const std::string& path, std::string* local_path) override;
+  Status DestroyFileFolder(const std::string& path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 };
@@ -217,6 +221,13 @@ LocalFileSystem::DownloadFileFolder(
 }
 
 Status
+LocalFileSystem::DestroyFileFolder(const std::string& path)
+{
+  // Do nothing
+  return Status::Success;
+}
+
+Status
 LocalFileSystem::WriteTextFile(
     const std::string& path, const std::string& contents)
 {
@@ -254,6 +265,7 @@ class GCSFileSystem : public FileSystem {
   Status ReadTextFile(const std::string& path, std::string* contents) override;
   Status DownloadFileFolder(
       const std::string& path, std::string* local_path) override;
+  Status DestroyFileFolder(const std::string& path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -532,6 +544,12 @@ GCSFileSystem::DownloadFileFolder(
   return Status::Success;
 }
 
+Status
+GCSFileSystem::DestroyFileFolder(const std::string& path)
+{
+  // Do nothing
+  return Status::Success;
+}
 
 Status
 GCSFileSystem::WriteTextFile(
@@ -565,6 +583,7 @@ class S3FileSystem : public FileSystem {
   Status ReadTextFile(const std::string& path, std::string* contents) override;
   Status DownloadFileFolder(
       const std::string& path, std::string* local_path) override;
+  Status DestroyFileFolder(const std::string& path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -850,14 +869,30 @@ S3FileSystem::DownloadFileFolder(
 
   bool is_dir = false;
   std::set<std::string> contents, files;
+  std::string file_template = "/tmp/fileXXXXXX";
   IsDirectory(path, &is_dir);
   if (is_dir) {
+    char* tmp_file = mkdtemp(const_cast<char*>(file_template.c_str()));
+    if (tmp_file != nullptr) {
+      return Status(
+        RequestStatusCode::INTERNAL, "Failed to create local temp folder: " + file_template);
+    }
+
+    *local_path = std::string(tmp_file);
     RETURN_IF_ERROR(GetDirectoryContents(path, &contents));
 
     for (auto iter = contents.begin(); iter != contents.end();) {
       bool is_sub_dir;
       RETURN_IF_ERROR(IsDirectory(JoinPath({path, *iter}), &is_sub_dir));
       if (is_sub_dir) {
+        // Create local mirror of subdirectories
+        std::string local_file_path = JoinPath({*local_path, *iter});
+        int status = mkdir(const_cast<char*>(local_file_path.c_str()), S_IRUSR | S_IWUSR | S_IXUSR);
+        if (!status) {
+          return Status(
+            RequestStatusCode::INTERNAL, "Failed to create local temp file: " + local_file_path);
+        }
+
         std::set<std::string> subdir_files;
         RETURN_IF_ERROR(
             GetDirectoryFiles(JoinPath({path, *iter}), &subdir_files));
@@ -870,9 +905,7 @@ S3FileSystem::DownloadFileFolder(
       }
     }
 
-    *local_path = "/PATH/FILE_NAME";
     for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
-      std::string local_file_path = JoinPath({*local_path, *iter});
       std::string bucket, object;
       RETURN_IF_ERROR(ParsePath(JoinPath({path, *iter}), &bucket, &object));
 
@@ -885,6 +918,7 @@ S3FileSystem::DownloadFileFolder(
       if (get_object_outcome.IsSuccess()) {
         auto& retrieved_file =
             get_object_outcome.GetResultWithOwnership().GetBody();
+        std::string local_file_path = JoinPath({*local_path, *iter});
         std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
         output_file << retrieved_file.rdbuf();
         output_file.close();
@@ -894,7 +928,13 @@ S3FileSystem::DownloadFileFolder(
       }
     }
   } else {
-    *local_path = "/PATH/FILE_NAME";
+    int status = mkstemp(const_cast<char*>(file_template.c_str()));
+    if (!status) {
+      return Status(
+        RequestStatusCode::INTERNAL, "Failed to create local temp file: " + file_template);
+    }
+
+    *local_path = file_template;
     std::string bucket, object;
     RETURN_IF_ERROR(ParsePath(path, &bucket, &object));
 
@@ -915,6 +955,13 @@ S3FileSystem::DownloadFileFolder(
           RequestStatusCode::INTERNAL, "Failed to get object at " + path);
     }
   }
+  return Status::Success;
+}
+
+Status
+S3FileSystem::DestroyFileFolder(const std::string& path)
+{
+  remove(path.c_str());
   return Status::Success;
 }
 
@@ -1147,6 +1194,15 @@ DownloadFileFolder(const std::string& path, std::string* local_path)
   RETURN_IF_ERROR(GetFileSystem(path, &fs));
   return fs->DownloadFileFolder(path, local_path);
 }
+
+Status
+DestroyFileFolder(const std::string& path)
+{
+  FileSystem* fs;
+  RETURN_IF_ERROR(GetFileSystem(path, &fs));
+  return fs->DestroyFileFolder(path);
+}
+
 
 Status
 WriteTextProto(const std::string& path, const google::protobuf::Message& msg)

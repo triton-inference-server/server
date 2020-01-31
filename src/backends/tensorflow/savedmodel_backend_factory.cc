@@ -72,6 +72,7 @@ SavedModelBackendFactory::CreateBackend(
     const auto savedmodel_path = JoinPath({path, filename});
     std::string local_savedmodel_path;
 
+    // Destory local copy if exists
     RETURN_IF_ERROR(
         DownloadFileFolder(savedmodel_path, &local_savedmodel_path));
     models.emplace(
@@ -86,6 +87,11 @@ SavedModelBackendFactory::CreateBackend(
       path, model_config, backend_config_.get(),
       kTensorFlowSavedModelPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
+
+  // Destory local copy if exists
+  for (const auto& model : models) {
+    RETURN_IF_ERROR(DestroyFileFolder(model.second));
+  }
 
   *backend = std::move(local_backend);
   return Status::Success;

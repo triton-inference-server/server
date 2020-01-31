@@ -72,6 +72,7 @@ GraphDefBackendFactory::CreateBackend(
     const auto graphdef_path = JoinPath({path, filename});
     std::string local_graphdef_path;
 
+    // Destory local copy if exists
     RETURN_IF_ERROR(DownloadFileFolder(graphdef_path, &local_graphdef_path));
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
@@ -84,6 +85,11 @@ GraphDefBackendFactory::CreateBackend(
   RETURN_IF_ERROR(local_backend->Init(
       path, model_config, backend_config_.get(), kTensorFlowGraphDefPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
+
+  // Destory local copy if exists
+  for (const auto& model : models) {
+    RETURN_IF_ERROR(DestroyFileFolder(model.second));
+  }
 
   *backend = std::move(local_backend);
   return Status::Success;
