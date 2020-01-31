@@ -39,7 +39,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class AllocatedSystemMemory;
+class AllocatedMemory;
 
 class LibTorchBackend : public InferenceBackend {
  public:
@@ -100,7 +100,8 @@ class LibTorchBackend : public InferenceBackend {
         std::vector<torch::Tensor>* outputs_, const std::string& name,
         const int& op_index, const DataType dtype, const size_t dtype_byte_size,
         const size_t total_batch_size, const DimsList& dims,
-        std::vector<Scheduler::Payload>* payloads, bool* cuda_copy);
+        std::vector<Scheduler::Payload>* payloads, OutputInfo* output,
+        bool* cuda_copy);
 
     // Set the input tensor given the meta data of the input.
     Status SetInputTensor(
@@ -108,7 +109,7 @@ class LibTorchBackend : public InferenceBackend {
 
     Status GetOutputTensor(
         std::vector<torch::Tensor>* outputs_, const int& op_index,
-        const std::string& name, const DataType dtype, void** content,
+        const std::string& name, const DataType dtype, const char** content,
         size_t* byte_size, std::vector<int64_t>* content_shape);
 
     Status Execute(

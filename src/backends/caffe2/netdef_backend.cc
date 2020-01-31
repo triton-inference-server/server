@@ -377,24 +377,29 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
     const std::string& name, const Caffe2Workspace::DataType dtype,
     const size_t dtype_byte_size, const size_t total_batch_size,
     const DimsList& dims, std::vector<Scheduler::Payload>* payloads,
-    bool* cuda_copy)
+    OutputInfo* output, bool* cuda_copy)
 {
-  std::vector<int64_t> content_shape;
-  const char* content = nullptr;
+  // [TODO] use the following statement. Right now we always create
+  // netdef workspace with inputs / outputs on CPU node
+  // auto content_memory_type = (gpu_device_ == NO_GPU_DEVICE)
+  //                                ? TRTSERVER_MEMORY_CPU
+  //                                : TRTSERVER_MEMORY_GPU;
+  output->memory_type_ = TRTSERVER_MEMORY_CPU;
+  output->memory_type_id_ = 0;
   size_t byte_size = 0;
   Caffe2Workspace::Error err = workspace_->GetOutputTensor(
-      name, dtype, &content, &byte_size, &content_shape);
+      name, dtype, &output->output_buffer_, &byte_size, &output->output_shape_);
   if (!err.IsOk()) {
     return Status(RequestStatusCode::INTERNAL, err.Message());
   }
 
   // verify shape of output matches shape from model config
   RETURN_IF_ERROR(CompareOutputDims(
-      name, content_shape, dims,
+      name, output->output_shape_, dims,
       max_batch_size_ != NO_BATCHING /* supports_batching */));
 
   const size_t total_byte_size =
-      GetElementCount(content_shape) * dtype_byte_size;
+      GetElementCount(output->output_shape_) * dtype_byte_size;
   const size_t batch1_byte_size = total_byte_size / total_batch_size;
 
   if (byte_size != total_byte_size) {
@@ -406,16 +411,8 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
             std::to_string(batch1_byte_size));
   }
 
-  // [TODO] use the following statement. Right now we always create
-  // netdef workspace with inputs / outputs on CPU node
-  // auto content_memory_type = (gpu_device_ == NO_GPU_DEVICE)
-  //                                ? TRTSERVER_MEMORY_CPU
-  //                                : TRTSERVER_MEMORY_GPU;
-  auto content_memory_type = TRTSERVER_MEMORY_CPU;
-  int64_t memory_type_id = 0;
-  *cuda_copy |= SetFixedSizeOutputBuffer(
-      name, batch1_byte_size, content, content_shape, content_memory_type,
-      memory_type_id, payloads);
+  *cuda_copy |=
+      SetFixedSizeOutputBuffer(name, batch1_byte_size, output, payloads);
   return Status::Success;
 }
 
@@ -423,7 +420,7 @@ Status
 NetDefBackend::Context::SetInput(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
+    std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
     std::vector<InputInfo>* inputs, bool* cuda_copy)
 {
   // Get the shape of the input. The provider has already checked that
@@ -452,8 +449,8 @@ NetDefBackend::Context::SetInput(
   // The entire input tensor must be delivered as a single
   // contiguous chunk so create a buffer large enough to hold the
   // entire dynamic batched input.
-  input_buffers->emplace_back(new AllocatedSystemMemory(
-      total_byte_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
+  input_buffers->emplace_back(
+      new AllocatedMemory(total_byte_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
   inputs->emplace_back();
   auto& input = inputs->back();
   input.input_buffer_ = input_buffers->back()->MutableBuffer(
@@ -511,7 +508,7 @@ NetDefBackend::Context::Run(
 
   // Hold reference to each buffer of input data to that it stays
   // until the inference has completed.
-  std::vector<std::unique_ptr<AllocatedSystemMemory>> input_buffers;
+  std::vector<std::unique_ptr<AllocatedMemory>> input_buffers;
   std::vector<InputInfo> inputs;
 
   // Create a tensor for each input sized correctly for the total
@@ -602,6 +599,7 @@ NetDefBackend::Context::Run(
   }
 #endif  // TRTIS_ENABLE_STATS
 
+  std::vector<OutputInfo> outputs;
   // Make sure each output is of the expected size and copy it into
   // the payload responses.
   cuda_copy = false;
@@ -620,11 +618,40 @@ NetDefBackend::Context::Run(
                                       ? output_config->reshape().shape()
                                       : output_config->dims();
 
+    outputs.emplace_back();
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
         name, dtype, GetDataTypeByteSize(output_config->data_type()),
-        total_batch_size, output_dims, payloads, &cuda_copy));
+        total_batch_size, output_dims, payloads, &outputs.back(), &cuda_copy));
   }
 #ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+  cuda_copy = false;
+  for (auto& output : outputs) {
+    for (auto& indirect_buffer : output.indirect_buffers_) {
+      bool cuda_used;
+      TRTSERVER_Memory_Type src_memory_type;
+      int64_t src_memory_type_id;
+      // placeholder, copy byte size is determined by dst_byte_size
+      size_t src_byte_size;
+      auto src = indirect_buffer.first->BufferAt(
+          0, &src_byte_size, &src_memory_type, &src_memory_type_id);
+      TRTSERVER_Memory_Type dst_memory_type;
+      int64_t dst_memory_type_id;
+      for (auto& payload_output : indirect_buffer.second) {
+        char* dst = payload_output.second->MutableBuffer(
+            &dst_memory_type, &dst_memory_type_id);
+        auto dst_byte_size = payload_output.second->TotalByteSize();
+        (*payloads)[payload_output.first].status_ = CopyBuffer(
+            "indirect buffer", src_memory_type, src_memory_type_id,
+            dst_memory_type, dst_memory_type_id, dst_byte_size, src, dst,
+            stream_, &cuda_used);
+        cuda_copy |= cuda_used;
+        src += dst_byte_size;
+      }
+    }
+  }
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }

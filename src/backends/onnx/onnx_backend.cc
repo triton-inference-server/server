@@ -577,7 +577,7 @@ OnnxBackend::Context::Run(
 
   // Hold reference to each buffer of input data so that it stays
   // until the inference has completed.
-  std::vector<std::unique_ptr<AllocatedSystemMemory>> input_buffers;
+  std::vector<std::unique_ptr<AllocatedMemory>> input_buffers;
   std::vector<InputInfo> inputs;
   std::vector<const char*> input_names;
   bool cuda_copy = false;
@@ -685,7 +685,7 @@ Status
 OnnxBackend::Context::SetInputTensor(
     const std::string& name, const DataType data_type, const DimsList& dims,
     size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
+    std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
     std::vector<InputInfo>* inputs, std::vector<const char*>* input_names,
     bool* cuda_used)
 {
@@ -737,7 +737,7 @@ OnnxBackend::Context::SetInputTensor(
   const size_t buffer_size =
       total_byte_size + ((data_type != TYPE_STRING) ? 0 : 1);
   input_buffers->emplace_back(
-      new AllocatedSystemMemory(buffer_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
+      new AllocatedMemory(buffer_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
   inputs->emplace_back();
   auto& input = inputs->back();
   input.input_buffer_ = input_buffers->back()->MutableBuffer(
@@ -858,7 +858,11 @@ OnnxBackend::Context::ReadOutputTensors(
     std::vector<Scheduler::Payload>* payloads)
 {
   bool cuda_copy = false;
+  std::vector<OutputInfo> outputs;
+  std::vector<std::vector<char>> string_buffers;
   for (size_t idx = 0; idx < output_names.size(); idx++) {
+    outputs.emplace_back();
+    auto& output = outputs.back();
     std::string name = std::string(output_names[idx]);
 
     const ModelOutput* output_config;
@@ -881,15 +885,15 @@ OnnxBackend::Context::ReadOutputTensors(
     RETURN_IF_ORT_ERROR(
         ort_api->CastTypeInfoToTensorInfo(typeinfo, &type_and_shape));
 
-    std::vector<int64_t> content_shape;
 
     size_t num_dims;
     RETURN_IF_ORT_ERROR(ort_api->GetDimensionsCount(type_and_shape, &num_dims));
 
-    content_shape.resize(num_dims);
+    output.output_shape_.resize(num_dims);
     RETURN_IF_ORT_ERROR(ort_api->GetDimensions(
-        type_and_shape, content_shape.data(), content_shape.size()));
-    const size_t element_count = GetElementCount(content_shape);
+        type_and_shape, output.output_shape_.data(),
+        output.output_shape_.size()));
+    const size_t element_count = GetElementCount(output.output_shape_);
 
     ONNXTensorElementDataType type;
     RETURN_IF_ORT_ERROR(ort_api->GetTensorElementType(type_and_shape, &type));
@@ -900,7 +904,8 @@ OnnxBackend::Context::ReadOutputTensors(
       RETURN_IF_ORT_ERROR(
           ort_api->GetStringTensorDataLength(output_tensor, &total_length));
 
-      char content[total_length];
+      string_buffers.emplace_back(std::vector<char>(total_length));
+      auto content = string_buffers.back().data();
       size_t offsets[element_count + 1];
       RETURN_IF_ORT_ERROR(ort_api->GetStringTensorContent(
           output_tensor, content, total_length, offsets, element_count));
@@ -908,7 +913,8 @@ OnnxBackend::Context::ReadOutputTensors(
       offsets[element_count] = total_length;
 
       cuda_copy |= SetStringOutputBuffer(
-          name, batch1_element_cnt, content, content_shape, offsets, payloads);
+          name, batch1_element_cnt, content, output.output_shape_, offsets,
+          payloads);
     } else {
       // Fixed size data type...
       const size_t actual_byte_size =
@@ -925,21 +931,47 @@ OnnxBackend::Context::ReadOutputTensors(
                 std::to_string(batch1_byte_size));
       }
 
-      char* content = nullptr;
-      RETURN_IF_ORT_ERROR(
-          ort_api->GetTensorMutableData(output_tensor, (void**)&content));
+      RETURN_IF_ORT_ERROR(ort_api->GetTensorMutableData(
+          output_tensor, (void**)&output.output_buffer_));
 
       // [TODO] currently ONNX output data are always on CPU
       // https://github.com/microsoft/onnxruntime/issues/1621
-      auto content_memory_type = TRTSERVER_MEMORY_CPU;
-      int64_t memory_type_id = 0;
-      cuda_copy |= SetFixedSizeOutputBuffer(
-          name, batch1_byte_size, content, content_shape, content_memory_type,
-          memory_type_id, payloads);
+      output.memory_type_ = TRTSERVER_MEMORY_CPU;
+      output.memory_type_id_ = 0;
+      cuda_copy |=
+          SetFixedSizeOutputBuffer(name, batch1_byte_size, &output, payloads);
     }
   }
 
 #ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+  cuda_copy = false;
+  for (auto& output : outputs) {
+    for (auto& indirect_buffer : output.indirect_buffers_) {
+      bool cuda_used;
+      TRTSERVER_Memory_Type src_memory_type;
+      int64_t src_memory_type_id;
+      // placeholder, copy byte size is determined by dst_byte_size
+      size_t src_byte_size;
+      auto src = indirect_buffer.first->BufferAt(
+          0, &src_byte_size, &src_memory_type, &src_memory_type_id);
+      TRTSERVER_Memory_Type dst_memory_type;
+      int64_t dst_memory_type_id;
+      for (auto& payload_output : indirect_buffer.second) {
+        char* dst = payload_output.second->MutableBuffer(
+            &dst_memory_type, &dst_memory_type_id);
+        auto dst_byte_size = payload_output.second->TotalByteSize();
+        (*payloads)[payload_output.first].status_ = CopyBuffer(
+            "indirect buffer", src_memory_type, src_memory_type_id,
+            dst_memory_type, dst_memory_type_id, dst_byte_size, src, dst,
+            stream_, &cuda_used);
+        cuda_copy |= cuda_used;
+        src += dst_byte_size;
+      }
+    }
+  }
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }

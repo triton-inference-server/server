@@ -99,17 +99,14 @@ class MemoryReference : public Memory {
   std::vector<Block> buffer_;
 };
 
-class AllocatedSystemMemory : public Memory {
+class MutableMemory : public Memory {
  public:
-  // Create a continuous data buffer with 'byte_size', 'memory_type' and
-  // 'memory_id.
-  AllocatedSystemMemory(
-      size_t byte_size, TRTSERVER_Memory_Type memory_type,
+  // Create a mutable data buffer referrencing to other data buffer.
+  MutableMemory(
+      char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
       int64_t memory_type_id);
 
-  DISALLOW_COPY_AND_ASSIGN(AllocatedSystemMemory);
-
-  ~AllocatedSystemMemory();
+  virtual ~MutableMemory() {}
 
   //\see Memory::BufferAt()
   const char* BufferAt(
@@ -122,10 +119,25 @@ class AllocatedSystemMemory : public Memory {
   char* MutableBuffer(
       TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
 
- private:
+  DISALLOW_COPY_AND_ASSIGN(MutableMemory);
+
+ protected:
+  MutableMemory() : Memory() {}
+
   char* buffer_;
   TRTSERVER_Memory_Type memory_type_;
   int64_t memory_type_id_;
+};
+
+class AllocatedMemory : public MutableMemory {
+ public:
+  // Create a continuous data buffer with 'byte_size', 'memory_type' and
+  // 'memory_id.
+  AllocatedMemory(
+      size_t byte_size, TRTSERVER_Memory_Type memory_type,
+      int64_t memory_type_id);
+
+  ~AllocatedMemory() override;
 };
 
 //

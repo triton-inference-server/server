@@ -73,12 +73,46 @@ MemoryReference::AddBuffer(
   return buffer_.size() - 1;
 }
 
-AllocatedSystemMemory::AllocatedSystemMemory(
-    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
-    : Memory(), memory_type_(memory_type), memory_type_id_(memory_type_id)
+MutableMemory::MutableMemory(
+    char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+    int64_t memory_type_id)
+    : Memory(), buffer_(buffer), memory_type_(memory_type),
+      memory_type_id_(memory_type_id)
 {
-  buffer_ = nullptr;
-  if (byte_size != 0) {
+  total_byte_size_ = byte_size;
+}
+
+const char*
+MutableMemory::BufferAt(
+    size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
+    int64_t* memory_type_id) const
+{
+  if (idx != 0) {
+    *byte_size = 0;
+    *memory_type = TRTSERVER_MEMORY_CPU;
+    *memory_type_id = 0;
+    return nullptr;
+  }
+  *byte_size = total_byte_size_;
+  *memory_type = memory_type_;
+  *memory_type_id = memory_type_id_;
+  return buffer_;
+}
+
+char*
+MutableMemory::MutableBuffer(
+    TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id)
+{
+  *memory_type = memory_type_;
+  *memory_type_id = memory_type_id_;
+  return buffer_;
+}
+
+AllocatedMemory::AllocatedMemory(
+    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
+    : MutableMemory(nullptr, byte_size, memory_type, memory_type_id)
+{
+  if (total_byte_size_ != 0) {
     // If the requested memory type is not GPU, we always attempt to allocated
     // on pinned memory first
     switch (memory_type_) {
@@ -94,11 +128,11 @@ AllocatedSystemMemory::AllocatedSystemMemory(
           }
         }
         if (err == cudaSuccess) {
-          err = cudaMalloc((void**)&buffer_, byte_size);
+          err = cudaMalloc((void**)&buffer_, total_byte_size_);
         }
         if (err != cudaSuccess) {
           LOG_ERROR << "failed to allocate GPU memory with byte size"
-                    << byte_size << ": "
+                    << total_byte_size_ << ": "
                     << std::string(cudaGetErrorString(err));
           buffer_ = nullptr;
         }
@@ -113,7 +147,7 @@ AllocatedSystemMemory::AllocatedSystemMemory(
 
       default: {
         auto status = PinnedMemoryManager::Alloc(
-            (void**)&buffer_, byte_size, &memory_type_, true);
+            (void**)&buffer_, total_byte_size_, &memory_type_, true);
         if (!status.IsOk()) {
           LOG_ERROR << status.Message();
           buffer_ = nullptr;
@@ -122,10 +156,10 @@ AllocatedSystemMemory::AllocatedSystemMemory(
       }
     }
   }
-  total_byte_size_ = (buffer_ == nullptr) ? 0 : byte_size;
+  total_byte_size_ = (buffer_ == nullptr) ? 0 : total_byte_size_;
 }
 
-AllocatedSystemMemory::~AllocatedSystemMemory()
+AllocatedMemory::~AllocatedMemory()
 {
   if (buffer_ != nullptr) {
     switch (memory_type_) {
@@ -165,32 +199,6 @@ AllocatedSystemMemory::~AllocatedSystemMemory()
     }
     buffer_ = nullptr;
   }
-}
-
-const char*
-AllocatedSystemMemory::BufferAt(
-    size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
-    int64_t* memory_type_id) const
-{
-  if (idx != 0) {
-    *byte_size = 0;
-    *memory_type = TRTSERVER_MEMORY_CPU;
-    *memory_type_id = 0;
-    return nullptr;
-  }
-  *byte_size = total_byte_size_;
-  *memory_type = memory_type_;
-  *memory_type_id = memory_type_id_;
-  return buffer_;
-}
-
-char*
-AllocatedSystemMemory::MutableBuffer(
-    TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id)
-{
-  *memory_type = memory_type_;
-  *memory_type_id = memory_type_id_;
-  return buffer_;
 }
 
 //
