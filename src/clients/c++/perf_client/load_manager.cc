@@ -115,17 +115,22 @@ LoadManager::~LoadManager()
 nic::Error
 LoadManager::CheckHealth()
 {
-  // Check thread status to make sure that the actual concurrency level is
+  // Check thread status to make sure that the load setting is
   // consistent to the one being reported
   // If some thread return early, main thread will return and
   // the worker thread's error message will be reported
-  // when ConcurrencyManager's destructor get called.
+  // when derived class destructor gets called.
   for (auto& thread_stat : threads_stat_) {
     if (!thread_stat->status_.IsOk()) {
       return nic::Error(
           ni::RequestStatusCode::INTERNAL,
-          "Failed to maintain concurrency level requested."
+          "Failed to maintain requested inference load."
           " Worker thread(s) failed to generate concurrent requests.");
+    }
+    if (!thread_stat->cb_status_.IsOk()) {
+      return nic::Error(
+          ni::RequestStatusCode::INTERNAL,
+          "Failed to retrieve results from inference request.");
     }
   }
   return nic::Error::Success;
@@ -724,6 +729,11 @@ LoadManager::StopWorkerThreads()
     if (!threads_stat_[cnt]->status_.IsOk()) {
       std::cerr << "Thread [" << cnt
                 << "] had error: " << (threads_stat_[cnt]->status_)
+                << std::endl;
+    }
+    if (!threads_stat_[cnt]->cb_status_.IsOk()) {
+      std::cerr << "Thread [" << cnt
+                << "] had error: " << (threads_stat_[cnt]->cb_status_)
                 << std::endl;
     }
     cnt++;
