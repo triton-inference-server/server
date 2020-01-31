@@ -65,7 +65,7 @@ class LibTorchBackend : public InferenceBackend {
 
     Context(
         const std::string& name, const int gpu_device, const int max_batch_size,
-        const bool enable_indirect_input, const bool enable_indirect_output);
+        const bool enable_pinned_input, const bool enable_pinned_output);
     ~Context();
 
     DISALLOW_COPY_AND_ASSIGN(Context);

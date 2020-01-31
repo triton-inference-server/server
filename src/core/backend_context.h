@@ -80,7 +80,7 @@ struct BackendContext {
 
   BackendContext(
       const std::string& name, const int gpu_device, const int max_batch_size,
-      const bool enable_indirect_input, const bool enable_indirect_output);
+      const bool enable_pinned_input, const bool enable_pinned_output);
 
   virtual ~BackendContext();
 
@@ -199,8 +199,8 @@ struct BackendContext {
   const int max_batch_size_;
 
   // Whether to use indirect pinned buffer for the corresponding data copy type.
-  const bool enable_indirect_input_;
-  const bool enable_indirect_output_;
+  const bool enable_pinned_input_;
+  const bool enable_pinned_output_;
 
   // The stream where data transfer operations are executed on.
   cudaStream_t stream_;

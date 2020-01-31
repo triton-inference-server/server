@@ -35,10 +35,10 @@ namespace nvidia { namespace inferenceserver {
 
 BackendContext::BackendContext(
     const std::string& name, const int gpu_device, const int max_batch_size,
-    const bool enable_indirect_input, const bool enable_indirect_output)
+    const bool enable_pinned_input, const bool enable_pinned_output)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
-      enable_indirect_input_(enable_indirect_input),
-      enable_indirect_output_(enable_indirect_output)
+      enable_pinned_input_(enable_pinned_input),
+      enable_pinned_output_(enable_pinned_output)
 {
 #ifdef TRTIS_ENABLE_GPU
   stream_ = nullptr;
@@ -229,7 +229,7 @@ BackendContext::GetIndirectBufferRequirement(
   // device       | buffer needed | cudaMemcpy | cudaMemcpy
   *need_indirect_buffer =
       (ref_buffer_type != TRTSERVER_MEMORY_CPU_PINNED) &&
-      (is_input ? enable_indirect_input_ : enable_indirect_output_);
+      (is_input ? enable_pinned_input_ : enable_pinned_output_);
   if (*need_indirect_buffer) {
     *candidate_type = ref_buffer_type == TRTSERVER_MEMORY_CPU
                           ? TRTSERVER_MEMORY_GPU
