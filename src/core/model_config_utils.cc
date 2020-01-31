@@ -364,11 +364,11 @@ GetNormalizedModelConfig(
   // as it is not allowed in ensemble scheduling
   if (!config->has_ensemble_scheduling()) {
     auto optimization = config->mutable_optimization();
-    if (!optimization->has_indirect_input_buffer()) {
-      optimization->mutable_indirect_input_buffer()->set_enable(true);
+    if (!optimization->has_input_pinned_memory()) {
+      optimization->mutable_input_pinned_memory()->set_enable(true);
     }
-    if (!optimization->has_indirect_output_buffer()) {
-      optimization->mutable_indirect_output_buffer()->set_enable(true);
+    if (!optimization->has_output_pinned_memory()) {
+      optimization->mutable_output_pinned_memory()->set_enable(true);
     }
 
     // Make sure there is at least one instance_group.

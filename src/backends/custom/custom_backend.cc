@@ -207,9 +207,9 @@ CustomBackend::CreateExecutionContext(
   const int mbs = (Config().max_batch_size() <= 0) ? Context::NO_BATCHING
                                                    : Config().max_batch_size();
   const bool pinned_input =
-      Config().optimization().indirect_input_buffer().enable();
+      Config().optimization().input_pinned_memory().enable();
   const bool pinned_output =
-      Config().optimization().indirect_output_buffer().enable();
+      Config().optimization().output_pinned_memory().enable();
 
   contexts_.emplace_back(
       new Context(instance_name, gpu_device, mbs, pinned_input, pinned_output));

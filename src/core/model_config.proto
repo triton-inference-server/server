@@ -531,20 +531,23 @@ message ModelOptimizationPolicy
   }
 
   //@@
-  //@@  .. cpp:var:: message IndirectPinnedBufferSetting
+  //@@  .. cpp:var:: message PinnedMemoryBuffer
   //@@
   //@@     Specify whether to use a pinned memory buffer when transferring data
-  //@@     between non-pinned system memory and device memory. i.e. when request
-  //@@     contains input in non-pinned system memory and the model instance
-  //@@     accepts GPU input, the input will be processed by two copies: from
-  //@@     non-pinned system memory to pinned memory, and from pinned memory to
-  //@@     device memory.
+  //@@     between non-pinned system memory and GPU memory. Using a pinned
+  //@@     memory buffer for system from/to GPU transfers will typically provide
+  //@@     increased performance. For example, in the common use case where the
+  //@@     request provides inputs and delivers outputs via non-pinned system
+  //@@     memory, if the model instance accepts GPU IOs, the inputs will be
+  //@@     processed by two copies: from non-pinned system memory to pinned
+  //@@     memory, and from pinned memory to GPU memory. Similarly, pinned
+  //@@     memory will be used for delivering the outputs.
   //@@
-  message IndirectPinnedBufferSetting
+  message PinnedMemoryBuffer
   {
     //@@    .. cpp:var:: bool enable
     //@@
-    //@@       Use indirect pinned memory buffer. Default is true.
+    //@@       Use pinned memory buffer. Default is true.
     //@@
     bool enable = 1;
   }
@@ -573,21 +576,21 @@ message ModelOptimizationPolicy
   //@@
   ExecutionAccelerators execution_accelerators = 4;
 
-  //@@  .. cpp:var:: IndirectPinnedBufferSetting indirect_input_buffer
+  //@@  .. cpp:var:: PinnedMemoryBuffer input_pinned_memory
   //@@
-  //@@     Use indirect pinned memory buffer when the data transfer for inputs
-  //@@     is between device memory and non-pinned system memory.
+  //@@     Use pinned memory buffer when the data transfer for inputs
+  //@@     is between GPU memory and non-pinned system memory.
   //@@     Default is true.
   //@@
-  IndirectPinnedBufferSetting indirect_input_buffer = 5;
+  PinnedMemoryBuffer input_pinned_memory = 5;
 
-  //@@  .. cpp:var:: IndirectPinnedBufferSetting indirect_output_buffer
+  //@@  .. cpp:var:: PinnedMemoryBuffer output_pinned_memory
   //@@
-  //@@     Use indirect pinned memory buffer when the data transfer for outputs
-  //@@     is between device memory and non-pinned system memory.
+  //@@     Use pinned memory buffer when the data transfer for outputs
+  //@@     is between GPU memory and non-pinned system memory.
   //@@     Default is true.
   //@@
-  IndirectPinnedBufferSetting indirect_output_buffer = 6;
+  PinnedMemoryBuffer output_pinned_memory = 6;
 }
 
 //@@
