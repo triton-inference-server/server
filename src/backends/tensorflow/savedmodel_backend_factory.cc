@@ -63,12 +63,11 @@ SavedModelBackendFactory::CreateBackend(
     std::unique_ptr<InferenceBackend>* backend)
 {
   // Read all the savedmodel directories in 'path'.
-  std::set<std::string> savedmodel_files;
-  RETURN_IF_ERROR(
-      GetDirectoryFiles(path, true /* skip_hidden_files */, &savedmodel_files));
+  std::set<std::string> savedmodel_subdirs;
+  RETURN_IF_ERROR(GetDirectorySubdirs(path, &savedmodel_subdirs));
 
   std::unordered_map<std::string, std::string> models;
-  for (const auto& filename : savedmodel_files) {
+  for (const auto& filename : savedmodel_subdirs) {
     const auto savedmodel_path = JoinPath({path, filename});
     std::string local_savedmodel_path;
 
@@ -77,7 +76,7 @@ SavedModelBackendFactory::CreateBackend(
         DownloadFileFolder(savedmodel_path, &local_savedmodel_path));
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(std::move(local_savedmodel_path)));
+        std::make_tuple(local_savedmodel_path));
   }
 
   // Create the backend for the model and all the execution contexts

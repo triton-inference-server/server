@@ -71,6 +71,12 @@ Status
 BaseBackend::CreateExecutionContexts(
     const std::unordered_map<std::string, std::string>& paths)
 {
+  if (LOG_VERBOSE_IS_ON(1)) {
+    LOG_INFO << "Creating execution contexts for:";
+    for (const auto p : paths) {
+      LOG_INFO << "  " << p.first << ": " << p.second;
+    }
+  }
   uint32_t total_context_cnt = 0;
 
   for (const auto& group : Config().instance_group()) {

@@ -64,7 +64,7 @@ class BaseBackend : public InferenceBackend {
   virtual Status CreateTRTISTFModel(
       const GraphDefBackendFactory::Config* backend_config,
       const int gpu_device, const bool has_graph_level, const int graph_level,
-      const std::string& model_name, const std::string& model_buffer,
+      const std::string& model_name, const std::string& model_path,
       TRTISTFModelHandle* trtistf_model, IONameMap* input_name_map,
       IONameMap* output_name_map, const TRTISTF_TFTRTConfig* tftrt_config) = 0;
 

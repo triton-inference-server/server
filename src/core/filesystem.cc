@@ -42,13 +42,13 @@
 #endif  // TRTIS_ENABLE_S3
 
 #include <google/protobuf/text_format.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <cerrno>
 #include <fstream>
 #include "src/core/constants.h"
-#include <stdlib.h>
-#include <stdio.h>
 
 namespace nvidia { namespace inferenceserver {
 
@@ -875,7 +875,8 @@ S3FileSystem::DownloadFileFolder(
     char* tmp_file = mkdtemp(const_cast<char*>(file_template.c_str()));
     if (tmp_file != nullptr) {
       return Status(
-        RequestStatusCode::INTERNAL, "Failed to create local temp folder: " + file_template);
+          RequestStatusCode::INTERNAL,
+          "Failed to create local temp folder: " + file_template);
     }
 
     *local_path = std::string(tmp_file);
@@ -887,10 +888,13 @@ S3FileSystem::DownloadFileFolder(
       if (is_sub_dir) {
         // Create local mirror of subdirectories
         std::string local_file_path = JoinPath({*local_path, *iter});
-        int status = mkdir(const_cast<char*>(local_file_path.c_str()), S_IRUSR | S_IWUSR | S_IXUSR);
+        int status = mkdir(
+            const_cast<char*>(local_file_path.c_str()),
+            S_IRUSR | S_IWUSR | S_IXUSR);
         if (!status) {
           return Status(
-            RequestStatusCode::INTERNAL, "Failed to create local temp file: " + local_file_path);
+              RequestStatusCode::INTERNAL,
+              "Failed to create local temp file: " + local_file_path);
         }
 
         std::set<std::string> subdir_files;
@@ -931,7 +935,8 @@ S3FileSystem::DownloadFileFolder(
     int status = mkstemp(const_cast<char*>(file_template.c_str()));
     if (!status) {
       return Status(
-        RequestStatusCode::INTERNAL, "Failed to create local temp file: " + file_template);
+          RequestStatusCode::INTERNAL,
+          "Failed to create local temp file: " + file_template);
     }
 
     *local_path = file_template;

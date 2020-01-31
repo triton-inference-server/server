@@ -76,7 +76,7 @@ GraphDefBackendFactory::CreateBackend(
     RETURN_IF_ERROR(DownloadFileFolder(graphdef_path, &local_graphdef_path));
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(std::move(local_graphdef_path)));
+        std::make_tuple(local_graphdef_path));
   }
 
   // Create the backend for the model and all the execution contexts
