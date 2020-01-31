@@ -542,7 +542,7 @@ message ModelOptimizationPolicy
   //@@
   message IndirectPinnedBufferSetting
   {
-    //@@    .. cpp:var:: bool enable_indirect_input
+    //@@    .. cpp:var:: bool enable
     //@@
     //@@       Use indirect pinned memory buffer. Default is true.
     //@@
