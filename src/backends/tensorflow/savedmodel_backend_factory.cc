@@ -71,6 +71,7 @@ SavedModelBackendFactory::CreateBackend(
     const auto savedmodel_path = JoinPath({path, filename});
     std::string local_savedmodel_path;
 
+    // Destory local copy if exists
     RETURN_IF_ERROR(
         DownloadFileFolder(savedmodel_path, &local_savedmodel_path));
     models.emplace(
