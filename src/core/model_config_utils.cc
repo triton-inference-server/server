@@ -363,6 +363,14 @@ GetNormalizedModelConfig(
   // If model ensembling is specified, don't attempt to normalize instance_group
   // as it is not allowed in ensemble scheduling
   if (!config->has_ensemble_scheduling()) {
+    auto optimization = config->mutable_optimization();
+    if (!optimization->has_indirect_input_buffer()) {
+      optimization->mutable_indirect_input_buffer()->set_enable(true);
+    }
+    if (!optimization->has_indirect_output_buffer()) {
+      optimization->mutable_indirect_output_buffer()->set_enable(true);
+    }
+
     // Make sure there is at least one instance_group.
     if (config->instance_group().size() == 0) {
       ModelInstanceGroup* group = config->add_instance_group();

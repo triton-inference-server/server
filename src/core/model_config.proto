@@ -530,6 +530,25 @@ message ModelOptimizationPolicy
     repeated Accelerator cpu_execution_accelerator = 2;
   }
 
+  //@@
+  //@@  .. cpp:var:: message IndirectPinnedBufferSetting
+  //@@
+  //@@     Specify whether to use a pinned memory buffer when transferring data
+  //@@     between non-pinned system memory and device memory. i.e. when request
+  //@@     contains input in non-pinned system memory and the model instance
+  //@@     accepts GPU input, the input will be processed by two copies: from
+  //@@     non-pinned system memory to pinned memory, and from pinned memory to
+  //@@     device memory.
+  //@@
+  message IndirectPinnedBufferSetting
+  {
+    //@@    .. cpp:var:: bool enable_indirect_input
+    //@@
+    //@@       Use indirect pinned memory buffer. Default is true.
+    //@@
+    bool enable = 1;
+  }
+
   //@@  .. cpp:var:: Graph graph
   //@@
   //@@     The graph optimization setting for the model. Optional.
@@ -553,6 +572,22 @@ message ModelOptimizationPolicy
   //@@     The accelerators used for the model. Optional.
   //@@
   ExecutionAccelerators execution_accelerators = 4;
+
+  //@@  .. cpp:var:: IndirectPinnedBufferSetting indirect_input_buffer
+  //@@
+  //@@     Use indirect pinned memory buffer when the data transfer for inputs
+  //@@     is between device memory and non-pinned system memory.
+  //@@     Default is true.
+  //@@
+  IndirectPinnedBufferSetting indirect_input_buffer = 5;
+
+  //@@  .. cpp:var:: IndirectPinnedBufferSetting indirect_output_buffer
+  //@@
+  //@@     Use indirect pinned memory buffer when the data transfer for outputs
+  //@@     is between device memory and non-pinned system memory.
+  //@@     Default is true.
+  //@@
+  IndirectPinnedBufferSetting indirect_output_buffer = 6;
 }
 
 //@@

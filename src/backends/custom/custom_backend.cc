@@ -74,8 +74,11 @@ ToTRTServerMemoryType(CustomMemoryType memory_type)
 namespace nvidia { namespace inferenceserver {
 
 CustomBackend::Context::Context(
-    const std::string& name, const int gpu_device, const int max_batch_size)
-    : BackendContext(name, gpu_device, max_batch_size),
+    const std::string& name, const int gpu_device, const int max_batch_size,
+    const bool enable_indirect_input, const bool enable_indirect_output)
+    : BackendContext(
+          name, gpu_device, max_batch_size, enable_indirect_input,
+          enable_indirect_output),
       library_handle_(nullptr), library_context_handle_(nullptr),
       InitializeFn_(nullptr), FinalizeFn_(nullptr), ErrorStringFn_(nullptr),
       ExecuteFn_(nullptr)
@@ -203,8 +206,13 @@ CustomBackend::CreateExecutionContext(
   // Max batch size. A value of 0 in the config becomes NO_BATCHING.
   const int mbs = (Config().max_batch_size() <= 0) ? Context::NO_BATCHING
                                                    : Config().max_batch_size();
+  const bool indirect_input =
+      Config().optimization().indirect_input_buffer().enable();
+  const bool indirect_output =
+      Config().optimization().indirect_output_buffer().enable();
 
-  contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
+  contexts_.emplace_back(new Context(
+      instance_name, gpu_device, mbs, indirect_input, indirect_output));
   Context* context = static_cast<Context*>(contexts_.back().get());
 
   // 'mn_itr->second' is the path to the shared library file to use

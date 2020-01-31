@@ -63,8 +63,8 @@ class OnnxBackend : public InferenceBackend {
   // For each model instance there is a context.
   struct Context : BackendContext {
     Context(
-        const std::string& name, const int gpu_device,
-        const int max_batch_size);
+        const std::string& name, const int gpu_device, const int max_batch_size,
+        const bool enable_indirect_input, const bool enable_indirect_output);
     ~Context();
 
     DISALLOW_MOVE(Context);
