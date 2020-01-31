@@ -161,42 +161,43 @@ for i in \
         wait $SERVER_PID
     done
 
-# Prepare the config file for dynamic sequence batching tests
-CONFIG_FILE="models/plan_dyna_sequence_float32/config.pbtxt"
-sed -i "s/max_candidate_sequences:.*/max_candidate_sequences:4/" $CONFIG_FILE && \
-sed -i "s/max_queue_delay_microseconds:.*/max_queue_delay_microseconds:5000000/" $CONFIG_FILE
-
-export NO_BATCHING=0
-
-for i in \
-    test_dynaseq_identical_shape_values_series \
-    test_dynaseq_identical_shape_values_parallel \
-    test_dynaseq_different_shape_values_series \
-    test_dynaseq_different_shape_values_parallel \
-    ;do
-    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-    SERVER_LOG="./$i.serverlog"
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
-
-    echo "Test: $i" >>$CLIENT_LOG
-
-    set +e
-    python $SHAPE_TENSOR_TEST DynaSequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-        echo -e "\n***\n*** Test $i Failed\n***"
-        RET=1
-    fi
-    set -e
-
-    kill $SERVER_PID
-    wait $SERVER_PID
-done
+# Fix Me: Fix the bug DLIS-1051
+## Prepare the config file for dynamic sequence batching tests
+#CONFIG_FILE="models/plan_dyna_sequence_float32/config.pbtxt"
+#sed -i "s/max_candidate_sequences:.*/max_candidate_sequences:4/" $CONFIG_FILE && \
+#sed -i "s/max_queue_delay_microseconds:.*/max_queue_delay_microseconds:5000000/" $CONFIG_FILE
+#
+#export NO_BATCHING=0
+#
+#for i in \
+#    test_dynaseq_identical_shape_values_series \
+#    test_dynaseq_identical_shape_values_parallel \
+#    test_dynaseq_different_shape_values_series \
+#    test_dynaseq_different_shape_values_parallel \
+#    ;do
+#    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+#    SERVER_LOG="./$i.serverlog"
+#    run_server
+#    if [ "$SERVER_PID" == "0" ]; then
+#        echo -e "\n***\n*** Failed to start $SERVER\n***"
+#        cat $SERVER_LOG
+#        exit 1
+#    fi
+#
+#    echo "Test: $i" >>$CLIENT_LOG
+#
+#    set +e
+#    python $SHAPE_TENSOR_TEST DynaSequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+#    if [ $? -ne 0 ]; then
+#        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+#        echo -e "\n***\n*** Test $i Failed\n***"
+#        RET=1
+#    fi
+#    set -e
+#
+#    kill $SERVER_PID
+#    wait $SERVER_PID
+#done
 
 grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
 if [ $? -ne 0 ]; then
