@@ -50,8 +50,6 @@
 #include <cerrno>
 #include <fstream>
 #include "src/core/constants.h"
-#include <stdlib.h>
-#include <stdio.h>
 
 namespace nvidia { namespace inferenceserver {
 

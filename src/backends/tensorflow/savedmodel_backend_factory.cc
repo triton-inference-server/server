@@ -63,9 +63,8 @@ SavedModelBackendFactory::CreateBackend(
     std::unique_ptr<InferenceBackend>* backend)
 {
   // Read all the savedmodel directories in 'path'.
-  std::set<std::string> savedmodel_files;
-  RETURN_IF_ERROR(
-      GetDirectoryFiles(path, true /* skip_hidden_files */, &savedmodel_files));
+  std::set<std::string> savedmodel_subdirs;
+  RETURN_IF_ERROR(GetDirectorySubdirs(path, &savedmodel_subdirs));
 
   std::unordered_map<std::string, std::string> models;
   for (const auto& filename : savedmodel_subdirs) {
