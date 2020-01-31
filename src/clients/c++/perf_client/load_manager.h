@@ -179,10 +179,16 @@ class LoadManager {
 
   // Holds the running status of the thread.
   struct ThreadStat {
-    ThreadStat() : status_(ni::RequestStatusCode::SUCCESS) {}
+    ThreadStat()
+        : status_(ni::RequestStatusCode::SUCCESS),
+          cb_status_(ni::RequestStatusCode::SUCCESS)
+    {
+    }
 
     // The status of the worker thread
     nic::Error status_;
+    // The status of the callback thread for async requests
+    nic::Error cb_status_;
     // The statistics of the InferContext
     std::vector<nic::InferContext::Stat> contexts_stat_;
     // The concurrency level that the worker should produce
