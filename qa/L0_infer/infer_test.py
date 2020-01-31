@@ -27,8 +27,6 @@
 import sys
 sys.path.append("../common")
 
-from builtins import range
-from future.utils import iteritems
 import unittest
 import numpy as np
 import infer_util as iu
