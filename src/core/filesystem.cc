@@ -870,48 +870,50 @@ S3FileSystem::DownloadFileFolder(
   bool is_dir = false;
   std::set<std::string> contents, files;
   std::string file_template = "/tmp/fileXXXXXX";
-  IsDirectory(path, &is_dir);
+  RETURN_IF_ERROR(IsDirectory(path, &is_dir));
   if (is_dir) {
-    char* tmp_file = mkdtemp(const_cast<char*>(file_template.c_str()));
-    if (tmp_file != nullptr) {
+    char* tmp_folder = mkdtemp(const_cast<char*>(file_template.c_str()));
+    if (tmp_folder == nullptr) {
       return Status(
           RequestStatusCode::INTERNAL,
           "Failed to create local temp folder: " + file_template);
     }
 
-    *local_path = std::string(tmp_file);
+    *local_path = std::string(tmp_folder);
     RETURN_IF_ERROR(GetDirectoryContents(path, &contents));
 
-    for (auto iter = contents.begin(); iter != contents.end();) {
-      bool is_sub_dir;
-      RETURN_IF_ERROR(IsDirectory(JoinPath({path, *iter}), &is_sub_dir));
-      if (is_sub_dir) {
-        // Create local mirror of subdirectories
-        std::string local_file_path = JoinPath({*local_path, *iter});
+    for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
+      bool is_subdir;
+      std::string s3_fpath = JoinPath({path, *iter});
+      std::string local_fpath = JoinPath({*local_path, *iter});
+      RETURN_IF_ERROR(IsDirectory(s3_fpath, &is_subdir));
+      if (is_subdir) {
+        // Create local mirror of sub-directories
         int status = mkdir(
-            const_cast<char*>(local_file_path.c_str()),
+            const_cast<char*>(local_fpath.c_str()),
             S_IRUSR | S_IWUSR | S_IXUSR);
         if (!status) {
           return Status(
               RequestStatusCode::INTERNAL,
-              "Failed to create local temp file: " + local_file_path);
+              "Failed to create local folder: " + local_fpath);
         }
 
+        // Add with s3 path
         std::set<std::string> subdir_files;
-        RETURN_IF_ERROR(
-            GetDirectoryFiles(JoinPath({path, *iter}), &subdir_files));
-        iter = contents.erase(iter);
-        std::merge(
-            contents.begin(), contents.end(), subdir_files.begin(),
-            subdir_files.end(), std::inserter(files, files.begin()));
+        RETURN_IF_ERROR(GetDirectoryFiles(s3_fpath, &subdir_files));
+        for (auto itr = subdir_files.begin(); itr != subdir_files.end();
+             ++itr) {
+          files.insert(JoinPath({s3_fpath, *iter}));
+        }
+
       } else {
-        ++iter;
+        files.insert(s3_fpath);
       }
     }
 
-    for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
+    for (auto iter = files.begin(); iter != files.end(); ++iter) {
       std::string bucket, object;
-      RETURN_IF_ERROR(ParsePath(JoinPath({path, *iter}), &bucket, &object));
+      RETURN_IF_ERROR(ParsePath(*iter, &bucket, &object));
 
       // Send a request for the objects metadata
       s3::Model::GetObjectRequest object_request;
@@ -922,7 +924,8 @@ S3FileSystem::DownloadFileFolder(
       if (get_object_outcome.IsSuccess()) {
         auto& retrieved_file =
             get_object_outcome.GetResultWithOwnership().GetBody();
-        std::string local_file_path = JoinPath({*local_path, *iter});
+        std::string s3_removed_path = (*iter).substr(path.size());
+        std::string local_file_path = JoinPath({*local_path, s3_removed_path});
         std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
         output_file << retrieved_file.rdbuf();
         output_file.close();
