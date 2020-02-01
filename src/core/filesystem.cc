@@ -1084,7 +1084,7 @@ JoinPath(std::initializer_list<std::string> segments)
   for (const auto& seg : segments) {
     if (joined.empty()) {
 #ifdef TRTIS_ENABLE_S3
-      // Check if this is an S3 path (s3://$BUCKET_NAME)
+      // Check if this is an S3 path (s3://<bucket>)
       if (!seg.empty() && !seg.rfind("s3://", 0)) {
         re2::RE2 s3_regex(
             "s3://([a-z]+):([0-9]+)/([0-9a-z.-]+)(((/[0-9a-zA-Z.-_]+)*)?)");
@@ -1106,6 +1106,8 @@ JoinPath(std::initializer_list<std::string> segments)
         } else {
           joined = "s3://" + bucket + '/' + object;
         }
+      } else {
+        joined = seg;
       }
 #elif
       joined = seg;
