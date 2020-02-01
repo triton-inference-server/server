@@ -216,6 +216,8 @@ Status
 LocalFileSystem::DownloadFileFolder(
     const std::string& path, std::string* local_path)
 {
+  // For local file system we don't actually need to download the folder. We use
+  // it in place.
   *local_path = path;
   return Status::Success;
 }
@@ -302,7 +304,7 @@ GCSFileSystem::ParsePath(
     const std::string& path, std::string* bucket, std::string* object)
 {
   // Get the bucket name and the object path. Return error if input is malformed
-  int bucket_start = path.find("gs://") + 5;
+  int bucket_start = path.find("gs://") + strlen("gs://");
   int bucket_end = path.find("/", bucket_start);
 
   // If there isn't a second slash, the address has only the bucket
@@ -540,6 +542,8 @@ Status
 GCSFileSystem::DownloadFileFolder(
     const std::string& path, std::string* local_path)
 {
+  // For GCS we don't actually need to download the folder. We use tensorflow's
+  // built in support for loading models directly from GCS.
   *local_path = path;
   return Status::Success;
 }
@@ -599,7 +603,7 @@ S3FileSystem::ParsePath(
     const std::string& path, std::string* bucket, std::string* object)
 {
   // Get the bucket name and the object path. Return error if input is malformed
-  int bucket_start = path.find("s3://") + 5;
+  int bucket_start = path.find("s3://") + strlen("s3://");
   int bucket_end = path.find("/", bucket_start);
 
   // If there isn't a second slash, the address has only the bucket
@@ -864,7 +868,7 @@ S3FileSystem::DownloadFileFolder(
 
   if (!exists) {
     return Status(
-        RequestStatusCode::INTERNAL, "File does not exist at " + path);
+        RequestStatusCode::INTERNAL, "File/folder does not exist at " + path);
   }
 
   bool is_dir = false;
