@@ -72,7 +72,6 @@ GraphDefBackendFactory::CreateBackend(
     const auto graphdef_path = JoinPath({path, filename});
     std::string local_graphdef_path;
 
-    // Destory local copy if exists
     RETURN_IF_ERROR(DownloadFileFolder(graphdef_path, &local_graphdef_path));
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
