@@ -39,7 +39,6 @@
 #include <aws/s3/model/HeadBucketRequest.h>
 #include <aws/s3/model/HeadObjectRequest.h>
 #include <aws/s3/model/ListObjectsRequest.h>
-#include <re2/re2.h>
 #endif  // TRTIS_ENABLE_S3
 
 #include <google/protobuf/text_format.h>
