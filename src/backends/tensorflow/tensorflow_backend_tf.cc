@@ -817,18 +817,9 @@ TRTISTF_ModelCreateFromGraphDef(
   tensorflow::Session* session;
   RETURN_IF_TF_ERROR(tensorflow::NewSession(session_options, &session));
 
-  // Write contents of model in local file
-  // std::ofstream outfile("tmp.graphdef", std::ofstream::binary);
-  // outfile.write(model_buffer, buffer_size);
-  // outfile.close();
-
   tensorflow::GraphDef graph_def;
   RETURN_IF_TF_ERROR(tensorflow::ReadBinaryProto(
       tensorflow::Env::Default(), model_path, &graph_def));
-
-  // Remove temp file
-  // std::remove("tmp.graphdef");
-
   if (graph_def.node_size() == 0) {
     return TRTISTF_ErrorNew(
         "model " + std::string(model_name) + " has an empty network");
@@ -931,18 +922,10 @@ TRTISTF_ModelCreateFromSavedModel(
   std::unordered_set<std::string> saved_model_tags;
   saved_model_tags.insert(tensorflow::kSavedModelTagServe);
 
-  // Write contents of model in local file
-  // std::ofstream outfile("tmp.savedmodel", std::ofstream::binary);
-  // outfile.write(model_buffer, buffer_size);
-  // outfile.close();
-
   tensorflow::RunOptions run_options;
   RETURN_IF_TF_ERROR(tensorflow::LoadSavedModel(
       session_options, run_options, model_path, saved_model_tags,
       bundle.get()));
-
-  // Remove temp file
-  // std::remove("tmp.savedmodel");
 
   // Verify that the bundle has the "serve" tag
   bool found_serve_tag = false;
