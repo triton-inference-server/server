@@ -1108,7 +1108,7 @@ JoinPath(std::initializer_list<std::string> segments)
       } else {
         joined = seg;
       }
-#elif
+#else
       joined = seg;
 #endif  // TRTIS_ENABLE_S3
     } else if (IsAbsolutePath(seg)) {
