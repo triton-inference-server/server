@@ -560,6 +560,28 @@ message ModelOptimizationPolicy
     repeated Accelerator cpu_execution_accelerator = 2;
   }
 
+  //@@
+  //@@  .. cpp:var:: message PinnedMemoryBuffer
+  //@@
+  //@@     Specify whether to use a pinned memory buffer when transferring data
+  //@@     between non-pinned system memory and GPU memory. Using a pinned
+  //@@     memory buffer for system from/to GPU transfers will typically provide
+  //@@     increased performance. For example, in the common use case where the
+  //@@     request provides inputs and delivers outputs via non-pinned system
+  //@@     memory, if the model instance accepts GPU IOs, the inputs will be
+  //@@     processed by two copies: from non-pinned system memory to pinned
+  //@@     memory, and from pinned memory to GPU memory. Similarly, pinned
+  //@@     memory will be used for delivering the outputs.
+  //@@
+  message PinnedMemoryBuffer
+  {
+    //@@    .. cpp:var:: bool enable
+    //@@
+    //@@       Use pinned memory buffer. Default is true.
+    //@@
+    bool enable = 1;
+  }
+
   //@@  .. cpp:var:: Graph graph
   //@@
   //@@     The graph optimization setting for the model. Optional.
@@ -583,6 +605,22 @@ message ModelOptimizationPolicy
   //@@     The accelerators used for the model. Optional.
   //@@
   ExecutionAccelerators execution_accelerators = 4;
+
+  //@@  .. cpp:var:: PinnedMemoryBuffer input_pinned_memory
+  //@@
+  //@@     Use pinned memory buffer when the data transfer for inputs
+  //@@     is between GPU memory and non-pinned system memory.
+  //@@     Default is true.
+  //@@
+  PinnedMemoryBuffer input_pinned_memory = 5;
+
+  //@@  .. cpp:var:: PinnedMemoryBuffer output_pinned_memory
+  //@@
+  //@@     Use pinned memory buffer when the data transfer for outputs
+  //@@     is between GPU memory and non-pinned system memory.
+  //@@     Default is true.
+  //@@
+  PinnedMemoryBuffer output_pinned_memory = 6;
 }
 
 //@@

@@ -75,8 +75,8 @@ class BaseBackend : public InferenceBackend {
     static constexpr int MODEL_DEVICE = -2;
 
     Context(
-        const std::string& name, const int gpu_device,
-        const int max_batch_size);
+        const std::string& name, const int gpu_device, const int max_batch_size,
+        const bool enable_pinned_input, const bool enable_pinned_output);
     ~Context();
 
     DISALLOW_MOVE(Context);

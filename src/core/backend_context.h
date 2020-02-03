@@ -79,7 +79,8 @@ struct BackendContext {
   static constexpr int NO_BATCHING = 0;
 
   BackendContext(
-      const std::string& name, const int gpu_device, const int max_batch_size);
+      const std::string& name, const int gpu_device, const int max_batch_size,
+      const bool enable_pinned_input, const bool enable_pinned_output);
 
   virtual ~BackendContext();
 
@@ -214,19 +215,23 @@ struct BackendContext {
   // 'need_indirect_buffer', and the memory type that should utilize the
   // indirect buffer in 'candiate_type'.
   void GetIndirectBufferRequirement(
-      TRTSERVER_Memory_Type ref_buffer_type,
+      TRTSERVER_Memory_Type ref_buffer_type, bool is_input,
       TRTSERVER_Memory_Type* candidate_type, bool* need_indirect_buffer);
 
   // Name of the model instance
   std::string name_;
 
   // The GPU index active when this context was created.
-  int gpu_device_;
+  const int gpu_device_;
 
   // Maximum batch size to allow. This is the minimum of what is
   // supported by the model and what is requested in the
   // configuration.
-  int max_batch_size_;
+  const int max_batch_size_;
+
+  // Whether to use indirect pinned buffer for the corresponding data copy type.
+  const bool enable_pinned_input_;
+  const bool enable_pinned_output_;
 
   // The stream where data transfer operations are executed on.
   cudaStream_t stream_;

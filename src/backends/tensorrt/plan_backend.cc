@@ -61,10 +61,13 @@ CreateCudaEvent(const std::string& event_name, cudaEvent_t* event)
 }  // namespace
 
 PlanBackend::Context::Context(
-    const std::string& name, const int gpu_device, const int max_batch_size)
-    : BackendContext(name, gpu_device, max_batch_size), engine_(nullptr),
-      is_shared_engine_(true), is_dynamic_(false), total_bindings_(0),
-      num_expected_bindings_(0)
+    const std::string& name, const int gpu_device, const int max_batch_size,
+    const bool enable_pinned_input, const bool enable_pinned_output)
+    : BackendContext(
+          name, gpu_device, max_batch_size, enable_pinned_input,
+          enable_pinned_output),
+      engine_(nullptr), is_shared_engine_(true), is_dynamic_(false),
+      total_bindings_(0), num_expected_bindings_(0)
 {
   stream_ = nullptr;
   input_copy_stream_ = nullptr;
@@ -398,8 +401,13 @@ PlanBackend::CreateExecutionContext(
   // Max batch size. A value of 0 in the config becomes NO_BATCHING.
   const int mbs = (Config().max_batch_size() <= 0) ? Context::NO_BATCHING
                                                    : Config().max_batch_size();
+  const bool pinned_input =
+      Config().optimization().input_pinned_memory().enable();
+  const bool pinned_output =
+      Config().optimization().output_pinned_memory().enable();
 
-  contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
+  contexts_.emplace_back(
+      new Context(instance_name, gpu_device, mbs, pinned_input, pinned_output));
   Context* context = static_cast<Context*>(contexts_.back().get());
   auto context_idx = contexts_.size() - 1;
 

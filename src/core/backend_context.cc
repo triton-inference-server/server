@@ -34,8 +34,11 @@
 namespace nvidia { namespace inferenceserver {
 
 BackendContext::BackendContext(
-    const std::string& name, const int gpu_device, const int max_batch_size)
-    : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size)
+    const std::string& name, const int gpu_device, const int max_batch_size,
+    const bool enable_pinned_input, const bool enable_pinned_output)
+    : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
+      enable_pinned_input_(enable_pinned_input),
+      enable_pinned_output_(enable_pinned_output)
 {
 #ifdef TRTIS_ENABLE_GPU
   stream_ = nullptr;
@@ -113,7 +116,7 @@ BackendContext::SetInputBuffer(
   bool need_buffer;
   TRTSERVER_Memory_Type candidate_type;
   GetIndirectBufferRequirement(
-      input->memory_type_, &candidate_type, &need_buffer);
+      input->memory_type_, true, &candidate_type, &need_buffer);
   BufferInfo pinned_buffer_info{0, 0, {}};
 
   // Visit the payloads in order and copy the input tensors to
@@ -216,20 +219,22 @@ BackendContext::SetInputBuffer(
 
 void
 BackendContext::GetIndirectBufferRequirement(
-    TRTSERVER_Memory_Type ref_buffer_type,
+    TRTSERVER_Memory_Type ref_buffer_type, bool is_input,
     TRTSERVER_Memory_Type* candidate_type, bool* need_indirect_buffer)
 {
-  // The following matrix is used for both input and output, but we may want
-  // to handle the two cases separately, because it is not symmetric when the
-  // 'ref_buffer' is used as dst v.s. when it is used as src.
+  // The following matrix is used for both input and output.
   // src   \ dest | non-pinned    | pinned     | device
   // non-pinned   | memcpy        | memcpy     | buffer needed
   // pinned       | memcpy        | memcpy     | cudaMemcpy
   // device       | buffer needed | cudaMemcpy | cudaMemcpy
-  *need_indirect_buffer = (ref_buffer_type != TRTSERVER_MEMORY_CPU_PINNED);
-  *candidate_type = ref_buffer_type == TRTSERVER_MEMORY_CPU
-                        ? TRTSERVER_MEMORY_GPU
-                        : TRTSERVER_MEMORY_CPU;
+  *need_indirect_buffer =
+      (ref_buffer_type != TRTSERVER_MEMORY_CPU_PINNED) &&
+      (is_input ? enable_pinned_input_ : enable_pinned_output_);
+  if (*need_indirect_buffer) {
+    *candidate_type = ref_buffer_type == TRTSERVER_MEMORY_CPU
+                          ? TRTSERVER_MEMORY_GPU
+                          : TRTSERVER_MEMORY_CPU;
+  }
   return;
 }
 
@@ -348,7 +353,7 @@ BackendContext::SetFixedSizeOutputBuffer(
   bool need_buffer;
   TRTSERVER_Memory_Type candidate_type;
   GetIndirectBufferRequirement(
-      output->memory_type_, &candidate_type, &need_buffer);
+      output->memory_type_, false, &candidate_type, &need_buffer);
   OutputBufferInfo pinned_buffer_info{0, 0, {}};
   output->indirect_buffers_.emplace_back();
   for (size_t idx = 0; idx < payloads->size(); idx++) {
