@@ -42,6 +42,8 @@
 #endif  // TRTIS_ENABLE_S3
 
 #include <google/protobuf/text_format.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <cerrno>
@@ -66,6 +68,9 @@ class FileSystem {
       const std::string& path, std::set<std::string>* files) = 0;
   virtual Status ReadTextFile(
       const std::string& path, std::string* contents) = 0;
+  virtual Status DownloadFileFolder(
+      const std::string& path, std::string* local_path) = 0;
+  virtual Status DestroyFileFolder(const std::string& path) = 0;
   virtual Status WriteTextFile(
       const std::string& path, const std::string& contents) = 0;
 };
@@ -83,6 +88,9 @@ class LocalFileSystem : public FileSystem {
   Status GetDirectoryFiles(
       const std::string& path, std::set<std::string>* files) override;
   Status ReadTextFile(const std::string& path, std::string* contents) override;
+  Status DownloadFileFolder(
+      const std::string& path, std::string* local_path) override;
+  Status DestroyFileFolder(const std::string& path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 };
@@ -205,6 +213,23 @@ LocalFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 }
 
 Status
+LocalFileSystem::DownloadFileFolder(
+    const std::string& path, std::string* local_path)
+{
+  // For local file system we don't actually need to download the folder. We use
+  // it in place.
+  *local_path = path;
+  return Status::Success;
+}
+
+Status
+LocalFileSystem::DestroyFileFolder(const std::string& path)
+{
+  // Do nothing
+  return Status::Success;
+}
+
+Status
 LocalFileSystem::WriteTextFile(
     const std::string& path, const std::string& contents)
 {
@@ -240,6 +265,9 @@ class GCSFileSystem : public FileSystem {
   Status GetDirectoryFiles(
       const std::string& path, std::set<std::string>* files) override;
   Status ReadTextFile(const std::string& path, std::string* contents) override;
+  Status DownloadFileFolder(
+      const std::string& path, std::string* local_path) override;
+  Status DestroyFileFolder(const std::string& path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -276,7 +304,7 @@ GCSFileSystem::ParsePath(
     const std::string& path, std::string* bucket, std::string* object)
 {
   // Get the bucket name and the object path. Return error if input is malformed
-  int bucket_start = path.find("gs://") + 5;
+  int bucket_start = path.find("gs://") + strlen("gs://");
   int bucket_end = path.find("/", bucket_start);
 
   // If there isn't a second slash, the address has only the bucket
@@ -511,6 +539,23 @@ GCSFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 }
 
 Status
+GCSFileSystem::DownloadFileFolder(
+    const std::string& path, std::string* local_path)
+{
+  // For GCS we don't actually need to download the folder. We use tensorflow's
+  // built in support for loading models directly from GCS.
+  *local_path = path;
+  return Status::Success;
+}
+
+Status
+GCSFileSystem::DestroyFileFolder(const std::string& path)
+{
+  // Do nothing
+  return Status::Success;
+}
+
+Status
 GCSFileSystem::WriteTextFile(
     const std::string& path, const std::string& contents)
 {
@@ -540,6 +585,9 @@ class S3FileSystem : public FileSystem {
   Status GetDirectoryFiles(
       const std::string& path, std::set<std::string>* files) override;
   Status ReadTextFile(const std::string& path, std::string* contents) override;
+  Status DownloadFileFolder(
+      const std::string& path, std::string* local_path) override;
+  Status DestroyFileFolder(const std::string& path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -555,7 +603,7 @@ S3FileSystem::ParsePath(
     const std::string& path, std::string* bucket, std::string* object)
 {
   // Get the bucket name and the object path. Return error if input is malformed
-  int bucket_start = path.find("s3://") + 5;
+  int bucket_start = path.find("s3://") + strlen("s3://");
   int bucket_end = path.find("/", bucket_start);
 
   // If there isn't a second slash, the address has only the bucket
@@ -689,6 +737,7 @@ S3FileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
   }
   return Status::Success;
 }
+
 Status
 S3FileSystem::GetDirectoryContents(
     const std::string& path, std::set<std::string>* contents)
@@ -732,6 +781,7 @@ S3FileSystem::GetDirectoryContents(
   }
   return Status::Success;
 }
+
 Status
 S3FileSystem::GetDirectorySubdirs(
     const std::string& path, std::set<std::string>* subdirs)
@@ -770,6 +820,7 @@ S3FileSystem::GetDirectoryFiles(
 
   return Status::Success;
 }
+
 Status
 S3FileSystem::ReadTextFile(const std::string& path, std::string* contents)
 {
@@ -807,6 +858,125 @@ S3FileSystem::ReadTextFile(const std::string& path, std::string* contents)
 
   return Status::Success;
 }
+
+Status
+S3FileSystem::DownloadFileFolder(
+    const std::string& path, std::string* local_path)
+{
+  bool exists;
+  RETURN_IF_ERROR(FileExists(path, &exists));
+
+  if (!exists) {
+    return Status(
+        RequestStatusCode::INTERNAL, "File/folder does not exist at " + path);
+  }
+
+  bool is_dir = false;
+  std::set<std::string> contents, files;
+  std::string file_template = "/tmp/fileXXXXXX";
+  RETURN_IF_ERROR(IsDirectory(path, &is_dir));
+  if (is_dir) {
+    char* tmp_folder = mkdtemp(const_cast<char*>(file_template.c_str()));
+    if (tmp_folder == nullptr) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "Failed to create local temp folder: " + file_template);
+    }
+
+    *local_path = std::string(tmp_folder);
+    RETURN_IF_ERROR(GetDirectoryContents(path, &contents));
+
+    for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
+      bool is_subdir;
+      std::string s3_fpath = JoinPath({path, *iter});
+      std::string local_fpath = JoinPath({*local_path, *iter});
+      RETURN_IF_ERROR(IsDirectory(s3_fpath, &is_subdir));
+      if (is_subdir) {
+        // Create local mirror of sub-directories
+        int status = mkdir(
+            const_cast<char*>(local_fpath.c_str()),
+            S_IRUSR | S_IWUSR | S_IXUSR);
+        if (!status) {
+          return Status(
+              RequestStatusCode::INTERNAL,
+              "Failed to create local folder: " + local_fpath);
+        }
+
+        // Add with s3 path
+        std::set<std::string> subdir_files;
+        RETURN_IF_ERROR(GetDirectoryFiles(s3_fpath, &subdir_files));
+        for (auto itr = subdir_files.begin(); itr != subdir_files.end();
+             ++itr) {
+          files.insert(JoinPath({s3_fpath, *iter}));
+        }
+
+      } else {
+        files.insert(s3_fpath);
+      }
+    }
+
+    for (auto iter = files.begin(); iter != files.end(); ++iter) {
+      std::string bucket, object;
+      RETURN_IF_ERROR(ParsePath(*iter, &bucket, &object));
+
+      // Send a request for the objects metadata
+      s3::Model::GetObjectRequest object_request;
+      object_request.SetBucket(bucket.c_str());
+      object_request.SetKey(object.c_str());
+
+      auto get_object_outcome = client_.GetObject(object_request);
+      if (get_object_outcome.IsSuccess()) {
+        auto& retrieved_file =
+            get_object_outcome.GetResultWithOwnership().GetBody();
+        std::string s3_removed_path = (*iter).substr(path.size());
+        std::string local_file_path = JoinPath({*local_path, s3_removed_path});
+        std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
+        output_file << retrieved_file.rdbuf();
+        output_file.close();
+      } else {
+        return Status(
+            RequestStatusCode::INTERNAL, "Failed to get object at " + path);
+      }
+    }
+  } else {
+    int status = mkstemp(const_cast<char*>(file_template.c_str()));
+    if (!status) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "Failed to create local temp file: " + file_template);
+    }
+
+    *local_path = file_template;
+    std::string bucket, object;
+    RETURN_IF_ERROR(ParsePath(path, &bucket, &object));
+
+    // Send a request for the objects metadata
+    s3::Model::GetObjectRequest object_request;
+    object_request.SetBucket(bucket.c_str());
+    object_request.SetKey(object.c_str());
+
+    auto get_object_outcome = client_.GetObject(object_request);
+    if (get_object_outcome.IsSuccess()) {
+      auto& retrieved_file =
+          get_object_outcome.GetResultWithOwnership().GetBody();
+      std::ofstream output_file(local_path->c_str(), std::ios::binary);
+      output_file << retrieved_file.rdbuf();
+      output_file.close();
+    } else {
+      return Status(
+          RequestStatusCode::INTERNAL, "Failed to get object at " + path);
+    }
+  }
+  return Status::Success;
+}
+
+Status
+S3FileSystem::DestroyFileFolder(const std::string& path)
+{
+  remove(path.c_str());
+  return Status::Success;
+}
+
 Status
 S3FileSystem::WriteTextFile(
     const std::string& path, const std::string& contents)
@@ -1028,6 +1198,23 @@ ReadTextProto(const std::string& path, google::protobuf::Message* msg)
 
   return Status::Success;
 }
+
+Status
+DownloadFileFolder(const std::string& path, std::string* local_path)
+{
+  FileSystem* fs;
+  RETURN_IF_ERROR(GetFileSystem(path, &fs));
+  return fs->DownloadFileFolder(path, local_path);
+}
+
+Status
+DestroyFileFolder(const std::string& path)
+{
+  FileSystem* fs;
+  RETURN_IF_ERROR(GetFileSystem(path, &fs));
+  return fs->DestroyFileFolder(path);
+}
+
 
 Status
 WriteTextProto(const std::string& path, const google::protobuf::Message& msg)

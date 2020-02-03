@@ -80,7 +80,6 @@ BaseBackend::CreateExecutionContexts(
       LOG_INFO << "  " << p.first << ": " << p.second;
     }
   }
-
   uint32_t total_context_cnt = 0;
 
   for (const auto& group : Config().instance_group()) {
@@ -291,7 +290,7 @@ BaseBackend::CreateExecutionContext(
 
   RETURN_IF_ERROR(CreateTRTISTFModel(
       backend_config_, vgpu_device, Config().optimization().has_graph(),
-      Config().optimization().graph().level(), gdp_itr->second,
+      Config().optimization().graph().level(), gdp_itr->first, gdp_itr->second,
       &context->trtistf_model_, &context->input_name_map_,
       &context->output_name_map_, tftrt_config_ptr));
 

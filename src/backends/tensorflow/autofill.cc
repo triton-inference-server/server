@@ -283,6 +283,9 @@ AutoFillSavedModel::Create(
 
   for (auto dir : savedmodel_dirs) {
     const auto savedmodel_path = JoinPath({version_path, dir});
+    std::string local_savedmodel_path;
+    RETURN_IF_ERROR(
+        DownloadFileFolder(savedmodel_path, &local_savedmodel_path));
 
     auto graphdef_backend_config =
         std::static_pointer_cast<GraphDefBackendFactory::Config>(
@@ -290,13 +293,14 @@ AutoFillSavedModel::Create(
 
     trtistf_model = nullptr;
     err = TRTISTF_ModelCreateFromSavedModel(
-        &trtistf_model, model_name.c_str(), savedmodel_path.c_str(),
+        &trtistf_model, model_name.c_str(), local_savedmodel_path.c_str(),
         TRTISTF_NO_GPU_DEVICE, false /* have_graph */, 0 /* graph_level */,
         graphdef_backend_config->allow_gpu_memory_growth,
         graphdef_backend_config->per_process_gpu_memory_fraction,
         graphdef_backend_config->allow_soft_placement,
         graphdef_backend_config->memory_limit_mb, nullptr /* tftrt_config */);
 
+    RETURN_IF_ERROR(DestroyFileFolder(local_savedmodel_path));
     if (err == nullptr) {
       savedmodel_dir = dir;
       found = true;
@@ -313,6 +317,7 @@ AutoFillSavedModel::Create(
 
   autofill->reset(
       new AutoFillSavedModelImpl(model_name, savedmodel_dir, trtistf_model));
+
   return Status::Success;
 }
 

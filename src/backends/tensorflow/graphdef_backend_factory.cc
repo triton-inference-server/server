@@ -67,18 +67,28 @@ GraphDefBackendFactory::CreateBackend(
   RETURN_IF_ERROR(
       GetDirectoryFiles(path, true /* skip_hidden_files */, &graphdef_files));
 
-  std::unordered_map<std::string, std::string> graphdef_paths;
+  std::unordered_map<std::string, std::string> models;
   for (const auto& filename : graphdef_files) {
     const auto graphdef_path = JoinPath({path, filename});
-    graphdef_paths.emplace(
+    std::string local_graphdef_path;
+
+    RETURN_IF_ERROR(DownloadFileFolder(graphdef_path, &local_graphdef_path));
+    models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(graphdef_path));
+        std::make_tuple(local_graphdef_path));
   }
 
+  // Create the backend for the model and all the execution contexts
+  // requested for this model.
   std::unique_ptr<GraphDefBackend> local_backend(new GraphDefBackend);
   RETURN_IF_ERROR(local_backend->Init(
       path, model_config, backend_config_.get(), kTensorFlowGraphDefPlatform));
-  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(graphdef_paths));
+  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
+
+  // Destroy local copy if exists
+  for (const auto& model : models) {
+    RETURN_IF_ERROR(DestroyFileFolder(model.second));
+  }
 
   *backend = std::move(local_backend);
   return Status::Success;
