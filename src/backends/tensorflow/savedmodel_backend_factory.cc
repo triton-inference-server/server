@@ -66,19 +66,30 @@ SavedModelBackendFactory::CreateBackend(
   std::set<std::string> savedmodel_subdirs;
   RETURN_IF_ERROR(GetDirectorySubdirs(path, &savedmodel_subdirs));
 
-  std::unordered_map<std::string, std::string> savedmodel_paths;
+  std::unordered_map<std::string, std::string> models;
   for (const auto& filename : savedmodel_subdirs) {
     const auto savedmodel_path = JoinPath({path, filename});
-    savedmodel_paths.emplace(
+    std::string local_savedmodel_path;
+
+    RETURN_IF_ERROR(
+        DownloadFileFolder(savedmodel_path, &local_savedmodel_path));
+    models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(savedmodel_path));
+        std::make_tuple(local_savedmodel_path));
   }
 
+  // Create the backend for the model and all the execution contexts
+  // requested for this model.
   std::unique_ptr<SavedModelBackend> local_backend(new SavedModelBackend);
   RETURN_IF_ERROR(local_backend->Init(
       path, model_config, backend_config_.get(),
       kTensorFlowSavedModelPlatform));
-  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(savedmodel_paths));
+  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
+
+  // Destroy local copy if exists
+  for (const auto& model : models) {
+    RETURN_IF_ERROR(DestroyFileFolder(model.second));
+  }
 
   *backend = std::move(local_backend);
   return Status::Success;
