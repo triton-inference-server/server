@@ -132,7 +132,11 @@ for TARGET in cpu gpu; do
     for FW in $BACKENDS; do
       if [ "$FW" != "plan" ]; then
         for MC in `ls models/${FW}*/config.pbtxt`; do
-            echo "instance_group [ { kind: ${KIND} }]" >> $MC
+            if [ "$FW" == "custom" ]; then
+              echo "instance_group [ { kind: KIND_CPU }]" >> $MC
+            else
+              echo "instance_group [ { kind: ${KIND} }]" >> $MC
+            fi
         done
       fi
     done
