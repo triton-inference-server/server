@@ -33,3 +33,11 @@ instance_group {
   kind: KIND_GPU
 }
 default_model_filename: "model.onnx"
+optimization {
+  input_pinned_memory {
+    enable: true
+  }
+  output_pinned_memory {
+    enable: true
+  }
+}
