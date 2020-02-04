@@ -228,6 +228,10 @@ COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/inclu
      /opt/tensorrtserver/include/torch
 COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so \
       /opt/tensorrtserver/lib/pytorch/
+COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch_cpu.so \
+      /opt/tensorrtserver/lib/pytorch/
+COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch_cuda.so \
+      /opt/tensorrtserver/lib/pytorch/
 COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_nvrtc.so \
      /opt/tensorrtserver/lib/pytorch/
 RUN cd /opt/tensorrtserver/lib/pytorch && \
