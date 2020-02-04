@@ -27,6 +27,7 @@
 #include "src/servers/http_server.h"
 
 #include <errno.h>
+#include <google/protobuf/text_format.h>
 #include <google/protobuf/util/json_util.h>
 #include <h2o.h>
 #include <h2o/cache.h>
@@ -100,6 +101,38 @@ class HTTPAPIServer : public HTTPServer {
         "deleting response allocator");
   }
 
+  using H2OBufferPair = std::pair<
+      h2o_iovec_t*,
+      std::unordered_map<
+          std::string,
+          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>>;
+
+  // Class object associated to evhtp thread, requests received are bounded
+  // with the thread that accepts it. Need to keep track of that and let the
+  // corresponding thread send back the reply
+  class InferRequest {
+   public:
+    InferRequest(
+        evhtp_request_t* req, uint64_t request_id, const char* server_id,
+        uint64_t unique_id);
+    ~InferRequest() = default;
+
+    evhtp_request_t* EvHtpRequest() const { return req_; }
+
+    static void InferComplete(
+        TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
+        TRTSERVER_InferenceResponse* response, void* userp);
+    evhtp_res FinalizeResponse(TRTSERVER_InferenceResponse* response);
+
+    std::unique_ptr<H2OBufferPair> response_pair_;
+
+   private:
+    evhtp_request_t* req_;
+    const uint64_t request_id_;
+    const char* const server_id_;
+    const uint64_t unique_id_;
+  };
+
  private:
   TRTSERVER_Error* Start() override;
   TRTSERVER_Error* Stop() override;
@@ -130,6 +163,16 @@ class HTTPAPIServer : public HTTPServer {
 
   static int health(h2o_handler_t* self, h2o_req_t* req);
   static int status(h2o_handler_t* self, h2o_req_t* req);
+  static int Infer(h2o_handler_t* self, h2o_req_t* req);
+
+  TRTSERVER_Error* H2OBufferToInput(
+      const std::string& model_name, const InferRequestHeader& request_header,
+      h2o_buffer_t* input_buffer,
+      TRTSERVER_InferenceRequestProvider* request_provider,
+      std::unordered_map<
+          std::string,
+          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
+          output_shm_map);
 
   h2o_globalconf_t config;
   h2o_context_t ctx;
@@ -546,6 +589,286 @@ HTTPAPIServer::status(h2o_handler_t* _self, h2o_req_t* req)
 }
 
 TRTSERVER_Error*
+HTTPAPIServer::EVBufferToInput(
+    const std::string& model_name, const InferRequestHeader& request_header,
+    h2o_iovec_t* input_buffer,
+    TRTSERVER_InferenceRequestProvider* request_provider,
+    std::unordered_map<
+        std::string,
+        std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
+        output_shm_map)
+{
+  // Extract individual input data from HTTP body and register in
+  // 'request_provider'. The input data from HTTP body is not
+  // necessarily contiguous so may need to register multiple input
+  // "blocks" for a given input.
+  //
+  // Get the addr and size of each chunk of input data from the
+  // evbuffer.
+  int v_idx = 0;
+  int n = input_buffer->len;
+
+  // Get the byte-size for each input and from that get the blocks
+  // holding the data for that input
+  for (const auto& io : request_header.input()) {
+    uint64_t byte_size = 0;
+    RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
+        request_provider, io.name().c_str(), &byte_size));
+
+    // If 'byte_size' is zero then need to add an empty input data
+    // block... the provider expects at least one data block for every
+    // input.
+    if (byte_size == 0) {
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
+          request_provider, io.name().c_str(), nullptr, 0 /* byte_size */,
+          TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+    } else {
+      // If input is in shared memory then verify that the size is
+      // correct and set input from the shared memory.
+      if (io.has_shared_memory()) {
+        // if (byte_size != io.shared_memory().byte_size()) {
+        //   return TRTSERVER_ErrorNew(
+        //       TRTSERVER_ERROR_INVALID_ARG,
+        //       std::string(
+        //           "unexpected shared-memory size " +
+        //           std::to_string(io.shared_memory().byte_size()) +
+        //           " for input '" + io.name() + "', expecting " +
+        //           std::to_string(byte_size) + " for model '" + model_name +
+        //           "'") .c_str());
+        // }
+        //
+        // void* base;
+        // TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
+        // int64_t memory_type_id;
+        // TRTSERVER_SharedMemoryBlock* smb = nullptr;
+        // RETURN_IF_ERR(smb_manager_->Get(&smb, io.shared_memory().name()));
+        // RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
+        //     server_.get(), smb, io.shared_memory().offset(),
+        //     io.shared_memory().byte_size(), &base));
+        // TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
+        // TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
+        // RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
+        //     request_provider, io.name().c_str(), base, byte_size,
+        //     memory_type, memory_type_id));
+      } else {
+        while ((byte_size > 0) && (v_idx < n)) {
+          char* base = static_cast<char*>(v[v_idx].iov_base);
+          size_t base_size;
+          if (v[v_idx].iov_len > byte_size) {
+            base_size = byte_size;
+            v[v_idx].iov_base = static_cast<void*>(base + byte_size);
+            v[v_idx].iov_len -= byte_size;
+            byte_size = 0;
+          } else {
+            base_size = v[v_idx].iov_len;
+            byte_size -= v[v_idx].iov_len;
+            v_idx++;
+          }
+
+          RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
+              request_provider, io.name().c_str(), base, base_size,
+              TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+        }
+
+        if (byte_size != 0) {
+          return TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INVALID_ARG,
+              std::string(
+                  "unexpected size for input '" + io.name() + "', expecting " +
+                  std::to_string(byte_size) + " bytes for model '" +
+                  model_name + "'")
+                  .c_str());
+        }
+      }
+    }
+  }
+
+  if (v_idx != n) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "unexpected additional input data for model '" + model_name + "'")
+            .c_str());
+  }
+
+  // // Initialize System Memory for Output if it uses shared memory
+  // for (const auto& io : request_header.output()) {
+  //   if (io.has_shared_memory()) {
+  //     void* base;
+  //     TRTSERVER_SharedMemoryBlock* smb = nullptr;
+  //     RETURN_IF_ERR(smb_manager_->Get(&smb, io.shared_memory().name()));
+  //     RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
+  //         server_.get(), smb, io.shared_memory().offset(),
+  //         io.shared_memory().byte_size(), &base));
+  //
+  //     TRTSERVER_Memory_Type memory_type;
+  //     int64_t memory_type_id;
+  //     TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
+  //     TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
+  //     output_shm_map.emplace(
+  //         io.name(),
+  //         std::make_tuple(
+  //             static_cast<const void*>(base), io.shared_memory().byte_size(),
+  //             memory_type, memory_type_id));
+  //   }
+  // }
+
+  return nullptr;  // success
+}
+
+int
+HTTPAPIServer::Infer(h2o_handler_t* _self, h2o_req_t* req)
+{
+  h2o_custom_req_handler_t* self = (h2o_custom_req_handler_t*)_self;
+  re2::RE2 infer_regex(R"(/api/infer/([^/]+)(?:/(\d+))?)");
+  if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("POST"))) {
+    req->res.status = 400;
+    req->res.reason = "Only POST method is allowed";
+    h2o_add_header(
+        &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+        H2O_STRLIT("text/plain"));
+    h2o_generator_t generator = {NULL, NULL};
+    h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+    h2o_start_response(req, &generator);
+    h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+    return 0;
+  }
+
+  std::string infer_uri =
+      std::string(req->path_normalized.base, req->path_normalized.len);
+  std::string model_name, model_version_str;
+  if ((infer_uri.empty()) ||
+      (!RE2::FullMatch(
+          infer_uri, infer_regex, &model_name, &model_version_str))) {
+    req->res.status = 400;
+    req->res.reason = "Bad request";
+    h2o_add_header(
+        &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+        H2O_STRLIT("text/plain"));
+    h2o_generator_t generator = {NULL, NULL};
+    h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+    h2o_start_response(req, &generator);
+    h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+    return 0;
+  }
+
+  int64_t model_version = -1;
+  if (!model_version_str.empty()) {
+    model_version = std::atoll(model_version_str.c_str());
+  }
+
+  ssize_t infer_request_cursor = h2o_find_header_by_str(
+      &req->headers, H2O_STRLIT(kInferRequestHTTPHeader), -1);
+  if (infer_request_cursor != -1) {
+    h2o_iovec_t* slot = &req->headers.entries[infer_request_cursor].value;
+    std::string infer_request_header = std::string(slot->base, slot->len);
+    InferRequestHeader request_header_protobuf;
+    if (!google::protobuf::TextFormat::ParseFromString(
+            infer_request_header, &request_header_protobuf)) {
+      req->res.status = 400;
+      req->res.reason = "Bad request";
+      h2o_add_header(
+          &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+          H2O_STRLIT("text/plain"));
+      h2o_generator_t generator = {NULL, NULL};
+      h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+      h2o_start_response(req, &generator);
+      h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+      return 0;
+    }
+  }
+
+  uint64_t unique_id = RequestStatusUtil::NextUniqueRequestId();
+
+  // Create the inference request provider which provides all the
+  // input information needed for an inference.
+  TRTSERVER_InferenceRequestOptions* request_options = nullptr;
+  TRTSERVER_Error* err = TRTSERVER_InferenceRequestOptionsNew(
+      &request_options, model_name.c_str(), model_version);
+  if (err == nullptr) {
+    err = SetTRTSERVER_InferenceRequestOptions(
+        request_options, request_header_protobuf);
+  }
+  TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
+  if (err == nullptr) {
+    err = TRTSERVER_InferenceRequestProviderNewV2(
+        &request_provider, server_.get(), request_options);
+  }
+
+  if (err == nullptr) {
+    H2OBufferPair* response_pair(new H2OBufferPair());
+    err = H2OBufferToInput(
+        model_name, request_header_protobuf, req->entity, request_provider,
+        response_pair->second);
+    if (err == nullptr) {
+      InferRequest* infer_request = new InferRequest(
+          req, request_header_protobuf.id(), server_id_, unique_id);
+
+      response_pair->first = req->buffer_out;
+      infer_request->response_pair_.reset(response_pair);
+
+      // Provide the trace manager object to use for this request, if nullptr
+      // then no tracing will be performed.
+      TRTSERVER_TraceManager* trace_manager = nullptr;
+#ifdef TRTIS_ENABLE_TRACING
+      if (trace_meta_data != nullptr) {
+        infer_request->trace_meta_data_ = std::move(trace_meta_data);
+        TRTSERVER_TraceManagerNew(
+            &trace_manager, TraceManager::CreateTrace,
+            TraceManager::ReleaseTrace, infer_request->trace_meta_data_.get());
+      }
+#endif  // TRTIS_ENABLE_TRACING
+
+      err = TRTSERVER_ServerInferAsync(
+          server_.get(), trace_manager, request_provider, allocator_,
+          reinterpret_cast<void*>(response_pair), InferRequest::InferComplete,
+          reinterpret_cast<void*>(infer_request));
+      if (err != nullptr) {
+        delete infer_request;
+        infer_request = nullptr;
+      }
+    }
+  }
+
+  // The request provider can be deleted before ServerInferAsync
+  // callback completes.
+  TRTSERVER_InferenceRequestProviderDelete(request_provider);
+  TRTSERVER_InferenceRequestOptionsDelete(request_options);
+
+  h2o_generator_t generator = {NULL, NULL};
+  h2o_iovec_t body;
+
+  RequestStatus request_status;
+  RequestStatusUtil::Create(
+      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
+      self->http_server->server_id_);
+
+  // Add NV-Status header
+  std::string status_header = std::string(kStatusHTTPHeader);
+  h2o_iovec_t status_header_content = h2o_strdup(
+      &req->pool, request_status.ShortDebugString().c_str(), SIZE_MAX);
+  h2o_add_header_by_str(
+      &req->pool, &req->res.headers, status_header.c_str(),
+      status_header.size(), 0, NULL, status_header_content.base,
+      status_header_content.len);
+
+  if (err == nullptr) {
+    req->res.status = 200;
+    req->res.reason = "OK";
+    req->res.content_length = body.len;
+  } else {
+    req->res.status = 400;
+    req->res.reason = "Bad Request";
+  }
+
+  h2o_start_response(req, &generator);
+  h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
+  TRTSERVER_ErrorDelete(err);
+
+  return 0;
+}
+
+TRTSERVER_Error*
 HTTPAPIServer::Start()
 {
   h2o_hostconf_t* hostconf;
@@ -569,6 +892,10 @@ HTTPAPIServer::Start()
     h2o_access_log_register(pathconf, logfh);
 
   pathconf = register_handler(hostconf, "/api/status", status);
+  if (logfh != NULL)
+    h2o_access_log_register(pathconf, logfh);
+
+  pathconf = register_handler(hostconf, "/api/infer", infer);
   if (logfh != NULL)
     h2o_access_log_register(pathconf, logfh);
 
