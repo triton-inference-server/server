@@ -25,7 +25,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "src/clients/c++/perf_client/concurrency_manager.h"
-#include <queue>
 
 ConcurrencyManager::~ConcurrencyManager()
 {
@@ -89,6 +88,15 @@ nic::Error
 ConcurrencyManager::ChangeConcurrencyLevel(
     const size_t concurrent_request_count)
 {
+  if (on_sequence_model_ && async_) {
+    execute_ = false;
+    // Wait to see all threads are paused.
+    for (auto& thread_config : threads_config_) {
+      while (!thread_config->is_paused_) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+    }
+  }
   // Always prefer to create new threads if the maximum limit has not been met
   while ((concurrent_request_count > threads_.size()) &&
          (threads_.size() < max_threads_)) {
@@ -124,6 +132,10 @@ ConcurrencyManager::ChangeConcurrencyLevel(
     }
   }
 
+  if (on_sequence_model_ && async_) {
+    execute_ = true;
+  }
+
   // Make sure all threads will check their updated concurrency level
   wake_signal_.notify_all();
 
@@ -156,15 +168,23 @@ ConcurrencyManager::Infer(
   // Variable that can be used across InferContexts
   std::unique_ptr<nic::InferContext::Options> options(nullptr);
 
-  // Variable used to signal request completion
-  bool notified = false;
-  std::mutex cb_mtx;
-  std::condition_variable cb_cv;
-
-  std::atomic<int> total_ongoing_requests(0);
-
   // run inferencing until receiving exit signal to maintain server load.
   do {
+    if (on_sequence_model_ && async_) {
+      if (!execute_) {
+        // Ensures the clean exit of the sequences
+        while (thread_config->total_ongoing_requests_ != 0) {
+          std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+        // Wait if no request should be sent and it is not exiting
+        thread_config->is_paused_ = true;
+        std::unique_lock<std::mutex> lock(wake_mutex_);
+        wake_signal_.wait(lock, [this]() { return early_exit || execute_; });
+      }
+    }
+
+    thread_config->is_paused_ = false;
+
     // Only interact with synchronous mechanism if the worker should wait
     if (thread_config->concurrency_ == 0) {
       // Wait if no request should be sent and it is not exiting
@@ -199,7 +219,7 @@ ConcurrencyManager::Infer(
     // matches the concurrency level
     // Non-sequence model is 'num_reqs' * 1 ctx
     // Sequence model is 1 request of 1 sequence * 'active_ctx_cnt' ctxs
-    while (total_ongoing_requests < (int)num_reqs) {
+    while (thread_config->total_ongoing_requests_ < (int)num_reqs) {
       // Update the inputs if required for non-sequence
       if (using_json_data_ && (!on_sequence_model_)) {
         int step_id = (thread_config->non_sequence_data_step_id_ %
@@ -225,7 +245,7 @@ ConcurrencyManager::Infer(
 
         // Find the next available context id to use for this request
         {
-          std::lock_guard<std::mutex> lk(cb_mtx);
+          std::lock_guard<std::mutex> lk(thread_config->cb_mtx_);
           ctx_id = free_ctx_ids.front();
           free_ctx_ids.pop();
         }
@@ -264,82 +284,21 @@ ConcurrencyManager::Infer(
             }
           }
           sequence_stat_[seq_id]->remaining_queries_--;
-        }
-      }
-      if (async_) {
-        struct timespec start_time_async;
-        clock_gettime(CLOCK_MONOTONIC, &start_time_async);
-        thread_stat->status_ = ctxs[ctx_id]->ctx_->AsyncRun(
-            [&notified, &cb_mtx, &cb_cv, &ctxs, &thread_stat,
-             &total_ongoing_requests, &free_ctx_ids, start_time_async, flags,
-             ctx_id](
-                nic::InferContext* ctx,
-                std::shared_ptr<nic::InferContext::Request> request) {
-              std::map<std::string, std::unique_ptr<nic::InferContext::Result>>
-                  results;
-              nic::Error callback_error =
-                  ctxs[ctx_id]->ctx_->GetAsyncRunResults(request, &results);
-              if (callback_error.IsOk()) {
-                struct timespec end_time_async;
-                clock_gettime(CLOCK_MONOTONIC, &end_time_async);
-                {
-                  // Add the request timestamp to thread Timestamp vector with
-                  // proper locking
-                  std::lock_guard<std::mutex> lock(thread_stat->mu_);
-                  thread_stat->request_timestamps_.emplace_back(std::make_tuple(
-                      start_time_async, end_time_async, flags,
-                      false /* delayed */));
-                  ctxs[ctx_id]->ctx_->GetStat(
-                      &(thread_stat->contexts_stat_[ctx_id]));
-                }
-              } else if (thread_stat->cb_status_.IsOk()) {
-                // Record the callback error if not already recorded
-                thread_stat->cb_status_ = callback_error;
-              }
-
-              // avoid competition over 'cb_mtx'
-              {
-                std::lock_guard<std::mutex> lk(cb_mtx);
-                free_ctx_ids.push(ctx_id);
-                notified = true;
-              }
-              total_ongoing_requests--;
-
-              cb_cv.notify_all();
-            });
-        if (!thread_stat->status_.IsOk()) {
-          return;
+          Request(
+              ctxs, ctx_id, free_ctx_ids, flags, thread_config, thread_stat);
         }
       } else {
-        std::map<std::string, std::unique_ptr<nic::InferContext::Result>>
-            results;
-        struct timespec start_time_sync, end_time_sync;
-        clock_gettime(CLOCK_MONOTONIC, &start_time_sync);
-        thread_stat->status_ = ctxs[ctx_id]->ctx_->Run(&results);
-        if (!thread_stat->status_.IsOk()) {
-          return;
-        }
-        clock_gettime(CLOCK_MONOTONIC, &end_time_sync);
-        {
-          // Add the request timestamp to thread Timestamp vector with proper
-          // locking
-          std::lock_guard<std::mutex> lock(thread_stat->mu_);
-          thread_stat->request_timestamps_.emplace_back(std::make_tuple(
-              start_time_sync, end_time_sync, flags, false /* delayed */));
-          ctxs[ctx_id]->ctx_->GetStat(&(thread_stat->contexts_stat_[ctx_id]));
-        }
-        free_ctx_ids.push(ctx_id);
+        Request(ctxs, ctx_id, free_ctx_ids, flags, thread_config, thread_stat);
       }
-      total_ongoing_requests++;
     }
 
     if (async_) {
       {
         // If async, then wait for signal from callback.
-        std::unique_lock<std::mutex> lk(cb_mtx);
-        cb_cv.wait(lk, [&notified] {
-          if (notified) {
-            notified = false;
+        std::unique_lock<std::mutex> lk(thread_config->cb_mtx_);
+        thread_config->cb_cv_.wait(lk, [&thread_config] {
+          if (thread_config->notified_) {
+            thread_config->notified_ = false;
             return true;
           }
           return false;
@@ -347,14 +306,14 @@ ConcurrencyManager::Infer(
       }
     } else {
       // If synchronous, then all the requests have already been completed.
-      total_ongoing_requests = 0;
+      thread_config->total_ongoing_requests_ = 0;
     }
 
     if (early_exit || (!thread_stat->cb_status_.IsOk())) {
       if (async_) {
         // Wait for all callbacks to complete.
         // Loop to ensure all the inflight requests have been completed.
-        while (total_ongoing_requests != 0) {
+        while (thread_config->total_ongoing_requests_ != 0) {
           std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
       }
@@ -362,4 +321,76 @@ ConcurrencyManager::Infer(
       break;
     }
   } while (true);
+}
+
+void
+ConcurrencyManager::Request(
+    std::vector<std::unique_ptr<InferContextMetaData>>& ctxs, const int ctx_id,
+    std::queue<int>& free_ctx_ids, const uint32_t flags,
+    std::shared_ptr<ThreadConfig>& thread_config,
+    std::shared_ptr<ThreadStat>& thread_stat)
+{
+  if (async_) {
+    struct timespec start_time_async;
+    clock_gettime(CLOCK_MONOTONIC, &start_time_async);
+    thread_stat->status_ = ctxs[ctx_id]->ctx_->AsyncRun(
+        [&thread_config, &ctxs, &thread_stat, &free_ctx_ids, start_time_async,
+         flags, ctx_id](
+            nic::InferContext* ctx,
+            std::shared_ptr<nic::InferContext::Request> request) {
+          std::map<std::string, std::unique_ptr<nic::InferContext::Result>>
+              results;
+          nic::Error callback_error =
+              ctxs[ctx_id]->ctx_->GetAsyncRunResults(request, &results);
+          if (callback_error.IsOk()) {
+            struct timespec end_time_async;
+            clock_gettime(CLOCK_MONOTONIC, &end_time_async);
+            {
+              // Add the request timestamp to thread Timestamp vector with
+              // proper locking
+              std::lock_guard<std::mutex> lock(thread_stat->mu_);
+              thread_stat->request_timestamps_.emplace_back(std::make_tuple(
+                  start_time_async, end_time_async, flags,
+                  false /* delayed */));
+              ctxs[ctx_id]->ctx_->GetStat(
+                  &(thread_stat->contexts_stat_[ctx_id]));
+            }
+          } else if (thread_stat->cb_status_.IsOk()) {
+            // Record the callback error if not already recorded
+            thread_stat->cb_status_ = callback_error;
+          }
+
+          // avoid competition over 'cb_mtx_'
+          {
+            std::lock_guard<std::mutex> lk(thread_config->cb_mtx_);
+            free_ctx_ids.push(ctx_id);
+            thread_config->notified_ = true;
+          }
+          thread_config->total_ongoing_requests_--;
+
+          thread_config->cb_cv_.notify_all();
+        });
+    if (!thread_stat->status_.IsOk()) {
+      return;
+    }
+  } else {
+    std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
+    struct timespec start_time_sync, end_time_sync;
+    clock_gettime(CLOCK_MONOTONIC, &start_time_sync);
+    thread_stat->status_ = ctxs[ctx_id]->ctx_->Run(&results);
+    if (!thread_stat->status_.IsOk()) {
+      return;
+    }
+    clock_gettime(CLOCK_MONOTONIC, &end_time_sync);
+    {
+      // Add the request timestamp to thread Timestamp vector with proper
+      // locking
+      std::lock_guard<std::mutex> lock(thread_stat->mu_);
+      thread_stat->request_timestamps_.emplace_back(std::make_tuple(
+          start_time_sync, end_time_sync, flags, false /* delayed */));
+      ctxs[ctx_id]->ctx_->GetStat(&(thread_stat->contexts_stat_[ctx_id]));
+    }
+    free_ctx_ids.push(ctx_id);
+  }
+  thread_config->total_ongoing_requests_++;
 }
