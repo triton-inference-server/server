@@ -40,7 +40,7 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG="./client.log"
 PERF_CLIENT=../clients/perf_client
 
-DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository/tf_model_store"
+DATADIR="/data/inferenceserver/${REPO_VERSION}/tf_model_store"
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS="--log-verbose=1 --model-repository=s3://localhost:4572/demo-bucket"
@@ -56,10 +56,10 @@ rm -f *.log*
     mkdir /usr/local/share/minio && \
     mkdir /etc/minio)
 
-MINIO_ACCESS_KEY="minio"
+export MINIO_ACCESS_KEY="minio"
 MINIO_VOLUMES="/usr/local/share/minio/"
 MINIO_OPTS="-C /etc/minio --address localhost:4572"
-MINIO_SECRET_KEY="miniostorage"
+export MINIO_SECRET_KEY="miniostorage"
 
 (curl -O https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service && \
     mv minio.service /etc/systemd/system)
@@ -68,13 +68,13 @@ MINIO_SECRET_KEY="miniostorage"
 /usr/local/bin/minio server $MINIO_OPTS $MINIO_VOLUMES &
 MINIO_PID=$!
 
-AWS_ACCESS_KEY_ID=minio
-AWS_SECRET_ACCESS_KEY=miniostorage
+export AWS_ACCESS_KEY_ID=minio && \
+    export AWS_SECRET_ACCESS_KEY=miniostorage
 
 # create and add data to bucket
 python -m pip install awscli-local && \
-  awslocal --endpoint-url=http://localhost:4572 s3 mb s3://test1 && \
-  awslocal s3 sync $DATADIR s3://demo-bucket
+    awslocal --endpoint-url=http://localhost:4572 s3 mb s3://demo-bucket && \
+    awslocal s3 sync $DATADIR s3://demo-bucket
 
 RET=0
 
@@ -90,7 +90,7 @@ fi
 
 set +e
 for MODEL_NAME in resnet_v1_50_graphdef resnet_v1_50_savedmodel; do
-  $PERF_CLIENT -m $MODEL_NAME -p 3000 -t 1>>$CLIENT_LOG 2>&1
+  $PERF_CLIENT -m $MODEL_NAME -p 3000 -t 1 >$CLIENT_LOG 2>&1
   if [ $? -ne 0 ]; then
       echo -e "\n***\n*** Test Failed\n***"
       cat $CLIENT_LOG
