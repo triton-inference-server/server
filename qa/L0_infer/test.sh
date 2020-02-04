@@ -40,11 +40,13 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 
-DATADIR=`pwd`/models
+MODELDIR=`pwd`/models
+DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+OPTDIR=${OPTDIR:="/opt"}
+SERVER=${OPTDIR}/tensorrtserver/bin/trtserver
 
-SERVER=/opt/tensorrtserver/bin/trtserver
 # Allow more time to exit. Ensemble brings in too many models
-SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 
@@ -76,7 +78,7 @@ for TARGET in cpu gpu; do
         fi
         # set strict readiness=false on CPU-only device to allow
         # unsuccessful load of TensorRT plans, which require GPU.
-        SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --strict-readiness=false --exit-on-error=false"
+        SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120 --strict-readiness=false --exit-on-error=false"
     fi
 
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log
@@ -85,7 +87,7 @@ for TARGET in cpu gpu; do
     rm -fr models && mkdir models
     for BACKEND in $BACKENDS; do
       if [ "$BACKEND" != "custom" ]; then
-        cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${BACKEND}* \
+        cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
           models/.
       else
         cp -r ../custom_models/custom_float32_* models/. && \
@@ -98,10 +100,10 @@ for TARGET in cpu gpu; do
       if [[ $BACKENDS == *"custom"* ]]; then
         for BACKEND in $BACKENDS; do
           if [ "$BACKEND" != "custom" ]; then
-              cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
+              cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
                 models/.
           else
-            cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/nop_* \
+            cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/nop_* \
               models/.
           fi
         done
