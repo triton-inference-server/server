@@ -40,8 +40,7 @@ class GRPCServerV2 {
       const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
           trace_manager,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
-      int32_t port, int infer_thread_cnt, int stream_infer_thread_cnt,
-      int infer_allocation_pool_size,
+      int32_t port, int infer_allocation_pool_size,
       std::unique_ptr<GRPCServerV2>* grpc_server);
 
   ~GRPCServerV2();
@@ -62,7 +61,6 @@ class GRPCServerV2 {
           trace_manager,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
       const char* server_id, const std::string& server_addr,
-      const int infer_thread_cnt, const int stream_infer_thread_cnt,
       const int infer_allocation_pool_size);
 
   std::shared_ptr<TRTSERVER_Server> server_;
@@ -71,8 +69,6 @@ class GRPCServerV2 {
   const char* server_id_;
   const std::string server_addr_;
 
-  const int infer_thread_cnt_;
-  const int stream_infer_thread_cnt_;
   const int infer_allocation_pool_size_;
 
   std::unique_ptr<grpc::ServerCompletionQueue> server_live_cq_;
@@ -81,7 +77,7 @@ class GRPCServerV2 {
   std::unique_ptr<grpc::ServerCompletionQueue> server_metadata_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> model_metadata_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> repository_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> infer_cq_;
+  std::unique_ptr<grpc::ServerCompletionQueue> model_infer_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> stream_infer_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> modelcontrol_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> shmcontrol_cq_;
@@ -95,7 +91,7 @@ class GRPCServerV2 {
   std::unique_ptr<HandlerBase> server_metadata_handler_;
   std::unique_ptr<HandlerBase> model_metadata_handler_;
   std::unique_ptr<HandlerBase> repository_handler_;
-  std::unique_ptr<HandlerBase> infer_handler_;
+  std::unique_ptr<HandlerBase> model_infer_handler_;
   std::unique_ptr<HandlerBase> stream_infer_handler_;
   std::unique_ptr<HandlerBase> modelcontrol_handler_;
   std::unique_ptr<HandlerBase> shmcontrol_handler_;

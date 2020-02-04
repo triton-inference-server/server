@@ -103,7 +103,7 @@ std::unique_ptr<nvidia::inferenceserver::GRPCServerV2> grpc_service_v2_;
 #endif  // TRTIS_ENABLE_GRPC_V2
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
 bool allow_grpc_ = true;
-int32_t grpc_api_version_ = 1;
+int32_t api_version_ = 1;
 int32_t grpc_port_ = 8001;
 #endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 
@@ -162,7 +162,7 @@ enum OptionId {
 #endif  // TRTIS_ENABLE_HTTP
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
   OPTION_ALLOW_GRPC,
-  OPTION_GRPC_API_VERSION,
+  OPTION_API_VERSION,
   OPTION_GRPC_PORT,
   OPTION_GRPC_INFER_THREAD_COUNT,
   OPTION_GRPC_STREAM_INFER_THREAD_COUNT,
@@ -259,8 +259,9 @@ std::vector<Option> options_
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
       {OPTION_ALLOW_GRPC, "allow-grpc",
        "Allow the server to listen for GRPC requests."},
-      {OPTION_GRPC_API_VERSION, "grpc-api-version",
-       "Version of the GRPC API to use. Default is version 1. Allowed versions are 1 and 2."},
+      {OPTION_API_VERSION, "api-version",
+       "Version of the GRPC/HTTP API to use. Default is version 1. Allowed "
+       "versions are 1 and 2."},
       {OPTION_GRPC_PORT, "grpc-port",
        "The port for the server to listen on for GRPC requests."},
       {OPTION_GRPC_INFER_THREAD_COUNT, "grpc-infer-thread-count",
@@ -444,8 +445,8 @@ StartGrpcServiceV2(
         smb_manager)
 {
   TRTSERVER_Error* err = nvidia::inferenceserver::GRPCServerV2::Create(
-      server, trace_manager, smb_manager, grpc_port_, grpc_infer_thread_cnt_,
-      grpc_stream_infer_thread_cnt_, grpc_infer_allocation_pool_size_, service);
+      server, trace_manager, smb_manager, grpc_port_,
+      grpc_infer_allocation_pool_size_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -523,7 +524,7 @@ StartEndpoints(
 
 #ifdef TRTIS_ENABLE_GRPC
   // Enable GRPC endpoints if requested...
-  if (allow_grpc_ && (grpc_api_version_ == 1) && (grpc_port_ != -1)) {
+  if (allow_grpc_ && (api_version_ == 1) && (grpc_port_ != -1)) {
     TRTSERVER_Error* err =
         StartGrpcService(&grpc_service_, server, trace_manager, smb_manager);
     if (err != nullptr) {
@@ -535,7 +536,7 @@ StartEndpoints(
 
 #ifdef TRTIS_ENABLE_GRPC_V2
   // Enable GRPC V2 endpoints if requested...
-  if (allow_grpc_ && (grpc_api_version_ == 2) && (grpc_port_ != -1)) {
+  if (allow_grpc_ && (api_version_ == 2) && (grpc_port_ != -1)) {
     TRTSERVER_Error* err = StartGrpcServiceV2(
         &grpc_service_v2_, server, trace_manager, smb_manager);
     if (err != nullptr) {
@@ -859,9 +860,9 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
 #ifdef TRTIS_ENABLE_GRPC
-  int32_t grpc_api_version = 1;
+  int32_t api_version = 1;
 #else
-  int32_t grpc_api_version = 2;
+  int32_t api_version = 2;
 #endif  // TRTIS_ENABLE_GRPC
   int32_t grpc_port = grpc_port_;
   int32_t grpc_infer_thread_cnt = grpc_infer_thread_cnt_;
@@ -960,8 +961,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       case OPTION_ALLOW_GRPC:
         allow_grpc_ = ParseBoolOption(optarg);
         break;
-      case OPTION_GRPC_API_VERSION:
-        grpc_api_version = ParseIntOption(optarg);
+      case OPTION_API_VERSION:
+        api_version = ParseIntOption(optarg);
         break;
       case OPTION_GRPC_PORT:
         grpc_port = ParseIntOption(optarg);
@@ -1119,7 +1120,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #endif  // TRTIS_ENABLE_HTTP
 
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
-  grpc_api_version_ = grpc_api_version;
+  api_version_ = api_version;
   grpc_port_ = grpc_port;
   grpc_infer_thread_cnt_ = grpc_infer_thread_cnt;
   grpc_stream_infer_thread_cnt_ = grpc_stream_infer_thread_cnt;
@@ -1144,6 +1145,12 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetServerId(server_options, server_id.c_str()),
       "setting server ID");
+#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetServerProtocolVersion(
+          server_options, api_version),
+      "setting server protocol version");
+#endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
   for (const auto& model_repository_path : model_repository_paths) {
     FAIL_IF_ERR(
         TRTSERVER_ServerOptionsSetModelRepositoryPath(

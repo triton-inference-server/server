@@ -604,10 +604,10 @@ message ModelInferRequest
     //@@    .. cpp:var:: string data_format
     //@@
     //@@       Format to use to return the output tensor data. Options
-    //@@       are "explicit", "encoded", "binary" and "shared_memory".
-    //@@       Default is "explicit". If "shared_memory" is specified then
+    //@@       are "explicit", "binary" and "shared_memory".
+    //@@       Default is "binary". If "shared_memory" is specified then
     //@@       the "shared_memory_data" field must also be specified.
-    //@@       Server support for “encoded”, “binary” and “shared_memory”
+    //@@       Server support for “binary” and “shared_memory”
     //@@       is optional.
     //@@
     string data_format = 3;

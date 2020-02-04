@@ -31,6 +31,10 @@
 #include "src/core/request_status.pb.h"
 #include "src/core/trtserver.h"
 
+#ifdef TRTIS_ENABLE_GRPC_V2
+#include "src/core/grpc_service_v2.pb.h"
+#endif  // TRTIS_ENABLE_GRPC_V2
+
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRTIS_ENABLE_GPU
@@ -103,7 +107,13 @@ class RequestStatusUtil {
 
 TRTSERVER_Error* SetTRTSERVER_InferenceRequestOptions(
     TRTSERVER_InferenceRequestOptions* request_options,
-    InferRequestHeader request_header_protobuf);
+    const InferRequestHeader& request_header);
+
+#ifdef TRTIS_ENABLE_GRPC_V2
+TRTSERVER_Error* SetInferenceRequestOptions(
+    TRTSERVER_InferenceRequestOptions* request_options,
+    const ModelInferRequest& request);
+#endif  // TRTIS_ENABLE_GRPC_V2
 
 std::string MemoryTypeString(TRTSERVER_Memory_Type memory_type);
 

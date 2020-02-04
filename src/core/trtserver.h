@@ -731,6 +731,15 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsDelete(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetServerId(
     TRTSERVER_ServerOptions* options, const char* server_id);
 
+/// Set the version of the data-plane protocol supported by the server
+/// in a server options.
+/// \param options The server options object.
+/// \param server_protocol_version The protocol version.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetServerProtocolVersion(
+    TRTSERVER_ServerOptions* options, const uint32_t server_protocol_version);
+
 /// Set the model repository path in a server options. The path must be
 /// the full absolute path to the model repository. This function can be called
 /// multiple times with different paths to set multiple model repositories.

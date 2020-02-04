@@ -82,6 +82,7 @@ InferenceServer::InferenceServer()
   start_time_ns_ = TIMESPEC_TO_NANOS(ts);
 
   id_ = "inference:0";
+  protocol_version_ = 1;
   extensions_.push_back("classification");
   extensions_.push_back("flat_tensor_format");
   extensions_.push_back("model_configuration");

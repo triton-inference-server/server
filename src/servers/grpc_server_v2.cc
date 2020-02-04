@@ -368,8 +368,8 @@ class Handler : public GRPCServerV2::HandlerBase {
   // Descriptive name of of the handler.
   const std::string& Name() const { return name_; }
 
-  // Start handling requests using 'thread_cnt' threads.
-  void Start(int thread_cnt);
+  // Start handling requests.
+  void Start();
 
   // Stop handling requests.
   void Stop();
@@ -425,7 +425,7 @@ class Handler : public GRPCServerV2::HandlerBase {
 
   ServiceType* service_;
   grpc::ServerCompletionQueue* cq_;
-  std::vector<std::unique_ptr<std::thread>> threads_;
+  std::unique_ptr<std::thread> thread_;
 
   // Mutex to serialize State allocation
   std::mutex alloc_mu_;
@@ -466,33 +466,30 @@ template <
     typename ServiceType, typename ServerResponderType, typename RequestType,
     typename ResponseType>
 void
-Handler<ServiceType, ServerResponderType, RequestType, ResponseType>::Start(
-    int thread_cnt)
+Handler<ServiceType, ServerResponderType, RequestType, ResponseType>::Start()
 {
-  // Use a barrier to make sure we don't return until all threads have
+  // Use a barrier to make sure we don't return until thread has
   // started.
-  auto barrier = std::make_shared<Barrier>(thread_cnt + 1);
+  auto barrier = std::make_shared<Barrier>(2);
 
-  for (int t = 0; t < thread_cnt; ++t) {
-    threads_.emplace_back(new std::thread([this, barrier] {
-      StartNewRequest();
-      barrier->Wait();
+  thread_.reset(new std::thread([this, barrier] {
+    StartNewRequest();
+    barrier->Wait();
 
-      void* tag;
-      bool ok;
+    void* tag;
+    bool ok;
 
-      while (cq_->Next(&tag, &ok)) {
-        State* state = static_cast<State*>(tag);
-        if (!Process(state, ok)) {
-          LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
-          StateRelease(state);
-        }
+    while (cq_->Next(&tag, &ok)) {
+      State* state = static_cast<State*>(tag);
+      if (!Process(state, ok)) {
+        LOG_VERBOSE(1) << "Done for " << Name() << ", " << state->unique_id_;
+        StateRelease(state);
       }
-    }));
-  }
+    }
+  }));
 
   barrier->Wait();
-  LOG_VERBOSE(1) << "Threads started for " << Name();
+  LOG_VERBOSE(1) << "Thread started for " << Name();
 }
 
 template <
@@ -501,11 +498,11 @@ template <
 void
 Handler<ServiceType, ServerResponderType, RequestType, ResponseType>::Stop()
 {
-  for (const auto& thread : threads_) {
-    thread->join();
+  if (thread_->joinable()) {
+    thread_->join();
   }
 
-  LOG_VERBOSE(1) << "Threads exited for " << Name();
+  LOG_VERBOSE(1) << "Thread exited for " << Name();
 }
 
 //
@@ -1033,7 +1030,6 @@ ModelMetadataHandler::Process(Handler::State* state, bool rpc_ok)
   return state->step_ != Steps::FINISH;
 }
 
-#if 0
 //
 // Infer utilities
 //
@@ -1046,7 +1042,7 @@ InferResponseAlloc(
     int64_t* actual_memory_type_id)
 {
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
-  InferResponse* response = payload->response_;
+  ModelInferResponse* response = payload->response_;
   const AllocPayload::TensorShmMap* shm_map = payload->shm_map_;
 
   *buffer = nullptr;
@@ -1054,11 +1050,13 @@ InferResponseAlloc(
   *actual_memory_type = preferred_memory_type;
   *actual_memory_type_id = preferred_memory_type_id;
 
-  // Called once for each result tensor in the inference request. Must
-  // always add a raw output into the response's list of outputs so
-  // that the number and order of raw output entries equals the output
-  // meta-data.
-  std::string* raw_output = response->add_raw_output();
+  // Called once for each result tensor in the inference request.
+  ModelInferResponse::InferOutputTensor* output_tensor =
+      response->add_outputs();
+  output_tensor->set_name(tensor_name);
+  std::string* raw_output =
+      output_tensor->mutable_contents()->mutable_raw_contents();
+
   if (byte_size > 0) {
     bool use_shm = false;
 
@@ -1127,7 +1125,7 @@ TRTSERVER_Error*
 InferAllocatorPayload(
     const std::shared_ptr<TRTSERVER_Server>& trtserver,
     const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
-    const InferRequestHeader& request_header, InferResponse& response,
+    const ModelInferRequest& request, ModelInferResponse& response,
     AllocPayload* alloc_payload)
 {
   alloc_payload->response_ = &response;
@@ -1139,7 +1137,8 @@ InferAllocatorPayload(
   // the memory address for that output and store it in the allocator
   // payload so that it is available when the allocation callback is
   // invoked.
-  for (const auto& io : request_header.output()) {
+#if 0
+  for (const auto& io : request.outputs()) {
     if (io.has_shared_memory()) {
       void* base;
       TRTSERVER_SharedMemoryBlock* smb = nullptr;
@@ -1163,6 +1162,7 @@ InferAllocatorPayload(
                                            memory_type, memory_type_id});
     }
   }
+#endif
 
   return nullptr;  // Success
 }
@@ -1171,17 +1171,17 @@ TRTSERVER_Error*
 InferGRPCToInput(
     const std::shared_ptr<TRTSERVER_Server>& trtserver,
     const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
-    const InferRequestHeader& request_header, const InferRequest& request,
+    const ModelInferRequest& request,
     TRTSERVER_InferenceRequestProvider* request_provider)
 {
   // Verify that the batch-byte-size of each input matches the size of
   // the provided tensor data (provided raw or from shared memory)
-  size_t idx = 0;
-  for (const auto& io : request_header.input()) {
+  for (const auto& io : request.inputs()) {
     const void* base;
     size_t byte_size;
     TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
     int64_t memory_type_id = 0;
+#if 0
     if (io.has_shared_memory()) {
       TRTSERVER_SharedMemoryBlock* smb = nullptr;
       RETURN_IF_ERR(smb_manager->Get(&smb, io.shared_memory().name()));
@@ -1191,17 +1191,20 @@ InferGRPCToInput(
       byte_size = io.shared_memory().byte_size();
       TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
       TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
-    } else if ((int)idx >= request.raw_input_size()) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
-          std::string(
-              "expected tensor data for at least " + std::to_string(idx) +
-              " inputs but got only " +
-              std::to_string(request.raw_input_size()) +
-              " sets of data for model '" + request.model_name() + "'")
-              .c_str());
-    } else {
-      const std::string& raw = request.raw_input(idx++);
+    } else
+#endif
+    {
+      if (!io.has_contents()) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "expected tensor data for input tensor '" + io.name() +
+                "' for model '" + request.model_name() + "'")
+                .c_str());
+      }
+
+      // FIXMEV2 handle non-raw content types
+      const std::string& raw = io.contents().raw_contents();
       base = raw.c_str();
       byte_size = raw.size();
     }
@@ -1229,14 +1232,15 @@ InferGRPCToInput(
 }
 
 //
-// InferHandler
+// ModelInferHandler
 //
-class InferHandler : public Handler<
-                         GRPCInferenceService::AsyncService,
-                         grpc::ServerAsyncResponseWriter<InferResponse>,
-                         InferRequest, InferResponse> {
+class ModelInferHandler
+    : public Handler<
+          GRPCInferenceService::AsyncService,
+          grpc::ServerAsyncResponseWriter<ModelInferResponse>,
+          ModelInferRequest, ModelInferResponse> {
  public:
-  InferHandler(
+  ModelInferHandler(
       const std::string& name,
       const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
       const std::shared_ptr<TraceManager>& trace_manager,
@@ -1252,7 +1256,7 @@ class InferHandler : public Handler<
     FAIL_IF_ERR(
         TRTSERVER_ResponseAllocatorNew(
             &allocator_, InferResponseAlloc, InferResponseRelease),
-        "creating response allocator");
+        "creating inference response allocator");
   }
 
  protected:
@@ -1270,7 +1274,7 @@ class InferHandler : public Handler<
 };
 
 void
-InferHandler::StartNewRequest()
+ModelInferHandler::StartNewRequest()
 {
   auto context = std::make_shared<State::Context>(server_id_);
   State* state = StateNew(context);
@@ -1285,7 +1289,7 @@ InferHandler::StartNewRequest()
   }
 #endif  // TRTIS_ENABLE_TRACING
 
-  service_->RequestInfer(
+  service_->RequestModelInfer(
       state->context_->ctx_.get(), &state->request_,
       state->context_->responder_.get(), cq_, cq_, state);
 
@@ -1294,7 +1298,7 @@ InferHandler::StartNewRequest()
 }
 
 bool
-InferHandler::Process(Handler::State* state, bool rpc_ok)
+ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
 {
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
                  << state->unique_id_ << " step " << state->step_;
@@ -1314,8 +1318,8 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
     finished = true;
   }
 
-  const InferRequest& request = state->request_;
-  InferResponse& response = state->response_;
+  const ModelInferRequest& request = state->request_;
+  ModelInferResponse& response = state->response_;
 
   if (state->step_ == Steps::START) {
 #ifdef TRTIS_ENABLE_TRACING
@@ -1339,9 +1343,9 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
         &request_options, request.model_name().c_str(),
         request.model_version());
     if (err == nullptr) {
-      err = SetTRTSERVER_InferenceRequestOptions(
-          request_options, request.meta_data());
+      err = SetInferenceRequestOptions(request_options, request);
     }
+
     TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
     if (err == nullptr) {
       err = TRTSERVER_InferenceRequestProviderNewV2(
@@ -1349,14 +1353,12 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
     }
 
     if (err == nullptr) {
-      err = InferGRPCToInput(
-          trtserver_, smb_manager_, request.meta_data(), request,
-          request_provider);
+      err =
+          InferGRPCToInput(trtserver_, smb_manager_, request, request_provider);
     }
     if (err == nullptr) {
       err = InferAllocatorPayload(
-          trtserver_, smb_manager_, request.meta_data(), response,
-          &state->alloc_payload_);
+          trtserver_, smb_manager_, request, response, &state->alloc_payload_);
     }
     if (err == nullptr) {
       // Provide the trace manager object to use for this request, if
@@ -1386,19 +1388,13 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
     // has initiated... completion callback will transition to
     // COMPLETE. If error go immediately to COMPLETE.
     if (err != nullptr) {
-      RequestStatusUtil::Create(
-          response.mutable_request_status(), err, state->unique_id_,
-          server_id_);
-
       LOG_VERBOSE(1) << "Infer failed: " << TRTSERVER_ErrorMessage(err);
+
+      grpc::Status status;
+      GrpcStatusUtil::Create(&status, err);
       TRTSERVER_ErrorDelete(err);
 
-      // Clear the meta-data and raw output as they may be partially
-      // initialized or uninitialized.
-      response.mutable_meta_data()->Clear();
-      response.mutable_raw_output()->Clear();
-
-      response.mutable_meta_data()->set_id(request.meta_data().id());
+      response.Clear();
 
 #ifdef TRTIS_ENABLE_TRACING
       if (state->trace_meta_data_ != nullptr) {
@@ -1408,7 +1404,7 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
 #endif  // TRTIS_ENABLE_TRACING
 
       state->step_ = COMPLETE;
-      state->context_->responder_->Finish(response, grpc::Status::OK, state);
+      state->context_->responder_->Finish(response, status, state);
     }
   } else if (state->step_ == Steps::COMPLETE) {
 #ifdef TRTIS_ENABLE_TRACING
@@ -1426,22 +1422,61 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
 }
 
 void
-InferHandler::InferComplete(
+ModelInferHandler::InferComplete(
     TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER_InferenceResponse* trtserver_response, void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
 
-  LOG_VERBOSE(1) << "InferHandler::InferComplete, " << state->unique_id_
+  LOG_VERBOSE(1) << "ModelInferHandler::InferComplete, " << state->unique_id_
                  << " step " << state->step_;
 
-  const InferRequest& request = state->request_;
-  InferResponse& response = state->response_;
+  ModelInferResponse& response = state->response_;
+  InferResponseHeader response_header;
 
-  TRTSERVER_Error* response_status =
-      TRTSERVER_InferenceResponseStatus(trtserver_response);
-  if ((response_status == nullptr) && (response.ByteSizeLong() > INT_MAX)) {
-    response_status = TRTSERVER_ErrorNew(
+  TRTSERVER_Error* err = TRTSERVER_InferenceResponseStatus(trtserver_response);
+  if (err == nullptr) {
+    TRTSERVER_Protobuf* response_protobuf = nullptr;
+    err = TRTSERVER_InferenceResponseHeader(
+        trtserver_response, &response_protobuf);
+    if (err == nullptr) {
+      const char* buffer;
+      size_t byte_size;
+      err = TRTSERVER_ProtobufSerialize(response_protobuf, &buffer, &byte_size);
+      if (err == nullptr) {
+        if (!response_header.ParseFromArray(buffer, byte_size)) {
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INTERNAL, "failed to parse response header");
+        }
+      }
+
+      TRTSERVER_ProtobufDelete(response_protobuf);
+    }
+  }
+
+  // Convert the InferResponseHeader to the V2 response
+  if (err == nullptr) {
+    response.set_model_name(response_header.model_name());
+    response.set_model_version(response_header.model_version());
+    response.set_id(std::to_string(response_header.id()));
+    for (const auto& io : response_header.output()) {
+      // Find the tensor in the response and set its shape.
+      for (auto& output : *(response.mutable_outputs())) {
+        if (output.name() == io.name()) {
+          for (const auto d : io.raw().dims()) {
+            output.add_shape(d);
+          }
+          // FIXMEV2 Need datatype
+
+          break;
+        }
+      }
+    }
+  }
+
+  // Make sure response doesn't exceed GRPC limits.
+  if ((err == nullptr) && (response.ByteSizeLong() > INT_MAX)) {
+    err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INVALID_ARG,
         std::string(
             "Response has byte size " +
@@ -1451,45 +1486,19 @@ InferHandler::InferComplete(
             .c_str());
   }
 
-  if (response_status == nullptr) {
-    TRTSERVER_Protobuf* response_protobuf = nullptr;
-    response_status = TRTSERVER_InferenceResponseHeader(
-        trtserver_response, &response_protobuf);
-    if (response_status == nullptr) {
-      const char* buffer;
-      size_t byte_size;
-      response_status =
-          TRTSERVER_ProtobufSerialize(response_protobuf, &buffer, &byte_size);
-      if (response_status == nullptr) {
-        if (!response.mutable_meta_data()->ParseFromArray(buffer, byte_size)) {
-          response_status = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INTERNAL, "failed to parse response header");
-        }
-      }
-
-      TRTSERVER_ProtobufDelete(response_protobuf);
-    }
+  if (err != nullptr) {
+    response.Clear();
   }
 
-  // If the response is an error then clear the meta-data and raw
-  // output as they may be partially initialized or uninitialized.
-  if (response_status != nullptr) {
-    response.mutable_meta_data()->Clear();
-    response.mutable_raw_output()->Clear();
-  }
-
-  RequestStatusUtil::Create(
-      response.mutable_request_status(), response_status, state->unique_id_,
-      state->context_->server_id_);
+  grpc::Status status;
+  GrpcStatusUtil::Create(&status, err);
 
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'state'.
   LOG_TRTSERVER_ERROR(
       TRTSERVER_InferenceResponseDelete(trtserver_response),
       "deleting GRPC response");
-  TRTSERVER_ErrorDelete(response_status);
-
-  response.mutable_meta_data()->set_id(request.meta_data().id());
+  TRTSERVER_ErrorDelete(err);
 
 #ifdef TRTIS_ENABLE_TRACING
   if (state->trace_meta_data_ != nullptr) {
@@ -1499,9 +1508,10 @@ InferHandler::InferComplete(
 #endif  // TRTIS_ENABLE_TRACING
 
   state->step_ = COMPLETE;
-  state->context_->responder_->Finish(response, grpc::Status::OK, state);
+  state->context_->responder_->Finish(response, status, state);
 }
 
+#if 0
 //
 // StreamInferHandler
 //
@@ -2233,12 +2243,9 @@ GRPCServerV2::GRPCServerV2(
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
     const char* server_id, const std::string& server_addr,
-    const int infer_thread_cnt, const int stream_infer_thread_cnt,
     const int infer_allocation_pool_size)
     : server_(server), trace_manager_(trace_manager), smb_manager_(smb_manager),
       server_id_(server_id), server_addr_(server_addr),
-      infer_thread_cnt_(infer_thread_cnt),
-      stream_infer_thread_cnt_(stream_infer_thread_cnt),
       infer_allocation_pool_size_(infer_allocation_pool_size), running_(false)
 {
 }
@@ -2253,7 +2260,6 @@ GRPCServerV2::Create(
     const std::shared_ptr<TRTSERVER_Server>& server,
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<SharedMemoryBlockManager>& smb_manager, int32_t port,
-    int infer_thread_cnt, int stream_infer_thread_cnt,
     int infer_allocation_pool_size, std::unique_ptr<GRPCServerV2>* grpc_server)
 {
   const char* server_id = nullptr;
@@ -2265,8 +2271,8 @@ GRPCServerV2::Create(
 
   const std::string addr = "0.0.0.0:" + std::to_string(port);
   grpc_server->reset(new GRPCServerV2(
-      server, trace_manager, smb_manager, server_id, addr, infer_thread_cnt,
-      stream_infer_thread_cnt, infer_allocation_pool_size));
+      server, trace_manager, smb_manager, server_id, addr,
+      infer_allocation_pool_size));
 
   return nullptr;  // success
 }
@@ -2288,102 +2294,86 @@ GRPCServerV2::Start()
   model_ready_cq_ = grpc_builder_.AddCompletionQueue();
   server_metadata_cq_ = grpc_builder_.AddCompletionQueue();
   model_metadata_cq_ = grpc_builder_.AddCompletionQueue();
+  model_infer_cq_ = grpc_builder_.AddCompletionQueue();
 #if 0
-  repository_cq_ = grpc_builder_.AddCompletionQueue();
-  infer_cq_ = grpc_builder_.AddCompletionQueue();
   stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
+  repository_cq_ = grpc_builder_.AddCompletionQueue();
   modelcontrol_cq_ = grpc_builder_.AddCompletionQueue();
   shmcontrol_cq_ = grpc_builder_.AddCompletionQueue();
 #endif
   grpc_server_ = grpc_builder_.BuildAndStart();
 
-  // Handler for server-live requests. A single thread processes all
-  // of these requests.
+  // Handler for server-live requests.
   ServerLiveHandler* hserverlive = new ServerLiveHandler(
       "ServerLiveHandler", server_, server_id_, &service_,
       server_live_cq_.get(), 2 /* max_state_bucket_count */);
-  hserverlive->Start(1 /* thread_cnt */);
+  hserverlive->Start();
   server_live_handler_.reset(hserverlive);
 
-  // Handler for server-ready requests. A single thread processes all
-  // of these requests.
+  // Handler for server-ready requests.
   ServerReadyHandler* hserverready = new ServerReadyHandler(
       "ServerReadyHandler", server_, server_id_, &service_,
       server_ready_cq_.get(), 2 /* max_state_bucket_count */);
-  hserverready->Start(1 /* thread_cnt */);
+  hserverready->Start();
   server_ready_handler_.reset(hserverready);
 
-  // Handler for model-ready requests. A single thread processes all
-  // of these requests.
+  // Handler for model-ready requests.
   ModelReadyHandler* hmodelready = new ModelReadyHandler(
       "ModelReadyHandler", server_, server_id_, &service_,
       model_ready_cq_.get(), 2 /* max_state_bucket_count */);
-  hmodelready->Start(1 /* thread_cnt */);
+  hmodelready->Start();
   model_ready_handler_.reset(hmodelready);
 
-  // Handler for server-metadata requests. A single thread processes
-  // all of these requests.
+  // Handler for server-metadata requests.
   ServerMetadataHandler* hservermetadata = new ServerMetadataHandler(
       "ServerMetadataHandler", server_, server_id_, &service_,
       server_metadata_cq_.get(), 2 /* max_state_bucket_count */);
-  hservermetadata->Start(1 /* thread_cnt */);
+  hservermetadata->Start();
   server_metadata_handler_.reset(hservermetadata);
 
-  // Handler for model-metadata requests. A single thread processes
-  // all of these requests.
+  // Handler for model-metadata requests.
   ModelMetadataHandler* hmodelmetadata = new ModelMetadataHandler(
       "ModelMetadataHandler", server_, server_id_, &service_,
       model_metadata_cq_.get(), 2 /* max_state_bucket_count */);
-  hmodelmetadata->Start(1 /* thread_cnt */);
+  hmodelmetadata->Start();
   model_metadata_handler_.reset(hmodelmetadata);
 
-#if 0
-  // Handler for inference requests. 'infer_thread_cnt_' is not used
-  // below due to thread-safety requirements and the way
-  // InferHandler::Process is written. We should likely implement it
-  // by making multiple completion queues each of which is serviced by
-  // a single thread.
-  InferHandler* hinfer = new InferHandler(
-      "InferHandler", server_, server_id_, trace_manager_, smb_manager_,
-      &service_, infer_cq_.get(),
+  // Handler for model inference requests.
+  ModelInferHandler* hmodelinfer = new ModelInferHandler(
+      "ModelInferHandler", server_, server_id_, trace_manager_, smb_manager_,
+      &service_, model_infer_cq_.get(),
       infer_allocation_pool_size_ /* max_state_bucket_count */);
-  hinfer->Start(/* infer_thread_cnt_ */ 1);
-  infer_handler_.reset(hinfer);
+  hmodelinfer->Start();
+  model_infer_handler_.reset(hmodelinfer);
 
+#if 0
   // Handler for streaming inference requests.
-  // 'stream_infer_thread_cnt_' is not used below due to thread-safety
-  // requirements and the way StreamInferHandler::Process is
-  // written. We should likely implement it by making multiple
-  // completion queues each of which is serviced by a single thread.
   StreamInferHandler* hstreaminfer = new StreamInferHandler(
       "StreamInferHandler", server_, server_id_, trace_manager_, smb_manager_,
       &service_, stream_infer_cq_.get(),
       infer_allocation_pool_size_ /* max_state_bucket_count */);
-  hstreaminfer->Start(/* stream_infer_thread_cnt_ */ 1);
+  hstreaminfer->Start();
   stream_infer_handler_.reset(hstreaminfer);
 
-  // Handler for status requests. A single thread processes all of
-  // these requests.
+  // Handler for status requests.
   RepositoryHandler* hrepository = new RepositoryHandler(
       "RepositoryHandler", server_, server_id_, &service_, repository_cq_.get(),
       2 /* max_state_bucket_count */);
-  hrepository->Start(1 /* thread_cnt */);
+  hrepository->Start();
   repository_handler_.reset(hrepository);
 
-  // Handler for model-control requests. A single thread processes all
-  // of these requests.
+  // Handler for model-control requests.
   ModelControlHandler* hmodelcontrol = new ModelControlHandler(
       "ModelControlHandler", server_, server_id_, &service_,
       modelcontrol_cq_.get(), 2 /* max_state_bucket_count */);
-  hmodelcontrol->Start(1 /* thread_cnt */);
+  hmodelcontrol->Start();
   modelcontrol_handler_.reset(hmodelcontrol);
 
-  // Handler for shared-memory-control requests. A single thread
-  // processes all of these requests.
+  // Handler for shared-memory-control requests.
   SharedMemoryControlHandler* hshmcontrol = new SharedMemoryControlHandler(
       "SharedMemoryControlHandler", server_, server_id_, smb_manager_,
       &service_, shmcontrol_cq_.get(), 2 /* max_state_bucket_count */);
-  hshmcontrol->Start(1 /* thread_cnt */);
+  hshmcontrol->Start();
   shmcontrol_handler_.reset(hshmcontrol);
 #endif
 
@@ -2408,9 +2398,9 @@ GRPCServerV2::Stop()
   model_ready_cq_->Shutdown();
   server_metadata_cq_->Shutdown();
   model_metadata_cq_->Shutdown();
+  model_infer_cq_->Shutdown();
 #if 0
   repository_cq_->Shutdown();
-  infer_cq_->Shutdown();
   stream_infer_cq_->Shutdown();
   modelcontrol_cq_->Shutdown();
   shmcontrol_cq_->Shutdown();
@@ -2423,8 +2413,8 @@ GRPCServerV2::Stop()
   dynamic_cast<ModelReadyHandler*>(model_ready_handler_.get())->Stop();
   dynamic_cast<ServerMetadataHandler*>(server_metadata_handler_.get())->Stop();
   dynamic_cast<ModelMetadataHandler*>(model_metadata_handler_.get())->Stop();
+  dynamic_cast<ModelInferHandler*>(model_infer_handler_.get())->Stop();
 #if 0
-  dynamic_cast<InferHandler*>(infer_handler_.get())->Stop();
   dynamic_cast<StreamInferHandler*>(stream_infer_handler_.get())->Stop();
   dynamic_cast<RepositoryHandler*>(repository_handler_.get())->Stop();
   dynamic_cast<ModelControlHandler*>(modelcontrol_handler_.get())->Stop();

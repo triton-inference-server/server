@@ -133,6 +133,10 @@ class InferenceServer {
   const std::string& Id() const { return id_; }
   void SetId(const std::string& id) { id_ = id; }
 
+  // Get / set the protocol version of the server.
+  uint32_t ProtocolVersion() const { return protocol_version_; }
+  void SetProtocolVersion(const uint32_t v) { protocol_version_ = v; }
+
   // Get / set the model repository path
   const std::set<std::string>& ModelRepositoryPaths() const
   {
@@ -222,6 +226,7 @@ class InferenceServer {
   std::vector<const char*> extensions_;
 
   uint64_t start_time_ns_;
+  uint32_t protocol_version_;
 
   std::set<std::string> model_repository_paths_;
   std::set<std::string> startup_models_;
