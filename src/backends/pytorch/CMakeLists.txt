@@ -47,6 +47,7 @@ add_library(
   libtorch-backend-library EXCLUDE_FROM_ALL OBJECT
   ${LIBTORCH_SRCS} ${LIBTORCH_HDRS}
 )
+set_target_properties(libtorch-backend-library PROPERTIES CXX_STANDARD 14)
 add_dependencies(libtorch-backend-library proto-library)
 target_include_directories(libtorch-backend-library PRIVATE ${TRTIS_PYTORCH_INCLUDE_PATHS})
 
