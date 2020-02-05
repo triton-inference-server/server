@@ -174,7 +174,7 @@ for i in \
     test_dynaseq_different_shape_values_series \
     test_dynaseq_different_shape_values_parallel \
     ;do
-    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+    SERVER_ARGS="--model-repository=`pwd`/models"
     SERVER_LOG="./$i.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then

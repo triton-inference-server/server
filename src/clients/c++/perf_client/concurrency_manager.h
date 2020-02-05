@@ -25,7 +25,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <queue>
 #include "src/clients/c++/perf_client/load_manager.h"
 
 //==============================================================================
@@ -95,8 +94,7 @@ class ConcurrencyManager : public LoadManager {
   struct ThreadConfig {
     ThreadConfig(size_t thread_id)
         : thread_id_(thread_id), concurrency_(0),
-          non_sequence_data_step_id_(thread_id), is_paused_(false),
-          total_ongoing_requests_(0), notified_(false)
+          non_sequence_data_step_id_(thread_id), is_paused_(false)
     {
     }
 
@@ -108,19 +106,7 @@ class ConcurrencyManager : public LoadManager {
     size_t non_sequence_data_step_id_;
     // Whether or not the thread is issuing new inference requests
     bool is_paused_;
-    // Total ongoing requests
-    std::atomic<int> total_ongoing_requests_;
-    // Variable used to signal request completion
-    bool notified_;
-    std::mutex cb_mtx_;
-    std::condition_variable cb_cv_;
   };
-
-  void Request(
-      std::vector<std::unique_ptr<InferContextMetaData>>& ctxs,
-      const int ctx_id, std::queue<int>& free_ctx_ids, const uint32_t flags,
-      std::shared_ptr<ThreadConfig>& thread_config,
-      std::shared_ptr<ThreadStat>& thread_stat);
 
   /// Function for worker that sends inference requests.
   /// \param thread_stat Worker thread status specific data.
