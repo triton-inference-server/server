@@ -43,7 +43,11 @@ gs://, for example,
 -\\-model-repository=gs://bucket/path/to/model/repository.  For a
 model repository residing in Amazon S3, the path must be prefixed with
 s3://, for example,
--\\-model-repository=s3://bucket/path/to/model/repository.
+-\\-model-repository=s3://bucket/path/to/model/repository. When
+using a local instance of S3, the prefix s3:// must be followed
+by the host and port (separated by a semicolon) and subsequently
+the bucket path. For example,
+-\\-model-repository=s3://host:port/bucket/path/to/model/repository.
 
 :ref:`section-example-model-repository` describes how to create an
 example repository with a couple of image classification models.
