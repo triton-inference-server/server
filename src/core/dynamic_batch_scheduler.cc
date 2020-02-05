@@ -113,7 +113,7 @@ DynamicBatchScheduler::Create(
         "Initialization failed for all dynamic-batch scheduler threads");
   }
 
-  sched->completion_queue_ =
+  sched->completion_queues_ =
       std::vector<std::queue<std::shared_ptr<std::vector<Scheduler::Payload>>>>(
           sched->scheduler_threads_.size());
 
@@ -281,8 +281,8 @@ DynamicBatchScheduler::SchedulerThread(
             payloads->emplace_back(std::move(queue_.front()));
             queue_.pop_front();
           }
-
           if (preserve_ordering_) {
+            std::lock_guard<std::mutex> lock(completion_queues_mtx_);
             runner_queue_.push(runner_id);
           }
 
@@ -314,6 +314,10 @@ DynamicBatchScheduler::SchedulerThread(
         payloads = std::make_shared<std::vector<Scheduler::Payload>>();
         payloads->emplace_back(std::move(queue_.front()));
         queue_.pop_front();
+        if (preserve_ordering_) {
+          std::lock_guard<std::mutex> lock(completion_queues_mtx_);
+          runner_queue_.push(runner_id);
+        }
       }
 
       // If no requests are to be handled, wait for notification or
@@ -518,17 +522,17 @@ DynamicBatchScheduler::FinalizePayloads(
   }
 
   if (preserve_ordering_) {
-    std::lock_guard<std::mutex> lock(completion_queue_mtx_);
-    completion_queue_[runner_id].push(payloads);
+    std::lock_guard<std::mutex> lock(completion_queues_mtx_);
+    completion_queues_[runner_id].push(payloads);
     // Finalize the completed payloads in-order as far as possible
     while ((!runner_queue_.empty()) &&
-           (!completion_queue_[runner_queue_.front()].empty())) {
-      for (auto& payload : *completion_queue_[runner_queue_.front()].front()) {
+           (!completion_queues_[runner_queue_.front()].empty())) {
+      for (auto& payload : *completion_queues_[runner_queue_.front()].front()) {
         if (payload.complete_function_ != nullptr) {
           payload.complete_function_(payload.status_);
         }
       }
-      completion_queue_[runner_queue_.front()].pop();
+      completion_queues_[runner_queue_.front()].pop();
       runner_queue_.pop();
     }
   }

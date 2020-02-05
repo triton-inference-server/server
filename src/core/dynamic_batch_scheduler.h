@@ -149,9 +149,9 @@ class DynamicBatchScheduler : public Scheduler {
   std::queue<size_t> runner_queue_;
   // Per runner queues to store the ready payloads
   std::vector<std::queue<std::shared_ptr<std::vector<Scheduler::Payload>>>>
-      completion_queue_;
+      completion_queues_;
   // Lock to protect the completion and runner queues
-  std::mutex completion_queue_mtx_;
+  std::mutex completion_queues_mtx_;
 };
 
 }}  // namespace nvidia::inferenceserver
