@@ -48,3 +48,11 @@ instance_group {
   profile: "2"
 }
 default_model_filename: "model.plan"
+optimization {
+  input_pinned_memory {
+    enable: true
+  }
+  output_pinned_memory {
+    enable: true
+  }
+}
