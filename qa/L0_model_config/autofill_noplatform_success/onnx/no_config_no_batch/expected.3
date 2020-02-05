@@ -31,3 +31,11 @@ instance_group {
   kind: KIND_CPU
 }
 default_model_filename: "no_batch.onnx"
+optimization {
+  input_pinned_memory {
+    enable: true
+  }
+  output_pinned_memory {
+    enable: true
+  }
+}
