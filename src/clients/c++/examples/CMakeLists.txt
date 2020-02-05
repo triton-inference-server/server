@@ -49,7 +49,7 @@ install(
 # Install cmake files that builds the samples within the client install.
 install(
   FILES
-    ${CMAKE_BINARY_DIR}/../CMakeLists.txt
+    ${CMAKE_SOURCE_DIR}/../CMakeLists.txt
   DESTINATION build
 )
 install(
