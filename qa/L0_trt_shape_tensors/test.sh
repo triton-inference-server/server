@@ -172,7 +172,6 @@ for i in \
     test_dynaseq_identical_shape_values_series \
     test_dynaseq_identical_shape_values_parallel \
     test_dynaseq_different_shape_values_series \
-    test_dynaseq_different_shape_values_parallel \
     ;do
     SERVER_ARGS="--model-repository=`pwd`/models"
     SERVER_LOG="./$i.serverlog"
