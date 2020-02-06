@@ -87,11 +87,6 @@ Ubuntu CUDA devel image to be able to build CUDA shared memory support.
 If CUDA shared memory support is not required, you can use an Ubuntu
 16.04 or 18.04 as the base image.
 
-The generated Python wheel file works with both Python2 and Python3,
-but you can control which version of Python (and pip) are used to
-generate the wheel file by editing PYVER in Dockerfile.client. The
-default is Python3 and pip3.
-
 After the build completes the tensorrtserver_client docker image will
 contain the built client libraries in /workspace/install/lib, the
 corresponding headers in /workspace/install/include, and the Python
