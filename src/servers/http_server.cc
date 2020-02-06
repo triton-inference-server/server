@@ -70,7 +70,7 @@ class HTTPAPIServer : public HTTPServer {
       const std::vector<std::string>& endpoints, const int32_t port);
   ~HTTPAPIServer();
 
-  using H2OMetaData = std::pair<
+  using ResponseMetaData = std::pair<
       std::vector<h2o_iovec_t*>,
       std::unordered_map<
           std::string,
@@ -100,7 +100,7 @@ class HTTPAPIServer : public HTTPServer {
         TRTSERVER_InferenceResponse* response, void* userp);
     int FinalizeResponse(TRTSERVER_InferenceResponse* response);
 
-    H2OMetaData response_meta_data_;
+    ResponseMetaData response_meta_data_;
 
    private:
     h2o_req_t* req_;
@@ -269,7 +269,7 @@ HTTPAPIServer::InferRequest::InferComplete(
     complete_buffer += std::string(buffer->base, buffer->len);
   }
 
-  h2o_generator_t generator = {NULL, NULL};
+  // h2o_generator_t generator = {NULL, NULL};
   h2o_iovec_t body =
       h2o_strdup(&infer_request->req_->pool, complete_buffer.c_str(), SIZE_MAX);
 
@@ -283,7 +283,8 @@ HTTPAPIServer::InferRequest::InferComplete(
     infer_request->req_->res.content_length = 0;
   }
 
-  h2o_start_response(infer_request->req_, &generator);
+  // h2o_start_response(infer_request->req_, &generator);
+  h2o_proceed_response()
   h2o_send(
       infer_request->req_, &body, 1 /* buffer count */, H2O_SEND_STATE_FINAL);
 
@@ -1029,6 +1030,75 @@ HTTPAPIServer::ResponseAlloc(
     void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
+  auto response_meta_data = reinterpret_cast<ResponseMetaData*>(userp);
+  h2o_iovec_t* h2o_buffer = new h2o_iovec_t();
+  // response_meta_data->first.push_back(h2o_buffer);
+
+  const std::unordered_map<
+      std::string,
+      std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
+      output_shm_map = response_meta_data->second;
+
+  *buffer = nullptr;
+  *buffer_userp = nullptr;
+  *actual_memory_type = preferred_memory_type;
+  *actual_memory_type_id = preferred_memory_type_id;
+
+  // Don't need to do anything if no memory was requested.
+  if (byte_size > 0) {
+    auto pr = output_shm_map.find(tensor_name);
+    if (pr != output_shm_map.end()) {
+      // If the output is in shared memory then check that the expected buffer
+      // size is at least the byte size of the output.
+      if (byte_size > std::get<1>(pr->second)) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INTERNAL,
+            std::string(
+                "expected buffer size to be at least " +
+                std::to_string(std::get<1>(pr->second)) + " bytes but gets " +
+                std::to_string(byte_size) + " bytes in output tensor")
+                .c_str());
+      }
+
+      *buffer = const_cast<void*>(std::get<0>(pr->second));
+      *actual_memory_type = std::get<2>(pr->second);
+      *actual_memory_type_id = std::get<3>(pr->second);
+    } else {
+      // Can't allocate for any memory type other than CPU.
+      if (preferred_memory_type != TRTSERVER_MEMORY_CPU) {
+        LOG_VERBOSE(1) << "HTTP: unable to provide '" << tensor_name << "' in "
+                       << MemoryTypeString(preferred_memory_type)
+                       << ", will use "
+                       << MemoryTypeString(TRTSERVER_MEMORY_CPU);
+        *actual_memory_type = TRTSERVER_MEMORY_CPU;
+        *actual_memory_type_id = 0;
+      }
+
+      // Reserve requested space in evbuffer...
+      // h2o_iovec_t output_iovec = h2o_buffer_reserve(buffer, len);;
+      h2o_buffer->base = (char*)malloc( byte_size * sizeof(char));
+      h2o_buffer->len = byte_size;
+      *buffer = h2o_buffer->base;
+      response_meta_data->first.push_back(h2o_buffer);
+
+      // Immediately commit the buffer space. We are relying on evbuffer
+      // not to relocate this space. Because we request a contiguous
+      // chunk every time (above by allowing only a single entry in
+      // output_iovec), this seems to be a valid assumption.
+      // if (evbuffer_commit_space(evhttp_buffer, &output_iovec, 1) != 0) {
+      //   *buffer = nullptr;
+      //   return TRTSERVER_ErrorNew(
+      //       TRTSERVER_ERROR_INTERNAL,
+      //       "failed to commit output tensors to output buffer");
+      // }
+    }
+  } else {
+    response_meta_data->first.push_back(h2o_buffer);
+  }
+
+  LOG_VERBOSE(1) << "HTTP allocation: '" << tensor_name
+                 << "', size: " << byte_size << ", addr: " << *buffer;
+
   return nullptr;  // Success
 }
 
