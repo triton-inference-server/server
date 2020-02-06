@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,13 +27,36 @@
 
 set +e
 
-SIMPLE_V2_CLIENT=/workspace/install/bin/simple_v2_client
-
 RET=0
 
-# Build Server with HTTP V2 Support
+# Install client dependencies
+(apt-get update && \
+    ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime && \
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get install -y tzdata && \
+    dpkg-reconfigure --frontend noninteractive tzdata && \
+    apt-get install -y --no-install-recommends \
+        libopencv-dev \
+        libopencv-core-dev \
+        pkg-config \
+        python3 \
+        python3-pip \
+        python3-dev \
+        rapidjson-dev && \
+    rm -f /usr/bin/python && \
+    ln -s /usr/bin/python3 /usr/bin/python && \
+    pip3 install --upgrade wheel setuptools && \
+    pip3 install --upgrade grpcio-tools)
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** Dependency install Passed\n***"
+else
+    echo -e "\n***\n*** Dependency install Failed\n***"
+    exit 1
+fi
+
+# Build Server and clients with HTTP V2 Support
 (cd /workspace/builddir && \
-    rm -fr trtis && \
+    rm -fr trtis trtis-clients && \
     cmake -DCMAKE_BUILD_TYPE=Release \
         -DTRTIS_ENABLE_METRICS=OFF \
         -DTRTIS_ENABLE_METRICS_GPU=OFF \
@@ -51,51 +74,21 @@ RET=0
         -DTRTIS_ENABLE_HTTP=ON \
         -DTRTIS_ENABLE_HTTP_V2=ON \
         ../build && \
-    make -j16 trtis && \
+    make -j16 trtis trtis-clients && \
     cp -r trtis/install/bin /opt/tensorrtserver/. && \
     cp -r trtis/install/lib /opt/tensorrtserver/. && \
     cp -r trtis/install/include /opt/tensorrtserver/include/trtserver)
 if [ $? -eq 0 ]; then
-    echo -e "\n***\n*** HTTP V2 Server Build Passed\n***"
+    echo -e "\n***\n*** HTTP V2 Build Passed\n***"
 else
-    echo -e "\n***\n*** HTTP V2 Server Build Failed\n***"
-    RET=1
+    echo -e "\n***\n*** HTTP V2 Build Failed\n***"
+    exit 1
 fi
 
-# Install client dependencies
-(apt-get update && \
-    ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime && \
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get install -y tzdata && \
-    dpkg-reconfigure --frontend noninteractive tzdata && \
-    apt-get install -y --no-install-recommends \
-        libopencv-dev \
-        libopencv-core-dev \
-        pkg-config \
-        python3 \
-        python3-pip \
-        python3-dev \
-        rapidjson-dev && \
-    pip3 install --upgrade wheel setuptools grpcio-tools && \
-    ln -s /usr/bin/python3 /usr/bin/python)
 
-# Build Client with HTTP V2 Support
-(cd /workspace/build && \
-    cmake -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install \
-        -DTRTIS_ENABLE_METRICS=OFF \
-        -DTRTIS_ENABLE_METRICS_GPU=OFF \
-        -DTRTIS_ENABLE_GPU=OFF \
-        -DTRTIS_ENABLE_HTTP_V2=ON && \
-    make -j16 trtis-clients)
-if [ $? -eq 0 ]; then
-    echo -e "\n***\n*** HTTP V2 Client Build Passed\n***"
-else
-    echo -e "\n***\n*** HTTP V2 Client Build Failed\n***"
-    RET=1
-fi
+SIMPLE_V2_CLIENT=/workspace/builddir/trtis-clients/install/bin/simple_v2_client
 
-(mkdir models && \
+(rm -fr models && mkdir models && \
     cp -r /workspace/docs/examples/model_repository/simple models/.)
 DATADIR=`pwd`/models
 SERVER=/opt/tensorrtserver/bin/trtserver
