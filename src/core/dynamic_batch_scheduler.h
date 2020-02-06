@@ -147,10 +147,12 @@ class DynamicBatchScheduler : public Scheduler {
 
   // Holds the sequence of runner indices in order the payloads were issued.
   std::queue<size_t> runner_queue_;
+  // Lock to protect the runner_queue_
+  std::mutex runner_queue_mtx_;
   // Per runner queues to store the ready payloads
   std::vector<std::queue<std::shared_ptr<std::vector<Scheduler::Payload>>>>
       completion_queues_;
-  // Lock to protect the completion and runner queues
+  // Lock to protect the completion_queues_
   std::mutex completion_queues_mtx_;
 };
 

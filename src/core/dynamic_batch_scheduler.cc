@@ -282,7 +282,7 @@ DynamicBatchScheduler::SchedulerThread(
             queue_.pop_front();
           }
           if (preserve_ordering_) {
-            std::lock_guard<std::mutex> lock(completion_queues_mtx_);
+            std::lock_guard<std::mutex> lock(runner_queue_mtx_);
             runner_queue_.push(runner_id);
           }
 
@@ -315,7 +315,7 @@ DynamicBatchScheduler::SchedulerThread(
         payloads->emplace_back(std::move(queue_.front()));
         queue_.pop_front();
         if (preserve_ordering_) {
-          std::lock_guard<std::mutex> lock(completion_queues_mtx_);
+          std::lock_guard<std::mutex> lock(runner_queue_mtx_);
           runner_queue_.push(runner_id);
         }
       }
@@ -525,15 +525,24 @@ DynamicBatchScheduler::FinalizePayloads(
     std::lock_guard<std::mutex> lock(completion_queues_mtx_);
     completion_queues_[runner_id].push(payloads);
     // Finalize the completed payloads in-order as far as possible
-    while ((!runner_queue_.empty()) &&
-           (!completion_queues_[runner_queue_.front()].empty())) {
-      for (auto& payload : *completion_queues_[runner_queue_.front()].front()) {
+    while (true) {
+      size_t head_runner_id;
+      {
+        std::lock_guard<std::mutex> lock(runner_queue_mtx_);
+        if (runner_queue_.empty() ||
+            completion_queues_[runner_queue_.front()].empty()) {
+          break;
+        }
+        head_runner_id = runner_queue_.front();
+        runner_queue_.pop();
+      }
+
+      for (auto& payload : *completion_queues_[head_runner_id].front()) {
         if (payload.complete_function_ != nullptr) {
           payload.complete_function_(payload.status_);
         }
       }
-      completion_queues_[runner_queue_.front()].pop();
-      runner_queue_.pop();
+      completion_queues_[head_runner_id].pop();
     }
   }
 }
