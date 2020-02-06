@@ -276,13 +276,12 @@ HTTPAPIServer::InferRequest::InferComplete(
     char infer_buffer[buffer_size + response_str.length()];
     int offset = 0;
     for (auto buffer : infer_request->response_meta_data_.first) {
-      memcpy(&infer_buffer + offset, buffer->base, buffer->len);
+      memcpy(&infer_buffer[0] + offset, buffer->base, buffer->len);
       offset += buffer->len;
     }
-    memcpy(&infer_buffer + offset, response_str.c_str(), response_str.length());
-    body = h2o_strdup(
-        &infer_request->req_->pool, const_cast<const char*>(&infer_buffer[0]),
-        SIZE_MAX);
+    memcpy(&infer_buffer[0] + offset, response_str.c_str(), response_str.length());
+    body.base = &infer_buffer[0];
+    body.len = buffer_size + response_str.length();
     infer_request->req_->res.status = 200;
     infer_request->req_->res.reason = response_str.c_str();
     infer_request->req_->res.content_length = body.len;
@@ -365,6 +364,7 @@ HTTPAPIServer::InferRequest::FinalizeResponse(
   RequestStatusUtil::Create(
       &request_status, response_status, unique_id_, server_id_);
 
+  // Add NV-InferResponse header
   std::string infer_header = std::string(kInferResponseHTTPHeader);
   h2o_iovec_t infer_header_content = h2o_strdup(
       &req_->pool, response_header.ShortDebugString().c_str(), SIZE_MAX);
@@ -373,6 +373,7 @@ HTTPAPIServer::InferRequest::FinalizeResponse(
       infer_header.size(), 0, NULL, infer_header_content.base,
       infer_header_content.len);
 
+  // Add NV-Status header
   std::string status_header = std::string(kStatusHTTPHeader);
   h2o_iovec_t status_header_content = h2o_strdup(
       &req_->pool, request_status.ShortDebugString().c_str(), SIZE_MAX);
@@ -1037,7 +1038,7 @@ HTTPAPIServer::ResponseAlloc(
 {
   auto response_meta_data = reinterpret_cast<ResponseMetaData*>(userp);
   h2o_iovec_t* h2o_buffer = new h2o_iovec_t();
-  // response_meta_data->first.push_back(h2o_buffer);
+  response_meta_data->first.push_back(h2o_buffer);
 
   const std::unordered_map<
       std::string,
@@ -1083,10 +1084,7 @@ HTTPAPIServer::ResponseAlloc(
       h2o_buffer->base = new char[byte_size];
       h2o_buffer->len = byte_size;
       *buffer = h2o_buffer->base;
-      response_meta_data->first.push_back(h2o_buffer);
     }
-  } else {
-    response_meta_data->first.push_back(h2o_buffer);
   }
 
   LOG_VERBOSE(1) << "HTTP allocation: '" << tensor_name
