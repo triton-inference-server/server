@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -96,7 +96,7 @@ function main() {
 
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"
-  VERSION=$VERSION python${PYVER} setup.py bdist_wheel
+  VERSION=$VERSION python3 setup.py bdist_wheel
   mkdir -p "${DEST}"
   cp dist/* "${DEST}"
   popd

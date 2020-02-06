@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,15 +29,9 @@ ARG BASE_IMAGE=nvidia/cuda:10.1-devel-centos7
 
 FROM ${BASE_IMAGE}
 
-# Default to use Python3. Allowed values are "2" and "3".
-ARG PYVER=3
-
-ENV PYVER=$PYVER
-
 RUN yum -y update; yum clean all
 RUN yum -y install epel-release
-RUN PYSFX=`[ "$PYVER" != "2" ] && echo "$PYVER" || echo ""` && \
-    yum install -y \
+RUN yum install -y \
         autoconf \
         automake \
         cmake3 \
@@ -46,10 +40,10 @@ RUN PYSFX=`[ "$PYVER" != "2" ] && echo "$PYVER" || echo ""` && \
         openssl-devel \
         libtool \
         make \
-        python${PYSFX} \
-        python${PYSFX}-pip && \
+        python3 \
+        python3-pip && \
     yum clean all && \
-    pip${PYSFX} install --upgrade wheel setuptools grpcio-tools
+    pip3 install --upgrade wheel setuptools grpcio-tools
 
 # QA scripts expect "cmake" executable (not cmake3).
 RUN rm -f /usr/bin/cmake && \
@@ -57,7 +51,7 @@ RUN rm -f /usr/bin/cmake && \
 
 # Build expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \
-    ln -s /usr/bin/python$PYVER /usr/bin/python
+    ln -s /usr/bin/python3 /usr/bin/python
 
 # Build the client library and examples
 WORKDIR /workspace
