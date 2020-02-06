@@ -27,8 +27,6 @@
 
 set +e
 
-SIMPLE_V2_CLIENT=/workspace/builddir/trtis-clients/install/bin/simple_v2_client
-
 RET=0
 
 # Install client dependencies
@@ -86,6 +84,9 @@ else
     echo -e "\n***\n*** HTTP V2 Build Failed\n***"
     exit 1
 fi
+
+
+SIMPLE_V2_CLIENT=/workspace/builddir/trtis-clients/install/bin/simple_v2_client
 
 (rm -fr models && mkdir models && \
     cp -r /workspace/docs/examples/model_repository/simple models/.)
