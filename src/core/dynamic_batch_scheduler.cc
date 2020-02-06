@@ -58,7 +58,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
       pending_batch_size_(0), pending_batch_queue_cnt_(0),
       queued_batch_size_(0), next_preferred_batch_size_(0),
       enforce_equal_shape_tensors_(enforce_equal_shape_tensors),
-      preserve_ordering_(preserve_ordering), last_processing_runner_id_(-1)
+      preserve_ordering_(preserve_ordering)
 {
   max_preferred_batch_size_ = 0;
   for (const auto size : preferred_batch_sizes_) {
@@ -113,8 +113,8 @@ DynamicBatchScheduler::Create(
         "Initialization failed for all dynamic-batch scheduler threads");
   }
 
-  sched->completion_promises_ =
-      std::vector<std::shared_ptr<std::promise<void>>>(
+  sched->completion_queues_ =
+      std::vector<std::queue<std::shared_ptr<std::vector<Scheduler::Payload>>>>(
           sched->scheduler_threads_.size());
 
   scheduler->reset(sched.release());
@@ -256,7 +256,6 @@ DynamicBatchScheduler::SchedulerThread(
     std::shared_ptr<std::vector<Scheduler::Payload>> payloads;
     bool wake_thread = false;
     uint64_t wait_microseconds = 0;
-    std::shared_ptr<std::promise<void>> completion_promise;
 
     // Hold the lock for as short a time as possible.
     {
@@ -282,16 +281,9 @@ DynamicBatchScheduler::SchedulerThread(
             payloads->emplace_back(std::move(queue_.front()));
             queue_.pop_front();
           }
-
           if (preserve_ordering_) {
-            // There is runner processing payloads before current runner
-            if (last_processing_runner_id_ != -1) {
-              completion_promise =
-                  completion_promises_[last_processing_runner_id_];
-            }
-            last_processing_runner_id_ = runner_id;
-            completion_promises_[runner_id] =
-                std::make_shared<std::promise<void>>();
+            std::lock_guard<std::mutex> lock(completion_queues_mtx_);
+            runner_queue_.push(runner_id);
           }
 
           queued_batch_size_ -= pending_batch_size_;
@@ -322,6 +314,10 @@ DynamicBatchScheduler::SchedulerThread(
         payloads = std::make_shared<std::vector<Scheduler::Payload>>();
         payloads->emplace_back(std::move(queue_.front()));
         queue_.pop_front();
+        if (preserve_ordering_) {
+          std::lock_guard<std::mutex> lock(completion_queues_mtx_);
+          runner_queue_.push(runner_id);
+        }
       }
 
       // If no requests are to be handled, wait for notification or
@@ -339,53 +335,9 @@ DynamicBatchScheduler::SchedulerThread(
     }
 
     if ((payloads != nullptr) && !payloads->empty()) {
-      auto OnCompleteQueuedPayloads = [this, runner_id, payloads,
-                                       completion_promise](
-                                          const Status& status) {
-#ifdef TRTIS_ENABLE_STATS
-        bool found_success = false;
-#endif  // TRTIS_ENABLE_STATS
-
-        if (completion_promise != nullptr) {
-          auto completion_future = completion_promise->get_future();
-          if (completion_future.valid()) {
-            completion_future.get();
-          } else {
-            LOG_ERROR << "Unexpected state for perserving order, response will "
-                      << "be returned in arbitrary order";
-          }
-        }
-
-        for (auto& payload : *payloads) {
-          Status final_status = status.IsOk() ? payload.status_ : status;
-
-#ifdef TRTIS_ENABLE_STATS
-          // All the payloads executed together, so count 1 execution in
-          // the first successful payload. Other payloads stay at 0
-          // executions.
-          if (!found_success && final_status.IsOk() &&
-              (payload.stats_ != nullptr)) {
-            payload.stats_->SetModelExecutionCount(1);
-            found_success = true;
-          }
-#endif  // TRTIS_ENABLE_STATS
-
-          if (payload.complete_function_ != nullptr) {
-            payload.complete_function_(final_status);
-          }
-        }
-
-        if (preserve_ordering_) {
-          {
-            std::lock_guard<std::mutex> lock(mu_);
-            // If runner id hasn't changed, then reset
-            // last_processing_runner_id_
-            if (last_processing_runner_id_ == runner_id) {
-              last_processing_runner_id_ = -1;
-            }
-          }
-          completion_promises_[runner_id]->set_value();
-        }
+      auto OnCompleteQueuedPayloads = [this, runner_id,
+                                       payloads](const Status& status) {
+        FinalizePayloads(runner_id, payloads, status);
       };
 
       OnSchedule_(runner_id, payloads.get(), OnCompleteQueuedPayloads);
@@ -535,6 +487,55 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
   // that time will then see the delay has been exceeded and will send
   // the batch).
   return (pending_batch_delay_ns_ - delay_ns) / 1000;
+}
+
+void
+DynamicBatchScheduler::FinalizePayloads(
+    const uint32_t runner_id,
+    std::shared_ptr<std::vector<Scheduler::Payload>> payloads,
+    const Status& status)
+{
+#ifdef TRTIS_ENABLE_STATS
+  bool found_success = false;
+#endif  // TRTIS_ENABLE_STATS
+
+  for (auto& payload : *payloads) {
+    payload.status_ = status.IsOk() ? payload.status_ : status;
+
+#ifdef TRTIS_ENABLE_STATS
+    // All the payloads executed together, so count 1 execution in
+    // the first successful payload. Other payloads stay at 0
+    // executions.
+    if (!found_success && payload.status_.IsOk() &&
+        (payload.stats_ != nullptr)) {
+      payload.stats_->SetModelExecutionCount(1);
+      found_success = true;
+    }
+#endif  // TRTIS_ENABLE_STATS
+
+    // Finalize right away if not preserving order
+    if (!preserve_ordering_) {
+      if (payload.complete_function_ != nullptr) {
+        payload.complete_function_(payload.status_);
+      }
+    }
+  }
+
+  if (preserve_ordering_) {
+    std::lock_guard<std::mutex> lock(completion_queues_mtx_);
+    completion_queues_[runner_id].push(payloads);
+    // Finalize the completed payloads in-order as far as possible
+    while ((!runner_queue_.empty()) &&
+           (!completion_queues_[runner_queue_.front()].empty())) {
+      for (auto& payload : *completion_queues_[runner_queue_.front()].front()) {
+        if (payload.complete_function_ != nullptr) {
+          payload.complete_function_(payload.status_);
+        }
+      }
+      completion_queues_[runner_queue_.front()].pop();
+      runner_queue_.pop();
+    }
+  }
 }
 
 }}  // namespace nvidia::inferenceserver

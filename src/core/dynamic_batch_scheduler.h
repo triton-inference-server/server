@@ -30,6 +30,7 @@
 #include <deque>
 #include <future>
 #include <mutex>
+#include <queue>
 #include <set>
 #include <thread>
 #include "src/core/api.pb.h"
@@ -83,6 +84,10 @@ class DynamicBatchScheduler : public Scheduler {
       const std::shared_ptr<std::atomic<bool>>& rthread_exit,
       std::promise<bool>* is_initialized);
   uint64_t GetDynamicBatch(const int64_t runner_id);
+  void FinalizePayloads(
+      const uint32_t runner_id,
+      std::shared_ptr<std::vector<Scheduler::Payload>> payloads,
+      const Status& status);
 
   // Function the scheduler will call to initialize a runner.
   const StandardInitFunc OnInit_;
@@ -140,12 +145,13 @@ class DynamicBatchScheduler : public Scheduler {
   // even when there are multiple scheduler threads.
   const bool preserve_ordering_;
 
-  // The runner that is currently processing payloads
-  int64_t last_processing_runner_id_;
-
-  // Per runner parameters to inform and wait for completion of the
-  // particular runner
-  std::vector<std::shared_ptr<std::promise<void>>> completion_promises_;
+  // Holds the sequence of runner indices in order the payloads were issued.
+  std::queue<size_t> runner_queue_;
+  // Per runner queues to store the ready payloads
+  std::vector<std::queue<std::shared_ptr<std::vector<Scheduler::Payload>>>>
+      completion_queues_;
+  // Lock to protect the completion and runner queues
+  std::mutex completion_queues_mtx_;
 };
 
 }}  // namespace nvidia::inferenceserver
