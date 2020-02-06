@@ -98,7 +98,7 @@ class HTTPAPIServer : public HTTPServer {
     static void InferComplete(
         TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
         TRTSERVER_InferenceResponse* response, void* userp);
-    int FinalizeResponse(TRTSERVER_InferenceResponse* response);
+    std::string FinalizeResponse(TRTSERVER_InferenceResponse* response);
 
     ResponseMetaData response_meta_data_;
 
@@ -264,27 +264,37 @@ HTTPAPIServer::InferRequest::InferComplete(
 {
   HTTPAPIServer::InferRequest* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequest*>(userp);
-  std::string complete_buffer = "";
+  int buffer_size = 0;
   for (auto buffer : infer_request->response_meta_data_.first) {
-    complete_buffer += std::string(buffer->base, buffer->len);
+    buffer_size += buffer->len;
   }
 
-  // h2o_generator_t generator = {NULL, NULL};
-  h2o_iovec_t body =
-      h2o_strdup(&infer_request->req_->pool, complete_buffer.c_str(), SIZE_MAX);
+  std::string response_str = infer_request->FinalizeResponse(response);
 
-  if (infer_request->FinalizeResponse(response) == 200) {
+  h2o_iovec_t body;
+  if (response_str != "") {
+    char infer_buffer[buffer_size + response_str.length()];
+    int offset = 0;
+    for (auto buffer : infer_request->response_meta_data_.first) {
+      memcpy(&infer_buffer + offset, buffer->base, buffer->len);
+      offset += buffer->len;
+    }
+    memcpy(&infer_buffer + offset, response_str.c_str(), response_str.length());
+    body = h2o_strdup(
+        &infer_request->req_->pool, const_cast<const char*>(&infer_buffer[0]),
+        SIZE_MAX);
     infer_request->req_->res.status = 200;
-    infer_request->req_->res.reason = "OK";
-    infer_request->req_->res.content_length += body.len;
+    infer_request->req_->res.reason = response_str.c_str();
+    infer_request->req_->res.content_length = body.len;
   } else {
+    body = h2o_strdup(&infer_request->req_->pool, "", SIZE_MAX);
     infer_request->req_->res.status = 400;
     infer_request->req_->res.reason = "Bad Request";
     infer_request->req_->res.content_length = 0;
   }
 
-  // h2o_start_response(infer_request->req_, &generator);
-  h2o_proceed_response()
+  h2o_generator_t generator = {NULL, NULL};
+  h2o_start_response(infer_request->req_, &generator);
   h2o_send(
       infer_request->req_, &body, 1 /* buffer count */, H2O_SEND_STATE_FINAL);
 
@@ -294,7 +304,7 @@ HTTPAPIServer::InferRequest::InferComplete(
       TRTSERVER_InferenceResponseDelete(response), "deleting HTTP response");
 }
 
-int
+std::string
 HTTPAPIServer::InferRequest::FinalizeResponse(
     TRTSERVER_InferenceResponse* response)
 {
@@ -322,6 +332,7 @@ HTTPAPIServer::InferRequest::FinalizeResponse(
     }
   }
 
+  std::string rstr = "";
   if (response_status == nullptr) {
     std::string format;
     size_t query_len = req_->path.len - req_->query_at;
@@ -340,17 +351,11 @@ HTTPAPIServer::InferRequest::FinalizeResponse(
     // serialized at the end of the body.
     response_header.set_id(request_id_);
 
-    std::string rstr;
     if (format == "binary") {
       response_header.SerializeToString(&rstr);
     } else {
       rstr = response_header.DebugString();
     }
-
-    h2o_generator_t generator = {NULL, NULL};
-    h2o_iovec_t body = h2o_strdup(&req_->pool, rstr.c_str(), SIZE_MAX);
-    h2o_start_response(req_, &generator);
-    h2o_send(req_, &body, 1 /* buffer count */, H2O_SEND_STATE_IN_PROGRESS);
   } else {
     response_header.Clear();
     response_header.set_id(request_id_);
@@ -382,7 +387,7 @@ HTTPAPIServer::InferRequest::FinalizeResponse(
 
   TRTSERVER_ErrorDelete(response_status);
 
-  return (request_status.code() == RequestStatusCode::SUCCESS) ? 200 : 400;
+  return rstr;
 }
 
 void
@@ -1074,23 +1079,11 @@ HTTPAPIServer::ResponseAlloc(
         *actual_memory_type_id = 0;
       }
 
-      // Reserve requested space in evbuffer...
-      // h2o_iovec_t output_iovec = h2o_buffer_reserve(buffer, len);;
-      h2o_buffer->base = (char*)malloc( byte_size * sizeof(char));
+      // Reserve requested space for output...
+      h2o_buffer->base = new char[byte_size];
       h2o_buffer->len = byte_size;
       *buffer = h2o_buffer->base;
       response_meta_data->first.push_back(h2o_buffer);
-
-      // Immediately commit the buffer space. We are relying on evbuffer
-      // not to relocate this space. Because we request a contiguous
-      // chunk every time (above by allowing only a single entry in
-      // output_iovec), this seems to be a valid assumption.
-      // if (evbuffer_commit_space(evhttp_buffer, &output_iovec, 1) != 0) {
-      //   *buffer = nullptr;
-      //   return TRTSERVER_ErrorNew(
-      //       TRTSERVER_ERROR_INTERNAL,
-      //       "failed to commit output tensors to output buffer");
-      // }
     }
   } else {
     response_meta_data->first.push_back(h2o_buffer);
