@@ -274,16 +274,17 @@ HTTPAPIServer::InferRequest::InferComplete(
   h2o_iovec_t body;
   if (response_str != "") {
     char infer_buffer[buffer_size + response_str.length()];
-    int offset = 0;
+    memcpy(&infer_buffer[0], response_str.c_str(), response_str.length());
+    int offset = response_str.length();
     for (auto buffer : infer_request->response_meta_data_.first) {
       memcpy(&infer_buffer[0] + offset, buffer->base, buffer->len);
       offset += buffer->len;
     }
-    memcpy(&infer_buffer[0] + offset, response_str.c_str(), response_str.length());
+
     body.base = &infer_buffer[0];
-    body.len = buffer_size + response_str.length();
+    body.len = offset;
     infer_request->req_->res.status = 200;
-    infer_request->req_->res.reason = response_str.c_str();
+    infer_request->req_->res.reason = "OK";
     infer_request->req_->res.content_length = body.len;
   } else {
     body = h2o_strdup(&infer_request->req_->pool, "", SIZE_MAX);
@@ -365,22 +366,19 @@ HTTPAPIServer::InferRequest::FinalizeResponse(
       &request_status, response_status, unique_id_, server_id_);
 
   // Add NV-InferResponse header
-  std::string infer_header = std::string(kInferResponseHTTPHeader);
   h2o_iovec_t infer_header_content = h2o_strdup(
       &req_->pool, response_header.ShortDebugString().c_str(), SIZE_MAX);
   h2o_add_header_by_str(
-      &req_->pool, &req_->res.headers, infer_header.c_str(),
-      infer_header.size(), 0, NULL, infer_header_content.base,
-      infer_header_content.len);
+      &req_->pool, &req_->res.headers, H2O_STRLIT(kInferResponseHTTPHeader), 0,
+      NULL, infer_header_content.base, infer_header_content.len);
+
 
   // Add NV-Status header
-  std::string status_header = std::string(kStatusHTTPHeader);
   h2o_iovec_t status_header_content = h2o_strdup(
       &req_->pool, request_status.ShortDebugString().c_str(), SIZE_MAX);
   h2o_add_header_by_str(
-      &req_->pool, &req_->res.headers, status_header.c_str(),
-      status_header.size(), 0, NULL, status_header_content.base,
-      status_header_content.len);
+      &req_->pool, &req_->res.headers, H2O_STRLIT(kStatusHTTPHeader), 0, NULL,
+      status_header_content.base, status_header_content.len);
 
   h2o_add_header(
       &req_->pool, &req_->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
