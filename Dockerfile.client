@@ -29,15 +29,10 @@ ARG BASE_IMAGE=nvidia/cuda:10.1-devel-ubuntu18.04
 
 FROM ${BASE_IMAGE}
 
-# Default to use Python3. Allowed values are "2" and "3".
-ARG PYVER=3
-
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PYVER=$PYVER
 
-RUN PYSFX=`[ "$PYVER" != "2" ] && echo "$PYVER" || echo ""` && \
-    apt-get update && \
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             software-properties-common \
             autoconf \
@@ -51,15 +46,15 @@ RUN PYSFX=`[ "$PYVER" != "2" ] && echo "$PYVER" || echo ""` && \
             libssl-dev \
             libtool \
             pkg-config \
-            python${PYSFX} \
-            python${PYSFX}-pip \
-            python${PYSFX}-dev \
+            python3 \
+            python3-pip \
+            python3-dev \
             rapidjson-dev && \
-    pip${PYSFX} install --upgrade wheel setuptools grpcio-tools
+    pip3 install --upgrade wheel setuptools grpcio-tools
 
 # Build expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \
-    ln -s /usr/bin/python$PYVER /usr/bin/python
+    ln -s /usr/bin/python3 /usr/bin/python
 
 # Build the client library and examples
 WORKDIR /workspace
@@ -83,15 +78,8 @@ COPY qa/images/mug.jpg images/mug.jpg
 
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
-# be used to run the client examples. The special upgrade and handling
-# of pip is needed to get numpy to install correctly with python2 on
-# ubuntu 16.04.
-RUN if [ "$PYVER" = "2" ]; then \
-        python -m pip install --user --upgrade pip; \
-        python -m pip install --upgrade install/python/tensorrtserver-*.whl numpy pillow; \
-    else \
-        pip3 install --upgrade install/python/tensorrtserver-*.whl numpy pillow; \
-    fi
+# be used to run the client examples.
+RUN pip3 install --upgrade install/python/tensorrtserver-*.whl numpy pillow
 
 ENV PATH //workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
