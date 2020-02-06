@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,10 +35,10 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+export CUDA_VISIBLE_DEVICES=0
+
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
-
 NULLCHAR_CLIENT_PY=nullchar_string_client.py
-
 CLIENT_LOG="./client.log"
 
 SERVER=/opt/tensorrtserver/bin/trtserver
