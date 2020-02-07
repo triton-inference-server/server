@@ -76,7 +76,7 @@ ContextFactory::GetEnsembleSchedulerType(
   if (itr == server_status.model_status().end()) {
     return nic::Error(
         ni::RequestStatusCode::INTERNAL,
-        "unable to find status for model" + model_name);
+        "unable to find status for model " + model_name);
   } else {
     if (itr->second.config().has_sequence_batching()) {
       *is_sequential = true;
