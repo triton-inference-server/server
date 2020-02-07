@@ -273,16 +273,17 @@ HTTPAPIServer::InferRequest::InferComplete(
 
   h2o_iovec_t body;
   if (response_str != "") {
-    char infer_buffer[buffer_size + response_str.length()];
-    memcpy(&infer_buffer[0], response_str.c_str(), response_str.length());
-    int offset = response_str.length();
+    char* infer_buffer = new char[buffer_size + response_str.length()];
+    int offset = 0;
     for (auto buffer : infer_request->response_meta_data_.first) {
-      memcpy(&infer_buffer[0] + offset, buffer->base, buffer->len);
+      memcpy(infer_buffer + offset, buffer->base, buffer->len);
       offset += buffer->len;
     }
 
-    body.base = &infer_buffer[0];
-    body.len = offset;
+    memcpy(infer_buffer + offset, response_str.c_str(), response_str.length());
+
+    body.base = infer_buffer;
+    body.len = offset + response_str.length();
     infer_request->req_->res.status = 200;
     infer_request->req_->res.reason = "OK";
     infer_request->req_->res.content_length = body.len;
@@ -714,16 +715,12 @@ HTTPAPIServer::H2OBufferToInput(
         std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
         output_shm_map)
 {
-  // Extract individual input data from HTTP body and register in
-  // 'request_provider'. The input data from HTTP body is not
-  // necessarily contiguous so may need to register multiple input
-  // "blocks" for a given input.
+  // Extract input data from HTTP body and register in 'request_provider'.
+  // The input data from HTTP body is contiguous.
   //
-  // Get the addr and size of each chunk of input data from the
-  // h2o buffer.
-  size_t v_idx = 0;
+  // Get the size of the total input data in the h2o buffer.
   size_t n = input_buffer->len;
-  std::string v(input_buffer->base, n);
+  size_t v_idx = 0;
 
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
@@ -741,8 +738,8 @@ HTTPAPIServer::H2OBufferToInput(
           TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
     } else if ((byte_size > 0) && (v_idx + byte_size <= n)) {
       RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, io.name().c_str(), &v[v_idx], byte_size,
-          TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+          request_provider, io.name().c_str(), input_buffer->base + v_idx,
+          byte_size, TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
       v_idx += byte_size;
     } else {
       return TRTSERVER_ErrorNew(
