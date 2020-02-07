@@ -45,6 +45,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <algorithm>
+#include <future>
 #include <thread>
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
@@ -100,6 +101,10 @@ class HTTPAPIServer : public HTTPServer {
         TRTSERVER_InferenceResponse* response, void* userp);
     std::string FinalizeResponse(TRTSERVER_InferenceResponse* response);
 
+    // #ifdef TRTIS_ENABLE_TRACING
+    //     std::unique_ptr<TraceMetaData> trace_meta_data_;
+    // #endif  // TRTIS_ENABLE_TRACING
+
     ResponseMetaData response_meta_data_;
 
    private:
@@ -145,6 +150,9 @@ class HTTPAPIServer : public HTTPServer {
           std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
           output_shm_map);
 
+  static void OKReplyCallback(void* arg, const std::string& response_str);
+  static void BADReplyCallback(void* arg);
+
   h2o_globalconf_t config_;
   h2o_context_t ctx_;
   h2o_accept_ctx_t accept_ctx_;
@@ -188,7 +196,7 @@ HTTPAPIServer::HTTPAPIServer(
 HTTPAPIServer::~HTTPAPIServer()
 {
   Stop();
-  LOG_IF_ERR(
+  LOG_TRTSERVER_ERROR(
       TRTSERVER_ResponseAllocatorDelete(allocator_),
       "deleting response allocator");
 }
@@ -198,53 +206,66 @@ struct h2o_custom_req_handler_t {
   HTTPAPIServer* http_server;
 };
 
-// void
-// HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
-// {
-//   HTTPAPIServer::InferRequest* infer_request =
-//       reinterpret_cast<HTTPAPIServer::InferRequest*>(arg);
-//
-//   evhtp_request_t* request = infer_request->EvHtpRequest();
-//   evhtp_send_reply(request, EVHTP_RES_OK);
-//   evhtp_request_resume(request);
-//
-// #ifdef TRTIS_ENABLE_TRACING
-//   if (infer_request->trace_meta_data_ != nullptr) {
-//     infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-//         TRTSERVER_TRACE_LEVEL_MIN, "http send start",
-//         TIMESPEC_TO_NANOS(request->send_start_ts));
-//     infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-//         TRTSERVER_TRACE_LEVEL_MIN, "http send end",
-//         TIMESPEC_TO_NANOS(request->send_end_ts));
-//   }
-// #endif  // TRTIS_ENABLE_TRACING
-//
-//   delete infer_request;
-// }
+void
+HTTPAPIServer::OKReplyCallback(void* arg, const std::string& response_str)
+{
+  HTTPAPIServer::InferRequest* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequest*>(arg);
+  h2o_req_t* req = infer_request->H2oRequest();
 
-// void
-// HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
-// {
-//   HTTPAPIServer::InferRequest* infer_request =
-//       reinterpret_cast<HTTPAPIServer::InferRequest*>(arg);
-//
-//   evhtp_request_t* request = infer_request->EvHtpRequest();
-//   evhtp_send_reply(request, EVHTP_RES_BADREQ);
-//   evhtp_request_resume(request);
-//
-// #ifdef TRTIS_ENABLE_TRACING
-//   if (infer_request->trace_meta_data_ != nullptr) {
-//     infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-//         TRTSERVER_TRACE_LEVEL_MIN, "http send start",
-//         TIMESPEC_TO_NANOS(request->send_start_ts));
-//     infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-//         TRTSERVER_TRACE_LEVEL_MIN, "http send end",
-//         TIMESPEC_TO_NANOS(request->send_end_ts));
-//   }
-// #endif  // TRTIS_ENABLE_TRACING
-//
-//   delete infer_request;
-// }
+  h2o_iovec_t merged_body[infer_request->response_meta_data_.first.size() + 1];
+  int buffer_count = 0;
+  int merged_buffer_size = 0;
+  for (auto buffer : infer_request->response_meta_data_.first) {
+    merged_body[buffer_count] = *buffer;
+    merged_buffer_size += buffer->len;
+    buffer_count++;
+  }
+
+  merged_body[buffer_count].base = const_cast<char*>(response_str.c_str());
+  merged_body[buffer_count].len = response_str.length();
+  buffer_count++;
+  merged_buffer_size += response_str.length();
+  req->res.status = 200;
+  req->res.reason = "OK";
+  req->res.content_length = merged_buffer_size;
+
+  h2o_generator_t generator = {NULL, NULL};
+  h2o_start_response(req, &generator);
+  h2o_send(req, &merged_body[0], buffer_count, H2O_SEND_STATE_FINAL);
+
+  delete infer_request;
+}
+
+void
+HTTPAPIServer::BADReplyCallback(void* arg)
+{
+  HTTPAPIServer::InferRequest* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequest*>(arg);
+  h2o_req_t* req = infer_request->H2oRequest();
+
+  h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
+  req->res.status = 400;
+  req->res.reason = "Bad Request";
+  req->res.content_length = 0;
+
+  // #ifdef TRTIS_ENABLE_TRACING
+  //   if (infer_request->trace_meta_data_ != nullptr) {
+  //     infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
+  //         TRTSERVER_TRACE_LEVEL_MIN, "http send start",
+  //         TIMESPEC_TO_NANOS(request->send_start_ts));
+  //     infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
+  //         TRTSERVER_TRACE_LEVEL_MIN, "http send end",
+  //         TIMESPEC_TO_NANOS(request->send_end_ts));
+  //   }
+  // #endif  // TRTIS_ENABLE_TRACING
+
+  h2o_generator_t generator = {NULL, NULL};
+  h2o_start_response(req, &generator);
+  h2o_send(req, &body, 1 /*buffer_count*/, H2O_SEND_STATE_FINAL);
+
+  delete infer_request;
+}
 
 HTTPAPIServer::InferRequest::InferRequest(
     h2o_req_t* req, uint64_t request_id, const char* server_id,
@@ -252,9 +273,6 @@ HTTPAPIServer::InferRequest::InferRequest(
     : req_(req), request_id_(request_id), server_id_(server_id),
       unique_id_(unique_id)
 {
-  // evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
-  // thread_ = htpconn->thread;
-  // evhtp_request_pause(req);
 }
 
 void
@@ -271,43 +289,16 @@ HTTPAPIServer::InferRequest::InferComplete(
 
   std::string response_str = infer_request->FinalizeResponse(response);
 
-  h2o_iovec_t merged_body[infer_request->response_meta_data_.first.size() + 1];
-  int buffer_count = 0;
-  int merged_buffer_size = 0;
   if (response_str != "") {
-    for (auto buffer : infer_request->response_meta_data_.first) {
-      merged_body[buffer_count] = *buffer;
-      // merged_body[buffer_count].base = buffer->base;
-      // merged_body[buffer_count].len = buffer->len;
-      merged_buffer_size += buffer->len;
-      buffer_count++;
-    }
-
-    merged_body[buffer_count].base = const_cast<char*>(response_str.c_str());
-    merged_body[buffer_count].len = response_str.length();
-    buffer_count++;
-    merged_buffer_size += response_str.length();
-
-    infer_request->req_->res.status = 200;
-    infer_request->req_->res.reason = "OK";
-    infer_request->req_->res.content_length = merged_buffer_size;
+    std::future<void> fut =
+        std::async(OKReplyCallback, infer_request, response_str);
   } else {
-    merged_body[buffer_count] =
-        h2o_strdup(&infer_request->req_->pool, "", SIZE_MAX);
-    buffer_count++;
-    infer_request->req_->res.status = 400;
-    infer_request->req_->res.reason = "Bad Request";
-    infer_request->req_->res.content_length = 0;
+    std::future<void> fut = std::async(BADReplyCallback, infer_request);
   }
-
-  h2o_generator_t generator = {NULL, NULL};
-  h2o_start_response(infer_request->req_, &generator);
-  h2o_send(
-      infer_request->req_, &merged_body[0], buffer_count, H2O_SEND_STATE_FINAL);
 
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'infer_request'.
-  LOG_IF_ERR(
+  LOG_TRTSERVER_ERROR(
       TRTSERVER_InferenceResponseDelete(response), "deleting HTTP response");
 }
 
