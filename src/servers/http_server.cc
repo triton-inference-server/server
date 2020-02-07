@@ -271,24 +271,29 @@ HTTPAPIServer::InferRequest::InferComplete(
 
   std::string response_str = infer_request->FinalizeResponse(response);
 
-  h2o_iovec_t body;
+  h2o_iovec_t* merged_body = new h2o_iovec_t();
+  int buffer_count = 0;
+  int merged_buffer_size = 0;
   if (response_str != "") {
-    char* infer_buffer = new char[buffer_size + response_str.length()];
-    int offset = 0;
     for (auto buffer : infer_request->response_meta_data_.first) {
-      memcpy(infer_buffer + offset, buffer->base, buffer->len);
-      offset += buffer->len;
+      merged_body[buffer_count].base = buffer->base;
+      merged_body[buffer_count].len = buffer->len;
+      merged_buffer_size += buffer->len;
+      buffer_count++;
     }
 
-    memcpy(infer_buffer + offset, response_str.c_str(), response_str.length());
+    merged_body[buffer_count].base = const_cast<char*>(response_str.c_str());
+    merged_body[buffer_count].len = response_str.length();
+    buffer_count++;
+    merged_buffer_size += response_str.length();
 
-    body.base = infer_buffer;
-    body.len = offset + response_str.length();
     infer_request->req_->res.status = 200;
     infer_request->req_->res.reason = "OK";
-    infer_request->req_->res.content_length = body.len;
+    infer_request->req_->res.content_length = merged_buffer_size;
   } else {
-    body = h2o_strdup(&infer_request->req_->pool, "", SIZE_MAX);
+    merged_body[buffer_count] =
+        h2o_strdup(&infer_request->req_->pool, "", SIZE_MAX);
+    buffer_count++;
     infer_request->req_->res.status = 400;
     infer_request->req_->res.reason = "Bad Request";
     infer_request->req_->res.content_length = 0;
@@ -297,7 +302,7 @@ HTTPAPIServer::InferRequest::InferComplete(
   h2o_generator_t generator = {NULL, NULL};
   h2o_start_response(infer_request->req_, &generator);
   h2o_send(
-      infer_request->req_, &body, 1 /* buffer count */, H2O_SEND_STATE_FINAL);
+      infer_request->req_, merged_body, buffer_count, H2O_SEND_STATE_FINAL);
 
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'infer_request'.
