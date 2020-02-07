@@ -77,9 +77,14 @@ if __name__ == '__main__':
     response = grpc_stub.ServerMetadata(request)
     print("server metadata:\n{}".format(response))
 
-    request = grpc_service_v2_pb2.ModelMetadataRequest(name="resnet_v1_50_graphdef")
+    request = grpc_service_v2_pb2.ModelMetadataRequest(name="resnet_v1_50_graphdef", version=-1)
     response = grpc_stub.ModelMetadata(request)
     print("model metadata:\n{}".format(response))
+
+    # Configuration
+    request = grpc_service_v2_pb2.ModelConfigRequest(name="resnet_v1_50_graphdef", version=-1)
+    response = grpc_stub.ModelConfig(request)
+    print("model config:\n{}".format(response))
 
     # Infer
     request = grpc_service_v2_pb2.ModelInferRequest()
@@ -89,7 +94,7 @@ if __name__ == '__main__':
     input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
     input.name = "input"
     input.datatype = "FP32"
-    input.shape.extend([224, 224, 3])
+    input.shape.extend([1, 224, 224, 3])
 
     input_contents = grpc_service_v2_pb2.InferTensorContents()
     input_contents.raw_contents = bytes(602112 * 'a', 'utf-8')

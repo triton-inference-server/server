@@ -76,6 +76,7 @@ class GRPCServerV2 {
   std::unique_ptr<grpc::ServerCompletionQueue> model_ready_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> server_metadata_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> model_metadata_cq_;
+  std::unique_ptr<grpc::ServerCompletionQueue> model_config_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> repository_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> model_infer_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> stream_infer_cq_;
@@ -90,6 +91,7 @@ class GRPCServerV2 {
   std::unique_ptr<HandlerBase> model_ready_handler_;
   std::unique_ptr<HandlerBase> server_metadata_handler_;
   std::unique_ptr<HandlerBase> model_metadata_handler_;
+  std::unique_ptr<HandlerBase> model_config_handler_;
   std::unique_ptr<HandlerBase> repository_handler_;
   std::unique_ptr<HandlerBase> model_infer_handler_;
   std::unique_ptr<HandlerBase> stream_infer_handler_;

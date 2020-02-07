@@ -34,6 +34,7 @@ from PIL import Image
 import grpc
 from tensorrtserver.api import grpc_service_v2_pb2
 from tensorrtserver.api import grpc_service_v2_pb2_grpc
+import tensorrtserver.api.model_config_pb2 as mc
 
 FLAGS = None
 
@@ -62,7 +63,7 @@ def model_dtype_to_np(model_dtype):
         return np.dtype(object)
     return None
 
-def parse_model(model_metadata, batch_size, verbose=False):
+def parse_model(model_metadata, model_config):
     """
     Check the configuration of a model to make sure it meets the
     requirements for an image classification network (as expected by
@@ -73,10 +74,15 @@ def parse_model(model_metadata, batch_size, verbose=False):
     if len(model_metadata.outputs) != 1:
         raise Exception("expecting 1 output, got {}".format(len(model_metadata.outputs)))
 
-    input = model_metadata.inputs[0]
-    output = model_metadata.outputs[0]
+    if len(model_config.input) != 1:
+        raise Exception("expecting 1 input in model configuration, got {}".format(
+            len(model_config.input)))
 
-    if output.datatype != "FP32":
+    input_metadata = model_metadata.inputs[0]
+    input_config = model_config.input[0]
+    output_metadata = model_metadata.outputs[0]
+
+    if output_metadata.datatype != "FP32":
         raise Exception("expecting output datatype to be FP32, model '" +
                         model_metadata.name + "' output type is " + ouput.datatype)
 
@@ -84,39 +90,38 @@ def parse_model(model_metadata, batch_size, verbose=False):
     # dimensions as long as all but 1 is size 1 (e.g. { 10 }, { 1, 10
     # }, { 10, 1, 1 } are all ok).
     non_one_cnt = 0
-    for dim in output.shape:
+    for dim in output_metadata.shape:
         if dim > 1:
             non_one_cnt += 1
             if non_one_cnt > 1:
                 raise Exception("expecting model output to be a vector")
 
     # Model input must have 3 dims, either CHW or HWC
-    if len(input.shape) != 3:
+    if len(input_metadata.shape) != 3:
         raise Exception(
             "expecting input to have 3 dimensions, model '{}' input has {}".format(
-                model_name, len(input.shape)))
+                model_name, len(input_metadata.shape)))
 
-    # FIXMEV2 need config endpoint to find format
-    #if ((input.format != model_config.ModelInput.FORMAT_NCHW) and
-    #    (input.format != model_config.ModelInput.FORMAT_NHWC)):
-    #    raise Exception("unexpected input format " +
-    #                    model_config.ModelInput.Format.Name(input.format) +
-    #                    ", expecting " +
-    #                    model_config.ModelInput.Format.Name(model_config.ModelInput.FORMAT_NCHW) +
-    #                    " or " +
-    #                    model_config.ModelInput.Format.Name(model_config.ModelInput.FORMAT_NHWC))
+    if ((input_config.format != mc.ModelInput.FORMAT_NCHW) and
+        (input_config.format != mc.ModelInput.FORMAT_NHWC)):
+        raise Exception("unexpected input format " +
+                        mc.ModelInput.Format.Name(input_config.format) +
+                        ", expecting " +
+                        mc.ModelInput.Format.Name(mc.ModelInput.FORMAT_NCHW) +
+                        " or " +
+                        mc.ModelInput.Format.Name(mc.ModelInput.FORMAT_NHWC))
 
-    format = "NHWC"
-    if format == "NHWC":
-        h = input.shape[0]
-        w = input.shape[1]
-        c = input.shape[2]
+    if input_config.format == mc.ModelInput.FORMAT_NHWC:
+        h = input_metadata.shape[0]
+        w = input_metadata.shape[1]
+        c = input_metadata.shape[2]
     else:
-        c = input.shape[0]
-        h = input.shape[1]
-        w = input.shape[2]
+        c = input_metadata.shape[0]
+        h = input_metadata.shape[1]
+        w = input_metadata.shape[2]
 
-    return (input.name, output.name, c, h, w, format, input.datatype)
+    return (input_metadata.name, output_metadata.name,
+            c, h, w, input_config.format, input_metadata.datatype)
 
 def preprocess(img, format, dtype, c, h, w, scaling):
     """
@@ -149,7 +154,7 @@ def preprocess(img, format, dtype, c, h, w, scaling):
         scaled = typed
 
     # Swap to CHW if necessary
-    if format == "NCHW":
+    if format == mc.ModelInput.FORMAT_NCHW:
         ordered = np.transpose(scaled, (2, 0, 1))
     else:
         ordered = scaled
@@ -184,7 +189,7 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
     input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
     input.name = input_name
     input.datatype = dtype
-    if format == "NHWC":
+    if format == mc.ModelInput.FORMAT_NHWC:
         input.shape.extend([FLAGS.batch_size, h, w, c])
     else:
         input.shape.extend([FLAGS.batch_size, c, h, w])
@@ -237,11 +242,16 @@ if __name__ == '__main__':
 
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
-    request = grpc_service_v2_pb2.ModelMetadataRequest(
+    metadata_request = grpc_service_v2_pb2.ModelMetadataRequest(
         name=FLAGS.model_name, version=FLAGS.model_version)
-    response = grpc_stub.ModelMetadata(request)
+    metadata_response = grpc_stub.ModelMetadata(metadata_request)
+
+    config_request = grpc_service_v2_pb2.ModelConfigRequest(
+        name=FLAGS.model_name, version=FLAGS.model_version)
+    config_response = grpc_stub.ModelConfig(config_request)
+
     input_name, output_name, c, h, w, format, dtype = parse_model(
-        response, FLAGS.batch_size, FLAGS.verbose)
+        metadata_response, config_response.config)
 
     # Send requests of FLAGS.batch_size images. If the number of
     # images isn't an exact multiple of FLAGS.batch_size then just

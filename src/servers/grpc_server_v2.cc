@@ -1031,6 +1031,118 @@ ModelMetadataHandler::Process(Handler::State* state, bool rpc_ok)
 }
 
 //
+// ModelConfigHandler
+//
+class ModelConfigHandler
+    : public Handler<
+          GRPCInferenceService::AsyncService,
+          grpc::ServerAsyncResponseWriter<ModelConfigResponse>,
+          ModelConfigRequest, ModelConfigResponse> {
+ public:
+  ModelConfigHandler(
+      const std::string& name,
+      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      GRPCInferenceService::AsyncService* service,
+      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
+      : Handler(name, trtserver, server_id, service, cq, max_state_bucket_count)
+  {
+  }
+
+ protected:
+  void StartNewRequest() override;
+  bool Process(State* state, bool rpc_ok) override;
+};
+
+void
+ModelConfigHandler::StartNewRequest()
+{
+  auto context = std::make_shared<State::Context>(server_id_);
+  State* state = StateNew(context);
+  service_->RequestModelConfig(
+      state->context_->ctx_.get(), &state->request_,
+      state->context_->responder_.get(), cq_, cq_, state);
+
+  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
+                 << state->unique_id_;
+}
+
+bool
+ModelConfigHandler::Process(Handler::State* state, bool rpc_ok)
+{
+  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
+                 << state->unique_id_ << " step " << state->step_;
+
+  // If RPC failed on a new request then the server is shutting down
+  // and so we should do nothing (including not registering for a new
+  // request). If RPC failed on a non-START step then there is nothing
+  // we can do since we one execute one step.
+  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
+  if (shutdown) {
+    state->step_ = Steps::FINISH;
+  }
+
+  const ModelConfigRequest& request = state->request_;
+  ModelConfigResponse& response = state->response_;
+
+  if (state->step_ == Steps::START) {
+    ServerStatus server_status;
+
+    TRTSERVER_Protobuf* model_status_protobuf = nullptr;
+    TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
+        trtserver_.get(), request.name().c_str(), &model_status_protobuf);
+    if (err == nullptr) {
+      const char* status_buffer;
+      size_t status_byte_size;
+      err = TRTSERVER_ProtobufSerialize(
+          model_status_protobuf, &status_buffer, &status_byte_size);
+      if (err == nullptr) {
+        if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
+        }
+      }
+    }
+
+    TRTSERVER_ProtobufDelete(model_status_protobuf);
+
+    if (err == nullptr) {
+      const auto& nitr = server_status.model_status().find(request.name());
+      if (nitr == server_status.model_status().end()) {
+        err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "no config available for unknown model '" + request.name() +
+                "'")
+                .c_str());
+      } else {
+        // All models share the same config across versions so we
+        // ignore request.version().
+        const ModelStatus& model_status = nitr->second;
+        response.mutable_config()->CopyFrom(model_status.config());
+      }
+    }
+
+    grpc::Status status;
+    GrpcStatusUtil::Create(&status, err);
+    TRTSERVER_ErrorDelete(err);
+
+    state->step_ = Steps::COMPLETE;
+    state->context_->responder_->Finish(response, status, state);
+  } else if (state->step_ == Steps::COMPLETE) {
+    state->step_ = Steps::FINISH;
+  }
+
+  // Only handle one request at a time (to avoid having request cause
+  // too much load on server), so register for next request only after
+  // this one finished.
+  if (!shutdown && (state->step_ == Steps::FINISH)) {
+    StartNewRequest();
+  }
+
+  return state->step_ != Steps::FINISH;
+}
+
+//
 // Infer utilities
 //
 TRTSERVER_Error*
@@ -2294,6 +2406,7 @@ GRPCServerV2::Start()
   model_ready_cq_ = grpc_builder_.AddCompletionQueue();
   server_metadata_cq_ = grpc_builder_.AddCompletionQueue();
   model_metadata_cq_ = grpc_builder_.AddCompletionQueue();
+  model_config_cq_ = grpc_builder_.AddCompletionQueue();
   model_infer_cq_ = grpc_builder_.AddCompletionQueue();
 #if 0
   stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
@@ -2337,6 +2450,13 @@ GRPCServerV2::Start()
       model_metadata_cq_.get(), 2 /* max_state_bucket_count */);
   hmodelmetadata->Start();
   model_metadata_handler_.reset(hmodelmetadata);
+
+  // Handler for model-config requests.
+  ModelConfigHandler* hmodelconfig = new ModelConfigHandler(
+      "ModelConfigHandler", server_, server_id_, &service_,
+      model_config_cq_.get(), 2 /* max_state_bucket_count */);
+  hmodelconfig->Start();
+  model_config_handler_.reset(hmodelconfig);
 
   // Handler for model inference requests.
   ModelInferHandler* hmodelinfer = new ModelInferHandler(
@@ -2398,6 +2518,7 @@ GRPCServerV2::Stop()
   model_ready_cq_->Shutdown();
   server_metadata_cq_->Shutdown();
   model_metadata_cq_->Shutdown();
+  model_config_cq_->Shutdown();
   model_infer_cq_->Shutdown();
 #if 0
   repository_cq_->Shutdown();
@@ -2413,6 +2534,7 @@ GRPCServerV2::Stop()
   dynamic_cast<ModelReadyHandler*>(model_ready_handler_.get())->Stop();
   dynamic_cast<ServerMetadataHandler*>(server_metadata_handler_.get())->Stop();
   dynamic_cast<ModelMetadataHandler*>(model_metadata_handler_.get())->Stop();
+  dynamic_cast<ModelConfigHandler*>(model_config_handler_.get())->Stop();
   dynamic_cast<ModelInferHandler*>(model_infer_handler_.get())->Stop();
 #if 0
   dynamic_cast<StreamInferHandler*>(stream_infer_handler_.get())->Stop();

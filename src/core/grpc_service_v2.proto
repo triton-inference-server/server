@@ -30,6 +30,8 @@ package nvidia.inferenceserver;
 
 //@@.. cpp:namespace:: nvidia::inferenceserver
 
+import "model_config.proto";
+
 //@@
 //@@.. cpp:var:: service InferenceService
 //@@
@@ -78,6 +80,13 @@ service GRPCInferenceService
   //@@     Perform inference using a specific model.
   //@@
   rpc ModelInfer(ModelInferRequest) returns (ModelInferResponse) {}
+
+  //@@  .. cpp:var:: rpc ModelConfig(ModelConfigRequest) returns
+  //@@       (ModelConfigResponse)
+  //@@
+  //@@     Get model configuration.
+  //@@
+  rpc ModelConfig(ModelConfigRequest) returns (ModelConfigResponse) {}
 }
 
 //@@
@@ -749,4 +758,41 @@ message ModelInferResponse
   //@@     The output tensors holding inference results.
   //@@
   repeated InferOutputTensor outputs = 7;
+}
+
+//@@
+//@@.. cpp:var:: message ModelConfigRequest
+//@@
+//@@   Request message for ModelConfig.
+//@@
+message ModelConfigRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the model.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: int64 version
+  //@@
+  //@@     The version of the model. If -1 the version of the model
+  //@@     is selected automatically based on the version policy.
+  //@@
+  int64 version = 2;
+}
+
+//@@
+//@@.. cpp:var:: message ModelConfigResponse
+//@@
+//@@   Response message for ModelConfig.
+//@@
+message ModelConfigResponse
+{
+  //@@
+  //@@  .. cpp:var:: ModelConfig config
+  //@@
+  //@@     The model configuration.
+  //@@
+  ModelConfig config = 1;
 }
