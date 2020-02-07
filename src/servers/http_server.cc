@@ -86,11 +86,11 @@ class HTTPAPIServer : public HTTPServer {
         uint64_t unique_id);
     ~InferRequest()
     {
-      // for (auto buffer : response_meta_data_.first) {
-      //   if (buffer != nullptr) {
-      //     evbuffer_free(buffer);
-      //   }
-      // }
+      for (auto it = response_meta_data_.first.begin();
+           it != response_meta_data_.first.end();) {
+        delete *it;
+        it = response_meta_data_.first.erase(it);
+      }
     }
 
     h2o_req_t* H2oRequest() const { return req_; }
@@ -271,13 +271,14 @@ HTTPAPIServer::InferRequest::InferComplete(
 
   std::string response_str = infer_request->FinalizeResponse(response);
 
-  h2o_iovec_t* merged_body = new h2o_iovec_t();
+  h2o_iovec_t merged_body[infer_request->response_meta_data_.first.size() + 1];
   int buffer_count = 0;
   int merged_buffer_size = 0;
   if (response_str != "") {
     for (auto buffer : infer_request->response_meta_data_.first) {
-      merged_body[buffer_count].base = buffer->base;
-      merged_body[buffer_count].len = buffer->len;
+      merged_body[buffer_count] = *buffer;
+      // merged_body[buffer_count].base = buffer->base;
+      // merged_body[buffer_count].len = buffer->len;
       merged_buffer_size += buffer->len;
       buffer_count++;
     }
@@ -302,7 +303,7 @@ HTTPAPIServer::InferRequest::InferComplete(
   h2o_generator_t generator = {NULL, NULL};
   h2o_start_response(infer_request->req_, &generator);
   h2o_send(
-      infer_request->req_, merged_body, buffer_count, H2O_SEND_STATE_FINAL);
+      infer_request->req_, &merged_body[0], buffer_count, H2O_SEND_STATE_FINAL);
 
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'infer_request'.
@@ -1037,7 +1038,8 @@ HTTPAPIServer::ResponseAlloc(
     int64_t* actual_memory_type_id)
 {
   auto response_meta_data = reinterpret_cast<ResponseMetaData*>(userp);
-  h2o_iovec_t* h2o_buffer = new h2o_iovec_t();
+  h2o_iovec_t* h2o_buffer =
+      reinterpret_cast<h2o_iovec_t*>(h2o_mem_alloc(sizeof(h2o_iovec_t)));
   response_meta_data->first.push_back(h2o_buffer);
 
   const std::unordered_map<
@@ -1081,7 +1083,7 @@ HTTPAPIServer::ResponseAlloc(
       }
 
       // Reserve requested space for output...
-      h2o_buffer->base = new char[byte_size];
+      h2o_buffer->base = reinterpret_cast<char*>(h2o_mem_alloc(byte_size));
       h2o_buffer->len = byte_size;
       *buffer = h2o_buffer->base;
     }
