@@ -94,6 +94,8 @@ constexpr uint64_t SEQUENCE_IDLE_DEFAULT_MICROSECONDS = 1000 * 1000;
 
 #define TIMESPEC_TO_NANOS(TS) \
   ((TS).tv_sec * nvidia::inferenceserver::NANOS_PER_SECOND + (TS).tv_nsec)
+#define TIMEVAL_TO_NANOS(TS) \
+  ((TS).tv_sec * nvidia::inferenceserver::NANOS_PER_SECOND + ((TS).tv_usec / 1000))
 #define TIMESPEC_TO_MILLIS(TS) (TIMESPEC_TO_NANOS(TS) * 1000 * 1000)
 
 #define DISALLOW_MOVE(TypeName) TypeName(Context&& o) = delete;

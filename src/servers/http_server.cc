@@ -101,9 +101,9 @@ class HTTPAPIServer : public HTTPServer {
         TRTSERVER_InferenceResponse* response, void* userp);
     std::string FinalizeResponse(TRTSERVER_InferenceResponse* response);
 
-    // #ifdef TRTIS_ENABLE_TRACING
-    //     std::unique_ptr<TraceMetaData> trace_meta_data_;
-    // #endif  // TRTIS_ENABLE_TRACING
+    #ifdef TRTIS_ENABLE_TRACING
+        std::unique_ptr<TraceMetaData> trace_meta_data_;
+    #endif  // TRTIS_ENABLE_TRACING
 
     ResponseMetaData response_meta_data_;
 
@@ -229,10 +229,20 @@ HTTPAPIServer::OKReplyCallback(void* arg, const std::string& response_str)
   req->res.status = 200;
   req->res.reason = "OK";
   req->res.content_length = merged_buffer_size;
-
   h2o_generator_t generator = {NULL, NULL};
   h2o_start_response(req, &generator);
   h2o_send(req, &merged_body[0], buffer_count, H2O_SEND_STATE_FINAL);
+
+#ifdef TRTIS_ENABLE_TRACING
+  if (infer_request->trace_meta_data_ != nullptr) {
+    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
+        TRTSERVER_TRACE_LEVEL_MIN, "http send start",
+        TIMEVAL_TO_NANOS(req->timestamps.response_start_at));
+    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
+        TRTSERVER_TRACE_LEVEL_MIN, "http send end",
+        TIMEVAL_TO_NANOS(req->timestamps.response_end_at));
+  }
+#endif  // TRTIS_ENABLE_TRACING
 
   delete infer_request;
 }
@@ -248,21 +258,20 @@ HTTPAPIServer::BADReplyCallback(void* arg)
   req->res.status = 400;
   req->res.reason = "Bad Request";
   req->res.content_length = 0;
-
-  // #ifdef TRTIS_ENABLE_TRACING
-  //   if (infer_request->trace_meta_data_ != nullptr) {
-  //     infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-  //         TRTSERVER_TRACE_LEVEL_MIN, "http send start",
-  //         TIMESPEC_TO_NANOS(request->send_start_ts));
-  //     infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-  //         TRTSERVER_TRACE_LEVEL_MIN, "http send end",
-  //         TIMESPEC_TO_NANOS(request->send_end_ts));
-  //   }
-  // #endif  // TRTIS_ENABLE_TRACING
-
   h2o_generator_t generator = {NULL, NULL};
   h2o_start_response(req, &generator);
   h2o_send(req, &body, 1 /*buffer_count*/, H2O_SEND_STATE_FINAL);
+
+#ifdef TRTIS_ENABLE_TRACING
+  if (infer_request->trace_meta_data_ != nullptr) {
+    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
+        TRTSERVER_TRACE_LEVEL_MIN, "http send start",
+        TIMEVAL_TO_NANOS(req->timestamps.response_start_at));
+    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
+        TRTSERVER_TRACE_LEVEL_MIN, "http send end",
+        TIMEVAL_TO_NANOS(req->timestamps.response_end_at));
+  }
+#endif  // TRTIS_ENABLE_TRACING
 
   delete infer_request;
 }
@@ -801,6 +810,24 @@ HTTPAPIServer::Infer(h2o_handler_t* _self, h2o_req_t* req)
     model_version = std::atoll(model_version_str.c_str());
   }
 
+#ifdef TRTIS_ENABLE_TRACING
+  // Timestamps from evhtp are capture in 'req'. We record here since
+  // this is the first place where we have a tracer.
+  std::unique_ptr<TraceMetaData> trace_meta_data;
+  if (self->http_server->trace_manager_ != nullptr) {
+    trace_meta_data.reset(self->http_server->trace_manager_->SampleTrace());
+    if (trace_meta_data != nullptr) {
+      trace_meta_data->tracer_->SetModel(model_name, model_version);
+      trace_meta_data->tracer_->CaptureTimestamp(
+          TRTSERVER_TRACE_LEVEL_MIN, "http recv start",
+          TIMEVAL_TO_NANOS(req->timestamps.request_begin_at));
+      trace_meta_data->tracer_->CaptureTimestamp(
+          TRTSERVER_TRACE_LEVEL_MIN, "http recv end",
+          TIMEVAL_TO_NANOS(req->timestamps.request_body_begin_at));
+    }
+  }
+#endif  // TRTIS_ENABLE_TRACING
+
   // Work around for h2o bug forces headers to lower case
   char kInferHeaderLower[sizeof(kInferRequestHTTPHeader)];
   for (size_t i = 0; i < sizeof(kInferRequestHTTPHeader); i++) {
@@ -861,6 +888,15 @@ HTTPAPIServer::Infer(h2o_handler_t* _self, h2o_req_t* req)
       // Provide the trace manager object to use for this request, if nullptr
       // then no tracing will be performed.
       TRTSERVER_TraceManager* trace_manager = nullptr;
+#ifdef TRTIS_ENABLE_TRACING
+      if (trace_meta_data != nullptr) {
+        infer_request->trace_meta_data_ = std::move(trace_meta_data);
+        TRTSERVER_TraceManagerNew(
+            &trace_manager, TraceManager::CreateTrace,
+            TraceManager::ReleaseTrace, infer_request->trace_meta_data_.get());
+      }
+#endif  // TRTIS_ENABLE_TRACING
+
       err = TRTSERVER_ServerInferAsync(
           self->http_server->server_.get(), trace_manager, request_provider,
           self->http_server->allocator_,
