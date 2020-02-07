@@ -219,7 +219,7 @@ InferenceProfiler::BuildComposingModelMap(
   if (itr == server_status.model_status().end()) {
     return nic::Error(
         ni::RequestStatusCode::INTERNAL,
-        "unable to find status for model" + model_name);
+        "unable to find status for model " + model_name);
   } else {
     if (itr->second.config().platform() == "ensemble") {
       for (const auto& step :
@@ -531,7 +531,7 @@ InferenceProfiler::GetServerSideStatus(
   if (itr == server_status.model_status().end()) {
     return nic::Error(
         ni::RequestStatusCode::INTERNAL,
-        "unable to find status for model" + model_info.first);
+        "unable to find status for model " + model_info.first);
   } else {
     model_status->emplace(model_info.first, itr->second);
   }
@@ -548,7 +548,7 @@ InferenceProfiler::GetServerSideStatus(
       if (itr == server_status.model_status().end()) {
         return nic::Error(
             ni::RequestStatusCode::INTERNAL,
-            "unable to find status for composing model" +
+            "unable to find status for composing model " +
                 composing_model_info.first);
       } else {
         model_status->emplace(composing_model_info.first, itr->second);
