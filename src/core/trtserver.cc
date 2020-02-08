@@ -379,6 +379,9 @@ class TrtServerRequestOptions {
       const std::shared_ptr<ni::InferRequestHeader>& request_header);
 
   TRTSERVER_Error* SetId(uint64_t id);
+#ifdef TRTIS_ENABLE_GRPC_V2
+  TRTSERVER_Error* SetIdStr(const char* id);
+#endif  // TRTIS_ENABLE_GRPC_V2
   TRTSERVER_Error* SetFlags(uint32_t flags);
   TRTSERVER_Error* SetCorrelationId(uint64_t correlation_id);
   TRTSERVER_Error* SetBatchSize(uint64_t batch_size);
@@ -394,10 +397,18 @@ class TrtServerRequestOptions {
   const std::string& ModelName() const { return model_name_; }
   int64_t ModelVersion() const { return model_version_; }
   ni::InferRequestHeader* InferRequestHeader() const;
+#ifdef TRTIS_ENABLE_GRPC_V2
+  const std::string& IdStr() const { return id_str_; }
+#endif  // TRTIS_ENABLE_GRPC_V2
 
  private:
   const std::string model_name_;
   const int64_t model_version_;
+
+#ifdef TRTIS_ENABLE_GRPC_V2
+  std::string id_str_;
+#endif  // TRTIS_ENABLE_GRPC_V2
+
   std::shared_ptr<ni::InferRequestHeader> request_header_;
 
   std::mutex mtx_;
@@ -427,6 +438,16 @@ TrtServerRequestOptions::SetId(uint64_t id)
   normalized_ = false;
   return nullptr;  // Success
 }
+
+#ifdef TRTIS_ENABLE_GRPC_V2
+TRTSERVER_Error*
+TrtServerRequestOptions::SetIdStr(const char* id)
+{
+  std::lock_guard<std::mutex> lk(mtx_);
+  id_str_ = id;
+  return nullptr;  // Success
+}
+#endif  // TRTIS_ENABLE_GRPC_V2
 
 TRTSERVER_Error*
 TrtServerRequestOptions::SetFlags(uint32_t flags)
@@ -529,6 +550,9 @@ class TrtServerRequestProvider {
 
   const std::string& ModelName() const { return request_options_->ModelName(); }
   int64_t ModelVersion() const { return request_options_->ModelVersion(); }
+#ifdef TRTIS_ENABLE_GRPC_V2
+  const std::string& IdStr() const { return request_options_->IdStr(); }
+#endif  // TRTIS_ENABLE_GRPC_V2
   ni::InferRequestHeader* InferRequestHeader() const;
   const std::shared_ptr<ni::InferenceBackend>& Backend() const;
   const std::unordered_map<std::string, std::shared_ptr<ni::Memory>>& InputMap()
@@ -620,9 +644,12 @@ TrtServerRequestProvider::SetInputData(
 class TrtServerResponse {
  public:
   TrtServerResponse(
-      const ni::Status& infer_status,
+      const ni::Status& infer_status, const std::string& id_str,
       const std::shared_ptr<ni::InferResponseProvider>& provider);
   TRTSERVER_Error* Status() const;
+#ifdef TRTIS_ENABLE_GRPC_V2
+  const std::string& IdStr() const { return id_str_; }
+#endif  // TRTIS_ENABLE_GRPC_V2
   const ni::InferResponseHeader& Header() const;
   TRTSERVER_Error* OutputData(
       const char* name, const void** base, size_t* byte_size,
@@ -630,13 +657,14 @@ class TrtServerResponse {
 
  private:
   const ni::Status infer_status_;
+  const std::string id_str_;
   std::shared_ptr<ni::InferResponseProvider> response_provider_;
 };
 
 TrtServerResponse::TrtServerResponse(
-    const ni::Status& infer_status,
+    const ni::Status& infer_status, const std::string& id_str,
     const std::shared_ptr<ni::InferResponseProvider>& provider)
-    : infer_status_(infer_status), response_provider_(provider)
+    : infer_status_(infer_status), id_str_(id_str), response_provider_(provider)
 {
 }
 
@@ -993,6 +1021,18 @@ TRTSERVER_InferenceRequestOptionsSetId(
   return nullptr;  // Success
 }
 
+#ifdef TRTIS_ENABLE_GRPC_V2
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestOptionsSetIdStr(
+    TRTSERVER_InferenceRequestOptions* request_options, const char* id)
+{
+  TrtServerRequestOptions* loptions =
+      reinterpret_cast<TrtServerRequestOptions*>(request_options);
+  loptions->SetIdStr(id);
+  return nullptr;  // Success
+}
+#endif  // TRTIS_ENABLE_GRPC_V2
+
 TRTSERVER_Error*
 TRTSERVER_InferenceRequestOptionsSetFlags(
     TRTSERVER_InferenceRequestOptions* request_options, uint32_t flags)
@@ -1187,6 +1227,17 @@ TRTSERVER_InferenceResponseStatus(TRTSERVER_InferenceResponse* response)
   TrtServerResponse* lresponse = reinterpret_cast<TrtServerResponse*>(response);
   return lresponse->Status();
 }
+
+#ifdef TRTIS_ENABLE_GRPC_V2
+TRTSERVER_Error*
+TRTSERVER_InferenceResponseIdStr(
+    TRTSERVER_InferenceResponse* response, const char** id)
+{
+  TrtServerResponse* lresponse = reinterpret_cast<TrtServerResponse*>(response);
+  *id = lresponse->IdStr().c_str();
+  return nullptr;  // Success
+}
+#endif  // TRTIS_ENABLE_GRPC_V2
 
 TRTSERVER_Error*
 TRTSERVER_InferenceResponseHeader(
@@ -1851,11 +1902,17 @@ TRTSERVER_ServerInferAsync(
     infer_response_provider = del_response_provider;
   }
 
+#ifdef TRTIS_ENABLE_GRPC_V2
+  const std::string& id_str = lprovider->IdStr();
+#else
+  const std::string id_str;
+#endif  // TRTIS_ENABLE_GRPC_V2
+
   lserver->InferAsync(
       lprovider->Backend(), infer_request_provider, infer_response_provider,
       infer_stats,
-      [infer_stats, trace_manager, infer_response_provider, server, complete_fn,
-       complete_userp](const ni::Status& status) mutable {
+      [infer_stats, id_str, trace_manager, infer_response_provider, server,
+       complete_fn, complete_userp](const ni::Status& status) mutable {
         if (!status.IsOk()) {
           LOG_VERBOSE(1) << "Infer failed: " << status.Message();
         }
@@ -1874,7 +1931,7 @@ TRTSERVER_ServerInferAsync(
 #endif  // TRTIS_ENABLE_STATS
 
         TrtServerResponse* response =
-            new TrtServerResponse(status, infer_response_provider);
+            new TrtServerResponse(status, id_str, infer_response_provider);
         complete_fn(
             server, trace_manager,
             reinterpret_cast<TRTSERVER_InferenceResponse*>(response),

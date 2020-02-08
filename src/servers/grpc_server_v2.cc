@@ -1566,11 +1566,16 @@ ModelInferHandler::InferComplete(
     }
   }
 
+  const char* id;
+  if (err == nullptr) {
+    err = TRTSERVER_InferenceResponseIdStr(trtserver_response, &id);
+  }
+
   // Convert the InferResponseHeader to the V2 response
   if (err == nullptr) {
     response.set_model_name(response_header.model_name());
     response.set_model_version(response_header.model_version());
-    response.set_id(std::to_string(response_header.id()));
+    response.set_id(id);
     for (const auto& io : response_header.output()) {
       // Find the tensor in the response and set its shape.
       for (auto& output : *(response.mutable_outputs())) {
