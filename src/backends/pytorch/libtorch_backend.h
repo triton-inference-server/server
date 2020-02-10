@@ -78,8 +78,8 @@ class LibTorchBackend : public InferenceBackend {
 
     // Set the meta data of an input from payloads.
     Status SetInputMetaData(
-        const std::string& name, const DataType datatype, const DimsList& dims,
-        const size_t total_batch_size,
+        const std::string& name, const DataType datatype,
+        const std::vector<int64_t>& dims, const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads,
         std::vector<InputInfo>* inputs, InputMetaData* meta_data,
         bool* cuda_copy);

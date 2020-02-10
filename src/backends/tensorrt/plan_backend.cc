@@ -289,7 +289,7 @@ PlanBackend::CreateExecutionContexts(
         Run(runner_idx, payloads, func);
       },
       [this](
-          uint32_t runner_idx, const InferRequestHeader::Input& input,
+          uint32_t runner_idx, const InferenceRequest::Input& input,
           const Scheduler::Payload& payload,
           std::vector<int64_t>* shape) -> Status {
         return PeekShapeTensor(runner_idx, input, payload, shape);
@@ -302,7 +302,7 @@ PlanBackend::CreateExecutionContexts(
 
 Status
 PlanBackend::PeekShapeTensor(
-    uint32_t runner_idx, const InferRequestHeader::Input& input,
+    uint32_t runner_idx, const InferenceRequest::Input& input,
     const Scheduler::Payload& payload, std::vector<int64_t>* shape)
 {
   // Each runner performs the peek using the corresponding since it
@@ -1308,12 +1308,12 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
 
 Status
 PlanBackend::Context::PeekShapeTensor(
-    const InferRequestHeader::Input& input, const Scheduler::Payload& payload,
+    const InferenceRequest::Input& input, const Scheduler::Payload& payload,
     std::vector<int64_t>* shape)
 {
   // It is the caller's responsibility to only call on shape tensors,
   // which means the datatype must be INT32.
-  int64_t element_cnt = GetElementCount(input.dims());
+  int64_t element_cnt = GetElementCount(input.Shape());
   size_t content_byte_size =
       element_cnt * GetDataTypeByteSize(DataType::TYPE_INT32);
   const char* content;
@@ -1322,7 +1322,7 @@ PlanBackend::Context::PeekShapeTensor(
   std::unique_ptr<AllocatedMemory> contiguous_buffer;
   bool cuda_copy = false;
   RETURN_IF_ERROR(GetContiguousInputContent(
-      input.name(), TRTSERVER_MEMORY_CPU, 0 /* src_memory_type_id */, payload,
+      input.Name(), TRTSERVER_MEMORY_CPU, 0 /* src_memory_type_id */, payload,
       &content, &content_byte_size, &contiguous_buffer, &cuda_copy));
 
   if (cuda_copy) {
@@ -1340,16 +1340,16 @@ PlanBackend::Context::PeekShapeTensor(
   // peek was already called, then mark it as not being consumed so
   // that the next peek or usage will be able to access it. If don't
   // already have an override, add it...
-  if (payload.request_provider_->HasInputOverride(input.name())) {
-    payload.request_provider_->SetInputOverrideConsumed(input.name(), false);
+  if (payload.request_provider_->HasInputOverride(input.Name())) {
+    payload.request_provider_->SetInputOverrideConsumed(input.Name(), false);
   } else {
     InferRequestProvider::InputOverride override;
     override.content_.assign(content, content + content_byte_size);
-    override.dims_ = input.dims();
+    override.dims_ = input.Shape();
     override.datatype_ = DataType::TYPE_INT32;
 
     auto overrides = std::make_shared<InferRequestProvider::InputOverrideMap>();
-    overrides->insert(std::make_pair(input.name(), override));
+    overrides->insert(std::make_pair(input.Name(), override));
     payload.request_provider_->AddInputOverrides(overrides);
   }
 
@@ -1524,7 +1524,7 @@ PlanBackend::Context::Run(
               name_ + "'");
     }
 
-    total_batch_size += payload.request_provider_->RequestHeader().batch_size();
+    total_batch_size += payload.request_provider_->Request().BatchSize();
 
     // All payloads must have equally-sized input tensors so use any
     // payload as the representative for the input tensors.
@@ -1611,11 +1611,11 @@ PlanBackend::Context::Run(
         input_request_provider->GetInputOverrideShape(name, &shape);
         input_request_provider->SetInputOverrideConsumed(name, false);
       } else {
-        for (const auto& input :
-             input_request_provider->RequestHeader().input()) {
-          const std::string& this_name = input.name();
+        for (const auto& pr : input_request_provider->Request().Inputs()) {
+          const auto& input = pr.second;
+          const std::string& this_name = input.Name();
           if (this_name.compare(name) == 0) {
-            for (auto dim : input.dims()) {
+            for (auto dim : input.Shape()) {
               shape.push_back(dim);
             }
             break;
@@ -1669,10 +1669,8 @@ PlanBackend::Context::Run(
       // in the dynamic batch.
       std::vector<size_t> expected_byte_sizes;
       for (auto& payload : *payloads) {
-        const InferRequestHeader& request_header =
-            payload.request_provider_->RequestHeader();
-        expected_byte_sizes.push_back(
-            request_header.batch_size() * batch1_byte_size);
+        const InferenceRequest& irequest = payload.request_provider_->Request();
+        expected_byte_sizes.push_back(irequest.BatchSize() * batch1_byte_size);
       }
 
       inputs_.emplace_back();
@@ -2021,8 +2019,9 @@ PlanBackend::Context::GetRequestShapeValues(
 {
   // Visit all the inputs and extract the shape values present in the request
   Status status;
-  for (const auto& input : payload.request_provider_->RequestHeader().input()) {
-    int io_index = engine_->getBindingIndex(input.name().c_str());
+  for (const auto& pr : payload.request_provider_->Request().Inputs()) {
+    const auto& input = pr.second;
+    int io_index = engine_->getBindingIndex(input.Name().c_str());
     if (engine_->isShapeBinding(io_index)) {
       auto it =
           request_shape_values->emplace(io_index, std::vector<int32_t>()).first;
@@ -2035,7 +2034,7 @@ PlanBackend::Context::GetRequestShapeValues(
       if (!PeekShapeTensor(input, payload, &shape).IsOk()) {
         return Status(
             RequestStatusCode::INTERNAL,
-            "unable to peek shape values for input '" + input.name() + "'");
+            "unable to peek shape values for input '" + input.Name() + "'");
       }
       for (auto value : shape) {
         it->second.push_back((int32_t)value);
@@ -2060,9 +2059,9 @@ PlanBackend::Context::GetMostOptimizedProfile(
     int64_t shortest_distance = LLONG_MAX;
     for (auto cit = trt_contexts_.begin(); cit != trt_contexts_.end(); cit++) {
       int64_t current_distance = 0;
-      for (const auto& input :
-           input_request_provider->RequestHeader().input()) {
-        int io_index = engine_->getBindingIndex(input.name().c_str());
+      for (const auto& pr : input_request_provider->Request().Inputs()) {
+        const auto& input = pr.second;
+        int io_index = engine_->getBindingIndex(input.Name().c_str());
         nvinfer1::Dims engine_dims = engine_->getBindingDimensions(io_index);
         // If the input has no dynamic shape nor is a shape binding, then skip
         // it as distance will be 0
@@ -2071,7 +2070,7 @@ PlanBackend::Context::GetMostOptimizedProfile(
           continue;
         }
         auto status = ValidateDimension(
-            input.dims(), cit->second.min_dims_[io_index],
+            input.Shape(), cit->second.min_dims_[io_index],
             cit->second.max_dims_[io_index], true);
         bool valid_bs =
             (((int64_t)total_batch_size >=
@@ -2106,7 +2105,8 @@ PlanBackend::Context::GetMostOptimizedProfile(
           current_distance +=
               std::abs(opt_dims.d[0] - (int64_t)total_batch_size);
           for (int idx = 1; idx < opt_dims.nbDims; idx++) {
-            current_distance += std::abs(opt_dims.d[idx] - input.dims(idx - 1));
+            current_distance +=
+                std::abs(opt_dims.d[idx] - input.Shape()[idx - 1]);
           }
           if (engine_->isShapeBinding(io_index)) {
             const auto* opt_shape_values = cit->second.opt_shapes_[io_index];

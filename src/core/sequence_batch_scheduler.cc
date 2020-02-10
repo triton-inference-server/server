@@ -200,12 +200,12 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
 
       InferRequestProvider::InputOverride false_override;
       false_override.content_.assign(false_p, false_p + sizeof(float));
-      false_override.dims_.Add(1);
+      false_override.dims_.push_back(1);
       false_override.datatype_ = tensor_datatype;
 
       InferRequestProvider::InputOverride true_override;
       true_override.content_.assign(true_p, true_p + sizeof(float));
-      true_override.dims_.Add(1);
+      true_override.dims_.push_back(1);
       true_override.datatype_ = tensor_datatype;
 
       auto oit = (*start_input_overrides)
@@ -260,12 +260,12 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
 
       InferRequestProvider::InputOverride false_override;
       false_override.content_.assign(false_p, false_p + sizeof(float));
-      false_override.dims_.Add(1);
+      false_override.dims_.push_back(1);
       false_override.datatype_ = tensor_datatype;
 
       InferRequestProvider::InputOverride true_override;
       true_override.content_.assign(true_p, true_p + sizeof(float));
-      true_override.dims_.Add(1);
+      true_override.dims_.push_back(1);
       true_override.datatype_ = tensor_datatype;
 
       auto oit = (*start_input_overrides)
@@ -320,12 +320,12 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
 
       InferRequestProvider::InputOverride false_override;
       false_override.content_.assign(false_p, false_p + sizeof(float));
-      false_override.dims_.Add(1);
+      false_override.dims_.push_back(1);
       false_override.datatype_ = tensor_datatype;
 
       InferRequestProvider::InputOverride true_override;
       true_override.content_.assign(true_p, true_p + sizeof(float));
-      true_override.dims_.Add(1);
+      true_override.dims_.push_back(1);
       true_override.datatype_ = tensor_datatype;
 
       auto oit = (*start_input_overrides)
@@ -377,12 +377,12 @@ SequenceBatchScheduler::Enqueue(
   stats->CaptureTimestamp(ModelInferStats::TimestampKind::kQueueStart);
 #endif  // TRTIS_ENABLE_STATS
 
-  const auto& request_header = request_provider->RequestHeader();
+  const auto& irequest = request_provider->Request();
 
   // For now the request must have batch-size 1 since the sequence
   // batcher does not yet support requests that are statically
   // batched.
-  if (request_header.batch_size() != 1) {
+  if (irequest.BatchSize() != 1) {
     OnComplete(Status(
         RequestStatusCode::INVALID_ARG,
         "inference request to model '" + request_provider->ModelName() +
@@ -394,7 +394,7 @@ SequenceBatchScheduler::Enqueue(
   // A request must have a correlation ID to be processed correctly by
   // this scheduler. A value of 0 (zero) indicates that the request
   // doesn't have a correlation ID.
-  const CorrelationID correlation_id = request_header.correlation_id();
+  const CorrelationID correlation_id = irequest.CorrelationId();
   if (correlation_id == 0) {
     OnComplete(Status(
         RequestStatusCode::INVALID_ARG,
@@ -406,9 +406,9 @@ SequenceBatchScheduler::Enqueue(
   BatcherSequenceSlot* target = nullptr;
 
   const bool seq_start =
-      ((request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0);
+      ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0);
   const bool seq_end =
-      ((request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
+      ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
 
   std::unique_lock<std::mutex> lock(mu_);
 
@@ -544,8 +544,8 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
     backlog_queues_.pop_front();
     if (!payloads->empty()) {  // should never be empty...
       const auto& request_provider = payloads->back().request_provider_;
-      const auto& request_header = request_provider->RequestHeader();
-      const CorrelationID correlation_id = request_header.correlation_id();
+      const auto& irequest = request_provider->Request();
+      const CorrelationID correlation_id = irequest.CorrelationId();
 
       // If the last queue entry is not an END request then the entire
       // sequence is not contained in the backlog. In that case must
@@ -553,8 +553,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
       // requests get directed to the batcher sequence-slot instead of
       // the backlog.
       const bool seq_end =
-          ((request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
-           0);
+          ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
       if (!seq_end) {
         // Since the correlation ID is being actively collected in the
         // backlog, there should not be any in-flight sequences with
@@ -781,7 +780,7 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
           seq_slot_corrid_overrides_maps_.back();
       InferRequestProvider::InputOverride& ovr =
           (*ovr_map)[correlation_id_tensor_];
-      ovr.dims_.Add(1);
+      ovr.dims_.push_back(1);
       ovr.datatype_ = correlation_id_datatype;
       ovr.content_.resize(GetDataTypeByteSize(correlation_id_datatype));
       ovr.content_ref_.AddBuffer(
@@ -797,22 +796,21 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
 
 void
 SequenceBatch::SetControlTensors(
-    const InferRequestHeader& request_header,
+    const InferenceRequest& irequest,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const int32_t seq_slot, const CorrelationID corr_id)
 {
   // Set the start, end, and ready control tensors
   // appropriately...
-  if ((request_header.flags() & (InferRequestHeader::FLAG_SEQUENCE_START |
-                                 InferRequestHeader::FLAG_SEQUENCE_END)) ==
+  if ((irequest.Flags() & (InferRequestHeader::FLAG_SEQUENCE_START |
+                           InferRequestHeader::FLAG_SEQUENCE_END)) ==
       (InferRequestHeader::FLAG_SEQUENCE_START |
        InferRequestHeader::FLAG_SEQUENCE_END)) {
     request_provider->AddInputOverrides(startend_input_overrides_);
   } else if (
-      (request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
+      (irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
     request_provider->AddInputOverrides(start_input_overrides_);
-  } else if (
-      (request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+  } else if ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
     request_provider->AddInputOverrides(end_input_overrides_);
   } else {
     request_provider->AddInputOverrides(continue_input_overrides_);
@@ -1023,16 +1021,16 @@ DirectSequenceBatch::SchedulerThread(
         if (max_seq_slot < 0) {
           wait_microseconds = default_wait_microseconds;
         } else {
-          // For NULL requests need a header that matches the shapes
-          // of the inputs that are being used for the batch. This is
-          // grabbed from the first request added to the batch.
-          InferRequestHeader null_request_header;
+          // For NULL requests need an InferenceRequest that matches
+          // the shapes of the inputs that are being used for the
+          // batch. This is grabbed from the first request added to
+          // the batch.
+          InferenceRequest null_irequest;
           for (int32_t seq_slot = 0; seq_slot <= max_seq_slot; ++seq_slot) {
             std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
             if (!queue.empty() &&
                 (queue.front().request_provider_ != nullptr)) {
-              null_request_header =
-                  queue.front().request_provider_->RequestHeader();
+              null_irequest = queue.front().request_provider_->Request();
               break;
             }
           }
@@ -1097,8 +1095,7 @@ DirectSequenceBatch::SchedulerThread(
             // payload in the queue...
             if (use_null_provider) {
               auto null_request_provider =
-                  std::make_shared<NULLInferRequestProvider>(
-                      null_request_header);
+                  std::make_shared<NULLInferRequestProvider>(null_irequest);
               null_request_provider->AddInputOverrides(
                   notready_input_overrides_);
 
@@ -1107,11 +1104,11 @@ DirectSequenceBatch::SchedulerThread(
             } else {
               Scheduler::Payload& seq_slot_payload = queue.front();
               const auto& request_provider = seq_slot_payload.request_provider_;
-              const auto& request_header = request_provider->RequestHeader();
+              const auto& irequest = request_provider->Request();
 
               // Set the control tensor values in the request provider.
               SetControlTensors(
-                  request_header, request_provider, seq_slot,
+                  irequest, request_provider, seq_slot,
                   seq_slot_correlation_ids_[seq_slot]);
 
               payloads->emplace_back(
@@ -1121,8 +1118,8 @@ DirectSequenceBatch::SchedulerThread(
 
               queue.pop_front();
 
-              if ((request_header.flags() &
-                   InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+              if ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
+                  0) {
                 end_of_sequence = true;
               }
             }
@@ -1363,14 +1360,13 @@ OldestSequenceBatch::CompleteAndNext(
                        << ", slot " << seq_slot;
         release_seq_slot = true;
       } else {
-        const auto& request_header = request_provider->RequestHeader();
-        const CorrelationID correlation_id = request_header.correlation_id();
+        const auto& irequest = request_provider->Request();
+        const CorrelationID correlation_id = irequest.CorrelationId();
 
         // After handling the last inference in a sequence we must
         // release the sequence slot to make it available to another
         // sequence.
-        if ((request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
-            0) {
+        if ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
           LOG_VERBOSE(1) << "end sequence CORRID " << correlation_id
                          << " in batcher " << batcher_idx_ << ", slot "
                          << seq_slot;
@@ -1378,8 +1374,7 @@ OldestSequenceBatch::CompleteAndNext(
         }
 
         // Add the appropriate control tensor values to the request.
-        SetControlTensors(
-            request_header, request_provider, seq_slot, correlation_id);
+        SetControlTensors(irequest, request_provider, seq_slot, correlation_id);
 
         LOG_VERBOSE(1) << "issue to dynamic batcher CORRID " << correlation_id
                        << " in batcher " << batcher_idx_ << ", slot "

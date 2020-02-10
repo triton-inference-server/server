@@ -31,6 +31,8 @@
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
 #include "src/core/grpc_service.pb.h"
+#include "src/core/infer_request.h"
+#include "src/core/memory.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
 #include "src/core/trtserver.h"
@@ -41,130 +43,22 @@ class InferenceBackend;
 class LabelProvider;
 
 //
-// Memory used to access data in providers
-//
-class Memory {
- public:
-  // Get the 'idx'-th data block in the buffer. Using index to avoid
-  // maintaining internal state such that one buffer can be shared
-  // across multiple providers.
-  // 'idx' zero base index. Valid indices are continuous.
-  // 'byte_size' returns the byte size of the chunk of bytes.
-  // 'memory_type' returns the memory type of the chunk of bytes.
-  // 'memory_type_id' returns the memory type id of the chunk of bytes.
-  // Return the pointer to the data block. Returns nullptr if 'idx' is
-  // out of range
-  virtual const char* BufferAt(
-      size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
-      int64_t* memory_type_id) const = 0;
-
-  // Return the total byte size of the data buffer
-  size_t TotalByteSize() const { return total_byte_size_; }
-
- protected:
-  Memory() : total_byte_size_(0) {}
-  size_t total_byte_size_;
-};
-
-class MemoryReference : public Memory {
- public:
-  // Create a read-only data buffer as a reference to other data buffer
-  MemoryReference();
-
-  //\see Memory::BufferAt()
-  const char* BufferAt(
-      size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
-      int64_t* memory_type_id) const override;
-
-  // Add a 'buffer' with 'byte_size' as part of this data buffer
-  // Return the index of the buffer
-  size_t AddBuffer(
-      const char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
-      int64_t memory_type_id);
-
- private:
-  struct Block {
-    Block(
-        const char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
-        int64_t memory_type_id)
-        : buffer_(buffer), byte_size_(byte_size), memory_type_(memory_type),
-          memory_type_id_(memory_type_id)
-    {
-    }
-    const char* buffer_;
-    size_t byte_size_;
-    TRTSERVER_Memory_Type memory_type_;
-    int64_t memory_type_id_;
-  };
-  std::vector<Block> buffer_;
-};
-
-class MutableMemory : public Memory {
- public:
-  // Create a mutable data buffer referrencing to other data buffer.
-  MutableMemory(
-      char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
-      int64_t memory_type_id);
-
-  virtual ~MutableMemory() {}
-
-  //\see Memory::BufferAt()
-  const char* BufferAt(
-      size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
-      int64_t* memory_type_id) const override;
-
-  // 'memory_type' returns the memory type of the chunk of bytes.
-  // 'memory_type_id' returns the memory type id of the chunk of bytes.
-  // Return the mutable buffer
-  char* MutableBuffer(
-      TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
-
-  DISALLOW_COPY_AND_ASSIGN(MutableMemory);
-
- protected:
-  MutableMemory() : Memory() {}
-
-  char* buffer_;
-  TRTSERVER_Memory_Type memory_type_;
-  int64_t memory_type_id_;
-};
-
-class AllocatedMemory : public MutableMemory {
- public:
-  // Create a continuous data buffer with 'byte_size', 'memory_type' and
-  // 'memory_id.
-  AllocatedMemory(
-      size_t byte_size, TRTSERVER_Memory_Type memory_type,
-      int64_t memory_type_id);
-
-  ~AllocatedMemory() override;
-};
-
-//
 // Provide inference request inputs and meta-data
 //
 class InferRequestProvider {
  public:
-  // Initialize based on map from input name to data. The 'input_buffer' object
-  // is mapping from input name to data buffer for that input.
   static Status Create(
-      const std::string& model_name, const int64_t model_version,
-      const InferRequestHeader& request_header,
-      const std::unordered_map<std::string, std::shared_ptr<Memory>>&
-          input_buffer,
+      const InferenceRequest& request,
       std::shared_ptr<InferRequestProvider>* provider);
 
   // Return the requested model name.
-  const std::string& ModelName() const { return model_name_; }
+  const std::string& ModelName() const { return irequest_.ModelName(); }
 
   // Return the requested model version, or -1 if no specific version
   // was requested.
-  int64_t ModelVersion() const { return version_; }
+  int64_t ModelVersion() const { return irequest_.RequestedModelVersion(); }
 
-  // Get the request header for this inference request that has been
-  // validated and normalized so that all inputs have shape and
-  // batch-byte-size defined.
-  const InferRequestHeader& RequestHeader() const { return request_header_; }
+  const InferenceRequest& Request() const { return irequest_; }
 
   // Get the next contiguous chunk of bytes for the 'name'd
   // input. Return a pointer to the chunk in 'content'.
@@ -204,7 +98,7 @@ class InferRequestProvider {
   // this content will be used in-place of existing content.
   struct InputOverride {
     std::vector<uint8_t> content_;
-    DimsList dims_;
+    std::vector<int64_t> dims_;
     DataType datatype_;
     // Alternative representation of 'content_' in the form of Memory class
     MemoryReference content_ref_;
@@ -220,9 +114,8 @@ class InferRequestProvider {
   void SetInputOverrideConsumed(const std::string& name, const bool consumed);
 
  protected:
-  explicit InferRequestProvider(
-      const std::string& model_name, const int64_t version)
-      : model_name_(model_name), version_(version)
+  explicit InferRequestProvider(const InferenceRequest& irequest)
+      : irequest_(irequest)
   {
   }
 
@@ -235,9 +128,7 @@ class InferRequestProvider {
   bool GetInputOverrideContent(
       const std::string& name, const void** content, size_t* content_byte_size);
 
-  const std::string model_name_;
-  const int64_t version_;
-  InferRequestHeader request_header_;
+  const InferenceRequest irequest_;
 
   // Input content overrides. Multiple maps can be provided but a
   // given tensor must not appear in more than one map.
@@ -264,10 +155,9 @@ class InferRequestProvider {
 //
 class NULLInferRequestProvider : public InferRequestProvider {
  public:
-  explicit NULLInferRequestProvider(const InferRequestHeader& request_header)
-      : InferRequestProvider("<NULL>", -1)
+  explicit NULLInferRequestProvider(const InferenceRequest& request)
+      : InferRequestProvider(request)
   {
-    request_header_ = request_header;
   }
 
   Status GetNextInputContent(
@@ -297,7 +187,7 @@ class InferResponseProvider {
       std::unordered_map<std::string, SecondaryLabelProvider>;
 
   static Status Create(
-      const InferRequestHeader& request_header,
+      const InferenceRequest& irequest,
       const std::shared_ptr<LabelProvider>& label_provider,
       TRTSERVER_ResponseAllocator* allocator,
       TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
@@ -352,17 +242,18 @@ class InferResponseProvider {
 
  private:
   InferResponseProvider(
-      const InferRequestHeader& request_header,
+      const InferenceRequest& irequest,
       const std::shared_ptr<LabelProvider>& label_provider,
       TRTSERVER_ResponseAllocator* allocator,
       TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
       TRTSERVER_ResponseAllocatorReleaseFn_t release_fn);
 
-  InferRequestHeader request_header_;
+  const InferenceRequest irequest_;
 
-  // Map from output name to the InferRequestHeader output information
+  // Map from output name to the InferenceRequest output information
   // for that output.
-  std::unordered_map<std::string, const InferRequestHeader::Output> output_map_;
+  std::unordered_map<std::string, const InferenceRequest::RequestedOutput>
+      output_map_;
 
   // Information about each output.
   struct Output {

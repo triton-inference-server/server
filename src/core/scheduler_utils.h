@@ -32,8 +32,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
-using PendingBatchShapes =
-    std::unordered_map<std::string, std::pair<DimsList, std::vector<int64_t>>>;
+using PendingBatchShapes = std::unordered_map<
+    std::string, std::pair<std::vector<int64_t>, std::vector<int64_t>>>;
 
 Status InitPendingShape(
     const int64_t runner_id, const Scheduler::Payload& payload,

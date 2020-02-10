@@ -349,6 +349,39 @@ ValidateDimension(
 }
 
 Status
+ValidateDimension(
+    const std::vector<int64_t>& this_dims, const nvinfer1::Dims& min_dims,
+    const nvinfer1::Dims& max_dims, const bool skip_first_dimension)
+{
+  const int nonbatch_start_idx = (skip_first_dimension ? 1 : 0);
+  if (int(this_dims.size() + nonbatch_start_idx) != max_dims.nbDims) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "model expected " +
+            std::to_string(max_dims.nbDims - nonbatch_start_idx) +
+            " dimensions but received " + std::to_string(this_dims.size()) +
+            " dimensions");
+  }
+
+  for (int i = 0; i < int(this_dims.size()); i++) {
+    if (this_dims[i] == -1) {
+      continue;
+    }
+    if (this_dims[i] < min_dims.d[i + nonbatch_start_idx] ||
+        this_dims[i] > max_dims.d[i + nonbatch_start_idx]) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "model expected the shape of dimension " + std::to_string(i) +
+              " to be between " +
+              std::to_string(min_dims.d[i + nonbatch_start_idx]) + " and " +
+              std::to_string(max_dims.d[i + nonbatch_start_idx]) +
+              " but received " + std::to_string(this_dims[i]));
+    }
+  }
+  return Status::Success;
+}
+
+Status
 ValidateControlDimsDynamic(
     const nvinfer1::Dims& dims, const bool support_batching)
 {

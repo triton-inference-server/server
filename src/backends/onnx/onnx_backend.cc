@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -138,7 +138,7 @@ OnnxBackend::CreateExecutionContextsHelper(
         Run(runner_idx, payloads, func);
       },
       [this](
-          uint32_t runner_idx, const InferRequestHeader::Input& input,
+          uint32_t runner_idx, const InferenceRequest::Input& input,
           const Scheduler::Payload& payload,
           std::vector<int64_t>* shape) -> Status { return Status::Success; }));
 
@@ -556,7 +556,7 @@ OnnxBackend::Context::Run(
               name_ + "'");
     }
 
-    total_batch_size += payload.request_provider_->RequestHeader().batch_size();
+    total_batch_size += payload.request_provider_->Request().BatchSize();
 
     // All payloads must have equally-sized input tensors so use any
     // payload as the representative for the input tensors.
@@ -594,8 +594,9 @@ OnnxBackend::Context::Run(
   std::vector<const char*> input_names;
   bool cuda_copy = false;
 
-  for (const auto& input : input_request_provider->RequestHeader().input()) {
-    const std::string& name = input.name();
+  for (const auto& pr : input_request_provider->Request().Inputs()) {
+    const auto& input = pr.second;
+    const std::string& name = input.Name();
 
     const ModelInput* input_config;
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
@@ -604,7 +605,7 @@ OnnxBackend::Context::Run(
     // payload batch size. Concatenate input values from each payload
     // into the corresponding tensor.
     RETURN_IF_ERROR(SetInputTensor(
-        name, input_config->data_type(), input.dims(), total_batch_size,
+        name, input_config->data_type(), input.Shape(), total_batch_size,
         payloads, &input_buffers, &inputs, &input_names, &cuda_copy));
   }
 
@@ -695,8 +696,9 @@ OnnxBackend::Context::Run(
 
 Status
 OnnxBackend::Context::SetInputTensor(
-    const std::string& name, const DataType data_type, const DimsList& dims,
-    size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
+    const std::string& name, const DataType data_type,
+    const std::vector<int64_t>& dims, size_t total_batch_size,
+    std::vector<Scheduler::Payload>* payloads,
     std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
     std::vector<InputInfo>* inputs, std::vector<const char*>* input_names,
     bool* cuda_used)
@@ -720,17 +722,17 @@ OnnxBackend::Context::SetInputTensor(
   std::vector<size_t> expected_byte_sizes;
   std::vector<size_t> expected_element_cnts;
   for (auto& payload : *payloads) {
-    const auto& request_header = payload.request_provider_->RequestHeader();
+    const auto& irequest = payload.request_provider_->Request();
 
-    expected_element_cnts.push_back(
-        request_header.batch_size() * batch1_element_cnt);
+    expected_element_cnts.push_back(irequest.BatchSize() * batch1_element_cnt);
 
     if (data_type == TYPE_STRING) {
       // For String data byte, obtain expected byte size from 'batch_byte_size'
       // The provider has already checked that batch_byte_size is set
-      for (const auto& in : request_header.input()) {
-        if (in.name() == name) {
-          expected_byte_sizes.push_back(in.batch_byte_size());
+      for (const auto& pr : irequest.Inputs()) {
+        const auto& in = pr.second;
+        if (in.Name() == name) {
+          expected_byte_sizes.push_back(in.BatchByteSize());
           break;
         }
       }
@@ -1001,10 +1003,9 @@ OnnxBackend::Context::SetStringOutputBuffer(
   size_t element_idx = 0;
   bool cuda_copy = false;
   for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
+    const InferenceRequest& irequest = payload.request_provider_->Request();
     const size_t expected_element_cnt =
-        request_header.batch_size() * batch1_element_cnt;
+        irequest.BatchSize() * batch1_element_cnt;
 
     // If 'payload' requested this output then copy it from
     // 'content'. If it did not request this output then just

@@ -56,7 +56,7 @@ class InferenceBackend {
   // Get the configuration of model being served.
   const ModelConfig& Config() const { return config_; }
 
-  // Get the metric reportoer for the model being served.
+  // Get the metric reporter for the model being served.
   const std::shared_ptr<MetricModelReporter>& MetricReporter() const
   {
     return metric_reporter_;
@@ -86,9 +86,6 @@ class InferenceBackend {
       const std::shared_ptr<InferRequestProvider>& request_provider,
       const std::shared_ptr<InferResponseProvider>& response_provider,
       std::function<void(const Status&)> OnCompleteHandleInfer);
-
-  uint32_t ProtocolVersion() const { return protocol_version_; }
-  void SetProtocolVersion(const uint32_t v) { protocol_version_ = v; }
 
  protected:
   // Run model on the context associated with 'runner_idx' to
@@ -125,7 +122,7 @@ class InferenceBackend {
 
     std::string sample_name_;
     size_t batch_size_;
-    InferRequestHeader request_header_;
+    InferenceRequest irequest_;
     std::unordered_map<std::string, std::shared_ptr<Memory>> input_buffer_;
     std::shared_ptr<InferRequestProvider::InputOverrideMap> input_override_;
 
@@ -161,9 +158,6 @@ class InferenceBackend {
 
   // Path to model
   std::string model_dir_;
-
-  // To be removed when protocol version no longer needed...
-  uint32_t protocol_version_;
 };
 
 }}  // namespace nvidia::inferenceserver
