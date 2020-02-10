@@ -77,9 +77,6 @@ class HTTPAPIServer : public HTTPServer {
           std::string,
           std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>>;
 
-  // Class object associated to evhtp thread, requests received are bounded
-  // with the thread that accepts it. Need to keep track of that and let the
-  // corresponding thread send back the reply
   class InferRequest {
    public:
     InferRequest(
@@ -101,9 +98,9 @@ class HTTPAPIServer : public HTTPServer {
         TRTSERVER_InferenceResponse* response, void* userp);
     std::string FinalizeResponse(TRTSERVER_InferenceResponse* response);
 
-    #ifdef TRTIS_ENABLE_TRACING
-        std::unique_ptr<TraceMetaData> trace_meta_data_;
-    #endif  // TRTIS_ENABLE_TRACING
+#ifdef TRTIS_ENABLE_TRACING
+    std::unique_ptr<TraceMetaData> trace_meta_data_;
+#endif  // TRTIS_ENABLE_TRACING
 
     ResponseMetaData response_meta_data_;
 
@@ -811,7 +808,7 @@ HTTPAPIServer::Infer(h2o_handler_t* _self, h2o_req_t* req)
   }
 
 #ifdef TRTIS_ENABLE_TRACING
-  // Timestamps from evhtp are capture in 'req'. We record here since
+  // Timestamps from h2o are capture in 'req'. We record here since
   // this is the first place where we have a tracer.
   std::unique_ptr<TraceMetaData> trace_meta_data;
   if (self->http_server->trace_manager_ != nullptr) {
@@ -823,27 +820,21 @@ HTTPAPIServer::Infer(h2o_handler_t* _self, h2o_req_t* req)
           TIMEVAL_TO_NANOS(req->timestamps.request_begin_at));
       trace_meta_data->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "http recv end",
-          TIMEVAL_TO_NANOS(req->timestamps.request_body_begin_at));
+          TIMEVAL_TO_NANOS(req->processed_at.at));
     }
   }
 #endif  // TRTIS_ENABLE_TRACING
 
-  // Work around for h2o bug forces headers to lower case
-  char kInferHeaderLower[sizeof(kInferRequestHTTPHeader)];
-  for (size_t i = 0; i < sizeof(kInferRequestHTTPHeader); i++) {
-    kInferHeaderLower[i] = std::tolower(kInferRequestHTTPHeader[i]);
-  }
-  ssize_t infer_request_cursor =
-      h2o_find_header_by_str(&req->headers, H2O_STRLIT(kInferHeaderLower), -1);
-
   InferRequestHeader request_header_protobuf;
+  ssize_t infer_request_cursor = h2o_find_header_by_str(
+      &req->headers, H2O_STRLIT(kInferRequestHTTPHeaderLowerCase), -1);
   if (infer_request_cursor != -1) {
     h2o_iovec_t* slot = &req->headers.entries[infer_request_cursor].value;
     std::string infer_request_header = std::string(slot->base, slot->len);
     if (!google::protobuf::TextFormat::ParseFromString(
             infer_request_header, &request_header_protobuf)) {
       req->res.status = 400;
-      req->res.reason = "Bad Request";
+      req->res.reason = "Unable to parse inference request";
       h2o_generator_t generator = {NULL, NULL};
       h2o_iovec_t body = h2o_strdup(&req->pool, "", SIZE_MAX);
       h2o_start_response(req, &generator);
