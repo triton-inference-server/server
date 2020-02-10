@@ -87,6 +87,9 @@ class InferenceBackend {
       const std::shared_ptr<InferResponseProvider>& response_provider,
       std::function<void(const Status&)> OnCompleteHandleInfer);
 
+  uint32_t ProtocolVersion() const { return protocol_version_; }
+  void SetProtocolVersion(const uint32_t v) { protocol_version_ = v; }
+
  protected:
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
@@ -158,6 +161,9 @@ class InferenceBackend {
 
   // Path to model
   std::string model_dir_;
+
+  // To be removed when protocol version no longer needed...
+  uint32_t protocol_version_;
 };
 
 }}  // namespace nvidia::inferenceserver

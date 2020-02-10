@@ -43,6 +43,22 @@ NormalizeRequestHeader(
   const std::string& model_name = is.Name();
   const ModelConfig& model_config = is.Config();
 
+  // FIXMEV2 For V2 protocol we must adjust the shape of the input
+  // tensors to remove the batch dimension and instead report that as
+  // batch-size.
+  if (is.ProtocolVersion() == 2) {
+    if (model_config.max_batch_size() == 0) {
+      request_header.set_batch_size(1);
+    } else {
+      // All inputs should have same size in first dimension (the
+      // batch dimension).
+      for (InferRequestHeader::Input& io : *request_header.mutable_input()) {
+        request_header.set_batch_size(io.dims(0));
+        io.mutable_dims()->erase(io.dims().begin());
+      }
+    }
+  }
+
   // Make sure the request has a batch-size > 0. Even for models that
   // don't support batching the requested batch size must be 1.
   if (request_header.batch_size() < 1) {

@@ -32,39 +32,74 @@ cmake_minimum_required (VERSION 3.5)
 set(GRPC_ENDPOINT_OBJECTS "")
 set(GRPC_ENDPOINT_LIBRARIES "")
 
-if(${TRTIS_ENABLE_GRPC})
-  set(
-    GRPC_ENDPOINT_SRCS
-    grpc_server.cc
-  )
+if(${TRTIS_ENABLE_GRPC} OR ${TRTIS_ENABLE_GRPC_V2})
 
-  set(
-    GRPC_ENDPOINT_HDRS
-    grpc_server.h
-  )
+  if(${TRTIS_ENABLE_GRPC})
+    list(APPEND
+      GRPC_ENDPOINT_SRCS
+      grpc_server.cc
+      )
+
+    list(APPEND
+      GRPC_ENDPOINT_HDRS
+      grpc_server.h
+      )
+  endif() # TRTIS_ENABLE_GRPC
+
+  if(${TRTIS_ENABLE_GRPC_V2})
+    list(APPEND
+      GRPC_ENDPOINT_SRCS
+      grpc_server_v2.cc
+      )
+
+    list(APPEND
+      GRPC_ENDPOINT_HDRS
+      grpc_server_v2.h
+      )
+  endif() # TRTIS_ENABLE_GRPC_V2
 
   add_library(
     grpc-endpoint-library EXCLUDE_FROM_ALL OBJECT
     ${GRPC_ENDPOINT_SRCS} ${GRPC_ENDPOINT_HDRS}
-  )
+    )
+
   if(${TRTIS_ENABLE_GPU})
     target_include_directories(grpc-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
   endif() # TRTIS_ENABLE_GPU
-  add_dependencies(grpc-endpoint-library grpc-library proto-library)
+
+  add_dependencies(grpc-endpoint-library proto-library)
+  if(${TRTIS_ENABLE_GRPC})
+    add_dependencies(grpc-endpoint-library grpc-library)
+  endif() # TRTIS_ENABLE_GRPC
+  if(${TRTIS_ENABLE_GRPC_V2})
+    add_dependencies(grpc-endpoint-library grpc-v2-library)
+  endif() # TRTIS_ENABLE_GRPC_V2
 
   set(
     GRPC_ENDPOINT_OBJECTS
     $<TARGET_OBJECTS:grpc-endpoint-library>
-    $<TARGET_OBJECTS:grpc-library>
     $<TARGET_OBJECTS:proto-library>
-  )
+    )
+  if(${TRTIS_ENABLE_GRPC})
+    list(APPEND
+      GRPC_ENDPOINT_OBJECTS
+      $<TARGET_OBJECTS:grpc-library>
+      )
+  endif() # TRTIS_ENABLE_GRPC
+  if(${TRTIS_ENABLE_GRPC_V2})
+    list(APPEND
+      GRPC_ENDPOINT_OBJECTS
+      $<TARGET_OBJECTS:grpc-v2-library>
+      )
+  endif() # TRTIS_ENABLE_GRPC_V2
+
   set(
     GRPC_ENDPOINT_LIBRARIES
     PRIVATE gRPC::grpc++
     PRIVATE gRPC::grpc
     PRIVATE protobuf::libprotobuf
-  )
-endif() # TRTIS_ENABLE_GRPC
+    )
+endif() # TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 
 #
 # http endpoint

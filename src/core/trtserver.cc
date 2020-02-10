@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -273,6 +273,12 @@ class TrtServerOptions {
   const std::string& ServerId() const { return server_id_; }
   void SetServerId(const char* id) { server_id_ = id; }
 
+  uint32_t ServerProtocolVersion() const { return server_protocol_version_; }
+  void SetServerProtocolVersion(const uint32_t v)
+  {
+    server_protocol_version_ = v;
+  }
+
   const std::set<std::string>& ModelRepositoryPaths() const
   {
     return repo_paths_;
@@ -326,6 +332,7 @@ class TrtServerOptions {
 
  private:
   std::string server_id_;
+  uint32_t server_protocol_version_;
   std::set<std::string> repo_paths_;
   ni::ModelControlMode model_control_mode_;
   std::set<std::string> models_;
@@ -343,11 +350,11 @@ class TrtServerOptions {
 };
 
 TrtServerOptions::TrtServerOptions()
-    : server_id_("inference:0"), model_control_mode_(ni::MODE_POLL),
-      exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
-      metrics_(true), gpu_metrics_(true), exit_timeout_(30),
-      pinned_memory_pool_size_(1 << 28), tf_soft_placement_(true),
-      tf_gpu_mem_fraction_(0)
+    : server_id_("inference:0"), server_protocol_version_(1),
+      model_control_mode_(ni::MODE_POLL), exit_on_error_(true),
+      strict_model_config_(true), strict_readiness_(true), metrics_(true),
+      gpu_metrics_(true), exit_timeout_(30), pinned_memory_pool_size_(1 << 28),
+      tf_soft_placement_(true), tf_gpu_mem_fraction_(0)
 {
 #ifndef TRTIS_ENABLE_METRICS
   metrics_ = false;
@@ -562,6 +569,10 @@ TrtServerRequestProvider::Init(ni::InferenceServer* server)
   // normalize the request).
   RETURN_IF_STATUS_ERROR(
       server->GetInferenceBackend(ModelName(), ModelVersion(), &backend_));
+
+  // FIXMEV2. We are redundantly setting this every time.. ok for now
+  // since will be removed once protocol version is no longer needed.
+  backend_->SetProtocolVersion(server->ProtocolVersion());
 
   return request_options_->Normalize(backend_.get());
 }
@@ -1231,6 +1242,15 @@ TRTSERVER_ServerOptionsSetServerId(
 }
 
 TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetServerProtocolVersion(
+    TRTSERVER_ServerOptions* options, const uint32_t server_protocol_version)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetServerProtocolVersion(server_protocol_version);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetModelRepositoryPath(
     TRTSERVER_ServerOptions* options, const char* model_repository_path)
 {
@@ -1455,6 +1475,7 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
 #endif  // TRTIS_ENABLE_METRICS_GPU
 
   lserver->SetId(loptions->ServerId());
+  lserver->SetProtocolVersion(loptions->ServerProtocolVersion());
   lserver->SetModelRepositoryPaths(loptions->ModelRepositoryPaths());
   lserver->SetModelControlMode(loptions->ModelControlMode());
   lserver->SetStartupModels(loptions->StartupModels());
@@ -1509,6 +1530,32 @@ TRTSERVER_ServerId(TRTSERVER_Server* server, const char** id)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
   *id = lserver->Id().c_str();
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerVersion(TRTSERVER_Server* server, const char** version)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  *version = lserver->Version().c_str();
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerExtensions(
+    TRTSERVER_Server* server, const char* const** extensions,
+    uint64_t* extensions_count)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  const std::vector<const char*>& exts = lserver->Extensions();
+  if (exts.empty()) {
+    *extensions_count = 0;
+    *extensions = nullptr;
+  } else {
+    *extensions_count = exts.size();
+    *extensions = &(lserver->Extensions()[0]);
+  }
+
   return nullptr;  // Success
 }
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,6 +36,8 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+add_definitions(-DTRTIS_VERSION="${TRTIS_VERSION}")
 
 if(${TRTIS_ENABLE_ASAN})
   set(CMAKE_BUILD_TYPE Debug)
@@ -77,6 +79,10 @@ endif() # TRTIS_ENABLE_GRPC
 if(${TRTIS_ENABLE_HTTP_V2})
   add_definitions(-DTRTIS_ENABLE_HTTP_V2=1)
 endif() # TRTIS_ENABLE_HTTP_V2
+
+if(${TRTIS_ENABLE_GRPC_V2})
+  add_definitions(-DTRTIS_ENABLE_GRPC_V2=1)
+endif() # TRTIS_ENABLE_GRPC_V2
 
 if(${TRTIS_ENABLE_METRICS})
   add_definitions(-DTRTIS_ENABLE_METRICS=1)
@@ -172,7 +178,7 @@ include_directories(${Protobuf_INCLUDE_DIRS})
 #
 # GRPC
 #
-if(${TRTIS_ENABLE_GRPC})
+if(${TRTIS_ENABLE_GRPC} OR ${TRTIS_ENABLE_GRPC_V2})
   find_package(gRPC CONFIG REQUIRED)
   message(STATUS "Using gRPC ${gRPC_VERSION}")
   include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)

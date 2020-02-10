@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -105,24 +105,24 @@ RequestStatusUtil::NextUniqueRequestId()
 TRTSERVER_Error*
 SetTRTSERVER_InferenceRequestOptions(
     TRTSERVER_InferenceRequestOptions* request_options,
-    InferRequestHeader request_header_protobuf)
+    const InferRequestHeader& request_header)
 {
   RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetId(
-      request_options, request_header_protobuf.id()));
+      request_options, request_header.id()));
   RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetFlags(
-      request_options, request_header_protobuf.flags()));
+      request_options, request_header.flags()));
   RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetCorrelationId(
-      request_options, request_header_protobuf.correlation_id()));
+      request_options, request_header.correlation_id()));
   RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetBatchSize(
-      request_options, request_header_protobuf.batch_size()));
+      request_options, request_header.batch_size()));
 
-  for (const auto& input : request_header_protobuf.input()) {
+  for (const auto& input : request_header.input()) {
     RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddInput(
         request_options, input.name().c_str(), input.dims().data(),
         input.dims_size(), input.batch_byte_size()));
   }
 
-  for (const auto& output : request_header_protobuf.output()) {
+  for (const auto& output : request_header.output()) {
     if (output.has_cls()) {
       RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddClassificationOutput(
           request_options, output.name().c_str(), output.cls().count()));
@@ -133,6 +133,48 @@ SetTRTSERVER_InferenceRequestOptions(
   }
   return nullptr;  // Success
 }
+
+#ifdef TRTIS_ENABLE_GRPC_V2
+
+TRTSERVER_Error*
+SetInferenceRequestOptions(
+    TRTSERVER_InferenceRequestOptions* request_options,
+    const ModelInferRequest& request)
+{
+  // FIXMEV2 Fix request ID to be a string.
+  RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetId(
+      request_options, 0 /*request.id()*/));
+  // FIXMEV2 parameters
+  // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetFlags(
+  //    request_options, request_header.flags()));
+  RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetCorrelationId(
+      request_options, request.sequence_id()));
+  // FIXMEV2 batch-size
+  // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetBatchSize(
+  //   request_options, request_header.batch_size()));
+
+  // FIXMEV2 raw contents size?? Do we need it?
+  for (const auto& input : request.inputs()) {
+    RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddInput(
+        request_options, input.name().c_str(), input.shape().data(),
+        input.shape_size(), input.contents().raw_contents().size()));
+  }
+
+  for (const auto& output : request.outputs()) {
+    // FIXMEV2 parameters
+    // if (output.has_cls()) {
+    //  RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddClassificationOutput(
+    //      request_options, output.name().c_str(), output.cls().count()));
+    //} else
+    {
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddOutput(
+          request_options, output.name().c_str()));
+    }
+  }
+  return nullptr;  // Success
+}
+
+#endif  // TRTIS_ENABLE_GRPC_V2
 
 std::string
 MemoryTypeString(TRTSERVER_Memory_Type memory_type)
@@ -147,6 +189,43 @@ MemoryTypeString(TRTSERVER_Memory_Type memory_type)
     default:
       return "unknown memory type";
   }
+}
+
+const char*
+GetDataTypeProtocolString(const DataType dtype)
+{
+  switch (dtype) {
+    case TYPE_BOOL:
+      return "BOOL";
+    case TYPE_UINT8:
+      return "UINT8";
+    case TYPE_UINT16:
+      return "UINT16";
+    case TYPE_UINT32:
+      return "UINT32";
+    case TYPE_UINT64:
+      return "UINT64";
+    case TYPE_INT8:
+      return "INT8";
+    case TYPE_INT16:
+      return "INT16";
+    case TYPE_INT32:
+      return "INT32";
+    case TYPE_INT64:
+      return "INT64";
+    case TYPE_FP16:
+      return "FP16";
+    case TYPE_FP32:
+      return "FP32";
+    case TYPE_FP64:
+      return "FP64";
+    case TYPE_STRING:
+      return "STRING";
+    default:
+      break;
+  }
+
+  return "";
 }
 
 }}  // namespace nvidia::inferenceserver

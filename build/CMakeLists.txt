@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,6 +45,7 @@ option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" OFF)
 option(TRTIS_ENABLE_HTTP "Include HTTP API in server" ON)
 option(TRTIS_ENABLE_GRPC "Include GRPC API in server" ON)
 option(TRTIS_ENABLE_HTTP_V2 "Enable version 2 of the HTTP API in server" OFF)
+option(TRTIS_ENABLE_GRPC_V2 "Enable version 2 of the GRPC API in server" OFF)
 option(TRTIS_ENABLE_METRICS "Include metrics support in server" ON)
 option(TRTIS_ENABLE_METRICS_GPU "Include GPU metrics support in server" ON)
 
@@ -68,6 +69,9 @@ option(TRTIS_ENABLE_ASAN "Build with address sanitizer" OFF)
 option(TRTIS_ENABLE_GPU "Enable GPU support in server/client" ON)
 set(TRTIS_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING
     "The minimum CUDA compute capability supported by TRTIS" )
+
+# Version
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION" TRTIS_VERSION)
 
 if(TRTIS_ENABLE_TRACING AND NOT TRTIS_ENABLE_STATS)
   message(FATAL_ERROR "TRTIS_ENABLE_TRACING=ON requires TRTIS_ENABLE_STATS=ON")
@@ -386,9 +390,6 @@ if (TRTIS_CLIENT_CMAKE_DIR)
   set(_CMAKE_TRTIS_DIR "-DTRTIS_DIR:PATH=${TRTIS_CLIENT_CMAKE_DIR}")
 endif()
 
-# version
-file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION" TRTIS_VERSION)
-
 ExternalProject_Add(trtis-clients
   PREFIX trtis-clients
   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis-clients"
@@ -429,9 +430,9 @@ endif() # TRTIS_ENABLE_S3
 if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} libevent libevhtp)
 endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
-if(${TRTIS_ENABLE_GRPC})
+if(${TRTIS_ENABLE_GRPC} OR ${TRTIS_ENABLE_GRPC_V2})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} grpc)
-endif() # TRTIS_ENABLE_GRPC
+endif() # TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 if(${TRTIS_ENABLE_METRICS})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} prometheus-cpp)
 endif() # TRTIS_ENABLE_METRICS
@@ -470,6 +471,7 @@ ExternalProject_Add(trtis
     -DTRTIS_ENABLE_HTTP:BOOL=${TRTIS_ENABLE_HTTP}
     -DTRTIS_ENABLE_GRPC:BOOL=${TRTIS_ENABLE_GRPC}
     -DTRTIS_ENABLE_HTTP_V2:BOOL=${TRTIS_ENABLE_HTTP_V2}
+    -DTRTIS_ENABLE_GRPC_V2:BOOL=${TRTIS_ENABLE_GRPC_V2}
     -DTRTIS_MIN_COMPUTE_CAPABILITY:STRING=${TRTIS_MIN_COMPUTE_CAPABILITY}
     -DTRTIS_ENABLE_METRICS:BOOL=${TRTIS_ENABLE_METRICS}
     -DTRTIS_ENABLE_METRICS_GPU:BOOL=${TRTIS_ENABLE_METRICS_GPU}
@@ -484,6 +486,7 @@ ExternalProject_Add(trtis
     -DTRTIS_ENABLE_CUSTOM:BOOL=${TRTIS_ENABLE_CUSTOM}
     -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_INSTALL_PREFIX}
+    -DTRTIS_VERSION:STRING=${TRTIS_VERSION}
   DEPENDS ${TRTIS_DEPENDS}
 )
 
