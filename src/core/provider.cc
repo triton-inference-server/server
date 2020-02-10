@@ -611,6 +611,11 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
       poutput->mutable_raw()->Clear();
       poutput->mutable_raw()->set_batch_byte_size(output.byte_size_);
 
+      // FIXMEV2 include batch dimension in V2 shape.
+      if ((is.ProtocolVersion() == 2) && (is.Config().max_batch_size() != 0)) {
+        poutput->mutable_raw()->add_dims(batch_size);
+      }
+
       // If there is a reshape them we need to record corresponding value for
       // variable-size dimensions so that we can set the output shape correctly.
       // If there is not a reshape then use output shape as that will have
@@ -633,7 +638,7 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
           }
         }
       } else {
-        poutput->mutable_raw()->mutable_dims()->CopyFrom(batch1_backend_shape);
+        poutput->mutable_raw()->mutable_dims()->MergeFrom(batch1_backend_shape);
       }
     } else {
       // Class result...

@@ -87,12 +87,17 @@ add_custom_command(
     crequest
     proto-py-library
     grpc-py-library
+    grpc-v2-py-library
 )
 
 add_custom_target(
   client-wheel ALL
   DEPENDS
     "${wheel_stamp_file}"
+)
+add_dependencies(
+  client-wheel
+  model-config-library grpc-library grpc-v2-library proto-library
 )
 
 file(

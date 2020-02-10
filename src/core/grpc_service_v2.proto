@@ -1,0 +1,798 @@
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto3";
+
+package nvidia.inferenceserver;
+
+//@@.. cpp:namespace:: nvidia::inferenceserver
+
+import "model_config.proto";
+
+//@@
+//@@.. cpp:var:: service InferenceService
+//@@
+//@@   Inference Server GRPC endpoints.
+//@@
+service GRPCInferenceService
+{
+  //@@  .. cpp:var:: rpc ServerLive(ServerLiveRequest) returns
+  //@@       (ServerLiveResponse)
+  //@@
+  //@@     Check liveness of the inference server.
+  //@@
+  rpc ServerLive(ServerLiveRequest) returns (ServerLiveResponse) {}
+
+  //@@  .. cpp:var:: rpc ServerReady(ServerReadyRequest) returns
+  //@@       (ServerReadyResponse)
+  //@@
+  //@@     Check readiness of the inference server.
+  //@@
+  rpc ServerReady(ServerReadyRequest) returns (ServerReadyResponse) {}
+
+  //@@  .. cpp:var:: rpc ModelReady(ModelReadyRequest) returns
+  //@@       (ModelReadyResponse)
+  //@@
+  //@@     Check readiness of a model in the inference server.
+  //@@
+  rpc ModelReady(ModelReadyRequest) returns (ModelReadyResponse) {}
+
+  //@@  .. cpp:var:: rpc ServerMetadata(ServerMetadataRequest) returns
+  //@@       (ServerMetadataResponse)
+  //@@
+  //@@     Get server metadata.
+  //@@
+  rpc ServerMetadata(ServerMetadataRequest) returns (ServerMetadataResponse) {}
+
+  //@@  .. cpp:var:: rpc ModelMetadata(ModelMetadataRequest) returns
+  //@@       (ModelMetadataResponse)
+  //@@
+  //@@     Get model metadata.
+  //@@
+  rpc ModelMetadata(ModelMetadataRequest) returns (ModelMetadataResponse) {}
+
+  //@@  .. cpp:var:: rpc ModelInfer(ModelInferRequest) returns
+  //@@       (ModelInferResponse)
+  //@@
+  //@@     Perform inference using a specific model.
+  //@@
+  rpc ModelInfer(ModelInferRequest) returns (ModelInferResponse) {}
+
+  //@@  .. cpp:var:: rpc ModelConfig(ModelConfigRequest) returns
+  //@@       (ModelConfigResponse)
+  //@@
+  //@@     Get model configuration.
+  //@@
+  rpc ModelConfig(ModelConfigRequest) returns (ModelConfigResponse) {}
+}
+
+//@@
+//@@.. cpp:var:: message ServerLiveRequest
+//@@
+//@@   Request message for ServerLive.
+//@@
+message ServerLiveRequest {}
+
+//@@
+//@@.. cpp:var:: message ServerLiveResponse
+//@@
+//@@   Response message for ServerLive.
+//@@
+message ServerLiveResponse
+{
+  //@@
+  //@@  .. cpp:var:: bool live
+  //@@
+  //@@     True if the inference server is live, false it not live.
+  //@@
+  bool live = 1;
+}
+
+//@@
+//@@.. cpp:var:: message ServerReadyRequest
+//@@
+//@@   Request message for ServerReady.
+//@@
+message ServerReadyRequest {}
+
+//@@
+//@@.. cpp:var:: message ServerReadyResponse
+//@@
+//@@   Response message for ServerReady.
+//@@
+message ServerReadyResponse
+{
+  //@@
+  //@@  .. cpp:var:: bool ready
+  //@@
+  //@@     True if the inference server is ready, false it not ready.
+  //@@
+  bool ready = 1;
+}
+
+//@@
+//@@.. cpp:var:: message ModelReadyRequest
+//@@
+//@@   Request message for ModelReady.
+//@@
+message ModelReadyRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the model to check for readiness.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: int64 version
+  //@@
+  //@@     The version of the model to check for readiness. If -1
+  //@@     the version of the model is selected automatically based
+  //@@     on the version policy.
+  //@@
+  int64 version = 2;
+}
+
+//@@
+//@@.. cpp:var:: message ModelReadyResponse
+//@@
+//@@   Response message for ModelReady.
+//@@
+message ModelReadyResponse
+{
+  //@@
+  //@@  .. cpp:var:: bool ready
+  //@@
+  //@@     True if the model is ready, false it not ready.
+  //@@
+  bool ready = 1;
+}
+
+//@@
+//@@.. cpp:var:: message ServerMetadataRequest
+//@@
+//@@   Request message for ServerMetadata.
+//@@
+message ServerMetadataRequest {}
+
+//@@
+//@@.. cpp:var:: message ServerMetadataResponse
+//@@
+//@@   Response message for ServerMetadata.
+//@@
+message ServerMetadataResponse
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The server name.
+  //@@
+  string name = 1;
+
+  //@@
+  //@@  .. cpp:var:: string version
+  //@@
+  //@@     The server version.
+  //@@
+  string version = 2;
+
+  //@@
+  //@@  .. cpp:var:: string extensions (repeated)
+  //@@
+  //@@     The extensions supported by the server.
+  //@@
+  repeated string extensions = 3;
+}
+
+//@@
+//@@.. cpp:var:: message ModelMetadataRequest
+//@@
+//@@   Request message for ModelMetadata.
+//@@
+message ModelMetadataRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the model.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: int64 version
+  //@@
+  //@@     The version of the model. If -1 the version of the model
+  //@@     is selected automatically based on the version policy.
+  //@@
+  int64 version = 2;
+}
+
+//@@
+//@@.. cpp:var:: message ModelMetadataResponse
+//@@
+//@@   Response message for ModelMetadata.
+//@@
+message ModelMetadataResponse
+{
+  //@@
+  //@@  .. cpp:var:: message TensorMetadata
+  //@@
+  //@@     Metadata for a tensor.
+  //@@
+  message TensorMetadata
+  {
+    //@@
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The tensor name.
+    //@@
+    string name = 1;
+
+    //@@
+    //@@    .. cpp:var:: string datatype
+    //@@
+    //@@       The tensor data type.
+    //@@
+    string datatype = 2;
+
+    //@@
+    //@@    .. cpp:var:: int64 shape (repeated)
+    //@@
+    //@@       The tensor shape. A variable-size dimension is represented
+    //@@       by a -1 value.
+    //@@
+    repeated int64 shape = 3;
+  }
+
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The model name.
+  //@@
+  string name = 1;
+
+  //@@
+  //@@  .. cpp:var:: int64 versions (repeated)
+  //@@
+  //@@     The versions of the model.
+  //@@
+  repeated int64 versions = 2;
+
+  //@@
+  //@@  .. cpp:var:: string platform
+  //@@
+  //@@     The model's platform.
+  //@@
+  string platform = 3;
+
+  //@@
+  //@@  .. cpp:var:: TensorMetadata inputs (repeated)
+  //@@
+  //@@     The model's inputs.
+  //@@
+  repeated TensorMetadata inputs = 4;
+
+  //@@
+  //@@  .. cpp:var:: TensorMetadata outputs (repeated)
+  //@@
+  //@@     The model's outputs.
+  //@@
+  repeated TensorMetadata outputs = 5;
+}
+
+//@@
+//@@.. cpp:var:: message InferParameter
+//@@
+//@@   An inference parameter value.
+//@@
+message InferParameter
+{
+  //@@
+  //@@  .. cpp:var:: message ResponseDetail
+  //@@
+  //@@     Value for a "response_detail" parameter.
+  //@@
+  message ResponseDetail
+  {
+    //@@    .. cpp:var:: bool model
+    //@@
+    //@@       Enable model information in response.
+    //@@
+    bool model = 1;
+
+    //@@    .. cpp:var:: bool request
+    //@@
+    //@@       Enable request information in response.
+    //@@
+    bool request = 2;
+
+    //@@    .. cpp:var:: bool statistics
+    //@@
+    //@@       Enable statistics information in response.
+    //@@
+    bool statistics = 3;
+
+    //@@    .. cpp:var:: bool parameters
+    //@@
+    //@@       Enable parameter information in response.
+    //@@
+    bool parameters = 4;
+  }
+
+  //@@  .. cpp:var:: oneof parameter_choice
+  //@@
+  //@@     The parameter value can be a string, an int64, a boolean
+  //@@     or a message specific to a predefined parameter.
+  //@@
+  oneof parameter_choice
+  {
+    //@@    .. cpp:var:: bool bool_param
+    //@@
+    //@@       A boolean parameter value.
+    //@@
+    bool bool_param = 1;
+
+    //@@    .. cpp:var:: int64 int64_param
+    //@@
+    //@@       An int64 parameter value.
+    //@@
+    int64 int64_param = 2;
+
+    //@@    .. cpp:var:: bytes string_param
+    //@@
+    //@@       A string parameter value.
+    //@@
+    bytes string_param = 3;
+
+    //@@    .. cpp:var:: ResponseDetail response_detail_param
+    //@@
+    //@@       The parameter value for a "response_detail" parameter.
+    //@@
+    ResponseDetail response_detail_param = 4;
+  }
+}
+
+//@@
+//@@.. cpp:var:: message StatisticDuration
+//@@
+//@@   Statistic recording a cumulative duration metric.
+//@@
+message StatisticDuration
+{
+  //@@  .. cpp:var:: uint64 count
+  //@@
+  //@@     Cumulative number of times this metric occurred.
+  //@@
+  uint64 count = 1;
+
+  //@@  .. cpp:var:: uint64 total_time_ns
+  //@@
+  //@@     Total collected duration of this metric in nanoseconds.
+  //@@
+  uint64 ns = 2;
+}
+
+//@@
+//@@.. cpp:var:: message InferStatistics
+//@@
+//@@   Inference statistics.
+//@@
+message InferStatistics
+{
+  //@@  .. cpp:var:: StatisticDuration success
+  //@@
+  //@@     Total time required to handle successful inference requests,
+  //@@     not including HTTP or GRPC endpoint time.
+  //@@
+  StatisticDuration success = 1;
+
+  //@@  .. cpp:var:: StatisticDuration fail
+  //@@
+  //@@     Total time required to handle failed inference requests,
+  //@@     not including HTTP or GRPC endpoint time.
+  //@@
+  StatisticDuration fail = 2;
+
+  //@@  .. cpp:var:: StatisticDuration queue
+  //@@
+  //@@     Total time inference requests are queued waiting for inference
+  //@@     resources.
+  //@@
+  StatisticDuration queue = 3;
+
+  //@@  .. cpp:var:: StatisticDuration compute_input
+  //@@
+  //@@     Total time spent preparing input tensors for inferencing, including
+  //@@     time required to copy tensor data to GPU memory.
+  //@@
+  StatisticDuration compute_input = 4;
+
+  //@@  .. cpp:var:: StatisticDuration compute_infer
+  //@@
+  //@@     Total time spent executing model to compute the output tensors.
+  //@@
+  StatisticDuration compute_infer = 5;
+
+  //@@  .. cpp:var:: StatisticDuration compute_output
+  //@@
+  //@@     Total time spent collecting output tensor results, including
+  //@@     time required to copy tensor data from GPU memory.
+  //@@
+  StatisticDuration compute_output = 6;
+}
+
+//@@
+//@@.. cpp:var:: message InferTensorContents
+//@@
+//@@   The data contained in a tensor. For a given data type the
+//@@   tensor contents can be represented in "raw" bytes form or in
+//@@   the repeated type that matches the tensor's data type. Protobuf
+//@@   oneof is not used because oneofs cannot contain repeated fields.
+//@@
+message InferTensorContents
+{
+  //@@
+  //@@  .. cpp:var:: bytes raw_contents
+  //@@
+  //@@     Raw representation of the tensor contents. The size of this
+  //@@     content must match what is expected by the tensor's shape
+  //@@     and data type. The raw data must be the flattened, one-dimensional,
+  //@@     row-major order of the tensor elements without any stride or padding
+  //@@     between the elements. Note that the FP16 data type must be
+  //@@     represented as raw content as there is no standard support for a
+  //@@     16-bit float type.
+  //@@
+  bytes raw_contents = 1;
+
+  //@@
+  //@@  .. cpp:var:: bool bool_contents (repeated)
+  //@@
+  //@@     Representation for BOOL data type. The size must match what is
+  //@@     expected by the tensor's shape. The contents must be the flattened,
+  //@@     one-dimensional, row-major order of the tensor elements.
+  //@@
+  repeated bool bool_contents = 2;
+
+  //@@
+  //@@  .. cpp:var:: int32 int_contents (repeated)
+  //@@
+  //@@     Representation for INT8, INT16, and INT32 data types. The size
+  //@@     must match what is expected by the tensor's shape. The contents
+  //@@     must be the flattened, one-dimensional, row-major order of the
+  //@@     tensor elements.
+  //@@
+  repeated int32 int_contents = 3;
+
+  //@@
+  //@@  .. cpp:var:: int64 int64_contents (repeated)
+  //@@
+  //@@     Representation for INT64 data types. The size must match what
+  //@@     is expected by the tensor's shape. The contents must be the
+  //@@     flattened, one-dimensional, row-major order of the tensor elements.
+  //@@
+  repeated int64 int64_contents = 4;
+
+  //@@
+  //@@  .. cpp:var:: uint32 uint_contents (repeated)
+  //@@
+  //@@     Representation for UINT8, UINT16, and UINT32 data types. The size
+  //@@     must match what is expected by the tensor's shape. The contents
+  //@@     must be the flattened, one-dimensional, row-major order of the
+  //@@     tensor elements.
+  //@@
+  repeated uint32 uint_contents = 5;
+
+  //@@
+  //@@  .. cpp:var:: uint64 uint64_contents (repeated)
+  //@@
+  //@@     Representation for UINT64 data types. The size must match what
+  //@@     is expected by the tensor's shape. The contents must be the
+  //@@     flattened, one-dimensional, row-major order of the tensor elements.
+  //@@
+  repeated uint64 uint64_contents = 6;
+
+  //@@
+  //@@  .. cpp:var:: float fp32_contents (repeated)
+  //@@
+  //@@     Representation for FP32 data type. The size must match what is
+  //@@     expected by the tensor's shape. The contents must be the flattened,
+  //@@     one-dimensional, row-major order of the tensor elements.
+  //@@
+  repeated float fp32_contents = 7;
+
+  //@@
+  //@@  .. cpp:var:: double fp64_contents (repeated)
+  //@@
+  //@@     Representation for FP64 data type. The size must match what is
+  //@@     expected by the tensor's shape. The contents must be the flattened,
+  //@@     one-dimensional, row-major order of the tensor elements.
+  //@@
+  repeated double fp64_contents = 8;
+
+  //@@
+  //@@  .. cpp:var:: bytes string_contents (repeated)
+  //@@
+  //@@     Representation for STRING data type. The size must match what is
+  //@@     expected by the tensor's shape. The contents must be the flattened,
+  //@@     one-dimensional, row-major order of the tensor elements.
+  //@@
+  repeated bytes string_contents = 9;
+}
+
+//@@
+//@@.. cpp:var:: message ModelInferRequest
+//@@
+//@@   Request message for ModelInfer.
+//@@
+message ModelInferRequest
+{
+  //@@
+  //@@  .. cpp:var:: message InferInputTensor
+  //@@
+  //@@     An input tensor for an inference request.
+  //@@
+  message InferInputTensor
+  {
+    //@@
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The tensor name.
+    //@@
+    string name = 1;
+
+    //@@
+    //@@    .. cpp:var:: string datatype
+    //@@
+    //@@       The tensor data type.
+    //@@
+    string datatype = 2;
+
+    //@@
+    //@@    .. cpp:var:: int64 shape (repeated)
+    //@@
+    //@@       The tensor shape.
+    //@@
+    repeated int64 shape = 3;
+
+    //@@    .. cpp:var:: map<string,InferParameter> parameters
+    //@@
+    //@@       Optional inference input tensor parameters.
+    //@@
+    map<string, InferParameter> parameters = 4;
+
+    //@@    .. cpp:var:: InferTensorContents
+    //@@
+    //@@       The input tensor data.
+    //@@
+    InferTensorContents contents = 5;
+  }
+
+  //@@
+  //@@  .. cpp:var:: message InferRequestedOutputTensor
+  //@@
+  //@@     An output tensor requested for an inference request.
+  //@@
+  message InferRequestedOutputTensor
+  {
+    //@@
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The tensor name.
+    //@@
+    string name = 1;
+
+    //@@    .. cpp:var:: map<string,InferParameter> parameters
+    //@@
+    //@@       Optional requested output tensor parameters.
+    //@@
+    map<string, InferParameter> parameters = 2;
+
+    //@@
+    //@@    .. cpp:var:: string data_format
+    //@@
+    //@@       Format to use to return the output tensor data. Options
+    //@@       are "explicit", "binary" and "shared_memory".
+    //@@       Default is "binary". If "shared_memory" is specified then
+    //@@       the "shared_memory_data" field must also be specified.
+    //@@       Server support for “binary” and “shared_memory”
+    //@@       is optional.
+    //@@
+    string data_format = 3;
+  }
+
+  //@@  .. cpp:var:: string model_name
+  //@@
+  //@@     The name of the model to use for inferencing.
+  //@@
+  string model_name = 1;
+
+  //@@  .. cpp:var:: int64 model_version
+  //@@
+  //@@     The version of the model to use for inference. If -1
+  //@@     the latest/most-recent version of the model is used.
+  //@@
+  int64 model_version = 2;
+
+  //@@  .. cpp:var:: string id
+  //@@
+  //@@     Optional identifier for the request. If specified will be
+  //@@     returned in the response.
+  //@@
+  string id = 3;
+
+  //@@  .. cpp:var:: map<string,InferParameter> parameters
+  //@@
+  //@@     Optional inference parameters.
+  //@@
+  map<string, InferParameter> parameters = 4;
+
+  //@@
+  //@@  .. cpp:var:: InferInputTensor inputs (repeated)
+  //@@
+  //@@     The input tensors for the inference.
+  //@@
+  repeated InferInputTensor inputs = 5;
+
+  //@@
+  //@@  .. cpp:var:: InferRequestedOutputTensor outputs (repeated)
+  //@@
+  //@@     The requested output tensors for the inference.
+  //@@
+  repeated InferRequestedOutputTensor outputs = 6;
+
+  //@@
+  //@@  .. cpp:var:: uin64 sequence_id
+  //@@
+  //@@     The sequence ID of the inference request. Default is 0, which
+  //@@     indicates that the request is not part of a sequence. The
+  //@@     sequence ID is used to indicate that two or more inference
+  //@@     requests are in the same sequence.
+  //@@
+  uint64 sequence_id = 7;
+}
+
+//@@
+//@@.. cpp:var:: message ModelInferResponse
+//@@
+//@@   Response message for ModelInfer.
+//@@
+message ModelInferResponse
+{
+  //@@
+  //@@  .. cpp:var:: message InferOutputTensor
+  //@@
+  //@@     An output tensor returned for an inference request.
+  //@@
+  message InferOutputTensor
+  {
+    //@@
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The tensor name.
+    //@@
+    string name = 1;
+
+    //@@
+    //@@    .. cpp:var:: string datatype
+    //@@
+    //@@       The tensor data type.
+    //@@
+    string datatype = 2;
+
+    //@@
+    //@@    .. cpp:var:: int64 shape (repeated)
+    //@@
+    //@@       The tensor shape.
+    //@@
+    repeated int64 shape = 3;
+
+    //@@    .. cpp:var:: InferTensorContents
+    //@@
+    //@@       The output tensor data.
+    //@@
+    InferTensorContents contents = 4;
+  }
+
+  //@@  .. cpp:var:: string model_name
+  //@@
+  //@@     The name of the model used for inferencing.
+  //@@
+  string model_name = 1;
+
+  //@@  .. cpp:var:: int64 model_version
+  //@@
+  //@@     The version of the model used for inference.
+  //@@
+  int64 model_version = 2;
+
+  //@@  .. cpp:var:: string id
+  //@@
+  //@@     The id of the inference request if one was specified.
+  //@@
+  string id = 3;
+
+  //@@  .. cpp:var:: map<string,InferParameter> parameters
+  //@@
+  //@@     Optional inference response parameters.
+  //@@
+  map<string, InferParameter> parameters = 4;
+
+  //@@  .. cpp:var:: ModelInferRequest request
+  //@@
+  //@@     Optionally returns the inference request that produced
+  //@@     this response.
+  //@@
+  ModelInferRequest request = 5;
+
+  //@@  .. cpp:var:: InferStatistics statistics
+  //@@
+  //@@     Optionally returns the inference statistics.
+  //@@
+  InferStatistics statistics = 6;
+
+  //@@
+  //@@  .. cpp:var:: InferOutputTensor outputs (repeated)
+  //@@
+  //@@     The output tensors holding inference results.
+  //@@
+  repeated InferOutputTensor outputs = 7;
+}
+
+//@@
+//@@.. cpp:var:: message ModelConfigRequest
+//@@
+//@@   Request message for ModelConfig.
+//@@
+message ModelConfigRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the model.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: int64 version
+  //@@
+  //@@     The version of the model. If -1 the version of the model
+  //@@     is selected automatically based on the version policy.
+  //@@
+  int64 version = 2;
+}
+
+//@@
+//@@.. cpp:var:: message ModelConfigResponse
+//@@
+//@@   Response message for ModelConfig.
+//@@
+message ModelConfigResponse
+{
+  //@@
+  //@@  .. cpp:var:: ModelConfig config
+  //@@
+  //@@     The model configuration.
+  //@@
+  ModelConfig config = 1;
+}

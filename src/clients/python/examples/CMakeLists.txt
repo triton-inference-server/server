@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,6 +31,8 @@ install(
     image_client.py
     ensemble_image_client.py
     grpc_image_client.py
+    grpc_v2_image_client.py
+    simple_grpc_v2_client.py
     simple_client.py
     simple_callback_client.py
     simple_string_client.py
