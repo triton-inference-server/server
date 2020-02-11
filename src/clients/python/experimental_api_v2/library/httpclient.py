@@ -25,97 +25,28 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from geventhttpclient import HTTPClient
-from geventhttpclient.connectionpool import ConnectionPool
 from geventhttpclient.url import URL
-from google.protobuf import text_format
 import rapidjson as json
+from google.protobuf import text_format
 
-import tensorrtserverV2.api.request_status_pb2 as request_status
+import tensorrtserver.api.request_status_pb2 as request_status
+from tensorrtserverV2.common import *
 
-def _raise_error(msg):
-    """
-    Raise error with the provided message
-    """
-    rstatus = request_status.RequestStatus()
-    rstatus.msg = msg
-    raise InferenceServerException(rstatus, msg_only=True)
 
-def _raise_if_error(nv_status):
+def raise_if_error(nv_status):
     """
     Raise InferenceServerException if 'nv_status' is non-success.
     Otherwise return the request ID.
     """
     rstatus = text_format.Parse(nv_status, request_status.RequestStatus())
     if not rstatus.code == request_status.RequestStatusCode.SUCCESS:
-        raise InferenceServerException(rstatus)
+        raise InferenceServerException(msg=rstatus.msg)
     else:
         return rstatus.request_id
 
 
-class InferenceServerException(Exception):
-    """Exception indicating non-Success status.
-
-    Parameters
-    ----------
-    err : RequestStatus Protobuf
-        The protobuf message describing the error
-
-    """
-
-    def __init__(self, err, msg_only=False):
-        self._msg = err.msg
-        if msg_only:
-            self._server_id = None
-            self._request_id = 0
-        else:
-            self._server_id = err.server_id
-            self._request_id = err.request_id
-
-    def __str__(self):
-        msg = super().__str__() if self._msg is None else self._msg
-        if self._server_id is not None:
-            msg = '[' + self._server_id + ' ' + str(
-                self._request_id) + '] ' + msg
-        return msg
-
-    def message(self):
-        """Get the exception message.
-
-        Returns
-        -------
-        str
-            The message associated with this exception, or None if no message.
-
-        """
-        return self._msg
-
-    def server_id(self):
-        """Get the ID of the server associated with this exception.
-
-        Returns
-        -------
-        str
-            The ID of the server associated with this exception, or
-            None if no server is associated.
-
-        """
-        return self._server_id
-
-    def request_id(self):
-        """Get the ID of the request with this exception.
-
-        Returns
-        -------
-        int
-            The ID of the request associated with this exception, or
-            0 (zero) if no request is associated.
-
-        """
-        return self._request_id
-
-
-class InferenceServerHTTPClient:
-    """An InferenceServerHTTPClient object is used to perform any kind of
+class InferenceServerClient:
+    """An InferenceServerClient object is used to perform any kind of
     communication with the InferenceServer using http protocol.
 
     Parameters
@@ -202,8 +133,8 @@ class InferenceServerHTTPClient:
             If unable to get liveness.
 
         """
-        self.response = self._client_stub.get("/api/health/live")
-        self._last_request_id = _raise_if_error(self.response['NV-Status'])
+        self.response = self._client_stub.get("/v2/health/live")
+        self._last_request_id = raise_if_error(self.response['NV-Status'])
         return self.response.status_code == 200
 
     def is_server_ready(self):
@@ -220,8 +151,8 @@ class InferenceServerHTTPClient:
             If unable to get readiness.
 
         """
-        self.response = self._client_stub.get("/api/health/ready")
-        self._last_request_id = _raise_if_error(self.response['NV-Status'])
+        self.response = self._client_stub.get("/v2/health/ready")
+        self._last_request_id = raise_if_error(self.response['NV-Status'])
         return self.response.status_code == 200
 
     def is_model_ready(self, model_name, model_version=-1):
@@ -248,70 +179,56 @@ class InferenceServerHTTPClient:
             If unable to get model readiness.
 
         """
-        self.response = self._client_stub.get("/api/status/" + model_name +
-                                              "?format=json")
-        self._last_request_id = _raise_if_error(self.response['NV-Status'])
+        raise_error('Not implemented')
 
-        status = json.loads(self.response.read())
-        if model_version == -1:
-            _raise_error('Currently not supported. Will be implemented as part of HTTP V2 API')
-        else:
-            if model_name in status['modelStatus'].keys() and \
-                str(model_version) in status['modelStatus']\
-                [model_name]['versionStatus'].keys() and \
-                status['modelStatus'][model_name]['versionStatus'] \
-                [str(model_version)]["readyState"] == 'MODEL_READY':
-                return True
-            else:
-                return False
-
-    def get_server_status(self):
-        """Contact the inference server and get its status.
+    def get_server_metadata(self):
+        """Contact the inference server and get its metadata.
 
         Returns
         -------
         object
-            The JSON object holding the status
+            The JSON object holding the metadata
 
         Raises
         ------
         InferenceServerException
-            If unable to get status.
+            If unable to get server metadata.
 
         """
 
-        self.response = self._client_stub.get("/api/status?format=json")
-        self._last_request_id = _raise_if_error(self.response['NV-Status'])
+        self.response = self._client_stub.get("/v2")
+        self._last_request_id = raise_if_error(self.response['NV-Status'])
 
         status = json.loads(self.response.read())
         return status
 
-    def get_model_status(self, model_name):
-        """Contact the inference server and get the status for specified model.
+    def get_model_metadata(self, model_name, model_version=-1):
+        """Contact the inference server and get the metadata for specified model.
 
         Parameters
         ----------
         model_name: str
-        The name of the model
+            The name of the model
 
         Returns
         -------
         object
-            The JSON object holding the model status
+            The JSON object holding the model metadata
 
         Raises
         ------
         InferenceServerException
-            If unable to get model status.
+            If unable to get model metadata.
 
         """
+        #self.response = self._client_stub.get("/api/status/" + model_name +
+        #                                      "?format=json")
+        #self._last_request_id = raise_if_error(self.response['NV-Status'])
 
-        self.response = self._client_stub.get("/api/status/" + model_name +
-                                              "?format=json")
-        self._last_request_id = _raise_if_error(self.response['NV-Status'])
-
-        status = json.loads(self.response.read())
-        return status
+        #status = json.loads(self.response.read())
+        #return status
+        raise_error('Not implemented')
+        return None
 
     def load_model(self, model_name):
         """Request the inference server to load or reload specified model.
@@ -327,9 +244,11 @@ class InferenceServerHTTPClient:
             If unable to load the model.
 
         """
-        self.response = self._client_stub.post("/api/modelcontrol/load/" +
-                                               model_name)
-        self._last_request_id = _raise_if_error(self.response['NV-Status'])
+        #self.response = self._client_stub.post("/api/modelcontrol/load/" +
+        #                                       model_name)
+        #self._last_request_id = raise_if_error(self.response['NV-Status'])
+        raise_error('Not implemented')
+        return None
 
     def unload_model(self, model_name):
         """Request the inference server to unload specified model.
@@ -345,6 +264,41 @@ class InferenceServerHTTPClient:
             If unable to unload the model.
 
         """
-        self.response = self._client_stub.post("/api/modelcontrol/unload/" +
-                                               model_name)
-        self._last_request_id = _raise_if_error(self.response['NV-Status'])
+        #self.response = self._client_stub.post("/api/modelcontrol/unload/" +
+        #                                       model_name)
+        #self._last_request_id = raise_if_error(self.response['NV-Status'])
+        raise_error('Not implemented')
+        return None
+
+
+#def infer(self, inputs, outputs, model_name, model_version=-1, batch_size=1, flags=0, correlation_id=0):
+#    """Run inference using the supplied 'inputs' to calculate the outputs
+#    specified by 'outputs'.
+#       Parameters
+#    ----------
+#    inputs : list
+#        A list of InferInput objects, each describing data for a input
+#        tensor required by the model.
+#       outputs : list
+#        A list of InferOutput objects, each describing how the output
+#        data must be returned. Only the output tensors present in the
+#        list will be requested from the server.
+#       batch_size : int
+#        The batch size of the inference. Each input must provide
+#        an appropriately sized batch of inputs.
+#       flags : int
+#        The flags to use for the inference. The bitwise-or of
+#        InferRequestHeader.Flag values.
+#       corr_id : int
+#        The correlation id of the inference. Used to differentiate
+#        sequences.
+#       Returns
+#    -------
+#    InferResult
+#        The object holding the result of the inference, including the
+#        statistics.
+#       Raises
+#    ------
+#    InferenceServerException
+#        If server fails to perform inference.
+#       """

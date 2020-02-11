@@ -28,8 +28,8 @@ cmake_minimum_required (VERSION 3.5)
 
 install(
   PROGRAMS
-    simple_client_v2.py
     grpc_v2_image_client.py
     simple_grpc_v2_client.py
+    simple_grpc_pyclient_v2.py
   DESTINATION python
 )

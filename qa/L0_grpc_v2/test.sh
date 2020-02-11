@@ -55,7 +55,7 @@ else
     exit 1
 fi
 
-# Build Server and clients with HTTP V2 Support
+# Build Server and clients with gRPC V2 Support
 (cd /workspace/builddir && \
     rm -fr trtis trtis-clients && \
     cmake -DCMAKE_BUILD_TYPE=Release \
@@ -82,6 +82,7 @@ fi
 
 # install the tensorrtserver wheel file
 pip3 install /workspace/builddir/trtis-clients/install/python/tensorrtserverV2-*.whl
+
 if [ $? -eq 0 ]; then
     echo -e "\n***\n*** GRPC V2 Build Passed\n***"
 else
@@ -90,13 +91,15 @@ else
 fi
 
 
-SIMPLE_V2_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_v2_client.py
+SIMPLE_V2_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_pyclient_v2.py
 
+rm -f *.log
 (rm -fr models && mkdir models && \
     cp -r /workspace/docs/examples/model_repository/simple models/.)
+CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS="--model-repository=$DATADIR"
+SERVER_ARGS="--model-repository=$DATADIR --api-version 2"
 source ../common/util.sh
 
 # Fix Me
@@ -110,9 +113,14 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-python $SIMPLE_V2_CLIENT -v >> client.log 2>&1
+python $SIMPLE_V2_CLIENT -v >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
-    cat client.log
+    cat $CLIENT_LOG
+    RET=1
+fi
+
+if [ $(cat $CLIENT_LOG | grep "PASS" | wc -l) -ne 7 ]; then
+    cat $CLIENT_LOG
     RET=1
 fi
 

@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -25,57 +24,64 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
-if [ "$#" -ge 1 ]; then
-    REPO_VERSION=$1
-fi
-if [ -z "$REPO_VERSION" ]; then
-    echo -e "Repository version must be specified"
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
-fi
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository/
+def raise_error(msg):
+    """
+    Raise error with the provided message
+    """
+    raise InferenceServerException(msg=msg) from None
 
-CLIENT_LOG="./client.log"
-SIMPLE_CLIENT=../clients/simple_client_v2.py
 
-SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit"
-SERVER_LOG="./inference_server.log"
-source ../common/util.sh
+class InferenceServerException(Exception):
+    """Exception indicating non-Success status.
 
-rm -f ./*.log
-rm -fr models && mkdir -p models
-cp -r $DATADIR/savedmodel_* models/
+    Parameters
+    ----------
+    err : RequestStatus Protobuf
+        The protobuf message describing the error
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+    """
 
-RET=0
+    def __init__(self, msg, status=None, debug_details=None):
+        self._msg = msg
+        self._status = status
+        self._debug_details = debug_details
 
-set +e
-python3 $SIMPLE_CLIENT >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG | grep "PASS" | wc -l) -ne 8 ]; then
-        RET=1
-    fi
-set -e
+    def __str__(self):
+        msg = super().__str__() if self._msg is None else self._msg
+        if self._status is not None:
+            msg = '[' + self._status + '] ' + msg
+        return msg
 
-kill $SERVER_PID
-wait $SERVER_PID
+    def message(self):
+        """Get the exception message.
 
-if [ $RET -eq 0 ]; then
-  echo -e "\n***\n*** Test Passed\n***"
-else
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test FAILED\n***"
-fi
+        Returns
+        -------
+        str
+            The message associated with this exception, or None if no message.
 
-exit $RET
+        """
+        return self._msg
+
+    def status(self):
+        """Get the status of the exception.
+
+        Returns
+        -------
+        str
+            Returns the status of the exception
+
+        """
+        return self._status
+
+    def debug_details(self):
+        """Get the detailed information about the exception for debugging purposes
+
+        Returns
+        -------
+        str
+            Returns string in JSON format containing the exception details            
+
+        """
+        return self._debug_details

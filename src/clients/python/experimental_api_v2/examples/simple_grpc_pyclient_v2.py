@@ -25,9 +25,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
 import argparse
-from tensorrtserverV2.api import *
+import numpy as np
+import os
+
+from tensorrtserverV2.api import grpcclient
+from tensorrtserverV2.common import InferenceServerException
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -41,18 +44,17 @@ if __name__ == '__main__':
                         '--url',
                         type=str,
                         required=False,
-                        default='localhost:8000',
-                        help='Inference server URL. Default is localhost:8000.')
+                        default='localhost:8001',
+                        help='Inference server URL. Default is localhost:8001.')
 
     FLAGS = parser.parse_args()
     try:
-        TRTISClient = InferenceServerHTTPClient(FLAGS.url)
+        TRTISClient = grpcclient.InferenceServerClient(FLAGS.url)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()
 
-    model_name = 'savedmodel_float32_float32_float32'
-    model_name_2 = 'savedmodel_object_object_object'
+    model_name = 'simple'
 
     if TRTISClient.is_server_live():
         print("PASS: is_server_live")
@@ -60,32 +62,26 @@ if __name__ == '__main__':
     if TRTISClient.is_server_ready():
         print("PASS: is_server_ready")
 
-    TRTISClient.load_model(model_name)
-    if TRTISClient.is_model_ready(model_name, 1):
-        print("PASS: load_model")
+    if TRTISClient.is_model_ready(model_name):
+        print("PASS: is_model_ready")
 
-    TRTISClient.load_model(model_name_2)
-    if TRTISClient.is_model_ready(model_name_2, 1):
-        print("PASS: load_model_2")
+    metadata = TRTISClient.get_server_metadata()
+    if (metadata['name'] == 'inference:0'):
+        print("PASS: get_server_metadata")
 
-    status = TRTISClient.get_server_status()
-    if 'id' in status.keys() and status['id'] == 'inference:0':
-        print("PASS: get_server_status")
-
-    status = TRTISClient.get_model_status(model_name)
-    if 'modelStatus' in status.keys() and len(status['modelStatus']) == 1:
-        print("PASS: get_model_status")
+    metadata = TRTISClient.get_model_metadata(model_name)
+    if (metadata['name'] == model_name):
+        print("PASS: get_model_metadata")
 
     # Passing incorrect model name
     try:
-        status = TRTISClient.get_model_status("wrong_model_name")
+        metadata = TRTISClient.get_model_metadata("wrong_model_name")
     except InferenceServerException as ex:
-        if "inference:0" == ex.server_id() and \
-            "no status available for unknown model" in ex.message():
+        if "no status available for unknown model" in ex.message():
             print("PASS: detected wrong model")
 
-    TRTISClient.unload_model(model_name_2)
-    if not TRTISClient.is_model_ready(model_name_2, 1):
-        print("PASS: unload_model")
+    config = TRTISClient.get_model_config(model_name)
+    if (config['config']['name'] == model_name):
+        print("PASS: get_model_config")
 
     TRTISClient.close()

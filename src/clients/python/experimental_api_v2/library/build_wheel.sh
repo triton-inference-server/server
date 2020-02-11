@@ -52,11 +52,18 @@ function main() {
   cp ../../../../core/*_grpc.py \
   "${WHLDIR}/tensorrtserverV2/api/."
 
-  cp __init__.py \
+  cp httpclient.py \
     "${WHLDIR}/tensorrtserverV2/api/."
+  
+  cp grpcclient.py \
+    "${WHLDIR}/tensorrtserverV2/api/."
+
+  cp common.py \
+    "${WHLDIR}/tensorrtserverV2/."
 
   cp setup.py "${WHLDIR}"
 	touch ${WHLDIR}/tensorrtserverV2/__init__.py
+  touch ${WHLDIR}/tensorrtserverV2/api/__init__.py
 
   # Use 'sed' command to fix protoc compiled imports (see
   # https://github.com/google/protobuf/issues/1491).

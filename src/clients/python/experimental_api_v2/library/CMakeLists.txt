@@ -31,7 +31,9 @@ cmake_minimum_required (VERSION 3.5)
 #
 set(wheel_stamp_file "stamp.whl")
 configure_file(../../../../../VERSION VERSION COPYONLY)
-configure_file(__init__.py __init__.py COPYONLY)
+configure_file(httpclient.py httpclient.py COPYONLY)
+configure_file(grpcclient.py grpcclient.py COPYONLY)
+configure_file(common.py common.py COPYONLY)
 configure_file(setup.py setup.py COPYONLY)
 
 add_custom_command(
@@ -40,7 +42,9 @@ add_custom_command(
   ARGS "${CMAKE_CURRENT_BINARY_DIR}"
   DEPENDS
     ${CMAKE_CURRENT_BINARY_DIR}/VERSION
-    ${CMAKE_CURRENT_BINARY_DIR}/__init__.py
+    ${CMAKE_CURRENT_BINARY_DIR}/httpclient.py
+    ${CMAKE_CURRENT_BINARY_DIR}/grpcclient.py
+    ${CMAKE_CURRENT_BINARY_DIR}/common.py
     ${CMAKE_CURRENT_BINARY_DIR}/setup.py
     proto-py-library
     grpc-v2-py-library
