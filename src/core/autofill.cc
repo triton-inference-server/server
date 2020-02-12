@@ -230,12 +230,16 @@ AutoFill::Create(
                     << model_name
                     << " (verify contents of model directory or use "
                        "--log-verbose=1 for more details)";
-      } else {
+      } else if (!(platform == Platform::PLATFORM_CUSTOM ||
+                   platform == Platform::PLATFORM_ENSEMBLE)) {
         LOG_WARNING << "Autofiller failed to retrieve model. Error Details: "
                     << status.AsString();
       }
     }
-    LOG_WARNING << "Proceeding with simple config for now";
+    if (!(platform == Platform::PLATFORM_CUSTOM ||
+          platform == Platform::PLATFORM_ENSEMBLE)) {
+      LOG_WARNING << "Proceeding with simple config for now";
+    }
 #endif
     std::unique_ptr<AutoFill> afs;
     status = AutoFillSimple::Create(model_name, &afs);
