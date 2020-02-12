@@ -104,9 +104,9 @@ source ../common/util.sh
 
 # Fix Me
 # Cannot use run_server since it repeatedly curls the (old) HTTP health endpoint to know
-# when the server is ready. This endpoint does not exist in the GRPC V2 server.
+# when the server is ready. This endpoint would not exist in future.
 run_server_nowait
-sleep 5
+sleep 10
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
