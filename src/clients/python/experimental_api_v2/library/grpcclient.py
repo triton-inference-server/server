@@ -27,6 +27,7 @@
 import grpc
 from google.protobuf.json_format import MessageToJson
 import rapidjson as json
+import numpy as np
 
 from tensorrtserverV2.api import grpc_service_v2_pb2
 from tensorrtserverV2.api import grpc_service_v2_pb2_grpc

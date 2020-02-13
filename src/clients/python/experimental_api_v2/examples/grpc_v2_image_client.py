@@ -27,8 +27,6 @@
 
 import argparse
 import numpy as np
-import os
-from functools import partial
 from PIL import Image
 
 import grpc

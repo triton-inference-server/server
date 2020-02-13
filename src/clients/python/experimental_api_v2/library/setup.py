@@ -26,7 +26,7 @@
 
 import os
 from setuptools import find_packages
-from setuptools import setup, dist
+from setuptools import setup
 
 if 'VERSION' not in os.environ:
     raise Exception('envvar VERSION must be specified')

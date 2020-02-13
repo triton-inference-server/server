@@ -26,8 +26,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-import numpy as np
-import os
 
 import grpc
 from tensorrtserverV2.api import grpc_service_v2_pb2

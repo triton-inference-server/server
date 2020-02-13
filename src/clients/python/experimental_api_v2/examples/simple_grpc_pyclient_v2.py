@@ -27,9 +27,7 @@
 
 from functools import partial
 import argparse
-import asyncio
 import numpy as np
-import os
 import time
 
 from tensorrtserverV2.api import grpcclient
