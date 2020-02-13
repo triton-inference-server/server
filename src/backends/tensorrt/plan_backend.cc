@@ -1909,9 +1909,7 @@ PlanBackend::Context::ProcessResponse(
     // so that it can begin enqueuing new memcpys into the input buffers
     cudaEventSynchronize(event_set.ready_for_input_);
     context_queue->Put(context_idx);
-    {
-      NVTX_RANGE(nvtx_, "plan_input_available");
-    }
+    NVTX_MARKER("plan_input_available");
 
 #ifdef TRTIS_ENABLE_STATS
     cudaEventSynchronize(event_set.ready_for_output_);
@@ -1924,9 +1922,7 @@ PlanBackend::Context::ProcessResponse(
 #endif  // TRTIS_ENABLE_STATS
 
     cudaEventSynchronize(event_set.output_ready_);
-    {
-      NVTX_RANGE(nvtx_, "plan_output_ready");
-    }
+    NVTX_MARKER("plan_output_ready");
     // Issue the last steps here if outputs are placed in indirect buffer
     // Note that the copies are expected to be HtoH if any.
     for (auto& output : *(std::get<3>(OnCompleteMetaData))) {
@@ -1970,7 +1966,10 @@ PlanBackend::Context::ProcessResponse(
 #endif  // TRTIS_ENABLE_STATS
 
     // Just trigger the callback, Payloads are all-set
-    OnComplete(Status::Success);
+    {
+      NVTX_RANGE(nvtx_, "OnComplete callback");
+      OnComplete(Status::Success);
+    }
   }
 }
 
