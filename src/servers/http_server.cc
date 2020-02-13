@@ -103,6 +103,7 @@ class HTTPAPIServer : public HTTPServer {
 #endif  // TRTIS_ENABLE_TRACING
 
     ResponseMetaData response_meta_data_;
+    std::promise<bool>* state_;
 
    private:
     h2o_req_t* req_;
@@ -288,19 +289,19 @@ HTTPAPIServer::InferRequest::InferComplete(
 {
   HTTPAPIServer::InferRequest* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequest*>(userp);
-  int buffer_size = 0;
-  for (auto buffer : infer_request->response_meta_data_.first) {
-    buffer_size += buffer->len;
-  }
-
   std::string response_str = infer_request->FinalizeResponse(response);
 
   if (response_str != "") {
-    std::future<void> fut =
-        std::async(OKReplyCallback, infer_request, response_str);
+    // std::future<void> fut =
+    //     std::async(OKReplyCallback, infer_request, response_str);
+    OKReplyCallback(infer_request, response_str);
   } else {
-    std::future<void> fut = std::async(BADReplyCallback, infer_request);
+    // std::future<void> fut = std::async(BADReplyCallback, infer_request);
+    BADReplyCallback(infer_request);
   }
+
+  infer_request->state_->set_value(true);
+  delete infer_request->state_;
 
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'infer_request'.
@@ -384,8 +385,8 @@ HTTPAPIServer::InferRequest::FinalizeResponse(
       &req_->pool, &req_->res.headers, H2O_STRLIT(kStatusHTTPHeader), 0, NULL,
       status_header_content.base, status_header_content.len);
 
-  h2o_add_header(
-      &req_->pool, &req_->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
+  h2o_add_header_by_str(
+      &req_->pool, &req_->res.headers, H2O_STRLIT("Content-Type"), 0, NULL,
       H2O_STRLIT("application/octet-stream"));
 
   TRTSERVER_ErrorDelete(response_status);
@@ -769,6 +770,7 @@ HTTPAPIServer::H2OBufferToInput(
 int
 HTTPAPIServer::Infer(h2o_handler_t* _self, h2o_req_t* req)
 {
+  h2o_req_log_error(req, "servers/http_server.cc", "start processing request");
   h2o_custom_req_handler_t* self = (h2o_custom_req_handler_t*)_self;
   re2::RE2 infer_regex(R"(/api/infer/([^/]+)(?:/(\d+))?)");
   if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("POST"))) {
@@ -868,6 +870,7 @@ HTTPAPIServer::Infer(h2o_handler_t* _self, h2o_req_t* req)
         &request_provider, self->http_server->server_.get(), request_options);
   }
 
+  std::future<bool> completed;
   if (err == nullptr) {
     std::unique_ptr<InferRequest> infer_request(new InferRequest(
         req, request_header_protobuf.id(), self->http_server->server_id_,
@@ -887,6 +890,9 @@ HTTPAPIServer::Infer(h2o_handler_t* _self, h2o_req_t* req)
             TraceManager::ReleaseTrace, infer_request->trace_meta_data_.get());
       }
 #endif  // TRTIS_ENABLE_TRACING
+
+      infer_request->state_ = new std::promise<bool>();
+      completed = infer_request->state_->get_future();
 
       err = TRTSERVER_ServerInferAsync(
           self->http_server->server_.get(), trace_manager, request_provider,
@@ -942,6 +948,10 @@ HTTPAPIServer::Infer(h2o_handler_t* _self, h2o_req_t* req)
   }
 
   TRTSERVER_ErrorDelete(err);
+
+  // Wait for inference to complete 
+  completed.get();
+  h2o_req_log_error(req, "servers/http_server.cc", "done processing request");
 
   return 0;
 }
