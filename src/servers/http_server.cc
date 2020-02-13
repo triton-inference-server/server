@@ -650,7 +650,7 @@ HTTPAPIServer::Status(h2o_handler_t* handler_self, h2o_req_t* req)
         h2o_add_header(
             &req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL,
             H2O_STRLIT("application/octet-stream"));
-        body = h2o_strdup(&req->pool, status_buffer, SIZE_MAX);
+        body = h2o_strdup(&req->pool, status_buffer, status_byte_size);
       } else {
         ServerStatus server_status;
         if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
