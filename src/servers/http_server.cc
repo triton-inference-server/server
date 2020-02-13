@@ -770,7 +770,6 @@ HTTPAPIServer::H2OBufferToInput(
 int
 HTTPAPIServer::Infer(h2o_handler_t* _self, h2o_req_t* req)
 {
-  h2o_req_log_error(req, "servers/http_server.cc", "start processing request");
   h2o_custom_req_handler_t* self = (h2o_custom_req_handler_t*)_self;
   re2::RE2 infer_regex(R"(/api/infer/([^/]+)(?:/(\d+))?)");
   if (!h2o_memis(req->method.base, req->method.len, H2O_STRLIT("POST"))) {
@@ -947,11 +946,9 @@ HTTPAPIServer::Infer(h2o_handler_t* _self, h2o_req_t* req)
     h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
   }
 
-  TRTSERVER_ErrorDelete(err);
-
-  // Wait for inference to complete 
+  // Wait for inference to complete
   completed.get();
-  h2o_req_log_error(req, "servers/http_server.cc", "done processing request");
+  TRTSERVER_ErrorDelete(err);
 
   return 0;
 }
