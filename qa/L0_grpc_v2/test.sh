@@ -102,7 +102,7 @@ SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS="--model-repository=$DATADIR --api-version 2"
 source ../common/util.sh
 
-# Fix Me
+# FIXMEPV2
 # Cannot use run_server since it repeatedly curls the (old) HTTP health endpoint to know
 # when the server is ready. This endpoint would not exist in future.
 run_server_nowait
@@ -119,7 +119,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-if [ $(cat $CLIENT_LOG | grep "PASS" | wc -l) -ne 7 ]; then
+if [ $(cat $CLIENT_LOG | grep "PASS" | wc -l) -ne 9 ]; then
     cat $CLIENT_LOG
     RET=1
 fi

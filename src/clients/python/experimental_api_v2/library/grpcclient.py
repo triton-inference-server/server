@@ -51,21 +51,27 @@ class InferenceServerClient:
 
     verbose : bool
         If True generate verbose output. Default value is False.
+    
+    enable_json : bool
+        If True then return type of result will be json dict,
+        otherwise the results are reported as protobuf message.
+        Default value is False.
 
     Raises
-        ------
-        Exception
-            If unable to create a client.
+    ------
+    Exception
+        If unable to create a client.
 
     """
 
-    def __init__(self, url, verbose=False):
+    def __init__(self, url, verbose=False, enable_json=False):
         # FixMe: Are any of the channel options worth exposing?
         # https://grpc.io/grpc/core/group__grpc__arg__keys.html
         self._channel = grpc.insecure_channel(url, options=None)
         self._client_stub = grpc_service_v2_pb2_grpc.GRPCInferenceServiceStub(
             self._channel)
         self._verbose = verbose
+        self._enable_json = enable_json
 
     def __enter__(self):
         return self
@@ -128,7 +134,7 @@ class InferenceServerClient:
     def is_model_ready(self, model_name, model_version=-1):
         """Contact the inference server and get the readiness of specified model.
 
-         Parameters
+        Parameters
         ----------
         model_name: str
             The name of the model to check for readiness.
@@ -136,7 +142,6 @@ class InferenceServerClient:
         model_version: int
             The version of the model to check for readiness. If -1 is given the 
             server will choose a version based on the model and internal policy.
-
 
         Returns
         -------
@@ -162,8 +167,9 @@ class InferenceServerClient:
 
         Returns
         -------
-        dict
-            The JSON object holding the metadata
+        dict or protobuf message
+            The JSON dict or ServerMetadataResponse message
+            holding the metadata. See 'enable_json'. 
 
         Raises
         ------
@@ -174,7 +180,10 @@ class InferenceServerClient:
         try:
             self._request = grpc_service_v2_pb2.ServerMetadataRequest()
             self._response = self._client_stub.ServerMetadata(self._request)
-            return json.loads(MessageToJson(self._response))
+            if self._enable_json:
+                return json.loads(MessageToJson(self._response))
+            else:
+                return self._response
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -192,8 +201,9 @@ class InferenceServerClient:
 
         Returns
         -------
-        dict
-            The JSON object holding the model metadata
+        dict or protobuf message 
+            The JSON dict or ModelMetadataResponse message holding
+            the metadata. See 'enable_json'.
 
         Raises
         ------
@@ -205,7 +215,10 @@ class InferenceServerClient:
             self._request = grpc_service_v2_pb2.ModelMetadataRequest(
                 name=model_name, version=model_version)
             self._response = self._client_stub.ModelMetadata(self._request)
-            return json.loads(MessageToJson(self._response))
+            if self._enable_json:
+                return json.loads(MessageToJson(self._response))
+            else:
+                return self._response
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -223,8 +236,9 @@ class InferenceServerClient:
 
         Returns
         -------
-        dict
-            The JSON object holding the model configuration
+        dict or protobuf message 
+            The JSON dict or ModelConfigResponse message holding
+            the metadata. See 'enable_json'.
 
         Raises
         ------
@@ -236,10 +250,14 @@ class InferenceServerClient:
             self._request = grpc_service_v2_pb2.ModelConfigRequest(
                 name=model_name, version=model_version)
             self._response = self._client_stub.ModelConfig(self._request)
-            return json.loads(MessageToJson(self._response))
+            if self._enable_json:
+                return json.loads(MessageToJson(self._response))
+            else:
+                return self._response
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
+    # FIXMEPV2: Add model control support
     def load_model(self, model_name):
         """Request the inference server to load or reload specified model.
 
@@ -256,6 +274,7 @@ class InferenceServerClient:
         """
         raise_error("Not implemented yet")
 
+    # FIXMEPV2: Add model control support
     def unload_model(self, model_name):
         """Request the inference server to unload specified model.
 
@@ -271,3 +290,384 @@ class InferenceServerClient:
 
         """
         raise_error("Not implemented yet")
+
+    # FIXMEPV2: Add parameter support
+    @property
+    def parameters(self):
+        raise_error("Not implemented yet")
+
+    def infer(self,
+              inputs,
+              outputs,
+              model_name,
+              model_version=-1,
+              batch_size=1,
+              request_id='0',
+              sequence_id=0):
+        """Run inference using the supplied 'inputs' to obtain the outputs
+        specified by 'outputs'.
+
+        Parameters
+        ----------
+        inputs : list
+            A list of InferInput objects, each describing data for a input
+            tensor required by the model.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. Only the output tensors present in the
+            list will be requested from the server.
+        batch_size : int
+            The batch size of the inference. Each input must provide
+            an appropriately sized batch of inputs.
+        request_id: string
+            Optional identifier for the request which will be
+            returned in the response. Default value is '0'.
+        sequence_id : int
+            The sequence ID of the inference request. Default is 0, which
+            indicates that the request is not part of a sequence. The
+            sequence ID is used to indicate that two or more inference
+            requests are in the same sequence.
+
+        Returns
+        -------
+        InferResult
+            The object holding the result of the inference, including the
+            statistics.
+
+        Raises
+        ------
+        InferenceServerException
+            If server fails to perform inference.
+        """
+
+        self._request = grpc_service_v2_pb2.ModelInferRequest()
+        self._request.model_name = model_name
+        self._request.model_version = model_version
+        self._request.id = request_id
+        self._request.sequence_id = sequence_id
+        for infer_input in inputs:
+            self._request.inputs.extend([infer_input._get_tensor()])
+        for infer_output in outputs:
+            self._request.outputs.extend([infer_output._get_tensor()])
+
+        try:
+            self._response = self._client_stub.ModelInfer(self._request)
+            self._result = InferResult(self._response)
+            return self._result
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
+
+    def async_infer(self,
+                    callback,
+                    inputs,
+                    outputs,
+                    model_name,
+                    model_version=-1,
+                    batch_size=1,
+                    flags=0,
+                    sequence_id=0):
+        """Run inference using the supplied 'inputs' to obtain the outputs
+        specified by 'outputs'.
+
+        Parameters
+        ----------
+        callback : function
+            Python function that is invoked once the request is completed.
+            The function must reserve the last argument to hold InferResult
+            object which will be provided to the function when executing
+            the callback. The ownership of this InferResult object will be
+            given to the user and the its lifetime is limited to the scope
+            of this function.
+        inputs : list
+            A list of InferInput objects, each describing data for a input
+            tensor required by the model.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. Only the output tensors present in the
+            list will be requested from the server.
+        batch_size : int
+            The batch size of the inference. Each input must provide
+            an appropriately sized batch of inputs.
+        flags : int
+            The flags to use for the inference. The bitwise-or of
+            InferRequestHeader.Flag values.
+        sequence_id : int
+            The sequence ID of the inference request. Default is 0, which
+            indicates that the request is not part of a sequence. The
+            sequence ID is used to indicate that two or more inference
+            requests are in the same sequence.
+
+        Returns
+        -------
+        InferResult
+            The object holding the result of the inference, including the
+            statistics.
+
+        Raises
+        ------
+        InferenceServerException
+            If server fails to issue inference.
+        """
+
+        def wrapped_callback(call_future):
+            try:
+                result = InferResult(call_future.result())
+            except grpc.RpcError as rpc_error:
+                raise_error_grpc(rpc_error)
+            callback(result=result)
+
+        self._request = grpc_service_v2_pb2.ModelInferRequest()
+        self._request.model_name = model_name
+        self._request.model_version = model_version
+        self._request.sequence_id = sequence_id
+        for infer_input in inputs:
+            self._request.inputs.extend([infer_input._get_tensor()])
+        for infer_output in outputs:
+            self._request.outputs.extend([infer_output._get_tensor()])
+
+        try:
+            self._call_future = self._client_stub.ModelInfer.future(
+                self._request)
+            self._call_future.add_done_callback(wrapped_callback)
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
+
+
+class InferInput:
+    """An object of InferInput class is used to describe
+    input tensor for an inference request.
+
+    Parameters
+    ----------
+    name : str
+        The name of input whose data will be described by this object
+
+    """
+
+    def __init__(self, name):
+        self._input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
+        self._input.name = name
+
+    @property
+    def name(self):
+        """Get the name of input associated with this object.
+
+        Returns
+        -------
+        str
+            The name of input
+        """
+        return self._input.name
+
+    @property
+    def datatype(self):
+        """Get the datatype of input associated with this object.
+
+        Returns
+        -------
+        str
+            The datatype of input
+        """
+        return self._input.datatype
+
+    @property
+    def shape(self):
+        """Get the shape of input associated with this object.
+
+        Returns
+        -------
+        str
+            The shape of input
+        """
+        return self._input.shape
+
+    def set_data_from_numpy(self, numpy_array):
+        """Set the tensor data (datatype, shape, contents) for
+        input associated with this object.
+
+        Parameters
+        ----------
+        numpy_array : numpy array
+            The tensor data in numpy array format
+        """
+        self._input.datatype = np_to_trtis_dtype(numpy_array.dtype)
+        self._input.shape.extend(numpy_array.shape)
+        self._input_contents = grpc_service_v2_pb2.InferTensorContents()
+        self._input_contents.raw_contents = numpy_array.tobytes()
+        self._input.contents.CopyFrom(self._input_contents)
+
+    # FIXMEPV2: Add parameter support
+    @property
+    def parameters(self):
+        raise_error("Not implemented yet")
+
+    def _get_tensor(self):
+        """Retrieve the underlying InferInputTensor message.
+        Returns
+        -------
+        Protobuf Message 
+            The underlying InferInputTensor protobuf message.
+        """
+        return self._input
+
+
+class InferOutput:
+    """An object of InferOutput class is used to describe a
+    requested output tensor for an inference request.
+
+    Parameters
+    ----------
+    name : str
+        The name of output tensor to associate with this object
+        
+    data_format : str
+        The format to use when returning the ouput tensor data. Options
+        are "explicit", "binary" and "shared_memory".
+        Default is "binary". If "shared_memory" is specified then
+        the "shared_memory_data" field must also be specified.
+        Server support for “binary” and “shared_memory”
+        is optional.
+    """
+
+    def __init__(self, name, data_format="binary"):
+        self._output = grpc_service_v2_pb2.ModelInferRequest(
+        ).InferRequestedOutputTensor()
+        self._output.name = name
+        self._output.data_format = data_format
+
+    @property
+    def name(self):
+        """Get the name of output associated with this object.
+
+        Returns
+        -------
+        str
+            The name of output
+        """
+        return self._output.name
+
+    @property
+    def data_format(self):
+        """Get the requested format of ouput associated with this object.
+
+        Returns
+        -------
+        str
+            The data format in which output will be requested
+        """
+        return self._output.data_format
+
+    @data_format.setter
+    def data_format(self, data_format):
+        """Set the requested format of ouput associated with this object.
+
+        Parameter
+        ---------
+        data_format : str
+            The data format in which output will be requested.
+        """
+        self._output.data_format = data_format
+
+    # FIXMEPV2: Add parameter support
+    @property
+    def parameters(self):
+        raise_error("Not implemented yet")
+
+    def _get_tensor(self):
+        """Retrieve the underlying InferRequestedOutputTensor message.
+        Returns
+        -------
+        Protobuf Message 
+            The underlying InferRequestedOutputTensor protobuf message.
+        """
+        return self._output
+
+
+class InferResult:
+    """An object of InferResult class holds the response of
+    an inference request and provide methods to retrieve
+    inference results.
+
+    Parameters
+    ----------
+    result : Protobuf Message
+        The ModelInferResponse returned by the server
+    """
+
+    def __init__(self, result):
+        self._result = result
+
+    def get_output_in_numpy(self, name):
+        """Get the output tensor data (datatype, shape, contents) for
+        output associated with this object in numpy format
+
+        Parameters
+        ----------
+        name : string
+            The name of the output tensor whose result is to be retrieved.
+    
+        Returns
+        -------
+        numpy array
+            The numpy array containing the response data for the tensor or
+            None if the data for specified tensor name is not found.
+        """
+        for self._output in self._result.outputs:
+            if self._output.name == name:
+                self._shape = []
+                for self._value in self._output.shape:
+                    self._shape.append(self._value)
+                # FIXMEPV2 datatype is not yet provided by the server
+                # yet. hard-coding to INT32
+                # self._np_array = np.frombuffer(
+                #   self._output.contents.raw_contents,
+                #   dtype=trtis_to_np_dtype(self._output.datatype))
+                self._np_array = np.frombuffer(
+                    self._output.contents.raw_contents,
+                    dtype=trtis_to_np_dtype('INT32'))
+                self._np_array = np.resize(self._np_array, self._shape)
+                return self._np_array
+        return None
+
+    def get_request(self, as_json=False):
+        """Retrieves the ModelInferRequest for the request associated
+        with this response as a json dict object or protobuf message
+
+        Returns
+        -------
+        Protobuf Message or dict
+            The ModelInferRequest protobuf message or dict for the request
+            associated  with this response.
+        """
+        if as_json:
+            return json.loads(MessageToJson(self._result.request))
+        else:
+            return self._result.request
+
+    def get_statistics(self, as_json=False):
+        """Retrieves the InferStatistics for this response as
+         a json dict object or protobuf message
+
+        Returns
+        -------
+        Protobuf Message or dict
+            The InferStatistics protobuf message or dict for this response.
+        """
+        if as_json:
+            return json.loads(MessageToJson(self._result.statistics))
+        else:
+            return self._result.statistics
+
+    def get_complete_response(self, as_json=False):
+        """Retrieves the complete ModelInferResponse as a
+        json dict object or protobuf message
+
+        Returns
+        -------
+        Protobuf Message or dict
+            The underlying ModelInferResponse as a protobuf message or dict.
+        """
+        if as_json:
+            return json.loads(MessageToJson(self._result))
+        else:
+            return self._result

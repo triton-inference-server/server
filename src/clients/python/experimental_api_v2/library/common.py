@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import numpy as np
 
 def raise_error(msg):
     """
@@ -85,3 +86,64 @@ class InferenceServerException(Exception):
 
         """
         return self._debug_details
+
+
+def np_to_trtis_dtype(np_dtype):
+    if np_dtype == np.bool:
+        return "BOOL"
+    elif np_dtype == np.int8:
+        return "INT8"
+    elif np_dtype == np.int16:
+        return "INT16"
+    elif np_dtype == np.int32:
+        return "INT32"
+    elif np_dtype == np.int64:
+        return "INT64"
+    elif np_dtype == np.uint8:
+        return "UINT8"
+    elif np_dtype == np.uint16:
+        return "UINT16"
+    elif np_dtype == np.uint32:
+        return "UINT32"
+    elif np_dtype == np.uint64:
+        return "UINT64"
+    elif np_dtype == np.float16:
+        return "FP16"
+    elif np_dtype == np.float32:
+        return "FP32"
+    elif np_dtype == np.float64:
+        return "FP64"
+    # FIXMEPV2 String support
+    # elif np_dtype == np_dtype_string:
+    #    return "STRING"
+    return None
+
+def trtis_to_np_dtype(dtype):
+    if dtype == "BOOL":
+        return np.bool
+    elif dtype == "INT8":
+        return np.int8
+    elif dtype == "INT16":
+        return np.int16
+    elif dtype == "INT32":
+        return np.int32
+    elif dtype == "INT64":
+        return np.int64
+    elif dtype == "UINT8":
+        return np.uint8
+    elif dtype == "UINT16":
+        return np.uint16
+    elif dtype == "UINT32":
+        return np.uint32
+    elif dtype == "UINT64":
+        return np.uint64
+    elif dtype == "FP16":
+        return np.float16
+    elif dtype == "FP32":
+        return np.float32
+    elif dtype == "FP64":
+        return np.float64
+    # FIXMEPV2 String support
+    # elif dtype == "STRING":
+    #    return np_dtype_string
+    return None
