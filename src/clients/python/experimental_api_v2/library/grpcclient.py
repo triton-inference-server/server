@@ -53,11 +53,6 @@ class InferenceServerClient:
     verbose : bool
         If True generate verbose output. Default value is False.
     
-    enable_json : bool
-        If True then return type of result will be json dict,
-        otherwise the results are reported as protobuf message.
-        Default value is False.
-
     Raises
     ------
     Exception
@@ -65,14 +60,13 @@ class InferenceServerClient:
 
     """
 
-    def __init__(self, url, verbose=False, enable_json=False):
+    def __init__(self, url, verbose=False):
         # FixMe: Are any of the channel options worth exposing?
         # https://grpc.io/grpc/core/group__grpc__arg__keys.html
         self._channel = grpc.insecure_channel(url, options=None)
         self._client_stub = grpc_service_v2_pb2_grpc.GRPCInferenceServiceStub(
             self._channel)
         self._verbose = verbose
-        self._enable_json = enable_json
 
     def __enter__(self):
         return self
@@ -163,14 +157,20 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def get_server_metadata(self):
+    def get_server_metadata(self, as_json=False):
         """Contact the inference server and get its metadata.
+
+        Parameters
+        ----------
+        as_json : bool
+            If true then returns server metadata as a json dict,
+            otherwise as a protobuf message. Default value is False.
 
         Returns
         -------
         dict or protobuf message
             The JSON dict or ServerMetadataResponse message
-            holding the metadata. See 'enable_json'. 
+            holding the metadata.
 
         Raises
         ------
@@ -181,30 +181,32 @@ class InferenceServerClient:
         try:
             self._request = grpc_service_v2_pb2.ServerMetadataRequest()
             self._response = self._client_stub.ServerMetadata(self._request)
-            if self._enable_json:
+            if as_json:
                 return json.loads(MessageToJson(self._response))
             else:
                 return self._response
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def get_model_metadata(self, model_name, model_version=-1):
+    def get_model_metadata(self, model_name, model_version=-1, as_json=False):
         """Contact the inference server and get the metadata for specified model.
 
         Parameters
         ----------
         model_name: str
             The name of the model
-        
         model_version: int
             The version of the model to get metadata. If -1 is given the 
             server will choose a version based on the model and internal policy.
+        as_json : bool
+            If true then returns model metadata as a json dict, otherwise
+            as a protobuf message. Default value is False.
 
         Returns
         -------
         dict or protobuf message 
             The JSON dict or ModelMetadataResponse message holding
-            the metadata. See 'enable_json'.
+            the metadata.
 
         Raises
         ------
@@ -216,30 +218,32 @@ class InferenceServerClient:
             self._request = grpc_service_v2_pb2.ModelMetadataRequest(
                 name=model_name, version=model_version)
             self._response = self._client_stub.ModelMetadata(self._request)
-            if self._enable_json:
+            if as_json:
                 return json.loads(MessageToJson(self._response))
             else:
                 return self._response
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def get_model_config(self, model_name, model_version=-1):
+    def get_model_config(self, model_name, model_version=-1, as_json=False):
         """Contact the inference server and get the configuration for specified model.
 
         Parameters
         ----------
         model_name: str
             The name of the model
-        
         model_version: int
             The version of the model to get configuration. If -1 is given the 
             server will choose a version based on the model and internal policy.
+        as_json : bool
+            If true then returns configuration as a json dict, otherwise
+            as a protobuf message. Default value is False.
 
         Returns
         -------
         dict or protobuf message 
             The JSON dict or ModelConfigResponse message holding
-            the metadata. See 'enable_json'.
+            the metadata.
 
         Raises
         ------
@@ -251,7 +255,7 @@ class InferenceServerClient:
             self._request = grpc_service_v2_pb2.ModelConfigRequest(
                 name=model_name, version=model_version)
             self._response = self._client_stub.ModelConfig(self._request)
-            if self._enable_json:
+            if as_json:
                 return json.loads(MessageToJson(self._response))
             else:
                 return self._response
@@ -302,11 +306,10 @@ class InferenceServerClient:
               outputs,
               model_name,
               model_version=-1,
-              batch_size=1,
-              request_id='0',
+              request_id=None,
               sequence_id=0):
-        """Run inference using the supplied 'inputs' to obtain the outputs
-        specified by 'outputs'.
+        """Run synchronous inference using the supplied 'inputs' requesting
+        the outputs specified by 'outputs'.
 
         Parameters
         ----------
@@ -317,12 +320,15 @@ class InferenceServerClient:
             A list of InferOutput objects, each describing how the output
             data must be returned. Only the output tensors present in the
             list will be requested from the server.
-        batch_size : int
-            The batch size of the inference. Each input must provide
-            an appropriately sized batch of inputs.
+        model_name: str
+            The name of the model to run inference.
+        model_version: int
+            The version of the model to run inference. If -1 is given the 
+            server will choose a version based on the model and internal policy.
         request_id: string
-            Optional identifier for the request which will be
-            returned in the response. Default value is '0'.
+            Optional identifier for the request. If specified will be returned
+            in the response. Default value is 'None' which means no request_id
+            will be used.
         sequence_id : int
             The sequence ID of the inference request. Default is 0, which
             indicates that the request is not part of a sequence. The
@@ -341,15 +347,8 @@ class InferenceServerClient:
             If server fails to perform inference.
         """
 
-        self._request = grpc_service_v2_pb2.ModelInferRequest()
-        self._request.model_name = model_name
-        self._request.model_version = model_version
-        self._request.id = request_id
-        self._request.sequence_id = sequence_id
-        for infer_input in inputs:
-            self._request.inputs.extend([infer_input._get_tensor()])
-        for infer_output in outputs:
-            self._request.outputs.extend([infer_output._get_tensor()])
+        self._get_inference_request(inputs, outputs, model_name, model_version,
+                                    request_id, sequence_id)
 
         try:
             self._response = self._client_stub.ModelInfer(self._request)
@@ -364,11 +363,10 @@ class InferenceServerClient:
                     outputs,
                     model_name,
                     model_version=-1,
-                    batch_size=1,
-                    flags=0,
-                    sequence_id=0):
-        """Run inference using the supplied 'inputs' to obtain the outputs
-        specified by 'outputs'.
+                    request_id=None,
+                    sequence_id=None):
+        """Run asynchronous inference using the supplied 'inputs' requesting
+        the outputs specified by 'outputs'.
 
         Parameters
         ----------
@@ -386,24 +384,21 @@ class InferenceServerClient:
             A list of InferOutput objects, each describing how the output
             data must be returned. Only the output tensors present in the
             list will be requested from the server.
-        batch_size : int
-            The batch size of the inference. Each input must provide
-            an appropriately sized batch of inputs.
-        flags : int
-            The flags to use for the inference. The bitwise-or of
-            InferRequestHeader.Flag values.
+        model_name: str
+            The name of the model to run inference.
+        model_version: int
+            The version of the model to run inference. If -1 is given the 
+            server will choose a version based on the model and internal policy.
+        request_id: string
+            Optional identifier for the request. If specified will be returned
+            in the response. Default value is 'None' which means no request_id
+            will be used.
         sequence_id : int
             The sequence ID of the inference request. Default is 0, which
             indicates that the request is not part of a sequence. The
             sequence ID is used to indicate that two or more inference
             requests are in the same sequence.
-
-        Returns
-        -------
-        InferResult
-            The object holding the result of the inference, including the
-            statistics.
-
+    
         Raises
         ------
         InferenceServerException
@@ -417,14 +412,8 @@ class InferenceServerClient:
                 raise_error_grpc(rpc_error)
             callback(result=result)
 
-        self._request = grpc_service_v2_pb2.ModelInferRequest()
-        self._request.model_name = model_name
-        self._request.model_version = model_version
-        self._request.sequence_id = sequence_id
-        for infer_input in inputs:
-            self._request.inputs.extend([infer_input._get_tensor()])
-        for infer_output in outputs:
-            self._request.outputs.extend([infer_output._get_tensor()])
+        self._get_inference_request(inputs, outputs, model_name, model_version,
+                                    request_id, sequence_id)
 
         try:
             self._call_future = self._client_stub.ModelInfer.future(
@@ -432,6 +421,47 @@ class InferenceServerClient:
             self._call_future.add_done_callback(wrapped_callback)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
+
+    def _get_inference_request(self, inputs, outputs, model_name, model_version,
+                               request_id, sequence_id):
+        """Creates and initializes an inference request.
+
+        Parameters
+        ----------
+        inputs : list
+            A list of InferInput objects, each describing data for a input
+            tensor required by the model.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. Only the output tensors present in the
+            list will be requested from the server.
+        model_name: str
+            The name of the model to run inference.
+        model_version: int
+            The version of the model to run inference. If -1 is given the 
+            server will choose a version based on the model and internal policy.
+        request_id: string
+            Optional identifier for the request. If specified will be returned
+            in the response. Default value is 'None' which means no request_id
+            will be used.
+        sequence_id : int
+            The sequence ID of the inference request. Default is 0, which
+            indicates that the request is not part of a sequence. The
+            sequence ID is used to indicate that two or more inference
+            requests are in the same sequence.
+        """
+
+        self._request = grpc_service_v2_pb2.ModelInferRequest()
+        self._request.model_name = model_name
+        self._request.model_version = model_version
+        if request_id != None:
+            self._request.id = request_id
+        if sequence_id != None:
+            self._request.sequence_id = sequence_id
+        for infer_input in inputs:
+            self._request.inputs.extend([infer_input._get_tensor()])
+        for infer_output in outputs:
+            self._request.outputs.extend([infer_output._get_tensor()])
 
 
 class InferInput:
@@ -493,9 +523,7 @@ class InferInput:
         """
         self._input.datatype = np_to_trtis_dtype(numpy_array.dtype)
         self._input.shape.extend(numpy_array.shape)
-        self._input_contents = grpc_service_v2_pb2.InferTensorContents()
-        self._input_contents.raw_contents = numpy_array.tobytes()
-        self._input.contents.CopyFrom(self._input_contents)
+        self._input.contents.raw_contents = numpy_array.tobytes()
 
     # FIXMEPV2: Add parameter support
     @property
@@ -598,7 +626,7 @@ class InferResult:
     def __init__(self, result):
         self._result = result
 
-    def get_output_in_numpy(self, name):
+    def as_numpy(self, name):
         """Get the output tensor data (datatype, shape, contents) for
         output associated with this object in numpy format
 
@@ -634,6 +662,12 @@ class InferResult:
         """Retrieves the ModelInferRequest for the request associated
         with this response as a json dict object or protobuf message
 
+        Parameters
+        ----------
+        as_json : bool
+            If true then returns request as a json dict, otherwise
+            as a protobuf message. Default value is False.
+
         Returns
         -------
         Protobuf Message or dict
@@ -647,8 +681,14 @@ class InferResult:
 
     def get_statistics(self, as_json=False):
         """Retrieves the InferStatistics for this response as
-         a json dict object or protobuf message
+        a json dict object or protobuf message
 
+        Parameters
+        ----------
+        as_json : bool
+            If true then returns statistics as a json dict, otherwise
+            as a protobuf message. Default value is False.
+        
         Returns
         -------
         Protobuf Message or dict
@@ -659,10 +699,16 @@ class InferResult:
         else:
             return self._result.statistics
 
-    def get_complete_response(self, as_json=False):
+    def get_response(self, as_json=False):
         """Retrieves the complete ModelInferResponse as a
         json dict object or protobuf message
 
+        Parameters
+        ----------
+        as_json : bool
+            If true then returns response as a json dict, otherwise
+            as a protobuf message. Default value is False.
+    
         Returns
         -------
         Protobuf Message or dict

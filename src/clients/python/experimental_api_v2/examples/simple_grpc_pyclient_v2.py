@@ -109,8 +109,8 @@ if __name__ == '__main__':
     results = TRTISClient.infer(inputs, outputs, model_name)
 
     # Get the output arrays from the
-    output0_data = results.get_output_in_numpy('OUTPUT0')
-    output1_data = results.get_output_in_numpy('OUTPUT1')
+    output0_data = results.as_numpy('OUTPUT0')
+    output1_data = results.as_numpy('OUTPUT1')
 
     print('Synchronous Inference')
     print('==============================================')
@@ -144,8 +144,8 @@ if __name__ == '__main__':
     if ((len(user_data) == 1)):
         # Validate the values by matching with already computed expected
         # values.
-        output0_data = results.get_output_in_numpy('OUTPUT0')
-        output1_data = results.get_output_in_numpy('OUTPUT1')
+        output0_data = results.as_numpy('OUTPUT0')
+        output1_data = results.as_numpy('OUTPUT1')
         print('Asynchronous Inference')
         print('==============================================')
         for i in range(16):
