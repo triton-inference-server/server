@@ -46,9 +46,10 @@ namespace {
 Status
 CreateCudaEvent(const std::string& event_name, cudaEvent_t* event)
 {
-  // cudaEventBlockingSync to avoid busy-waiting on CPU thread
-  auto cuerr = cudaEventCreateWithFlags(
-      event, cudaEventDisableTiming | cudaEventBlockingSync);
+  // Not adding 'cudaEventBlockingSync' to reduce gaps between the time of
+  // event record and the time of signaling blocking thread.
+  // The busy waiting only happens when there is inflight request.
+  auto cuerr = cudaEventCreateWithFlags(event, cudaEventDisableTiming);
   if (cuerr != cudaSuccess) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to create CUDA event for " +
