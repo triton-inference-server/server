@@ -24,13 +24,46 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.5)
+import os
+from setuptools import find_packages
+from setuptools import setup
 
-add_subdirectory(api_v1/library)
-add_subdirectory(api_v1/examples)
+if 'VERSION' not in os.environ:
+    raise Exception('envvar VERSION must be specified')
 
-# Build V2 api if required
-if(TRTIS_ENABLE_GRPC_V2 OR TRTIS_ENABLE_HTTP_V2)
-    add_subdirectory(experimental_api_v2/library)
-    add_subdirectory(experimental_api_v2/examples)
-endif()
+VERSION = os.environ['VERSION']
+
+REQUIRED = [
+    'numpy', 'geventhttpclient', 'python-rapidjson', 'protobuf>=3.5.0', 'grpcio'
+]
+
+try:
+    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
+
+    class bdist_wheel(_bdist_wheel):
+
+        def finalize_options(self):
+            _bdist_wheel.finalize_options(self)
+            self.root_is_pure = False
+
+        def get_tag(self):
+            pyver, abi, plat = _bdist_wheel.get_tag(self)
+            pyver, abi = 'py3', 'none'
+            return pyver, abi, plat
+except ImportError:
+    bdist_wheel = None
+
+setup(
+    name='tensorrtserverV2',
+    version=VERSION,
+    author='NVIDIA Inc.',
+    author_email='tanmayv@nvidia.com',
+    description='Python client library version 2 for TensorRT Inference Server',
+    license='BSD',
+    url='http://nvidia.com',
+    keywords='tensorrt inference server service client',
+    packages=find_packages(),
+    install_requires=REQUIRED,
+    zip_safe=False,
+    cmdclass={'bdist_wheel': bdist_wheel},
+)

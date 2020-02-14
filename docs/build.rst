@@ -452,7 +452,7 @@ To build the docs install the required dependencies::
 To get the Python client library API docs the TensorRT Inference
 Server Python package must be installed and a couple of files must be copied::
 
-  $ pip install --upgrade tensorrtserver-*.whl
+  $ pip install --upgrade tensorrtserver*.whl
   $ cd src/clients/c++/library
   $ cp -f request.h.in request.h
   $ cp -f request_grpc.h.in request_grpc.h

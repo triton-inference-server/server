@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,13 +25,62 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.5)
+set -e
 
-add_subdirectory(api_v1/library)
-add_subdirectory(api_v1/examples)
+function main() {
+  if [[ $# -lt 1 ]] ; then
+    echo "usage: $0 <destination dir>"
+    exit 1
+  fi
 
-# Build V2 api if required
-if(TRTIS_ENABLE_GRPC_V2 OR TRTIS_ENABLE_HTTP_V2)
-    add_subdirectory(experimental_api_v2/library)
-    add_subdirectory(experimental_api_v2/examples)
-endif()
+  if [[ ! -f "VERSION" ]]; then
+    echo "Could not find VERSION"
+    exit 1
+  fi
+
+  VERSION=`cat VERSION`
+  DEST="$1"
+  WHLDIR="$DEST/wheel"
+
+  echo $(date) : "=== Using builddir: ${WHLDIR}"
+  mkdir -p ${WHLDIR}/tensorrtserverV2/api
+
+  echo "Adding package files"
+  cp ../../../../core/*_pb2.py \
+    "${WHLDIR}/tensorrtserverV2/api/."
+
+  cp ../../../../core/*_grpc.py \
+  "${WHLDIR}/tensorrtserverV2/api/."
+
+  cp httpclient.py \
+    "${WHLDIR}/tensorrtserverV2/api/."
+  
+  cp grpcclient.py \
+    "${WHLDIR}/tensorrtserverV2/api/."
+
+  cp common.py \
+    "${WHLDIR}/tensorrtserverV2/."
+
+  cp setup.py "${WHLDIR}"
+	touch ${WHLDIR}/tensorrtserverV2/__init__.py
+  touch ${WHLDIR}/tensorrtserverV2/api/__init__.py
+
+  # Use 'sed' command to fix protoc compiled imports (see
+  # https://github.com/google/protobuf/issues/1491).
+	sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tensorrtserverV2.api import \1_pb2 as \2/" \
+    ${WHLDIR}/tensorrtserverV2/api/*_pb2.py
+	sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tensorrtserverV2.api import \1_pb2 as \2/" \
+    ${WHLDIR}/tensorrtserverV2/api/*_pb2_grpc.py
+
+  pushd "${WHLDIR}"
+  echo $(date) : "=== Building wheel"
+  VERSION=$VERSION python${PYVER} setup.py bdist_wheel
+  mkdir -p "${DEST}"
+  cp dist/* "${DEST}"
+  popd
+  echo $(date) : "=== Output wheel file is in: ${DEST}"
+
+	touch ${DEST}/stamp.whl
+}
+
+main "$@"
