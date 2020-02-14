@@ -646,7 +646,8 @@ message RequestTimeoutPolicy
     //@@    .. cpp:enumerator:: Action::DELAY = 1
     //@@
     //@@       Delay the request until all other requests within the timeout
-    //@@       are processed.
+    //@@       are processed. The priority of the delayed request will be
+    //@@       disregarded.
     //@@
     DELAY = 1;
   }
@@ -656,7 +657,7 @@ message RequestTimeoutPolicy
   //@@
   //@@     The action applied on timeout request. The default action is REJECT.
   //@@
-  Action action = 0;
+  Action action = 1;
 
   //@@
   //@@  .. cpp:var:: uint64 timeout_limit_microseconds
@@ -664,7 +665,7 @@ message RequestTimeoutPolicy
   //@@     The timeout limit for every request, in microseconds.
   //@@     The default value is 0 which indicates that no timeout limit is set.
   //@@
-  uint64 timeout_limit_microseconds = 1;
+  uint64 timeout_limit_microseconds = 2;
 
   //@@
   //@@  .. cpp:var:: bool allow_override [DLIS-997]
@@ -672,7 +673,7 @@ message RequestTimeoutPolicy
   //@@     Whether individual request can override the timeout limit.
   //@@     The default value is false.
   //@@
-  bool allow_override = 2;
+  bool allow_override = 3;
 }
 
 //@@
@@ -959,7 +960,7 @@ message ModelSequenceBatching
   //@@     priority or specify priority that doesn't map to any timeout policy.
   //@@     If not specify, then no timeout limit is enforced.
   //@@
-  RequestTimeoutPolicy default_timeout_policy = 3;
+  RequestTimeoutPolicy default_timeout_policy = 5;
 
   //@@  .. cpp:var:: map<uint32, PrioritySetting> priority_setting
   //@@
@@ -967,7 +968,7 @@ message ModelSequenceBatching
   //@@     and the setting associated with the priority level. The requests
   //@@     with higher priority level will be prioritized than other requests.
   //@@
-  map<uint32, PrioritySetting> priority_setting = 4;
+  map<uint32, PrioritySetting> priority_setting = 6;
 }
 
 //@@
