@@ -28,60 +28,70 @@
 SIMPLE_CLIENT=../clients/simple_sequence_client
 SIMPLE_CLIENT_PY=../clients/simple_sequence_client.py
 
-CLIENT_LOG="./client.log"
-
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-repository=`pwd`/models
-SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
-rm -f $CLIENT_LOG $SERVER_LOG
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+rm -f *.log
 
 RET=0
 
-set +e
+for TRIAL in simple dyna; do
+    if [ "$TRIAL" == "simple" ]; then
+        CLIENT_ARGS="-v"
+        CLIENT_LOG="./client.log"
+        SERVER_ARGS="--model-repository=`pwd`/models"
+        SERVER_LOG="./inference_server.log"
+    else
+        CLIENT_ARGS="-v -d"
+        CLIENT_LOG="./client_dyna.log"
+        SERVER_ARGS="--model-repository=`pwd`/models_dyna"
+        SERVER_LOG="./inference_server_dyna.log"
+    fi
 
-$SIMPLE_CLIENT -v >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-python $SIMPLE_CLIENT_PY -v >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
+    set +e
 
-$SIMPLE_CLIENT -v -a >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
+    $SIMPLE_CLIENT $CLIENT_ARGS >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
 
-python $SIMPLE_CLIENT_PY -v -a >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
+    python $SIMPLE_CLIENT_PY $CLIENT_ARGS >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
 
-$SIMPLE_CLIENT -v -r -a >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
+    $SIMPLE_CLIENT $CLIENT_ARGS -a >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
 
-python $SIMPLE_CLIENT_PY -v -r -a >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
+    python $SIMPLE_CLIENT_PY $CLIENT_ARGS -a >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
 
-set -e
+    $SIMPLE_CLIENT $CLIENT_ARGS -r -a >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+    python $SIMPLE_CLIENT_PY $CLIENT_ARGS -r -a >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
