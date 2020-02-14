@@ -43,11 +43,16 @@ import tensorrtserver.cuda_shared_memory as cudashm
 import tensorrtserver.api.server_status_pb2 as server_status
 from ctypes import *
 
-_trials = ("savedmodel", "graphdef", "plan", "netdef", "custom", "libtorch", "onnx")
-_ragged_batch_supported_trials = ("custom",)
-
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel netdef onnx libtorch plan custom")
+ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
+
+_trials = BACKENDS.split(" ")
+if "custom" in BACKENDS:
+    _ragged_batch_supported_trials = ("custom",)
+else:
+    _ragged_batch_supported_trials = ()
 
 _max_queue_delay_ms = 10000
 
