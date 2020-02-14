@@ -68,6 +68,13 @@ if(${TRTIS_ENABLE_HTTP_V2})
 endif() # TRTIS_ENABLE_HTTP_V2
 
 #
+# GRPC V2
+#
+if(${TRTIS_ENABLE_GRPC_V2})
+  add_definitions(-DTRTIS_ENABLE_GRPC_V2=1)
+endif()
+
+#
 # Protobuf
 #
 set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
@@ -79,7 +86,6 @@ include_directories(${Protobuf_INCLUDE_DIRS})
 # GRPC
 #
 set(TRTIS_ENABLE_GRPC ON)
-set(TRTIS_ENABLE_GRPC_V2 OFF)
 find_package(gRPC CONFIG REQUIRED)
 message(STATUS "Using gRPC ${gRPC_VERSION}")
 include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)

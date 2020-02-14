@@ -279,14 +279,14 @@ and in the API Reference.
 
 The Python client API provides similar capabilities as the C++
 API. The commented interface is available at
-`src/clients/python/library/\_\_init\_\_.py
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/library/__init__.py>`_
+`src/clients/python/api_v1/library/\_\_init\_\_.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/api_v1/library/__init__.py>`_
 and in the API Reference.
 
 A simple C++ example application at `src/clients/c++/examples/simple\_client.cc.in
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/simple_client.cc.in>`_
-and a Python version at `src/clients/python/examples/simple\_client.py
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/examples/simple_client.py>`_
+and a Python version at `src/clients/python/api_v1/examples/simple\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/api_v1/examples/simple_client.py>`_
 demonstrate basic client API usage.
 
 To run the C++ version of the simple example, first build or
@@ -317,8 +317,8 @@ System Shared Memory
 A simple C++ example application using system shared memory at
 `src/clients/c++/examples/simple\_shm\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/simple_shm_client.cc>`_
-and a Python version at `src/clients/python/examples/simple\_shm\_client.py
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/examples/simple_shm_client.py>`_
+and a Python version at `src/clients/python/api_v1/examples/simple\_shm\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/api_v1/examples/simple_shm_client.py>`_
 demonstrate the usage of shared memory with the client API.
 
 To run the C++ version of the simple system shared memory example, first
@@ -338,7 +338,7 @@ build or download it as described in
   15 - 1 = 14
 
 We have added a simple `system shared memory module
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/library/shared_memory/__init__.py>`_
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/api_v1/library/shared_memory/__init__.py>`_
 that extends the Python client API to create, set and destroy system shared
 memory. To run the Python version of the simple system shared memory example,
 first build or download it as described in
@@ -353,8 +353,8 @@ CUDA Shared Memory
 A simple C++ example application using CUDA shared memory at
 `src/clients/c++/examples/simple\_cuda\_shm\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/simple_cuda_shm_client.cc>`_
-and a Python version at `src/clients/python/examples/simple\_shm\_client.py
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/examples/simple_cuda_shm_client.py>`_
+and a Python version at `src/clients/python/api_v1/examples/simple\_shm\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/api_v1/examples/simple_cuda_shm_client.py>`_
 demonstrate the usage of shared memory with the client API.
 
 To run the C++ version of the simple CUDA shared memory example, first
@@ -374,7 +374,7 @@ $ simple_cuda_shm_client
 15 - 1 = 14
 
 We have added a simple `CUDA shared memory module
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/library/cuda_shared_memory/__init__.py>`_
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/api_v1/library/cuda_shared_memory/__init__.py>`_
 that extends the Python client API to create, set and destroy CUDA shared
 memory. To run the Python version of the simple CUDA shared memory example,
 first build or download it as described in
@@ -396,8 +396,8 @@ SetRaw().
 String tensors are demonstrated in the C++ example application at
 `src/clients/c++/examples/simple\_string\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/simple_string_client.cc>`_
-and a Python version at `src/clients/python/examples/simple\_string\_client.py
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/examples/simple_string_client.py>`_.
+and a Python version at `src/clients/python/api_v1/examples/simple\_string\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/api_v1/examples/simple_string_client.py>`_.
 
 .. _section-client-api-stateful-models:
 
@@ -423,8 +423,8 @@ the C++ example application at
 `src/clients/c++/examples/simple\_sequence\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/simple_sequence_client.cc>`_
 and a Python version at
-`src/clients/python/examples/simple\_sequence\_client.py
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/examples/simple_sequence_client.py>`_.
+`src/clients/python/api_v1/examples/simple\_sequence\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/api_v1/examples/simple_sequence_client.py>`_.
 
 Shape Tensor
 ^^^^^^^^^^^^

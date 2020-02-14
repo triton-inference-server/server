@@ -113,7 +113,7 @@ by default it is
 addition to that, you also need to install the tensorrtserver Python
 package and other packages required by the examples::
 
-  $ pip install trtis-clients/install/python/tensorrtserver-*.whl numpy pillow
+  $ pip install trtis-clients/install/python/tensorrtserver*.whl numpy pillow
 
 Windows 10
 ..........
@@ -125,7 +125,7 @@ can use the Python examples to test if the build is successful. To use
 the Python examples, you need to install the tensorrtserver Python
 package and other packages required by the examples::
 
-  > pip install trtis-clients/install/python/tensorrtserver-*.whl numpy pillow
+  > pip install trtis-clients/install/python/tensorrtserver*.whl numpy pillow
 
 Download From GitHub
 ^^^^^^^^^^^^^^^^^^^^
@@ -149,7 +149,7 @@ The Python examples require that you additionally install the wheel
 file and some other dependencies::
 
   $ apt-get install python python-pip
-  $ pip install --user --upgrade python/tensorrtserver-*.whl numpy pillow
+  $ pip install --user --upgrade python/tensorrtserver*.whl numpy pillow
 
 The C++ image_client example uses OpenCV for image manipulation so for
 that example you must install the following::
@@ -191,8 +191,8 @@ The image classification example that uses the C++ client API is
 available at `src/clients/c++/examples/image\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/image_client.cc>`_. The
 Python version of the image classification client is available at
-`src/clients/python/examples/image\_client.py
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/examples/image_client.py>`_.
+`src/clients/python/api_v1/examples/image\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/api_v1/examples/image_client.py>`_.
 
 To use image\_client (or image\_client.py) you must first have a
 running inference server that is serving one or more image
@@ -288,8 +288,8 @@ on all images in the directory::
       751 (RACER) = 0.0597549
 
 The grpc\_image\_client.py application at available at
-`src/clients/python/examples/grpc\_image\_client.py
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/examples/grpc_image_client.py>`_
+`src/clients/python/api_v1/examples/grpc\_image\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/api_v1/examples/grpc_image_client.py>`_
 behaves the same as the image\_client except that instead of using the
 inference server client library it uses the GRPC generated client
 library to communicate with the server.
@@ -308,8 +308,8 @@ client. The ensemble image classification example that uses the C++
 client API is available at `src/clients/c++/examples/ensemble\_image\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/ensemble_image_client.cc>`_.
 The Python version of the image classification client is available at
-`src/clients/python/examples/ensemble\_image\_client.py
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/examples/ensemble_image_client.py>`_.
+`src/clients/python/api_v1/examples/ensemble\_image\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/api_v1/examples/ensemble_image_client.py>`_.
 
 To use ensemble\_image\_client (or ensemble\_image\_client.py) you must first
 have a running inference server that is serving the
