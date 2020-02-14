@@ -161,12 +161,6 @@ class InferenceRequest {
   // Initialize this request so that it is prepared to run on
   // 'server'. All options and tensor data must be set before calling.
   Status Init(InferenceServer* server);
-  Status Init(const std::shared_ptr<InferenceBackend>& backend);
-
-  // Finalize this request after inference is complete. Options and
-  // tensor data are still accessible after finalizing but backend is
-  // no longer valid.
-  Status Fini();
 
   uint32_t ProtocolVersion() const { return protocol_version_; }
 
@@ -177,7 +171,7 @@ class InferenceRequest {
   void SetRequestedModelVersion(int64_t v) { requested_model_version_ = v; }
 
   int64_t ActualModelVersion() const { return actual_model_version_; }
-  const std::shared_ptr<InferenceBackend>& Backend() const { return backend_; }
+  void SetActualModelVersion(int64_t v) { actual_model_version_ = v; }
 
   uint64_t Id() const { return id_; }
   void SetId(uint64_t i) { id_ = i; }
@@ -246,7 +240,11 @@ class InferenceRequest {
     return input_map_;
   }
 
-  Status Normalize();
+  // Normalize the request by checking and conforming it to the model
+  // configuration. We pass backend here as non-shared-ptr because
+  // normalize must be used in contexts where the backend shared_ptr
+  // does not yet exist (e.g. warmup).
+  Status Normalize(const InferenceBackend& backend);
 
  private:
   std::string model_name_;
@@ -269,9 +267,6 @@ class InferenceRequest {
 
   std::unordered_map<std::string, Input> inputs_;
   std::unordered_map<std::string, RequestedOutput> requested_outputs_;
-
-  // The model backend associated with this request.
-  std::shared_ptr<InferenceBackend> backend_;
 
   // The data for each input. FIXMEV2 should have memory/data for each
   // input in the Input object.

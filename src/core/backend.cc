@@ -140,9 +140,7 @@ InferenceBackend::SetConfiguredScheduler(
                      << " is running warmup sample '" << sample.sample_name_
                      << "'";
       std::vector<Scheduler::Payload> payloads;
-      // Duplicate payloads to match batch size requirement. FIXMEV2,
-      // this only works if the dynamic batcher is used so really need
-      // to create the request in the correct batch size.
+      // Duplicate payloads to match batch size requirement.
       for (size_t idx = 0; idx < sample.batch_size_; idx++) {
         std::shared_ptr<InferRequestProvider> request_provider;
         RETURN_IF_ERROR(
@@ -152,7 +150,6 @@ InferenceBackend::SetConfiguredScheduler(
         payloads.emplace_back(nullptr, request_provider, nullptr, nullptr);
       }
 
-      // FIXMEV2 need to init and fini the requests around the run?
       std::promise<Status> warmup_promise;
       auto warmup_future = warmup_promise.get_future();
       Run(runner_idx, &payloads, [&warmup_promise](Status status) {
@@ -478,16 +475,14 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
                   "' to have input_data_type set");
       }
 
-      auto pr = warmup_data.input_buffer_.emplace(input_meta.first, nullptr);
-      pr.first->second.reset(new MemoryReference());
-      static_cast<MemoryReference*>(pr.first->second.get())
-          ->AddBuffer(
-              allocated_ptr, batch_byte_size,
-              TRTSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */);
-
       RETURN_IF_ERROR(warmup_data.irequest_.AddInput(
           input_meta.first, input_meta_shape, batch_byte_size));
+      RETURN_IF_ERROR(warmup_data.irequest_.AppendInputData(
+          input_meta.first.c_str(), allocated_ptr, batch_byte_size,
+          TRTSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */));
     }
+
+    RETURN_IF_ERROR(warmup_data.irequest_.Normalize(*this));
   }
 
   return Status::Success;

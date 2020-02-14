@@ -43,35 +43,6 @@ InferenceRequest::InferenceRequest(
 }
 
 Status
-InferenceRequest::Init(InferenceServer* server)
-{
-  // Grab a handle to the backend that this request requires so that
-  // the backend doesn't get unloaded while processing the request.
-  RETURN_IF_ERROR(server->GetInferenceBackend(
-      model_name_, requested_model_version_, &backend_));
-
-  actual_model_version_ = backend_->Version();
-
-  return Normalize();
-}
-
-Status
-InferenceRequest::Init(const std::shared_ptr<InferenceBackend>& backend)
-{
-  backend_ = backend;
-  actual_model_version_ = backend_->Version();
-
-  return Normalize();
-}
-
-Status
-InferenceRequest::Fini()
-{
-  backend_.reset();
-  return Status::Success;
-}
-
-Status
 InferenceRequest::AddInput(
     const std::string& name, const InferenceRequest::Input& other,
     InferenceRequest::Input** input)
@@ -249,7 +220,7 @@ InferenceRequest::SetInputData(
 }
 
 Status
-InferenceRequest::Normalize()
+InferenceRequest::Normalize(const InferenceBackend& backend)
 {
   // FIXMEV2 these checks and normalization should move to when the
   // shapes are set in the request (so that we don't need to run this
@@ -257,7 +228,7 @@ InferenceRequest::Normalize()
   // overwrite the registered shape but instead create reshaped shape
   // as separate member.
 
-  const ModelConfig& model_config = backend_->Config();
+  const ModelConfig& model_config = backend.Config();
 
   // FIXMEV2 For V2 protocol we must adjust the shape of the input
   // tensors to remove the batch dimension and instead report that as
@@ -306,7 +277,7 @@ InferenceRequest::Normalize()
   // Validate if the requested output name exists in the model configuration
   for (const auto& pr : requested_outputs_) {
     const ModelOutput* output_config;
-    RETURN_IF_ERROR(backend_->GetOutput(pr.first, &output_config));
+    RETURN_IF_ERROR(backend.GetOutput(pr.first, &output_config));
   }
 
   // Make sure that the request is providing the same number of inputs
@@ -322,7 +293,7 @@ InferenceRequest::Normalize()
   // Update each input to have shape and batch-byte-size.
   for (auto& pr : inputs_) {
     const ModelInput* input_config;
-    RETURN_IF_ERROR(backend_->GetInput(pr.first, &input_config));
+    RETURN_IF_ERROR(backend.GetInput(pr.first, &input_config));
 
     auto& shape = *pr.second.MutableShape();
 

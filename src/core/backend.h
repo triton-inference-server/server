@@ -123,7 +123,6 @@ class InferenceBackend {
     std::string sample_name_;
     size_t batch_size_;
     InferenceRequest irequest_;
-    std::unordered_map<std::string, std::shared_ptr<Memory>> input_buffer_;
     std::shared_ptr<InferRequestProvider::InputOverrideMap> input_override_;
 
     // Placeholder for input data

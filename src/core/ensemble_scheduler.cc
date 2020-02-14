@@ -555,7 +555,7 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   irequest.SetCorrelationId(correlation_id_);
   irequest.SetFlags(flags_);
   irequest.SetBatchSize((batch_size == 0 ? 1 : batch_size));
-  RETURN_IF_ERROR(irequest.Init(backend));
+  RETURN_IF_ERROR(irequest.Normalize(*backend));
 
   step->reset(new Step(step_idx));
   (*step)->backend_ = backend;
