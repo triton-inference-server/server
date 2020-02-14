@@ -1885,6 +1885,7 @@ PlanBackend::Context::ProcessResponse(
     size_t context_idx, std::shared_ptr<SyncQueue<size_t>> context_queue)
 {
   while (true) {
+    NVTX_RANGE(nvtx_, "ProcessResponse " + context_idx);
     auto OnCompleteMetaData = completion_queue_.Get();
     auto& OnComplete = std::get<0>(OnCompleteMetaData);
     if (OnComplete == nullptr) {
@@ -1908,6 +1909,7 @@ PlanBackend::Context::ProcessResponse(
     // so that it can begin enqueuing new memcpys into the input buffers
     cudaEventSynchronize(event_set.ready_for_input_);
     context_queue->Put(context_idx);
+    NVTX_MARKER("plan_input_available");
 
 #ifdef TRTIS_ENABLE_STATS
     cudaEventSynchronize(event_set.ready_for_output_);
@@ -1920,9 +1922,11 @@ PlanBackend::Context::ProcessResponse(
 #endif  // TRTIS_ENABLE_STATS
 
     cudaEventSynchronize(event_set.output_ready_);
+    NVTX_MARKER("plan_output_ready");
     // Issue the last steps here if outputs are placed in indirect buffer
     // Note that the copies are expected to be HtoH if any.
     for (auto& output : *(std::get<3>(OnCompleteMetaData))) {
+      NVTX_RANGE(nvtx_, "IndirectOutputBufferCopy");
       for (auto& indirect_buffer : output.indirect_buffers_) {
         bool cuda_used;
         TRTSERVER_Memory_Type src_memory_type;
@@ -1962,7 +1966,10 @@ PlanBackend::Context::ProcessResponse(
 #endif  // TRTIS_ENABLE_STATS
 
     // Just trigger the callback, Payloads are all-set
-    OnComplete(Status::Success);
+    {
+      NVTX_RANGE(nvtx_, "OnComplete callback");
+      OnComplete(Status::Success);
+    }
   }
 }
 
