@@ -64,7 +64,9 @@ class NvtxRange {
 #ifdef TRTIS_ENABLE_NVTX
 #define NVTX_INITIALIZE nvtxInitialize(nullptr)
 #define NVTX_RANGE(V, L) nvidia::inferenceserver::NvtxRange V(L)
+#define NVTX_MARKER(L) nvtxMarkA(L)
 #else
 #define NVTX_INITIALIZE
 #define NVTX_RANGE(V, L)
+#define NVTX_MARKER(L)
 #endif  // TRTIS_ENABLE_NVTX
