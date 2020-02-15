@@ -25,11 +25,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
+import struct
 
-__all__ = ['raise_error',
-        'np_to_trtis_dtype',
-        'trtis_to_np_dtype',
-        'InferenceServerException']
+__all__ = [
+    'raise_error', 'np_to_trtis_dtype', 'trtis_to_np_dtype',
+    'InferenceServerException', 'serialize_string_tensor',
+    'deserialize_string_tensor'
+]
+
 
 def raise_error(msg):
     """
@@ -118,10 +121,11 @@ def np_to_trtis_dtype(np_dtype):
         return "FP32"
     elif np_dtype == np.float64:
         return "FP64"
-    # FIXMEPV2 String support
-    # elif np_dtype == np_dtype_string:
-    #    return "STRING"
+    # FIXMEPV2 support np.bytes_ or np.str_
+    elif np_dtype == np.object:
+        return "STRING"
     return None
+
 
 def trtis_to_np_dtype(dtype):
     if dtype == "BOOL":
@@ -148,7 +152,91 @@ def trtis_to_np_dtype(dtype):
         return np.float32
     elif dtype == "FP64":
         return np.float64
-    # FIXMEPV2 String support
-    # elif dtype == "STRING":
-    #    return np_dtype_string
+    # FIXMEPV2 support np.bytes_ or np.str_
+    elif dtype == "STRING":
+        return np.object
     return None
+
+
+def serialize_string_tensor(input_tensor):
+    """
+        Serializes a string tensor into a flat numpy array of length prepend strings.
+        Can pass string tensor as numpy array of bytes with dtype of np.bytes_,
+        numpy strings with dtype of np.str_ or python strings with dtype of np.object.
+
+        Parameters
+        ----------
+        input_tensor : np.array
+            The string tensor to serialize.
+
+        Returns
+        -------
+        serialized_string_tensor : np.array
+            The 1-D numpy array of type uint8 containing the serialized string in 'C' order.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to serialize the given tensor.
+        """
+
+    if input_tensor.size == 0:
+        raise_error("input cannot be empty")
+
+    # If the input is a tensor of string objects, then must flatten those into
+    # a 1-dimensional array containing the 4-byte string length followed by the
+    # actual string characters. All strings are concatenated together in "C"
+    # order.
+    if (input_tensor.dtype == np.object) or (
+            input_tensor.dtype.type == np.bytes_):
+        flattened = bytes()
+        for obj in np.nditer(input_tensor, flags=["refs_ok"], order='C'):
+            # If directly passing bytes to STRING type,
+            # don't convert it to str as Python will encode the
+            # bytes which may distort the meaning
+            if obj.dtype.type == np.bytes_:
+                if type(obj.item()) == bytes:
+                    s = obj.item()
+                else:
+                    s = bytes(obj)
+            else:
+                s = str(obj).encode('utf-8')
+            flattened += struct.pack("<I", len(s))
+            flattened += s
+        flattened_array = np.asarray(flattened)
+        if not flattened_array.flags['C_CONTIGUOUS']:
+            flattened_array = np.ascontiguousarray(flattened_array)
+        return flattened_array
+    else:
+        raise_error("cannot serialize string tensor: invalid datatype")
+    return None
+
+
+def deserialize_string_tensor(encoded_tensor):
+    """
+    Deserializes an encoded string tensor into an
+    numpy array of dtype of python objects
+
+    Parameters
+    ----------
+    encoded_tensor : bytes
+        The encoded string tensor where each element
+        has its length in first 4 bytes followed by
+        the content
+    Returns
+    -------
+    string_tensor : np.array
+        The 1-D numpy array of type object containing the
+        deserialized string in 'C' order.
+   
+    """
+    strs = list()
+    offset = 0
+    val_buf = encoded_tensor
+    while offset < len(val_buf):
+        l = struct.unpack_from("<I", val_buf, offset)[0]
+        offset += 4
+        sb = struct.unpack_from("<{}s".format(l), val_buf, offset)[0]
+        offset += l
+        strs.append(sb)
+    return (np.array(strs, dtype=str))

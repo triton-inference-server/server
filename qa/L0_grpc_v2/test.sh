@@ -91,11 +91,16 @@ else
 fi
 
 
-SIMPLE_V2_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_pyclient_v2.py
+SIMPLE_HEALTH_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_health_metadata.py
+SIMPLE_INFER_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_infer_client.py
+SIMPLE_ASYNC_INFER_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_async_infer_client.py
+SIMPLE_STRING_INFER_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_string_infer_client.py
 
 rm -f *.log
+rm -f *.log.*
 (rm -fr models && mkdir models && \
-    cp -r /workspace/docs/examples/model_repository/simple models/.)
+    cp -r /workspace/docs/examples/model_repository/simple models/. && \
+    cp -r /workspace/docs/examples/model_repository/simple_string models/.)
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
 SERVER=/opt/tensorrtserver/bin/trtserver
@@ -113,16 +118,36 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-python $SIMPLE_V2_CLIENT -v >> $CLIENT_LOG 2>&1
+# Test health
+python $SIMPLE_HEALTH_CLIENT -v >> ${CLIENT_LOG}.health 2>&1
 if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
+    cat ${CLIENT_LOG}.health
     RET=1
 fi
 
-if [ $(cat $CLIENT_LOG | grep "PASS" | wc -l) -ne 9 ]; then
-    cat $CLIENT_LOG
+if [ $(cat ${CLIENT_LOG}.health | grep "PASS" | wc -l) -ne 7 ]; then
+    cat ${CLIENT_LOG}.health
     RET=1
 fi
+
+for i in \
+        $SIMPLE_INFER_CLIENT \
+        $SIMPLE_ASYNC_INFER_CLIENT \
+        $SIMPLE_STRING_INFER_CLIENT \
+        ; do
+BASE=$(basename -- $i)
+SUFFIX="${BASE%.*}"
+    python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+    if [ $? -ne 0 ]; then
+        cat "${CLIENT_LOG}.${SUFFIX}"
+        RET=1
+    fi
+
+    if [ $(cat "${CLIENT_LOG}.${SUFFIX}" | grep "PASS" | wc -l) -ne 1 ]; then
+        cat "${CLIENT_LOG}.${SUFFIX}"
+        RET=1
+    fi
+done
 
 kill $SERVER_PID
 wait $SERVER_PID
