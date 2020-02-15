@@ -233,7 +233,7 @@ message InferRequestHeader
   //@@     The default value is 0 which indicates that the request will not be
   //@@     prioritized.
   //@@
-  uint32 priority = 6;
+  uint32 priority = 7;
 
   //@@  .. cpp:var:: uint64 timeout_limit_microseconds [DLIS-997]
   //@@
@@ -243,7 +243,7 @@ message InferRequestHeader
   //@@     timeout policy. The default value is 0 which indicates that the
   //@@     request will not have timeout limit.
   //@@
-  uint64 timeout_limit_microseconds = 7;
+  uint64 timeout_limit_microseconds = 8;
 }
 
 //@@
