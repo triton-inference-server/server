@@ -115,7 +115,7 @@ DynamicBatchScheduler::Create(
 
   sched->completion_queues_ =
       std::vector<std::queue<std::shared_ptr<std::vector<Scheduler::Payload>>>>(
-          sched->scheduler_threads_.size());
+          sched->scheduler_thread_cnt_);
 
   scheduler->reset(sched.release());
 
