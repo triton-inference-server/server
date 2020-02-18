@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -224,20 +224,30 @@ AutoFill::Create(
 #if defined(TRTIS_ENABLE_TENSORFLOW) || defined(TRTIS_ENABLE_TENSORRT) || \
     defined(TRTIS_ENABLE_CAFFE2) || defined(TRTIS_ENABLE_ONNXRUNTIME) ||  \
     defined(TRTIS_ENABLE_PYTORCH)
+    bool print_warning = true;
     if (!LOG_VERBOSE_IS_ON(1)) {
       if (platform == Platform::PLATFORM_UNKNOWN) {
         LOG_WARNING << "Autofiller failed to detect the platform for "
                     << model_name
                     << " (verify contents of model directory or use "
                        "--log-verbose=1 for more details)";
-      } else if (!(platform == Platform::PLATFORM_CUSTOM ||
-                   platform == Platform::PLATFORM_ENSEMBLE)) {
-        LOG_WARNING << "Autofiller failed to retrieve model. Error Details: "
-                    << status.AsString();
+      } else {
+#ifdef TRTIS_ENABLE_CUSTOM
+        if (platform == Platform::PLATFORM_CUSTOM) {
+          print_warning = false;
+        }
+#endif
+        if (platform == Platform::PLATFORM_ENSEMBLE) {
+          print_warning = false;
+        }
+
+        if (print_warning) {
+          LOG_WARNING << "Autofiller failed to retrieve model. Error Details: "
+                      << status.AsString();
+        }
       }
     }
-    if (!(platform == Platform::PLATFORM_CUSTOM ||
-          platform == Platform::PLATFORM_ENSEMBLE)) {
+    if (print_warning) {
       LOG_WARNING << "Proceeding with simple config for now";
     }
 #endif

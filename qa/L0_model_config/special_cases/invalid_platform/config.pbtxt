@@ -1,0 +1,29 @@
+name: "invalid_platform"
+platform: "tensorflo"
+default_model_filename: "model.savedmodel"
+max_batch_size: 8
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  },
+  {
+    name: "INPUT1"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+    label_filename: "output0_labels.txt"
+  },
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
