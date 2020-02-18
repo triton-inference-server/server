@@ -38,12 +38,18 @@ fi
 CLIENT_LOG="./client.log"
 BATCHER_TEST=sequence_batcher_test.py
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}
-
-SERVER=/opt/tensorrtserver/bin/trtserver
+DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+OPTDIR=${OPTDIR:="/opt"}
+SERVER=${OPTDIR}/tensorrtserver/bin/trtserver
 source ../common/util.sh
 
 RET=0
+
+# If BACKENDS not specified, set to all
+BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
+
+# If ENSEMBLES not specified, set to 1
+ENSEMBLES=${ENSEMBLES:="1"}
 
 # Must run on a single device or else the TRTSERVER_DELAY_SCHEDULER
 # can fail when the requests are distributed to multiple devices.
@@ -56,76 +62,146 @@ export CUDA_VISIBLE_DEVICES=0
 #   models2 - two instances with batch-size 2
 #   models4 - four instances with batch-size 1
 rm -fr *.log *.serverlog models{0,1,2,4} && mkdir models{0,1,2,4}
-for m in \
-        $DATADIR/qa_sequence_model_repository/plan_sequence_float32 \
-        $DATADIR/qa_sequence_model_repository/netdef_sequence_int32 \
-        $DATADIR/qa_sequence_model_repository/graphdef_sequence_object \
-        $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32 \
-        $DATADIR/qa_sequence_model_repository/savedmodel_sequence_float32 \
-        $DATADIR/qa_sequence_model_repository/onnx_sequence_int32 \
-        $DATADIR/qa_sequence_model_repository/libtorch_sequence_int32 \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_plan_sequence_float32 \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_netdef_sequence_int32 \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_sequence_object \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_sequence_float32 \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_onnx_sequence_int32 \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_libtorch_sequence_int32 \
-        ../custom_models/custom_sequence_int32 ; do
-    cp -r $m models1/. && \
-        (cd models1/$(basename $m) && \
+
+MODELS=""
+for BACKEND in $BACKENDS; do
+  if [[ $BACKENDS == *"plan"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/plan_sequence_float32"
+  elif [[ $BACKENDS == *"netdef"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/netdef_sequence_int32"
+  elif [[ $BACKENDS == *"graphdef"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_sequence_object \
+              $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32"
+  elif [[ $BACKENDS == *"savedmodel"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/savedmodel_sequence_float32"
+  elif [[ $BACKENDS == *"onnx"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/onnx_sequence_int32"
+  elif [[ $BACKENDS == *"libtorch"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/libtorch_sequence_int32"
+  elif [[ $BACKENDS == *"custom"* ]]; then
+    MODELS="$MODELS ../custom_models/custom_sequence_int32"
+  fi
+
+  if [ "$ENSEMBLES" == "1" ]; then
+    if [[ $BACKENDS == *"plan"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_plan_sequence_float32"
+    elif [[ $BACKENDS == *"netdef"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_netdef_sequence_int32"
+    elif [[ $BACKENDS == *"graphdef"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_sequence_object"
+    elif [[ $BACKENDS == *"savedmodel"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_sequence_float32"
+    elif [[ $BACKENDS == *"onnx"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_onnx_sequence_int32"
+    elif [[ $BACKENDS == *"libtorch"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_libtorch_sequence_int32"
+    fi
+  fi
+done
+
+for MODEL in $MODELS; do
+    cp -r $MODEL models1/. && \
+        (cd models1/$(basename $MODEL) && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
             sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
-    cp -r $m models2/. && \
-        (cd models2/$(basename $m) && \
+    cp -r $MODEL models2/. && \
+        (cd models2/$(basename $MODEL) && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 2/" config.pbtxt && \
             sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
-    cp -r $m models4/. && \
-        (cd models4/$(basename $m) && \
+    cp -r $MODEL models4/. && \
+        (cd models4/$(basename $MODEL) && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
             sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
-for m in \
-        $DATADIR/qa_sequence_model_repository/plan_nobatch_sequence_float32 \
-        $DATADIR/qa_sequence_model_repository/netdef_nobatch_sequence_int32 \
-        $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_object \
-        $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32 \
-        $DATADIR/qa_sequence_model_repository/savedmodel_nobatch_sequence_float32 \
-        $DATADIR/qa_sequence_model_repository/onnx_nobatch_sequence_int32 \
-        $DATADIR/qa_sequence_model_repository/libtorch_nobatch_sequence_int32 \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_plan_nobatch_sequence_float32 \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_netdef_nobatch_sequence_int32 \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_object \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_int32 \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_nobatch_sequence_float32 \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_onnx_nobatch_sequence_int32 \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_libtorch_nobatch_sequence_int32 ; do
-    cp -r $m models0/. && \
-        (cd models0/$(basename $m) && \
+MODELS=""
+for BACKEND in $BACKENDS; do
+  if [[ $BACKENDS == *"plan"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/plan_nobatch_sequence_float32"
+  elif [[ $BACKENDS == *"netdef"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/netdef_nobatch_sequence_int32"
+  elif [[ $BACKENDS == *"graphdef"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_object \
+              $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32"
+  elif [[ $BACKENDS == *"savedmodel"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/savedmodel_nobatch_sequence_float32"
+  elif [[ $BACKENDS == *"onnx"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/onnx_nobatch_sequence_int32"
+  elif [[ $BACKENDS == *"libtorch"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/libtorch_nobatch_sequence_int32"
+  elif [[ $BACKENDS == *"custom"* ]]; then
+    MODELS="$MODELS ../custom_models/custom_sequence_int32"
+  fi
+
+  if [ "$ENSEMBLES" == "1" ]; then
+    if [[ $BACKENDS == *"plan"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_plan_nobatch_sequence_float32"
+    elif [[ $BACKENDS == *"netdef"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_netdef_nobatch_sequence_int32"
+    elif [[ $BACKENDS == *"graphdef"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_object \
+                $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_int32"
+    elif [[ $BACKENDS == *"savedmodel"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_nobatch_sequence_float32"
+    elif [[ $BACKENDS == *"onnx"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_onnx_nobatch_sequence_int32"
+    elif [[ $BACKENDS == *"libtorch"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_libtorch_nobatch_sequence_int32"
+    fi
+  fi
+done
+
+for MODEL in $MODELS; do
+    cp -r $MODEL models0/. && \
+        (cd models0/$(basename $MODEL) && \
             sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
 #   modelsv - one instance with batch-size 4
 rm -fr modelsv && mkdir modelsv
-for m in \
-        $DATADIR/qa_variable_sequence_model_repository/plan_sequence_float32 \
-        $DATADIR/qa_variable_sequence_model_repository/netdef_sequence_int32 \
-        $DATADIR/qa_variable_sequence_model_repository/graphdef_sequence_object \
-        $DATADIR/qa_variable_sequence_model_repository/savedmodel_sequence_float32 \
-        $DATADIR/qa_variable_sequence_model_repository/onnx_sequence_int32 \
-        $DATADIR/qa_variable_sequence_model_repository/libtorch_sequence_int32 \
-        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_plan_sequence_float32 \
-        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_netdef_sequence_int32 \
-        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_graphdef_sequence_object \
-        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_savedmodel_sequence_float32 \
-        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_onnx_sequence_int32 \
-        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_libtorch_sequence_int32 ; do
-    cp -r $m modelsv/. && \
-        (cd modelsv/$(basename $m) && \
+
+MODELS=""
+for BACKEND in $BACKENDS; do
+  if [[ $BACKENDS == *"plan"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/plan_sequence_float32"
+  elif [[ $BACKENDS == *"netdef"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/netdef_sequence_int32"
+  elif [[ $BACKENDS == *"graphdef"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/graphdef_sequence_object"
+  elif [[ $BACKENDS == *"savedmodel"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/savedmodel_sequence_float32"
+  elif [[ $BACKENDS == *"onnx"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/onnx_sequence_int32"
+  elif [[ $BACKENDS == *"libtorch"* ]]; then
+    MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/libtorch_sequence_int32"
+  elif [[ $BACKENDS == *"custom"* ]]; then
+    MODELS="$MODELS ../custom_models/custom_sequence_int32"
+  fi
+
+  if [ "$ENSEMBLES" == "1" ]; then
+    if [[ $BACKENDS == *"plan"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_plan_nobatch_sequence_float32"
+    elif [[ $BACKENDS == *"netdef"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_netdef_nobatch_sequence_int32"
+    elif [[ $BACKENDS == *"graphdef"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_graphdef_sequence_object"
+    elif [[ $BACKENDS == *"savedmodel"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_savedmodel_sequence_float32"
+    elif [[ $BACKENDS == *"onnx"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_onnx_sequence_int32"
+    elif [[ $BACKENDS == *"libtorch"* ]]; then
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_libtorch_sequence_int32"
+    fi
+  fi
+done
+
+for MODEL in $MODELS; do
+    cp -r $MODEL modelsv/. && \
+        (cd modelsv/$(basename $MODEL) && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
             sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
@@ -142,8 +218,10 @@ for model_trial in v 0 1 2 4; do
 
     MODEL_DIR=models${model_trial}
 
-    cp -r $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/nop_* `pwd`/$MODEL_DIR/.
-    create_nop_modelfile `pwd`/libidentity.so `pwd`/$MODEL_DIR
+    if [ "$ENSEMBLES" == "1" ]; then
+      cp -r $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/nop_* `pwd`/$MODEL_DIR/.
+      create_nop_modelfile `pwd`/libidentity.so `pwd`/$MODEL_DIR
+    fi
 
     # Need to launch the server for each test so that the model status
     # is reset (which is used to make sure the correct batch size was
@@ -235,49 +313,51 @@ for model_trial in v 0 1 2 4; do
 done
 
 # ragged models
-rm -fr ragged_models && mkdir ragged_models
-cp -r ../custom_models/custom_dyna_sequence_int32 ragged_models/.
-(cd ragged_models/custom_dyna_sequence_int32 && \
-        sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
+if [[ $BACKENDS == *"custom"* ]]; then
+  rm -fr ragged_models && mkdir ragged_models
+  cp -r ../custom_models/custom_dyna_sequence_int32 ragged_models/.
+  (cd ragged_models/custom_dyna_sequence_int32 && \
+          sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
 
-export NO_BATCHING=0
-export MODEL_INSTANCES=1
-export BATCHER_TYPE="VARIABLE"
-MODEL_DIR=ragged_models
+  export NO_BATCHING=0
+  export MODEL_INSTANCES=1
+  export BATCHER_TYPE="VARIABLE"
+  MODEL_DIR=ragged_models
 
-# Need to launch the server for each test so that the model status
-# is reset (which is used to make sure the correct batch size was
-# used for execution). Test everything with fixed-tensor-size
-# models and variable-tensor-size models.
-for i in test_ragged_batch_allowed ; do
-    export TRTSERVER_BACKLOG_DELAY_SCHEDULER=3
-    export TRTSERVER_DELAY_SCHEDULER=12
+  # Need to launch the server for each test so that the model status
+  # is reset (which is used to make sure the correct batch size was
+  # used for execution). Test everything with fixed-tensor-size
+  # models and variable-tensor-size models.
+  for i in test_ragged_batch_allowed ; do
+      export TRTSERVER_BACKLOG_DELAY_SCHEDULER=3
+      export TRTSERVER_DELAY_SCHEDULER=12
 
-    SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
-    SERVER_LOG="./$i.$MODEL_DIR.serverlog"
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
+      SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
+      SERVER_LOG="./$i.$MODEL_DIR.serverlog"
+      run_server
+      if [ "$SERVER_PID" == "0" ]; then
+          echo -e "\n***\n*** Failed to start $SERVER\n***"
+          cat $SERVER_LOG
+          exit 1
+      fi
 
-    echo "Test: $i, repository $MODEL_DIR" >>$CLIENT_LOG
+      echo "Test: $i, repository $MODEL_DIR" >>$CLIENT_LOG
 
-    set +e
-    python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-        echo -e "\n***\n*** Test $i Failed\n***"
-        RET=1
-    fi
-    set -e
+      set +e
+      python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+      if [ $? -ne 0 ]; then
+          echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+          echo -e "\n***\n*** Test $i Failed\n***"
+          RET=1
+      fi
+      set -e
 
-    unset TRTSERVER_DELAY_SCHEDULER
-    unset TRTSERVER_BACKLOG_DELAY_SCHEDULER
-    kill $SERVER_PID
-    wait $SERVER_PID
-done
+      unset TRTSERVER_DELAY_SCHEDULER
+      unset TRTSERVER_BACKLOG_DELAY_SCHEDULER
+      kill $SERVER_PID
+      wait $SERVER_PID
+  done
+fi
 
 # python unittest seems to swallow ImportError and still return 0 exit
 # code. So need to explicitly check CLIENT_LOG to make sure we see
