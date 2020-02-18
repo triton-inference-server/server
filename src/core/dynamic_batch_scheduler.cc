@@ -94,9 +94,9 @@ DynamicBatchScheduler::Create(
     auto thread_exit = std::make_shared<std::atomic<bool>>(false);
     sched->scheduler_threads_exit_.emplace_back(thread_exit);
     sched->scheduler_threads_.emplace_back(new std::thread(
-        [dyna_sched, runner_id, nice, thread_exit, &init_state]() {
+        [dyna_sched, runner_id, c, nice, thread_exit, &init_state]() {
           dyna_sched->SchedulerThread(
-              runner_id, nice, thread_exit, &init_state);
+              runner_id, c, nice, thread_exit, &init_state);
         }));
     if (!init_state.get_future().get()) {
       if (sched->scheduler_threads_.back()->joinable()) {
@@ -115,7 +115,7 @@ DynamicBatchScheduler::Create(
 
   sched->completion_queues_ =
       std::vector<std::queue<std::shared_ptr<std::vector<Scheduler::Payload>>>>(
-          sched->scheduler_threads_.size());
+          sched->scheduler_thread_cnt_);
 
   scheduler->reset(sched.release());
 
@@ -188,7 +188,7 @@ DynamicBatchScheduler::Enqueue(
 
 void
 DynamicBatchScheduler::SchedulerThread(
-    const uint32_t runner_id, const int nice,
+    const uint32_t runner_id, const uint32_t completion_id, const int nice,
     const std::shared_ptr<std::atomic<bool>>& rthread_exit,
     std::promise<bool>* is_initialized)
 {
@@ -282,8 +282,8 @@ DynamicBatchScheduler::SchedulerThread(
             queue_.pop_front();
           }
           if (preserve_ordering_) {
-            std::lock_guard<std::mutex> lock(runner_queue_mtx_);
-            runner_queue_.push(runner_id);
+            std::lock_guard<std::mutex> lock(completion_id_queue_mtx_);
+            completion_id_queue_.push(completion_id);
           }
 
           queued_batch_size_ -= pending_batch_size_;
@@ -315,8 +315,8 @@ DynamicBatchScheduler::SchedulerThread(
         payloads->emplace_back(std::move(queue_.front()));
         queue_.pop_front();
         if (preserve_ordering_) {
-          std::lock_guard<std::mutex> lock(runner_queue_mtx_);
-          runner_queue_.push(runner_id);
+          std::lock_guard<std::mutex> lock(completion_id_queue_mtx_);
+          completion_id_queue_.push(completion_id);
         }
       }
 
@@ -335,9 +335,9 @@ DynamicBatchScheduler::SchedulerThread(
     }
 
     if ((payloads != nullptr) && !payloads->empty()) {
-      auto OnCompleteQueuedPayloads = [this, runner_id,
+      auto OnCompleteQueuedPayloads = [this, completion_id,
                                        payloads](const Status& status) {
-        FinalizePayloads(runner_id, payloads, status);
+        FinalizePayloads(completion_id, payloads, status);
       };
 
       OnSchedule_(runner_id, payloads.get(), OnCompleteQueuedPayloads);
@@ -491,7 +491,7 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
 
 void
 DynamicBatchScheduler::FinalizePayloads(
-    const uint32_t runner_id,
+    const uint32_t completion_id,
     std::shared_ptr<std::vector<Scheduler::Payload>> payloads,
     const Status& status)
 {
@@ -523,26 +523,26 @@ DynamicBatchScheduler::FinalizePayloads(
 
   if (preserve_ordering_) {
     std::lock_guard<std::mutex> lock(completion_queues_mtx_);
-    completion_queues_[runner_id].push(payloads);
+    completion_queues_[completion_id].push(payloads);
     // Finalize the completed payloads in-order as far as possible
     while (true) {
-      size_t head_runner_id;
+      size_t head_completion_id;
       {
-        std::lock_guard<std::mutex> lock(runner_queue_mtx_);
-        if (runner_queue_.empty() ||
-            completion_queues_[runner_queue_.front()].empty()) {
+        std::lock_guard<std::mutex> lock(completion_id_queue_mtx_);
+        if (completion_id_queue_.empty() ||
+            completion_queues_[completion_id_queue_.front()].empty()) {
           break;
         }
-        head_runner_id = runner_queue_.front();
-        runner_queue_.pop();
+        head_completion_id = completion_id_queue_.front();
+        completion_id_queue_.pop();
       }
 
-      for (auto& payload : *completion_queues_[head_runner_id].front()) {
+      for (auto& payload : *completion_queues_[head_completion_id].front()) {
         if (payload.complete_function_ != nullptr) {
           payload.complete_function_(payload.status_);
         }
       }
-      completion_queues_[head_runner_id].pop();
+      completion_queues_[head_completion_id].pop();
     }
   }
 }
