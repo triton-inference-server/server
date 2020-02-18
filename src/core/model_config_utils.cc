@@ -465,6 +465,13 @@ ValidateModelConfig(
                                           config.name());
   }
 
+  if (GetPlatform(config.platform()) == Platform::PLATFORM_UNKNOWN) {
+    return Status(
+        RequestStatusCode::INVALID_ARG, "unexpected platform type \'" +
+                                            config.platform() + "\' for " +
+                                            config.name());
+  }
+
   if (!config.has_version_policy()) {
     return Status(
         RequestStatusCode::INVALID_ARG,

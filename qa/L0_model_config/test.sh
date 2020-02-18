@@ -153,9 +153,53 @@ for modelpath in \
    cp ./libidentity.so $modelpath/libcustom.so
 done
 
+# Copy other required models
+mkdir -p special_cases/invalid_platform/1
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1/model.savedmodel \
+    special_cases/invalid_platform/1/
 
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG
 RET=0
+
+# Run special test cases
+for TARGET in `ls special_cases`; do
+    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"
+    SERVER_LOG=$SERVER_LOG_BASE.special_case_${TARGET}.log
+
+    rm -fr models && mkdir models
+    cp -r special_cases/$TARGET models/.
+
+    CONFIG=models/$TARGET/config.pbtxt
+    EXPECTEDS=models/$TARGET/expected*
+
+    echo -e "Test on special_cases/$TARGET" >> $CLIENT_LOG
+
+    # We expect all the tests to fail with one of the expected
+    # error messages
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+        RET=1
+        kill $SERVER_PID
+        wait $SERVER_PID
+    else
+        EXFOUND=0
+        for EXPECTED in `ls $EXPECTEDS`; do
+            EX=`cat $EXPECTED`
+            if grep ^E[0-9][0-9][0-9][0-9].*"$EX" $SERVER_LOG; then
+                echo -e "Found \"$EX\"" >> $CLIENT_LOG
+                EXFOUND=1
+                break
+            else
+                echo -e "Not found \"$EX\"" >> $CLIENT_LOG
+            fi
+        done
+        if [ "$EXFOUND" == "0" ]; then
+            echo -e "*** FAILED: special_cases/$TARGET" >> $CLIENT_LOG
+            RET=1
+        fi
+    fi
+done
 
 for TRIAL in $TRIALS; do
     # Run all tests that require no autofill but that add the platform to
