@@ -50,7 +50,7 @@ if __name__ == '__main__':
     try:
         TRTISClient = grpcclient.InferenceServerClient(FLAGS.url)
     except Exception as e:
-        print("context creation failed: " + str(e))
+        print("channel creation failed: " + str(e))
         sys.exit()
 
     model_name = 'simple'

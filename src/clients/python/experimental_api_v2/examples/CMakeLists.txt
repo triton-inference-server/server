@@ -30,6 +30,7 @@ install(
   PROGRAMS
     grpc_v2_image_client.py
     simple_grpc_v2_client.py
+    simple_grpc_class_client.py
     simple_grpc_health_metadata.py
     simple_grpc_async_infer_client.py
     simple_grpc_infer_client.py
