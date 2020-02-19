@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -216,16 +216,20 @@ main(int argc, char** argv)
   bool verbose = false;
   bool async = false;
   bool reverse = false;
+  bool dyna_sequence = false;
   std::string url("localhost:8001");
   std::string protocol = "grpc";
   int correlation_id_offset = 0;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vrau:o:")) != -1) {
+  while ((opt = getopt(argc, argv, "vrdau:o:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
+        break;
+      case 'd':
+        dyna_sequence = true;
         break;
       case 'r':
         reverse = true;
@@ -387,6 +391,13 @@ main(int argc, char** argv)
     if (i < values.size()) {
       seq0_expected += values[i];
       seq1_expected -= values[i];
+
+      // The dyna_sequence custom backend adds the correlation ID to
+      // the last request in a sequence.
+      if (dyna_sequence && (values[i] == 1)) {
+        seq0_expected += correlation_id0;
+        seq1_expected += correlation_id1;
+      }
     }
   }
 
