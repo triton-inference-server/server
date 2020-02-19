@@ -99,6 +99,7 @@ if __name__ == '__main__':
     request = grpc_service_v2_pb2.ModelInferRequest()
     request.model_name = "resnet_v1_50_graphdef"
     request.model_version = -1
+    request.id = "my request id"
 
     input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
     input.name = "input"

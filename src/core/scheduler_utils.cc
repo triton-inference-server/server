@@ -39,13 +39,13 @@ InitPendingShape(
 {
   pending_batch_shapes->clear();
 
-  const InferRequestHeader& request =
-      payload.request_provider_->RequestHeader();
-  for (const auto& input : request.input()) {
-    const auto itr = enforce_equal_shape_tensors.find(input.name());
+  const InferenceRequest& irequest = payload.request_provider_->Request();
+  for (const auto& pr : irequest.Inputs()) {
+    const auto& input = pr.second;
+    const auto itr = enforce_equal_shape_tensors.find(input.Name());
     if (itr != enforce_equal_shape_tensors.end()) {
-      std::pair<DimsList, std::vector<int64_t>> shapes;
-      shapes.first = input.dims();
+      std::pair<std::vector<int64_t>, std::vector<int64_t>> shapes;
+      shapes.first = input.Shape();
 
       // For shape tensors must compare the contents of the tensor in
       // addition to the tensor shape itself.
@@ -54,7 +54,7 @@ InitPendingShape(
       }
 
       pending_batch_shapes->emplace(
-          std::make_pair(input.name(), std::move(shapes)));
+          std::make_pair(input.Name(), std::move(shapes)));
     }
   }
 
@@ -67,13 +67,13 @@ CompareWithPendingShape(
     const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
     const PendingBatchShapes& pending_batch_shapes)
 {
-  const InferRequestHeader& request =
-      payload.request_provider_->RequestHeader();
+  const InferenceRequest& irequest = payload.request_provider_->Request();
 
-  for (const auto& input : request.input()) {
-    const auto itr = pending_batch_shapes.find(input.name());
+  for (const auto& pr : irequest.Inputs()) {
+    const auto& input = pr.second;
+    const auto itr = pending_batch_shapes.find(input.Name());
     if (itr != pending_batch_shapes.end()) {
-      if (!CompareDims(itr->second.first, input.dims())) {
+      if (!CompareDims(itr->second.first, input.Shape())) {
         return false;
       }
 

@@ -120,7 +120,7 @@ BaseBackend::CreateExecutionContexts(
         Run(runner_idx, payloads, func);
       },
       [this](
-          uint32_t runner_idx, const InferRequestHeader::Input& input,
+          uint32_t runner_idx, const InferenceRequest::Input& input,
           const Scheduler::Payload& payload,
           std::vector<int64_t>* shape) -> Status { return Status::Success; }));
 
@@ -365,10 +365,10 @@ FillStringTensor(TRTISTF_Tensor* tensor, const size_t idx, const size_t cnt)
 
 Status
 BaseBackend::Context::SetInput(
-    const std::string& name, const DataType datatype, const DimsList& dims,
-    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<InputInfo>* inputs, TRTISTF_TensorList** input_tensors,
-    bool* cuda_copy)
+    const std::string& name, const DataType datatype,
+    const std::vector<int64_t>& dims, const size_t total_batch_size,
+    std::vector<Scheduler::Payload>* payloads, std::vector<InputInfo>* inputs,
+    TRTISTF_TensorList** input_tensors, bool* cuda_copy)
 {
   // Get the shape of the input. The provider has already checked
   // that the request shape is valid so don't need to do it here.
@@ -443,10 +443,8 @@ BaseBackend::Context::SetFixedSizedInputTensor(
   // included in the dynamic batch.
   std::vector<size_t> expected_byte_sizes;
   for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-    expected_byte_sizes.push_back(
-        request_header.batch_size() * batch1_byte_size);
+    const InferenceRequest& irequest = payload.request_provider_->Request();
+    expected_byte_sizes.push_back(irequest.BatchSize() * batch1_byte_size);
   }
 
   input->memory_type_ = (TRTISTF_TensorIsGPUTensor(tensor))
@@ -471,10 +469,9 @@ BaseBackend::Context::SetStringInputTensor(
   // input tensor. Skip payloads that had errors since they are not
   // included in the dynamic batch.
   for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
+    const InferenceRequest& irequest = payload.request_provider_->Request();
     const size_t expected_element_cnt =
-        request_header.batch_size() * batch1_element_cnt;
+        irequest.BatchSize() * batch1_element_cnt;
     size_t element_idx = 0;
 
     // For string data type, we always need to copy the data to CPU so that
@@ -588,10 +585,9 @@ BaseBackend::Context::ReadStringOutputTensor(
   size_t tensor_element_idx = 0;
 
   for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
+    const InferenceRequest& irequest = payload.request_provider_->Request();
     const size_t expected_element_cnt =
-        request_header.batch_size() * batch1_element_cnt;
+        irequest.BatchSize() * batch1_element_cnt;
 
     // If 'payload' should have valid output (status ok) and
     // if 'payload' requested this output then copy it from
@@ -662,7 +658,7 @@ BaseBackend::Context::Run(
               name_ + "'");
     }
 
-    total_batch_size += payload.request_provider_->RequestHeader().batch_size();
+    total_batch_size += payload.request_provider_->Request().BatchSize();
 
     // All payloads must have equally-sized input tensors so use any
     // payload as the representative for the input tensors.
@@ -703,14 +699,15 @@ BaseBackend::Context::Run(
   // Inputs from the request...
   std::vector<InputInfo> inputs;
   bool cuda_copy = false;
-  for (const auto& input : input_request_provider->RequestHeader().input()) {
-    const std::string& name = input.name();
+  for (const auto& pr : input_request_provider->Request().Inputs()) {
+    const auto& input = pr.second;
+    const std::string& name = input.Name();
 
     const ModelInput* input_config;
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
     RETURN_IF_ERROR(SetInput(
-        name, input_config->data_type(), input.dims(), total_batch_size,
+        name, input_config->data_type(), input.Shape(), total_batch_size,
         payloads, &inputs, input_tensors.get(), &cuda_copy));
   }
 
@@ -731,10 +728,9 @@ BaseBackend::Context::Run(
   // payload.
   std::set<std::string> required_outputs;
   for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-    for (const auto& output : request_header.output()) {
-      required_outputs.insert(output.name());
+    const InferenceRequest& irequest = payload.request_provider_->Request();
+    for (const auto& pr : irequest.RequestedOutputs()) {
+      required_outputs.insert(pr.first);
     }
   }
 

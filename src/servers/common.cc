@@ -141,17 +141,13 @@ SetInferenceRequestOptions(
     TRTSERVER_InferenceRequestOptions* request_options,
     const ModelInferRequest& request)
 {
-  // FIXMEV2 Fix request ID to be a string.
-  RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetId(
-      request_options, 0 /*request.id()*/));
+  RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetIdStr(
+      request_options, request.id().c_str()));
   // FIXMEV2 parameters
   // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetFlags(
   //    request_options, request_header.flags()));
   RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetCorrelationId(
       request_options, request.sequence_id()));
-  // FIXMEV2 batch-size
-  // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetBatchSize(
-  //   request_options, request_header.batch_size()));
 
   // FIXMEV2 raw contents size?? Do we need it?
   for (const auto& input : request.inputs()) {

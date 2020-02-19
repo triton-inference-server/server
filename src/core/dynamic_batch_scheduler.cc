@@ -166,7 +166,7 @@ DynamicBatchScheduler::Enqueue(
   {
     std::lock_guard<std::mutex> lock(mu_);
     queue_.emplace_back(stats, request_provider, response_provider, OnComplete);
-    queued_batch_size_ += request_provider->RequestHeader().batch_size();
+    queued_batch_size_ += request_provider->Request().BatchSize();
 
     // If there are any idle runners and the queued batch size is greater or
     // equal to next preferred batch size, then wake one up to service this
@@ -387,7 +387,7 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
   size_t search_batch_cnt = pending_batch_queue_cnt_;
   for (auto idx = pending_batch_queue_cnt_; idx < queue_.size(); ++idx) {
     const auto batch_size =
-        queue_[idx].request_provider_->RequestHeader().batch_size();
+        queue_[idx].request_provider_->Request().BatchSize();
 
     // If there is no pending batch, then this request is starting a
     // new batch.

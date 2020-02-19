@@ -193,7 +193,7 @@ class SequenceBatch {
  protected:
   bool CreateCorrelationIDControl(const ModelConfig& config);
   void SetControlTensors(
-      const InferRequestHeader& request_header,
+      const InferenceRequest& irequest,
       const std::shared_ptr<InferRequestProvider>& request_provider,
       const int32_t seq_slot, const CorrelationID corr_id);
 

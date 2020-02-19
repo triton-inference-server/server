@@ -27,6 +27,7 @@
 
 #include <functional>
 #include "src/core/api.pb.h"
+#include "src/core/infer_request.h"
 #include "src/core/server_status.h"
 #include "src/core/status.h"
 
@@ -106,7 +107,7 @@ class Scheduler {
   // get the contents of a shape tensor. A non-OK error status
   // indicates that the peek failed.
   using StandardShapeTensorPeekFunc = std::function<Status(
-      uint32_t runner_idx, const InferRequestHeader::Input& input,
+      uint32_t runner_idx, const InferenceRequest::Input& input,
       const Scheduler::Payload& payload, std::vector<int64_t>* shape)>;
 
   // Enqueue a request with the scheduler.
