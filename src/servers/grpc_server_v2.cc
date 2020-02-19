@@ -1583,8 +1583,7 @@ ModelInferHandler::InferComplete(
           for (const auto d : io.raw().dims()) {
             output.add_shape(d);
           }
-          // FIXMEV2 Need datatype
-
+          output.set_datatype(GetDataTypeProtocolString(io.data_type()));
           break;
         }
       }

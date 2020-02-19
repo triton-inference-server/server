@@ -30,6 +30,8 @@ package nvidia.inferenceserver;
 
 //@@.. cpp:namespace:: nvidia::inferenceserver
 
+import "common.proto";
+
 //@@.. cpp:var:: message InferSharedMemory
 //@@
 //@@   The meta-data for the shared memory from which to read the input
@@ -246,6 +248,12 @@ message InferResponseHeader
     //@@       The name of the output tensor.
     //@@
     string name = 1;
+
+    //@@    .. cpp:var:: DataType data_type
+    //@@
+    //@@       The datatype of the output tensor.
+    //@@
+    DataType data_type = 4;
 
     //@@    .. cpp:var:: message Raw
     //@@

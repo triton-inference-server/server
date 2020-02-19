@@ -654,9 +654,7 @@ class InferResult:
                 for self._value in self._output.shape:
                     self._shape.append(self._value)
 
-                # FIXMEPV2 datatype is not yet provided by the server
-                # for ouput yet. hard-coding to INT32
-                self._datatype = 'INT32'
+                self._datatype = self._output.datatype
                 if self._datatype == 'STRING':
                     # String results contain a 4-byte string length
                     # followed by the actual string characters. Hence,
