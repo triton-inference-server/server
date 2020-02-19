@@ -80,12 +80,12 @@ class DynamicBatchScheduler : public Scheduler {
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds);
   void SchedulerThread(
-      const uint32_t runner_id, const int nice,
+      const uint32_t runner_id, const uint32_t completion_id, const int nice,
       const std::shared_ptr<std::atomic<bool>>& rthread_exit,
       std::promise<bool>* is_initialized);
   uint64_t GetDynamicBatch(const int64_t runner_id);
   void FinalizePayloads(
-      const uint32_t runner_id,
+      const uint32_t completion_id,
       std::shared_ptr<std::vector<Scheduler::Payload>> payloads,
       const Status& status);
 
@@ -145,11 +145,13 @@ class DynamicBatchScheduler : public Scheduler {
   // even when there are multiple scheduler threads.
   const bool preserve_ordering_;
 
-  // Holds the sequence of runner indices in order the payloads were issued.
-  std::queue<size_t> runner_queue_;
-  // Lock to protect the runner_queue_
-  std::mutex runner_queue_mtx_;
-  // Per runner queues to store the ready payloads
+  // Holds the sequence of completion-queue indices in order the
+  // payloads were issued.
+  std::queue<size_t> completion_id_queue_;
+  // Lock to protect the completion_id_queue_
+  std::mutex completion_id_queue_mtx_;
+
+  // Per completion-id queues to store the ready payloads
   std::vector<std::queue<std::shared_ptr<std::vector<Scheduler::Payload>>>>
       completion_queues_;
   // Lock to protect the completion_queues_

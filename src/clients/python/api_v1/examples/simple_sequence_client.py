@@ -92,6 +92,8 @@ if __name__ == '__main__':
                         default=False, help='Enable asynchronous inference')
     parser.add_argument('-r', '--reverse', action="store_true", required=False, default=False,
                         help='Enable to run non-streaming context first')
+    parser.add_argument('-d', '--dyna', action="store_true", required=False, default=False,
+                        help='Assume dynamic sequence model')
     parser.add_argument('-o', '--offset', type=int, required=False, default=0,
                         help='Add offset to correlation ID used')
 
@@ -150,7 +152,7 @@ if __name__ == '__main__':
         while len(result1_list) <= len(values):
             (infer_ctx, request_id) = user_data_1._completed_requests.get()
             result1_list.append(async_receive(infer_ctx, request_id))
-    
+
     else:
         ctxs = []
         if not FLAGS.reverse:
@@ -190,3 +192,9 @@ if __name__ == '__main__':
         if i < len(values):
             seq0_expected += values[i]
             seq1_expected -= values[i]
+
+            # The dyna_sequence custom backend adds the correlation ID
+            # to the last request in a sequence.
+            if FLAGS.dyna and (values[i] == 1):
+              seq0_expected += correlation_id0
+              seq1_expected += correlation_id1

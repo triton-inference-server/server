@@ -116,6 +116,9 @@ RUN mkdir -p qa/L0_custom_param/models/param/1 && \
 RUN mkdir -p qa/L0_simple_sequence_example/models/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/L0_simple_sequence_example/models/simple_sequence/1/. && \
+    mkdir -p qa/L0_simple_sequence_example/models_dyna/simple_sequence/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libdyna_sequence.so \
+        qa/L0_simple_sequence_example/models_dyna/simple_sequence/1/. && \
     mkdir -p qa/L0_backend_release/simple_seq_models/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/L0_backend_release/simple_seq_models/simple_sequence/1/. && \
