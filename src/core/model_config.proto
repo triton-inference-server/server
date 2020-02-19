@@ -726,24 +726,30 @@ message ModelDynamicBatching
   //@@
   bool preserve_ordering = 3;
 
-    //@@  .. cpp:var:: ModelQueuePolicy default_queue_policy
+  //@@  .. cpp:var:: ModelQueuePolicy default_queue_policy
   //@@
   //@@     The default queue policy used for requests that don't require
   //@@     priority handling and requests that specify priority levels where
-  //@@     there is no specific policy given. If not specified, a policy with 
+  //@@     there is no specific policy given. If not specified, a policy with
   //@@     default field values will be used.
   //@@
   ModelQueuePolicy default_queue_policy = 4;
 
+  //@@  .. cpp:var:: uint32 number_of_priority_level
+  //@@
+  //@@     The number of priority levels to be enabled for the model,
+  //@@     the priority level starts from 1 and the requests with higher
+  //@@     priority level will be prioritized than other requests.
+  //@@
+  uint32 number_of_priority_level = 5;
+
   //@@  .. cpp:var:: map<uint32, ModelQueuePolicy> priority_queue_policy
   //@@
-  //@@     Specify the prioritiy levels enabled for the scheduler,
-  //@@     and the policy for queue associated with the priority level.
-  //@@     The requests with higher priority level will be prioritized than
-  //@@     other requests. We encourage to use as less priority levels as
-  //@@     possible because a queue is required for each priority level.
+  //@@     Specify the queue policy for the priority level. The default queue
+  //@@     policy will be used if a priority level doesn't specify a queue
+  //@@     policy.
   //@@
-  map<uint32, ModelQueuePolicy> priority_queue_policy = 5;
+  map<uint32, ModelQueuePolicy> priority_queue_policy = 6;
 }
 
 //@@
@@ -951,25 +957,6 @@ message ModelSequenceBatching
   //@@     model.
   //@@
   repeated ControlInput control_input = 2;
-
-  //@@  .. cpp:var:: ModelQueuePolicy default_queue_policy
-  //@@
-  //@@     The default queue policy used for requests that don't require
-  //@@     priority handling and requests that specify priority levels where
-  //@@     there is no specific policy given. If not specified, a policy with 
-  //@@     default field values will be used.
-  //@@
-  ModelQueuePolicy default_queue_policy = 5;
-
-  //@@  .. cpp:var:: map<uint32, ModelQueuePolicy> priority_queue_policy
-  //@@
-  //@@     Specify the prioritiy levels enabled for the scheduler,
-  //@@     and the policy for queue associated with the priority level.
-  //@@     The requests with higher priority level will be prioritized than
-  //@@     other requests. We encourage to use as less priority levels as
-  //@@     possible because a queue is required for each priority level.
-  //@@
-  map<uint32, ModelQueuePolicy> priority_queue_policy = 6;
 }
 
 //@@
