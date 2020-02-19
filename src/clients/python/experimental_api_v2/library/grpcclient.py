@@ -24,10 +24,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import grpc
-from google.protobuf.json_format import MessageToJson
-import rapidjson as json
 import numpy as np
+import grpc
+import rapidjson as json
+from google.protobuf.json_format import MessageToJson
 
 from tensorrtserverV2.api import grpc_service_v2_pb2
 from tensorrtserverV2.api import grpc_service_v2_pb2_grpc
@@ -512,18 +512,25 @@ class InferInput:
         """
         return self._input.shape
 
-    def set_data_from_numpy(self, numpy_array):
+    def set_data_from_numpy(self, input_tensor):
         """Set the tensor data (datatype, shape, contents) for
         input associated with this object.
 
         Parameters
         ----------
-        numpy_array : numpy array
+        input_tensor : numpy array
             The tensor data in numpy array format
         """
-        self._input.datatype = np_to_trtis_dtype(numpy_array.dtype)
-        self._input.shape.extend(numpy_array.shape)
-        self._input.contents.raw_contents = numpy_array.tobytes()
+        if not isinstance(input_tensor, (np.ndarray,)):
+            raise_error("input_tensor must be a numpy array")
+        self._input.datatype = np_to_trtis_dtype(input_tensor.dtype)
+        self._input.ClearField('shape')
+        self._input.shape.extend(input_tensor.shape)
+        if self._input.datatype == "STRING":
+            self._input.contents.raw_contents = serialize_string_tensor(
+                input_tensor).tobytes()
+        else:
+            self._input.contents.raw_contents = input_tensor.tobytes()
 
     # FIXMEPV2: Add parameter support
     @property
@@ -646,14 +653,21 @@ class InferResult:
                 self._shape = []
                 for self._value in self._output.shape:
                     self._shape.append(self._value)
+
                 # FIXMEPV2 datatype is not yet provided by the server
-                # yet. hard-coding to INT32
-                # self._np_array = np.frombuffer(
-                #   self._output.contents.raw_contents,
-                #   dtype=trtis_to_np_dtype(self._output.datatype))
-                self._np_array = np.frombuffer(
-                    self._output.contents.raw_contents,
-                    dtype=trtis_to_np_dtype('INT32'))
+                # for ouput yet. hard-coding to INT32
+                self._datatype = 'INT32'
+                if self._datatype == 'STRING':
+                    # String results contain a 4-byte string length
+                    # followed by the actual string characters. Hence,
+                    # need to decode the raw bytes to convert into
+                    # array elements.
+                    self._np_array = deserialize_string_tensor(
+                        self._output.contents.raw_contents)
+                else:
+                    self._np_array = np.frombuffer(
+                        self._output.contents.raw_contents,
+                        dtype=trtis_to_np_dtype(self._datatype))
                 self._np_array = np.resize(self._np_array, self._shape)
                 return self._np_array
         return None

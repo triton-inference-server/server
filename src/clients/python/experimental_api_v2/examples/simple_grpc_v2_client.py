@@ -35,9 +35,17 @@ FLAGS = None
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', action="store_true", required=False, default=False,
+    parser.add_argument('-v',
+                        '--verbose',
+                        action="store_true",
+                        required=False,
+                        default=False,
                         help='Enable verbose output')
-    parser.add_argument('-u', '--url', type=str, required=False, default='localhost:8001',
+    parser.add_argument('-u',
+                        '--url',
+                        type=str,
+                        required=False,
+                        default='localhost:8001',
                         help='Inference server URL. Default is localhost:8001.')
 
     FLAGS = parser.parse_args()
@@ -66,7 +74,8 @@ if __name__ == '__main__':
     response = grpc_stub.ServerReady(request)
     print("server {}".format(response))
 
-    request = grpc_service_v2_pb2.ModelReadyRequest(name="resnet_v1_50_graphdef", version=-1)
+    request = grpc_service_v2_pb2.ModelReadyRequest(
+        name="resnet_v1_50_graphdef", version=-1)
     response = grpc_stub.ModelReady(request)
     print("model {}".format(response))
 
@@ -75,12 +84,14 @@ if __name__ == '__main__':
     response = grpc_stub.ServerMetadata(request)
     print("server metadata:\n{}".format(response))
 
-    request = grpc_service_v2_pb2.ModelMetadataRequest(name="resnet_v1_50_graphdef", version=-1)
+    request = grpc_service_v2_pb2.ModelMetadataRequest(
+        name="resnet_v1_50_graphdef", version=-1)
     response = grpc_stub.ModelMetadata(request)
     print("model metadata:\n{}".format(response))
 
     # Configuration
-    request = grpc_service_v2_pb2.ModelConfigRequest(name="resnet_v1_50_graphdef", version=-1)
+    request = grpc_service_v2_pb2.ModelConfigRequest(
+        name="resnet_v1_50_graphdef", version=-1)
     response = grpc_stub.ModelConfig(request)
     print("model config:\n{}".format(response))
 
@@ -100,7 +111,8 @@ if __name__ == '__main__':
 
     request.inputs.extend([input])
 
-    output = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor(
+    )
     output.name = "resnet_v1_50/predictions/Softmax"
     request.outputs.extend([output])
 
