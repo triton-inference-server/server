@@ -223,7 +223,7 @@ EnsembleContext::EnsembleContext(
   for (const auto& ensemble_output : info_->ensemble_output_shape_) {
     ignored_tensor.insert(ensemble_output.first);
   }
-  for (const auto& pr : request_provider_->Request().RequestedOutputs()) {
+  for (const auto& pr : request_provider_->Request()->RequestedOutputs()) {
     ignored_tensor.erase(pr.first);
   }
   if (ignored_tensor.empty()) {
@@ -269,11 +269,11 @@ EnsembleContext::EnsembleContext(
   if (ensemble_status_.IsOk()) {
     const auto& irequest = request_provider_->Request();
 
-    batch_size_ = irequest.BatchSize();
-    correlation_id_ = irequest.CorrelationId();
-    flags_ = irequest.Flags();
+    batch_size_ = irequest->BatchSize();
+    correlation_id_ = irequest->CorrelationId();
+    flags_ = irequest->Flags();
 
-    for (const auto& pr : irequest.Inputs()) {
+    for (const auto& pr : irequest->Inputs()) {
       const auto& input = pr.second;
       auto it = tensor_data_.find(input.Name());
       if (it != tensor_data_.end()) {
@@ -520,7 +520,7 @@ EnsembleContext::GetNextSteps(
 Status
 EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
 {
-  InferenceRequest irequest;
+  auto irequest = std::make_shared<InferenceRequest>();
   auto& version_map = handles_[info_->steps_[step_idx].model_name_];
   auto& backend = version_map[info_->steps_[step_idx].model_version_];
 
@@ -529,9 +529,10 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
 
   // Set inputs in request and prepare input map
   for (const auto& pair : info_->steps_[step_idx].input_to_tensor_) {
+    const auto& other = std::get<0>(tensor_data_[pair.second]);
     InferenceRequest::Input* input;
-    RETURN_IF_ERROR(irequest.AddInput(
-        pair.first, std::get<0>(tensor_data_[pair.second]), &input));
+    RETURN_IF_ERROR(irequest->AddInput(
+        pair.first, other.Shape(), other.BatchByteSize(), &input));
 
     // If the actual shape and config shape agree with each other without
     // considering batch size, non-batch / batch conversion are not required
@@ -541,21 +542,20 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
         input_config->dims(), allow_batching,
         std::get<1>(tensor_data_[pair.second]), input->MutableShape());
 
-    RETURN_IF_ERROR(irequest.SetInputData(
-        pair.first, std::get<2>(tensor_data_[pair.second])));
+    RETURN_IF_ERROR(input->SetData(std::get<2>(tensor_data_[pair.second])));
   }
 
   // Set requested outputs in request header
   for (const auto& pair : info_->steps_[step_idx].output_to_tensor_) {
-    irequest.RequestOutput(pair.first, 0 /* classification_cnt */);
+    irequest->RequestOutput(pair.first, 0 /* classification_cnt */);
   }
 
-  irequest.SetModelName(info_->steps_[step_idx].model_name_);
-  irequest.SetRequestedModelVersion(info_->steps_[step_idx].model_version_);
-  irequest.SetCorrelationId(correlation_id_);
-  irequest.SetFlags(flags_);
-  irequest.SetBatchSize((batch_size == 0 ? 1 : batch_size));
-  RETURN_IF_ERROR(irequest.Normalize(*backend));
+  irequest->SetModelName(info_->steps_[step_idx].model_name_);
+  irequest->SetRequestedModelVersion(info_->steps_[step_idx].model_version_);
+  irequest->SetCorrelationId(correlation_id_);
+  irequest->SetFlags(flags_);
+  irequest->SetBatchSize((batch_size == 0 ? 1 : batch_size));
+  RETURN_IF_ERROR(irequest->Normalize(*backend));
 
   step->reset(new Step(step_idx));
   (*step)->backend_ = backend;
@@ -726,7 +726,7 @@ EnsembleContext::ScheduleSteps(
         ModelInferStats::TimestampKind::kRequestStart);
     infer_stats->SetRequestedVersion(step->backend_->Version());
     infer_stats->SetMetricReporter(step->backend_->MetricReporter());
-    infer_stats->SetBatchSize(step->request_provider_->Request().BatchSize());
+    infer_stats->SetBatchSize(step->request_provider_->Request()->BatchSize());
     infer_stats->SetFailed(true);
 
     // Passing trace-related objects down

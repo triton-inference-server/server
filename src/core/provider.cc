@@ -46,32 +46,21 @@ namespace nvidia { namespace inferenceserver {
 //
 Status
 InferRequestProvider::Create(
-    const InferenceRequest& request,
+    const std::shared_ptr<InferenceRequest>& irequest,
     std::shared_ptr<InferRequestProvider>* provider)
 {
-  provider->reset(new InferRequestProvider(request));
+  provider->reset(new InferRequestProvider(irequest));
 
-  const auto& input_map = request.InputDataMap();
-
-  for (const auto& pr : request.Inputs()) {
-    const std::string& input_name = pr.first;
-    auto it = input_map.find(input_name);
-    if (it == input_map.end()) {
+  for (const auto& pr : irequest->Inputs()) {
+    if (pr.second.BatchByteSize() != pr.second.Data()->TotalByteSize()) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "input '" + input_name + "' is specified in request header but" +
-              " not found in memory block mapping for model '" +
-              request.ModelName() + "'");
-    }
-    if (pr.second.BatchByteSize() != it->second->TotalByteSize()) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unexpected size " + std::to_string(it->second->TotalByteSize()) +
-              " for input '" + input_name + "', expecting " +
+          "unexpected size " +
+              std::to_string(pr.second.Data()->TotalByteSize()) +
+              " for input '" + pr.first + "', expecting " +
               std::to_string(pr.second.BatchByteSize()) + " for model '" +
-              request.ModelName() + "'");
+              irequest->ModelName() + "'");
     }
-    (*provider)->input_buffer_[input_name] = std::make_pair(it->second, 0);
   }
 
   return Status::Success;
@@ -172,15 +161,15 @@ InferRequestProvider::GetNextInputContent(
     *memory_type = TRTSERVER_MEMORY_CPU;
     *memory_type_id = 0;
   } else {
-    const auto& pr = input_buffer_.find(name);
-    if (pr == input_buffer_.end()) {
+    auto* inputs = irequest_->MutableInputs();
+    auto it = inputs->find(name);
+    if (it == inputs->end()) {
       return Status(
           RequestStatusCode::INTERNAL, "unexpected input '" + name + "'");
     }
 
-    auto& input_content = pr->second;
-    *content = input_content.first->BufferAt(
-        input_content.second++, content_byte_size, memory_type, memory_type_id);
+    RETURN_IF_ERROR(it->second.NextContent(
+        content, content_byte_size, memory_type, memory_type_id));
   }
 
   return Status::Success;
@@ -190,13 +179,16 @@ Status
 InferRequestProvider::GetMemory(
     const std::string& name, std::shared_ptr<Memory>* input_buffer)
 {
-  auto it = input_buffer_.find(name);
-  if (it == input_buffer_.end()) {
+  const auto& inputs = irequest_->Inputs();
+  const auto it = inputs.find(name);
+  if (it == inputs.end()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "input '" + name + "' is not found in the provider");
   }
-  *input_buffer = it->second.first;
+
+  *input_buffer = it->second.Data();
+
   return Status::Success;
 }
 
@@ -204,9 +196,10 @@ Status
 InferRequestProvider::GetMemoryWithOverride(
     const std::string& name, const Memory** input_buffer)
 {
-  auto it = input_buffer_.find(name);
-  if (it != input_buffer_.end()) {
-    *input_buffer = it->second.first.get();
+  const auto& inputs = irequest_->Inputs();
+  const auto it = inputs.find(name);
+  if (it != inputs.end()) {
+    *input_buffer = it->second.Data().get();
   } else {
     // check input overrides
     auto found = false;
@@ -334,7 +327,7 @@ AddClassResults(
 // InferResponseProvider
 //
 InferResponseProvider::InferResponseProvider(
-    const InferenceRequest& irequest,
+    const std::shared_ptr<InferenceRequest>& irequest,
     const std::shared_ptr<LabelProvider>& label_provider,
     TRTSERVER_ResponseAllocator* allocator,
     TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
@@ -345,7 +338,7 @@ InferResponseProvider::InferResponseProvider(
 {
   // Create a map from output name to the InferenceRequest::Output
   // object for that output.
-  for (const auto& pr : irequest_.RequestedOutputs()) {
+  for (const auto& pr : irequest_->RequestedOutputs()) {
     const auto& output = pr.second;
     output_map_.emplace(std::make_pair(output.Name(), output));
   }
@@ -405,7 +398,7 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
   response_header->set_model_name(is.Name());
   response_header->set_model_version(is.Version());
 
-  const size_t batch_size = irequest_.BatchSize();
+  const size_t batch_size = irequest_->BatchSize();
   response_header->set_batch_size(batch_size);
 
   int output_idx = 0;
@@ -450,7 +443,7 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
       poutput->mutable_raw()->set_batch_byte_size(output.byte_size_);
 
       // FIXMEV2 include batch dimension in V2 shape.
-      if ((irequest_.ProtocolVersion() == 2) &&
+      if ((irequest_->ProtocolVersion() == 2) &&
           (is.Config().max_batch_size() != 0)) {
         poutput->mutable_raw()->add_dims(batch_size);
       }
@@ -562,7 +555,7 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
 
 Status
 InferResponseProvider::Create(
-    const InferenceRequest& irequest,
+    const std::shared_ptr<InferenceRequest>& irequest,
     const std::shared_ptr<LabelProvider>& label_provider,
     TRTSERVER_ResponseAllocator* allocator,
     TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,

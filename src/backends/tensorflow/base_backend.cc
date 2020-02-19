@@ -443,8 +443,8 @@ BaseBackend::Context::SetFixedSizedInputTensor(
   // included in the dynamic batch.
   std::vector<size_t> expected_byte_sizes;
   for (auto& payload : *payloads) {
-    const InferenceRequest& irequest = payload.request_provider_->Request();
-    expected_byte_sizes.push_back(irequest.BatchSize() * batch1_byte_size);
+    const auto& irequest = payload.request_provider_->Request();
+    expected_byte_sizes.push_back(irequest->BatchSize() * batch1_byte_size);
   }
 
   input->memory_type_ = (TRTISTF_TensorIsGPUTensor(tensor))
@@ -469,9 +469,9 @@ BaseBackend::Context::SetStringInputTensor(
   // input tensor. Skip payloads that had errors since they are not
   // included in the dynamic batch.
   for (auto& payload : *payloads) {
-    const InferenceRequest& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_provider_->Request();
     const size_t expected_element_cnt =
-        irequest.BatchSize() * batch1_element_cnt;
+        irequest->BatchSize() * batch1_element_cnt;
     size_t element_idx = 0;
 
     // For string data type, we always need to copy the data to CPU so that
@@ -585,9 +585,9 @@ BaseBackend::Context::ReadStringOutputTensor(
   size_t tensor_element_idx = 0;
 
   for (auto& payload : *payloads) {
-    const InferenceRequest& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_provider_->Request();
     const size_t expected_element_cnt =
-        irequest.BatchSize() * batch1_element_cnt;
+        irequest->BatchSize() * batch1_element_cnt;
 
     // If 'payload' should have valid output (status ok) and
     // if 'payload' requested this output then copy it from
@@ -658,7 +658,7 @@ BaseBackend::Context::Run(
               name_ + "'");
     }
 
-    total_batch_size += payload.request_provider_->Request().BatchSize();
+    total_batch_size += payload.request_provider_->Request()->BatchSize();
 
     // All payloads must have equally-sized input tensors so use any
     // payload as the representative for the input tensors.
@@ -699,7 +699,7 @@ BaseBackend::Context::Run(
   // Inputs from the request...
   std::vector<InputInfo> inputs;
   bool cuda_copy = false;
-  for (const auto& pr : input_request_provider->Request().Inputs()) {
+  for (const auto& pr : input_request_provider->Request()->Inputs()) {
     const auto& input = pr.second;
     const std::string& name = input.Name();
 
@@ -728,8 +728,8 @@ BaseBackend::Context::Run(
   // payload.
   std::set<std::string> required_outputs;
   for (auto& payload : *payloads) {
-    const InferenceRequest& irequest = payload.request_provider_->Request();
-    for (const auto& pr : irequest.RequestedOutputs()) {
+    const auto& irequest = payload.request_provider_->Request();
+    for (const auto& pr : irequest->RequestedOutputs()) {
       required_outputs.insert(pr.first);
     }
   }

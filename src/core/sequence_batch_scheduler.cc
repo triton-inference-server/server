@@ -382,7 +382,7 @@ SequenceBatchScheduler::Enqueue(
   // For now the request must have batch-size 1 since the sequence
   // batcher does not yet support requests that are statically
   // batched.
-  if (irequest.BatchSize() != 1) {
+  if (irequest->BatchSize() != 1) {
     OnComplete(Status(
         RequestStatusCode::INVALID_ARG,
         "inference request to model '" + request_provider->ModelName() +
@@ -394,7 +394,7 @@ SequenceBatchScheduler::Enqueue(
   // A request must have a correlation ID to be processed correctly by
   // this scheduler. A value of 0 (zero) indicates that the request
   // doesn't have a correlation ID.
-  const CorrelationID correlation_id = irequest.CorrelationId();
+  const CorrelationID correlation_id = irequest->CorrelationId();
   if (correlation_id == 0) {
     OnComplete(Status(
         RequestStatusCode::INVALID_ARG,
@@ -406,9 +406,9 @@ SequenceBatchScheduler::Enqueue(
   BatcherSequenceSlot* target = nullptr;
 
   const bool seq_start =
-      ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0);
+      ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0);
   const bool seq_end =
-      ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
+      ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
 
   std::unique_lock<std::mutex> lock(mu_);
 
@@ -545,7 +545,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
     if (!payloads->empty()) {  // should never be empty...
       const auto& request_provider = payloads->back().request_provider_;
       const auto& irequest = request_provider->Request();
-      const CorrelationID correlation_id = irequest.CorrelationId();
+      const CorrelationID correlation_id = irequest->CorrelationId();
 
       // If the last queue entry is not an END request then the entire
       // sequence is not contained in the backlog. In that case must
@@ -553,7 +553,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
       // requests get directed to the batcher sequence-slot instead of
       // the backlog.
       const bool seq_end =
-          ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
+          ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
       if (!seq_end) {
         // Since the correlation ID is being actively collected in the
         // backlog, there should not be any in-flight sequences with
@@ -796,21 +796,21 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
 
 void
 SequenceBatch::SetControlTensors(
-    const InferenceRequest& irequest,
+    const std::shared_ptr<InferenceRequest>& irequest,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const int32_t seq_slot, const CorrelationID corr_id)
 {
   // Set the start, end, and ready control tensors
   // appropriately...
-  if ((irequest.Flags() & (InferRequestHeader::FLAG_SEQUENCE_START |
-                           InferRequestHeader::FLAG_SEQUENCE_END)) ==
+  if ((irequest->Flags() & (InferRequestHeader::FLAG_SEQUENCE_START |
+                            InferRequestHeader::FLAG_SEQUENCE_END)) ==
       (InferRequestHeader::FLAG_SEQUENCE_START |
        InferRequestHeader::FLAG_SEQUENCE_END)) {
     request_provider->AddInputOverrides(startend_input_overrides_);
   } else if (
-      (irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
+      (irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
     request_provider->AddInputOverrides(start_input_overrides_);
-  } else if ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+  } else if ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
     request_provider->AddInputOverrides(end_input_overrides_);
   } else {
     request_provider->AddInputOverrides(continue_input_overrides_);
@@ -1025,7 +1025,7 @@ DirectSequenceBatch::SchedulerThread(
           // the shapes of the inputs that are being used for the
           // batch. This is grabbed from the first request added to
           // the batch.
-          InferenceRequest null_irequest;
+          std::shared_ptr<InferenceRequest> null_irequest;
           for (int32_t seq_slot = 0; seq_slot <= max_seq_slot; ++seq_slot) {
             std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
             if (!queue.empty() &&
@@ -1118,7 +1118,7 @@ DirectSequenceBatch::SchedulerThread(
 
               queue.pop_front();
 
-              if ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
+              if ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
                   0) {
                 end_of_sequence = true;
               }
@@ -1361,12 +1361,12 @@ OldestSequenceBatch::CompleteAndNext(
         release_seq_slot = true;
       } else {
         const auto& irequest = request_provider->Request();
-        const CorrelationID correlation_id = irequest.CorrelationId();
+        const CorrelationID correlation_id = irequest->CorrelationId();
 
         // After handling the last inference in a sequence we must
         // release the sequence slot to make it available to another
         // sequence.
-        if ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+        if ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
           LOG_VERBOSE(1) << "end sequence CORRID " << correlation_id
                          << " in batcher " << batcher_idx_ << ", slot "
                          << seq_slot;

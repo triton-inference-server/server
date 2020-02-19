@@ -76,7 +76,6 @@ class InferenceRequest {
   class Input {
    public:
     Input() = default;
-    Input(const std::string& name, const Input& other);
     Input(
         const std::string& name, const std::vector<int64_t>& shape,
         const uint64_t batch_byte_size);
@@ -105,6 +104,38 @@ class InferenceRequest {
       return shared_memory_;
     }
 
+    // The data for this input.
+    const std::shared_ptr<Memory>& Data() const { return data_; }
+
+    // Append a new buffer of data to this input.
+    Status AppendData(
+        const void* base, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+        int64_t memory_type_id);
+
+    // Set the data for this input. Error is input already has some
+    // data.
+    Status SetData(const std::shared_ptr<Memory>& data);
+
+    // Get the next contiguous chunk of bytes for the input. Return a
+    // pointer to the chunk in 'content'.  If there are no more bytes
+    // for the input return 'content' == nullptr.  'content_byte_size'
+    // acts as both input and output. On input 'content_byte_size' is
+    // a hint of the maximum chunk size that should be returned in
+    // 'content' and must be non-zero unless no additional input is
+    // expected. On return 'content_byte_size' gives the actual size
+    // of the chunk pointed to by 'content'.  'memory_type' acts as
+    // both input and output. On input 'memory_type' is the buffer
+    // memory type preferred by the function caller. On return
+    // 'memory_type' gives the actual memory type of the chunk pointed
+    // to by 'content'.  'memory_type_id' acts as both input and
+    // output. On input 'memory_type_id' is the buffer memory type id
+    // preferred by the function caller.  On return 'memory_type_id'
+    // gives the actual memory type id of the chunk pointed to by
+    // 'content'.
+    virtual Status NextContent(
+        const void** content, size_t* content_byte_size,
+        TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
+
    private:
     std::string name_;
     std::vector<int64_t> shape_;
@@ -112,6 +143,9 @@ class InferenceRequest {
 
     bool use_shared_memory_;
     InferenceRequest::SharedMemory shared_memory_;
+
+    std::shared_ptr<Memory> data_;
+    size_t data_idx_;
   };
 
   // Requested output tensor
@@ -189,6 +223,7 @@ class InferenceRequest {
   uint32_t BatchSize() const { return batch_size_; }
   void SetBatchSize(uint32_t b) { batch_size_ = b; }
 
+  std::unordered_map<std::string, Input>* MutableInputs() { return &inputs_; }
   const std::unordered_map<std::string, Input>& Inputs() const
   {
     return inputs_;
@@ -203,8 +238,6 @@ class InferenceRequest {
   // Add an input to the request. If 'input' is non-null return a
   // pointer to the newly added input.
   Status AddInput(
-      const std::string& name, const Input& other, Input** input = nullptr);
-  Status AddInput(
       const std::string& name, const DimsList& shape,
       const uint64_t batch_byte_size, Input** input = nullptr);
   Status AddInput(
@@ -219,26 +252,12 @@ class InferenceRequest {
       const uint64_t batch_byte_size, const InferSharedMemory& shared_memory,
       Input** input = nullptr);
 
+  // Request an output.
   Status RequestOutput(
       const std::string& name, const uint32_t classification_cnt);
   Status RequestOutput(
       const std::string& name, const uint32_t classification_cnt,
       const InferSharedMemory& shared_memory);
-
-  // Append a new buffer of data to this input.
-  Status AppendInputData(
-      const char* name, const void* base, size_t byte_size,
-      TRTSERVER_Memory_Type memory_type, int64_t memory_type_id);
-
-  // Set the data for this input. Error is input already has some data.
-  Status SetInputData(
-      const std::string& name, const std::shared_ptr<Memory>& data);
-
-  const std::unordered_map<std::string, std::shared_ptr<Memory>>& InputDataMap()
-      const
-  {
-    return input_map_;
-  }
 
   // Normalize the request by checking and conforming it to the model
   // configuration. We pass backend here as non-shared-ptr because
@@ -249,8 +268,8 @@ class InferenceRequest {
  private:
   std::string model_name_;
 
-  // A model version is requested and based on version policy a
-  // specific version is actually used for inference.
+  // The model version as requested and based on version policy the
+  // specific version that is actually used for inference.
   int64_t requested_model_version_;
   int64_t actual_model_version_;
 
@@ -267,10 +286,6 @@ class InferenceRequest {
 
   std::unordered_map<std::string, Input> inputs_;
   std::unordered_map<std::string, RequestedOutput> requested_outputs_;
-
-  // The data for each input. FIXMEV2 should have memory/data for each
-  // input in the Input object.
-  std::unordered_map<std::string, std::shared_ptr<Memory>> input_map_;
 };
 
 }}  // namespace nvidia::inferenceserver

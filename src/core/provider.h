@@ -48,17 +48,17 @@ class LabelProvider;
 class InferRequestProvider {
  public:
   static Status Create(
-      const InferenceRequest& request,
+      const std::shared_ptr<InferenceRequest>& irequest,
       std::shared_ptr<InferRequestProvider>* provider);
 
   // Return the requested model name.
-  const std::string& ModelName() const { return irequest_.ModelName(); }
+  const std::string& ModelName() const { return irequest_->ModelName(); }
 
   // Return the requested model version, or -1 if no specific version
   // was requested.
-  int64_t ModelVersion() const { return irequest_.RequestedModelVersion(); }
+  int64_t ModelVersion() const { return irequest_->RequestedModelVersion(); }
 
-  const InferenceRequest& Request() const { return irequest_; }
+  const std::shared_ptr<InferenceRequest>& Request() const { return irequest_; }
 
   // Get the next contiguous chunk of bytes for the 'name'd
   // input. Return a pointer to the chunk in 'content'.
@@ -114,7 +114,8 @@ class InferRequestProvider {
   void SetInputOverrideConsumed(const std::string& name, const bool consumed);
 
  protected:
-  explicit InferRequestProvider(const InferenceRequest& irequest)
+  explicit InferRequestProvider(
+      const std::shared_ptr<InferenceRequest>& irequest)
       : irequest_(irequest)
   {
   }
@@ -128,7 +129,7 @@ class InferRequestProvider {
   bool GetInputOverrideContent(
       const std::string& name, const void** content, size_t* content_byte_size);
 
-  const InferenceRequest irequest_;
+  std::shared_ptr<InferenceRequest> irequest_;
 
   // Input content overrides. Multiple maps can be provided but a
   // given tensor must not appear in more than one map.
@@ -140,11 +141,6 @@ class InferRequestProvider {
   // 'content' == nullptr to indicate that all the override content
   // has been consumed.
   std::set<std::string> overrides_consumed_;
-
-  // Map from input name to the content of the input. The content contains
-  // the buffer and index to the next data block for the named input.
-  std::unordered_map<std::string, std::pair<std::shared_ptr<Memory>, size_t>>
-      input_buffer_;
 };
 
 //
@@ -155,8 +151,9 @@ class InferRequestProvider {
 //
 class NULLInferRequestProvider : public InferRequestProvider {
  public:
-  explicit NULLInferRequestProvider(const InferenceRequest& request)
-      : InferRequestProvider(request)
+  explicit NULLInferRequestProvider(
+      const std::shared_ptr<InferenceRequest>& irequest)
+      : InferRequestProvider(irequest)
   {
   }
 
@@ -187,7 +184,7 @@ class InferResponseProvider {
       std::unordered_map<std::string, SecondaryLabelProvider>;
 
   static Status Create(
-      const InferenceRequest& irequest,
+      const std::shared_ptr<InferenceRequest>& irequest,
       const std::shared_ptr<LabelProvider>& label_provider,
       TRTSERVER_ResponseAllocator* allocator,
       TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
@@ -242,13 +239,13 @@ class InferResponseProvider {
 
  private:
   InferResponseProvider(
-      const InferenceRequest& irequest,
+      const std::shared_ptr<InferenceRequest>& irequest,
       const std::shared_ptr<LabelProvider>& label_provider,
       TRTSERVER_ResponseAllocator* allocator,
       TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
       TRTSERVER_ResponseAllocatorReleaseFn_t release_fn);
 
-  const InferenceRequest irequest_;
+  std::shared_ptr<InferenceRequest> irequest_;
 
   // Map from output name to the InferenceRequest output information
   // for that output.
