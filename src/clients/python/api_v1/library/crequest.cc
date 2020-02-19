@@ -247,6 +247,11 @@ ServerStatusContextGetServerStatus(
   ni::ServerStatus server_status;
   nic::Error err = ctx->ctx->GetServerStatus(&server_status);
   if (err.IsOk()) {
+#ifdef JP_VERSION
+    ctx->status_buf = server_status.DebugString();
+    *status = &ctx->status_buf[0];
+    *status_len = ctx->status_buf.size();
+#else
     if (server_status.SerializeToString(&ctx->status_buf)) {
       *status = &ctx->status_buf[0];
       *status_len = ctx->status_buf.size();
@@ -254,6 +259,7 @@ ServerStatusContextGetServerStatus(
       err = nic::Error(
           ni::RequestStatusCode::INTERNAL, "failed to parse server status");
     }
+#endif
   }
 
   return new nic::Error(err);

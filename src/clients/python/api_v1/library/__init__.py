@@ -34,6 +34,7 @@ from numpy.ctypeslib import ndpointer
 import pkg_resources
 import struct
 import threading
+from google.protobuf import text_format
 import tensorrtserver.api.model_config_pb2
 from tensorrtserver.api.server_status_pb2 import ModelRepositoryIndex
 from tensorrtserver.api.server_status_pb2 import ServerStatus
@@ -51,6 +52,9 @@ class _utf8(object):
             return value.encode('utf8')
 
 import os
+# If JP_VERSION is set then building on Jetson
+JETSON = bool(os.environ.get('JP_VERSION', 0))
+
 _request_lib = "request" if os.name == 'nt' else 'librequest.so'
 _crequest_lib = "crequest" if os.name == 'nt' else 'libcrequest.so'
 _request_path = pkg_resources.resource_filename('tensorrtserver.api', _request_lib)
@@ -626,10 +630,13 @@ class ServerStatusContext:
         self._last_request_id = _raise_if_error(
             c_void_p(_crequest_status_ctx_get(
                 self._ctx, byref(cstatus), byref(cstatus_len))))
-        status_buf = cast(cstatus, POINTER(c_byte * cstatus_len.value))[0]
 
         status = ServerStatus()
-        status.ParseFromString(status_buf)
+        if JETSON:
+            status = text_format.Parse(cstatus.value.decode(), ServerStatus())
+        else:
+            status_buf = cast(cstatus, POINTER(c_byte * cstatus_len.value))[0]
+            status.ParseFromString(status_buf)
         return status
 
     def get_last_request_id(self):
@@ -1024,7 +1031,10 @@ class SharedMemoryControlContext:
         status_buf = cast(cstatus, POINTER(c_byte * cstatus_len.value))[0]
 
         status = SharedMemoryStatus()
-        status.ParseFromString(status_buf)
+        if JETSON:
+            status = text_format.Parse(status_buf, SharedMemoryStatus())
+        else:
+            status.ParseFromString(status_buf)
         return status
 
     def get_last_request_id(self):
