@@ -151,7 +151,7 @@ CustomBackend::CreateExecutionContexts(
         Run(runner_idx, payloads, func);
       },
       [this](
-          uint32_t runner_idx, const InferRequestHeader::Input& input,
+          uint32_t runner_idx, const InferenceRequest::Input& input,
           const Scheduler::Payload& payload,
           std::vector<int64_t>* shape) -> Status { return Status::Success; }));
 
@@ -327,12 +327,11 @@ CustomBackend::Context::Run(
               name_ + "'");
     }
 
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
+    const InferenceRequest& irequest = payload.request_provider_->Request();
 
-    total_batch_size += request_header.batch_size();
-    total_inputs += request_header.input_size();
-    total_requested_outputs += request_header.output_size();
+    total_batch_size += irequest.BatchSize();
+    total_inputs += irequest.Inputs().size();
+    total_requested_outputs += irequest.RequestedOutputs().size();
   }
 
   // If there are no valid payloads then no need to run the
@@ -385,42 +384,41 @@ CustomBackend::Context::Run(
   // that here.
   std::vector<CustomPayload> custom_payloads;
   for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
+    const InferenceRequest& irequest = payload.request_provider_->Request();
 
     custom_payloads.emplace_back();
     CustomPayload& custom_payload = custom_payloads.back();
-    custom_payload.batch_size = request_header.batch_size();
+    custom_payload.batch_size = irequest.BatchSize();
 
     // Inputs
-    custom_payload.input_cnt = request_header.input_size();
+    custom_payload.input_cnt = irequest.Inputs().size();
     custom_payload.input_names = nullptr;
     custom_payload.input_shape_dim_cnts = nullptr;
     custom_payload.input_shape_dims = nullptr;
-    for (const auto& input : request_header.input()) {
+    for (const auto& pr : irequest.Inputs()) {
+      const auto& input = pr.second;
+
       // If the input has fixed size then use the pre-calculated
       // shape, otherwise must look at the request header to find the
       // specific shape for the input in this payload.
-      auto itr = fixed_input_shapes_.find(input.name());
+      auto itr = fixed_input_shapes_.find(input.Name());
       if (itr != fixed_input_shapes_.end()) {
         std::unique_ptr<std::vector<int64_t>>& shape = itr->second;
         work_input_dim_cnts.push_back(shape->size());
         work_input_dims_ptrs.push_back(
             (shape->size() == 0) ? nullptr : &(shape->at(0)));
       } else {
-        std::vector<int64_t> shape;
-        shape.reserve(input.dims_size());
-        for (auto d : input.dims()) {
-          shape.push_back(d);
-        }
-        variable_input_shapes.emplace_back(std::move(shape));
+        // FIXMEV2 should be able to point directly to the shape
+        // vectors in InferenceRequest::Input instead of using the
+        // intermediate variable_input_shapes.
+        variable_input_shapes.emplace_back(input.Shape());
         const std::vector<int64_t>& vshape = variable_input_shapes.back();
         work_input_dim_cnts.push_back(vshape.size());
         work_input_dims_ptrs.push_back(
             (vshape.size() == 0) ? nullptr : &vshape[0]);
       }
 
-      work_input_name_ptrs.push_back(input.name().c_str());
+      work_input_name_ptrs.push_back(input.Name().c_str());
       if (custom_payload.input_names == nullptr) {
         custom_payload.input_names = &work_input_name_ptrs.back();
         custom_payload.input_shape_dim_cnts = &work_input_dim_cnts.back();
@@ -429,10 +427,11 @@ CustomBackend::Context::Run(
     }
 
     // Outputs
-    custom_payload.output_cnt = request_header.output_size();
+    custom_payload.output_cnt = irequest.RequestedOutputs().size();
     custom_payload.required_output_names = nullptr;
-    for (const auto& output : request_header.output()) {
-      work_output_name_ptrs.push_back(output.name().c_str());
+    for (const auto& pr : irequest.RequestedOutputs()) {
+      const auto& output = pr.second;
+      work_output_name_ptrs.push_back(output.Name().c_str());
       if (custom_payload.required_output_names == nullptr) {
         custom_payload.required_output_names = &work_output_name_ptrs.back();
       }

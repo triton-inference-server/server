@@ -105,7 +105,7 @@ struct BackendContext {
   // 1-dimensional, INT32 tensors. A non-OK status indicates that the
   // contents of the tensor could not be peeked.
   virtual Status PeekShapeTensor(
-      const InferRequestHeader::Input& input, const Scheduler::Payload& payload,
+      const InferenceRequest::Input& input, const Scheduler::Payload& payload,
       std::vector<int64_t>* shape);
 
   // Helper function to batch input data from payloads into 'input_buffer'.

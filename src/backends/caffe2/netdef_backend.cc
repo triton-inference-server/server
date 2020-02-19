@@ -141,7 +141,7 @@ NetDefBackend::CreateExecutionContexts(
         Run(runner_idx, payloads, func);
       },
       [this](
-          uint32_t runner_idx, const InferRequestHeader::Input& input,
+          uint32_t runner_idx, const InferenceRequest::Input& input,
           const Scheduler::Payload& payload,
           std::vector<int64_t>* shape) -> Status { return Status::Success; }));
 
@@ -366,10 +366,8 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
   // 'buffer'.
   std::vector<size_t> expected_byte_sizes;
   for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-    expected_byte_sizes.push_back(
-        request_header.batch_size() * batch1_byte_size);
+    const InferenceRequest& irequest = payload.request_provider_->Request();
+    expected_byte_sizes.push_back(irequest.BatchSize() * batch1_byte_size);
   }
 
   *cuda_copy |= SetInputBuffer(name, expected_byte_sizes, payloads, input);
@@ -430,8 +428,9 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
 
 Status
 NetDefBackend::Context::SetInput(
-    const std::string& name, const DataType datatype, const DimsList& dims,
-    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
+    const std::string& name, const DataType datatype,
+    const std::vector<int64_t>& dims, const size_t total_batch_size,
+    std::vector<Scheduler::Payload>* payloads,
     std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
     std::vector<InputInfo>* inputs, bool* cuda_copy)
 {
@@ -495,7 +494,7 @@ NetDefBackend::Context::Run(
               name_ + "'");
     }
 
-    total_batch_size += payload.request_provider_->RequestHeader().batch_size();
+    total_batch_size += payload.request_provider_->Request().BatchSize();
 
     // All payloads must have equally-sized input tensors so use any
     // payload as the representative for the input tensors.
@@ -529,13 +528,14 @@ NetDefBackend::Context::Run(
 
   // Inputs from the request...
   bool cuda_copy = false;
-  for (const auto& input : input_request_provider->RequestHeader().input()) {
-    const std::string& name = input.name();
+  for (const auto& pr : input_request_provider->Request().Inputs()) {
+    const auto& input = pr.second;
+    const std::string& name = input.Name();
 
     const ModelInput* input_config;
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
     RETURN_IF_ERROR(SetInput(
-        name, input_config->data_type(), input.dims(), total_batch_size,
+        name, input_config->data_type(), input.Shape(), total_batch_size,
         payloads, &input_buffers, &inputs, &cuda_copy));
   }
 

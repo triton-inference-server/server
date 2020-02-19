@@ -179,7 +179,7 @@ LibTorchBackend::CreateExecutionContexts(
         Run(runner_idx, payloads, func);
       },
       [this](
-          uint32_t runner_idx, const InferRequestHeader::Input& input,
+          uint32_t runner_idx, const InferenceRequest::Input& input,
           const Scheduler::Payload& payload,
           std::vector<int64_t>* shape) -> Status { return Status::Success; }));
 
@@ -457,9 +457,10 @@ LibTorchBackend::Context::GetOutputTensor(
 
 Status
 LibTorchBackend::Context::SetInputMetaData(
-    const std::string& name, const DataType datatype, const DimsList& dims,
-    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<InputInfo>* inputs, InputMetaData* meta_data, bool* cuda_copy)
+    const std::string& name, const DataType datatype,
+    const std::vector<int64_t>& dims, const size_t total_batch_size,
+    std::vector<Scheduler::Payload>* payloads, std::vector<InputInfo>* inputs,
+    InputMetaData* meta_data, bool* cuda_copy)
 {
   meta_data->name_ = name;
   // Get the shape of the input. The provider has already checked that
@@ -521,10 +522,8 @@ LibTorchBackend::Context::SetFixedSizedInputBuffer(
   // Visit the payloads in order and copy the input tensors to 'buffer'.
   std::vector<size_t> expected_byte_sizes;
   for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-    expected_byte_sizes.push_back(
-        request_header.batch_size() * batch1_byte_size);
+    const InferenceRequest& irequest = payload.request_provider_->Request();
+    expected_byte_sizes.push_back(irequest.BatchSize() * batch1_byte_size);
   }
 
   *cuda_copy |= SetInputBuffer(name, expected_byte_sizes, payloads, input);
@@ -554,7 +553,7 @@ LibTorchBackend::Context::Run(
               name_ + "'");
     }
 
-    total_batch_size += payload.request_provider_->RequestHeader().batch_size();
+    total_batch_size += payload.request_provider_->Request().BatchSize();
 
     // All payloads must have equally-sized input tensors so use any
     // payload as the representative for the input tensors.
@@ -581,7 +580,7 @@ LibTorchBackend::Context::Run(
   const InferRequestProvider::InputOverrideMapVec& input_override_maps =
       input_request_provider->GetInputOverrides();
 
-  size_t input_count = input_request_provider->RequestHeader().input().size();
+  size_t input_count = input_request_provider->Request().Inputs().size();
   for (const auto& ovr_map : input_override_maps) {
     input_count += ovr_map->size();
   }
@@ -597,14 +596,15 @@ LibTorchBackend::Context::Run(
 
   // Inputs from the request...
   bool cuda_copy = false;
-  for (const auto& input : input_request_provider->RequestHeader().input()) {
-    const std::string& name = input.name();
+  for (const auto& pr : input_request_provider->Request().Inputs()) {
+    const auto& input = pr.second;
+    const std::string& name = input.Name();
     int ip_index = input_index_map_[name];
     const ModelInput* input_config;
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
     RETURN_IF_ERROR(SetInputMetaData(
-        name, input_config->data_type(), input.dims(), total_batch_size,
+        name, input_config->data_type(), input.Shape(), total_batch_size,
         payloads, &inputs, &(input_meta_data[ip_index]), &cuda_copy));
   }
 
@@ -713,10 +713,9 @@ LibTorchBackend::Context::Run(
   // Prepare set of Outputs requested for
   std::set<std::string> required_outputs;
   for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-    for (const auto& output : request_header.output()) {
-      required_outputs.insert(output.name());
+    const InferenceRequest& irequest = payload.request_provider_->Request();
+    for (const auto& pr : irequest.RequestedOutputs()) {
+      required_outputs.insert(pr.first);
     }
   }
 
