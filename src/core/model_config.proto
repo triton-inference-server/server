@@ -624,12 +624,12 @@ message ModelOptimizationPolicy
 }
 
 //@@
-//@@.. cpp:var:: message RequestTimeoutPolicy
+//@@.. cpp:var:: message ModelQueuePolicy
 //@@
 //@@   Timeout policy for inference requests. If specified, the scheduler will
 //@@   handle pending requests that exceed timeout accordingly.
 //@@
-message RequestTimeoutPolicy
+message ModelQueuePolicy
 {
   //@@
   //@@  .. cpp:enum:: Action
@@ -645,9 +645,10 @@ message RequestTimeoutPolicy
 
     //@@    .. cpp:enumerator:: Action::DELAY = 1
     //@@
-    //@@       Delay the request until all other requests within the timeout
-    //@@       are processed. The priority of the delayed request will be
-    //@@       disregarded.
+    //@@       Delay the request until all other requests at the same
+    //@@       (or higher) priority levels that have not reached their timeouts
+    //@@       are processed. A delayed request will eventually be processed,
+    //@@       but may be delayed indefinitely due to newly arriving requests.
     //@@
     DELAY = 1;
   }
@@ -660,36 +661,30 @@ message RequestTimeoutPolicy
   Action action = 1;
 
   //@@
-  //@@  .. cpp:var:: uint64 timeout_limit_microseconds
+  //@@  .. cpp:var:: uint64 default_timeout_microseconds
   //@@
-  //@@     The timeout limit for every request, in microseconds.
-  //@@     The default value is 0 which indicates that no timeout limit is set.
+  //@@     The default timeout for every request, in microseconds.
+  //@@     The default value is 0 which indicates that no timeout is set.
   //@@
-  uint64 timeout_limit_microseconds = 2;
+  uint64 default_timeout_microseconds = 2;
 
   //@@
-  //@@  .. cpp:var:: bool allow_override [DLIS-997]
+  //@@  .. cpp:var:: bool allow_timeout_override
   //@@
-  //@@     Whether individual request can override the timeout limit.
+  //@@     Whether individual request can override the timeout value.
   //@@     The default value is false.
   //@@
-  bool allow_override = 3;
-}
+  bool allow_timeout_override = 3;
 
-//@@
-//@@.. cpp:var:: message PrioritySetting [DLIS-1083]
-//@@
-//@@   Configuration used for specified priority level.
-//@@
-message PrioritySetting
-{
   //@@
-  //@@  .. cpp:var:: RequestTimeoutPolicy timeout_policy
+  //@@  .. cpp:var:: uint32 max_queue_size
   //@@
-  //@@     The timeout policy used for this priority level, default policy will
-  //@@     be used if not specified.
+  //@@     The maximum queue size for holding requests. The request enqueued
+  //@@     after the queue is full will be handled based on the timeout policy
+  //@@     immediately. The default value is 0 which indicates that no maximum
+  //@@     queue size is enforced.
   //@@
-  RequestTimeoutPolicy timeout_policy = 1;
+  uint32 max_queue_size = 4;
 }
 
 //@@
@@ -731,21 +726,24 @@ message ModelDynamicBatching
   //@@
   bool preserve_ordering = 3;
 
-  //@@  .. cpp:var:: RequestTimeoutPolicy default_timeout_policy
+    //@@  .. cpp:var:: ModelQueuePolicy default_queue_policy
   //@@
-  //@@     The default timeout policy used for requests that don't specify
-  //@@     priority or specify priority that doesn't map to any timeout policy.
-  //@@     If not specify, then no timeout limit is enforced.
+  //@@     The default queue policy used for requests that don't require
+  //@@     priority handling and requests that specify priority levels where
+  //@@     there is no specific policy given. If not specified, a policy with 
+  //@@     default field values will be used.
   //@@
-  RequestTimeoutPolicy default_timeout_policy = 4;
+  ModelQueuePolicy default_queue_policy = 4;
 
-  //@@  .. cpp:var:: map<uint32, PrioritySetting> priority_setting
+  //@@  .. cpp:var:: map<uint32, ModelQueuePolicy> priority_queue_policy
   //@@
   //@@     Specify the prioritiy levels enabled for the scheduler,
-  //@@     and the setting associated with the priority level. The requests
-  //@@     with higher priority level will be prioritized than other requests.
+  //@@     and the policy for queue associated with the priority level.
+  //@@     The requests with higher priority level will be prioritized than
+  //@@     other requests. We encourage to use as less priority levels as
+  //@@     possible because a queue is required for each priority level.
   //@@
-  map<uint32, PrioritySetting> priority_setting = 5;
+  map<uint32, ModelQueuePolicy> priority_queue_policy = 5;
 }
 
 //@@
@@ -954,21 +952,24 @@ message ModelSequenceBatching
   //@@
   repeated ControlInput control_input = 2;
 
-  //@@  .. cpp:var:: RequestTimeoutPolicy default_timeout_policy
+  //@@  .. cpp:var:: ModelQueuePolicy default_queue_policy
   //@@
-  //@@     The default timeout policy used for requests that don't specify
-  //@@     priority or specify priority that doesn't map to any timeout policy.
-  //@@     If not specify, then no timeout limit is enforced.
+  //@@     The default queue policy used for requests that don't require
+  //@@     priority handling and requests that specify priority levels where
+  //@@     there is no specific policy given. If not specified, a policy with 
+  //@@     default field values will be used.
   //@@
-  RequestTimeoutPolicy default_timeout_policy = 5;
+  ModelQueuePolicy default_queue_policy = 5;
 
-  //@@  .. cpp:var:: map<uint32, PrioritySetting> priority_setting
+  //@@  .. cpp:var:: map<uint32, ModelQueuePolicy> priority_queue_policy
   //@@
   //@@     Specify the prioritiy levels enabled for the scheduler,
-  //@@     and the setting associated with the priority level. The requests
-  //@@     with higher priority level will be prioritized than other requests.
+  //@@     and the policy for queue associated with the priority level.
+  //@@     The requests with higher priority level will be prioritized than
+  //@@     other requests. We encourage to use as less priority levels as
+  //@@     possible because a queue is required for each priority level.
   //@@
-  map<uint32, PrioritySetting> priority_setting = 6;
+  map<uint32, ModelQueuePolicy> priority_queue_policy = 6;
 }
 
 //@@
