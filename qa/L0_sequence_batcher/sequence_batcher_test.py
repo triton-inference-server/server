@@ -61,19 +61,17 @@ else:
     _trials = BACKENDS.split(' ')
 
 # Add ensemble to the _trials
-if ENSEMBLES:
-    ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
-else:
-    ENSEMBLE_PREFIXES = []
+ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
 
-res = []
-for trial in _trials:
-    res.append(trial)
-    if ("custom" in trial):
-        continue
-    for ensemble_prefix in ENSEMBLE_PREFIXES:
-        res.append(ensemble_prefix + trial)
-_trials = tuple(res)
+if ENSEMBLES:
+    res = []
+    for trial in _trials:
+        res.append(trial)
+        if ("custom" in trial):
+            continue
+        for ensemble_prefix in ENSEMBLE_PREFIXES:
+            res.append(ensemble_prefix + trial)
+    _trials = tuple(res)
 
 _ragged_batch_supported_trials = list()
 if "custom" in _trials:

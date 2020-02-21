@@ -58,42 +58,34 @@ export CUDA_VISIBLE_DEVICES=0
 rm -fr *.log *.serverlog models && mkdir models
 for BACKEND in $BACKENDS; do
     if [ "$BACKEND" != "custom" ]; then
-      cp -r $DATADIR/qa_model_repository/${BACKEND}_float32_float32_float32 models/. &&
-        (cd models/${BACKEND}_float32_float32_float32 && \
-            sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
-            sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
-            echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
+      TMP_MODEL_DIR="$DATADIR/qa_model_repository/${BACKEND}_float32_float32_float32"
     else
-      cp -r ../custom_models/custom_float32_float32_float32 models/. &&
-        (cd models/custom_float32_float32_float32 && \
-            sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
-            sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
-            echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
+      TMP_MODEL_DIR="../custom_models/custom_float32_float32_float32"
     fi
+
+    cp -r $TMP_MODEL_DIR models/. &&
+    (cd models/$(basename $TMP_MODEL_DIR) && \
+          sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+          sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
+          echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
 done
 
 # Setup variable-size model repository
 rm -fr var_models && mkdir var_models
 for BACKEND in $BACKENDS; do
     if [ "$BACKEND" != "custom" ]; then
-      cp -r $DATADIR/qa_variable_model_repository/${BACKEND}_float32_float32_float32 var_models/. &&
-        (cd var_models/${BACKEND}_float32_float32_float32 && \
-            sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
-            sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
-            echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
+      TMP_MODEL_DIR="$DATADIR/qa_variable_model_repository/${BACKEND}_float32_float32_float32"
     else
-      cp -r ../custom_models/custom_float32_float32_float32 var_models/. &&
-        (cd var_models/custom_float32_float32_float32 && \
-            sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
-            sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
-            echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
-
-      cp -r ../custom_models/custom_zero_1_float32 var_models/. &&
-        (cd var_models/custom_zero_1_float32 && \
-            sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
-            sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
-            echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
+      TMP_MODEL_DIR="../custom_models/custom_float32_float32_float32 ../custom_models/custom_zero_1_float32"
     fi
+
+    for TMP_DIR in $TMP_MODEL_DIR; do
+      cp -r $TMP_DIR var_models/. &&
+        (cd var_models/$(basename $TMP_DIR) && \
+            sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+            sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
+            echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
+    done
 done
 
 for MC in `ls var_models/*/config.pbtxt`; do
