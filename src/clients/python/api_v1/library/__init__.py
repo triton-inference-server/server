@@ -52,9 +52,6 @@ class _utf8(object):
             return value.encode('utf8')
 
 import os
-# If JP_VERSION is set then building on Jetson
-JETSON = bool(os.environ.get('JP_VERSION', 0))
-
 _request_lib = "request" if os.name == 'nt' else 'librequest.so'
 _crequest_lib = "crequest" if os.name == 'nt' else 'libcrequest.so'
 _request_path = pkg_resources.resource_filename('tensorrtserver.api', _request_lib)
@@ -631,12 +628,7 @@ class ServerStatusContext:
             c_void_p(_crequest_status_ctx_get(
                 self._ctx, byref(cstatus), byref(cstatus_len))))
 
-        status = ServerStatus()
-        if JETSON:
-            status = text_format.Parse(cstatus.value.decode(), ServerStatus())
-        else:
-            status_buf = cast(cstatus, POINTER(c_byte * cstatus_len.value))[0]
-            status.ParseFromString(status_buf)
+        status = text_format.Parse(cstatus.value.decode(), ServerStatus())
         return status
 
     def get_last_request_id(self):
@@ -1028,13 +1020,8 @@ class SharedMemoryControlContext:
         self._last_request_id = _raise_if_error(
             c_void_p(_crequest_shm_control_ctx_get_status(
                 self._ctx, byref(cstatus), byref(cstatus_len))))
-        status_buf = cast(cstatus, POINTER(c_byte * cstatus_len.value))[0]
 
-        status = SharedMemoryStatus()
-        if JETSON:
-            status = text_format.Parse(status_buf, SharedMemoryStatus())
-        else:
-            status.ParseFromString(status_buf)
+        status = text_format.Parse(cstatus.value.decode(), SharedMemoryStatus())
         return status
 
     def get_last_request_id(self):
