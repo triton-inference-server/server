@@ -65,35 +65,35 @@ rm -fr *.log *.serverlog models{0,1,2,4} && mkdir models{0,1,2,4}
 
 MODELS=""
 for BACKEND in $BACKENDS; do
-  if [[ $BACKENDS == *"plan"* ]]; then
+  if [[ $BACKEND == "plan" ]]; then
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/plan_sequence_float32"
-  elif [[ $BACKENDS == *"netdef"* ]]; then
+  elif [[ $BACKEND == "netdef" ]]; then
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/netdef_sequence_int32"
-  elif [[ $BACKENDS == *"graphdef"* ]]; then
+  elif [[ $BACKEND == "graphdef" ]]; then
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_sequence_object \
               $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32"
-  elif [[ $BACKENDS == *"savedmodel"* ]]; then
+  elif [[ $BACKEND == "savedmodel" ]]; then
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/savedmodel_sequence_float32"
-  elif [[ $BACKENDS == *"onnx"* ]]; then
+  elif [[ $BACKEND == "onnx" ]]; then
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/onnx_sequence_int32"
-  elif [[ $BACKENDS == *"libtorch"* ]]; then
+  elif [[ $BACKEND == "libtorch" ]]; then
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/libtorch_sequence_int32"
-  elif [[ $BACKENDS == *"custom"* ]]; then
+  elif [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
   fi
 
   if [ "$ENSEMBLES" == "1" ]; then
-    if [[ $BACKENDS == *"plan"* ]]; then
+    if [[ $BACKEND == "plan" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_plan_sequence_float32"
-    elif [[ $BACKENDS == *"netdef"* ]]; then
+    elif [[ $BACKEND == "netdef" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_netdef_sequence_int32"
-    elif [[ $BACKENDS == *"graphdef"* ]]; then
+    elif [[ $BACKEND == "graphdef" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_sequence_object"
-    elif [[ $BACKENDS == *"savedmodel"* ]]; then
+    elif [[ $BACKEND == "savedmodel" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_sequence_float32"
-    elif [[ $BACKENDS == *"onnx"* ]]; then
+    elif [[ $BACKEND == "onnx" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_onnx_sequence_int32"
-    elif [[ $BACKENDS == *"libtorch"* ]]; then
+    elif [[ $BACKEND == "libtorch" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_libtorch_sequence_int32"
     fi
   fi
@@ -119,36 +119,36 @@ done
 
 MODELS=""
 for BACKEND in $BACKENDS; do
-  if [[ $BACKENDS == *"plan"* ]]; then
+  if [[ $BACKEND == "plan" ]]; then
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/plan_nobatch_sequence_float32"
-  elif [[ $BACKENDS == *"netdef"* ]]; then
+  elif [[ $BACKEND == "netdef" ]]; then
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/netdef_nobatch_sequence_int32"
-  elif [[ $BACKENDS == *"graphdef"* ]]; then
+  elif [[ $BACKEND == "graphdef" ]]; then
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_object \
               $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32"
-  elif [[ $BACKENDS == *"savedmodel"* ]]; then
+  elif [[ $BACKEND == "savedmodel" ]]; then
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/savedmodel_nobatch_sequence_float32"
-  elif [[ $BACKENDS == *"onnx"* ]]; then
+  elif [[ $BACKEND == "onnx" ]]; then
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/onnx_nobatch_sequence_int32"
-  elif [[ $BACKENDS == *"libtorch"* ]]; then
+  elif [[ $BACKEND == "libtorch" ]]; then
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/libtorch_nobatch_sequence_int32"
-  elif [[ $BACKENDS == *"custom"* ]]; then
+  elif [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
   fi
 
   if [ "$ENSEMBLES" == "1" ]; then
-    if [[ $BACKENDS == *"plan"* ]]; then
+    if [[ $BACKEND == "plan" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_plan_nobatch_sequence_float32"
-    elif [[ $BACKENDS == *"netdef"* ]]; then
+    elif [[ $BACKEND == "netdef" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_netdef_nobatch_sequence_int32"
-    elif [[ $BACKENDS == *"graphdef"* ]]; then
+    elif [[ $BACKEND == "graphdef" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_object \
                 $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_int32"
-    elif [[ $BACKENDS == *"savedmodel"* ]]; then
+    elif [[ $BACKEND == "savedmodel" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_nobatch_sequence_float32"
-    elif [[ $BACKENDS == *"onnx"* ]]; then
+    elif [[ $BACKEND == "onnx" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_onnx_nobatch_sequence_int32"
-    elif [[ $BACKENDS == *"libtorch"* ]]; then
+    elif [[ $BACKEND == "libtorch" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_libtorch_nobatch_sequence_int32"
     fi
   fi
@@ -166,34 +166,34 @@ rm -fr modelsv && mkdir modelsv
 
 MODELS=""
 for BACKEND in $BACKENDS; do
-  if [[ $BACKENDS == *"plan"* ]]; then
+  if [[ $BACKEND == "plan" ]]; then
     MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/plan_sequence_float32"
-  elif [[ $BACKENDS == *"netdef"* ]]; then
+  elif [[ $BACKEND == "netdef" ]]; then
     MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/netdef_sequence_int32"
-  elif [[ $BACKENDS == *"graphdef"* ]]; then
+  elif [[ $BACKEND == "graphdef" ]]; then
     MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/graphdef_sequence_object"
-  elif [[ $BACKENDS == *"savedmodel"* ]]; then
+  elif [[ $BACKEND == "savedmodel" ]]; then
     MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/savedmodel_sequence_float32"
-  elif [[ $BACKENDS == *"onnx"* ]]; then
+  elif [[ $BACKEND == "onnx" ]]; then
     MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/onnx_sequence_int32"
-  elif [[ $BACKENDS == *"libtorch"* ]]; then
+  elif [[ $BACKEND == "libtorch" ]]; then
     MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/libtorch_sequence_int32"
-  elif [[ $BACKENDS == *"custom"* ]]; then
+  elif [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
   fi
 
   if [ "$ENSEMBLES" == "1" ]; then
-    if [[ $BACKENDS == *"plan"* ]]; then
+    if [[ $BACKEND == "plan" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_plan_nobatch_sequence_float32"
-    elif [[ $BACKENDS == *"netdef"* ]]; then
+    elif [[ $BACKEND == "netdef" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_netdef_nobatch_sequence_int32"
-    elif [[ $BACKENDS == *"graphdef"* ]]; then
+    elif [[ $BACKEND == "graphdef" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_graphdef_sequence_object"
-    elif [[ $BACKENDS == *"savedmodel"* ]]; then
+    elif [[ $BACKEND == "savedmodel" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_savedmodel_sequence_float32"
-    elif [[ $BACKENDS == *"onnx"* ]]; then
+    elif [[ $BACKEND == "onnx" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_onnx_sequence_int32"
-    elif [[ $BACKENDS == *"libtorch"* ]]; then
+    elif [[ $BACKEND == "libtorch" ]]; then
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_libtorch_sequence_int32"
     fi
   fi
