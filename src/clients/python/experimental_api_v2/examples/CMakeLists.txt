@@ -28,6 +28,8 @@ cmake_minimum_required (VERSION 3.5)
 
 install(
   PROGRAMS
+    grpc_v2_explicit_byte_content_client.py
+    grpc_v2_explicit_int_content_client.py
     grpc_v2_image_client.py
     simple_grpc_v2_client.py
     simple_grpc_class_client.py

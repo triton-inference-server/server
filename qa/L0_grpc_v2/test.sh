@@ -97,6 +97,8 @@ SIMPLE_INFER_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc
 SIMPLE_ASYNC_INFER_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_async_infer_client.py
 SIMPLE_STRING_INFER_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_string_infer_client.py
 SIMPLE_CLASS_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_class_client.py
+EXPLICIT_BYTE_CONTENT_CLIENT=/workspace/builddir/trtis-clients/install/python/grpc_v2_explicit_byte_content_client.py
+EXPLICIT_INT_CONTENT_CLIENT=/workspace/builddir/trtis-clients/install/python/grpc_v2_explicit_int_content_client.py
 
 rm -f *.log
 rm -f *.log.*
@@ -147,6 +149,8 @@ for i in \
         $SIMPLE_ASYNC_INFER_CLIENT \
         $SIMPLE_STRING_INFER_CLIENT \
         $SIMPLE_CLASS_CLIENT \
+        $EXPLICIT_BYTE_CONTENT_CLIENT \
+        $EXPLICIT_INT_CONTENT_CLIENT \
         ; do
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"

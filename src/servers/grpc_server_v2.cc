@@ -187,16 +187,25 @@ struct AllocPayload {
   };
 
   using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
+  using TensorSerializedDataMap =
+      std::unordered_map<std::string, std::shared_ptr<std::string>>;
 
-  explicit AllocPayload() : response_(nullptr), shm_map_(nullptr) {}
+  explicit AllocPayload()
+      : response_(nullptr), shm_map_(nullptr), serialized_data_map_(nullptr)
+  {
+  }
   ~AllocPayload()
   {
     // Don't delete 'response_'.. it is owned by the HandlerState
     delete shm_map_;
+    delete serialized_data_map_;
   }
 
   ModelInferResponse* response_;
   TensorShmMap* shm_map_;
+  // Used to extend the lifetime of the serialized data in case
+  // repeated byte contents were provided in the request.
+  TensorSerializedDataMap* serialized_data_map_;
 };
 
 //
@@ -1228,7 +1237,7 @@ InferResponseRelease(
   LOG_VERBOSE(1) << "GRPC release: "
                  << "size " << byte_size << ", addr " << buffer;
 
-  // Don't do anything when releasing a buffer since ResponseAlloc
+  // Don't do anything when releasing a buffer since InferResponseAlloc
   // wrote directly into the response protobuf.
   return nullptr;  // Success
 }
@@ -1237,18 +1246,26 @@ TRTSERVER_Error*
 InferAllocatorPayload(
     const std::shared_ptr<TRTSERVER_Server>& trtserver,
     const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
-    const ModelInferRequest& request, ModelInferResponse& response,
-    AllocPayload* alloc_payload)
+    const ModelInferRequest& request,
+    AllocPayload::TensorSerializedDataMap* serialized_data_map,
+    ModelInferResponse& response, AllocPayload* alloc_payload)
 {
   alloc_payload->response_ = &response;
   if (alloc_payload->shm_map_ != nullptr) {
     alloc_payload->shm_map_->clear();
+  }
+  if (alloc_payload->serialized_data_map_ != nullptr) {
+    alloc_payload->serialized_data_map_->clear();
+  }
+  if (!serialized_data_map->empty()) {
+    alloc_payload->serialized_data_map_ = serialized_data_map;
   }
 
   // If any of the outputs use shared memory, then we must calculate
   // the memory address for that output and store it in the allocator
   // payload so that it is available when the allocation callback is
   // invoked.
+
 #if 0
   for (const auto& io : request.outputs()) {
     if (io.has_shared_memory()) {
@@ -1280,10 +1297,38 @@ InferAllocatorPayload(
 }
 
 TRTSERVER_Error*
+InferGRPCToInputHelper(
+    const std::string& input_name, const std::string& model_name,
+    const std::string& tensor_dt, const std::string input_dt,
+    const size_t byte_size)
+{
+  if (input_dt.compare(tensor_dt) != 0) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "unexpected explicit tensor data for input tensor '" + input_name +
+            "' for model '" + model_name + "' of type '" + tensor_dt +
+            "', expected datatype '" + input_dt + "'")
+            .c_str());
+  }
+  if (byte_size != 0) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "unexpected explicit tensor data for input tensor '" + input_name +
+            "' for model '" + model_name +
+            "', binary data was already supplied.")
+            .c_str());
+  }
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
 InferGRPCToInput(
     const std::shared_ptr<TRTSERVER_Server>& trtserver,
     const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
     const ModelInferRequest& request,
+    AllocPayload::TensorSerializedDataMap* serialized_data_map,
     TRTSERVER_InferenceRequestProvider* request_provider)
 {
   // Verify that the batch-byte-size of each input matches the size of
@@ -1293,6 +1338,7 @@ InferGRPCToInput(
     size_t byte_size;
     TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
     int64_t memory_type_id = 0;
+
 #if 0
     if (io.has_shared_memory()) {
       TRTSERVER_SharedMemoryBlock* smb = nullptr;
@@ -1315,17 +1361,94 @@ InferGRPCToInput(
                 .c_str());
       }
 
-      // FIXMEV2 handle non-raw content types
+      // Try to read the raw contents if available
       const std::string& raw = io.contents().raw_contents();
       base = raw.c_str();
       byte_size = raw.size();
+
+      // Check the presence of explicit tensors
+      if (io.contents().bool_contents_size() != 0) {
+        RETURN_IF_ERR(InferGRPCToInputHelper(
+            io.name(), request.model_name(), "BOOL", io.datatype(), byte_size));
+        base = (const void*)io.contents().bool_contents().data();
+        byte_size = io.contents().bool_contents_size();
+      }
+
+      if (io.contents().int_contents_size() != 0) {
+        RETURN_IF_ERR(InferGRPCToInputHelper(
+            io.name(), request.model_name(), "INT32", io.datatype(),
+            byte_size));
+        base = (const void*)io.contents().int_contents().data();
+        byte_size = io.contents().int_contents_size() * 4;
+      }
+
+      if (io.contents().int64_contents_size() != 0) {
+        RETURN_IF_ERR(InferGRPCToInputHelper(
+            io.name(), request.model_name(), "INT64", io.datatype(),
+            byte_size));
+        base = (const void*)io.contents().int64_contents().data();
+        byte_size = io.contents().int64_contents_size() * 8;
+      }
+
+      if (io.contents().uint_contents_size() != 0) {
+        RETURN_IF_ERR(InferGRPCToInputHelper(
+            io.name(), request.model_name(), "UINT32", io.datatype(),
+            byte_size));
+        base = (const void*)io.contents().uint_contents().data();
+        byte_size = io.contents().uint_contents_size() * 4;
+      }
+
+      if (io.contents().uint64_contents_size() != 0) {
+        RETURN_IF_ERR(InferGRPCToInputHelper(
+            io.name(), request.model_name(), "UINT64", io.datatype(),
+            byte_size));
+        base = (const void*)io.contents().uint64_contents().data();
+        byte_size = io.contents().uint64_contents_size() * 8;
+      }
+
+      if (io.contents().fp32_contents_size() != 0) {
+        RETURN_IF_ERR(InferGRPCToInputHelper(
+            io.name(), request.model_name(), "FP32", io.datatype(), byte_size));
+        base = (const void*)io.contents().fp32_contents().data();
+        byte_size = io.contents().fp32_contents_size() * 4;
+      }
+
+      if (io.contents().fp64_contents_size() != 0) {
+        RETURN_IF_ERR(InferGRPCToInputHelper(
+            io.name(), request.model_name(), "FP64", io.datatype(), byte_size));
+        base = (const void*)io.contents().fp64_contents().data();
+        byte_size = io.contents().fp64_contents_size() * 8;
+      }
+
+      if (io.contents().byte_contents_size() != 0) {
+        RETURN_IF_ERR(InferGRPCToInputHelper(
+            io.name(), request.model_name(), "STRING", io.datatype(),
+            byte_size));
+        std::shared_ptr<std::string> serialized(new std::string(""));
+        serialized_data_map->emplace(io.name(), serialized);
+
+        // Serialize the output tensor strings. Each string is
+        // serialized as a 4-byte length followed by the string itself
+        // with no null-terminator.
+        for (int e = 0; e < io.contents().byte_contents_size(); ++e) {
+          const std::string& element = io.contents().byte_contents().Get(e);
+          uint32_t len{(uint32_t)element.size()};
+          serialized->append(
+              reinterpret_cast<const char*>(&len), sizeof(uint32_t));
+          if (element.size() > 0) {
+            serialized->append(element.c_str(), len);
+          }
+        }
+        base = serialized->c_str();
+        byte_size = serialized->size();
+      }
     }
 
     uint64_t expected_byte_size = 0;
     RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
         request_provider, io.name().c_str(), &expected_byte_size));
 
-    if (byte_size != expected_byte_size) {
+    if ((expected_byte_size != 0) && (byte_size != expected_byte_size)) {
       return TRTSERVER_ErrorNew(
           TRTSERVER_ERROR_INVALID_ARG,
           std::string(
@@ -1464,13 +1587,20 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
           &request_provider, trtserver_.get(), request_options);
     }
 
+    // Will be used to hold the serialized data in case explicit string tensors
+    // are present in the request.
+    AllocPayload::TensorSerializedDataMap* serialized_data_map =
+        new AllocPayload::TensorSerializedDataMap();
+
     if (err == nullptr) {
-      err =
-          InferGRPCToInput(trtserver_, smb_manager_, request, request_provider);
+      err = InferGRPCToInput(
+          trtserver_, smb_manager_, request, serialized_data_map,
+          request_provider);
     }
     if (err == nullptr) {
       err = InferAllocatorPayload(
-          trtserver_, smb_manager_, request, response, &state->alloc_payload_);
+          trtserver_, smb_manager_, request, serialized_data_map, response,
+          &state->alloc_payload_);
     }
     if (err == nullptr) {
       // Provide the trace manager object to use for this request, if
@@ -1806,15 +1936,20 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
       err = TRTSERVER_InferenceRequestProviderNewV2(
           &request_provider, trtserver_.get(), request_options);
     }
+
+    // Will be used when GRPC request contains explicit bytes tensors
+    AllocPayload::TensorSerializedDataMap* serialized_data_map =
+      new AllocPayload::TensorSerializedDataMap();
+
     if (err == nullptr) {
       err = InferGRPCToInput(
           trtserver_, smb_manager_, request.meta_data(), request,
-          request_provider);
+          serialized_data_map, request_provider);
     }
     if (err == nullptr) {
       err = InferAllocatorPayload(
-          trtserver_, smb_manager_, request.meta_data(), response,
-          &state->alloc_payload_);
+          trtserver_, smb_manager_, request.meta_data(),
+          serialized_data_map, response, &state->alloc_payload_);
     }
     if (err == nullptr) {
       // Provide the trace manager object to use for this request, if

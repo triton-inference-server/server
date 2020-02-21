@@ -555,14 +555,6 @@ class InferOutput:
     ----------
     name : str
         The name of output tensor to associate with this object
-        
-    data_format : str
-        The format to use when returning the ouput tensor data. Options
-        are "explicit", "binary" and "shared_memory".
-        Default is "binary". If "shared_memory" is specified then
-        the "shared_memory_data" field must also be specified.
-        Server support for “binary” and “shared_memory”
-        is optional.
     """
 
     def __init__(self, name):
@@ -580,28 +572,6 @@ class InferOutput:
             The name of output
         """
         return self._output.name
-
-    @property
-    def data_format(self):
-        """Get the requested format of ouput associated with this object.
-
-        Returns
-        -------
-        str
-            The data format in which output will be requested
-        """
-        return self._output.data_format
-
-    @data_format.setter
-    def data_format(self, data_format):
-        """Set the requested format of ouput associated with this object.
-
-        Parameter
-        ---------
-        data_format : str
-            The data format in which output will be requested.
-        """
-        self._output.data_format = data_format
 
     def set_parameter(self, key, value):
         """Adds the specified key-value pair in the requested output parameters
