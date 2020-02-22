@@ -90,6 +90,8 @@ class InferenceBackend {
       const std::shared_ptr<InferResponseProvider>& response_provider,
       std::function<void(const Status&)> OnCompleteHandleInfer);
 
+  uint32_t DefaultPriorityLevel() const { return default_priority_level_; }
+
  protected:
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
@@ -163,6 +165,9 @@ class InferenceBackend {
 
   // Path to model
   std::string model_dir_;
+
+  // The default priority level for the backend.
+  uint32_t default_priority_level_;
 };
 
 }}  // namespace nvidia::inferenceserver

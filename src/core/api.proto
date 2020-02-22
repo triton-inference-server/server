@@ -237,7 +237,8 @@ message InferRequestHeader
   //@@  .. cpp:var:: uint64 timeout_microseconds
   //@@
   //@@     The timeout for this request. This value overrides the timeout
-  //@@     specified by the model, if the model allows timeout override.
+  //@@     specified by the model, if the model allows timeout override and if
+  //@@     the value is less than the default timeout specified by the model.
   //@@     If the request cannot be processed within this timeout, the request
   //@@     will be handled based on the model's timeout policy.
   //@@     The default value is 0 which indicates that the request does not
