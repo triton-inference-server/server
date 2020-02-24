@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -29,6 +29,8 @@ syntax = "proto3";
 package nvidia.inferenceserver;
 
 //@@.. cpp:namespace:: nvidia::inferenceserver
+
+import "model_config.proto";
 
 //@@.. cpp:var:: message InferSharedMemory
 //@@
@@ -246,6 +248,12 @@ message InferResponseHeader
     //@@       The name of the output tensor.
     //@@
     string name = 1;
+
+    //@@    .. cpp:var:: DataType data_type
+    //@@
+    //@@       The datatype of the output tensor.
+    //@@
+    DataType data_type = 4;
 
     //@@    .. cpp:var:: message Raw
     //@@

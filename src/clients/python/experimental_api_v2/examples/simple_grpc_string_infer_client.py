@@ -62,29 +62,46 @@ if __name__ == '__main__':
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
-    input0_data = np.arange(start=0, stop=16, dtype=np.int32)
-    input0_data = np.expand_dims(input0_data, axis=0)
-    input1_data = np.ones(shape=(1, 16), dtype=np.int32)
+    in0 = np.arange(start=0, stop=16, dtype=np.int32)
+    in0 = np.expand_dims(in0, axis=0)
+    in1 = np.ones(shape=(1, 16), dtype=np.int32)
+    expected_sum = np.add(in0, in1)
+    expected_diff = np.subtract(in0, in1)
 
-    in0n = np.array([str(x) for x in input0_data.reshape(input0_data.size)],
-                    dtype=object)
-    input0_data_str = in0n.reshape(input0_data.shape)
-    in1n = np.array([str(x) for x in input1_data.reshape(input1_data.size)],
-                    dtype=object)
-    input1_data_str = in1n.reshape(input1_data.shape)
+    in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+    input0_data = in0n.reshape(in0.shape)
+    in1n = np.array([str(x) for x in in1.reshape(in1.size)], dtype=object)
+    input1_data = in1n.reshape(in1.shape)
 
     # Initialize the data
-    inputs[0].set_data_from_numpy(input0_data_str)
-    inputs[1].set_data_from_numpy(input1_data_str)
+    inputs[0].set_data_from_numpy(input0_data)
+    inputs[1].set_data_from_numpy(input1_data)
 
     outputs.append(grpcclient.InferOutput('OUTPUT0'))
     outputs.append(grpcclient.InferOutput('OUTPUT1'))
 
     results = TRTISClient.infer(inputs, outputs, model_name)
-    # FIXMEPV2 Get numpy string array and validate the content
-    # Depends upon the server to provide the datatype field in
-    # output
-    print(results.get_response())
+
+    # Get the output arrays from the
+    output0_data = results.as_numpy('OUTPUT0')
+    output1_data = results.as_numpy('OUTPUT1')
+
+    for i in range(16):
+        print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
+              str(output0_data[0][i]))
+        print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
+              str(output1_data[0][i]))
+
+        # Convert result from string to int to check result
+        r0 = int(output0_data[0][i])
+        r1 = int(output1_data[0][i])
+        if expected_sum[0][i] != r0:
+            print("error: incorrect sum")
+            sys.exit(1)
+        if expected_diff[0][i] != r1:
+            print("error: incorrect difference")
+            sys.exit(1)
+
     print('PASS: string')
 
     TRTISClient.close()

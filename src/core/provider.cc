@@ -442,6 +442,7 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
 
     auto poutput = response_header->add_output();
     poutput->set_name(output.name_);
+    poutput->set_data_type(output_config->data_type());
 
     if (output.cls_count_ == 0) {
       // Raw result...
