@@ -44,7 +44,7 @@
 namespace nvidia { namespace inferenceserver { namespace custom {
 namespace image_preprocess {
 
-enum ScaleType { NONE = 0, VGG = 1, INCEPTION = 2 };
+enum ScaleType { NONE = 0, VGG = 1, INCEPTION = 2, ONE255 = 3 };
 
 // Context object. All state must be kept in this object.
 class Context : public CustomInstance {
@@ -76,7 +76,7 @@ class Context : public CustomInstance {
   ModelInput::Format format_;
 
   // The scaling used to normalize the image for corresponding models
-  ScaleType scaling_;
+  ScaleType scaling_ = NONE;
 
   // The shape of preprocessed image
   std::vector<int64_t> output_shape_;
@@ -96,6 +96,7 @@ class Context : public CustomInstance {
   const int kInputSize =
       RegisterError("input obtained does not match batch size");
   const int kOpenCV = RegisterError("unable to preprocess image");
+  const int kScaleType = RegisterError("unrecognized scaling type");
 };
 
 Context::Context(
@@ -154,8 +155,13 @@ Context::Init()
         scaling_ = ScaleType::VGG;
       } else if (pr.second.string_value() == "INCEPTION") {
         scaling_ = ScaleType::INCEPTION;
-      } else {
+      } else if (pr.second.string_value() == "ONE255") {
+        scaling_ = ScaleType::ONE255;
+      } else if (pr.second.string_value() == "NONE" ||
+                 pr.second.string_value().length() == 0) {
         scaling_ = NONE;
+      } else {
+        return kScaleType;
       }
     }
   }
@@ -368,6 +374,13 @@ Context::Preprocess(const cv::Mat& img, char* data, size_t* image_byte_size)
       sample_final = sample_type - cv::Scalar(128);
     } else {
       sample_final = sample_type - cv::Scalar(104, 117, 123);
+    }
+  } else if (scaling_ == ScaleType::ONE255) {
+    if (c == 1) {
+      sample_final = sample_type.mul(cv::Scalar(1 / 255.0));
+    } else {
+      sample_final =
+          sample_type.mul(cv::Scalar(1 / 255.0, 1 / 255.0, 1 / 255.0));
     }
   } else {
     sample_final = sample_type;
