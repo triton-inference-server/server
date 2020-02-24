@@ -1580,10 +1580,32 @@ ModelInferHandler::InferComplete(
       // Find the tensor in the response and set its shape.
       for (auto& output : *(response.mutable_outputs())) {
         if (output.name() == io.name()) {
-          for (const auto d : io.raw().dims()) {
-            output.add_shape(d);
+          if (io.batch_classes().size() == 0) {
+            for (const auto d : io.raw().dims()) {
+              output.add_shape(d);
+            }
+            output.set_datatype(GetDataTypeProtocolString(io.data_type()));
+          } else {
+            int cls_count = 0;
+            for (const auto& classes : io.batch_classes()) {
+              cls_count = classes.cls().size();
+              for (const auto& cls : classes.cls()) {
+                if (!cls.label().empty()) {
+                  output.mutable_contents()->add_string_contents(std::string(
+                      std::to_string(cls.idx()) + ":" +
+                      std::to_string(cls.value()) + ":" + cls.label()));
+                } else {
+                  output.mutable_contents()->add_string_contents(std::string(
+                      std::to_string(cls.idx()) + ":" +
+                      std::to_string(cls.value())));
+                }
+              }
+            }
+            output.add_shape(io.batch_classes().size());
+            output.add_shape(cls_count);
+
+            output.set_datatype("STRING");
           }
-          output.set_datatype(GetDataTypeProtocolString(io.data_type()));
           break;
         }
       }

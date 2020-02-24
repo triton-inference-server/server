@@ -604,10 +604,29 @@ class InferOutput:
         """
         self._output.data_format = data_format
 
-    # FIXMEPV2: Add parameter support
-    @property
-    def parameters(self):
-        raise_error("Not implemented yet")
+    def set_parameter(self, key, value):
+        """Adds the specified key-value pair in the requested output parameters
+
+        Parameter
+        ---------
+        key : str
+            The name of the parameter to be included in the request. 
+        value : str/int/bool
+            The value of the parameter
+        
+        """
+        if not type(key) is str:
+            raise_error("only string data type for key is supported in parameters")
+
+        param = self._output.parameters[key]
+        if type(value) is int:
+            param.int64_param = value
+        elif type(value) is bool:
+            param.bool_param = value
+        elif type(value) is str:
+            param.string_param = value
+        else:
+            raise_error("unsupported value type for the parameter")
 
     def _get_tensor(self):
         """Retrieve the underlying InferRequestedOutputTensor message.

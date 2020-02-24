@@ -153,10 +153,7 @@ def postprocess(results, output_name, batch_size):
     #if len(results.outputs) != 1:
     #    raise Exception("expected 1 result, got {}".format(len(results.outputs)))
 
-    output0_data = results.as_numpy(output_name)
-    print(output0_data[0][24])
-    print(output0_data[0][25])
-    print(output0_data[0][26])
+    print(results.get_response())
 
 
 def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
@@ -176,6 +173,7 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
 
     outputs = []
     outputs.append(grpcclient.InferOutput(output_name))
+    outputs[0].set_parameter("classification", 2)
 
     yield inputs, outputs, FLAGS.model_name, FLAGS.model_version
 
@@ -262,6 +260,7 @@ if __name__ == '__main__':
     for inputs, outputs, FLAGS.model_name, FLAGS.model_version in requestGenerator(input_name, output_name, c, h, w, format,
                                     dtype, FLAGS):
         try:
+            print(outputs[0]._get_tensor())
             results.append(TRTISClient.infer(inputs, outputs, model_name=FLAGS.model_name, model_version=FLAGS.model_version))
         except InferenceServerException as e:
             print("inference failed: " + str(e))

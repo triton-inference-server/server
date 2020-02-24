@@ -158,11 +158,12 @@ SetInferenceRequestOptions(
 
   for (const auto& output : request.outputs()) {
     // FIXMEV2 parameters
-    // if (output.has_cls()) {
-    //  RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddClassificationOutput(
-    //      request_options, output.name().c_str(), output.cls().count()));
-    //} else
-    {
+    if (output.parameters().find("classification") !=
+        output.parameters().end()) {
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddClassificationOutput(
+          request_options, output.name().c_str(),
+          output.parameters().at("classification").int64_param()));
+    } else {
       RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddOutput(
           request_options, output.name().c_str()));
     }
