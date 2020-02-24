@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servers/http_server.h"
+#include "src/servers/http_server_v2.h"
 
 #include <event2/buffer.h>
 #include <evhtp/evhtp.h>
@@ -47,14 +47,14 @@
 namespace nvidia { namespace inferenceserver {
 
 // Generic HTTP server using evhtp
-class HTTPServerImpl : public HTTPServer {
+class HTTPServerV2Impl : public HTTPServerV2 {
  public:
-  explicit HTTPServerImpl(const int32_t port, const int thread_cnt)
+  explicit HTTPServerV2Impl(const int32_t port, const int thread_cnt)
       : port_(port), thread_cnt_(thread_cnt)
   {
   }
 
-  virtual ~HTTPServerImpl() { Stop(); }
+  virtual ~HTTPServerV2Impl() { Stop(); }
 
   static void Dispatch(evhtp_request_t* req, void* arg);
 
@@ -77,13 +77,13 @@ class HTTPServerImpl : public HTTPServer {
 };
 
 TRTSERVER_Error*
-HTTPServerImpl::Start()
+HTTPServerV2Impl::Start()
 {
   if (!worker_.joinable()) {
     evbase_ = event_base_new();
     htp_ = evhtp_new(evbase_, NULL);
     evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_NODELAY);
-    evhtp_set_gencb(htp_, HTTPServerImpl::Dispatch, this);
+    evhtp_set_gencb(htp_, HTTPServerV2Impl::Dispatch, this);
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
     evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024);
     // Set listening event for breaking event loop
@@ -99,7 +99,7 @@ HTTPServerImpl::Start()
 }
 
 TRTSERVER_Error*
-HTTPServerImpl::Stop()
+HTTPServerV2Impl::Stop()
 {
   if (worker_.joinable()) {
     // Notify event loop to break via fd write
@@ -119,31 +119,31 @@ HTTPServerImpl::Stop()
 }
 
 void
-HTTPServerImpl::StopCallback(int sock, short events, void* arg)
+HTTPServerV2Impl::StopCallback(int sock, short events, void* arg)
 {
   struct event_base* base = (struct event_base*)arg;
   event_base_loopbreak(base);
 }
 
 void
-HTTPServerImpl::Dispatch(evhtp_request_t* req, void* arg)
+HTTPServerV2Impl::Dispatch(evhtp_request_t* req, void* arg)
 {
-  (static_cast<HTTPServerImpl*>(arg))->Handle(req);
+  (static_cast<HTTPServerV2Impl*>(arg))->Handle(req);
 }
 
 
 // Handle HTTP requests to inference server APIs
-class HTTPAPIServer : public HTTPServerImpl {
+class HTTPAPIServerV2 : public HTTPServerV2Impl {
  public:
-  explicit HTTPAPIServer(
+  explicit HTTPAPIServerV2(
       const std::shared_ptr<TRTSERVER_Server>& server,
       const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
           trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const std::vector<std::string>& endpoints, const int32_t port,
       const int thread_cnt)
-      : HTTPServerImpl(port, thread_cnt), server_(server),
-        trace_manager_(trace_manager), shm_manager_(shm_manager),
+      : HTTPServerV2Impl(port, thread_cnt), server_(server),
+        trace_manager_(trace_manager), smb_manager_(smb_manager),
         allocator_(nullptr),
         api_regex_(R"(/v1/models/([^(/|:)]+)(:predict|/metadata)?)")
   {
@@ -159,7 +159,7 @@ class HTTPAPIServer : public HTTPServerImpl {
         "creating response allocator");
   }
 
-  ~HTTPAPIServer()
+  ~HTTPAPIServerV2()
   {
     LOG_TRTSERVER_ERROR(
         TRTSERVER_ResponseAllocatorDelete(allocator_),
@@ -259,7 +259,7 @@ class HTTPAPIServer : public HTTPServerImpl {
 };
 
 TRTSERVER_Error*
-HTTPAPIServer::ResponseAlloc(
+HTTPAPIServerV2::ResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
     int64_t preferred_memory_type_id, void* userp, void** buffer,
@@ -361,7 +361,7 @@ HTTPAPIServer::ResponseAlloc(
 }
 
 TRTSERVER_Error*
-HTTPAPIServer::ResponseRelease(
+HTTPAPIServerV2::ResponseRelease(
     TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
     size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
 {
@@ -374,7 +374,7 @@ HTTPAPIServer::ResponseRelease(
 }
 
 void
-HTTPAPIServer::Handle(evhtp_request_t* req)
+HTTPAPIServerV2::Handle(evhtp_request_t* req)
 {
   LOG_VERBOSE(1) << "HTTP V2 request: " << req->method << " "
                  << req->uri->path->full;
@@ -406,7 +406,7 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
 }
 
 void
-HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& model_name)
+HTTPAPIServerV2::HandleHealth(evhtp_request_t* req, const std::string& model_name)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -469,7 +469,7 @@ HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& model_name)
   TRTSERVER_ErrorDelete(err);
 }
 void
-HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& model_name)
+HTTPAPIServerV2::HandleStatus(evhtp_request_t* req, const std::string& model_name)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -543,7 +543,7 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& model_name)
 }
 
 TRTSERVER_Error*
-HTTPAPIServer::EVBufferToInput(
+HTTPAPIServerV2::EVBufferToInput(
     const std::string& model_name, const InferRequestHeader& request_header,
     const InferRequest& request,
     TRTSERVER_InferenceRequestProvider* request_provider,
@@ -637,7 +637,7 @@ HTTPAPIServer::EVBufferToInput(
 }
 
 void
-HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& model_name)
+HTTPAPIServerV2::HandleInfer(evhtp_request_t* req, const std::string& model_name)
 {
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -785,10 +785,10 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& model_name)
 }
 
 void
-HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
+HTTPAPIServerV2::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
-  HTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
+  HTTPAPIServerV2::InferRequestClass* infer_request =
+      reinterpret_cast<HTTPAPIServerV2::InferRequestClass*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_OK);
@@ -809,10 +809,10 @@ HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 }
 
 void
-HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
+HTTPAPIServerV2::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
-  HTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
+  HTTPAPIServerV2::InferRequestClass* infer_request =
+      reinterpret_cast<HTTPAPIServerV2::InferRequestClass*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_BADREQ);
@@ -832,7 +832,7 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   delete infer_request;
 }
 
-HTTPAPIServer::InferRequestClass::InferRequestClass(
+HTTPAPIServerV2::InferRequestClass::InferRequestClass(
     evhtp_request_t* req, uint64_t request_id, const char* server_id,
     uint64_t unique_id)
     : req_(req), request_id_(request_id), server_id_(server_id),
@@ -844,12 +844,12 @@ HTTPAPIServer::InferRequestClass::InferRequestClass(
 }
 
 void
-HTTPAPIServer::InferRequestClass::InferComplete(
+HTTPAPIServerV2::InferRequestClass::InferComplete(
     TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER_InferenceResponse* response, void* userp)
 {
-  HTTPAPIServer::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(userp);
+  HTTPAPIServerV2::InferRequestClass* infer_request =
+      reinterpret_cast<HTTPAPIServerV2::InferRequestClass*>(userp);
   for (auto buffer : std::get<0>(infer_request->response_meta_data_)) {
     evbuffer_add_buffer(infer_request->req_->buffer_out, buffer);
   }
@@ -866,7 +866,7 @@ HTTPAPIServer::InferRequestClass::InferComplete(
 }
 
 evhtp_res
-HTTPAPIServer::InferRequestClass::FinalizeResponse(
+HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     TRTSERVER_InferenceResponse* response)
 {
   InferResponseHeader response_header;
@@ -946,12 +946,12 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
 }
 
 TRTSERVER_Error*
-HTTPServer::CreateAPIServer(
+HTTPServerV2::CreateAPIServer(
     const std::shared_ptr<TRTSERVER_Server>& server,
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
-    std::vector<std::unique_ptr<HTTPServer>>* http_servers)
+    std::vector<std::unique_ptr<HTTPServerV2>>* http_servers)
 {
   if (port_map.empty()) {
     return TRTSERVER_ErrorNew(
@@ -963,8 +963,8 @@ HTTPServer::CreateAPIServer(
   for (auto const& ep_map : port_map) {
     std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
     LOG_INFO << "Starting HTTPV2Service at " << addr;
-    http_servers->emplace_back(new HTTPAPIServer(
-        server, trace_manager, shm_manager, ep_map.second, ep_map.first,
+    http_servers->emplace_back(new HTTPAPIServerV2(
+        server, trace_manager, smb_manager, ep_map.second, ep_map.first,
         thread_cnt));
   }
 

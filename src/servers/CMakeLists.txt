@@ -107,26 +107,30 @@ endif() # TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 set(HTTP_ENDPOINT_OBJECTS "")
 set(HTTP_ENDPOINT_LIBRARIES "")
 
-if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
+if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
   find_package(libevhtp CONFIG REQUIRED)
   message(STATUS "Using libevhtp ${libevhtp_VERSION}")
 
-  if(${TRTIS_ENABLE_HTTP_V2})
-    set(
-      HTTP_ENDPOINT_SRCS
-      http_v2_server.cc
-    )
-  else()
-    set(
+  if(${TRTIS_ENABLE_GRPC})
+    list(APPEND
       HTTP_ENDPOINT_SRCS
       http_server.cc
-    )
+      )
+    list(APPEND
+      HTTP_ENDPOINT_HDRS
+      http_server.h
+      )
+  endif() # TRTIS_ENABLE_GRPC
+  if(${TRTIS_ENABLE_HTTP_V2})
+    list(APPEND
+      HTTP_ENDPOINT_SRCS
+      http_server_v2.cc
+      )
+    list(APPEND
+      HTTP_ENDPOINT_HDRS
+      http_server_v2.h
+      )
   endif() # TRTIS_ENABLE_HTTP_V2
-
-  set(
-    HTTP_ENDPOINT_HDRS
-    http_server.h
-  )
 
   add_library(
     http-endpoint-library EXCLUDE_FROM_ALL OBJECT
@@ -138,6 +142,13 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
   endif() # TRTIS_ENABLE_GPU
 
   add_dependencies(http-endpoint-library proto-library)
+  if(${TRTIS_ENABLE_HTTP})
+    add_dependencies(http-endpoint-library grpc-library)
+  endif() # TRTIS_ENABLE_HTTP
+  if(${TRTIS_ENABLE_HTTP_V2})
+    add_dependencies(http-endpoint-library grpc-v2-library)
+  endif() # TRTIS_ENABLE_HTTP_V2
+
   target_include_directories(
     http-endpoint-library
     PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
@@ -148,13 +159,19 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
     $<TARGET_OBJECTS:http-endpoint-library>
     $<TARGET_OBJECTS:proto-library>
   )
-  if(${TRTIS_ENABLE_HTTP_V2})
-    set(
+  if(${TRTIS_ENABLE_HTTP})
+    list(APPEND
       HTTP_ENDPOINT_OBJECTS
-      ${HTTP_ENDPOINT_OBJECTS}
       $<TARGET_OBJECTS:grpc-library>
-    )
+      )
+  endif() # TRTIS_ENABLE_HTTP
+  if(${TRTIS_ENABLE_HTTP_V2})
+    list(APPEND
+      GRPC_ENDPOINT_OBJECTS
+      $<TARGET_OBJECTS:grpc-v2-library>
+      )
   endif() # TRTIS_ENABLE_HTTP_V2
+
   set(
     HTTP_ENDPOINT_LIBRARIES
     PRIVATE ${LIBEVENT_LIBRARIES}
@@ -162,15 +179,7 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
     PRIVATE protobuf::libprotobuf
     PRIVATE -lre2
   )
-  if(${TRTIS_ENABLE_HTTP_V2})
-    set(
-      HTTP_ENDPOINT_LIBRARIES
-      ${HTTP_ENDPOINT_LIBRARIES}
-      PRIVATE gRPC::grpc++
-      PRIVATE gRPC::grpc
-    )
-  endif() # TRTIS_ENABLE_HTTP_V2
-endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
+endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS || TRTIS_ENABLE_HTTP_V2
 
 #
 # tracing
