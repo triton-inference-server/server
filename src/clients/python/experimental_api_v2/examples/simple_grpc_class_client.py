@@ -39,6 +39,7 @@ import tensorrtserverV2.api.model_config_pb2 as mc
 
 FLAGS = None
 
+
 def parse_model(model_metadata, model_config):
     """
     Check the configuration of a model to make sure it meets the
@@ -150,10 +151,12 @@ def postprocess(results, output_name, batch_size):
     """
     Post-process results to show classifications.
     """
-    #if len(results.outputs) != 1:
-    #    raise Exception("expected 1 result, got {}".format(len(results.outputs)))
 
-    print(results.get_response())
+    output_array = results.as_numpy(output_name)
+    if not "VULTURE" in str(output_array[0][0]):
+        raise Exception(
+            "expected VULTURE as the first result, instead received: {}".format(
+                output_array[0][0]))
 
 
 def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
@@ -167,7 +170,7 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
 
     repeated_image_data = [image_data for _ in range(FLAGS.batch_size)]
     batched_image_data = np.stack(repeated_image_data, axis=0)
-    
+
     # Set the input data
     inputs[0].set_data_from_numpy(batched_image_data)
 
@@ -176,6 +179,7 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
     outputs[0].set_parameter("classification", 2)
 
     yield inputs, outputs, FLAGS.model_name, FLAGS.model_version
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -240,7 +244,7 @@ if __name__ == '__main__':
     except InferenceServerException as e:
         print("failed to retrieve the metadata: " + str(e))
         sys.exit()
-    
+
     try:
         model_config = TRTISClient.get_model_config(model_name=FLAGS.model_name)
     except InferenceServerException as e:
@@ -257,16 +261,19 @@ if __name__ == '__main__':
     results = []
 
     # Send request
-    for inputs, outputs, FLAGS.model_name, FLAGS.model_version in requestGenerator(input_name, output_name, c, h, w, format,
-                                    dtype, FLAGS):
+    for inputs, outputs, FLAGS.model_name, FLAGS.model_version in requestGenerator(
+            input_name, output_name, c, h, w, format, dtype, FLAGS):
         try:
-            print(outputs[0]._get_tensor())
-            results.append(TRTISClient.infer(inputs, outputs, model_name=FLAGS.model_name, model_version=FLAGS.model_version))
+            results.append(
+                TRTISClient.infer(inputs,
+                                  outputs,
+                                  model_name=FLAGS.model_name,
+                                  model_version=FLAGS.model_version))
         except InferenceServerException as e:
             print("inference failed: " + str(e))
             sys.exit()
 
     for result in results:
         postprocess(result, output_name, FLAGS.batch_size)
-    
+
     print("PASS : Classification ")

@@ -1591,11 +1591,11 @@ ModelInferHandler::InferComplete(
               cls_count = classes.cls().size();
               for (const auto& cls : classes.cls()) {
                 if (!cls.label().empty()) {
-                  output.mutable_contents()->add_string_contents(std::string(
+                  output.mutable_contents()->add_byte_contents(std::string(
                       std::to_string(cls.idx()) + ":" +
                       std::to_string(cls.value()) + ":" + cls.label()));
                 } else {
-                  output.mutable_contents()->add_string_contents(std::string(
+                  output.mutable_contents()->add_byte_contents(std::string(
                       std::to_string(cls.idx()) + ":" +
                       std::to_string(cls.value())));
                 }
