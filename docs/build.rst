@@ -201,9 +201,12 @@ different build process but you may have build or execution issues.
 Your build should produce the ONNX Runtime library, libonnxruntime.so.
 You can enable the ONNX Runtime backend in the inference server with
 the CMake option -DTRTIS_ENABLE_ONNXRUNTIME=ON as described below. If
-you want to enable OpenVino within the ONNX Runtime you must also
-specify the CMake option TRTIS_ENABLE_ONNXRUNTIME_OPENVINO=ON and
-provide the necessary OpenVino dependencies.
+you want to enable TensorRT within the ONNX Runtime you must also
+specify the CMake option TRTIS_ENABLE_ONNXRUNTIME_TENSORRT=ON and
+provide the necessary TensorRT dependencies. If you want to enable
+OpenVino within the ONNX Runtime you must also specify the CMake
+option TRTIS_ENABLE_ONNXRUNTIME_OPENVINO=ON and provide the necessary
+OpenVino dependencies.
 
 You can install the library in a system library path or you can
 specify the path with the CMake option TRTIS_EXTRA_LIB_PATHS. Multiple
