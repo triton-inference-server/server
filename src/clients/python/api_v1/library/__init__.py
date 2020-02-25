@@ -34,6 +34,7 @@ from numpy.ctypeslib import ndpointer
 import pkg_resources
 import struct
 import threading
+from google.protobuf import text_format
 import tensorrtserver.api.model_config_pb2
 from tensorrtserver.api.server_status_pb2 import ModelRepositoryIndex
 from tensorrtserver.api.server_status_pb2 import ServerStatus
@@ -626,10 +627,8 @@ class ServerStatusContext:
         self._last_request_id = _raise_if_error(
             c_void_p(_crequest_status_ctx_get(
                 self._ctx, byref(cstatus), byref(cstatus_len))))
-        status_buf = cast(cstatus, POINTER(c_byte * cstatus_len.value))[0]
 
-        status = ServerStatus()
-        status.ParseFromString(status_buf)
+        status = text_format.Parse(cstatus.value.decode(), ServerStatus())
         return status
 
     def get_last_request_id(self):
@@ -1021,10 +1020,8 @@ class SharedMemoryControlContext:
         self._last_request_id = _raise_if_error(
             c_void_p(_crequest_shm_control_ctx_get_status(
                 self._ctx, byref(cstatus), byref(cstatus_len))))
-        status_buf = cast(cstatus, POINTER(c_byte * cstatus_len.value))[0]
 
-        status = SharedMemoryStatus()
-        status.ParseFromString(status_buf)
+        status = text_format.Parse(cstatus.value.decode(), SharedMemoryStatus())
         return status
 
     def get_last_request_id(self):

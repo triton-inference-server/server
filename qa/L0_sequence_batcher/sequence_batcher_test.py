@@ -40,28 +40,38 @@ import test_util as tu
 import sequence_util as su
 from tensorrtserver.api import *
 
-_test_system_shared_memory = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-_test_cuda_shared_memory = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel netdef onnx plan custom")
+ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 
-_no_batching = (int(os.environ['NO_BATCHING']) == 1)
-_model_instances = int(os.environ['MODEL_INSTANCES'])
+NO_BATCHING = (int(os.environ['NO_BATCHING']) == 1)
+MODEL_INSTANCES = int(os.environ['MODEL_INSTANCES'])
 
-if _no_batching:
-    _trials = ("savedmodel_nobatch", "graphdef_nobatch", "netdef_nobatch", "plan_nobatch", "onnx_nobatch")
+_trials = ()
+if NO_BATCHING:
+    for backend in BACKENDS.split(' '):
+        if (backend != "libtorch") and (backend != 'custom'):
+            _trials + (backend + "_nobatch",)
 elif os.environ['BATCHER_TYPE'] == "VARIABLE":
-    _trials = ("savedmodel", "graphdef", "netdef", "onnx")
+    for backend in BACKENDS.split(' '):
+        if (backend != "libtorch") and (backend != 'custom') and (backend != 'plan'):
+            _trials + (backend,)
 else:
-    _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan", "onnx")
+    _trials = BACKENDS.split(' ')
+
 # Add ensemble to the _trials
 ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
-res = []
-for trial in _trials:
-    res.append(trial)
-    if ("custom" in trial):
-        continue
-    for ensemble_prefix in ENSEMBLE_PREFIXES:
-        res.append(ensemble_prefix + trial)
-_trials = tuple(res)
+
+if ENSEMBLES:
+    res = []
+    for trial in _trials:
+        res.append(trial)
+        if ("custom" in trial):
+            continue
+        for ensemble_prefix in ENSEMBLE_PREFIXES:
+            res.append(ensemble_prefix + trial)
+    _trials = tuple(res)
 
 _ragged_batch_supported_trials = list()
 if "custom" in _trials:
@@ -95,7 +105,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # couldn't implement the full accumulator. See
         # qa/common/gen_qa_sequence_models.py for more
         # information.
-        if ((not _no_batching and ("custom" not in trial)) or
+        if ((not NO_BATCHING and ("custom" not in trial)) or
             ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial) or
             ("onnx" in trial))  or ("libtorch" in trial):
             expected_result = value
@@ -173,7 +183,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # When 4 model instances the max-batch-size is 1 so can't test
         # since that gives a different error: "batch-size 2 exceeds
         # maximum batch size"
-        if (_model_instances == 4) or _no_batching:
+        if (MODEL_INSTANCES == 4) or NO_BATCHING:
             return
 
         for trial in _trials:
@@ -439,11 +449,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), 4 * min(2, _model_instances), 8)
+                self.check_status(model_name, (1,), 4 * min(2, MODEL_INSTANCES), 8)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
-                if _test_system_shared_memory or _test_cuda_shared_memory:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)
                     self.cleanup_shm_regions(precreated_shm1_handles)
 
@@ -526,16 +536,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                if _model_instances == 1:
+                if MODEL_INSTANCES == 1:
                     self.check_status(model_name, (1,), 4, 12)
-                elif _model_instances == 2:
+                elif MODEL_INSTANCES == 2:
                     self.check_status(model_name, (1,), 8, 12)
-                elif _model_instances == 4:
+                elif MODEL_INSTANCES == 4:
                     self.check_status(model_name, (1,), 12, 12)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
-                if _test_system_shared_memory or _test_cuda_shared_memory:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)
                     self.cleanup_shm_regions(precreated_shm1_handles)
                     self.cleanup_shm_regions(precreated_shm2_handles)
@@ -617,11 +627,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), 3 * _model_instances, 12)
+                self.check_status(model_name, (1,), 3 * MODEL_INSTANCES, 12)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
-                if _test_system_shared_memory or _test_cuda_shared_memory:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)
                     self.cleanup_shm_regions(precreated_shm1_handles)
                     self.cleanup_shm_regions(precreated_shm2_handles)
@@ -636,7 +646,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
         # Only works with 1 model instance since want to test all
         # sequences batching together.
-        if _model_instances != 1:
+        if MODEL_INSTANCES != 1:
             return
 
         for trial in _ragged_batch_not_supported_trials:
@@ -722,7 +732,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
-                if _test_system_shared_memory or _test_cuda_shared_memory:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)
                     self.cleanup_shm_regions(precreated_shm1_handles)
                     self.cleanup_shm_regions(precreated_shm2_handles)
@@ -737,7 +747,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
         # Only works with 1 model instance since want to test all
         # sequences batching together.
-        if _model_instances != 1:
+        if MODEL_INSTANCES != 1:
             return
 
         for trial in _ragged_batch_supported_trials:
@@ -823,7 +833,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
-                if _test_system_shared_memory or _test_cuda_shared_memory:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)
                     self.cleanup_shm_regions(precreated_shm1_handles)
                     self.cleanup_shm_regions(precreated_shm2_handles)
@@ -918,11 +928,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), (3 * _model_instances) + 3, 15)
+                self.check_status(model_name, (1,), (3 * MODEL_INSTANCES) + 3, 15)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
-                if _test_system_shared_memory or _test_cuda_shared_memory:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)
                     self.cleanup_shm_regions(precreated_shm1_handles)
                     self.cleanup_shm_regions(precreated_shm2_handles)
@@ -939,7 +949,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # Only works with 1 model instance since otherwise an instance
         # can run ahead and handle more work than expected (leads to
         # intermittent failures)
-        if _model_instances != 1:
+        if MODEL_INSTANCES != 1:
             return
 
         for trial in _trials:
@@ -1036,11 +1046,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), (3 * _model_instances), 12)
+                self.check_status(model_name, (1,), (3 * MODEL_INSTANCES), 12)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
-                if _test_system_shared_memory or _test_cuda_shared_memory:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)
                     self.cleanup_shm_regions(precreated_shm1_handles)
                     self.cleanup_shm_regions(precreated_shm2_handles)
@@ -1059,7 +1069,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # Only works with 1 model instance since otherwise an instance
         # can run ahead and handle more work than expected (leads to
         # intermittent failures)
-        if _model_instances != 1:
+        if MODEL_INSTANCES != 1:
             return
 
         for trial in _trials:
@@ -1158,11 +1168,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), (3 * _model_instances) + 2, 14)
+                self.check_status(model_name, (1,), (3 * MODEL_INSTANCES) + 2, 14)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
-                if _test_system_shared_memory or _test_cuda_shared_memory:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)
                     self.cleanup_shm_regions(precreated_shm1_handles)
                     self.cleanup_shm_regions(precreated_shm2_handles)
@@ -1262,11 +1272,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), (3 * _model_instances) + 2, 14)
+                self.check_status(model_name, (1,), (3 * MODEL_INSTANCES) + 2, 14)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
-                if _test_system_shared_memory or _test_cuda_shared_memory:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)
                     self.cleanup_shm_regions(precreated_shm1_handles)
                     self.cleanup_shm_regions(precreated_shm2_handles)
@@ -1287,7 +1297,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # Only works with 1 model instance since otherwise an instance
         # can run ahead and handle more work than expected (leads to
         # intermittent failures)
-        if _model_instances != 1:
+        if MODEL_INSTANCES != 1:
             return
 
         for trial in _trials:
@@ -1378,11 +1388,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), 4 * _model_instances, 16)
+                self.check_status(model_name, (1,), 4 * MODEL_INSTANCES, 16)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
-                if _test_system_shared_memory or _test_cuda_shared_memory:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)
                     self.cleanup_shm_regions(precreated_shm1_handles)
                     self.cleanup_shm_regions(precreated_shm2_handles)
@@ -1402,7 +1412,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # Only works with 1 model instance since otherwise an instance
         # can run ahead and handle more work than expected (leads to
         # intermittent failures)
-        if _model_instances != 1:
+        if MODEL_INSTANCES != 1:
             return
 
         for trial in _trials:
@@ -1513,7 +1523,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             "model '{}' must specify the START flag on the first " +
                             "request of the sequence").format(model_name)))
             finally:
-                if _test_system_shared_memory or _test_cuda_shared_memory:
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)
                     self.cleanup_shm_regions(precreated_shm1_handles)
                     self.cleanup_shm_regions(precreated_shm2_handles)
