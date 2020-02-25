@@ -157,8 +157,9 @@ Context::Init()
         scaling_ = ScaleType::INCEPTION;
       } else if (pr.second.string_value() == "ONE255") {
         scaling_ = ScaleType::ONE255;
-      } else if (pr.second.string_value() == "NONE" ||
-                 pr.second.string_value().length() == 0) {
+      } else if (
+          pr.second.string_value() == "NONE" ||
+          pr.second.string_value().length() == 0) {
         scaling_ = NONE;
       } else {
         return kScaleType;

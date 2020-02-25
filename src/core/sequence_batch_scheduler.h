@@ -79,8 +79,9 @@ class SequenceBatchScheduler : public Scheduler {
     uint32_t seq_slot_;
   };
 
-  // Show that a sequence slot is no longer being used.
-  bool ReleaseSequenceSlot(
+  // Fill a sequence slot with a sequence from the backlog or show
+  // that the sequence slot is no longer being used.
+  CorrelationID ReleaseSequenceSlot(
       const BatcherSequenceSlot& seq_slot,
       std::deque<Scheduler::Payload>* payloads);
 
