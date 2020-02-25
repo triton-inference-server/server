@@ -676,7 +676,7 @@ StopEndpoints()
     }
   }
 
-  http_services_.clear();
+  http_services_v2_.clear();
 #endif  // TRTIS_ENABLE_HTTP_V2
 
 #ifdef TRTIS_ENABLE_GRPC
