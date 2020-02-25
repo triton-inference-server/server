@@ -604,10 +604,30 @@ class InferOutput:
         """
         self._output.data_format = data_format
 
-    # FIXMEPV2: Add parameter support
-    @property
-    def parameters(self):
-        raise_error("Not implemented yet")
+    def set_parameter(self, key, value):
+        """Adds the specified key-value pair in the requested output parameters
+
+        Parameter
+        ---------
+        key : str
+            The name of the parameter to be included in the request. 
+        value : str/int/bool
+            The value of the parameter
+        
+        """
+        if not type(key) is str:
+            raise_error(
+                "only string data type for key is supported in parameters")
+
+        param = self._output.parameters[key]
+        if type(value) is int:
+            param.int64_param = value
+        elif type(value) is bool:
+            param.bool_param = value
+        elif type(value) is str:
+            param.string_param = value
+        else:
+            raise_error("unsupported value type for the parameter")
 
     def _get_tensor(self):
         """Retrieve the underlying InferRequestedOutputTensor message.
@@ -648,26 +668,29 @@ class InferResult:
             The numpy array containing the response data for the tensor or
             None if the data for specified tensor name is not found.
         """
-        for self._output in self._result.outputs:
-            if self._output.name == name:
-                self._shape = []
-                for self._value in self._output.shape:
-                    self._shape.append(self._value)
+        for output in self._result.outputs:
+            if output.name == name:
+                shape = []
+                for value in output.shape:
+                    shape.append(value)
 
-                self._datatype = self._output.datatype
-                if self._datatype == 'STRING':
-                    # String results contain a 4-byte string length
-                    # followed by the actual string characters. Hence,
-                    # need to decode the raw bytes to convert into
-                    # array elements.
-                    self._np_array = deserialize_string_tensor(
-                        self._output.contents.raw_contents)
-                else:
-                    self._np_array = np.frombuffer(
-                        self._output.contents.raw_contents,
-                        dtype=trtis_to_np_dtype(self._datatype))
-                self._np_array = np.resize(self._np_array, self._shape)
-                return self._np_array
+                datatype = output.datatype
+                if len(output.contents.raw_contents) != 0:
+                    if datatype == 'STRING':
+                        # String results contain a 4-byte string length
+                        # followed by the actual string characters. Hence,
+                        # need to decode the raw bytes to convert into
+                        # array elements.
+                        np_array = deserialize_string_tensor(
+                            output.contents.raw_contents)
+                    else:
+                        np_array = np.frombuffer(
+                            output.contents.raw_contents,
+                            dtype=trtis_to_np_dtype(datatype))
+                elif len(output.contents.byte_contents) != 0:
+                    np_array = np.array(output.contents.byte_contents)
+                np_array = np.resize(np_array, shape)
+                return np_array
         return None
 
     def get_request(self, as_json=False):
