@@ -34,7 +34,7 @@
 #include <thread>
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
-#include "src/core/grpc_service.grpc.pb.h"
+#include "src/core/grpc_service_v2.grpc.pb.h"
 #include "src/core/logging.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
@@ -194,15 +194,8 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
 
     std::vector<evbuffer*> response_buffer_;
     TensorShmMap* shm_map_;
-    InferRequest infer_request_;
+    ModelInferRequest infer_request_;
   };
-
-  // using ResponseMetaData = std::tuple<
-  //     std::vector<evbuffer*>,
-  //     std::unordered_map<
-  //         std::string,
-  //         std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>,
-  //     InferRequest>;
 
   // Class object associated to evhtp thread, requests received are bounded
   // with the thread that accepts it. Need to keep track of that and let the
@@ -265,8 +258,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle);
 #endif  // TRTIS_ENABLE_GPU
   TRTSERVER_Error* EVBufferToInput(
-      const std::string& model_name, const InferRequestHeader& request_header,
-      const InferRequest& request,
+      const std::string& model_name, const ModelInferRequest& request,
       TRTSERVER_InferenceRequestProvider* request_provider,
       TensorShmMap* shm_map);
 
@@ -581,16 +573,14 @@ HTTPAPIServerV2::HandleStatus(
 
 TRTSERVER_Error*
 HTTPAPIServerV2::EVBufferToInput(
-    const std::string& model_name, const InferRequestHeader& request_header,
-    const InferRequest& request,
+    const std::string& model_name, const ModelInferRequest& request,
     TRTSERVER_InferenceRequestProvider* request_provider, TensorShmMap* shm_map)
 {
   // Extract input data from HTTP body and register in
   // 'request_provider'.
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
-  size_t idx = 0;
-  for (const auto& io : request_header.input()) {
+  for (const auto& io : request.inputs()) {
     uint64_t byte_size = 0;
     RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
         request_provider, io.name().c_str(), &byte_size));
@@ -605,6 +595,7 @@ HTTPAPIServerV2::EVBufferToInput(
     } else {
       // If input is in shared memory then verify that the size is
       // correct and set input from the shared memory.
+#if 0
       if (io.has_shared_memory()) {
         if (byte_size != io.shared_memory().byte_size()) {
           return TRTSERVER_ErrorNew(
@@ -626,8 +617,11 @@ HTTPAPIServerV2::EVBufferToInput(
         RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
             request_provider, io.name().c_str(), base, byte_size, memory_type,
             memory_type_id));
-      } else {
-        const std::string& raw = request.raw_input(idx++);
+      }
+      else {
+#endif
+        // FIXMEV2 handle non-raw content types
+        const std::string& raw = io.contents().raw_contents();
         const void* base = raw.c_str();
         size_t request_byte_size = raw.size();
 
@@ -644,12 +638,15 @@ HTTPAPIServerV2::EVBufferToInput(
         RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
             request_provider, io.name().c_str(), base, byte_size,
             TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+#if 0
       }
+#endif
     }
   }
 
+#if 0
   // Initialize System Memory for Output if it uses shared memory
-  for (const auto& io : request_header.output()) {
+  for (const auto& io : request.outputs()) {
     if (io.has_shared_memory()) {
       void* base;
       TRTSERVER_Memory_Type memory_type;
@@ -665,6 +662,7 @@ HTTPAPIServerV2::EVBufferToInput(
               memory_type, memory_type_id));
     }
   }
+#endif
 
   return nullptr;  // success
 }
@@ -756,8 +754,7 @@ HTTPAPIServerV2::HandleInfer(
     }
 
     err = EVBufferToInput(
-        model_name, request_header_protobuf,
-        infer_request->response_meta_data_.infer_request_, request_provider,
+        model_name, infer_request->response_meta_data_.infer_request_, request_provider,
         infer_request->response_meta_data_.shm_map_);
     if (err == nullptr) {
       // Provide the trace manager object to use for this request, if nullptr
