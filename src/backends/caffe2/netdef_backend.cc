@@ -366,8 +366,8 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
   // 'buffer'.
   std::vector<size_t> expected_byte_sizes;
   for (auto& payload : *payloads) {
-    const InferenceRequest& irequest = payload.request_provider_->Request();
-    expected_byte_sizes.push_back(irequest.BatchSize() * batch1_byte_size);
+    const auto& irequest = payload.request_provider_->Request();
+    expected_byte_sizes.push_back(irequest->BatchSize() * batch1_byte_size);
   }
 
   *cuda_copy |= SetInputBuffer(name, expected_byte_sizes, payloads, input);
@@ -494,7 +494,7 @@ NetDefBackend::Context::Run(
               name_ + "'");
     }
 
-    total_batch_size += payload.request_provider_->Request().BatchSize();
+    total_batch_size += payload.request_provider_->Request()->BatchSize();
 
     // All payloads must have equally-sized input tensors so use any
     // payload as the representative for the input tensors.
@@ -528,7 +528,7 @@ NetDefBackend::Context::Run(
 
   // Inputs from the request...
   bool cuda_copy = false;
-  for (const auto& pr : input_request_provider->Request().Inputs()) {
+  for (const auto& pr : input_request_provider->Request()->Inputs()) {
     const auto& input = pr.second;
     const std::string& name = input.Name();
 

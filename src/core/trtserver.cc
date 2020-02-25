@@ -1130,8 +1130,17 @@ TRTSERVER_InferenceRequestProviderSetInputData(
       reinterpret_cast<TrtInferenceRequest*>(request_provider);
   const auto& lrequest = ltrtrequest->Request();
 
-  lrequest->AppendInputData(
-      input_name, base, byte_size, memory_type, memory_type_id);
+  auto* inputs = lrequest->MutableInputs();
+  auto it = inputs->find(input_name);
+  if (it == inputs->end()) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string("input '" + std::string(input_name) + "' does not exist")
+            .c_str());
+  }
+
+  it->second.AppendData(base, byte_size, memory_type, memory_type_id);
+
   return nullptr;  // Success
 }
 
@@ -1815,13 +1824,13 @@ TRTSERVER_ServerInferAsync(
 
   std::shared_ptr<ni::InferRequestProvider> infer_request_provider;
   RETURN_IF_STATUS_ERROR(
-      ni::InferRequestProvider::Create(*lrequest, &infer_request_provider));
+      ni::InferRequestProvider::Create(lrequest, &infer_request_provider));
 
   std::shared_ptr<ni::InferResponseProvider> infer_response_provider;
   {
     std::shared_ptr<ni::InferResponseProvider> del_response_provider;
     RETURN_IF_STATUS_ERROR(ni::InferResponseProvider::Create(
-        *lrequest, lbackend->GetLabelProvider(), response_allocator,
+        lrequest, lbackend->GetLabelProvider(), response_allocator,
         lresponsealloc->AllocFn(), response_allocator_userp,
         lresponsealloc->ReleaseFn(), &del_response_provider));
     infer_response_provider = del_response_provider;

@@ -358,8 +358,8 @@ BackendContext::SetFixedSizeOutputBuffer(
   output->indirect_buffers_.emplace_back();
   for (size_t idx = 0; idx < payloads->size(); idx++) {
     auto& payload = (*payloads)[idx];
-    const InferenceRequest& irequest = payload.request_provider_->Request();
-    const size_t expected_byte_size = irequest.BatchSize() * batch1_byte_size;
+    const auto& irequest = payload.request_provider_->Request();
+    const size_t expected_byte_size = irequest->BatchSize() * batch1_byte_size;
 
     // If 'payload' should have valid output (status ok) and
     // if 'payload' requested this output then copy it from
@@ -514,7 +514,7 @@ BackendContext::SetOutputShapeTensorBuffer(
   int shape_index = (support_batching ? 1 : 0);
   int nb_shape_values = content_shape[shape_index];
   for (auto& payload : *payloads) {
-    int this_batch_size = payload.request_provider_->Request().BatchSize();
+    int this_batch_size = payload.request_provider_->Request()->BatchSize();
     // Fix the content shape for this payload
     if (support_batching) {
       content_shape[0] = this_batch_size;

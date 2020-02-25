@@ -327,11 +327,11 @@ CustomBackend::Context::Run(
               name_ + "'");
     }
 
-    const InferenceRequest& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_provider_->Request();
 
-    total_batch_size += irequest.BatchSize();
-    total_inputs += irequest.Inputs().size();
-    total_requested_outputs += irequest.RequestedOutputs().size();
+    total_batch_size += irequest->BatchSize();
+    total_inputs += irequest->Inputs().size();
+    total_requested_outputs += irequest->RequestedOutputs().size();
   }
 
   // If there are no valid payloads then no need to run the
@@ -384,18 +384,18 @@ CustomBackend::Context::Run(
   // that here.
   std::vector<CustomPayload> custom_payloads;
   for (auto& payload : *payloads) {
-    const InferenceRequest& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_provider_->Request();
 
     custom_payloads.emplace_back();
     CustomPayload& custom_payload = custom_payloads.back();
-    custom_payload.batch_size = irequest.BatchSize();
+    custom_payload.batch_size = irequest->BatchSize();
 
     // Inputs
-    custom_payload.input_cnt = irequest.Inputs().size();
+    custom_payload.input_cnt = irequest->Inputs().size();
     custom_payload.input_names = nullptr;
     custom_payload.input_shape_dim_cnts = nullptr;
     custom_payload.input_shape_dims = nullptr;
-    for (const auto& pr : irequest.Inputs()) {
+    for (const auto& pr : irequest->Inputs()) {
       const auto& input = pr.second;
 
       // If the input has fixed size then use the pre-calculated
@@ -427,9 +427,9 @@ CustomBackend::Context::Run(
     }
 
     // Outputs
-    custom_payload.output_cnt = irequest.RequestedOutputs().size();
+    custom_payload.output_cnt = irequest->RequestedOutputs().size();
     custom_payload.required_output_names = nullptr;
-    for (const auto& pr : irequest.RequestedOutputs()) {
+    for (const auto& pr : irequest->RequestedOutputs()) {
       const auto& output = pr.second;
       work_output_name_ptrs.push_back(output.Name().c_str());
       if (custom_payload.required_output_names == nullptr) {

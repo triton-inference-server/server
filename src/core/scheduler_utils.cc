@@ -39,8 +39,8 @@ InitPendingShape(
 {
   pending_batch_shapes->clear();
 
-  const InferenceRequest& irequest = payload.request_provider_->Request();
-  for (const auto& pr : irequest.Inputs()) {
+  const auto& irequest = payload.request_provider_->Request();
+  for (const auto& pr : irequest->Inputs()) {
     const auto& input = pr.second;
     const auto itr = enforce_equal_shape_tensors.find(input.Name());
     if (itr != enforce_equal_shape_tensors.end()) {
@@ -67,9 +67,9 @@ CompareWithPendingShape(
     const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
     const PendingBatchShapes& pending_batch_shapes)
 {
-  const InferenceRequest& irequest = payload.request_provider_->Request();
+  const auto& irequest = payload.request_provider_->Request();
 
-  for (const auto& pr : irequest.Inputs()) {
+  for (const auto& pr : irequest->Inputs()) {
     const auto& input = pr.second;
     const auto itr = pending_batch_shapes.find(input.Name());
     if (itr != pending_batch_shapes.end()) {
