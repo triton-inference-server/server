@@ -158,11 +158,19 @@ SetInferenceRequestOptions(
 
   for (const auto& output : request.outputs()) {
     // FIXMEV2 parameters
-    // if (output.has_cls()) {
-    //  RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddClassificationOutput(
-    //      request_options, output.name().c_str(), output.cls().count()));
-    //} else
-    {
+    if (output.parameters().find("classification") !=
+        output.parameters().end()) {
+      const auto& infer_param = output.parameters().at("classification");
+      if (infer_param.parameter_choice_case() !=
+          InferParameter::ParameterChoiceCase::kInt64Param) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            "invalid value type for 'classification' parameter, expected "
+            "int64_param.");
+      }
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddClassificationOutput(
+          request_options, output.name().c_str(), infer_param.int64_param()));
+    } else {
       RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddOutput(
           request_options, output.name().c_str()));
     }

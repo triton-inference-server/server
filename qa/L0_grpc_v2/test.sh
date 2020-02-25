@@ -45,7 +45,7 @@ RET=0
         rapidjson-dev && \
     rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python && \
-    pip3 install numpy && \
+    pip3 install numpy Pillow && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools)
 if [ $? -eq 0 ]; then
@@ -95,12 +95,22 @@ SIMPLE_HEALTH_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grp
 SIMPLE_INFER_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_infer_client.py
 SIMPLE_ASYNC_INFER_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_async_infer_client.py
 SIMPLE_STRING_INFER_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_string_infer_client.py
+SIMPLE_CLASS_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_class_client.py
 
 rm -f *.log
 rm -f *.log.*
 (rm -fr models && mkdir models && \
     cp -r /workspace/docs/examples/model_repository/simple models/. && \
-    cp -r /workspace/docs/examples/model_repository/simple_string models/.)
+    cp -r /workspace/docs/examples/model_repository/simple_string models/. && \
+    cp -r /workspace/docs/examples/model_repository/inception_graphdef models/.)
+
+# Get the TensorFlow inception model
+mkdir -p models/inception_graphdef/1
+wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
+     https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz
+(cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
+mv /tmp/inception_v3_2016_08_28_frozen.pb models/inception_graphdef/1/model.graphdef
+
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
 SERVER=/opt/tensorrtserver/bin/trtserver
@@ -130,14 +140,21 @@ if [ $(cat ${CLIENT_LOG}.health | grep "PASS" | wc -l) -ne 7 ]; then
     RET=1
 fi
 
+IMAGE=../images/vulture.jpeg
 for i in \
         $SIMPLE_INFER_CLIENT \
         $SIMPLE_ASYNC_INFER_CLIENT \
         $SIMPLE_STRING_INFER_CLIENT \
+        $SIMPLE_CLASS_CLIENT \
         ; do
-BASE=$(basename -- $i)
-SUFFIX="${BASE%.*}"
-    python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+    BASE=$(basename -- $i)
+    SUFFIX="${BASE%.*}"
+    if [ $SUFFIX == "simple_grpc_class_client" ]; then
+        python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+    else
+        python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+    fi
+
     if [ $? -ne 0 ]; then
         cat "${CLIENT_LOG}.${SUFFIX}"
         RET=1
