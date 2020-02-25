@@ -53,6 +53,9 @@ static_assert(
 #if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
 #include "src/servers/http_server.h"
 #endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
+#if defined(TRTIS_ENABLE_HTTP_V2)
+#include "src/servers/http_server_v2.h"
+#endif  // TRTIS_ENABLE_HTTP_V2
 
 #ifdef TRTIS_ENABLE_GRPC
 #include "src/servers/grpc_server.h"
@@ -79,21 +82,26 @@ bool allow_model_control_ = false;
 // The HTTP, GRPC and metrics service/s and ports. Initialized to
 // default values and modifyied based on command-line args. Set to -1
 // to indicate the protocol is disabled.
+// Default to using the V1 protocol.
+int32_t api_version_ = 1;
 #ifdef TRTIS_ENABLE_HTTP
 std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>
     http_services_;
+std::vector<std::string> endpoint_names = {
+    "status",    "health", "infer", "modelcontrol", "sharedmemorycontrol",
+    "repository"};
+#endif  // TRTIS_ENABLE_HTTP
+#ifdef TRTIS_ENABLE_HTTP_V2
+std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServerV2>>
+    http_services_v2_;
+std::vector<std::string> endpoint_names_v2 = {"health", "infer"};
+#endif  // TRTIS_ENABLE_HTTP_V2
+#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
 bool allow_http_ = true;
 int32_t http_port_ = 8000;
 int32_t http_health_port_ = -1;
 std::vector<int32_t> http_ports_;
-#ifdef TRTIS_ENABLE_HTTP_V2
-std::vector<std::string> endpoint_names = {"health", "infer"};
-#else
-std::vector<std::string> endpoint_names = {
-    "status",    "health", "infer", "modelcontrol", "sharedmemorycontrol",
-    "repository"};
-#endif  // TRTIS_ENABLE_HTTP_V2
-#endif  // TRTIS_ENABLE_HTTP
+#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
 
 #ifdef TRTIS_ENABLE_GRPC
 std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
@@ -103,7 +111,6 @@ std::unique_ptr<nvidia::inferenceserver::GRPCServerV2> grpc_service_v2_;
 #endif  // TRTIS_ENABLE_GRPC_V2
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
 bool allow_grpc_ = true;
-int32_t api_version_ = 1;
 int32_t grpc_port_ = 8001;
 #endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 
@@ -135,10 +142,10 @@ int grpc_stream_infer_thread_cnt_ = 1;
 int grpc_infer_allocation_pool_size_ = 8;
 #endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 
-#ifdef TRTIS_ENABLE_HTTP
+#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
 // The number of threads to initialize for the HTTP front-end.
 int http_thread_cnt_ = 8;
-#endif  // TRTIS_ENABLE_HTTP
+#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
 
 // Command-line options
 enum OptionId {
@@ -154,15 +161,15 @@ enum OptionId {
   OPTION_EXIT_ON_ERROR,
   OPTION_STRICT_MODEL_CONFIG,
   OPTION_STRICT_READINESS,
-#ifdef TRTIS_ENABLE_HTTP
+  OPTION_API_VERSION,
+#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
   OPTION_ALLOW_HTTP,
   OPTION_HTTP_PORT,
   OPTION_HTTP_HEALTH_PORT,
   OPTION_HTTP_THREAD_COUNT,
-#endif  // TRTIS_ENABLE_HTTP
+  #endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
   OPTION_ALLOW_GRPC,
-  OPTION_API_VERSION,
   OPTION_GRPC_PORT,
   OPTION_GRPC_INFER_THREAD_COUNT,
   OPTION_GRPC_STREAM_INFER_THREAD_COUNT,
@@ -247,7 +254,10 @@ std::vector<Option> options_
        "is responsive and all models are available. If false "
        "/api/health/ready endpoint indicates ready if server is responsive "
        "even if some/all models are unavailable."},
-#ifdef TRTIS_ENABLE_HTTP
+      {OPTION_API_VERSION, "api-version",
+       "Version of the GRPC/HTTP API to use. Default is version 1. Allowed "
+       "versions are 1 and 2."},
+#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
       {OPTION_ALLOW_HTTP, "allow-http",
        "Allow the server to listen for HTTP requests."},
       {OPTION_HTTP_PORT, "http-port",
@@ -256,13 +266,10 @@ std::vector<Option> options_
        "The port for the server to listen on for HTTP Health requests."},
       {OPTION_HTTP_THREAD_COUNT, "http-thread-count",
        "Number of threads handling HTTP requests."},
-#endif  // TRTIS_ENABLE_HTTP
+#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
       {OPTION_ALLOW_GRPC, "allow-grpc",
        "Allow the server to listen for GRPC requests."},
-      {OPTION_API_VERSION, "api-version",
-       "Version of the GRPC/HTTP API to use. Default is version 1. Allowed "
-       "versions are 1 and 2."},
       {OPTION_GRPC_PORT, "grpc-port",
        "The port for the server to listen on for GRPC requests."},
       {OPTION_GRPC_INFER_THREAD_COUNT, "grpc-infer-thread-count",
@@ -379,7 +386,7 @@ SignalHandler(int signum)
 bool
 CheckPortCollision()
 {
-#if defined(TRTIS_ENABLE_HTTP) && \
+#if (defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)) && \
     (defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2))
   // Check if HTTP and GRPC have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), grpc_port_) !=
@@ -389,7 +396,7 @@ CheckPortCollision()
               << "and GRPC requests at the same port" << std::endl;
     return true;
   }
-#endif  // TRTIS_ENABLE_HTTP && (TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2)
+#endif  // (TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2) && (TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2)
 
 #if (defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)) && \
     defined(TRTIS_ENABLE_METRICS)
@@ -496,6 +503,38 @@ StartHttpService(
 }
 #endif  // TRTIS_ENABLE_HTTP
 
+#ifdef TRTIS_ENABLE_HTTP_V2
+TRTSERVER_Error*
+StartHttpService(
+    std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServerV2>>* services,
+    const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
+    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>&
+        smb_manager,
+    std::map<int32_t, std::vector<std::string>>& port_map)
+{
+  TRTSERVER_Error* err = nvidia::inferenceserver::HTTPServerV2::CreateAPIServer(
+      server, trace_manager, smb_manager, port_map, http_thread_cnt_, services);
+  if (err == nullptr) {
+    for (auto& http_eps : *services) {
+      if (http_eps != nullptr) {
+        err = http_eps->Start();
+      }
+    }
+  }
+
+  if (err != nullptr) {
+    for (auto& http_eps : *services) {
+      if (http_eps != nullptr) {
+        http_eps.reset();
+      }
+    }
+  }
+
+  return err;
+}
+#endif  // TRTIS_ENABLE_HTTP_V2
+
 #ifdef TRTIS_ENABLE_METRICS
 TRTSERVER_Error*
 StartMetricsService(
@@ -553,7 +592,7 @@ StartEndpoints(
 
 #ifdef TRTIS_ENABLE_HTTP
   // Enable HTTP endpoints if requested...
-  if (allow_http_) {
+  if (allow_http_ && (api_version_ == 1)) {
     std::map<int32_t, std::vector<std::string>> port_map;
 
     // Group by port numbers
@@ -571,6 +610,27 @@ StartEndpoints(
     }
   }
 #endif  // TRTIS_ENABLE_HTTP
+
+#ifdef TRTIS_ENABLE_HTTP_V2
+  // Enable HTTP endpoints if requested...
+  if (allow_http_ && (api_version_ == 2)) {
+    std::map<int32_t, std::vector<std::string>> port_map;
+
+    // Group by port numbers
+    for (size_t i = 0; i < http_ports_.size(); i++) {
+      if (http_ports_[i] != -1) {
+        port_map[http_ports_[i]].push_back(endpoint_names_v2[i]);
+      }
+    }
+
+    TRTSERVER_Error* err = StartHttpService(
+        &http_services_v2_, server, trace_manager, smb_manager, port_map);
+    if (err != nullptr) {
+      LOG_TRTSERVER_ERROR(err, "failed to start HTTP service");
+      return false;
+    }
+  }
+#endif  // TRTIS_ENABLE_HTTP_V2
 
 #ifdef TRTIS_ENABLE_METRICS
   // Enable metrics endpoint if requested...
@@ -604,6 +664,20 @@ StopEndpoints()
 
   http_services_.clear();
 #endif  // TRTIS_ENABLE_HTTP
+
+#ifdef TRTIS_ENABLE_HTTP_V2
+  for (auto& http_eps : http_services_v2_) {
+    if (http_eps != nullptr) {
+      TRTSERVER_Error* err = http_eps->Stop();
+      if (err != nullptr) {
+        LOG_TRTSERVER_ERROR(err, "failed to stop HTTP service");
+        ret = false;
+      }
+    }
+  }
+
+  http_services_.clear();
+#endif  // TRTIS_ENABLE_HTTP_V2
 
 #ifdef TRTIS_ENABLE_GRPC
   if (grpc_service_) {
@@ -870,22 +944,24 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #endif  // TRTIS_ENABLE_GPU
 
 #ifdef TRTIS_ENABLE_HTTP
+#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
   int32_t http_port = http_port_;
   int32_t http_thread_cnt = http_thread_cnt_;
   int32_t http_health_port = http_port_;
-#endif  // TRTIS_ENABLE_HTTP
+#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
 
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
-#ifdef TRTIS_ENABLE_GRPC
-  int32_t api_version = 1;
-#else
-  int32_t api_version = 2;
-#endif  // TRTIS_ENABLE_GRPC
   int32_t grpc_port = grpc_port_;
   int32_t grpc_infer_thread_cnt = grpc_infer_thread_cnt_;
   int32_t grpc_stream_infer_thread_cnt = grpc_stream_infer_thread_cnt_;
   int32_t grpc_infer_allocation_pool_size = grpc_infer_allocation_pool_size_;
 #endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
+
+#if defined(TRTIS_ENABLE_HTTP_V2) || defined(TRTIS_ENABLE_GRPC_V2)
+  int32_t api_version = 2;
+#else
+  int32_t api_version = 1;
+#endif  // TRTIS_ENABLE_HTTP_V2 || TRTIS_ENABLE_GRPC_V2
 
 #ifdef TRTIS_ENABLE_METRICS
   int32_t metrics_port = metrics_port_;
@@ -957,8 +1033,11 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       case OPTION_STRICT_READINESS:
         strict_readiness = ParseBoolOption(optarg);
         break;
+      case OPTION_API_VERSION:
+        api_version = ParseIntOption(optarg);
+        break;
 
-#ifdef TRTIS_ENABLE_HTTP
+#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
       case OPTION_ALLOW_HTTP:
         allow_http_ = ParseBoolOption(optarg);
         break;
@@ -977,9 +1056,6 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
       case OPTION_ALLOW_GRPC:
         allow_grpc_ = ParseBoolOption(optarg);
-        break;
-      case OPTION_API_VERSION:
-        api_version = ParseIntOption(optarg);
         break;
       case OPTION_GRPC_PORT:
         grpc_port = ParseIntOption(optarg);
@@ -1127,17 +1203,18 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   }
 
 
-#ifdef TRTIS_ENABLE_HTTP
+#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
+  api_version_ = api_version;
   http_port_ = http_port;
   http_health_port_ = http_health_port;
+  http_thread_cnt_ = http_thread_cnt;
 #ifdef TRTIS_ENABLE_HTTP_V2
   http_ports_ = {http_health_port_, http_port_};
 #else
   http_ports_ = {http_port_, http_health_port_, http_port_,
                  http_port_, http_port_,        http_port_};
 #endif  // TRTIS_ENABLE_HTTP_V2
-  http_thread_cnt_ = http_thread_cnt;
-#endif  // TRTIS_ENABLE_HTTP
+#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
 
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
   api_version_ = api_version;

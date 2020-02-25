@@ -155,7 +155,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
 
     FAIL_IF_ERR(
         TRTSERVER_ResponseAllocatorNew(
-            &allocator_, ResponseAlloc, ResponseRelease),
+            &allocator_, InferResponseAlloc, ResponseRelease),
         "creating response allocator");
   }
 
@@ -166,12 +166,43 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
         "deleting response allocator");
   }
 
-  using ResponseMetaData = std::tuple<
-      std::vector<evbuffer*>,
-      std::unordered_map<
-          std::string,
-          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>,
-      InferRequest>;
+  //
+  // AllocPayload
+  //
+  // Simple structure that carries the userp payload needed for
+  // allocation. These are just pointers into a HandlerState
+  // object. HandlerState lifetime is always longer than what is
+  // required for allocation callback so HandlerState manages the
+  // lifetime of the actual objects referenced by those pointers.
+  //
+  struct ShmInfo {
+    void* base_;
+    size_t byte_size_;
+    TRTSERVER_Memory_Type memory_type_;
+    int64_t device_id_;
+  };
+
+  using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
+
+  struct AllocPayload {
+    explicit AllocPayload() : shm_map_(nullptr) {}
+    ~AllocPayload()
+    {
+      // Don't delete 'response_'.. it is owned by the HandlerState
+      delete shm_map_;
+    }
+
+    std::vector<evbuffer*> response_buffer_;
+    TensorShmMap* shm_map_;
+    InferRequest infer_request_;
+  };
+
+  // using ResponseMetaData = std::tuple<
+  //     std::vector<evbuffer*>,
+  //     std::unordered_map<
+  //         std::string,
+  //         std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>,
+  //     InferRequest>;
 
   // Class object associated to evhtp thread, requests received are bounded
   // with the thread that accepts it. Need to keep track of that and let the
@@ -184,7 +215,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
 
     ~InferRequestClass()
     {
-      for (auto buffer : std::get<0>(response_meta_data_)) {
+      for (auto buffer : response_meta_data_.response_buffer_) {
         if (buffer != nullptr) {
           evbuffer_free(buffer);
         }
@@ -202,7 +233,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
     std::unique_ptr<TraceMetaData> trace_meta_data_;
 #endif  // TRTIS_ENABLE_TRACING
 
-    ResponseMetaData response_meta_data_;
+    AllocPayload response_meta_data_;
 
    private:
     evhtp_request_t* req_;
@@ -213,7 +244,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
   };
 
  private:
-  static TRTSERVER_Error* ResponseAlloc(
+  static TRTSERVER_Error* InferResponseAlloc(
       TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
       size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
       int64_t preferred_memory_type_id, void* userp, void** buffer,
@@ -237,10 +268,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       const std::string& model_name, const InferRequestHeader& request_header,
       const InferRequest& request,
       TRTSERVER_InferenceRequestProvider* request_provider,
-      std::unordered_map<
-          std::string,
-          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
-          output_shm_map);
+      TensorShmMap* shm_map);
 
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
@@ -259,27 +287,24 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
 };
 
 TRTSERVER_Error*
-HTTPAPIServerV2::ResponseAlloc(
+HTTPAPIServerV2::InferResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
     int64_t preferred_memory_type_id, void* userp, void** buffer,
     void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
-  auto response_meta_data = reinterpret_cast<ResponseMetaData*>(userp);
+  AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
   evbuffer* evhttp_buffer = evbuffer_new();
   if (evhttp_buffer == nullptr) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INTERNAL,
         std::string("failed to create evbuffer for output tensor").c_str());
   } else {
-    std::get<0>(*response_meta_data).push_back(evhttp_buffer);
+    payload->response_buffer_.push_back(evhttp_buffer);
   }
 
-  const std::unordered_map<
-      std::string,
-      std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
-      output_shm_map = std::get<1>(*response_meta_data);
+  const TensorShmMap* shm_map = payload->shm_map_;
 
   *buffer = nullptr;
   *buffer_userp = nullptr;
@@ -288,29 +313,39 @@ HTTPAPIServerV2::ResponseAlloc(
 
   // Don't need to do anything if no memory was requested.
   if (byte_size > 0) {
-    auto pr = output_shm_map.find(tensor_name);
-    if (pr != output_shm_map.end()) {
-      // If the output is in shared memory then check that the expected buffer
-      // size is at least the byte size of the output.
-      if (byte_size > std::get<1>(pr->second)) {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INTERNAL,
-            std::string(
-                "expected buffer size to be at least " +
-                std::to_string(std::get<1>(pr->second)) + " bytes but gets " +
-                std::to_string(byte_size) + " bytes in output tensor")
-                .c_str());
-      }
+    bool use_shm = false;
 
-      *buffer = const_cast<void*>(std::get<0>(pr->second));
-      *actual_memory_type = std::get<2>(pr->second);
-      *actual_memory_type_id = std::get<3>(pr->second);
-    } else {
-      // Can't allocate for any memory type other than CPU.
-      if (preferred_memory_type != TRTSERVER_MEMORY_CPU) {
-        LOG_VERBOSE(1) << "HTTP V2: unable to provide '" << tensor_name
-                       << "' in " << MemoryTypeString(preferred_memory_type)
-                       << ", will use "
+    if (shm_map != nullptr) {
+      const auto& pr = shm_map->find(tensor_name);
+      if (pr != shm_map->end()) {
+        // If the output is in shared memory then check that the expected
+        // requested buffer size is at least the byte size of the output.
+        if (byte_size > pr->second.byte_size_) {
+          return TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INTERNAL,
+              std::string(
+                  "expected buffer size to be at least " +
+                  std::to_string(pr->second.byte_size_) + " bytes but got " +
+                  std::to_string(byte_size) + " bytes in output tensor")
+                  .c_str());
+        }
+
+        *buffer = const_cast<void*>(pr->second.base_);
+        *actual_memory_type = pr->second.memory_type_;
+        *actual_memory_type_id = pr->second.device_id_;
+        use_shm = true;
+
+        LOG_VERBOSE(1) << "HTTP: using shared-memory for '" << tensor_name
+                       << "', size: " << byte_size << ", addr: " << *buffer;
+      }
+    }
+
+    if (!use_shm) {
+      // Can't allocate for any memory type other than CPU. If asked to
+      // allocate on GPU memory then force allocation on CPU instead.
+      if (*actual_memory_type != TRTSERVER_MEMORY_CPU) {
+        LOG_VERBOSE(1) << "HTTP: unable to provide '" << tensor_name << "' in "
+                       << MemoryTypeString(*actual_memory_type) << ", will use "
                        << MemoryTypeString(TRTSERVER_MEMORY_CPU);
         *actual_memory_type = TRTSERVER_MEMORY_CPU;
         *actual_memory_type_id = 0;
@@ -351,11 +386,11 @@ HTTPAPIServerV2::ResponseAlloc(
             TRTSERVER_ERROR_INTERNAL,
             "failed to commit output tensors to output buffer");
       }
+
+      LOG_VERBOSE(1) << "HTTP using buffer for: '" << tensor_name
+                     << "', size: " << byte_size << ", addr: " << *buffer;
     }
   }
-
-  LOG_VERBOSE(1) << "HTTP V2 allocation: '" << tensor_name
-                 << "', size: " << byte_size << ", addr: " << *buffer;
 
   return nullptr;  // Success
 }
@@ -365,7 +400,7 @@ HTTPAPIServerV2::ResponseRelease(
     TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
     size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
 {
-  LOG_VERBOSE(1) << "HTTP V2 release: "
+  LOG_VERBOSE(1) << "HTTP release: "
                  << "size " << byte_size << ", addr " << buffer;
 
   // Don't do anything when releasing a buffer since ResponseAlloc
@@ -406,7 +441,8 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
 }
 
 void
-HTTPAPIServerV2::HandleHealth(evhtp_request_t* req, const std::string& model_name)
+HTTPAPIServerV2::HandleHealth(
+    evhtp_request_t* req, const std::string& model_name)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -469,7 +505,8 @@ HTTPAPIServerV2::HandleHealth(evhtp_request_t* req, const std::string& model_nam
   TRTSERVER_ErrorDelete(err);
 }
 void
-HTTPAPIServerV2::HandleStatus(evhtp_request_t* req, const std::string& model_name)
+HTTPAPIServerV2::HandleStatus(
+    evhtp_request_t* req, const std::string& model_name)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -546,11 +583,7 @@ TRTSERVER_Error*
 HTTPAPIServerV2::EVBufferToInput(
     const std::string& model_name, const InferRequestHeader& request_header,
     const InferRequest& request,
-    TRTSERVER_InferenceRequestProvider* request_provider,
-    std::unordered_map<
-        std::string,
-        std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
-        output_shm_map)
+    TRTSERVER_InferenceRequestProvider* request_provider, TensorShmMap* shm_map)
 {
   // Extract input data from HTTP body and register in
   // 'request_provider'.
@@ -637,7 +670,8 @@ HTTPAPIServerV2::EVBufferToInput(
 }
 
 void
-HTTPAPIServerV2::HandleInfer(evhtp_request_t* req, const std::string& model_name)
+HTTPAPIServerV2::HandleInfer(
+    evhtp_request_t* req, const std::string& model_name)
 {
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -715,7 +749,7 @@ HTTPAPIServerV2::HandleInfer(evhtp_request_t* req, const std::string& model_name
         std::string(request_buffer.data(), buffer_length);
     if (google::protobuf::util::JsonStringToMessage(
             json_request_string,
-            &std::get<2>(infer_request->response_meta_data_)) !=
+            &infer_request->response_meta_data_.infer_request_) !=
         google::protobuf::util::Status::OK) {
       evhtp_send_reply(req, EVHTP_RES_BADREQ);
       return;
@@ -723,8 +757,8 @@ HTTPAPIServerV2::HandleInfer(evhtp_request_t* req, const std::string& model_name
 
     err = EVBufferToInput(
         model_name, request_header_protobuf,
-        std::get<2>(infer_request->response_meta_data_), request_provider,
-        std::get<1>(infer_request->response_meta_data_));
+        infer_request->response_meta_data_.infer_request_, request_provider,
+        infer_request->response_meta_data_.shm_map_);
     if (err == nullptr) {
       // Provide the trace manager object to use for this request, if nullptr
       // then no tracing will be performed.
@@ -850,7 +884,7 @@ HTTPAPIServerV2::InferRequestClass::InferComplete(
 {
   HTTPAPIServerV2::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServerV2::InferRequestClass*>(userp);
-  for (auto buffer : std::get<0>(infer_request->response_meta_data_)) {
+  for (auto buffer : infer_request->response_meta_data_.response_buffer_) {
     evbuffer_add_buffer(infer_request->req_->buffer_out, buffer);
   }
   if (infer_request->FinalizeResponse(response) == EVHTP_RES_OK) {
