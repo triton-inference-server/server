@@ -382,7 +382,7 @@ SequenceBatchScheduler::Enqueue(
   // For now the request must have batch-size 1 since the sequence
   // batcher does not yet support requests that are statically
   // batched.
-  if (irequest.BatchSize() != 1) {
+  if (irequest->BatchSize() != 1) {
     OnComplete(Status(
         RequestStatusCode::INVALID_ARG,
         "inference request to model '" + request_provider->ModelName() +
@@ -394,7 +394,7 @@ SequenceBatchScheduler::Enqueue(
   // A request must have a correlation ID to be processed correctly by
   // this scheduler. A value of 0 (zero) indicates that the request
   // doesn't have a correlation ID.
-  const CorrelationID correlation_id = irequest.CorrelationId();
+  const CorrelationID correlation_id = irequest->CorrelationId();
   if (correlation_id == 0) {
     OnComplete(Status(
         RequestStatusCode::INVALID_ARG,
@@ -406,9 +406,9 @@ SequenceBatchScheduler::Enqueue(
   BatcherSequenceSlot* target = nullptr;
 
   const bool seq_start =
-      ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0);
+      ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0);
   const bool seq_end =
-      ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
+      ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
 
   std::unique_lock<std::mutex> lock(mu_);
 
@@ -529,7 +529,7 @@ SequenceBatchScheduler::Enqueue(
       OnComplete);
 }
 
-bool
+CorrelationID
 SequenceBatchScheduler::ReleaseSequenceSlot(
     const BatcherSequenceSlot& batcher_seq_slot,
     std::deque<Scheduler::Payload>* payloads)
@@ -545,7 +545,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
     if (!payloads->empty()) {  // should never be empty...
       const auto& request_provider = payloads->back().request_provider_;
       const auto& irequest = request_provider->Request();
-      const CorrelationID correlation_id = irequest.CorrelationId();
+      const CorrelationID correlation_id = irequest->CorrelationId();
 
       // If the last queue entry is not an END request then the entire
       // sequence is not contained in the backlog. In that case must
@@ -553,7 +553,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
       // requests get directed to the batcher sequence-slot instead of
       // the backlog.
       const bool seq_end =
-          ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
+          ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
       if (!seq_end) {
         // Since the correlation ID is being actively collected in the
         // backlog, there should not be any in-flight sequences with
@@ -573,7 +573,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
                      << batcher_seq_slot.batcher_idx_ << ", slot "
                      << batcher_seq_slot.seq_slot_ << ": "
                      << request_provider->ModelName();
-      return false;
+      return correlation_id;
     }
   }
 
@@ -582,7 +582,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
                  << ", slot " << batcher_seq_slot.seq_slot_;
 
   ready_batcher_seq_slots_.push(batcher_seq_slot);
-  return true;
+  return 0;
 }
 
 bool
@@ -796,21 +796,21 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
 
 void
 SequenceBatch::SetControlTensors(
-    const InferenceRequest& irequest,
+    const std::shared_ptr<InferenceRequest>& irequest,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const int32_t seq_slot, const CorrelationID corr_id)
 {
   // Set the start, end, and ready control tensors
   // appropriately...
-  if ((irequest.Flags() & (InferRequestHeader::FLAG_SEQUENCE_START |
-                           InferRequestHeader::FLAG_SEQUENCE_END)) ==
+  if ((irequest->Flags() & (InferRequestHeader::FLAG_SEQUENCE_START |
+                            InferRequestHeader::FLAG_SEQUENCE_END)) ==
       (InferRequestHeader::FLAG_SEQUENCE_START |
        InferRequestHeader::FLAG_SEQUENCE_END)) {
     request_provider->AddInputOverrides(startend_input_overrides_);
   } else if (
-      (irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
+      (irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
     request_provider->AddInputOverrides(start_input_overrides_);
-  } else if ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+  } else if ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
     request_provider->AddInputOverrides(end_input_overrides_);
   } else {
     request_provider->AddInputOverrides(continue_input_overrides_);
@@ -985,13 +985,11 @@ DirectSequenceBatch::SchedulerThread(
 
   while (!scheduler_thread_exit_) {
     auto payloads = std::make_shared<std::vector<Scheduler::Payload>>();
-    uint64_t wait_microseconds = 0;
+    uint64_t wait_microseconds = default_wait_microseconds;
 
     // Hold the lock for as short a time as possible.
     {
       std::unique_lock<std::mutex> lock(mu_);
-
-      bool adjust_max_active_seq_slot = false;
 
       if (delay_cnt > 0) {
         wait_microseconds = 10 * 1000;
@@ -1009,167 +1007,155 @@ DirectSequenceBatch::SchedulerThread(
                  << " queued payloads, current total = " << total_size;
       } else {
         PendingBatchShapes pending_batch_shapes;
+        std::shared_ptr<InferenceRequest> null_irequest;
 
-        // Make sure there is at least one request that needs to be
-        // handled. Find the largest sequence slot index that has a
-        // payload available...
-        int32_t max_seq_slot = max_active_seq_slot_;
-        while ((max_seq_slot >= 0) && queues_[max_seq_slot].empty()) {
-          max_seq_slot--;
-        }
-
-        if (max_seq_slot < 0) {
-          wait_microseconds = default_wait_microseconds;
-        } else {
-          // For NULL requests need an InferenceRequest that matches
-          // the shapes of the inputs that are being used for the
-          // batch. This is grabbed from the first request added to
-          // the batch.
-          InferenceRequest null_irequest;
-          for (int32_t seq_slot = 0; seq_slot <= max_seq_slot; ++seq_slot) {
-            std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
-            if (!queue.empty() &&
-                (queue.front().request_provider_ != nullptr)) {
-              null_irequest = queue.front().request_provider_->Request();
-              break;
-            }
-          }
-
-          // Collect payloads from slot 0 to max_seq_slot.
-          for (int32_t seq_slot = 0; seq_slot <= max_seq_slot; ++seq_slot) {
-            bool end_of_sequence = false;
-            bool use_null_provider = false;
-            std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
-
-            // If 'seq_slot' doesn't have any requests then change the
-            // request provider to send dummy/null input tensors for
-            // this slot. We need this so that other payloads stay in
-            // the correct slot.
-            if (queue.empty()) {
-              use_null_provider = true;
-            } else {
-              // If the payload has no request provider then the
-              // sequence is being forcibly ended (e.g. because it has
-              // been idle too long). Use a null provider for the
-              // sequence slot since there isn't an actual payload but
-              // also handle as if it were the end of the sequence.
-              Scheduler::Payload& seq_slot_payload = queue.front();
-              if (seq_slot_payload.request_provider_ == nullptr) {
-                use_null_provider = true;
-                end_of_sequence = true;
-                queue.pop_front();
-              }
-            }
-
-            // If there are one or more tensors that don't support
-            // ragged batch, then don't allow a payload into an existing
-            // batch if shape differs.
-            if (!use_null_provider && !enforce_equal_shape_tensors_.empty()) {
-              // If this is the first non-null payload capture the
-              // shape of the tensors that don't support ragged so we
-              // can compare them to later payloads.
-              if (pending_batch_shapes.empty()) {
-                Status status = InitPendingShape(
-                    batcher_idx_, queue.front(), enforce_equal_shape_tensors_,
-                    OnPeek_, &pending_batch_shapes);
-                if (!status.IsOk()) {
-                  LOG_ERROR
-                      << "internal: unexpecting failure initializing shape: "
-                      << status.Message();
-                  use_null_provider = true;
-                  pending_batch_shapes.clear();
-                }
-              } else {
-                // There is already a payload in the batch that set
-                // shapes... if this payload doesn't match those
-                // shapes then don't allow it into the batch.
-                if (!CompareWithPendingShape(
-                        batcher_idx_, queue.front(), OnPeek_,
-                        pending_batch_shapes)) {
-                  use_null_provider = true;
-                }
-              }
-            }
-
-            // Use null-provider if necessary otherwise use the next
-            // payload in the queue...
-            if (use_null_provider) {
-              auto null_request_provider =
-                  std::make_shared<NULLInferRequestProvider>(null_irequest);
-              null_request_provider->AddInputOverrides(
-                  notready_input_overrides_);
-
-              payloads->emplace_back(
-                  nullptr, null_request_provider, nullptr, nullptr);
-            } else {
-              Scheduler::Payload& seq_slot_payload = queue.front();
-              const auto& request_provider = seq_slot_payload.request_provider_;
-              const auto& irequest = request_provider->Request();
-
-              // Set the control tensor values in the request provider.
-              SetControlTensors(
-                  irequest, request_provider, seq_slot,
-                  seq_slot_correlation_ids_[seq_slot]);
-
-              payloads->emplace_back(
-                  seq_slot_payload.stats_, request_provider,
-                  seq_slot_payload.response_provider_,
-                  seq_slot_payload.complete_function_);
-
+        // Make one pass through the active slots to:
+        //
+        //   1) release any slots that have forcibly ended sequences
+        //
+        //   2) find a representative payload that will provide:
+        //
+        //      a) the shape, type, etc. information for null payloads
+        //
+        //      b) the required tensor shapes for the batch for the
+        //      case where ragged batching is not allowed
+        int32_t max_seq_slot = -1;
+        for (int32_t seq_slot = 0; seq_slot <= max_active_seq_slot_;
+             ++seq_slot) {
+          std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
+          if (!queue.empty()) {
+            // If the payload is nullptr then the sequence in the slot
+            // has timed-out so release the slot for another sequence
+            // from the backlog.
+            if (queue.front().request_provider_ == nullptr) {
               queue.pop_front();
-
-              if ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
-                  0) {
-                end_of_sequence = true;
-              }
-            }
-
-            // If the sequence has ended then attempt to refill the
-            // sequence slot with a sequence from the backlog. If
-            // there is no backlog show that the slot is no longer
-            // active, and if it is currently the maximum active slot
-            // note that we need to adjust 'max_active_seq_slot_' once
-            // all slots are processed (we defer processing because
-            // multiple slots could have ending sequences).
-            if (end_of_sequence) {
-              LOG_VERBOSE(1)
-                  << "End sequence CORRID "
-                  << seq_slot_correlation_ids_[seq_slot] << " in batcher "
-                  << batcher_idx_ << ", slot " << seq_slot;
-
-              // Should never be anything in a queue after the END
-              // marker. If it happens that means we will clobber
-              // that request if/when we swap in a backlog sequence
-              // in ReleaseSequenceSlot below.
-              if (!queue.empty()) {
-                LOG_ERROR << "internal: unexpected requests after sequence "
-                             "end in slot "
-                          << seq_slot;
-              }
 
               SequenceBatchScheduler::BatcherSequenceSlot batcher_seq_slot(
                   batcher_idx_, seq_slot);
-              bool released =
+              seq_slot_correlation_ids_[seq_slot] =
                   base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
-              if (released) {
-                seq_slot_correlation_ids_[seq_slot] = 0;
-                if (seq_slot == max_active_seq_slot_) {
-                  adjust_max_active_seq_slot = true;
-                }
+            }
+          }
+
+          // Need to check queue again for contents since if released
+          // above it may now be empty...
+          if (!queue.empty()) {
+            // For NULL requests need an InferenceRequest so grab the
+            // first one.
+            if (null_irequest == nullptr) {
+              null_irequest = queue.front().request_provider_->Request();
+            }
+
+            // If this is the first non-null payload capture the
+            // shape of the tensors that don't support ragged so we
+            // can compare them to later payloads.
+            if (pending_batch_shapes.empty() &&
+                !enforce_equal_shape_tensors_.empty()) {
+              Status status = InitPendingShape(
+                  batcher_idx_, queue.front(), enforce_equal_shape_tensors_,
+                  OnPeek_, &pending_batch_shapes);
+              if (!status.IsOk()) {
+                LOG_ERROR
+                    << "internal: unexpecting failure initializing shape: "
+                    << status.Message();
+                pending_batch_shapes.clear();
               }
             }
+
+            max_seq_slot = seq_slot;
+            wait_microseconds = 0;
+          }
+        }
+
+        // Collect payloads from slot 0 to max_seq_slot.
+        for (int32_t seq_slot = 0; seq_slot <= max_seq_slot; ++seq_slot) {
+          bool end_of_sequence = false;
+          bool use_null_provider = false;
+          std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
+
+          // If 'seq_slot' doesn't have any requests then change the
+          // request provider to send dummy/null input tensors for
+          // this slot. We need this so that other payloads stay in
+          // the correct slot.
+          if (queue.empty()) {
+            use_null_provider = true;
+          }
+          // If there are one or more tensors that don't support
+          // ragged batch, then don't allow a payload into an existing
+          // batch if shape differs.
+          else if (!pending_batch_shapes.empty()) {
+            if (!CompareWithPendingShape(
+                    batcher_idx_, queue.front(), OnPeek_,
+                    pending_batch_shapes)) {
+              use_null_provider = true;
+            }
+          }
+
+          // Use null-provider if necessary otherwise use the next
+          // payload in the queue...
+          if (use_null_provider) {
+            auto null_request_provider =
+                std::make_shared<NULLInferRequestProvider>(null_irequest);
+            null_request_provider->AddInputOverrides(notready_input_overrides_);
+
+            payloads->emplace_back(
+                nullptr, null_request_provider, nullptr, nullptr);
+          } else {
+            Scheduler::Payload& seq_slot_payload = queue.front();
+            const auto& request_provider = seq_slot_payload.request_provider_;
+            const auto& irequest = request_provider->Request();
+
+            // Set the control tensor values in the request provider.
+            SetControlTensors(
+                irequest, request_provider, seq_slot,
+                seq_slot_correlation_ids_[seq_slot]);
+
+            payloads->emplace_back(
+                seq_slot_payload.stats_, request_provider,
+                seq_slot_payload.response_provider_,
+                seq_slot_payload.complete_function_);
+
+            queue.pop_front();
+
+            if ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
+                0) {
+              end_of_sequence = true;
+            }
+          }
+
+          // If the sequence has ended then attempt to refill the
+          // sequence slot with a sequence from the backlog. If
+          // there is no backlog show that the slot is no longer
+          // active.
+          if (end_of_sequence) {
+            LOG_VERBOSE(1) << "End sequence CORRID "
+                           << seq_slot_correlation_ids_[seq_slot]
+                           << " in batcher " << batcher_idx_ << ", slot "
+                           << seq_slot;
+
+            // Should never be anything in a queue after the END
+            // marker. If it happens that means we will clobber
+            // that request if/when we swap in a backlog sequence
+            // in ReleaseSequenceSlot below.
+            if (!queue.empty()) {
+              LOG_ERROR << "internal: unexpected requests after sequence "
+                           "end in slot "
+                        << seq_slot;
+            }
+
+            SequenceBatchScheduler::BatcherSequenceSlot batcher_seq_slot(
+                batcher_idx_, seq_slot);
+            seq_slot_correlation_ids_[seq_slot] =
+                base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
           }
         }
       }
 
-      // If one or more sequences ended, and one of them was in
-      // 'max_active_seq_slot_', then need to find the new
+      // One or more sequences may have ended... find the new
       // 'max_active_seq_slot_'.
-      if (adjust_max_active_seq_slot) {
-        while ((max_active_seq_slot_ >= 0) &&
-               (seq_slot_correlation_ids_[max_active_seq_slot_] == 0)) {
-          max_active_seq_slot_--;
-        }
+      while ((max_active_seq_slot_ >= 0) &&
+             (seq_slot_correlation_ids_[max_active_seq_slot_] == 0)) {
+        max_active_seq_slot_--;
       }
 
       // If no requests are to be handled, wait for notification or
@@ -1361,12 +1347,12 @@ OldestSequenceBatch::CompleteAndNext(
         release_seq_slot = true;
       } else {
         const auto& irequest = request_provider->Request();
-        const CorrelationID correlation_id = irequest.CorrelationId();
+        const CorrelationID correlation_id = irequest->CorrelationId();
 
         // After handling the last inference in a sequence we must
         // release the sequence slot to make it available to another
         // sequence.
-        if ((irequest.Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+        if ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
           LOG_VERBOSE(1) << "end sequence CORRID " << correlation_id
                          << " in batcher " << batcher_idx_ << ", slot "
                          << seq_slot;
@@ -1406,9 +1392,9 @@ OldestSequenceBatch::CompleteAndNext(
 
       SequenceBatchScheduler::BatcherSequenceSlot batcher_seq_slot(
           batcher_idx_, seq_slot);
-      const bool released =
+      const CorrelationID released_cid =
           base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
-      if (!released) {
+      if (released_cid != 0) {
         LOG_VERBOSE(1) << "Enqueued new sequence containing " << queue.size()
                        << " requests into OldestFirst batcher " << batcher_idx_
                        << ", slot " << seq_slot;

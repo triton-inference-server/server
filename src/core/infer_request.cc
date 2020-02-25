@@ -44,26 +44,6 @@ InferenceRequest::InferenceRequest(
 
 Status
 InferenceRequest::AddInput(
-    const std::string& name, const InferenceRequest::Input& other,
-    InferenceRequest::Input** input)
-{
-  const auto& pr = inputs_.emplace(
-      std::make_pair(name, InferenceRequest::Input(name, other)));
-  if (!pr.second) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "input '" + name + "' already exists in request");
-  }
-
-  if (input != nullptr) {
-    *input = std::addressof(pr.first->second);
-  }
-
-  return Status::Success;
-}
-
-Status
-InferenceRequest::AddInput(
     const std::string& name, const DimsList& shape,
     const uint64_t batch_byte_size, InferenceRequest::Input** input)
 {
@@ -181,39 +161,6 @@ InferenceRequest::RequestOutput(
     return Status(
         RequestStatusCode::INVALID_ARG,
         "output '" + name + "' already requested");
-  }
-
-  return Status::Success;
-}
-
-Status
-InferenceRequest::AppendInputData(
-    const char* name, const void* base, size_t byte_size,
-    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
-{
-  auto pr = input_map_.insert({name, nullptr});
-  std::shared_ptr<Memory>& smem = pr.first->second;
-  if (pr.second) {
-    smem.reset(new MemoryReference());
-  }
-
-  if (byte_size > 0) {
-    std::static_pointer_cast<MemoryReference>(smem)->AddBuffer(
-        static_cast<const char*>(base), byte_size, memory_type, memory_type_id);
-  }
-
-  return Status::Success;
-}
-
-Status
-InferenceRequest::SetInputData(
-    const std::string& name, const std::shared_ptr<Memory>& data)
-{
-  auto pr = input_map_.insert({name, data});
-  if (!pr.second) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "input '" + name + "' already has data, can't overwrite");
   }
 
   return Status::Success;
@@ -410,12 +357,9 @@ InferenceRequest::Normalize(const InferenceBackend& backend)
   return Status::Success;
 }
 
-InferenceRequest::Input::Input(const std::string& name, const Input& other)
-    : Input(other)
-{
-  name_ = name;
-}
-
+//
+// Input
+//
 InferenceRequest::Input::Input(
     const std::string& name, const std::vector<int64_t>& shape,
     const uint64_t batch_byte_size)
@@ -435,6 +379,58 @@ InferenceRequest::Input::Input(
 {
 }
 
+Status
+InferenceRequest::Input::AppendData(
+    const void* base, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+    int64_t memory_type_id)
+{
+  if (data_ == nullptr) {
+    data_.reset(new MemoryReference());
+    data_idx_ = 0;
+  }
+
+  if (byte_size > 0) {
+    std::static_pointer_cast<MemoryReference>(data_)->AddBuffer(
+        static_cast<const char*>(base), byte_size, memory_type, memory_type_id);
+  }
+
+  return Status::Success;
+}
+
+Status
+InferenceRequest::Input::SetData(const std::shared_ptr<Memory>& data)
+{
+  if (data_ != nullptr) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "input '" + name_ + "' already has data, can't overwrite");
+  }
+
+  data_ = data;
+  data_idx_ = 0;
+
+  return Status::Success;
+}
+
+Status
+InferenceRequest::Input::NextContent(
+    const void** content, size_t* content_byte_size,
+    TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id)
+{
+  if (*content_byte_size == 0) {
+    *content = nullptr;
+    return Status::Success;
+  }
+
+  *content = data_->BufferAt(
+      data_idx_++, content_byte_size, memory_type, memory_type_id);
+
+  return Status::Success;
+}
+
+//
+// RequestedOutput
+//
 InferenceRequest::RequestedOutput::RequestedOutput(
     const std::string& name, const uint32_t classification_cnt)
     : name_(name), classification_cnt_(classification_cnt),

@@ -556,7 +556,7 @@ OnnxBackend::Context::Run(
               name_ + "'");
     }
 
-    total_batch_size += payload.request_provider_->Request().BatchSize();
+    total_batch_size += payload.request_provider_->Request()->BatchSize();
 
     // All payloads must have equally-sized input tensors so use any
     // payload as the representative for the input tensors.
@@ -594,7 +594,7 @@ OnnxBackend::Context::Run(
   std::vector<const char*> input_names;
   bool cuda_copy = false;
 
-  for (const auto& pr : input_request_provider->Request().Inputs()) {
+  for (const auto& pr : input_request_provider->Request()->Inputs()) {
     const auto& input = pr.second;
     const std::string& name = input.Name();
 
@@ -724,12 +724,12 @@ OnnxBackend::Context::SetInputTensor(
   for (auto& payload : *payloads) {
     const auto& irequest = payload.request_provider_->Request();
 
-    expected_element_cnts.push_back(irequest.BatchSize() * batch1_element_cnt);
+    expected_element_cnts.push_back(irequest->BatchSize() * batch1_element_cnt);
 
     if (data_type == TYPE_STRING) {
       // For String data byte, obtain expected byte size from 'batch_byte_size'
       // The provider has already checked that batch_byte_size is set
-      for (const auto& pr : irequest.Inputs()) {
+      for (const auto& pr : irequest->Inputs()) {
         const auto& in = pr.second;
         if (in.Name() == name) {
           expected_byte_sizes.push_back(in.BatchByteSize());
@@ -1003,9 +1003,9 @@ OnnxBackend::Context::SetStringOutputBuffer(
   size_t element_idx = 0;
   bool cuda_copy = false;
   for (auto& payload : *payloads) {
-    const InferenceRequest& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_provider_->Request();
     const size_t expected_element_cnt =
-        irequest.BatchSize() * batch1_element_cnt;
+        irequest->BatchSize() * batch1_element_cnt;
 
     // If 'payload' requested this output then copy it from
     // 'content'. If it did not request this output then just

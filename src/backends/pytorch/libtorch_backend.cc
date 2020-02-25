@@ -522,8 +522,8 @@ LibTorchBackend::Context::SetFixedSizedInputBuffer(
   // Visit the payloads in order and copy the input tensors to 'buffer'.
   std::vector<size_t> expected_byte_sizes;
   for (auto& payload : *payloads) {
-    const InferenceRequest& irequest = payload.request_provider_->Request();
-    expected_byte_sizes.push_back(irequest.BatchSize() * batch1_byte_size);
+    const auto& irequest = payload.request_provider_->Request();
+    expected_byte_sizes.push_back(irequest->BatchSize() * batch1_byte_size);
   }
 
   *cuda_copy |= SetInputBuffer(name, expected_byte_sizes, payloads, input);
@@ -553,7 +553,7 @@ LibTorchBackend::Context::Run(
               name_ + "'");
     }
 
-    total_batch_size += payload.request_provider_->Request().BatchSize();
+    total_batch_size += payload.request_provider_->Request()->BatchSize();
 
     // All payloads must have equally-sized input tensors so use any
     // payload as the representative for the input tensors.
@@ -580,7 +580,7 @@ LibTorchBackend::Context::Run(
   const InferRequestProvider::InputOverrideMapVec& input_override_maps =
       input_request_provider->GetInputOverrides();
 
-  size_t input_count = input_request_provider->Request().Inputs().size();
+  size_t input_count = input_request_provider->Request()->Inputs().size();
   for (const auto& ovr_map : input_override_maps) {
     input_count += ovr_map->size();
   }
@@ -596,7 +596,7 @@ LibTorchBackend::Context::Run(
 
   // Inputs from the request...
   bool cuda_copy = false;
-  for (const auto& pr : input_request_provider->Request().Inputs()) {
+  for (const auto& pr : input_request_provider->Request()->Inputs()) {
     const auto& input = pr.second;
     const std::string& name = input.Name();
     int ip_index = input_index_map_[name];
@@ -713,8 +713,8 @@ LibTorchBackend::Context::Run(
   // Prepare set of Outputs requested for
   std::set<std::string> required_outputs;
   for (auto& payload : *payloads) {
-    const InferenceRequest& irequest = payload.request_provider_->Request();
-    for (const auto& pr : irequest.RequestedOutputs()) {
+    const auto& irequest = payload.request_provider_->Request();
+    for (const auto& pr : irequest->RequestedOutputs()) {
       required_outputs.insert(pr.first);
     }
   }

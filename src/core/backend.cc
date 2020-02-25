@@ -135,7 +135,7 @@ InferenceBackend::SetConfiguredScheduler(
   // [DLIS-1001] Assumption on runner tied to instance is not longer valid
   auto OnWarmup = [this, &samples](uint32_t runner_idx) -> Status {
     for (const auto& sample : samples) {
-      LOG_VERBOSE(1) << "model '" << sample.irequest_.ModelName()
+      LOG_VERBOSE(1) << "model '" << sample.irequest_->ModelName()
                      << "' instance " << std::to_string(runner_idx)
                      << " is running warmup sample '" << sample.sample_name_
                      << "'";
@@ -340,15 +340,16 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
       random_buffer[offset] = rand();
     }
 
-    // use batch-1 for every request, batch size is simulated by populating
+    // Use batch-1 for every request, batch size is simulated by populating
     // requests for single run.
-    warmup_data.irequest_.SetModelName(Name());
-    warmup_data.irequest_.SetRequestedModelVersion(Version());
-    warmup_data.irequest_.SetBatchSize(1);
+    warmup_data.irequest_ = std::make_shared<InferenceRequest>();
+    warmup_data.irequest_->SetModelName(Name());
+    warmup_data.irequest_->SetRequestedModelVersion(Version());
+    warmup_data.irequest_->SetBatchSize(1);
 
     // Request all outputs
     for (const auto& io : Config().output()) {
-      RETURN_IF_ERROR(warmup_data.irequest_.RequestOutput(
+      RETURN_IF_ERROR(warmup_data.irequest_->RequestOutput(
           io.name(), 0 /* classification_cnt */));
     }
 
@@ -475,14 +476,15 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
                   "' to have input_data_type set");
       }
 
-      RETURN_IF_ERROR(warmup_data.irequest_.AddInput(
-          input_meta.first, input_meta_shape, batch_byte_size));
-      RETURN_IF_ERROR(warmup_data.irequest_.AppendInputData(
-          input_meta.first.c_str(), allocated_ptr, batch_byte_size,
+      InferenceRequest::Input* input = nullptr;
+      RETURN_IF_ERROR(warmup_data.irequest_->AddInput(
+          input_meta.first, input_meta_shape, batch_byte_size, &input));
+      RETURN_IF_ERROR(input->AppendData(
+          allocated_ptr, batch_byte_size,
           TRTSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */));
     }
 
-    RETURN_IF_ERROR(warmup_data.irequest_.Normalize(*this));
+    RETURN_IF_ERROR(warmup_data.irequest_->Normalize(*this));
   }
 
   return Status::Success;

@@ -1524,7 +1524,7 @@ PlanBackend::Context::Run(
               name_ + "'");
     }
 
-    total_batch_size += payload.request_provider_->Request().BatchSize();
+    total_batch_size += payload.request_provider_->Request()->BatchSize();
 
     // All payloads must have equally-sized input tensors so use any
     // payload as the representative for the input tensors.
@@ -1611,7 +1611,7 @@ PlanBackend::Context::Run(
         input_request_provider->GetInputOverrideShape(name, &shape);
         input_request_provider->SetInputOverrideConsumed(name, false);
       } else {
-        for (const auto& pr : input_request_provider->Request().Inputs()) {
+        for (const auto& pr : input_request_provider->Request()->Inputs()) {
           const auto& input = pr.second;
           const std::string& this_name = input.Name();
           if (this_name.compare(name) == 0) {
@@ -1669,8 +1669,8 @@ PlanBackend::Context::Run(
       // in the dynamic batch.
       std::vector<size_t> expected_byte_sizes;
       for (auto& payload : *payloads) {
-        const InferenceRequest& irequest = payload.request_provider_->Request();
-        expected_byte_sizes.push_back(irequest.BatchSize() * batch1_byte_size);
+        const auto& irequest = payload.request_provider_->Request();
+        expected_byte_sizes.push_back(irequest->BatchSize() * batch1_byte_size);
       }
 
       inputs_.emplace_back();
@@ -2019,7 +2019,7 @@ PlanBackend::Context::GetRequestShapeValues(
 {
   // Visit all the inputs and extract the shape values present in the request
   Status status;
-  for (const auto& pr : payload.request_provider_->Request().Inputs()) {
+  for (const auto& pr : payload.request_provider_->Request()->Inputs()) {
     const auto& input = pr.second;
     int io_index = engine_->getBindingIndex(input.Name().c_str());
     if (engine_->isShapeBinding(io_index)) {
@@ -2059,7 +2059,7 @@ PlanBackend::Context::GetMostOptimizedProfile(
     int64_t shortest_distance = LLONG_MAX;
     for (auto cit = trt_contexts_.begin(); cit != trt_contexts_.end(); cit++) {
       int64_t current_distance = 0;
-      for (const auto& pr : input_request_provider->Request().Inputs()) {
+      for (const auto& pr : input_request_provider->Request()->Inputs()) {
         const auto& input = pr.second;
         int io_index = engine_->getBindingIndex(input.Name().c_str());
         nvinfer1::Dims engine_dims = engine_->getBindingDimensions(io_index);
