@@ -317,7 +317,7 @@ AutoFillOnnx::Create(
   RETURN_IF_ORT_ERROR(ort_api->SetSessionGraphOptimizationLevel(
       session_options, ORT_DISABLE_ALL));
 
-  OrtSession* session;
+  OrtSession* session = nullptr;
 
   // All versions should share the same model configuration, thus use the first
   // one that can be loaded successfully.
@@ -327,44 +327,90 @@ AutoFillOnnx::Create(
   OrtStatus* ort_status;
   const std::string opset_error(
       "onnx runtime error " + std::to_string(ORT_NOT_IMPLEMENTED));
+
   for (const auto& version : version_dirs) {
     const auto version_path = JoinPath({model_path, version});
 
-    std::set<std::string> onnx_files;
-    RETURN_IF_ERROR(GetDirectoryFiles(
-        version_path, true /* skip_hidden_files */, &onnx_files));
+    // First try loading models that are contained in a single file.
+    {
+      std::set<std::string> onnx_files;
+      RETURN_IF_ERROR(GetDirectoryFiles(
+          version_path, true /* skip_hidden_files */, &onnx_files));
 
-    for (auto file : onnx_files) {
-      const auto onnx_path = JoinPath({version_path, file});
+      for (auto file : onnx_files) {
+        const auto onnx_path = JoinPath({version_path, file});
+        std::string onnx_file_content;
+        status = ReadTextFile(onnx_path, &onnx_file_content);
+        if (!status.IsOk()) {
+          continue;
+        }
 
-      // Load session
-      std::string onnx_file_content;
-      status = ReadTextFile(onnx_path, &onnx_file_content);
-      if (!status.IsOk()) {
-        continue;
+        status = OnnxLoader::LoadSession(
+            std::make_pair(true, std::move(onnx_file_content)), session_options,
+            &session);
+        if (status.IsOk()) {
+          local_autofill.reset(new AutoFillOnnxImpl(model_name, file));
+          found = true;
+          break;
+        } else if (
+            (status.Message().compare(0, opset_error.size(), opset_error)) ==
+            0) {
+          local_autofill.reset(new AutoFillOnnxImpl(model_name, file));
+          unsupported_opset = true;
+          // no break in case there is a valid version
+        } else {
+          LOG_VERBOSE(1) << "failed to load " << onnx_path << ": "
+                         << status.AsString();
+        }
       }
-      status =
-          OnnxLoader::LoadSession(onnx_file_content, session_options, &session);
 
-      if (status.IsOk()) {
-        local_autofill.reset(new AutoFillOnnxImpl(model_name, file));
-        found = true;
+      if (found) {
         break;
-      } else if (
-          (status.Message().compare(0, opset_error.size(), opset_error)) == 0) {
-        local_autofill.reset(new AutoFillOnnxImpl(model_name, file));
-        unsupported_opset = true;
-        // no break in case there is a valid version
       }
     }
-    if (found) {
-      break;
+
+    // Next try loading models that are contained in a directory.
+    {
+      std::set<std::string> onnx_dirs;
+      RETURN_IF_ERROR(GetDirectorySubdirs(version_path, &onnx_dirs));
+
+      for (auto dir : onnx_dirs) {
+        const auto onnx_path = JoinPath({version_path, dir});
+        std::string local_onnx_path;
+        status = DownloadFileFolder(onnx_path, &local_onnx_path);
+        if (!status.IsOk()) {
+          LOG_VERBOSE(1) << "failed to download " << onnx_path << ": "
+                         << status.AsString();
+          continue;
+        }
+
+        status = OnnxLoader::LoadSession(
+            std::make_pair(false, local_onnx_path), session_options, &session);
+        if (status.IsOk()) {
+          local_autofill.reset(new AutoFillOnnxImpl(model_name, dir));
+          found = true;
+          break;
+        } else if (
+            (status.Message().compare(0, opset_error.size(), opset_error)) ==
+            0) {
+          local_autofill.reset(new AutoFillOnnxImpl(model_name, dir));
+          unsupported_opset = true;
+          // no break in case there is a valid version
+        } else {
+          LOG_VERBOSE(1) << "failed to load " << local_onnx_path << ": "
+                         << status.AsString();
+        }
+      }
+
+      if (found) {
+        break;
+      }
     }
   }
 
   // If it is due to unsupported opset, return success with limited autofill
   // capability
-  if ((!found) && unsupported_opset) {
+  if (!found && unsupported_opset) {
     *autofill = std::move(local_autofill);
     return Status::Success;
   }

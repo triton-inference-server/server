@@ -263,10 +263,11 @@ in response to inference requests. See
 ONNX Models
 ^^^^^^^^^^^
 
-An ONNX model is a single file that by default must be named model.onnx.
-Notice that some ONNX models may not be supported by the inference server
-as they are not supported by the underlying ONNX Runtime (due to either
-using `stale ONNX opset version
+An ONNX model is a single file or a directory containing multiple
+files. By default the file or directory must be named model.onnx.
+Notice that some ONNX models may not be supported by the inference
+server as they are not supported by the underlying ONNX Runtime (due
+to either using `stale ONNX opset version
 <https://github.com/Microsoft/onnxruntime/blob/master/docs/Versioning.md#version-matrix>`_
 or containing operators with `unsupported types
 <https://github.com/microsoft/onnxruntime/issues/1122>`_).
@@ -285,7 +286,8 @@ TensorRT to accelerate all or part of the model. See
 :ref:`section-optimization-policy-tensorrt` for more information on
 the *tensorrt* execution provider.
 
-A minimal model repository for a single ONNX model would look like::
+A minimal model repository for a single ONNX model contained in a
+single file would look like::
 
   models/
     <model-name>/
@@ -301,6 +303,30 @@ required the minimal model repository would look like::
     <model-name>/
       1/
         model.onnx
+
+An ONNX model composed from multiple files must be contained in a
+directory. The main model file must be named model.onnx. A minimal
+model repository for a single ONNX model contained in a directory
+would look like::
+
+  models/
+    <model-name>/
+      config.pbtxt
+      1/
+        model.onnx/
+           model.onnx
+           <other model files>
+
+As described in :ref:`section-generated-model-configuration` the
+config.pbtxt is optional for some models. In cases where it is not
+required the minimal model repository would look like::
+
+  models/
+    <model-name>/
+      1/
+        model.onnx/
+           model.onnx
+           <other model files>
 
 .. _section-pytorch-models:
 

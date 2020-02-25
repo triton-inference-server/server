@@ -76,7 +76,7 @@ OnnxBackend::Context::~Context()
 
 Status
 OnnxBackend::CreateExecutionContexts(
-    const std::unordered_map<std::string, std::string>& models)
+    const std::unordered_map<std::string, std::pair<bool, std::string>>& models)
 {
   // [TODO] configurable like optimization policy in Tensorflow models
   // Create a "prototype" session option, which will be cloned and set
@@ -101,7 +101,7 @@ OnnxBackend::CreateExecutionContexts(
 Status
 OnnxBackend::CreateExecutionContextsHelper(
     OrtSessionOptions* session_options,
-    const std::unordered_map<std::string, std::string>& models)
+    const std::unordered_map<std::string, std::pair<bool, std::string>>& models)
 {
   uint32_t total_context_cnt = 0;
 
@@ -149,7 +149,7 @@ Status
 OnnxBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     OrtSessionOptions* base_session_options,
-    const std::unordered_map<std::string, std::string>& models)
+    const std::unordered_map<std::string, std::pair<bool, std::string>>& models)
 {
   // For a GPU context, determine the model file to use for device
   // compute capability. CPU always uses the default model file.
