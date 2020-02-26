@@ -957,11 +957,11 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   int32_t grpc_infer_allocation_pool_size = grpc_infer_allocation_pool_size_;
 #endif  // TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 
-#if defined(TRTIS_ENABLE_HTTP_V2) || defined(TRTIS_ENABLE_GRPC_V2)
-  int32_t api_version = 2;
-#else
+#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_GRPC)
   int32_t api_version = 1;
-#endif  // TRTIS_ENABLE_HTTP_V2 || TRTIS_ENABLE_GRPC_V2
+#else
+  int32_t api_version = 2;
+#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_METRICS
   int32_t metrics_port = metrics_port_;
