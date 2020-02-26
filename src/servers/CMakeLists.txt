@@ -111,7 +111,7 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
   find_package(libevhtp CONFIG REQUIRED)
   message(STATUS "Using libevhtp ${libevhtp_VERSION}")
 
-  if(${TRTIS_ENABLE_GRPC})
+  if(${TRTIS_ENABLE_HTTP})
     list(APPEND
       HTTP_ENDPOINT_SRCS
       http_server.cc
@@ -120,7 +120,7 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
       HTTP_ENDPOINT_HDRS
       http_server.h
       )
-  endif() # TRTIS_ENABLE_GRPC
+  endif() # TRTIS_ENABLE_HTTP
   if(${TRTIS_ENABLE_HTTP_V2})
     list(APPEND
       HTTP_ENDPOINT_SRCS
@@ -142,13 +142,6 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
   endif() # TRTIS_ENABLE_GPU
 
   add_dependencies(http-endpoint-library proto-library)
-  if(${TRTIS_ENABLE_HTTP})
-    add_dependencies(http-endpoint-library grpc-library)
-  endif() # TRTIS_ENABLE_HTTP
-  if(${TRTIS_ENABLE_HTTP_V2})
-    add_dependencies(http-endpoint-library grpc-v2-library)
-  endif() # TRTIS_ENABLE_HTTP_V2
-
   target_include_directories(
     http-endpoint-library
     PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
@@ -159,18 +152,6 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
     $<TARGET_OBJECTS:http-endpoint-library>
     $<TARGET_OBJECTS:proto-library>
   )
-  if(${TRTIS_ENABLE_HTTP})
-    list(APPEND
-      HTTP_ENDPOINT_OBJECTS
-      $<TARGET_OBJECTS:grpc-library>
-      )
-  endif() # TRTIS_ENABLE_HTTP
-  if(${TRTIS_ENABLE_HTTP_V2})
-    list(APPEND
-      GRPC_ENDPOINT_OBJECTS
-      $<TARGET_OBJECTS:grpc-v2-library>
-      )
-  endif() # TRTIS_ENABLE_HTTP_V2
 
   set(
     HTTP_ENDPOINT_LIBRARIES

@@ -34,7 +34,6 @@
 #include <thread>
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
-#include "src/core/grpc_service_v2.grpc.pb.h"
 #include "src/core/logging.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
@@ -194,7 +193,6 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
 
     std::vector<evbuffer*> response_buffer_;
     TensorShmMap* shm_map_;
-    ModelInferRequest infer_request_;
   };
 
   // Class object associated to evhtp thread, requests received are bounded
@@ -258,7 +256,8 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle);
 #endif  // TRTIS_ENABLE_GPU
   TRTSERVER_Error* EVBufferToInput(
-      const std::string& model_name, const ModelInferRequest& request,
+      const std::string& model_name, const InferRequestHeader& request_header,
+      evbuffer* input_buffer,
       TRTSERVER_InferenceRequestProvider* request_provider,
       TensorShmMap* shm_map);
 
@@ -573,14 +572,33 @@ HTTPAPIServerV2::HandleStatus(
 
 TRTSERVER_Error*
 HTTPAPIServerV2::EVBufferToInput(
-    const std::string& model_name, const ModelInferRequest& request,
+    const std::string& model_name, const InferRequestHeader& request_header,
+    evbuffer* input_buffer,
     TRTSERVER_InferenceRequestProvider* request_provider, TensorShmMap* shm_map)
 {
-  // Extract input data from HTTP body and register in
-  // 'request_provider'.
+  // Extract individual input data from HTTP body and register in
+  // 'request_provider'. The input data from HTTP body is not
+  // necessarily contiguous so may need to register multiple input
+  // "blocks" for a given input.
+  //
+  // Get the addr and size of each chunk of input data from the
+  // evbuffer.
+  struct evbuffer_iovec* v = nullptr;
+  int v_idx = 0;
+
+  int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
+  if (n > 0) {
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
+    if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INTERNAL, "unexpected error getting input buffers ");
+    }
+  }
+
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
-  for (const auto& io : request.inputs()) {
+  for (const auto& io : request_header.input()) {
     uint64_t byte_size = 0;
     RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
         request_provider, io.name().c_str(), &byte_size));
@@ -621,32 +639,51 @@ HTTPAPIServerV2::EVBufferToInput(
       else {
 #endif
         // FIXMEV2 handle non-raw content types
-        const std::string& raw = io.contents().raw_contents();
-        const void* base = raw.c_str();
-        size_t request_byte_size = raw.size();
+        while ((byte_size > 0) && (v_idx < n)) {
+          char* base = static_cast<char*>(v[v_idx].iov_base);
+          size_t base_size;
+          if (v[v_idx].iov_len > byte_size) {
+            base_size = byte_size;
+            v[v_idx].iov_base = static_cast<void*>(base + byte_size);
+            v[v_idx].iov_len -= byte_size;
+            byte_size = 0;
+          } else {
+            base_size = v[v_idx].iov_len;
+            byte_size -= v[v_idx].iov_len;
+            v_idx++;
+          }
 
-        if (byte_size != request_byte_size) {
+          RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
+              request_provider, io.name().c_str(), base, base_size,
+              TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+        }
+
+        if (byte_size != 0) {
           return TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_INVALID_ARG,
               std::string(
-                  "unexpected size " + std::to_string(request_byte_size) +
-                  " for input '" + io.name() + "', expecting " +
-                  std::to_string(byte_size) + " for model '" + model_name + "'")
+                  "unexpected size for input '" + io.name() + "', expecting " +
+                  std::to_string(byte_size) + " bytes for model '" +
+                  model_name + "'")
                   .c_str());
         }
-
-        RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-            request_provider, io.name().c_str(), base, byte_size,
-            TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
 #if 0
       }
 #endif
     }
   }
 
+  if (v_idx != n) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "unexpected additional input data for model '" + model_name + "'")
+            .c_str());
+  }
+
 #if 0
   // Initialize System Memory for Output if it uses shared memory
-  for (const auto& io : request.outputs()) {
+  for (const auto& io : request_header.output()) {
     if (io.has_shared_memory()) {
       void* base;
       TRTSERVER_Memory_Type memory_type;
@@ -735,26 +772,8 @@ HTTPAPIServerV2::HandleInfer(
   if (err == nullptr) {
     std::unique_ptr<InferRequestClass> infer_request(new InferRequestClass(
         req, request_header_protobuf.id(), server_id_, unique_id));
-
-    // FIXME seems to have too many copies below, should be fixed automatically
-    // once the protobuf dependency is dropped.
-    //
-    // Convert the json string to protobuf message
-    size_t buffer_length = evbuffer_get_length(req->buffer_in);
-    std::vector<char> request_buffer(buffer_length);
-    evbuffer_copyout(req->buffer_in, request_buffer.data(), buffer_length);
-    std::string json_request_string =
-        std::string(request_buffer.data(), buffer_length);
-    if (google::protobuf::util::JsonStringToMessage(
-            json_request_string,
-            &infer_request->response_meta_data_.infer_request_) !=
-        google::protobuf::util::Status::OK) {
-      evhtp_send_reply(req, EVHTP_RES_BADREQ);
-      return;
-    }
-
     err = EVBufferToInput(
-        model_name, infer_request->response_meta_data_.infer_request_, request_provider,
+        model_name, request_header_protobuf, req->buffer_in, request_provider,
         infer_request->response_meta_data_.shm_map_);
     if (err == nullptr) {
       // Provide the trace manager object to use for this request, if nullptr

@@ -1202,9 +1202,9 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
     }
   }
 
+  api_version_ = api_version;
 
 #if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
-  api_version_ = api_version;
   http_port_ = http_port;
   http_health_port_ = http_health_port;
   http_thread_cnt_ = http_thread_cnt;
@@ -1217,7 +1217,6 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
 
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
-  api_version_ = api_version;
   grpc_port_ = grpc_port;
   grpc_infer_thread_cnt_ = grpc_infer_thread_cnt;
   grpc_stream_infer_thread_cnt_ = grpc_stream_infer_thread_cnt;
