@@ -253,7 +253,8 @@ GetTypedSequenceControlProperties(
 Status
 GetNormalizedModelConfig(
     const std::string& path, const BackendConfigMap& backend_config_map,
-    const bool autofill, ModelConfig* config)
+    const bool autofill, const double min_compute_capability,
+    ModelConfig* config)
 {
   // If 'autofill' then the configuration file can be empty.
   const auto config_path = JoinPath({path, kModelConfigPbTxt});
@@ -381,7 +382,7 @@ GetNormalizedModelConfig(
     std::set<int> supported_gpus;
 #ifdef TRTIS_ENABLE_GPU
     // Get the total number of GPUs from the runtime library.
-    Status status = GetSupportedGPUs(supported_gpus);
+    Status status = GetSupportedGPUs(&supported_gpus, min_compute_capability);
     if (!status.IsOk()) {
       return status;
     }
@@ -438,7 +439,8 @@ GetNormalizedModelConfig(
 
 Status
 ValidateModelConfig(
-    const ModelConfig& config, const std::string& expected_platform)
+    const ModelConfig& config, const std::string& expected_platform,
+    const double min_compute_capability)
 {
   if (config.name().empty()) {
     return Status(
@@ -607,7 +609,7 @@ ValidateModelConfig(
     // not specify any GPUs.
 #ifdef TRTIS_ENABLE_GPU
     std::set<int> supported_gpus;
-    Status status = GetSupportedGPUs(supported_gpus);
+    Status status = GetSupportedGPUs(&supported_gpus, min_compute_capability);
     if (!status.IsOk()) {
       return status;
     }
@@ -1162,7 +1164,7 @@ ParseLongLongParameter(
 
 #ifdef TRTIS_ENABLE_GPU
 Status
-CheckGPUCompatibility(const int gpu_id)
+CheckGPUCompatibility(const int gpu_id, const double min_compute_capability)
 {
   // Query the compute capability from the device
   cudaDeviceProp cuprops;
@@ -1173,9 +1175,10 @@ CheckGPUCompatibility(const int gpu_id)
         "unable to get CUDA device properties for GPU ID" +
             std::to_string(gpu_id) + ": " + cudaGetErrorString(cuerr));
   }
+
   double compute_compability = cuprops.major + (cuprops.minor / 10.0);
-  if ((compute_compability > TRTIS_MIN_COMPUTE_CAPABILITY) ||
-      (abs(compute_compability - TRTIS_MIN_COMPUTE_CAPABILITY) < 0.01)) {
+  if ((compute_compability > min_compute_capability) ||
+      (abs(compute_compability - min_compute_capability) < 0.01)) {
     return Status::Success;
   } else {
     return Status(
@@ -1184,15 +1187,16 @@ CheckGPUCompatibility(const int gpu_id)
             std::to_string(cuprops.major) + "." +
             std::to_string(cuprops.minor) +
             "' which is less than the minimum supported of '" +
-            std::to_string(TRTIS_MIN_COMPUTE_CAPABILITY) + "'");
+            std::to_string(min_compute_capability) + "'");
   }
 }
 
 Status
-GetSupportedGPUs(std::set<int>& supported_gpus)
+GetSupportedGPUs(
+    std::set<int>* supported_gpus, const double min_compute_capability)
 {
   // Make sure set is empty before starting
-  supported_gpus.clear();
+  supported_gpus->clear();
 
   int device_cnt;
   cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
@@ -1207,9 +1211,9 @@ GetSupportedGPUs(std::set<int>& supported_gpus)
 
   // populates supported_gpus
   for (int gpu_id = 0; gpu_id < device_cnt; gpu_id++) {
-    Status status = CheckGPUCompatibility(gpu_id);
+    Status status = CheckGPUCompatibility(gpu_id, min_compute_capability);
     if (status.IsOk()) {
-      supported_gpus.insert(gpu_id);
+      supported_gpus->insert(gpu_id);
     }
   }
   return Status::Success;

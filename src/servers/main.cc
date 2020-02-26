@@ -184,6 +184,7 @@ enum OptionId {
   OPTION_ALLOW_MODEL_CONTROL,
   OPTION_STARTUP_MODEL,
   OPTION_PINNED_MEMORY_POOL_BYTE_SIZE,
+  OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
   OPTION_EXIT_TIMEOUT_SECS,
   OPTION_TF_ALLOW_SOFT_PLACEMENT,
   OPTION_TF_GPU_MEMORY_FRACTION,
@@ -329,6 +330,10 @@ std::vector<Option> options_
        "memory to accelerate data transfer between host and devices until it "
        "exceeds the specified byte size. This option will not affect the "
        "allocation conducted by the backend frameworks. Default is 256 MB."},
+      {OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
+       "min-supported-compute-capability",
+       "The minimum supported CUDA compute capability. GPUs that don't support "
+       "this compute capability will not be used by the server."},
       {OPTION_EXIT_TIMEOUT_SECS, "exit-timeout-secs",
        "Timeout (in seconds) when exiting to wait for in-flight inferences to "
        "finish. After the timeout expires the server exits even if inferences "
@@ -729,6 +734,12 @@ ParseFloatOption(const std::string arg)
   return std::stof(arg);
 }
 
+double
+ParseDoubleOption(const std::string arg)
+{
+  return std::stod(arg);
+}
+
 // Condition here merely to avoid compilation error, this function will
 // be defined but not used otherwise.
 #ifdef TRTIS_ENABLE_LOGGING
@@ -851,6 +862,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   int32_t exit_timeout_secs = 30;
   int32_t repository_poll_secs = repository_poll_secs_;
   int64_t pinned_memory_pool_byte_size = 1 << 28;
+  double min_supported_compute_capability = TRTIS_MIN_COMPUTE_CAPABILITY;
 
 #ifdef TRTIS_ENABLE_HTTP
   int32_t http_port = http_port_;
@@ -1037,6 +1049,9 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       case OPTION_PINNED_MEMORY_POOL_BYTE_SIZE:
         pinned_memory_pool_byte_size = ParseLongLongOption(optarg);
         break;
+      case OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY:
+        min_supported_compute_capability = ParseDoubleOption(optarg);
+        break;
       case OPTION_EXIT_TIMEOUT_SECS:
         exit_timeout_secs = ParseIntOption(optarg);
         break;
@@ -1169,6 +1184,10 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       TRTSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(
           server_options, pinned_memory_pool_byte_size),
       "setting total pinned memory byte size");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetMinSupportedComputeCapability(
+          server_options, min_supported_compute_capability),
+      "setting minimum supported CUDA compute capability");
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetExitOnError(server_options, exit_on_error),
       "setting exit on error");

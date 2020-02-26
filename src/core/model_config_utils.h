@@ -76,20 +76,26 @@ Status GetTypedSequenceControlProperties(
 /// configuration for that platform.
 /// \param autofill If true attempt to determine any missing required
 /// configuration from the model definition.
+/// \param min_compute_capability The minimum support CUDA compute
+/// capability.
 /// \param config Returns the normalized model configuration.
 /// \return The error status.
 Status GetNormalizedModelConfig(
     const std::string& path, const BackendConfigMap& backend_config_map,
-    const bool autofill, ModelConfig* config);
+    const bool autofill, const double min_compute_capability,
+    ModelConfig* config);
 
 /// Validate that a model is specified correctly.
 /// \param config The model configuration to validate.
 /// \param expected_platform If non-empty the model will be checked
 /// to make sure its platform matches this value.
+/// \param min_compute_capability The minimum support CUDA compute
+/// capability.
 /// \return The error status. A non-OK status indicates the configuration
 /// is not valid.
 Status ValidateModelConfig(
-    const ModelConfig& config, const std::string& expected_platform);
+    const ModelConfig& config, const std::string& expected_platform,
+    const double min_compute_capability);
 
 /// Validate that the ensemble scheduling are specified correctly.
 /// \param ensemble_config The model configuration that specifies
@@ -166,17 +172,23 @@ Status ParseLongLongParameter(
 
 #ifdef TRTIS_ENABLE_GPU
 /// Validates the compute capability of the GPU indexed
-/// \param The index of the target GPU.
+/// \param gpu_id The index of the target GPU.
+/// \param min_compute_capability The minimum support CUDA compute
+/// capability.
 /// \return The error status. A non-OK status means the target GPU is
 ///  not supported
-Status CheckGPUCompatibility(const int gpu_id);
+Status CheckGPUCompatibility(
+    const int gpu_id, const double min_compute_capability);
 
 /// Obtains a set of gpu ids that is supported by TRTIS.
-/// \param The set of integers which is populated by ids of
-///  supported GPUS
+/// \param supported_gpus Returns the set of integers which is
+///  populated by ids of supported GPUS
+/// \param min_compute_capability The minimum support CUDA compute
+/// capability.
 /// \return The error status. A non-ok status means there were
 /// errors encountered while querying GPU devices.
-Status GetSupportedGPUs(std::set<int>& supported_gpus);
+Status GetSupportedGPUs(
+    std::set<int>* supported_gpus, const double min_compute_capability);
 #endif
 
 /// Obtain the 'profile_index' of the 'profile_name'.
