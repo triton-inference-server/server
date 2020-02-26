@@ -50,10 +50,12 @@ OnnxLoader::Init()
     // If needed, provide custom logger with
     // ort_api->CreateEnvWithCustomLogger()
     OrtStatus* status;
-    if (LOG_VERBOSE_IS_ON(1)) {
+    if (LOG_VERBOSE_IS_ON(2)) {
       status = ort_api->CreateEnv(ORT_LOGGING_LEVEL_VERBOSE, "log", &env);
-    } else {
+    } else if (LOG_VERBOSE_IS_ON(1)) {
       status = ort_api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "log", &env);
+    } else {
+      status = ort_api->CreateEnv(ORT_LOGGING_LEVEL_ERROR, "log", &env);
     }
 
     loader = new OnnxLoader(env);
