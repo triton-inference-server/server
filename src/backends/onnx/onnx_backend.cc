@@ -43,9 +43,9 @@
 #include <cuda_runtime_api.h>
 #endif  // TRTIS_ENABLE_GPU
 
-#ifdef TRTIS_ENABLE_TENSORRT
+#ifdef TRTIS_ENABLE_ONNXRUNTIME_TENSORRT
 #include <tensorrt_provider_factory.h>
-#endif  // TRTIS_ENABLE_TENSORRT
+#endif  // TRTIS_ENABLE_ONNXRUNTIME_TENSORRT
 
 #ifdef TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
 #include <openvino_provider_factory.h>
@@ -226,14 +226,14 @@ OnnxBackend::CreateExecutionContext(
                .optimization()
                .execution_accelerators()
                .gpu_execution_accelerator()) {
-#ifdef TRTIS_ENABLE_TENSORRT
+#ifdef TRTIS_ENABLE_ONNXRUNTIME_TENSORRT
         if (execution_accelerator.name() == kTensorRTExecutionAccelerator) {
           RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_Tensorrt(
               session_options, gpu_device));
           LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
                          << instance_name << " on device " << gpu_device;
         } else
-#endif  // TRTIS_ENABLE_TENSORRT
+#endif  // TRTIS_ENABLE_ONNXRUNTIME_TENSORRT
         {
           return Status(
               RequestStatusCode::INVALID_ARG,
