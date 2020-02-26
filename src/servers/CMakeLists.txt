@@ -142,13 +142,6 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
   endif() # TRTIS_ENABLE_GPU
 
   add_dependencies(http-endpoint-library proto-library)
-  if(${TRTIS_ENABLE_HTTP})
-    add_dependencies(http-endpoint-library grpc-library)
-  endif() # TRTIS_ENABLE_HTTP
-  if(${TRTIS_ENABLE_HTTP_V2})
-    add_dependencies(http-endpoint-library grpc-v2-library)
-  endif() # TRTIS_ENABLE_HTTP_V2
-
   target_include_directories(
     http-endpoint-library
     PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
