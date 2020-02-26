@@ -71,8 +71,9 @@ fi
         -DTRTIS_ENABLE_ONNXRUNTIME_OPENVINO=OFF \
         -DTRTIS_ENABLE_PYTORCH=OFF \
         -DTRTIS_ENABLE_GPU=OFF \
-        -DTRTIS_ENABLE_GRPC=ON \
-        -DTRTIS_ENABLE_HTTP=ON \
+        -DTRTIS_ENABLE_GRPC=OFF \
+        -DTRTIS_ENABLE_GRPC_V2=ON \
+        -DTRTIS_ENABLE_HTTP=OFF \
         -DTRTIS_ENABLE_HTTP_V2=ON \
         ../build && \
     make -j16 trtis trtis-clients && \
