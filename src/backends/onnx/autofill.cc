@@ -386,6 +386,9 @@ AutoFillOnnx::Create(
 
         status = OnnxLoader::LoadSession(
             std::make_pair(false, local_onnx_path), session_options, &session);
+
+        DestroyFileFolder(local_onnx_path);
+
         if (status.IsOk()) {
           local_autofill.reset(new AutoFillOnnxImpl(model_name, dir));
           found = true;
