@@ -99,9 +99,9 @@ class InferenceServerClient:
 
         """
         try:
-            self._request = grpc_service_v2_pb2.ServerLiveRequest()
-            self._response = self._client_stub.ServerLive(self._request)
-            return self._response.live
+            request = grpc_service_v2_pb2.ServerLiveRequest()
+            response = self._client_stub.ServerLive(request)
+            return response.live
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -120,9 +120,9 @@ class InferenceServerClient:
 
         """
         try:
-            self._request = grpc_service_v2_pb2.ServerReadyRequest()
-            self._response = self._client_stub.ServerReady(self._request)
-            return self._response.ready
+            request = grpc_service_v2_pb2.ServerReadyRequest()
+            response = self._client_stub.ServerReady(request)
+            return response.ready
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -150,10 +150,10 @@ class InferenceServerClient:
 
         """
         try:
-            self._request = grpc_service_v2_pb2.ModelReadyRequest(
+            request = grpc_service_v2_pb2.ModelReadyRequest(
                 name=model_name, version=model_version)
-            self._response = self._client_stub.ModelReady(self._request)
-            return self._response.ready
+            response = self._client_stub.ModelReady(request)
+            return response.ready
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -179,12 +179,12 @@ class InferenceServerClient:
 
         """
         try:
-            self._request = grpc_service_v2_pb2.ServerMetadataRequest()
-            self._response = self._client_stub.ServerMetadata(self._request)
+            request = grpc_service_v2_pb2.ServerMetadataRequest()
+            response = self._client_stub.ServerMetadata(request)
             if as_json:
-                return json.loads(MessageToJson(self._response))
+                return json.loads(MessageToJson(response))
             else:
-                return self._response
+                return response
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -215,13 +215,13 @@ class InferenceServerClient:
 
         """
         try:
-            self._request = grpc_service_v2_pb2.ModelMetadataRequest(
+            request = grpc_service_v2_pb2.ModelMetadataRequest(
                 name=model_name, version=model_version)
-            self._response = self._client_stub.ModelMetadata(self._request)
+            response = self._client_stub.ModelMetadata(request)
             if as_json:
-                return json.loads(MessageToJson(self._response))
+                return json.loads(MessageToJson(response))
             else:
-                return self._response
+                return response
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -252,13 +252,13 @@ class InferenceServerClient:
 
         """
         try:
-            self._request = grpc_service_v2_pb2.ModelConfigRequest(
+            request = grpc_service_v2_pb2.ModelConfigRequest(
                 name=model_name, version=model_version)
-            self._response = self._client_stub.ModelConfig(self._request)
+            response = self._client_stub.ModelConfig(request)
             if as_json:
-                return json.loads(MessageToJson(self._response))
+                return json.loads(MessageToJson(response))
             else:
-                return self._response
+                return response
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -351,9 +351,9 @@ class InferenceServerClient:
                                     request_id, sequence_id)
 
         try:
-            self._response = self._client_stub.ModelInfer(self._request)
-            self._result = InferResult(self._response)
-            return self._result
+            response = self._client_stub.ModelInfer(self._request)
+            result = InferResult(response)
+            return result
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -565,11 +565,10 @@ class InferOutput:
         is optional.
     """
 
-    def __init__(self, name, data_format="binary"):
+    def __init__(self, name):
         self._output = grpc_service_v2_pb2.ModelInferRequest(
         ).InferRequestedOutputTensor()
         self._output.name = name
-        self._output.data_format = data_format
 
     @property
     def name(self):

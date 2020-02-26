@@ -133,9 +133,9 @@ class InferenceServerClient:
             If unable to get liveness.
 
         """
-        self.response = self._client_stub.get("/v2/health/live")
-        self._last_request_id = raise_if_error(self.response['NV-Status'])
-        return self.response.status_code == 200
+        response = self._client_stub.get("/v2/health/live")
+        self._last_request_id = raise_if_error(response['NV-Status'])
+        return response.status_code == 200
 
     def is_server_ready(self):
         """Contact the inference server and get readiness.
@@ -151,9 +151,9 @@ class InferenceServerClient:
             If unable to get readiness.
 
         """
-        self.response = self._client_stub.get("/v2/health/ready")
-        self._last_request_id = raise_if_error(self.response['NV-Status'])
-        return self.response.status_code == 200
+        response = self._client_stub.get("/v2/health/ready")
+        self._last_request_id = raise_if_error(response['NV-Status'])
+        return response.status_code == 200
 
     def is_model_ready(self, model_name, model_version=-1):
         """Contact the inference server and get the readiness of specified model.
@@ -196,8 +196,8 @@ class InferenceServerClient:
 
         """
 
-        self.response = self._client_stub.get("/v2")
-        self._last_request_id = raise_if_error(self.response['NV-Status'])
+        response = self._client_stub.get("/v2")
+        self._last_request_id = raise_if_error(response['NV-Status'])
 
         status = json.loads(self.response.read())
         return status
@@ -221,11 +221,11 @@ class InferenceServerClient:
             If unable to get model metadata.
 
         """
-        #self.response = self._client_stub.get("/api/status/" + model_name +
+        #response = self._client_stub.get("/api/status/" + model_name +
         #                                      "?format=json")
-        #self._last_request_id = raise_if_error(self.response['NV-Status'])
+        #self._last_request_id = raise_if_error(response['NV-Status'])
 
-        #status = json.loads(self.response.read())
+        #status = json.loads(response.read())
         #return status
         raise_error('Not implemented')
         return None
@@ -244,9 +244,9 @@ class InferenceServerClient:
             If unable to load the model.
 
         """
-        #self.response = self._client_stub.post("/api/modelcontrol/load/" +
+        #response = self._client_stub.post("/api/modelcontrol/load/" +
         #                                       model_name)
-        #self._last_request_id = raise_if_error(self.response['NV-Status'])
+        #self._last_request_id = raise_if_error(response['NV-Status'])
         raise_error('Not implemented')
         return None
 
@@ -264,9 +264,9 @@ class InferenceServerClient:
             If unable to unload the model.
 
         """
-        #self.response = self._client_stub.post("/api/modelcontrol/unload/" +
+        #response = self._client_stub.post("/api/modelcontrol/unload/" +
         #                                       model_name)
-        #self._last_request_id = raise_if_error(self.response['NV-Status'])
+        #self._last_request_id = raise_if_error(response['NV-Status'])
         raise_error('Not implemented')
         return None
 
