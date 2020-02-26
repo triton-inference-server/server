@@ -25,6 +25,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
 set +e
 
 RET=0
@@ -99,6 +109,7 @@ SIMPLE_STRING_INFER_CLIENT=/workspace/builddir/trtis-clients/install/python/simp
 SIMPLE_CLASS_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc_class_client.py
 EXPLICIT_BYTE_CONTENT_CLIENT=/workspace/builddir/trtis-clients/install/python/grpc_v2_explicit_byte_content_client.py
 EXPLICIT_INT_CONTENT_CLIENT=/workspace/builddir/trtis-clients/install/python/grpc_v2_explicit_int_content_client.py
+EXPLICIT_INT8_CONTENT_CLIENT=/workspace/builddir/trtis-clients/install/python/grpc_v2_explicit_int8_content_client.py
 
 rm -f *.log
 rm -f *.log.*
@@ -113,6 +124,7 @@ wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
      https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz
 (cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
 mv /tmp/inception_v3_2016_08_28_frozen.pb models/inception_graphdef/1/model.graphdef
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_int8_int32_int32 models/
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
@@ -151,6 +163,7 @@ for i in \
         $SIMPLE_CLASS_CLIENT \
         $EXPLICIT_BYTE_CONTENT_CLIENT \
         $EXPLICIT_INT_CONTENT_CLIENT \
+        $EXPLICIT_INT8_CONTENT_CLIENT \
         ; do
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"

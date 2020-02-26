@@ -58,7 +58,7 @@ def model_dtype_to_np(model_dtype):
         return np.float32
     elif model_dtype == "FP64":
         return np.float64
-    elif model_dtype == "STRING":
+    elif model_dtype == "BYTES":
         return np.dtype(object)
     return None
 

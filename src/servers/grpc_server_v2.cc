@@ -1299,7 +1299,7 @@ InferAllocatorPayload(
 TRTSERVER_Error*
 InferGRPCToInputHelper(
     const std::string& input_name, const std::string& model_name,
-    const std::string& tensor_dt, const std::string input_dt,
+    const std::string& tensor_dt, const std::string& input_dt,
     const size_t byte_size)
 {
   if (input_dt.compare(tensor_dt) != 0) {
@@ -1338,6 +1338,7 @@ InferGRPCToInput(
     size_t byte_size;
     TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
     int64_t memory_type_id = 0;
+    bool has_byte_contents = false;
 
 #if 0
     if (io.has_shared_memory()) {
@@ -1375,11 +1376,41 @@ InferGRPCToInput(
       }
 
       if (io.contents().int_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), "INT32", io.datatype(),
-            byte_size));
-        base = (const void*)io.contents().int_contents().data();
-        byte_size = io.contents().int_contents_size() * 4;
+        if (io.datatype().compare("INT8") == 0) {
+          RETURN_IF_ERR(InferGRPCToInputHelper(
+              io.name(), request.model_name(), "INT8", io.datatype(),
+              byte_size));
+          std::shared_ptr<std::string> serialized(new std::string());
+          serialized_data_map->emplace(io.name(), serialized);
+          for (const auto& element : io.contents().int_contents()) {
+            // Assuming the system is little-endian, picking the
+            // least significant byte of 32-bit integer as a
+            // int8 element
+            serialized->append(reinterpret_cast<const char*>(&element), 1);
+          }
+          base = serialized->c_str();
+          byte_size = serialized->size();
+        } else if (io.datatype().compare("INT16") == 0) {
+          RETURN_IF_ERR(InferGRPCToInputHelper(
+              io.name(), request.model_name(), "INT16", io.datatype(),
+              byte_size));
+          std::shared_ptr<std::string> serialized(new std::string());
+          serialized_data_map->emplace(io.name(), serialized);
+          for (const auto& element : io.contents().int_contents()) {
+            // Assuming the system is little-endian, picking the
+            // least 2 significant bytes of 32-bit integer as a
+            // int16 element
+            serialized->append(reinterpret_cast<const char*>(&element), 2);
+          }
+          base = serialized->c_str();
+          byte_size = serialized->size();
+        } else {
+          RETURN_IF_ERR(InferGRPCToInputHelper(
+              io.name(), request.model_name(), "INT32", io.datatype(),
+              byte_size));
+          base = (const void*)io.contents().int_contents().data();
+          byte_size = io.contents().int_contents_size() * 4;
+        }
       }
 
       if (io.contents().int64_contents_size() != 0) {
@@ -1391,11 +1422,41 @@ InferGRPCToInput(
       }
 
       if (io.contents().uint_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), "UINT32", io.datatype(),
-            byte_size));
-        base = (const void*)io.contents().uint_contents().data();
-        byte_size = io.contents().uint_contents_size() * 4;
+        if (io.datatype().compare("UINT8") == 0) {
+          RETURN_IF_ERR(InferGRPCToInputHelper(
+              io.name(), request.model_name(), "UINT8", io.datatype(),
+              byte_size));
+          std::shared_ptr<std::string> serialized(new std::string());
+          serialized_data_map->emplace(io.name(), serialized);
+          for (const auto& element : io.contents().uint_contents()) {
+            // Assuming the system is little-endian, picking the
+            // least significant byte of 32-bit unsigned integer as a
+            // uint8 element
+            serialized->append(reinterpret_cast<const char*>(&element), 1);
+          }
+          base = serialized->c_str();
+          byte_size = serialized->size();
+        } else if (io.datatype().compare("UINT16") == 0) {
+          RETURN_IF_ERR(InferGRPCToInputHelper(
+              io.name(), request.model_name(), "UINT16", io.datatype(),
+              byte_size));
+          std::shared_ptr<std::string> serialized(new std::string());
+          serialized_data_map->emplace(io.name(), serialized);
+          for (const auto& element : io.contents().uint_contents()) {
+            // Assuming the system is little-endian, picking the
+            // least 2 significant bytes of 32-bit integer as a
+            // uint16 element
+            serialized->append(reinterpret_cast<const char*>(&element), 2);
+          }
+          base = serialized->c_str();
+          byte_size = serialized->size();
+        } else {
+          RETURN_IF_ERR(InferGRPCToInputHelper(
+              io.name(), request.model_name(), "UINT32", io.datatype(),
+              byte_size));
+          base = (const void*)io.contents().int_contents().data();
+          byte_size = io.contents().int_contents_size() * 4;
+        }
       }
 
       if (io.contents().uint64_contents_size() != 0) {
@@ -1421,17 +1482,17 @@ InferGRPCToInput(
       }
 
       if (io.contents().byte_contents_size() != 0) {
+        has_byte_contents = true;
         RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), "STRING", io.datatype(),
+            io.name(), request.model_name(), "BYTES", io.datatype(),
             byte_size));
-        std::shared_ptr<std::string> serialized(new std::string(""));
+        std::shared_ptr<std::string> serialized(new std::string());
         serialized_data_map->emplace(io.name(), serialized);
 
         // Serialize the output tensor strings. Each string is
         // serialized as a 4-byte length followed by the string itself
         // with no null-terminator.
-        for (int e = 0; e < io.contents().byte_contents_size(); ++e) {
-          const std::string& element = io.contents().byte_contents().Get(e);
+        for (const auto& element : io.contents().byte_contents()) {
           uint32_t len{(uint32_t)element.size()};
           serialized->append(
               reinterpret_cast<const char*>(&len), sizeof(uint32_t));
@@ -1443,19 +1504,21 @@ InferGRPCToInput(
         byte_size = serialized->size();
       }
     }
+    if (!has_byte_contents) {
+      uint64_t expected_byte_size = 0;
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
+          request_provider, io.name().c_str(), &expected_byte_size));
 
-    uint64_t expected_byte_size = 0;
-    RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
-        request_provider, io.name().c_str(), &expected_byte_size));
-
-    if ((expected_byte_size != 0) && (byte_size != expected_byte_size)) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
-          std::string(
-              "unexpected size " + std::to_string(byte_size) + " for input '" +
-              io.name() + "', expecting " + std::to_string(expected_byte_size) +
-              " for model '" + request.model_name() + "'")
-              .c_str());
+      if ((byte_size != expected_byte_size)) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "unexpected size " + std::to_string(byte_size) +
+                " for input '" + io.name() + "', expecting " +
+                std::to_string(expected_byte_size) + " for model '" +
+                request.model_name() + "'")
+                .c_str());
+      }
     }
 
     RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
@@ -1734,7 +1797,7 @@ ModelInferHandler::InferComplete(
             output.add_shape(io.batch_classes().size());
             output.add_shape(cls_count);
 
-            output.set_datatype("STRING");
+            output.set_datatype("BYTES");
           }
           break;
         }

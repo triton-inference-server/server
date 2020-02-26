@@ -526,7 +526,7 @@ class InferInput:
         self._input.datatype = np_to_trtis_dtype(input_tensor.dtype)
         self._input.ClearField('shape')
         self._input.shape.extend(input_tensor.shape)
-        if self._input.datatype == "STRING":
+        if self._input.datatype == "BYTES":
             self._input.contents.raw_contents = serialize_string_tensor(
                 input_tensor).tobytes()
         else:
@@ -645,7 +645,7 @@ class InferResult:
 
                 datatype = output.datatype
                 if len(output.contents.raw_contents) != 0:
-                    if datatype == 'STRING':
+                    if datatype == 'BYTES':
                         # String results contain a 4-byte string length
                         # followed by the actual string characters. Hence,
                         # need to decode the raw bytes to convert into

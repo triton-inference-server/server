@@ -26,13 +26,11 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-import sys
 import numpy as np
 
 import grpc
 from tensorrtserverV2.api import grpc_service_v2_pb2
 from tensorrtserverV2.api import grpc_service_v2_pb2_grpc
-from tensorrtserverV2.common import deserialize_string_tensor
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -55,7 +53,7 @@ if __name__ == '__main__':
     # each and returns 2 output tensors of 16 integers each. One
     # output tensor is the element-wise sum of the inputs and one
     # output is the element-wise difference.
-    model_name = "simple_string"
+    model_name = "graphdef_int8_int32_int32"
     model_version = -1
     batch_size = 1
 
@@ -68,21 +66,22 @@ if __name__ == '__main__':
     request.model_name = model_name
     request.model_version = -1
 
+    # Input data
+    input0_data = [i for i in range(16)]
+    input1_data = [1 for i in range(16)]
+
     # Populate the inputs in inference request
     input0 = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
     input0.name = "INPUT0"
-    input0.datatype = "BYTES"
+    input0.datatype = "INT8"
     input0.shape.extend([1, 16])
-    for i in range(16):
-        input0.contents.byte_contents.append(('{}'.format(i)).encode('utf-8'))
+    input0.contents.int_contents[:] = input0_data
 
     input1 = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
     input1.name = "INPUT1"
-    input1.datatype = "BYTES"
+    input1.datatype = "INT8"
     input1.shape.extend([1, 16])
-    for i in range(16):
-        input1.contents.byte_contents.append('1'.encode('utf-8'))
-
+    input1.contents.int_contents[:] = input1_data
     request.inputs.extend([input0, input1])
 
     # Populate the outputs in the inference request
@@ -95,27 +94,30 @@ if __name__ == '__main__':
 
     response = grpc_stub.ModelInfer(request)
 
-    # Deserialize the output raw tensor to numpy array for proper comparison
     output_results = []
     for output in response.outputs:
         shape = []
         for value in output.shape:
             shape.append(value)
-        output_results.append(deserialize_string_tensor(output.contents.raw_contents))
+        output_results.append(np.frombuffer(
+                        output.contents.raw_contents,
+                        dtype=np.int32))
         output_results[-1] = np.resize(output_results[-1], shape)
-
+    
     if len(output_results) != 2:
         print("expected two output results")
         sys.exit(1)
 
     for i in range(16):
-        print("{} + 1 = {}".format(i, output_results[0][0][i]))
-        print("{} - 1 = {}".format(i, output_results[1][0][i]))
-        
-        if (i + 1) != int(output_results[0][0][i]):
-            print("explicit string infer error: incorrect sum")
+        print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
+            str(output_results[0][0][i]))
+        print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
+            str(output_results[1][0][i]))
+        if (input0_data[i] + input1_data[i]) != output_results[0][0][i]:
+            print("sync infer error: incorrect sum")
             sys.exit(1)
-        if (i - 1) != int(output_results[1][0][i]):
-            print("explicit string infer error: incorrect difference")
+        if (input0_data[i] - input1_data[i]) != output_results[1][0][i]:
+            print("sync infer error: incorrect difference")
             sys.exit(1)
-    print('PASS: explicit string')
+    
+    print('PASS: explicit int8')

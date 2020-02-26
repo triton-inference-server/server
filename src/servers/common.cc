@@ -224,7 +224,7 @@ GetDataTypeProtocolString(const DataType dtype)
     case TYPE_FP64:
       return "FP64";
     case TYPE_STRING:
-      return "STRING";
+      return "BYTES";
     default:
       break;
   }
