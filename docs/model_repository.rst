@@ -305,7 +305,10 @@ required the minimal model repository would look like::
         model.onnx
 
 An ONNX model composed from multiple files must be contained in a
-directory. The main model file must be named model.onnx. A minimal
+directory.  By default this directory must be named model.onnx but can
+be overridden using the *default_model_filename* property in the
+:ref:`model configuration <section-model-configuration>`. The main
+model file within this directory must be named model.onnx. A minimal
 model repository for a single ONNX model contained in a directory
 would look like::
 
