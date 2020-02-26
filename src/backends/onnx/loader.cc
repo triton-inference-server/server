@@ -28,6 +28,7 @@
 
 #include <future>
 #include <thread>
+#include "src/core/logging.h"
 #include "src/backends/onnx/onnx_utils.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -48,8 +49,13 @@ OnnxLoader::Init()
     OrtEnv* env;
     // If needed, provide custom logger with
     // ort_api->CreateEnvWithCustomLogger()
-    OrtStatus* status =
-        ort_api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "log", &env);
+    OrtStatus* status;
+    if (LOG_VERBOSE_IS_ON(1)) {
+      status = ort_api->CreateEnv(ORT_LOGGING_LEVEL_VERBOSE, "log", &env);
+    } else {
+      status = ort_api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "log", &env);
+    }
+
     loader = new OnnxLoader(env);
     RETURN_IF_ORT_ERROR(status);
   } else {
