@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 HTTP and GRPC API
 =================
 
-The TensorRT Inference Server exposes both HTTP and GRPC
+The Triton Inference Server exposes both HTTP and GRPC
 endpoints. The following endpoints are exposed for each protocol.
 
 * :ref:`section-api-health`: The server health API for determining
@@ -229,7 +229,7 @@ Stream Inference
 Some applications may request that multiple requests be sent using one
 persistent connection rather than potentially establishing multiple
 connections. For instance, in the case where multiple instances of
-TensorRT Inference Server are created with the purpose of load
+Triton Inference Server are created with the purpose of load
 balancing, requests sent in different connections may be routed to
 different server instances. This scenario will not fit the need if the
 requests are correlated, where they are expected to be processed by

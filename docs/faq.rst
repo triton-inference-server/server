@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -30,10 +30,10 @@
 FAQ
 ===
 
-What are the advantages of running a model with TensorRT Inference Server compared to running directly using the model's framework API?
----------------------------------------------------------------------------------------------------------------------------------------
+What are the advantages of running a model with Triton Inference Server compared to running directly using the model's framework API?
+-------------------------------------------------------------------------------------------------------------------------------------
 
-When using TensorRT Inference Server the inference result will be the
+When using Triton Inference Server the inference result will be the
 same as when using the model's framework directly. However, with the
 inference server we get benefits like :ref:`concurrent model execution
 <section-concurrent-model-execution>` (the ability to run multiple
@@ -42,20 +42,20 @@ models at the same time on the same GPU) and :ref:`dynamic batching
 :ref:`replace or upgrade models while the inference server and client
 application are running <section-model-management>`. Another benefit
 is that the inference server can be deployed as a Docker container,
-anywhere – on premises and on public clouds. TensorRT Inference Server
+anywhere – on premises and on public clouds. Triton Inference Server
 also :ref:`supports several frameworks <section-model-repository>`
 such as TensorRT, TensorFlow, PyTorch, and ONNX on both GPUs and CPUs
 leading to a streamlined deployment.
 
-Can TensorRT Inference Server run on systems that don't have GPUs?
-------------------------------------------------------------------
+Can Triton Inference Server run on systems that don't have GPUs?
+----------------------------------------------------------------
 
 Yes, see :ref:`section-running-the-inference-server-without-gpu`.
 
-Can TensorRT Inference Server be used in non-Docker environments?
------------------------------------------------------------------
+Can Triton Inference Server be used in non-Docker environments?
+---------------------------------------------------------------
 
-Yes. TensorRT Inference Server has a CMake build that allows the
+Yes. Triton Inference Server has a CMake build that allows the
 inference server to be built from source making it more portable to
 non-Docker environments. For more details, see
 :ref:`section-building-the-server-with-cmake`. After building you can
@@ -66,10 +66,10 @@ Do you provide client libraries for languages other than C++ and Python?
 ------------------------------------------------------------------------
 
 We provide C++ and Python client libraries to make it easy for users
-to write client applications that communicate with TRTIS. We chose
-those languages because they were likely to be popular and performant
-in the ML inference space, but in the future we can possibly add
-another language if there is a need.
+to write client applications that communicate with Triton Inference
+Server. We chose those languages because they were likely to be
+popular and performant in the ML inference space, but in the future we
+can possibly add another language if there is a need.
 
 We provide the GRPC API as a way to generate your own client library
 for a large number of languages. By following the official GRPC
@@ -90,10 +90,10 @@ well tested, but they are not meant to serve every possible use
 case. In some cases you may want to develop your own customized
 library to suit your specific needs.
 
-How would you use TensorRT Inference Server within the AWS environment?
------------------------------------------------------------------------
+How would you use Triton Inference Server within the AWS environment?
+---------------------------------------------------------------------
 
-In an AWS environment, the TensorRT Inference Server docker container
+In an AWS environment, the Triton Inference Server docker container
 can run on :ref:`CPU-only instances
 <section-running-the-inference-server-without-gpu>` or GPU compute
 instances. The inference server can run directly on the compute
@@ -103,10 +103,10 @@ load balancing traffic among multiple inference server
 instances. Elastic Block Store (EBS) or S3 can be used for storing
 deep-learning models loaded by the inference server.
 
-How do I measure the performance of my model running in the TensorRT Inference Server?
---------------------------------------------------------------------------------------
+How do I measure the performance of my model running in the Triton Inference Server?
+------------------------------------------------------------------------------------
 
-The TensorRT Inference Server exposes performance information in two
+The Triton Inference Server exposes performance information in two
 ways: by :ref:`Prometheus metrics <section-metrics>` and by the
 :ref:`Status API <section-api-status>`.
 
@@ -116,10 +116,10 @@ of an individual model using a synthetic load. The perf\_client
 application is designed to show you the tradeoff of latency
 vs. throughput.
 
-How can I fully utilize the GPU with TensorRT Inference Server?
----------------------------------------------------------------
+How can I fully utilize the GPU with Triton Inference Server?
+-------------------------------------------------------------
 
-TensorRT Inference Server has several features designed to increase
+Triton Inference Server has several features designed to increase
 GPU utilization:
 
 * The inference server can :ref:`simultaneous perform inference for
@@ -147,11 +147,11 @@ most useful for models that have small compute requirements. Most
 models will benefit from using two instances but more than that is
 often not useful.
 
-If I have a server with multiple GPUs should I use one TensorRT Inference Server to manage all GPUs or should I use multiple inference servers, one for each GPU?
------------------------------------------------------------------------------------------------------------------------------------------------------------------
+If I have a server with multiple GPUs should I use one Triton Inference Server to manage all GPUs or should I use multiple inference servers, one for each GPU?
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-TensorRT Inference Server will take advantage of all GPUs on the
-server that it has access to. You can limit the GPUs available to the
+Triton Inference Server will take advantage of all GPUs on the server
+that it has access to. You can limit the GPUs available to the
 inference server by using the CUDA_VISIBLE_DEVICES environment
 variable (or with Docker you can also use NVIDIA_VISIBLE_DEVICES when
 launching the container). When using multiple GPUs, the inference

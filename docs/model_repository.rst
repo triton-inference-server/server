@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 Model Repository
 ================
 
-The TensorRT Inference Server accesses models from one or more locally
+The Triton Inference Server accesses models from one or more locally
 accessible file paths, from Google Cloud Storage, and from Amazon
 S3. These paths are specified when the server is started using the
 -\\-model-repository option.

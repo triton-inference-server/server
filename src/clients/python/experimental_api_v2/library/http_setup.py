@@ -61,7 +61,7 @@ setup(
     description='Python client library for communicating with NVIDIA Triton Inference Server using HTTP',
     license='BSD',
     url='http://nvidia.com',
-    keywords='triton tensorrt inference server service client',
+    keywords='triton inference server service client',
     packages=find_packages(),
     install_requires=REQUIRED,
     zip_safe=False,

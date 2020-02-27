@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -29,7 +29,7 @@ Testing
 =======
 
 Currently there is no CI testing enabled for the open-source version
-of the TensorRT Inference Server. We will enable CI testing in a
+of the Triton Inference Server. We will enable CI testing in a
 future update.
 
 However, there is a set of tests in the qa/ directory that can be run

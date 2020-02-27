@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 Metrics
 =======
 
-The TensorRT Inference server provides `Prometheus
+The Triton Inference server provides `Prometheus
 <https://prometheus.io/>`_ metrics indicating GPU and request
 statistics. By default, these metrics are available at
 http://localhost:8002/metrics. The metrics are only available by

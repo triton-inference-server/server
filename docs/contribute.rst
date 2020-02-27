@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -28,7 +28,7 @@
 Contributing
 ============
 
-Contributions to TensorRT Inference Server are more than welcome. To
+Contributions to Triton Inference Server are more than welcome. To
 contribute make a pull request and follow the guidelines outlined in
 the `CONTRIBUTING
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/CONTRIBUTING.md>`_

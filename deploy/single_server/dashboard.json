@@ -405,7 +405,7 @@
     ]
   },
   "timezone": "",
-  "title": "TensorRT Inference Server",
+  "title": "Triton Inference Server",
   "uid": "slEY4dsZk",
   "version": 8
 }

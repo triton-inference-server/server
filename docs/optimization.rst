@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 Optimization
 ============
 
-The TensorRT Inference Server has many features that you can use to
+The Triton Inference Server has many features that you can use to
 decrease latency and increase throughput for your model. This section
 discusses these features and demonstrates how you can use them to
 improve the performance of your model. As a prerequisite you should
