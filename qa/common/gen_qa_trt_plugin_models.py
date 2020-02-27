@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@ import os
 import sys
 
 import numpy as np
-import tensorrt.legacy as trt
+import tensorrt as trt
 
 TRT_LOGGER = trt.Logger()
 
@@ -108,23 +108,27 @@ def create_plan_modelfile(models_dir, max_batch, model_version, plugin_name,
                                input_dtype, output0_dtype, output0_dtype) + '_' +  plugin_name
 
     with trt.Builder(TRT_LOGGER) as builder, builder.create_network() as network:
-        builder.set_max_batch_size(max(1, max_batch))
-        builder.max_workspace_size = 1 << 20
         input_layer = network.add_input(name="INPUT0", dtype=trt_input_dtype, shape=input_shape)
         plugin_layer = network.add_plugin_v2(inputs=[input_layer], plugin=get_trt_plugin(plugin_name))
         plugin_layer.get_output(0).name = "OUTPUT0"
         network.mark_output(plugin_layer.get_output(0))
-        engine = builder.build_cuda_engine(network)
-        lengine = trt.lite.Engine(engine_stream=engine.serialize(),
-                                  max_batch_size=max(1, max_batch))
+
+        config = builder.create_builder_config()
+        config.max_workspace_size = 1 << 20
+        builder.max_batch_size = max(1, max_batch)
+        engine = builder.build_engine(network,config)
+
         model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
         try:
             os.makedirs(model_version_dir)
         except OSError as ex:
             pass # ignore existing dir
-        lengine.save(model_version_dir + "/model.plan")
-        engine.destroy()
+
+        with open(model_version_dir + "/model.plan", "wb") as f:
+            f.write(engine.serialize())
+
+        del engine
 
 def create_plan_modelconfig(
         models_dir, max_batch, model_version, plugin_name, input_shape,
