@@ -44,7 +44,10 @@ class MetricModelReporter;
 //
 class InferenceBackend {
  public:
-  InferenceBackend() = default;
+  explicit InferenceBackend(const double min_compute_capability)
+      : min_compute_capability_(min_compute_capability)
+  {
+  }
   virtual ~InferenceBackend() {}
 
   // Get the name of model being served.
@@ -133,6 +136,9 @@ class InferenceBackend {
 
   // Generate warmup data
   Status GenerateWarmupData(std::vector<WarmupData>* samples);
+
+  // The minimum supported CUDA compute capability.
+  const double min_compute_capability_;
 
   // Configuration of the model that this backend represents.
   ModelConfig config_;

@@ -217,7 +217,8 @@ InferenceBackend::Init(
     const std::string& path, const ModelConfig& config,
     const std::string& platform)
 {
-  RETURN_IF_ERROR(ValidateModelConfig(config, platform));
+  RETURN_IF_ERROR(
+      ValidateModelConfig(config, platform, min_compute_capability_));
   RETURN_IF_ERROR(SetModelConfig(path, config));
 
   return Status::Success;

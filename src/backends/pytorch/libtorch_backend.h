@@ -43,7 +43,10 @@ class AllocatedMemory;
 
 class LibTorchBackend : public InferenceBackend {
  public:
-  LibTorchBackend() = default;
+  explicit LibTorchBackend(const double min_compute_capability)
+      : InferenceBackend(min_compute_capability)
+  {
+  }
   LibTorchBackend(LibTorchBackend&&) = default;
 
   // Create a context for execution for each instance for the

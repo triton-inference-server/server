@@ -53,6 +53,7 @@ NetDefBackendFactory::Create(
 Status
 NetDefBackendFactory::CreateBackend(
     const std::string& path, const ModelConfig& model_config,
+    const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {
   // Read all the netdef files in 'path'.
@@ -72,7 +73,8 @@ NetDefBackendFactory::CreateBackend(
 
   // Create the backend for the model and all the execution contexts
   // requested for this model.
-  std::unique_ptr<NetDefBackend> local_backend(new NetDefBackend);
+  std::unique_ptr<NetDefBackend> local_backend(
+      new NetDefBackend(min_compute_capability));
   RETURN_IF_ERROR(
       local_backend->Init(path, model_config, kCaffe2NetDefPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));

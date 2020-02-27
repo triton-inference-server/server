@@ -88,6 +88,8 @@ class ModelRepositoryManager {
   /// and the models in the model repository will not be loaded at startup.
   /// Otherwise, LoadUnloadModel() is not allowed and the models will be loaded.
   /// Cannot be set to true if polling_enabled is true.
+  /// \param min_compute_capability The minimum support CUDA compute
+  /// capability.
   /// \return The error status.
   static Status Create(
       InferenceServer* server, const std::string& server_version,
@@ -98,6 +100,7 @@ class ModelRepositoryManager {
       const bool tf_allow_soft_placement,
       const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
       const bool polling_enabled, const bool model_control_enabled,
+      const double min_compute_capability,
       std::unique_ptr<ModelRepositoryManager>* model_repository_manager);
 
   /// Poll the model repository to determine the new set of models and
@@ -148,6 +151,7 @@ class ModelRepositoryManager {
       const std::set<std::string>& repository_paths,
       const BackendConfigMap& backend_config_map, const bool autofill,
       const bool polling_enabled, const bool model_control_enabled,
+      const double min_compute_capability,
       std::unique_ptr<BackendLifeCycle> life_cycle);
 
   /// The internal function that are called in Create() and PollAndUpdate().
@@ -259,6 +263,7 @@ class ModelRepositoryManager {
   const bool autofill_;
   const bool polling_enabled_;
   const bool model_control_enabled_;
+  const double min_compute_capability_;
 
   std::mutex poll_mu_;
   ModelInfoMap infos_;

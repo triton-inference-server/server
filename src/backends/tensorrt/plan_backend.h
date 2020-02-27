@@ -39,7 +39,10 @@ namespace nvidia { namespace inferenceserver {
 
 class PlanBackend : public InferenceBackend {
  public:
-  PlanBackend() = default;
+  explicit PlanBackend(const double min_compute_capability)
+      : InferenceBackend(min_compute_capability)
+  {
+  }
   PlanBackend(PlanBackend&&) = default;
   ~PlanBackend();
 

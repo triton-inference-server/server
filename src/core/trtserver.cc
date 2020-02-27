@@ -300,6 +300,15 @@ class TrtServerOptions {
   uint64_t PinnedMemoryPoolByteSize() const { return pinned_memory_pool_size_; }
   void SetPinnedMemoryPoolByteSize(uint64_t s) { pinned_memory_pool_size_ = s; }
 
+  double MinSupportedComputeCapability() const
+  {
+    return min_compute_capability_;
+  }
+  void SetMinSupportedComputeCapability(double c)
+  {
+    min_compute_capability_ = c;
+  }
+
   bool StrictReadiness() const { return strict_readiness_; }
   void SetStrictReadiness(bool b) { strict_readiness_ = b; }
 
@@ -343,6 +352,7 @@ class TrtServerOptions {
   bool gpu_metrics_;
   unsigned int exit_timeout_;
   uint64_t pinned_memory_pool_size_;
+  double min_compute_capability_;
 
   bool tf_soft_placement_;
   float tf_gpu_mem_fraction_;
@@ -354,6 +364,11 @@ TrtServerOptions::TrtServerOptions()
       model_control_mode_(ni::MODE_POLL), exit_on_error_(true),
       strict_model_config_(true), strict_readiness_(true), metrics_(true),
       gpu_metrics_(true), exit_timeout_(30), pinned_memory_pool_size_(1 << 28),
+#ifdef TRTIS_ENABLE_GPU
+      min_compute_capability_(TRTIS_MIN_COMPUTE_CAPABILITY),
+#else
+      min_compute_capability_(0),
+#endif  // TRTIS_ENABLE_GPU
       tf_soft_placement_(true), tf_gpu_mem_fraction_(0)
 {
 #ifndef TRTIS_ENABLE_METRICS
@@ -1312,6 +1327,15 @@ TRTSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(
 }
 
 TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetMinSupportedComputeCapability(
+    TRTSERVER_ServerOptions* options, double cc)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetMinSupportedComputeCapability(cc);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetStrictReadiness(
     TRTSERVER_ServerOptions* options, bool strict)
 {
@@ -1466,6 +1490,8 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
   lserver->SetStartupModels(loptions->StartupModels());
   lserver->SetStrictModelConfigEnabled(loptions->StrictModelConfig());
   lserver->SetPinnedMemoryPoolByteSize(loptions->PinnedMemoryPoolByteSize());
+  lserver->SetMinSupportedComputeCapability(
+      loptions->MinSupportedComputeCapability());
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
   lserver->SetTensorFlowSoftPlacementEnabled(

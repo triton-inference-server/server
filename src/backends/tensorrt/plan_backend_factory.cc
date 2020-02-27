@@ -70,6 +70,7 @@ PlanBackendFactory::Create(
 Status
 PlanBackendFactory::CreateBackend(
     const std::string& path, const ModelConfig& model_config,
+    const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {
   std::set<std::string> plan_files;
@@ -87,7 +88,8 @@ PlanBackendFactory::CreateBackend(
 
   // Create the backend for the model and all the execution contexts
   // requested for this model.
-  std::unique_ptr<PlanBackend> local_backend(new PlanBackend);
+  std::unique_ptr<PlanBackend> local_backend(
+      new PlanBackend(min_compute_capability));
   RETURN_IF_ERROR(
       local_backend->Init(path, model_config, kTensorRTPlanPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));

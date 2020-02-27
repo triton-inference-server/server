@@ -60,6 +60,7 @@ GraphDefBackendFactory::Create(
 Status
 GraphDefBackendFactory::CreateBackend(
     const std::string& path, const ModelConfig& model_config,
+    const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {
   // Read all the graphdef files in 'path'.
@@ -80,7 +81,8 @@ GraphDefBackendFactory::CreateBackend(
 
   // Create the backend for the model and all the execution contexts
   // requested for this model.
-  std::unique_ptr<GraphDefBackend> local_backend(new GraphDefBackend);
+  std::unique_ptr<GraphDefBackend> local_backend(
+      new GraphDefBackend(min_compute_capability));
   RETURN_IF_ERROR(local_backend->Init(
       path, model_config, backend_config_.get(), kTensorFlowGraphDefPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
