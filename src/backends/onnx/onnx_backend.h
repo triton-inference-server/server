@@ -43,18 +43,21 @@ class OnnxBackend : public InferenceBackend {
   // Create a context for execution for each instance for the
   // serialized plans specified in 'models'.
   Status CreateExecutionContexts(
-      const std::unordered_map<std::string, std::string>& paths);
+      const std::unordered_map<std::string, std::pair<bool, std::string>>&
+          paths);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
       OrtSessionOptions* base_session_options,
-      const std::unordered_map<std::string, std::string>& paths);
+      const std::unordered_map<std::string, std::pair<bool, std::string>>&
+          paths);
 
  private:
   // Helper function for CreateExecutionContexts() so that session_options
   // will be released properly regardless of possible errors
   Status CreateExecutionContextsHelper(
       OrtSessionOptions* session_options,
-      const std::unordered_map<std::string, std::string>& paths);
+      const std::unordered_map<std::string, std::pair<bool, std::string>>&
+          paths);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(OnnxBackend);
