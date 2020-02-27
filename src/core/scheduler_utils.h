@@ -122,9 +122,7 @@ class PriorityQueue {
   }
 
   // Return the number of payloads in pending batch.
-  size_t PendingBatchCount() {
-    return pending_cursor_.pending_batch_count_;
-  }
+  size_t PendingBatchCount() { return pending_cursor_.pending_batch_count_; }
 
  private:
   class PolicyQueue {

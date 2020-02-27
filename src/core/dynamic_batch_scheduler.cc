@@ -55,8 +55,8 @@ DynamicBatchScheduler::DynamicBatchScheduler(
       scheduler_thread_cnt_(runner_cnt), idle_scheduler_thread_cnt_(0),
       preferred_batch_sizes_(preferred_batch_sizes),
       pending_batch_delay_ns_(max_queue_delay_microseconds * 1000),
-      pending_batch_size_(0),
-      queued_batch_size_(0), next_preferred_batch_size_(0),
+      pending_batch_size_(0), queued_batch_size_(0),
+      next_preferred_batch_size_(0),
       enforce_equal_shape_tensors_(enforce_equal_shape_tensors),
       preserve_ordering_(preserve_ordering)
 {
@@ -427,13 +427,13 @@ DynamicBatchScheduler::SchedulerThread(
     }
 
     // Finish rejected payloads if any
-    static Status rejected_status = Status(RequestStatusCode::UNAVAILABLE,
-        "Request timeout expired");
+    static Status rejected_status =
+        Status(RequestStatusCode::UNAVAILABLE, "Request timeout expired");
     for (auto& rejected_queue : rejected_payloads) {
       for (auto& rejected_payload : rejected_queue) {
-         if (rejected_payload.complete_function_ != nullptr) {
+        if (rejected_payload.complete_function_ != nullptr) {
           rejected_payload.complete_function_(rejected_status);
-         }
+        }
       }
     }
 
