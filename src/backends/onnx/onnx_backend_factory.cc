@@ -65,6 +65,7 @@ OnnxBackendFactory::Create(
 Status
 OnnxBackendFactory::CreateBackend(
     const std::string& path, const ModelConfig& model_config,
+    const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {
   // ONNX models can be in single file or as a subdirectory containing
@@ -106,7 +107,8 @@ OnnxBackendFactory::CreateBackend(
 
   // Create the backend for the model and all the execution contexts
   // requested for this model.
-  std::unique_ptr<OnnxBackend> local_backend(new OnnxBackend);
+  std::unique_ptr<OnnxBackend> local_backend(
+      new OnnxBackend(min_compute_capability));
   RETURN_IF_ERROR(
       local_backend->Init(path, model_config, kOnnxRuntimeOnnxPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));

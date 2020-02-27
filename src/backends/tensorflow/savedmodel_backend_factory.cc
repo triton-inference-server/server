@@ -60,6 +60,7 @@ SavedModelBackendFactory::Create(
 Status
 SavedModelBackendFactory::CreateBackend(
     const std::string& path, const ModelConfig& model_config,
+    const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {
   // Read all the savedmodel directories in 'path'.
@@ -80,7 +81,8 @@ SavedModelBackendFactory::CreateBackend(
 
   // Create the backend for the model and all the execution contexts
   // requested for this model.
-  std::unique_ptr<SavedModelBackend> local_backend(new SavedModelBackend);
+  std::unique_ptr<SavedModelBackend> local_backend(
+      new SavedModelBackend(min_compute_capability));
   RETURN_IF_ERROR(local_backend->Init(
       path, model_config, backend_config_.get(),
       kTensorFlowSavedModelPlatform));

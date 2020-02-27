@@ -54,6 +54,7 @@ Status
 CustomBackendFactory::CreateBackend(
     const std::string& model_repository_path, const std::string& model_name,
     const int64_t version, const ModelConfig& model_config,
+    const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {
   const auto path =
@@ -83,7 +84,8 @@ CustomBackendFactory::CreateBackend(
 
   // Create the backend for the model and all the execution contexts
   // requested for this model.
-  std::unique_ptr<CustomBackend> local_backend(new CustomBackend);
+  std::unique_ptr<CustomBackend> local_backend(
+      new CustomBackend(min_compute_capability));
   RETURN_IF_ERROR(local_backend->Init(path, server_params, model_config));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(custom_paths));
 

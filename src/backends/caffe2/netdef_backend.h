@@ -37,7 +37,10 @@ namespace nvidia { namespace inferenceserver {
 
 class NetDefBackend : public InferenceBackend {
  public:
-  NetDefBackend() = default;
+  explicit NetDefBackend(const double min_compute_capability)
+      : InferenceBackend(min_compute_capability)
+  {
+  }
   NetDefBackend(NetDefBackend&&) = default;
 
   // Create a context for execution for each instance for the

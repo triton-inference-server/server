@@ -32,7 +32,10 @@ namespace nvidia { namespace inferenceserver {
 
 class SavedModelBackend : public BaseBackend {
  public:
-  SavedModelBackend() = default;
+  explicit SavedModelBackend(const double min_compute_capability)
+      : BaseBackend(min_compute_capability)
+  {
+  }
   SavedModelBackend(SavedModelBackend&&) = default;
 
   Status CreateTRTISTFModel(

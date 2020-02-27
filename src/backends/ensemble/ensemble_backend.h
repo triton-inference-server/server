@@ -36,7 +36,10 @@ class InferenceServer;
 
 class EnsembleBackend : public InferenceBackend {
  public:
-  EnsembleBackend() = default;
+  explicit EnsembleBackend(const double min_compute_capability)
+      : InferenceBackend(min_compute_capability)
+  {
+  }
   EnsembleBackend(EnsembleBackend&&) = default;
 
   Status Init(

@@ -47,6 +47,7 @@ class CustomBackendFactory {
   Status CreateBackend(
       const std::string& model_repository_path, const std::string& model_name,
       const int64_t version, const ModelConfig& model_config,
+      const double min_compute_capability,
       std::unique_ptr<InferenceBackend>* backend);
 
   ~CustomBackendFactory() = default;

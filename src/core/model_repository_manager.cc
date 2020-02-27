@@ -750,45 +750,48 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
   switch (backend_info->platform_) {
 #ifdef TRTIS_ENABLE_TENSORFLOW
     case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
-      status =
-          graphdef_factory_->CreateBackend(version_path, model_config, &is);
+      status = graphdef_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
     case Platform::PLATFORM_TENSORFLOW_SAVEDMODEL:
-      status =
-          savedmodel_factory_->CreateBackend(version_path, model_config, &is);
+      status = savedmodel_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
 #endif  // TRTIS_ENABLE_TENSORFLOW
 #ifdef TRTIS_ENABLE_TENSORRT
     case Platform::PLATFORM_TENSORRT_PLAN:
-      status = plan_factory_->CreateBackend(version_path, model_config, &is);
+      status = plan_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
 #endif  // TRTIS_ENABLE_TENSORRT
 #ifdef TRTIS_ENABLE_CAFFE2
     case Platform::PLATFORM_CAFFE2_NETDEF:
-      status = netdef_factory_->CreateBackend(version_path, model_config, &is);
+      status = netdef_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
 #endif  // TRTIS_ENABLE_CAFFE2
 #ifdef TRTIS_ENABLE_ONNXRUNTIME
     case Platform::PLATFORM_ONNXRUNTIME_ONNX:
-      status = onnx_factory_->CreateBackend(version_path, model_config, &is);
+      status = onnx_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
 #endif  // TRTIS_ENABLE_ONNXRUNTIME
 #ifdef TRTIS_ENABLE_PYTORCH
     case Platform::PLATFORM_PYTORCH_LIBTORCH:
-      status =
-          libtorch_factory_->CreateBackend(version_path, model_config, &is);
+      status = libtorch_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
 #endif  // TRTIS_ENABLE_PYTORCH
 #ifdef TRTIS_ENABLE_CUSTOM
     case Platform::PLATFORM_CUSTOM:
       status = custom_factory_->CreateBackend(
           backend_info->repository_path_, model_name, version, model_config,
-          &is);
+          min_compute_capability_, &is);
       break;
 #endif  // TRTIS_ENABLE_CUSTOM
     case Platform::PLATFORM_ENSEMBLE:
-      status =
-          ensemble_factory_->CreateBackend(version_path, model_config, &is);
+      status = ensemble_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
     default:
       break;
@@ -802,8 +805,6 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
               << version << " while it is being served";
   } else {
     if (status.IsOk()) {
-      is->SetMinSupportedComputeCapability(min_compute_capability_);
-
       // Unless the handle is nullptr, always reset handle out of the mutex,
       // otherwise the handle's destructor will try to acquire the mutex and
       // cause deadlock.
