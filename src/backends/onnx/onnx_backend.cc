@@ -91,11 +91,13 @@ OnnxBackend::CreateExecutionContexts(
   // set graph optimization level
   GraphOptimizationLevel optimization_level =
       GraphOptimizationLevel::ORT_ENABLE_ALL;
-  int graph_level = Config().optimization().graph().level();
-  if (graph_level == -1) {
-    optimization_level = GraphOptimizationLevel::ORT_ENABLE_BASIC;
-  } else if (graph_level == 1) {
-    optimization_level = GraphOptimizationLevel::ORT_ENABLE_EXTENDED;
+  if (Config().optimization().has_graph()) {
+    int graph_level = Config().optimization().graph().level();
+    if (graph_level == -1) {
+      optimization_level = GraphOptimizationLevel::ORT_ENABLE_BASIC;
+    } else if (graph_level == 1) {
+      optimization_level = GraphOptimizationLevel::ORT_ENABLE_EXTENDED;
+    }
   }
   RETURN_IF_ORT_ERROR(ort_api->SetSessionGraphOptimizationLevel(
       session_options, optimization_level));
