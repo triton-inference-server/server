@@ -67,11 +67,32 @@ OnnxBackendFactory::CreateBackend(
     const std::string& path, const ModelConfig& model_config,
     std::unique_ptr<InferenceBackend>* backend)
 {
+  // ONNX models can be in single file or as a subdirectory containing
+  // multiple files (the main file and separate binary files for
+  // tensors).
   std::set<std::string> onnx_files;
   RETURN_IF_ERROR(
       GetDirectoryFiles(path, true /* skip_hidden_files */, &onnx_files));
 
-  std::unordered_map<std::string, std::string> models;
+  std::set<std::string> onnx_subdirs;
+  RETURN_IF_ERROR(GetDirectorySubdirs(path, &onnx_subdirs));
+
+  // 'models' is a map from filename/subdirname to either file contents
+  // or path to downloaded copy of the subdir.
+  std::unordered_map<std::string, std::pair<bool, std::string>> models;
+
+  // Download the subdirs so that relative file references in the main
+  // model file work correctly.
+  for (const auto& dirname : onnx_subdirs) {
+    const auto onnx_path = JoinPath({path, dirname});
+    std::string local_onnx_path;
+
+    RETURN_IF_ERROR(DownloadFileFolder(onnx_path, &local_onnx_path));
+    models.emplace(
+        std::piecewise_construct, std::make_tuple(dirname),
+        std::make_tuple(std::move(std::make_pair(false, local_onnx_path))));
+  }
+
   for (const auto& filename : onnx_files) {
     const auto onnx_path = JoinPath({path, filename});
     std::string model_data_str;
@@ -79,7 +100,8 @@ OnnxBackendFactory::CreateBackend(
     RETURN_IF_ERROR(ReadTextFile(onnx_path, &model_data_str));
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(std::move(model_data_str)));
+        std::make_tuple(
+            std::move(std::make_pair(true, std::move(model_data_str)))));
   }
 
   // Create the backend for the model and all the execution contexts
@@ -88,6 +110,13 @@ OnnxBackendFactory::CreateBackend(
   RETURN_IF_ERROR(
       local_backend->Init(path, model_config, kOnnxRuntimeOnnxPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
+
+  // Destroy local copy if exists
+  for (const auto& model : models) {
+    if (!model.second.first) {
+      RETURN_IF_ERROR(DestroyFileFolder(model.second.second));
+    }
+  }
 
   *backend = std::move(local_backend);
   return Status::Success;

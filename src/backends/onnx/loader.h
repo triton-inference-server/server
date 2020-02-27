@@ -46,13 +46,14 @@ class OnnxLoader {
   /// Load a Onnx model from a path and return the corresponding
   /// OrtSession.
   ///
-  /// \param model_path The path to the Onnx model
+  /// \param model_data The Onnx model or path to the directory
+  /// holding the onnx model
   /// \param session_options The options to use when creating the session
   /// \param session Returns the Onnx model session
   /// \return Error status.
   static Status LoadSession(
-      const std::string& model_path, const OrtSessionOptions* session_options,
-      OrtSession** session);
+      const std::pair<bool, std::string>& model_data,
+      const OrtSessionOptions* session_options, OrtSession** session);
 
   /// Unload a Onnx model session
   ///
