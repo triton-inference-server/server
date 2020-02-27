@@ -167,7 +167,7 @@ enum OptionId {
   OPTION_HTTP_PORT,
   OPTION_HTTP_HEALTH_PORT,
   OPTION_HTTP_THREAD_COUNT,
-  #endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
+#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
   OPTION_ALLOW_GRPC,
   OPTION_GRPC_PORT,
@@ -396,7 +396,8 @@ CheckPortCollision()
               << "and GRPC requests at the same port" << std::endl;
     return true;
   }
-#endif  // (TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2) && (TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2)
+#endif  // (TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2) && (TRTIS_ENABLE_GRPC ||
+        // TRTIS_ENABLE_GRPC_V2)
 
 #if (defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)) && \
     defined(TRTIS_ENABLE_METRICS)
@@ -506,7 +507,8 @@ StartHttpService(
 #ifdef TRTIS_ENABLE_HTTP_V2
 TRTSERVER_Error*
 StartHttpService(
-    std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServerV2>>* services,
+    std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServerV2>>*
+        services,
     const std::shared_ptr<TRTSERVER_Server>& server,
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>&
