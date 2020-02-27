@@ -27,11 +27,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ template "tensorrt-inference-server.fullname" . }}
+  name: {{ template "triton-inference-server.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ template "tensorrt-inference-server.name" . }}
-    chart: {{ template "tensorrt-inference-server.chart" . }}
+    app: {{ template "triton-inference-server.name" . }}
+    chart: {{ template "triton-inference-server.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
@@ -47,17 +47,17 @@ spec:
       targetPort: metrics
       name: metrics-inference-server
   selector:
-    app: {{ template "tensorrt-inference-server.name" . }}
+    app: {{ template "triton-inference-server.name" . }}
     release: {{ .Release.Name }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ template "tensorrt-inference-server-metrics.fullname" . }}
+  name: {{ template "triton-inference-server-metrics.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ template "tensorrt-inference-server-metrics.name" . }}
-    chart: {{ template "tensorrt-inference-server.chart" . }}
+    app: {{ template "triton-inference-server-metrics.name" . }}
+    chart: {{ template "triton-inference-server.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
   annotations:
@@ -69,23 +69,23 @@ spec:
     targetPort: metrics
     protocol: TCP
   selector:
-    app: {{ template "tensorrt-inference-server.name" . }}
+    app: {{ template "triton-inference-server.name" . }}
     release: {{ .Release.Name }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ template "tensorrt-inference-server-metrics-monitor.fullname" . }}
+  name: {{ template "triton-inference-server-metrics-monitor.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ template "tensorrt-inference-server-metrics-monitor.name" . }}
-    chart: {{ template "tensorrt-inference-server.chart" . }}
+    app: {{ template "triton-inference-server-metrics-monitor.name" . }}
+    chart: {{ template "triton-inference-server.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
   selector:
     matchLabels:
-      app: {{ template "tensorrt-inference-server-metrics.name" . }}
+      app: {{ template "triton-inference-server-metrics.name" . }}
   endpoints:
   - port: metrics
     interval: 15s

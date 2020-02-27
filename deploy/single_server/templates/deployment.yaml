@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,23 +27,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ template "tensorrt-inference-server.fullname" . }}
+  name: {{ template "triton-inference-server.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ template "tensorrt-inference-server.name" . }}
-    chart: {{ template "tensorrt-inference-server.chart" . }}
+    app: {{ template "triton-inference-server.name" . }}
+    chart: {{ template "triton-inference-server.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: {{ template "tensorrt-inference-server.name" . }}
+      app: {{ template "triton-inference-server.name" . }}
       release: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: {{ template "tensorrt-inference-server.name" . }}
+        app: {{ template "triton-inference-server.name" . }}
         release: {{ .Release.Name }}
 
     spec:

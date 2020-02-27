@@ -30,7 +30,7 @@
 Building
 ========
 
-The TensorRT Inference Server, the client libraries and examples, and
+The Triton Inference Server, the client libraries and examples, and
 custom backends can each be built using either Docker or CMake. The
 procedure for each is different and is detailed in the corresponding
 sections below.
@@ -38,7 +38,7 @@ sections below.
 Building the Server
 -------------------
 
-The TensorRT Inference Server can be built in two ways:
+The Triton Inference Server can be built in two ways:
 
 * Build using Docker and the TensorFlow and PyTorch containers from
   `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. Before building
@@ -54,7 +54,7 @@ The TensorRT Inference Server can be built in two ways:
 Building the Server with Docker
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To build a release version of the TensorRT Inference Server container,
+To build a release version of the Triton Inference Server container,
 change directory to the root of the repo and checkout the release
 version of the branch that you want to build (or the master branch if
 you want to build the under-development version)::
@@ -101,7 +101,7 @@ You can reconfigure the build by running *cmake* as described in
 Building the Server with CMake
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To build a release version of the TensorRT Inference Server with
+To build a release version of the Triton Inference Server with
 CMake, change directory to the root of the repo and checkout the
 release version of the branch that you want to build (or the master
 branch if you want to build the under-development version)::
@@ -253,7 +253,7 @@ can be specified by separating them with a semicolon.
 Configure Inference Server
 ..........................
 
-Use cmake to configure the TensorRT Inference Server::
+Use cmake to configure the Triton Inference Server::
 
   $ mkdir builddir
   $ cd builddir
@@ -337,9 +337,10 @@ These additional options may be specified:
 * **TRTIS_MIN_COMPUTE_CAPABILITY**: By default, the inference server
   supports NVIDIA GPUs with CUDA compute capability 6.0 or higher. If
   all framework backends included in the inference server are built to
-  support a lower compute capability, then TRTIS can be built to support
-  that lower compute capability by setting -DTRTIS_MIN_COMPUTE_CAPABILITY
-  appropriately. The setting is ignored if -DTRTIS_ENABLE_GPU=OFF.
+  support a lower compute capability, then Triton Inference Server can
+  be built to support that lower compute capability by setting
+  -DTRTIS_MIN_COMPUTE_CAPABILITY appropriately. The setting is ignored
+  if -DTRTIS_ENABLE_GPU=OFF.
 
 * **TRTIS_EXTRA_LIB_PATHS**: Extra paths that are searched for
   framework libraries as described above. Multiple paths can be
@@ -455,7 +456,7 @@ To build the docs install the required dependencies::
   $ pip3 install --upgrade setuptools
   $ pip3 install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale
 
-To get the Python client library API docs the TensorRT Inference
+To get the Python client library API docs the Triton Inference
 Server Python package must be installed and a couple of files must be copied::
 
   $ pip install --upgrade tensorrtserver*.whl

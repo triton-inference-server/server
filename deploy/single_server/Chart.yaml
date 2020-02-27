@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,6 +26,6 @@
 
 apiVersion: v1
 appVersion: "1.0"
-description: TensorRT Inference Server
-name: tensorrt-inference-server
+description: Triton Inference Server
+name: triton-inference-server
 version: 1.0.0

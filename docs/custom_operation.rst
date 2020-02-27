@@ -29,7 +29,7 @@ Custom Operations
 =================
 
 Modeling frameworks that allow custom operations are partially
-supported by the TensorRT Inference Server. Custom operations can be
+supported by the Triton Inference Server. Custom operations can be
 added to the server at build time or at server startup and are made
 available to all models loaded by the server.
 

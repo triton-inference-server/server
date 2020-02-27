@@ -119,7 +119,7 @@ InferenceServer::Init()
 
   ready_state_ = ServerReadyState::SERVER_INITIALIZING;
 
-  LOG_INFO << "Initializing TensorRT Inference Server";
+  LOG_INFO << "Initializing Triton Inference Server";
 
   if (model_repository_paths_.empty()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;

@@ -27,8 +27,8 @@
 
 |License|
 
-Kubernetes Deploy of Inference Server Cluster
-=============================================
+Kubernetes Deploy: Triton Inference Server Cluster
+==================================================
 
     **NOTE: Some versions of Google Kubernetes Engine (GKE) contain a
     regression in the handling of LD_LIBRARY_PATH that prevents the
@@ -37,17 +37,17 @@ Kubernetes Deploy of Inference Server Cluster
     or earlier version or a GKE 1.14.6 or later version to avoid this
     issue.**
 
-A helm chart for installing a single cluster of the NVIDIA TensorRT
+A helm chart for installing a single cluster of NVIDIA Triton
 Inference Server is provided. By default the cluster contains a single
 instance of the inference server but the *replicaCount* configuration
 parameter can be set to create a cluster of any size, as described
 below. This guide assumes you already have a functional Kubernetes
 cluster and helm installed (see below for instructions on installing
-helm). If you want TRTIS to use GPUs for inferencing, your cluster
-must be configured with support for the NVIDIA driver and CUDA version
-required by the version of the inference server you are using.
+helm). If you want Triton Server to use GPUs for inferencing, your
+cluster must be configured with support for the NVIDIA driver and CUDA
+version required by the version of the inference server you are using.
 
-This helm chart is available from `TensorRT Inference Server GitHub
+This helm chart is available from `Triton Inference Server GitHub
 <https://github.com/NVIDIA/tensorrt-inference-server>`_ or from the
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_
 
@@ -80,18 +80,18 @@ model repository::
 
   $ git clone https://github.com/NVIDIA/tensorrt-inference-server.git
 
-TensorRT Inference Server needs a repository of models that it will
-make available for inferencing. For this example you will place the
-model repository in a Google Cloud Storage bucket::
+Triton Server needs a repository of models that it will make available
+for inferencing. For this example you will place the model repository
+in a Google Cloud Storage bucket::
 
-  $ gsutil mb gs://tensorrt-inference-server-repository
+  $ gsutil mb gs://triton-inference-server-repository
 
 Following the `instructions
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/run.html#example-model-repository>`_
 download the example model repository to your system and copy it into
 the GCS bucket::
 
-  $ gsutil cp -r docs/examples/model_repository gs://tensorrt-inference-server-repository/model_repository
+  $ gsutil cp -r docs/examples/model_repository gs://triton-inference-server-repository/model_repository
 
 GCS Permissions
 ^^^^^^^^^^^^^^^
@@ -172,8 +172,8 @@ Use kubectl to see status and wait until the inference server pods are
 running::
 
   $ kubectl get pods
-  NAME                                                 READY   STATUS    RESTARTS   AGE
-  example-tensorrt-inference-server-5f74b55885-n6lt7   1/1     Running   0          2m21s
+  NAME                                               READY   STATUS    RESTARTS   AGE
+  example-triton-inference-server-5f74b55885-n6lt7   1/1     Running   0          2m21s
 
 There are several ways of overriding the default configuration as
 described in this `helm documentation
@@ -198,8 +198,8 @@ want to override and pass it to helm::
 
   $ helm install --name example -f config.yaml .
 
-Using the TensorRT Inference Server
------------------------------------
+Using Triton Inference Server
+-----------------------------
 
 Now that the inference server is running you can send HTTP or GRPC
 requests to it to perform inferencing. By default, the inferencing
@@ -208,9 +208,9 @@ to find the external IP for the inference server. In this case it is
 34.83.9.133::
 
   $ kubectl get services
-  NAME                               TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)                                        AGE
+  NAME                             TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)                                        AGE
   ...
-  example-tensorrt-inference-server  LoadBalancer   10.18.13.28    34.83.9.133   8000:30249/TCP,8001:30068/TCP,8002:32723/TCP   47m
+  example-triton-inference-server  LoadBalancer   10.18.13.28    34.83.9.133   8000:30249/TCP,8001:30068/TCP,8002:32723/TCP   47m
 
 The inference server exposes an HTTP endpoint on port 8000, and GRPC
 endpoint on port 8001 and a Prometheus metrics endpoint on
@@ -239,9 +239,9 @@ Once you've finished using the inference server you should use helm to
 delete the deployment::
 
   $ helm list
-  NAME            REVISION  UPDATED                   STATUS    CHART                            APP VERSION   NAMESPACE
-  example         1         Wed Feb 27 22:16:55 2019  DEPLOYED  tensorrt-inference-server-1.0.0  1.0           default
-  example-metrics	1       	Tue Jan 21 12:24:07 2020	DEPLOYED	prometheus-operator-6.18.0     	 0.32.0     	 default
+  NAME            REVISION  UPDATED                   STATUS    CHART                          APP VERSION   NAMESPACE
+  example         1         Wed Feb 27 22:16:55 2019  DEPLOYED  triton-inference-server-1.0.0  1.0           default
+  example-metrics	1       	Tue Jan 21 12:24:07 2020	DEPLOYED	prometheus-operator-6.18.0   	 0.32.0     	 default
 
   $ helm delete --purge example
   $ helm delete --purge example-metrics
@@ -255,7 +255,7 @@ https://github.com/helm/charts/tree/master/stable/prometheus-operator#uninstalli
 You may also want to delete the GCS bucket you created to hold the
 model repository::
 
-  $ gsutil rm -r gs://tensorrt-inference-server-repository
+  $ gsutil rm -r gs://triton-inference-server-repository
 
 .. |License| image:: https://img.shields.io/badge/License-BSD3-lightgrey.svg
    :target: https://opensource.org/licenses/BSD-3-Clause

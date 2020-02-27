@@ -31,7 +31,7 @@ Client Libraries
 ================
 
 The inference server *client libraries* make it easy to communicate
-with the TensorRT Inference Server from your C++ or Python
+with the Triton Inference Server from your C++ or Python
 application. Using these libraries you can send either HTTP or GRPC
 requests to the server to check status or health and to make inference
 requests. These libraries also support using system and CUDA shared memory for
@@ -191,7 +191,7 @@ example, v1.2.0_ubuntu1604.clients.tar.gz.
 
 The pre-built libraries can be used on the corresponding host system
 (for example Ubuntu-16.04 or Ubuntu-18.04) or you can install them
-into the TensorRT Inference Server container to have both the clients
+into the Triton Inference Server container to have both the clients
 and server in the same container::
 
   $ mkdir clients

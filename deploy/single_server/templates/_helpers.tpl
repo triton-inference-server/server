@@ -30,7 +30,7 @@
 {{/*
 Create inference server name.
 */}}
-{{- define "tensorrt-inference-server.name" -}}
+{{- define "triton-inference-server.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
@@ -39,7 +39,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "tensorrt-inference-server.fullname" -}}
+{{- define "triton-inference-server.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -56,14 +56,14 @@ If release name contains chart name it will be used as a full name.
   Create inference server metrics service name and fullname derived from above and
   truncated appropriately.
 */}}
-{{- define "tensorrt-inference-server-metrics.name" -}}
-{{- $basename := include "tensorrt-inference-server.name" . -}}
+{{- define "triton-inference-server-metrics.name" -}}
+{{- $basename := include "triton-inference-server.name" . -}}
 {{- $basename_trimmed := $basename | trunc 55 | trimSuffix "-" -}}
 {{- printf "%s-%s" $basename_trimmed "metrics" -}}
 {{- end -}}
 
-{{- define "tensorrt-inference-server-metrics.fullname" -}}
-{{- $basename := include "tensorrt-inference-server.fullname" . -}}
+{{- define "triton-inference-server-metrics.fullname" -}}
+{{- $basename := include "triton-inference-server.fullname" . -}}
 {{- $basename_trimmed := $basename | trunc 55 | trimSuffix "-" -}}
 {{- printf "%s-%s" $basename_trimmed "metrics" -}}
 {{- end -}}
@@ -72,14 +72,14 @@ If release name contains chart name it will be used as a full name.
   Create inference server metrics monitor name and fullname derived from
   above and truncated appropriately.
 */}}
-{{- define "tensorrt-inference-server-metrics-monitor.name" -}}
-{{- $basename := include "tensorrt-inference-server.name" . -}}
+{{- define "triton-inference-server-metrics-monitor.name" -}}
+{{- $basename := include "triton-inference-server.name" . -}}
 {{- $basename_trimmed := $basename | trunc 47 | trimSuffix "-" -}}
 {{- printf "%s-%s" $basename_trimmed "metrics-monitor" -}}
 {{- end -}}
 
-{{- define "tensorrt-inference-server-metrics-monitor.fullname" -}}
-{{- $basename := include "tensorrt-inference-server.fullname" . -}}
+{{- define "triton-inference-server-metrics-monitor.fullname" -}}
+{{- $basename := include "triton-inference-server.fullname" . -}}
 {{- $basename_trimmed := $basename | trunc 47 | trimSuffix "-" -}}
 {{- printf "%s-%s" $basename_trimmed "metrics-monitor" -}}
 {{- end -}}
@@ -87,6 +87,6 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "tensorrt-inference-server.chart" -}}
+{{- define "triton-inference-server.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}

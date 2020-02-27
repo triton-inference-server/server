@@ -28,7 +28,7 @@
 Installing the Server
 =====================
 
-The TensorRT Inference Server is available as a pre-built Docker
+The Triton Inference Server is available as a pre-built Docker
 container or you can :ref:`build it from source
 <section-building>`.
 
@@ -51,7 +51,7 @@ For users other than DGX, follow the `nvidia-docker installation
 documentation <https://github.com/NVIDIA/nvidia-docker>`_ to install
 the most recent version of CUDA, Docker, and nvidia-docker.
 
-After performing the above setup, you can pull the TensorRT Inference
+After performing the above setup, you can pull the Triton Inference
 Server container using the following command::
 
   docker pull nvcr.io/nvidia/tensorrtserver:20.02-py3
