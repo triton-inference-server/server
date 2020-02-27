@@ -28,7 +28,7 @@
 Running the Server
 ==================
 
-For best performance the TensorRT Inference Server should be run on a
+For best performance the Triton Inference Server should be run on a
 system that contains Docker, nvidia-docker, CUDA and one or more
 supported GPUs, as explained in
 :ref:`section-running-the-inference-server`. The inference server can
@@ -45,7 +45,7 @@ inference server without Docker, as explained in
 Example Model Repository
 ------------------------
 
-Before running the TensorRT Inference Server, you must first set up a
+Before running the Triton Inference Server, you must first set up a
 model repository containing the models that the server will make
 available for inferencing.
 

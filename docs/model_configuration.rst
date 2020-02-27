@@ -106,7 +106,7 @@ input or output with an empty shape.
 
 For models that support batched inputs the :cpp:var:`max_batch_size
 <nvidia::inferenceserver::ModelConfig::max_batch_size>` value must be
->= 1. The TensorRT Inference Server assumes that the batching occurs
+>= 1. The Triton Inference Server assumes that the batching occurs
 along a first dimension that is not listed in the inputs or
 outputs. For the above example, the server expects to receive input
 tensors with shape **[ x, 16 ]** and produces an output tensor with
@@ -166,7 +166,7 @@ use shape tensors with batching::
     }
   ]
 
-As discussed before, the TensorRT Inference Server assumes that
+As discussed before, the Triton Inference Server assumes that
 batching occurs along the first dimension which is not listed in
 in the input or output tensor dims. However, for shape tensors,
 batching occurs at the first shape value. For the above example,
@@ -218,7 +218,7 @@ When using -\\-strict-model-config=false you can see the model
 configuration that was generated for a model by using the :ref:`Status
 API <section-api-status>`.
 
-The TensorRT Inference Server only generates the required portion of
+The Triton Inference Server only generates the required portion of
 the model configuration file. You must still provide the optional
 portions of the model configuration if necessary, such as
 :cpp:var:`version_policy
@@ -248,7 +248,7 @@ Datatypes
 ---------
 
 The following table shows the tensor datatypes supported by the
-TensorRT Inference Server. The first column shows the name of the
+Triton Inference Server. The first column shows the name of the
 datatype as it appears in the model configuration file. The other
 columns show the corresponding datatype for the model frameworks
 supported by the server and for the Python numpy library. If a model
@@ -421,7 +421,7 @@ that all versions of the model will be available from the server::
 Instance Groups
 ---------------
 
-The TensorRT Inference Server can provide multiple :ref:`execution
+The Triton Inference Server can provide multiple :ref:`execution
 instances <section-concurrent-model-execution>` of a model so that
 multiple simultaneous inference requests for that model can be handled
 simultaneously. The model configuration :cpp:var:`ModelInstanceGroup
@@ -476,7 +476,7 @@ on the CPU::
 Scheduling And Batching
 -----------------------
 
-The TensorRT Inference Server supports batch inferencing by allowing
+The Triton Inference Server supports batch inferencing by allowing
 individual inference requests to specify a batch of inputs. The
 inferencing for a batch of inputs is performed at the same time which
 is especially important for GPUs since it can greatly increase

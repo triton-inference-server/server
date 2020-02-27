@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -28,7 +28,7 @@
 Architecture
 ============
 
-The following figure shows the TensorRT Inference Server high-level
+The following figure shows the Triton Inference Server high-level
 architecture. The :ref:`model repository <section-model-repository>`
 is a file-system based repository of the models that the inference
 server will make available for inferencing. Inference requests arrive
@@ -51,7 +51,7 @@ sent.
 Concurrent Model Execution
 --------------------------
 
-The TensorRT Inference Server architecture allows multiple models
+The Triton Inference Server architecture allows multiple models
 and/or multiple instances of the same model to execute in parallel on
 a single GPU. The following figure shows an example with two models;
 model0 and model1. Assuming the server is not currently processing any
@@ -69,7 +69,7 @@ figure.
 
 .. image:: images/multi_model_serial_exec.png
 
-The TensorRT inference server provides an :ref:`instance-group
+The Triton inference server provides an :ref:`instance-group
 <section-instance-groups>` feature that allows each model to specify
 how many parallel executions of that model should be allowed. Each
 such enabled parallel execution is referred to as an *execution
@@ -99,8 +99,8 @@ kernel for another model, and a different kernel for yet another model
 at the same time.
 
 The following figure shows some details of how this works within the
-TensorRT Inference Server. Each framework backend (TensorRT,
-TensorFlow, Caffe2) provides an API for creating an execution context
+Triton Inference Server. Each framework backend (TensorRT, TensorFlow,
+PyTorch, ONNX, etc.) provides an API for creating an execution context
 that is used to execute a given model (each framework uses different
 terminology for this concept but here we refer to them generally as
 execution contexts). Each framework allows an execution context to be

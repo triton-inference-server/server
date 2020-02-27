@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -32,7 +32,7 @@ Models And Schedulers
 
 By incorporating :ref:`multiple frameworks
 <section-framework-model-definition>` and also :ref:`custom backends
-<section-custom-backends>`, the TensorRT Inference Server supports a
+<section-custom-backends>`, the Triton Inference Server supports a
 wide variety of models. The inference server also supports multiple
 :ref:`scheduling and batching configurations
 <section-scheduling-and-batching>` that further expand the class of

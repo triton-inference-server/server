@@ -65,10 +65,10 @@ setup(
     version=VERSION,
     author='NVIDIA Inc.',
     author_email='davidg@nvidia.com',
-    description='Python client library for TensorRT Inference Server',
+    description='Python client library for Triton Inference Server',
     license='BSD',
     url='http://nvidia.com',
-    keywords='tensorrt inference server service client',
+    keywords='triton inference server service client',
     packages=find_packages(),
     install_requires=REQUIRED,
     package_data={
