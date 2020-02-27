@@ -211,14 +211,14 @@ set(
   TRTSERVER_SRCS
   main.cc
   common.cc
-  shared_memory_block_manager.cc
+  shared_memory_manager.cc
   ../core/logging.cc
 )
 
 set(
   TRTSERVER_HDRS
   common.h
-  shared_memory_block_manager.h
+  shared_memory_manager.h
   ../core/logging.h
 )
 
@@ -248,6 +248,7 @@ target_link_libraries(
   ${HTTP_ENDPOINT_LIBRARIES}
   ${GRPC_ENDPOINT_LIBRARIES}
   ${TRACING_LIBRARIES}
+  PRIVATE ${CUDA_LIBRARIES}
   PRIVATE protobuf::libprotobuf
   PRIVATE trtserver
 )

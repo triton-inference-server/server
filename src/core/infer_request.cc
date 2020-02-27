@@ -88,75 +88,11 @@ InferenceRequest::AddInput(
 }
 
 Status
-InferenceRequest::AddInput(
-    const std::string& name, const DimsList& shape,
-    const uint64_t batch_byte_size, const InferSharedMemory& shared_memory,
-    InferenceRequest::Input** input)
-{
-  std::vector<int64_t> lshape;
-  for (const auto d : shape) {
-    lshape.push_back(d);
-  }
-
-  const auto& pr = inputs_.emplace(std::make_pair(
-      name,
-      InferenceRequest::Input(name, lshape, batch_byte_size, shared_memory)));
-  if (!pr.second) {
-    return Status(
-        RequestStatusCode::INVALID_ARG, "input '" + name + "' already exists");
-  }
-
-  if (input != nullptr) {
-    *input = std::addressof(pr.first->second);
-  }
-
-  return Status::Success;
-}
-
-Status
-InferenceRequest::AddInput(
-    const std::string& name, const std::vector<int64_t>& shape,
-    const uint64_t batch_byte_size, const InferSharedMemory& shared_memory,
-    InferenceRequest::Input** input)
-{
-  const auto& pr = inputs_.emplace(std::make_pair(
-      name,
-      InferenceRequest::Input(name, shape, batch_byte_size, shared_memory)));
-  if (!pr.second) {
-    return Status(
-        RequestStatusCode::INVALID_ARG, "input '" + name + "' already exists");
-  }
-
-  if (input != nullptr) {
-    *input = std::addressof(pr.first->second);
-  }
-
-  return Status::Success;
-}
-
-Status
 InferenceRequest::RequestOutput(
     const std::string& name, const uint32_t classification_cnt)
 {
   const auto& pr = requested_outputs_.emplace(std::make_pair(
       name, InferenceRequest::RequestedOutput(name, classification_cnt)));
-  if (!pr.second) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "output '" + name + "' already requested");
-  }
-
-  return Status::Success;
-}
-
-Status
-InferenceRequest::RequestOutput(
-    const std::string& name, const uint32_t classification_cnt,
-    const InferSharedMemory& shared_memory)
-{
-  const auto& pr = requested_outputs_.emplace(std::make_pair(
-      name, InferenceRequest::RequestedOutput(
-                name, classification_cnt, shared_memory)));
   if (!pr.second) {
     return Status(
         RequestStatusCode::INVALID_ARG,
@@ -363,19 +299,7 @@ InferenceRequest::Normalize(const InferenceBackend& backend)
 InferenceRequest::Input::Input(
     const std::string& name, const std::vector<int64_t>& shape,
     const uint64_t batch_byte_size)
-    : name_(name), shape_(shape), batch_byte_size_(batch_byte_size),
-      use_shared_memory_(false)
-{
-}
-
-InferenceRequest::Input::Input(
-    const std::string& name, const std::vector<int64_t>& shape,
-    const uint64_t batch_byte_size, const InferSharedMemory& shared_memory)
-    : name_(name), shape_(shape), batch_byte_size_(batch_byte_size),
-      use_shared_memory_(true),
-      shared_memory_(
-          shared_memory.name(), shared_memory.offset(),
-          shared_memory.byte_size())
+    : name_(name), shape_(shape), batch_byte_size_(batch_byte_size)
 {
 }
 
@@ -433,19 +357,7 @@ InferenceRequest::Input::NextContent(
 //
 InferenceRequest::RequestedOutput::RequestedOutput(
     const std::string& name, const uint32_t classification_cnt)
-    : name_(name), classification_cnt_(classification_cnt),
-      use_shared_memory_(false)
-{
-}
-
-InferenceRequest::RequestedOutput::RequestedOutput(
-    const std::string& name, const uint32_t classification_cnt,
-    const InferSharedMemory& shared_memory)
-    : name_(name), classification_cnt_(classification_cnt),
-      use_shared_memory_(true),
-      shared_memory_(
-          shared_memory.name(), shared_memory.offset(),
-          shared_memory.byte_size())
+    : name_(name), classification_cnt_(classification_cnt)
 {
 }
 

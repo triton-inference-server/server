@@ -47,9 +47,6 @@ class ServerStatTimerScoped {
     // Stat for model control request. Duration from request to
     // response.
     MODEL_CONTROL,
-    // Stat for shared memory control request. Duration from request
-    // to response.
-    SHARED_MEMORY_CONTROL,
     // Stat for repository request. Duration from request to response.
     REPOSITORY
   };

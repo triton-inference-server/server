@@ -43,35 +43,6 @@ class InferSharedMemory;
 //
 class InferenceRequest {
  public:
-  // Reference to a block of memory in a shared memory region
-  class SharedMemory {
-   public:
-    SharedMemory() = default;
-    SharedMemory(
-        const std::string& name, const uint64_t offset,
-        const uint64_t byte_size)
-        : name_(name), offset_(offset), byte_size_(byte_size)
-    {
-    }
-
-    // The name given during registration of a shared memory region
-    // that holds the input data (or where the output data should be
-    // written).
-    const std::string& Name() const { return name_; }
-
-    // The offset from the start of the shared memory region to the
-    // start of the memory block.
-    uint64_t Offset() const { return offset_; }
-
-    // Size of the memory block, in bytes.
-    uint64_t ByteSize() const { return byte_size_; }
-
-   private:
-    std::string name_;
-    uint64_t offset_;
-    uint64_t byte_size_;
-  };
-
   // Input tensor
   class Input {
    public:
@@ -79,9 +50,6 @@ class InferenceRequest {
     Input(
         const std::string& name, const std::vector<int64_t>& shape,
         const uint64_t batch_byte_size);
-    Input(
-        const std::string& name, const std::vector<int64_t>& shape,
-        const uint64_t batch_byte_size, const InferSharedMemory& shared_memory);
 
     // The name of the input tensor. There is no mutable operator for
     // the name because it is used in a InferenceReference map and a
@@ -95,14 +63,6 @@ class InferenceRequest {
     // The size, in bytes, of the entire input tensor.
     uint64_t BatchByteSize() const { return batch_byte_size_; }
     void SetBatchByteSize(uint64_t b) { batch_byte_size_ = b; }
-
-    // Shared-memory information for input tensors being communicated
-    // via shared-memory.
-    bool SharedMemoryEnable() const { return use_shared_memory_; }
-    const InferenceRequest::SharedMemory& SharedMemory() const
-    {
-      return shared_memory_;
-    }
 
     // The data for this input.
     const std::shared_ptr<Memory>& Data() const { return data_; }
@@ -141,9 +101,6 @@ class InferenceRequest {
     std::vector<int64_t> shape_;
     uint64_t batch_byte_size_;
 
-    bool use_shared_memory_;
-    InferenceRequest::SharedMemory shared_memory_;
-
     std::shared_ptr<Memory> data_;
     size_t data_idx_;
   };
@@ -153,9 +110,6 @@ class InferenceRequest {
    public:
     RequestedOutput() = default;
     RequestedOutput(const std::string& name, const uint32_t classification_cnt);
-    RequestedOutput(
-        const std::string& name, const uint32_t classification_cnt,
-        const InferSharedMemory& shared_memory);
 
     // The name of the output tensor. There is no mutable operator for
     // the name because it is used in a InferenceReference map and a
@@ -168,23 +122,12 @@ class InferenceRequest {
     // classes.
     uint32_t ClassificationCount() const { return classification_cnt_; }
 
-    // Shared-memory information for output tensors being communicated
-    // via shared-memory.
-    bool SharedMemoryEnable() const { return use_shared_memory_; }
-    const InferenceRequest::SharedMemory& SharedMemory() const
-    {
-      return shared_memory_;
-    }
-
    private:
     std::string name_;
 
     // If > 0 then return result as a classification with the
     // indicated number of classes.
     uint32_t classification_cnt_;
-
-    bool use_shared_memory_;
-    InferenceRequest::SharedMemory shared_memory_;
   };
 
   InferenceRequest();
@@ -243,21 +186,10 @@ class InferenceRequest {
   Status AddInput(
       const std::string& name, const std::vector<int64_t>& shape,
       const uint64_t batch_byte_size, Input** input = nullptr);
-  Status AddInput(
-      const std::string& name, const DimsList& shape,
-      const uint64_t batch_byte_size, const InferSharedMemory& shared_memory,
-      Input** input = nullptr);
-  Status AddInput(
-      const std::string& name, const std::vector<int64_t>& shape,
-      const uint64_t batch_byte_size, const InferSharedMemory& shared_memory,
-      Input** input = nullptr);
 
   // Request an output.
   Status RequestOutput(
       const std::string& name, const uint32_t classification_cnt);
-  Status RequestOutput(
-      const std::string& name, const uint32_t classification_cnt,
-      const InferSharedMemory& shared_memory);
 
   // Normalize the request by checking and conforming it to the model
   // configuration. We pass backend here as non-shared-ptr because

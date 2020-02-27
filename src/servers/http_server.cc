@@ -197,11 +197,11 @@ class HTTPAPIServer : public HTTPServerImpl {
       const std::shared_ptr<TRTSERVER_Server>& server,
       const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
           trace_manager,
-      const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
+      const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const std::vector<std::string>& endpoints, const int32_t port,
       const int thread_cnt)
       : HTTPServerImpl(port, thread_cnt), server_(server),
-        trace_manager_(trace_manager), smb_manager_(smb_manager),
+        trace_manager_(trace_manager), shm_manager_(shm_manager),
         endpoint_names_(endpoints), allocator_(nullptr),
         api_regex_(
             R"(/api/(health|infer|status|modelcontrol|sharedmemorycontrol|repository)(.*))"),
@@ -319,7 +319,7 @@ class HTTPAPIServer : public HTTPServerImpl {
   const char* server_id_;
 
   std::shared_ptr<TraceManager> trace_manager_;
-  std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
+  std::shared_ptr<SharedMemoryManager> shm_manager_;
   std::vector<std::string> endpoint_names_;
 
   // The allocator that will be used to allocate buffers for the
@@ -885,14 +885,10 @@ HTTPAPIServer::HandleSharedMemoryControl(
   size_t byte_size = std::atoll(byte_size_str.c_str());
 
   TRTSERVER_Error* err = nullptr;
-  TRTSERVER_SharedMemoryBlock* smb = nullptr;
 
   if (action_type_str == "register") {
-    err = smb_manager_->CpuCreate(
-        &smb, name.c_str(), shm_key.c_str(), offset, byte_size);
-    if (err == nullptr) {
-      err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
-    }
+    err = shm_manager_->AddSystemSharedMemory(
+        name.c_str(), shm_key.c_str(), offset, byte_size);
   } else if (action_type_str == "cudaregister") {
 #ifdef TRTIS_ENABLE_GPU
     int device_id = std::atoll(device_id_str.c_str());
@@ -901,11 +897,8 @@ HTTPAPIServer::HandleSharedMemoryControl(
     cudaIpcMemHandle_t* cuda_shm_handle;
     err = EVBufferToCudaHandle(req->buffer_in, &cuda_shm_handle);
     if (err == nullptr) {
-      err = smb_manager_->GpuCreate(
-          &smb, name.c_str(), cuda_shm_handle, byte_size, device_id);
-      if (err == nullptr) {
-        err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
-      }
+      err = shm_manager_->AddCUDASharedMemory(
+          name.c_str(), cuda_shm_handle, byte_size, device_id);
     }
 #else
     err = TRTSERVER_ErrorNew(
@@ -916,29 +909,14 @@ HTTPAPIServer::HandleSharedMemoryControl(
             .c_str());
 #endif  // TRTIS_ENABLE_GPU
   } else if ((action_type_str == "unregister") && (remaining == "all")) {
-    err = smb_manager_->Clear();
-    if (err == nullptr) {
-      err = TRTSERVER_ServerUnregisterAllSharedMemory(server_.get());
-    }
+    err = shm_manager_->Clear();
   } else if (action_type_str == "unregister") {
-    err = smb_manager_->Remove(&smb, name.c_str());
-    if ((err == nullptr) && (smb != nullptr)) {
-      err = TRTSERVER_ServerUnregisterSharedMemory(server_.get(), smb);
-      TRTSERVER_Error* del_err = TRTSERVER_SharedMemoryBlockDelete(smb);
-      if (del_err != nullptr) {
-        LOG_ERROR << "failed to delete shared memory block: "
-                  << TRTSERVER_ErrorMessage(del_err);
-      }
-    }
+    err = shm_manager_->Remove(name);
+
   } else if (action_type_str == "status") {
-    TRTSERVER_Protobuf* shm_status_protobuf = nullptr;
-    TRTSERVER_Error* err =
-        TRTSERVER_ServerSharedMemoryStatus(server_.get(), &shm_status_protobuf);
+    SharedMemoryStatus shm_status;
+    TRTSERVER_Error* err = shm_manager_->GetStatus(&shm_status);
     if (err == nullptr) {
-      const char* status_buffer;
-      size_t status_byte_size;
-      err = TRTSERVER_ProtobufSerialize(
-          shm_status_protobuf, &status_buffer, &status_byte_size);
       if (err == nullptr) {
         std::string format;
         const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
@@ -949,26 +927,24 @@ HTTPAPIServer::HandleSharedMemoryControl(
         }
 
         if (format == "binary") {
+          const char* status_buffer;
+          size_t status_byte_size;
+          std::string serialized;
+          shm_status.SerializeToString(&serialized);
+          status_buffer = serialized.c_str();
+          status_byte_size = serialized.size();
           evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
           evhtp_headers_add_header(
               req->headers_out,
               evhtp_header_new(
                   "Content-Type", "application/octet-stream", 1, 1));
         } else {
-          SharedMemoryStatus shm_status;
-          if (!shm_status.ParseFromArray(status_buffer, status_byte_size)) {
-            err = TRTSERVER_ErrorNew(
-                TRTSERVER_ERROR_UNKNOWN,
-                "failed to parse shared memory status");
-          } else {
-            std::string shm_status_str = shm_status.DebugString();
-            evbuffer_add(
-                req->buffer_out, shm_status_str.c_str(), shm_status_str.size());
-          }
+          std::string shm_status_str = shm_status.DebugString();
+          evbuffer_add(
+              req->buffer_out, shm_status_str.c_str(), shm_status_str.size());
         }
       }
     }
-    TRTSERVER_ProtobufDelete(shm_status_protobuf);
   } else {
     err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_UNKNOWN,
@@ -1054,14 +1030,10 @@ HTTPAPIServer::EVBufferToInput(
 
         void* base;
         TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
-        int64_t memory_type_id;
-        TRTSERVER_SharedMemoryBlock* smb = nullptr;
-        RETURN_IF_ERR(smb_manager_->Get(&smb, io.shared_memory().name()));
-        RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
-            server_.get(), smb, io.shared_memory().offset(),
-            io.shared_memory().byte_size(), &base));
-        TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
-        TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
+        int memory_type_id;
+        RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
+            io.shared_memory().name(), io.shared_memory().offset(), &base,
+            &memory_type, &memory_type_id));
         RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
             request_provider, io.name().c_str(), base, byte_size, memory_type,
             memory_type_id));
@@ -1110,16 +1082,12 @@ HTTPAPIServer::EVBufferToInput(
   for (const auto& io : request_header.output()) {
     if (io.has_shared_memory()) {
       void* base;
-      TRTSERVER_SharedMemoryBlock* smb = nullptr;
-      RETURN_IF_ERR(smb_manager_->Get(&smb, io.shared_memory().name()));
-      RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
-          server_.get(), smb, io.shared_memory().offset(),
-          io.shared_memory().byte_size(), &base));
-
       TRTSERVER_Memory_Type memory_type;
-      int64_t memory_type_id;
-      TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
-      TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
+      int memory_type_id;
+      RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
+          io.shared_memory().name(), io.shared_memory().offset(), &base,
+          &memory_type, &memory_type_id));
+
       output_shm_map.emplace(
           io.name(),
           std::make_tuple(
@@ -1427,7 +1395,7 @@ TRTSERVER_Error*
 HTTPServer::CreateAPIServer(
     const std::shared_ptr<TRTSERVER_Server>& server,
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
-    const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
     std::vector<std::unique_ptr<HTTPServer>>* http_servers)
 {
@@ -1442,7 +1410,7 @@ HTTPServer::CreateAPIServer(
     std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
     LOG_INFO << "Starting HTTPService at " << addr;
     http_servers->emplace_back(new HTTPAPIServer(
-        server, trace_manager, smb_manager, ep_map.second, ep_map.first,
+        server, trace_manager, shm_manager, ep_map.second, ep_map.first,
         thread_cnt));
   }
 

@@ -125,15 +125,6 @@ InferenceServer::Init()
         RequestStatusCode::INVALID_ARG, "--model-repository must be specified");
   }
 
-  // Create the shared memory manager that registers / unregisters and returns
-  // the shared memory regions that are current registered.
-  status =
-      SharedMemoryManager::Create(status_manager_, &shared_memory_manager_);
-  if (!status.IsOk()) {
-    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
-    return status;
-  }
-
   PinnedMemoryManager::Options options(pinned_memory_pool_size_);
   status = PinnedMemoryManager::Create(options);
   if (!status.IsOk()) {
@@ -396,83 +387,6 @@ InferenceServer::UnloadModel(const std::string& model_name)
 
   auto action_type = ModelRepositoryManager::ActionType::UNLOAD;
   return model_repository_manager_->LoadUnloadModel(model_name, action_type);
-}
-
-Status
-InferenceServer::RegisterSharedMemory(
-    const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size)
-{
-  if (ready_state_ != ServerReadyState::SERVER_READY) {
-    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
-  }
-
-  ScopedAtomicIncrement inflight(inflight_request_counter_);
-
-  return shared_memory_manager_->RegisterSharedMemory(
-      name, shm_key, offset, byte_size);
-}
-
-#ifdef TRTIS_ENABLE_GPU
-Status
-InferenceServer::RegisterCudaSharedMemory(
-    const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
-    const size_t byte_size, const int device_id)
-{
-  if (ready_state_ != ServerReadyState::SERVER_READY) {
-    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
-  }
-
-  ScopedAtomicIncrement inflight(inflight_request_counter_);
-
-  return shared_memory_manager_->RegisterCudaSharedMemory(
-      name, cuda_shm_handle, byte_size, device_id);
-}
-#endif  // TRTIS_ENABLE_GPU
-
-Status
-InferenceServer::UnregisterSharedMemory(const std::string& name)
-{
-  if (ready_state_ != ServerReadyState::SERVER_READY) {
-    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
-  }
-
-  ScopedAtomicIncrement inflight(inflight_request_counter_);
-
-  return shared_memory_manager_->UnregisterSharedMemory(name);
-}
-
-Status
-InferenceServer::UnregisterAllSharedMemory()
-{
-  if (ready_state_ != ServerReadyState::SERVER_READY) {
-    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
-  }
-
-  ScopedAtomicIncrement inflight(inflight_request_counter_);
-
-  return shared_memory_manager_->UnregisterAllSharedMemory();
-}
-
-Status
-InferenceServer::SharedMemoryAddress(
-    const std::string& name, size_t offset, size_t byte_size,
-    void** shm_mapped_addr)
-{
-  return shared_memory_manager_->SharedMemoryAddress(
-      name, offset, byte_size, shm_mapped_addr);
-}
-
-Status
-InferenceServer::GetSharedMemoryStatus(SharedMemoryStatus* shm_status)
-{
-  if (ready_state_ != ServerReadyState::SERVER_READY) {
-    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
-  }
-
-  ScopedAtomicIncrement inflight(inflight_request_counter_);
-
-  return shared_memory_manager_->GetSharedMemoryStatus(shm_status);
 }
 
 uint64_t
