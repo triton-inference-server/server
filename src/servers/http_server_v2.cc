@@ -311,7 +311,8 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
   void HandleModelHealth(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
-  void HandleMetadata(
+  void HandleMetadata(evhtp_request_t* req);
+  void HandleModelMetadata(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
   void HandleInfer(
@@ -481,16 +482,18 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
     if (type == "health") {
       std::string kind;
       if (RE2::FullMatch(
-              std::string(req->uri->path->full), health_regex_, &kind)) {
+              std::string(rest), health_regex_, &kind)) {
         HandleHealth(req, kind);
         return;
       }
     }
     // model health, status or infer
-    else if (type == "model") {
+    else if (type == "models") {
       std::string model_name, model_version, kind;
+      LOG_VERBOSE(1) << "type: " << type;
+      LOG_VERBOSE(1) << "rest: " << rest;
       if (RE2::FullMatch(
-              std::string(req->uri->path->full), model_regex_, &model_name,
+              std::string(rest), model_regex_, &model_name,
               &model_version, &kind)) {
         if (kind == "ready") {
           HandleModelHealth(req, model_name, model_version);
@@ -499,14 +502,15 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
           HandleInfer(req, model_name, model_version);
           return;
         } else {
-          HandleMetadata(req, model_name, model_version);
+          HandleModelMetadata(req, model_name, model_version);
           return;
         }
       }
+      LOG_VERBOSE(1) << "model_name" << model_name;
     }
     // server metadata
     else {
-      HandleMetadata(req, "", "");
+      HandleMetadata(req);
       return;
     }
   }
@@ -639,7 +643,7 @@ HTTPAPIServerV2::HandleModelHealth(
 }
 
 void
-HTTPAPIServerV2::HandleMetadata(
+HTTPAPIServerV2::HandleModelMetadata(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
@@ -653,12 +657,75 @@ HTTPAPIServerV2::HandleMetadata(
     return;
   }
 
+  TRTSERVER_Protobuf* model_status_protobuf = nullptr;
+  TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
+                server_.get(), model_name.c_str(), &model_status_protobuf);
+  if (err == nullptr) {
+    const char* status_buffer;
+    size_t status_byte_size;
+    err = TRTSERVER_ProtobufSerialize(
+        model_status_protobuf, &status_buffer, &status_byte_size);
+    if (err == nullptr) {
+      // Request text or binary format for status?
+      std::string format;
+      const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
+      if (format_c_str != NULL) {
+        format = std::string(format_c_str);
+      } else {
+        format = "text";
+      }
+
+      if (format == "binary") {
+        evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
+        evhtp_headers_add_header(
+            req->headers_out,
+            evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
+      } else {
+        ServerStatus server_status;
+        if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
+        } else {
+          std::string server_status_str = server_status.DebugString();
+          evbuffer_add(
+              req->buffer_out, server_status_str.c_str(),
+              server_status_str.size());
+        }
+      }
+    }
+  }
+
+  TRTSERVER_ProtobufDelete(model_status_protobuf);
+
+  RequestStatus request_status;
+  RequestStatusUtil::Create(
+      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
+      server_id_);
+
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(
+          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
+
+  evhtp_send_reply(
+      req, (request_status.code() == RequestStatusCode::SUCCESS)
+               ? EVHTP_RES_OK
+               : EVHTP_RES_BADREQ);
+
+  TRTSERVER_ErrorDelete(err);
+}
+
+void
+HTTPAPIServerV2::HandleMetadata(evhtp_request_t* req)
+{
+  if (req->method != htp_method_GET) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
   TRTSERVER_Protobuf* server_status_protobuf = nullptr;
   TRTSERVER_Error* err =
-      (model_name.empty())
-          ? TRTSERVER_ServerStatus(server_.get(), &server_status_protobuf)
-          : TRTSERVER_ServerModelStatus(
-                server_.get(), model_name.c_str(), &server_status_protobuf);
+          TRTSERVER_ServerStatus(server_.get(), &server_status_protobuf);
   if (err == nullptr) {
     const char* status_buffer;
     size_t status_byte_size;
