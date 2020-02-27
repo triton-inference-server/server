@@ -314,8 +314,9 @@ AutoFillOnnx::Create(
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
       session_options, ort_api->ReleaseSessionOptions);
   RETURN_IF_ORT_ERROR(ort_api->SetIntraOpNumThreads(session_options, 1));
+  // enable basic graph optimization (Quicker loading)
   RETURN_IF_ORT_ERROR(ort_api->SetSessionGraphOptimizationLevel(
-      session_options, ORT_DISABLE_ALL));
+      session_options, ORT_ENABLE_BASIC));
 
   OrtSession* session = nullptr;
 

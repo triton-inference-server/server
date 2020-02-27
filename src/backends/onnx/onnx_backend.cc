@@ -87,9 +87,18 @@ OnnxBackend::CreateExecutionContexts(
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
       session_options, ort_api->ReleaseSessionOptions);
   RETURN_IF_ORT_ERROR(ort_api->SetIntraOpNumThreads(session_options, 1));
-  // disable graph optimization
+
+  // set graph optimization level
+  GraphOptimizationLevel optimization_level =
+      GraphOptimizationLevel::ORT_ENABLE_ALL;
+  int graph_level = Config().optimization().graph().level();
+  if (graph_level == -1) {
+    optimization_level = GraphOptimizationLevel::ORT_ENABLE_BASIC;
+  } else if (graph_level == 1) {
+    optimization_level = GraphOptimizationLevel::ORT_ENABLE_EXTENDED;
+  }
   RETURN_IF_ORT_ERROR(ort_api->SetSessionGraphOptimizationLevel(
-      session_options, ORT_DISABLE_ALL));
+      session_options, optimization_level));
 
   RETURN_IF_ERROR(CreateExecutionContextsHelper(session_options, models));
 
