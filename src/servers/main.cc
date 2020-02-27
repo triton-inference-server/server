@@ -862,7 +862,12 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   int32_t exit_timeout_secs = 30;
   int32_t repository_poll_secs = repository_poll_secs_;
   int64_t pinned_memory_pool_byte_size = 1 << 28;
+
+#ifdef TRTIS_ENABLE_GPU
   double min_supported_compute_capability = TRTIS_MIN_COMPUTE_CAPABILITY;
+#else
+  double min_supported_compute_capability = 0;
+#endif  // TRTIS_ENABLE_GPU
 
 #ifdef TRTIS_ENABLE_HTTP
   int32_t http_port = http_port_;

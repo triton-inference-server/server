@@ -95,7 +95,11 @@ InferenceServer::InferenceServer()
   strict_readiness_ = true;
   exit_timeout_secs_ = 30;
   pinned_memory_pool_size_ = 1 << 28;
+#ifdef TRTIS_ENABLE_GPU
   min_supported_compute_capability_ = TRTIS_MIN_COMPUTE_CAPABILITY;
+#else
+  min_supported_compute_capability_ = 0.0;
+#endif  // TRTIS_ENABLE_GPU
 
   tf_soft_placement_enabled_ = true;
   tf_gpu_memory_fraction_ = 0.0;
