@@ -349,8 +349,6 @@ A minimal model repository for a single PyTorch model would look like::
       1/
         model.pt
 
-.. _section-custom-backends:
-
 Caffe2 Models
 ^^^^^^^^^^^^^
 
@@ -363,6 +361,8 @@ model repository for a single NetDef model would look like::
       config.pbtxt
       1/
         model.netdef
+
+.. _section-custom-backends:
 
 Custom Backends
 ---------------
