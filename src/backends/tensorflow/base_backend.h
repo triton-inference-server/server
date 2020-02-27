@@ -38,7 +38,10 @@ namespace nvidia { namespace inferenceserver {
 // Base for both GraphDef and SavedModel backends
 class BaseBackend : public InferenceBackend {
  public:
-  BaseBackend() = default;
+  explicit BaseBackend(const double min_compute_capability)
+      : InferenceBackend(min_compute_capability)
+  {
+  }
   BaseBackend(BaseBackend&&) = default;
 
   Status Init(

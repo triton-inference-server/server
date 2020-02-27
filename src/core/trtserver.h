@@ -824,6 +824,15 @@ TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(
     TRTSERVER_ServerOptions* options, uint64_t size);
 
+/// Set the minimum support CUDA compute capability in a server
+/// options.
+/// \param options The server options object.
+/// \param cc The minimum CUDA compute capability.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetMinSupportedComputeCapability(
+    TRTSERVER_ServerOptions* options, double cc);
+
 /// Enable or disable exit-on-error in a server options.
 /// \param options The server options object.
 /// \param exit True to enable exiting on intialization error, false

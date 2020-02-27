@@ -33,14 +33,14 @@
 namespace nvidia { namespace inferenceserver {
 
 Status
-EnablePeerAccess()
+EnablePeerAccess(const double min_compute_capability)
 {
 #ifdef TRTIS_ENABLE_GPU
   // If we can't enable peer access for one device pair, the best we can
   // do is skipping it...
   std::set<int> supported_gpus;
   bool all_enabled = false;
-  if (GetSupportedGPUs(supported_gpus).IsOk()) {
+  if (GetSupportedGPUs(&supported_gpus, min_compute_capability).IsOk()) {
     all_enabled = true;
     int can_access_peer = false;
     for (const auto& host : supported_gpus) {

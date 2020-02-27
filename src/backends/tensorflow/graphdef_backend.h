@@ -32,7 +32,10 @@ namespace nvidia { namespace inferenceserver {
 
 class GraphDefBackend : public BaseBackend {
  public:
-  GraphDefBackend() = default;
+  explicit GraphDefBackend(const double min_compute_capability)
+      : BaseBackend(min_compute_capability)
+  {
+  }
   GraphDefBackend(GraphDefBackend&&) = default;
 
   Status CreateTRTISTFModel(

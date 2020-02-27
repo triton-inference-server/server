@@ -37,7 +37,10 @@ namespace nvidia { namespace inferenceserver {
 
 class OnnxBackend : public InferenceBackend {
  public:
-  OnnxBackend() = default;
+  explicit OnnxBackend(const double min_compute_capability)
+      : InferenceBackend(min_compute_capability)
+  {
+  }
   OnnxBackend(OnnxBackend&&) = default;
 
   // Create a context for execution for each instance for the

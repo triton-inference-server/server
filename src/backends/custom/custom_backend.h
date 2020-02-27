@@ -36,7 +36,10 @@ namespace nvidia { namespace inferenceserver {
 
 class CustomBackend : public InferenceBackend {
  public:
-  CustomBackend() = default;
+  explicit CustomBackend(const double min_compute_capability)
+      : InferenceBackend(min_compute_capability)
+  {
+  }
   CustomBackend(CustomBackend&&) = default;
 
   Status Init(

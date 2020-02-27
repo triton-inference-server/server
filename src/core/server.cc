@@ -95,6 +95,11 @@ InferenceServer::InferenceServer()
   strict_readiness_ = true;
   exit_timeout_secs_ = 30;
   pinned_memory_pool_size_ = 1 << 28;
+#ifdef TRTIS_ENABLE_GPU
+  min_supported_compute_capability_ = TRTIS_MIN_COMPUTE_CAPABILITY;
+#else
+  min_supported_compute_capability_ = 0.0;
+#endif  // TRTIS_ENABLE_GPU
 
   tf_soft_placement_enabled_ = true;
   tf_gpu_memory_fraction_ = 0.0;
@@ -136,7 +141,7 @@ InferenceServer::Init()
     return status;
   }
 
-  status = EnablePeerAccess();
+  status = EnablePeerAccess(min_supported_compute_capability_);
   if (!status.IsOk()) {
     // failed to enable peer access is not critical, just inefficient.
     LOG_ERROR << status.Message();
@@ -150,7 +155,7 @@ InferenceServer::Init()
       this, version_, status_manager_, model_repository_paths_, startup_models_,
       strict_model_config_, tf_gpu_memory_fraction_, tf_soft_placement_enabled_,
       tf_vgpu_memory_limits_, polling_enabled, model_control_enabled,
-      &model_repository_manager_);
+      min_supported_compute_capability_, &model_repository_manager_);
   if (!status.IsOk()) {
     if (model_repository_manager_ == nullptr) {
       ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;

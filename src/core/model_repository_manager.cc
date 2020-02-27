@@ -265,7 +265,7 @@ struct ModelRepositoryManager::ModelInfo {
 class ModelRepositoryManager::BackendLifeCycle {
  public:
   static Status Create(
-      InferenceServer* server,
+      InferenceServer* server, const double min_compute_capability,
       const std::shared_ptr<ServerStatusManager>& status_manager,
       const BackendConfigMap& backend_map,
       std::unique_ptr<BackendLifeCycle>* life_cycle);
@@ -323,8 +323,11 @@ class ModelRepositoryManager::BackendLifeCycle {
     std::shared_ptr<InferenceBackend> backend_;
   };
 
-  BackendLifeCycle(const std::shared_ptr<ServerStatusManager>& status_manager)
-      : status_manager_(status_manager)
+  BackendLifeCycle(
+      const double min_compute_capability,
+      const std::shared_ptr<ServerStatusManager>& status_manager)
+      : min_compute_capability_(min_compute_capability),
+        status_manager_(status_manager)
   {
   }
 
@@ -347,6 +350,8 @@ class ModelRepositoryManager::BackendLifeCycle {
   Status CreateInferenceBackend(
       const std::string& model_name, const int64_t version,
       BackendInfo* backend_info);
+
+  const double min_compute_capability_;
 
   using VersionMap = std::map<int64_t, std::unique_ptr<BackendInfo>>;
   using BackendMap = std::map<std::string, VersionMap>;
@@ -379,13 +384,13 @@ class ModelRepositoryManager::BackendLifeCycle {
 
 Status
 ModelRepositoryManager::BackendLifeCycle::Create(
-    InferenceServer* server,
+    InferenceServer* server, const double min_compute_capability,
     const std::shared_ptr<ServerStatusManager>& status_manager,
     const BackendConfigMap& backend_map,
     std::unique_ptr<BackendLifeCycle>* life_cycle)
 {
   std::unique_ptr<BackendLifeCycle> local_life_cycle(
-      new BackendLifeCycle(status_manager));
+      new BackendLifeCycle(min_compute_capability, status_manager));
 
 #ifdef TRTIS_ENABLE_TENSORFLOW
   {
@@ -745,45 +750,48 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
   switch (backend_info->platform_) {
 #ifdef TRTIS_ENABLE_TENSORFLOW
     case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
-      status =
-          graphdef_factory_->CreateBackend(version_path, model_config, &is);
+      status = graphdef_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
     case Platform::PLATFORM_TENSORFLOW_SAVEDMODEL:
-      status =
-          savedmodel_factory_->CreateBackend(version_path, model_config, &is);
+      status = savedmodel_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
 #endif  // TRTIS_ENABLE_TENSORFLOW
 #ifdef TRTIS_ENABLE_TENSORRT
     case Platform::PLATFORM_TENSORRT_PLAN:
-      status = plan_factory_->CreateBackend(version_path, model_config, &is);
+      status = plan_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
 #endif  // TRTIS_ENABLE_TENSORRT
 #ifdef TRTIS_ENABLE_CAFFE2
     case Platform::PLATFORM_CAFFE2_NETDEF:
-      status = netdef_factory_->CreateBackend(version_path, model_config, &is);
+      status = netdef_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
 #endif  // TRTIS_ENABLE_CAFFE2
 #ifdef TRTIS_ENABLE_ONNXRUNTIME
     case Platform::PLATFORM_ONNXRUNTIME_ONNX:
-      status = onnx_factory_->CreateBackend(version_path, model_config, &is);
+      status = onnx_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
 #endif  // TRTIS_ENABLE_ONNXRUNTIME
 #ifdef TRTIS_ENABLE_PYTORCH
     case Platform::PLATFORM_PYTORCH_LIBTORCH:
-      status =
-          libtorch_factory_->CreateBackend(version_path, model_config, &is);
+      status = libtorch_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
 #endif  // TRTIS_ENABLE_PYTORCH
 #ifdef TRTIS_ENABLE_CUSTOM
     case Platform::PLATFORM_CUSTOM:
       status = custom_factory_->CreateBackend(
           backend_info->repository_path_, model_name, version, model_config,
-          &is);
+          min_compute_capability_, &is);
       break;
 #endif  // TRTIS_ENABLE_CUSTOM
     case Platform::PLATFORM_ENSEMBLE:
-      status =
-          ensemble_factory_->CreateBackend(version_path, model_config, &is);
+      status = ensemble_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
       break;
     default:
       break;
@@ -848,11 +856,13 @@ ModelRepositoryManager::ModelRepositoryManager(
     const std::set<std::string>& repository_paths,
     const BackendConfigMap& backend_config_map, const bool autofill,
     const bool polling_enabled, const bool model_control_enabled,
+    const double min_compute_capability,
     std::unique_ptr<BackendLifeCycle> life_cycle)
     : repository_paths_(repository_paths),
       backend_config_map_(backend_config_map), autofill_(autofill),
       polling_enabled_(polling_enabled),
       model_control_enabled_(model_control_enabled),
+      min_compute_capability_(min_compute_capability),
       status_manager_(status_manager),
       backend_life_cycle_(std::move(life_cycle))
 {
@@ -869,6 +879,7 @@ ModelRepositoryManager::Create(
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
     const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
     const bool polling_enabled, const bool model_control_enabled,
+    const double min_compute_capability,
     std::unique_ptr<ModelRepositoryManager>* model_repository_manager)
 {
   // The rest only matters if repository path is valid directory
@@ -896,14 +907,15 @@ ModelRepositoryManager::Create(
 
   std::unique_ptr<BackendLifeCycle> life_cycle;
   RETURN_IF_ERROR(BackendLifeCycle::Create(
-      server, status_manager, backend_config_map, &life_cycle));
+      server, min_compute_capability, status_manager, backend_config_map,
+      &life_cycle));
 
   // Not setting the smart pointer directly to simplify clean up
   std::unique_ptr<ModelRepositoryManager> local_manager(
       new ModelRepositoryManager(
           status_manager, repository_paths, backend_config_map,
           !strict_model_config, polling_enabled, model_control_enabled,
-          std::move(life_cycle)));
+          min_compute_capability, std::move(life_cycle)));
 
   bool all_models_polled = true;
   if (!model_control_enabled) {
@@ -1450,9 +1462,11 @@ ModelRepositoryManager::Poll(
       // the model configuration (autofill) from the model
       // definition. In all cases normalize and validate the config.
       status = GetNormalizedModelConfig(
-          full_path, backend_config_map_, autofill_, &model_config);
+          full_path, backend_config_map_, autofill_, min_compute_capability_,
+          &model_config);
       if (status.IsOk()) {
-        status = ValidateModelConfig(model_config, std::string());
+        status = ValidateModelConfig(
+            model_config, std::string(), min_compute_capability_);
       }
       if (status.IsOk()) {
         model_info->platform_ = GetPlatform(model_config.platform());

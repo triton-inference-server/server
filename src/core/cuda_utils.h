@@ -38,8 +38,10 @@ using cudaStream_t = void*;
 #endif  // TRTIS_ENABLE_GPU
 
 /// Enable peer access for all GPU device pairs
+/// \param min_compute_capability The minimum support CUDA compute
+/// capability.
 /// \return The error status. A non-OK status means not all pairs are enabled
-Status EnablePeerAccess();
+Status EnablePeerAccess(const double min_compute_capability);
 
 /// Copy buffer from 'src' to 'dst' for given 'byte_size'. The buffer location
 /// is identified by the memory type and id, and the corresponding copy will be
