@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 cmake_minimum_required (VERSION 3.5)
-project (tensorrt-inference-server)
+project (triton-inference-server)
 
 include(CMakeDependentOption)
 include(ExternalProject)
@@ -58,10 +58,10 @@ option(TRTIS_ENABLE_S3 "Include S3 Filesystem support in server" OFF)
 # Multiple paths may be specified by separating them with semicolon
 set(TRTIS_ONNXRUNTIME_INCLUDE_PATHS "" CACHE PATH "Paths to ONNXRuntime includes")
 set(TRTIS_PYTORCH_INCLUDE_PATHS "" CACHE PATH "Paths to PyTorch includes")
-set(TRTIS_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for TRTIS build")
+set(TRTIS_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for Triton Server build")
 
 # Client
-set(TRTIS_CLIENT_CMAKE_DIR "" CACHE PATH "Path to TRTIS client library cmake configuration")
+set(TRTIS_CLIENT_CMAKE_DIR "" CACHE PATH "Path to Triton client library cmake configuration")
 
 option(TRTIS_ENABLE_LOGGING "Include logging support in server" ON)
 option(TRTIS_ENABLE_STATS "Include statistics collections in server" ON)
@@ -355,7 +355,7 @@ ExternalProject_Add(aws-sdk-cpp
 )
 
 #
-# Build TRTIS test utilities
+# Build Triton Server test utilities
 #
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(TRTIS_TEST_UTILS_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/trtis-test-utils/install)
@@ -407,7 +407,7 @@ ExternalProject_Add(trtis-custom-backends
 )
 
 #
-# Build TRTIS client libraries and examples
+# Build Triton client libraries and examples
 #
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(TRTIS_CLIENTS_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/trtis-clients/install)
@@ -415,7 +415,7 @@ else()
   set(TRTIS_CLIENTS_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
-# If TRTIS_CLIENT_CMAKE_DIR is set then use it to find TRTIS cmake
+# If TRTIS_CLIENT_CMAKE_DIR is set then use it to find Triton client cmake
 # config
 set(_CMAKE_TRTIS_DIR "")
 if (TRTIS_CLIENT_CMAKE_DIR)
@@ -445,7 +445,7 @@ ExternalProject_Add(trtis-clients
 )
 
 #
-# Build TRTIS server library and main executable
+# Build Triton Server library and main executable
 #
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(TRTIS_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/trtis/install)

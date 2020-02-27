@@ -33,7 +33,7 @@ perf\_client
 A critical part of optimizing the inference performance of your model
 is being able to measure changes in performance as you experiment with
 different optimization strategies. The *perf\_client* application
-performs this task for the TensorRT Inference Server. The perf\_client
+performs this task for the Triton Inference Server. The perf\_client
 is included with the client examples which are :ref:`available from
 several sources <section-getting-the-client-examples>`.
 
@@ -225,9 +225,9 @@ For such cases users can provide data to be used with every inference request
 made by client in a JSON file. The perf_client will use the provided data when
 sending inference requests in a round-robin fashion.
 
-Each entry in the "data" array must specify all input tensors with the exact 
+Each entry in the "data" array must specify all input tensors with the exact
 size expected by the model from a single batch. The following example describes
-data for a model with inputs named, INPUT0 and INPUT1, shape [4, 4] and data 
+data for a model with inputs named, INPUT0 and INPUT1, shape [4, 4] and data
 type INT32: ::
 
 
@@ -258,8 +258,8 @@ type INT32: ::
 
 Kindly note that the [4, 4] tensor has been flattened in a row-major format for the inputs.
 
-A part from specifying explicit tensors, users can also provide Base64 encoded binary data 
-for the tensors. Each data object must list its data in a row-major order. The following 
+A part from specifying explicit tensors, users can also provide Base64 encoded binary data
+for the tensors. Each data object must list its data in a row-major order. The following
 example highlights how this can be acheived: ::
 
   {

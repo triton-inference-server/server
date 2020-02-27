@@ -30,7 +30,7 @@
 Quickstart
 ==========
 
-The TensorRT Inference Server is available in two ways:
+The Triton Inference Server is available in two ways:
 
 * As a pre-built Docker container available from the `NVIDIA GPU Cloud
   (NGC) <https://ngc.nvidia.com>`_. For more information, see
@@ -49,7 +49,7 @@ Regardless of which method you choose (starting with a pre-built
 container from NGC or building from source), you must perform the
 following prerequisite steps:
 
-* Clone the TensorRT Inference Server GitHub repo. Even if you choose
+* Clone the Triton Inference Server GitHub repo. Even if you choose
   to get the pre-built inference server from NGC, you need the GitHub
   repo for the example model repository and to build the example
   applications. Go to
@@ -90,7 +90,7 @@ Using A Prebuilt Docker Container
 
 Make sure you log into NGC as described in
 :ref:`section-quickstart-prerequisites` before attempting the steps in this
-section.  Use docker pull to get the TensorRT Inference Server
+section.  Use docker pull to get the Triton Inference Server
 container from NGC::
 
   $ docker pull nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3
@@ -138,7 +138,7 @@ Building With CMake
 Make sure you complete the steps in :ref:`section-quickstart-prerequisites`
 before attempting to build the inference server. To build with CMake
 you must decide which features of the inference server you want, build
-any required dependencies, and the lastly build the TensorRT Inference
+any required dependencies, and the lastly build the Triton Inference
 Server itself. See :ref:`section-building-the-server-with-cmake` for
 details on how to build with CMake.
 
@@ -152,8 +152,8 @@ example client applications.
 
 .. _section-quickstart-run-tensorrt-inference-server:
 
-Run TensorRT Inference Server
------------------------------
+Run Triton Inference Server
+---------------------------
 
 Assuming the example model repository is available in
 /full/path/to/example/model/repository, if you build using Docker use

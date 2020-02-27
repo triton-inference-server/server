@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 Library API
 ===========
 
-The TensorRT Inference Server provides a backwards-compatible C API
+The Triton Inference Server provides a backwards-compatible C API
 that allows the server to be linked directly into a C/C++
 application. The API is documented in `trtserver.h
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/trtserver.h>`_
