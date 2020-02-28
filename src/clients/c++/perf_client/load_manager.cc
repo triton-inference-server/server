@@ -118,6 +118,7 @@ LoadManager::~LoadManager()
                     << static_cast<void*>(
                            shared_memory_regions_[region.first].first)
                     << ", size: " << shared_memory_regions_[region.first].second
+                    << " bytes, Details: " << cudaGetErrorString(cuda_err)
                     << std::endl;
         }
       }
