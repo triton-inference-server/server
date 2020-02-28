@@ -230,7 +230,8 @@ message InferRequestHeader
   //@@
   //@@     The priority value of this request. If priority handling is not
   //@@     enable for the model, then this value is ignored. The default value
-  //@@     is 0 which indicates that the request will not be prioritized.
+  //@@     is 0 which indicates that the request will be assigned the default
+  //@@     priority associated with the model.
   //@@
   uint32 priority = 7;
 
@@ -242,7 +243,7 @@ message InferRequestHeader
   //@@     If the request cannot be processed within this timeout, the request
   //@@     will be handled based on the model's timeout policy.
   //@@     The default value is 0 which indicates that the request does not
-  //@@     override timeout value.
+  //@@     override the model's timeout value.
   //@@
   uint64 timeout_microseconds = 8;
 }

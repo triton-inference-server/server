@@ -70,7 +70,8 @@ class PriorityQueue {
   Scheduler::Payload Dequeue();
 
   // Retrieve the payloads that are rejected based on the queue policies.
-  std::vector<std::deque<Scheduler::Payload>> ReleaseRejectedPayloads();
+  std::shared_ptr<std::vector<std::deque<Scheduler::Payload>>>
+  ReleaseRejectedPayloads();
 
   // Return the number of payloads in the queue, rejected payloads are not
   // included.

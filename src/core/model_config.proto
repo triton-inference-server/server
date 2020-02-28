@@ -671,6 +671,8 @@ message ModelQueuePolicy
   //@@  .. cpp:var:: bool allow_timeout_override
   //@@
   //@@     Whether individual request can override the default timeout value.
+  //@@     When true, individual requests can set a timeout that is less than
+  //@@     the default timeout value but may not increase the timeout.
   //@@     The default value is false.
   //@@
   bool allow_timeout_override = 3;
@@ -725,6 +727,23 @@ message ModelDynamicBatching
   //@@
   bool preserve_ordering = 3;
 
+  //@@  .. cpp:var:: uint32 priority_levels
+  //@@
+  //@@     The number of priority levels to be enabled for the model,
+  //@@     the priority level starts from 1. Requests with lower priority level
+  //@@     will be handled before requests with higher priority levels.
+  //@@     Requests with the same priority level will be handled in the order
+  //@@     that they are received.
+  //@@
+  uint32 priority_levels = 4;
+
+  //@@  .. cpp:var:: uint32 default_priority_level
+  //@@
+  //@@     The priority level used for requests that don't specify their
+  //@@     priority. The value must be in the range [ 1, 'priority_levels' ].
+  //@@
+  uint32 default_priority_level = 5;
+
   //@@  .. cpp:var:: ModelQueuePolicy default_queue_policy
   //@@
   //@@     The default queue policy used for requests that don't require
@@ -732,23 +751,7 @@ message ModelDynamicBatching
   //@@     there is no specific policy given. If not specified, a policy with
   //@@     default field values will be used.
   //@@
-  ModelQueuePolicy default_queue_policy = 4;
-
-  //@@  .. cpp:var:: uint32 priority_levels
-  //@@
-  //@@     The number of priority levels to be enabled for the model,
-  //@@     the priority level starts from 1 and the requests with lower
-  //@@     priority level will be prioritized than other requests.
-  //@@
-  uint32 priority_levels = 5;
-
-  //@@  .. cpp:var:: uint32 default_priority_level
-  //@@
-  //@@     The priority level used for requests that don't specify their
-  //@@     priority. The value must be in the range yielded by
-  //@@     'priority_levels'.
-  //@@
-  uint32 default_priority_level = 6;
+  ModelQueuePolicy default_queue_policy = 6;
 
   //@@  .. cpp:var:: map<uint32, ModelQueuePolicy> priority_queue_policy
   //@@

@@ -97,7 +97,10 @@ class DynamicBatchScheduler : public Scheduler {
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
-      const uint64_t max_queue_delay_microseconds);
+      const uint64_t max_queue_delay_microseconds,
+      const ModelQueuePolicy& default_queue_policy,
+      const uint32_t priority_levels,
+      const ModelQueuePolicyMap& queue_policy_map);
   void SchedulerThread(
       const uint32_t runner_id, const uint32_t completion_id, const int nice,
       const std::shared_ptr<std::atomic<bool>>& rthread_exit,
@@ -135,8 +138,8 @@ class DynamicBatchScheduler : public Scheduler {
   std::condition_variable cv_;
 
   // Map from priority level to queue holding inference requests for the model
-  // represented by this scheduler. Priority level 0 is reserved for default
-  // timeout queue
+  // represented by this scheduler. If priority queues are not supported by the
+  // scheduler, then priority zero entry is used as the single queue?
   PriorityQueue queue_;
 
   std::vector<std::unique_ptr<std::thread>> scheduler_threads_;

@@ -526,7 +526,8 @@ ValidateModelConfig(
       }
       for (const auto& queue_policy :
            config.dynamic_batching().priority_queue_policy()) {
-        if (queue_policy.first == 0 || queue_policy.first > priority_levels) {
+        if ((queue_policy.first == 0) ||
+            (queue_policy.first > priority_levels)) {
           return Status(
               RequestStatusCode::INVALID_ARG,
               "priority queue policy must have priority level in range [1, " +

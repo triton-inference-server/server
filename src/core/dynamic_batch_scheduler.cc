@@ -49,10 +49,13 @@ DynamicBatchScheduler::DynamicBatchScheduler(
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
-    const uint64_t max_queue_delay_microseconds)
+    const uint64_t max_queue_delay_microseconds,
+    const ModelQueuePolicy& default_queue_policy,
+    const uint32_t priority_levels, const ModelQueuePolicyMap& queue_policy_map)
     : OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
       OnPeek_(OnPeek), dynamic_batching_enabled_(dynamic_batching_enabled),
       scheduler_thread_cnt_(runner_cnt), idle_scheduler_thread_cnt_(0),
+      queue_(default_queue_policy, priority_levels, queue_policy_map),
       preferred_batch_sizes_(preferred_batch_sizes),
       pending_batch_delay_ns_(max_queue_delay_microseconds * 1000),
       pending_batch_size_(0), queued_batch_size_(0),
@@ -80,46 +83,11 @@ DynamicBatchScheduler::Create(
     const uint64_t max_queue_delay_microseconds,
     std::unique_ptr<Scheduler>* scheduler)
 {
-  DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
-      runner_id_start, runner_cnt, OnInit, OnWarmup, OnSchedule, OnPeek,
+  return Create(
+      runner_id_start, runner_cnt, nice, OnInit, OnWarmup, OnSchedule, OnPeek,
       dynamic_batching_enabled, enforce_equal_shape_tensors, preserve_ordering,
-      preferred_batch_sizes, max_queue_delay_microseconds);
-  std::unique_ptr<DynamicBatchScheduler> sched(dyna_sched);
-
-  // Create one scheduler thread for each requested runner. Associate
-  // each scheduler thread with a runner.
-  for (uint32_t c = 0; c < sched->scheduler_thread_cnt_; ++c) {
-    const uint32_t runner_id = runner_id_start + c;
-    std::promise<bool> init_state;
-    auto thread_exit = std::make_shared<std::atomic<bool>>(false);
-    sched->scheduler_threads_exit_.emplace_back(thread_exit);
-    sched->scheduler_threads_.emplace_back(new std::thread(
-        [dyna_sched, runner_id, c, nice, thread_exit, &init_state]() {
-          dyna_sched->SchedulerThread(
-              runner_id, c, nice, thread_exit, &init_state);
-        }));
-    if (!init_state.get_future().get()) {
-      if (sched->scheduler_threads_.back()->joinable()) {
-        sched->scheduler_threads_.back()->join();
-      }
-      sched->scheduler_threads_exit_.pop_back();
-      sched->scheduler_threads_.pop_back();
-    }
-  }
-
-  if (sched->scheduler_threads_.empty()) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "Initialization failed for all dynamic-batch scheduler threads");
-  }
-
-  sched->completion_queues_ =
-      std::vector<std::queue<std::shared_ptr<std::vector<Scheduler::Payload>>>>(
-          sched->scheduler_thread_cnt_);
-
-  scheduler->reset(sched.release());
-
-  return Status::Success;
+      preferred_batch_sizes, max_queue_delay_microseconds, ModelQueuePolicy(),
+      0, ModelQueuePolicyMap(), scheduler);
 }
 
 Status
@@ -140,11 +108,9 @@ DynamicBatchScheduler::Create(
   DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
       runner_id_start, runner_cnt, OnInit, OnWarmup, OnSchedule, OnPeek,
       dynamic_batching_enabled, enforce_equal_shape_tensors, preserve_ordering,
-      preferred_batch_sizes, max_queue_delay_microseconds);
+      preferred_batch_sizes, max_queue_delay_microseconds, default_queue_policy,
+      priority_levels, queue_policy_map);
   std::unique_ptr<DynamicBatchScheduler> sched(dyna_sched);
-
-  sched->queue_ =
-      PriorityQueue(default_queue_policy, priority_levels, queue_policy_map);
 
   // Create one scheduler thread for each requested runner. Associate
   // each scheduler thread with a runner.
@@ -325,7 +291,8 @@ DynamicBatchScheduler::SchedulerThread(
     NVTX_RANGE(nvtx_, "DynamicBatchScheduler " + runner_id);
 
     std::shared_ptr<std::vector<Scheduler::Payload>> payloads;
-    std::vector<std::deque<Scheduler::Payload>> rejected_payloads;
+    std::shared_ptr<std::vector<std::deque<Scheduler::Payload>>>
+        rejected_payloads;
     bool wake_thread = false;
     uint64_t wait_microseconds = 0;
 
@@ -353,7 +320,7 @@ DynamicBatchScheduler::SchedulerThread(
 
         // Extract batch only if there is pending batch
         auto pending_batch_queue_cnt = queue_.PendingBatchCount();
-        if (wait_microseconds == 0 && (pending_batch_queue_cnt != 0)) {
+        if ((wait_microseconds == 0) && (pending_batch_queue_cnt != 0)) {
           payloads = std::make_shared<std::vector<Scheduler::Payload>>();
           for (size_t idx = 0; idx < pending_batch_queue_cnt; ++idx) {
             payloads->emplace_back(std::move(queue_.Dequeue()));
@@ -427,12 +394,14 @@ DynamicBatchScheduler::SchedulerThread(
     }
 
     // Finish rejected payloads if any
-    static Status rejected_status =
-        Status(RequestStatusCode::UNAVAILABLE, "Request timeout expired");
-    for (auto& rejected_queue : rejected_payloads) {
-      for (auto& rejected_payload : rejected_queue) {
-        if (rejected_payload.complete_function_ != nullptr) {
-          rejected_payload.complete_function_(rejected_status);
+    if (rejected_payloads != nullptr) {
+      static Status rejected_status =
+          Status(RequestStatusCode::UNAVAILABLE, "Request timeout expired");
+      for (auto& rejected_queue : *rejected_payloads) {
+        for (auto& rejected_payload : rejected_queue) {
+          if (rejected_payload.complete_function_ != nullptr) {
+            rejected_payload.complete_function_(rejected_status);
+          }
         }
       }
     }

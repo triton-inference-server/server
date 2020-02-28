@@ -260,16 +260,17 @@ PriorityQueue::Dequeue()
   throw std::out_of_range("dequeue on empty queue");
 }
 
-std::vector<std::deque<Scheduler::Payload>>
+std::shared_ptr<std::vector<std::deque<Scheduler::Payload>>>
 PriorityQueue::ReleaseRejectedPayloads()
 {
-  std::vector<std::deque<Scheduler::Payload>> res(queues_.size());
+  auto res = std::make_shared<std::vector<std::deque<Scheduler::Payload>>>(
+      queues_.size());
   size_t idx = 0;
   for (auto& queue : queues_) {
-    res[idx] = std::move(queue.second.ReleaseRejectedQueue());
+    (*res)[idx] = std::move(queue.second.ReleaseRejectedQueue());
     idx++;
   }
-  return res;
+  return std::move(res);
 }
 
 bool
