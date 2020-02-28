@@ -178,6 +178,9 @@ class PriorityQueue {
     // included.
     size_t Size() { return queue_.size() + delayed_queue_.size(); }
 
+    // Return the number of unexpired requests in the queue
+    size_t UnexpiredSize() { return queue_.size(); }
+
    private:
     // Variables that define the policy for the queue
     const ModelQueuePolicy::TimeoutAction timeout_action_;
@@ -200,6 +203,7 @@ class PriorityQueue {
 
     Cursor(const Cursor& rhs)
         : curr_it_(rhs.curr_it_), queue_idx_(rhs.queue_idx_),
+          at_delayed_queue_(rhs.at_delayed_queue_),
           pending_batch_closest_timeout_ns_(
               rhs.pending_batch_closest_timeout_ns_),
           pending_batch_oldest_enqueue_time_ns_(
@@ -210,6 +214,7 @@ class PriorityQueue {
 
     PriorityQueues::iterator curr_it_;
     size_t queue_idx_;
+    bool at_delayed_queue_;
     uint64_t pending_batch_closest_timeout_ns_;
     uint64_t pending_batch_oldest_enqueue_time_ns_;
     size_t pending_batch_count_;
@@ -218,6 +223,11 @@ class PriorityQueue {
 
   PriorityQueues queues_;
   size_t size_;
+
+  // Keep track of the priority level that the first payload in the queue
+  // is at to avoid traversing 'queues_'
+  uint32_t front_priority_level_;
+  uint32_t last_priority_level_;
 
   Cursor pending_cursor_;
   Cursor current_mark_;

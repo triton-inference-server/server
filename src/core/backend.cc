@@ -101,6 +101,9 @@ InferenceBackend::SetModelConfig(
     default_priority_level_ =
         config_.dynamic_batching().default_priority_level();
     max_priority_level_ = config_.dynamic_batching().priority_levels();
+  } else {
+    default_priority_level_ = 0;
+    max_priority_level_ = 0;
   }
 
   return Status::Success;

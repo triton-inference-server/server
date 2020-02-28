@@ -148,24 +148,37 @@ PriorityQueue::PolicyQueue::ApplyPolicy(
   struct timespec now;
   clock_gettime(CLOCK_MONOTONIC, &now);
   auto now_nanoseconds = TIMESPEC_TO_NANOS(now);
-  while (idx < queue_.size()) {
-    if ((timeout_timestamp_ns_[idx] != 0) &&
-        (now_nanoseconds > timeout_timestamp_ns_[idx])) {
-      if (timeout_action_ == ModelQueuePolicy::DELAY) {
-        delayed_queue_.emplace_back(std::move(queue_[idx]));
-      } else {
-        rejected_queue_.emplace_back(std::move(queue_[idx]));
-        *rejected_count += 1;
-        *rejected_batch_size +=
-            rejected_queue_.back().request_provider_->Request()->BatchSize();
+  if (idx < queue_.size()) {
+    size_t curr_idx = idx;
+    while (curr_idx < queue_.size()) {
+      if ((timeout_timestamp_ns_[curr_idx] != 0) &&
+          (now_nanoseconds > timeout_timestamp_ns_[curr_idx])) {
+        if (timeout_action_ == ModelQueuePolicy::DELAY) {
+          delayed_queue_.emplace_back(std::move(queue_[curr_idx]));
+        } else {
+          rejected_queue_.emplace_back(std::move(queue_[curr_idx]));
+          *rejected_count += 1;
+          *rejected_batch_size += rejected_queue_.back()
+                                      .request_provider_->Request()
+                                      ->BatchSize();
+        }
+        curr_idx++;
       }
-      // FIXME: erase on deque is linear, should consider to use different data
-      // structure instead. List is the first one to think of, but the traversal
-      // may not be as efficient due to cache miss.
-      queue_.erase(queue_.begin() + idx);
-      timeout_timestamp_ns_.erase(timeout_timestamp_ns_.begin() + idx);
-    } else {
-      // Current idx is pointing to an item with unexpired timeout
+      break;
+    }
+
+    // Use range erasure on deque as all erasure functions are linear,
+    // this implies in the edge case where this function is always called on
+    // 'bad' index can be O(n^2). However, for data structures that are O(1)
+    // erasure, the traversal may not be as efficient due to cache miss
+    // (elements not stored contiguously).
+    queue_.erase(queue_.begin() + idx, queue_.begin() + curr_idx);
+    timeout_timestamp_ns_.erase(
+        timeout_timestamp_ns_.begin() + idx,
+        timeout_timestamp_ns_.begin() + curr_idx);
+
+    // Current idx is pointing to an item with unexpired timeout
+    if (idx < queue_.size()) {
       return true;
     }
   }
@@ -203,17 +216,19 @@ PriorityQueue::PolicyQueue::TimeoutAt(size_t idx)
   }
 }
 
-PriorityQueue::PriorityQueue() : size_(0)
+PriorityQueue::PriorityQueue()
+    : size_(0), front_priority_level_(0), last_priority_level_(0)
 {
   ModelQueuePolicy default_policy;
   queues_.emplace(0, PolicyQueue(default_policy));
+  front_priority_level_ = queues_.begin()->first;
   ResetCursor();
 }
 
 PriorityQueue::PriorityQueue(
     const ModelQueuePolicy& default_queue_policy, uint32_t priority_levels,
     const ModelQueuePolicyMap queue_policy_map)
-    : size_(0)
+    : size_(0), last_priority_level_(priority_levels)
 {
   if (priority_levels == 0) {
     queues_.emplace(0, PolicyQueue(default_queue_policy));
@@ -227,6 +242,7 @@ PriorityQueue::PriorityQueue(
       }
     }
   }
+  front_priority_level_ = queues_.begin()->first;
   ResetCursor();
 }
 
@@ -236,12 +252,16 @@ PriorityQueue::Enqueue(uint32_t priority_level, Scheduler::Payload&& payload)
   auto status = queues_[priority_level].Enqueue(std::move(payload));
   if (status.IsOk()) {
     size_++;
-    pending_cursor_.valid_ =
-        pending_cursor_.valid_ &&
-        // FIXME: change to ">=", we just need to make sure pending batch hasn't
-        // reached delayed queue, then new payload at the same level is
-        // guaranteed to be after pending batch.
-        (priority_level > pending_cursor_.curr_it_->first);
+    front_priority_level_ = std::min(front_priority_level_, priority_level);
+    // Invalidate the pending batch cursor if the enqueued item is placed
+    // in within the pending batch. At the same priority level, the payload is
+    // guaranteed to be after pending batch if the batch hasn't reached
+    // delayed queue.
+    if ((priority_level < pending_cursor_.curr_it_->first) ||
+        ((priority_level == pending_cursor_.curr_it_->first) &&
+         (pending_cursor_.at_delayed_queue_))) {
+      pending_cursor_.valid_ = false;
+    }
   }
   return status;
 }
@@ -250,12 +270,11 @@ Scheduler::Payload
 PriorityQueue::Dequeue()
 {
   pending_cursor_.valid_ = false;
-  // FIXME: be smart here, keep track of policy queue that is current head
-  for (auto& queue : queues_) {
-    if (!queue.second.Empty()) {
-      size_--;
-      return queue.second.Dequeue();
-    }
+  if (!queues_[front_priority_level_].Empty()) {
+    size_--;
+    return queues_[front_priority_level_].Dequeue();
+  } else if (front_priority_level_ != last_priority_level_) {
+    front_priority_level_++;
   }
   throw std::out_of_range("dequeue on empty queue");
 }
@@ -286,7 +305,8 @@ PriorityQueue::IsCursorValid()
 }
 
 PriorityQueue::Cursor::Cursor(PriorityQueues::iterator start_it)
-    : curr_it_(start_it), queue_idx_(0), pending_batch_closest_timeout_ns_(0),
+    : curr_it_(start_it), queue_idx_(0), at_delayed_queue_(false),
+      pending_batch_closest_timeout_ns_(0),
       pending_batch_oldest_enqueue_time_ns_(0), pending_batch_count_(0),
       valid_(true)
 {
@@ -350,6 +370,11 @@ PriorityQueue::AdvanceCursor()
   }
   ++pending_cursor_.queue_idx_;
   ++pending_cursor_.pending_batch_count_;
+  // pending batch includes delayed payload if (queue_idx_ - 1) points to
+  // delayed queue.
+  pending_cursor_.at_delayed_queue_ =
+      (pending_cursor_.queue_idx_ >
+       pending_cursor_.curr_it_->second.UnexpiredSize());
 }
 
 }}  // namespace nvidia::inferenceserver
