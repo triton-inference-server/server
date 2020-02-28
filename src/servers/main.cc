@@ -79,11 +79,12 @@ int32_t repository_poll_secs_ = 15;
 // Whether explicit model control is allowed
 bool allow_model_control_ = false;
 
+// Default to using the V1 protocol.
+int32_t api_version_ = 1;
+
 // The HTTP, GRPC and metrics service/s and ports. Initialized to
 // default values and modifyied based on command-line args. Set to -1
 // to indicate the protocol is disabled.
-// Default to using the V1 protocol.
-int32_t api_version_ = 1;
 #ifdef TRTIS_ENABLE_HTTP
 std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>
     http_services_;
@@ -506,7 +507,7 @@ StartHttpService(
 
 #ifdef TRTIS_ENABLE_HTTP_V2
 TRTSERVER_Error*
-StartHttpService(
+StartHttpV2Service(
     std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServerV2>>*
         services,
     const std::shared_ptr<TRTSERVER_Server>& server,
@@ -625,7 +626,7 @@ StartEndpoints(
       }
     }
 
-    TRTSERVER_Error* err = StartHttpService(
+    TRTSERVER_Error* err = StartHttpV2Service(
         &http_services_v2_, server, trace_manager, smb_manager, port_map);
     if (err != nullptr) {
       LOG_TRTSERVER_ERROR(err, "failed to start HTTP service");
@@ -945,7 +946,6 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   double min_supported_compute_capability = 0;
 #endif  // TRTIS_ENABLE_GPU
 
-#ifdef TRTIS_ENABLE_HTTP
 #if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_HTTP_V2)
   int32_t http_port = http_port_;
   int32_t http_thread_cnt = http_thread_cnt_;
@@ -1210,12 +1210,12 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   http_port_ = http_port;
   http_health_port_ = http_health_port;
   http_thread_cnt_ = http_thread_cnt;
-#ifdef TRTIS_ENABLE_HTTP_V2
-  http_ports_ = {http_health_port_, http_port_};
-#else
-  http_ports_ = {http_port_, http_health_port_, http_port_,
-                 http_port_, http_port_,        http_port_};
-#endif  // TRTIS_ENABLE_HTTP_V2
+  if (api_version_ == 2) {
+    http_ports_ = {http_health_port_, http_port_};
+  } else {
+    http_ports_ = {http_port_, http_health_port_, http_port_,
+                   http_port_, http_port_,        http_port_};
+  }
 #endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_HTTP_V2
 
 #if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)

@@ -422,8 +422,7 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
     // server health
     if (type == "health") {
       std::string kind;
-      if (RE2::FullMatch(
-              std::string(rest), health_regex_, &kind)) {
+      if (RE2::FullMatch(std::string(rest), health_regex_, &kind)) {
         HandleHealth(req, kind);
         return;
       }
@@ -434,8 +433,8 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
       LOG_VERBOSE(1) << "type: " << type;
       LOG_VERBOSE(1) << "rest: " << rest;
       if (RE2::FullMatch(
-              std::string(rest), model_regex_, &model_name,
-              &model_version, &kind)) {
+              std::string(rest), model_regex_, &model_name, &model_version,
+              &kind)) {
         if (kind == "ready") {
           HandleModelHealth(req, model_name, model_version);
           return;
@@ -463,8 +462,7 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
 }
 
 void
-HTTPAPIServerV2::HandleHealth(
-    evhtp_request_t* req, const std::string& kind)
+HTTPAPIServerV2::HandleHealth(evhtp_request_t* req, const std::string& kind)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -476,8 +474,7 @@ HTTPAPIServerV2::HandleHealth(
 
   if (kind == "live") {
     err = TRTSERVER_ServerIsLive(server_.get(), &health);
-  }
-  else {
+  } else {
     err = TRTSERVER_ServerIsReady(server_.get(), &health);
   }
 
@@ -556,10 +553,12 @@ HTTPAPIServerV2::HandleModelHealth(
                 TRTSERVER_ERROR_INVALID_ARG,
                 std::string(
                     "no status available for model '" + model_name +
-                    "', version " + model_version_str).c_str());
+                    "', version " + model_version_str)
+                    .c_str());
           } else {
             const ModelVersionStatus& version_status = vitr->second;
-            ready = version_status.ready_state() == ModelReadyState::MODEL_READY;
+            ready =
+                version_status.ready_state() == ModelReadyState::MODEL_READY;
           }
         }
       }
@@ -600,7 +599,7 @@ HTTPAPIServerV2::HandleModelMetadata(
 
   TRTSERVER_Protobuf* model_status_protobuf = nullptr;
   TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
-                server_.get(), model_name.c_str(), &model_status_protobuf);
+      server_.get(), model_name.c_str(), &model_status_protobuf);
   if (err == nullptr) {
     const char* status_buffer;
     size_t status_byte_size;
@@ -666,7 +665,7 @@ HTTPAPIServerV2::HandleMetadata(evhtp_request_t* req)
 
   TRTSERVER_Protobuf* server_status_protobuf = nullptr;
   TRTSERVER_Error* err =
-          TRTSERVER_ServerStatus(server_.get(), &server_status_protobuf);
+      TRTSERVER_ServerStatus(server_.get(), &server_status_protobuf);
   if (err == nullptr) {
     const char* status_buffer;
     size_t status_byte_size;
