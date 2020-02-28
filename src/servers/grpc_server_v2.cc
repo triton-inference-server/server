@@ -1368,11 +1368,12 @@ InferGRPCToInput(
       byte_size = raw.size();
 
       // Check the presence of explicit tensors
+      const size_t elem_byte_size = GetDataTypeByteSize(io.datatype());
       if (io.contents().bool_contents_size() != 0) {
         RETURN_IF_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "BOOL", io.datatype(), byte_size));
         base = (const void*)io.contents().bool_contents().data();
-        byte_size = io.contents().bool_contents_size();
+        byte_size = io.contents().bool_contents_size() * elem_byte_size;
       }
 
       if (io.contents().int_contents_size() != 0) {
@@ -1381,12 +1382,15 @@ InferGRPCToInput(
               io.name(), request.model_name(), "INT8", io.datatype(),
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
+          serialized->reserve(
+              io.contents().int_contents_size() * elem_byte_size);
           serialized_data_map->emplace(io.name(), serialized);
           for (const auto& element : io.contents().int_contents()) {
             // Assuming the system is little-endian, picking the
             // least significant byte of 32-bit integer as a
             // int8 element
-            serialized->append(reinterpret_cast<const char*>(&element), 1);
+            serialized->append(
+                reinterpret_cast<const char*>(&element), elem_byte_size);
           }
           base = serialized->c_str();
           byte_size = serialized->size();
@@ -1395,12 +1399,15 @@ InferGRPCToInput(
               io.name(), request.model_name(), "INT16", io.datatype(),
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
+          serialized->reserve(
+              io.contents().int_contents_size() * elem_byte_size);
           serialized_data_map->emplace(io.name(), serialized);
           for (const auto& element : io.contents().int_contents()) {
             // Assuming the system is little-endian, picking the
             // least 2 significant bytes of 32-bit integer as a
             // int16 element
-            serialized->append(reinterpret_cast<const char*>(&element), 2);
+            serialized->append(
+                reinterpret_cast<const char*>(&element), elem_byte_size);
           }
           base = serialized->c_str();
           byte_size = serialized->size();
@@ -1409,7 +1416,7 @@ InferGRPCToInput(
               io.name(), request.model_name(), "INT32", io.datatype(),
               byte_size));
           base = (const void*)io.contents().int_contents().data();
-          byte_size = io.contents().int_contents_size() * 4;
+          byte_size = io.contents().int_contents_size() * elem_byte_size;
         }
       }
 
@@ -1418,7 +1425,7 @@ InferGRPCToInput(
             io.name(), request.model_name(), "INT64", io.datatype(),
             byte_size));
         base = (const void*)io.contents().int64_contents().data();
-        byte_size = io.contents().int64_contents_size() * 8;
+        byte_size = io.contents().int64_contents_size() * elem_byte_size;
       }
 
       if (io.contents().uint_contents_size() != 0) {
@@ -1428,11 +1435,14 @@ InferGRPCToInput(
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
           serialized_data_map->emplace(io.name(), serialized);
+          serialized->reserve(
+              io.contents().uint_contents_size() * elem_byte_size);
           for (const auto& element : io.contents().uint_contents()) {
             // Assuming the system is little-endian, picking the
             // least significant byte of 32-bit unsigned integer as a
             // uint8 element
-            serialized->append(reinterpret_cast<const char*>(&element), 1);
+            serialized->append(
+                reinterpret_cast<const char*>(&element), elem_byte_size);
           }
           base = serialized->c_str();
           byte_size = serialized->size();
@@ -1442,11 +1452,14 @@ InferGRPCToInput(
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
           serialized_data_map->emplace(io.name(), serialized);
+          serialized->reserve(
+              io.contents().uint_contents_size() * elem_byte_size);
           for (const auto& element : io.contents().uint_contents()) {
             // Assuming the system is little-endian, picking the
             // least 2 significant bytes of 32-bit integer as a
             // uint16 element
-            serialized->append(reinterpret_cast<const char*>(&element), 2);
+            serialized->append(
+                reinterpret_cast<const char*>(&element), elem_byte_size);
           }
           base = serialized->c_str();
           byte_size = serialized->size();
@@ -1455,7 +1468,7 @@ InferGRPCToInput(
               io.name(), request.model_name(), "UINT32", io.datatype(),
               byte_size));
           base = (const void*)io.contents().int_contents().data();
-          byte_size = io.contents().int_contents_size() * 4;
+          byte_size = io.contents().int_contents_size() * elem_byte_size;
         }
       }
 
@@ -1464,21 +1477,21 @@ InferGRPCToInput(
             io.name(), request.model_name(), "UINT64", io.datatype(),
             byte_size));
         base = (const void*)io.contents().uint64_contents().data();
-        byte_size = io.contents().uint64_contents_size() * 8;
+        byte_size = io.contents().uint64_contents_size() * elem_byte_size;
       }
 
       if (io.contents().fp32_contents_size() != 0) {
         RETURN_IF_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "FP32", io.datatype(), byte_size));
         base = (const void*)io.contents().fp32_contents().data();
-        byte_size = io.contents().fp32_contents_size() * 4;
+        byte_size = io.contents().fp32_contents_size() * elem_byte_size;
       }
 
       if (io.contents().fp64_contents_size() != 0) {
         RETURN_IF_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "FP64", io.datatype(), byte_size));
         base = (const void*)io.contents().fp64_contents().data();
-        byte_size = io.contents().fp64_contents_size() * 8;
+        byte_size = io.contents().fp64_contents_size() * elem_byte_size;
       }
 
       if (io.contents().byte_contents_size() != 0) {
@@ -1504,12 +1517,13 @@ InferGRPCToInput(
         byte_size = serialized->size();
       }
     }
+
     if (!has_byte_contents) {
       uint64_t expected_byte_size = 0;
       RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
           request_provider, io.name().c_str(), &expected_byte_size));
 
-      if ((byte_size != expected_byte_size)) {
+      if (byte_size != expected_byte_size) {
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INVALID_ARG,
             std::string(

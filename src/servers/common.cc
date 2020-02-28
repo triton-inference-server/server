@@ -232,4 +232,32 @@ GetDataTypeProtocolString(const DataType dtype)
   return "";
 }
 
+size_t
+GetDataTypeByteSize(const std::string& protocol_dtype)
+{
+  if ((protocol_dtype.compare("BOOL") == 0) ||
+      (protocol_dtype.compare("INT8") == 0) ||
+      (protocol_dtype.compare("UINT8") == 0)) {
+    return 1;
+  } else if (
+      (protocol_dtype.compare("INT16") == 0) ||
+      (protocol_dtype.compare("UINT16") == 0) ||
+      (protocol_dtype.compare("FP16") == 0)) {
+    return 2;
+  } else if (
+      (protocol_dtype.compare("INT32") == 0) ||
+      (protocol_dtype.compare("UINT32") == 0) ||
+      (protocol_dtype.compare("FP32") == 0)) {
+    return 4;
+  } else if (
+      (protocol_dtype.compare("INT64") == 0) ||
+      (protocol_dtype.compare("UINT64") == 0) ||
+      (protocol_dtype.compare("FP64") == 0)) {
+    return 8;
+  } else {
+    // If the data type is unknown or bytes (variable) then return 0
+    return 0;
+  }
+}
+
 }}  // namespace nvidia::inferenceserver
