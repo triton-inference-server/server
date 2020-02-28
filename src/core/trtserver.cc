@@ -400,6 +400,8 @@ class TrtServerRequestOptions {
   TRTSERVER_Error* SetFlags(uint32_t flags);
   TRTSERVER_Error* SetCorrelationId(uint64_t correlation_id);
   TRTSERVER_Error* SetBatchSize(uint64_t batch_size);
+  TRTSERVER_Error* SetPriority(uint32_t priority);
+  TRTSERVER_Error* SetTimeoutMs(uint64_t timeout_ms);
 
   TRTSERVER_Error* AddInput(
       const char* input_name, const int64_t* dims, uint64_t dim_count,
@@ -481,6 +483,22 @@ TrtServerRequestOptions::SetBatchSize(uint64_t batch_size)
 {
   std::lock_guard<std::mutex> lk(mtx_);
   request_header_->set_batch_size(batch_size);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TrtServerRequestOptions::SetPriority(uint32_t priority)
+{
+  std::lock_guard<std::mutex> lk(mtx_);
+  request_header_->set_priority(priority);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TrtServerRequestOptions::SetTimeoutMs(uint64_t timeout_ms)
+{
+  std::lock_guard<std::mutex> lk(mtx_);
+  request_header_->set_timeout_microseconds(timeout_ms);
   return nullptr;  // Success
 }
 
@@ -981,6 +999,26 @@ TRTSERVER_InferenceRequestOptionsSetBatchSize(
 }
 
 TRTSERVER_Error*
+TRTSERVER_InferenceRequestOptionsSetPriority(
+    TRTSERVER_InferenceRequestOptions* request_options, uint32_t priority)
+{
+  TrtServerRequestOptions* loptions =
+      reinterpret_cast<TrtServerRequestOptions*>(request_options);
+  loptions->SetPriority(priority);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestOptionsSetTimeout(
+    TRTSERVER_InferenceRequestOptions* request_options, uint64_t timeout_ms)
+{
+  TrtServerRequestOptions* loptions =
+      reinterpret_cast<TrtServerRequestOptions*>(request_options);
+  loptions->SetTimeoutMs(timeout_ms);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
 TRTSERVER_InferenceRequestOptionsAddInput(
     TRTSERVER_InferenceRequestOptions* request_options, const char* input_name,
     const int64_t* dims, uint64_t dim_count, uint64_t batch_byte_size)
@@ -1074,6 +1112,8 @@ TRTSERVER_InferenceRequestProviderNewV2(
   request->SetFlags(loptions->InferRequestHeader()->flags());
   request->SetCorrelationId(loptions->InferRequestHeader()->correlation_id());
   request->SetBatchSize(loptions->InferRequestHeader()->batch_size());
+  request->SetPriority(loptions->InferRequestHeader()->priority());
+  request->SetTimeoutMs(loptions->InferRequestHeader()->timeout_microseconds());
   for (const auto& io : loptions->InferRequestHeader()->input()) {
     if (io.has_shared_memory()) {
       RETURN_IF_STATUS_ERROR(request->AddInput(

@@ -359,6 +359,8 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
     warmup_data.irequest_->SetModelName(Name());
     warmup_data.irequest_->SetRequestedModelVersion(Version());
     warmup_data.irequest_->SetBatchSize(1);
+    warmup_data.irequest_->SetPriority(0);
+    warmup_data.irequest_->SetTimeoutMs(0);
 
     // Request all outputs
     for (const auto& io : Config().output()) {

@@ -580,6 +580,12 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestOptionsSetBatchSize(request_options, 1),
       "setting batch size for the request");
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsSetPriority(request_options, 0),
+      "setting priority for the request");
+  FAIL_IF_ERR(
+      TRTSERVER_InferenceRequestOptionsSetTimeout(request_options, 0),
+      "setting timeout for the request");
 
   auto input0 = is_torch_model ? "INPUT__0" : "INPUT0";
   auto input1 = is_torch_model ? "INPUT__1" : "INPUT1";

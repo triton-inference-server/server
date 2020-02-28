@@ -115,6 +115,10 @@ SetTRTSERVER_InferenceRequestOptions(
       request_options, request_header.correlation_id()));
   RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetBatchSize(
       request_options, request_header.batch_size()));
+  RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetPriority(
+      request_options, request_header.priority()));
+  RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetTimeout(
+      request_options, request_header.timeout_microseconds()));
 
   for (const auto& input : request_header.input()) {
     RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddInput(

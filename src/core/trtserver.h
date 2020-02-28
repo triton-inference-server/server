@@ -538,6 +538,20 @@ TRTSERVER_InferenceRequestOptionsSetCorrelationId(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetBatchSize(
     TRTSERVER_InferenceRequestOptions* request_options, uint32_t batch_size);
 
+/// Set the priority for the request in a request options.
+/// \param request_options The request options object.
+/// \param priority The priority level.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetPriority(
+    TRTSERVER_InferenceRequestOptions* request_options, uint32_t priority);
+
+/// Set the timeout for the request in a request options, in microseconds.
+/// \param request_options The request options object.
+/// \param timeout_ms The timeout, in microseconds.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetTimeout(
+    TRTSERVER_InferenceRequestOptions* request_options, uint64_t timeout_ms);
+
 /// Add a input meta-data associated with the request in a request options.
 /// \param request_options The request options object.
 /// \param input_name The name of the input.

@@ -167,6 +167,7 @@ class EnsembleContext {
   uint32_t flags_;
   uint64_t correlation_id_;
   uint32_t batch_size_;
+  uint32_t priority_;
 
   // Objects related to the ensemble infer request
   Status ensemble_status_;
@@ -272,6 +273,7 @@ EnsembleContext::EnsembleContext(
     batch_size_ = irequest->BatchSize();
     correlation_id_ = irequest->CorrelationId();
     flags_ = irequest->Flags();
+    priority_ = irequest->Priority();
 
     for (const auto& pr : irequest->Inputs()) {
       const auto& input = pr.second;
@@ -555,6 +557,9 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   irequest->SetCorrelationId(correlation_id_);
   irequest->SetFlags(flags_);
   irequest->SetBatchSize((batch_size == 0 ? 1 : batch_size));
+  irequest->SetPriority(priority_);
+  // FIXME: need to think about how to interpret timeout in ensemble.
+  irequest->SetTimeoutMs(0);
   RETURN_IF_ERROR(irequest->Normalize(*backend));
 
   step->reset(new Step(step_idx));
