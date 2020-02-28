@@ -46,10 +46,6 @@ class HTTPServerV2 {
       const int thread_cnt,
       std::vector<std::unique_ptr<HTTPServerV2>>* http_servers);
 
-  static TRTSERVER_Error* CreateMetricsServer(
-      const std::shared_ptr<TRTSERVER_Server>& server, int32_t port,
-      int thread_cnt, std::unique_ptr<HTTPServerV2>* metrics_server);
-
   virtual ~HTTPServerV2() = default;
 
   virtual TRTSERVER_Error* Start() = 0;

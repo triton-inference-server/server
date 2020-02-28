@@ -131,65 +131,6 @@ HTTPServerV2Impl::Dispatch(evhtp_request_t* req, void* arg)
 }
 
 
-#ifdef TRTIS_ENABLE_METRICS
-
-// Handle HTTP requests to obtain prometheus metrics
-class HTTPMetricsServer : public HTTPServerImpl {
- public:
-  explicit HTTPMetricsServer(
-      const std::shared_ptr<TRTSERVER_Server>& server, const int32_t port,
-      const int thread_cnt)
-      : HTTPServerImpl(port, thread_cnt), server_(server),
-        api_regex_(R"(/metrics/?)")
-  {
-  }
-
-  ~HTTPMetricsServer() = default;
-
- private:
-  void Handle(evhtp_request_t* req) override;
-
-  std::shared_ptr<TRTSERVER_Server> server_;
-  re2::RE2 api_regex_;
-};
-
-void
-HTTPMetricsServer::Handle(evhtp_request_t* req)
-{
-  LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
-                 << req->uri->path->full;
-
-  if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  evhtp_res res = EVHTP_RES_BADREQ;
-
-  // Call to metric endpoint should not have any trailing string
-  if (RE2::FullMatch(std::string(req->uri->path->full), api_regex_)) {
-    TRTSERVER_Metrics* metrics = nullptr;
-    TRTSERVER_Error* err = TRTSERVER_ServerMetrics(server_.get(), &metrics);
-    if (err == nullptr) {
-      const char* base;
-      size_t byte_size;
-      err = TRTSERVER_MetricsFormatted(
-          metrics, TRTSERVER_METRIC_PROMETHEUS, &base, &byte_size);
-      if (err == nullptr) {
-        res = EVHTP_RES_OK;
-        evbuffer_add(req->buffer_out, base, byte_size);
-      }
-    }
-
-    TRTSERVER_MetricsDelete(metrics);
-    TRTSERVER_ErrorDelete(err);
-  }
-
-  evhtp_send_reply(req, res);
-}
-
-#endif  // TRTIS_ENABLE_METRICS
-
 // Handle HTTP requests to inference server APIs
 class HTTPAPIServerV2 : public HTTPServerV2Impl {
  public:
@@ -1224,25 +1165,6 @@ HTTPServerV2::CreateAPIServer(
   }
 
   return nullptr;
-}
-
-TRTSERVER_Error*
-HTTPServerV2::CreateMetricsServer(
-    const std::shared_ptr<TRTSERVER_Server>& server, const int32_t port,
-    const int thread_cnt, std::unique_ptr<HTTPServerV2>* metrics_server)
-{
-  std::string addr = "0.0.0.0:" + std::to_string(port);
-  LOG_INFO << "Starting Metrics Service at " << addr;
-
-#ifndef TRTIS_ENABLE_METRICS
-  return TRTSERVER_ErrorNew(
-      TRTSERVER_ERROR_UNAVAILABLE, "Metrics support is disabled");
-#endif  // !TRTIS_ENABLE_METRICS
-
-#ifdef TRTIS_ENABLE_METRICS
-  metrics_server->reset(new HTTPMetricsServer(server, port, thread_cnt));
-  return nullptr;
-#endif  // TRTIS_ENABLE_METRICS
 }
 
 }}  // namespace nvidia::inferenceserver
