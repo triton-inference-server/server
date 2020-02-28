@@ -49,13 +49,14 @@
 
 namespace {
 
-// Just keep the alpha numeric characters in the name
 std::string
 TensorToRegionName(std::string name)
 {
+  // Remove slashes from the name, if any.
   name.erase(
       std::remove_if(
-          name.begin(), name.end(), std::not1(std::ptr_fun(isalnum))),
+          name.begin(), name.end(),
+          [](const char& c) { return ((c == '/') || (c == '\\')); }),
       name.end());
   return name;
 }
