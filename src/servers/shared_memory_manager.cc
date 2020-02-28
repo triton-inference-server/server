@@ -72,11 +72,14 @@ MapSharedMemory(
 TRTSERVER_Error*
 CloseSharedMemoryRegion(int shm_fd)
 {
-  int tmp = close(shm_fd);
-  if (tmp == -1) {
+  int status = close(shm_fd);
+  if (status == -1) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INTERNAL,
-        std::string("Unable to close shared memory region").c_str());
+        std::string(
+            "Unable to close shared memory region, errno: " +
+            std::string(std::strerror(errno)))
+            .c_str());
   }
   return nullptr;
 }
@@ -84,11 +87,14 @@ CloseSharedMemoryRegion(int shm_fd)
 TRTSERVER_Error*
 UnmapSharedMemory(void* mapped_addr, size_t byte_size)
 {
-  int tmp_fd = munmap(mapped_addr, byte_size);
-  if (tmp_fd == -1) {
+  int status = munmap(mapped_addr, byte_size);
+  if (status == -1) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INTERNAL,
-        std::string("Unable to munmap shared memory region").c_str());
+        std::string(
+            "Unable to munmap shared memory region, errno: " +
+            std::string(std::strerror(errno)))
+            .c_str());
   }
 
   return nullptr;
@@ -121,11 +127,11 @@ OpenCudaIPCRegion(
 
 SharedMemoryManager::~SharedMemoryManager()
 {
-  Clear();
+  UnregisterAll();
 }
 
 TRTSERVER_Error*
-SharedMemoryManager::AddSystemSharedMemory(
+SharedMemoryManager::RegisterSystemSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
     const size_t byte_size)
 {
@@ -176,7 +182,7 @@ SharedMemoryManager::AddSystemSharedMemory(
 
 #ifdef TRTIS_ENABLE_GPU
 TRTSERVER_Error*
-SharedMemoryManager::AddCUDASharedMemory(
+SharedMemoryManager::RegisterCUDASharedMemory(
     const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
     const size_t byte_size, const int device_id)
 {
@@ -296,16 +302,16 @@ SharedMemoryManager::GetStatus(SharedMemoryStatus* shm_status)
 }
 
 TRTSERVER_Error*
-SharedMemoryManager::Remove(const std::string& name)
+SharedMemoryManager::Unregister(const std::string& name)
 {
   // Serialize all operations that write/read current shared memory regions
   std::lock_guard<std::mutex> lock(mu_);
 
-  return RemoveHelper(name);
+  return UnregisterHelper(name);
 }
 
 TRTSERVER_Error*
-SharedMemoryManager::Clear()
+SharedMemoryManager::UnregisterAll()
 {
   // Serialize all operations that write/read current shared memory regions
   std::lock_guard<std::mutex> lock(mu_);
@@ -314,7 +320,7 @@ SharedMemoryManager::Clear()
       "Failed to unregister the following shared memory regions: ";
   std::vector<std::string> unregister_fails;
   for (const auto& shm_info : shared_memory_map_) {
-    TRTSERVER_Error* err = RemoveHelper(shm_info.first);
+    TRTSERVER_Error* err = UnregisterHelper(shm_info.first);
     if (err != nullptr) {
       unregister_fails.push_back(shm_info.first);
     }
@@ -333,7 +339,7 @@ SharedMemoryManager::Clear()
 
 
 TRTSERVER_Error*
-SharedMemoryManager::RemoveHelper(const std::string& name)
+SharedMemoryManager::UnregisterHelper(const std::string& name)
 {
   // Must hold the lock on register_mu_ while calling this function.
   auto it = shared_memory_map_.find(name);

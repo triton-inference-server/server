@@ -887,7 +887,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
   TRTSERVER_Error* err = nullptr;
 
   if (action_type_str == "register") {
-    err = shm_manager_->AddSystemSharedMemory(
+    err = shm_manager_->RegisterSystemSharedMemory(
         name.c_str(), shm_key.c_str(), offset, byte_size);
   } else if (action_type_str == "cudaregister") {
 #ifdef TRTIS_ENABLE_GPU
@@ -897,7 +897,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
     cudaIpcMemHandle_t* cuda_shm_handle;
     err = EVBufferToCudaHandle(req->buffer_in, &cuda_shm_handle);
     if (err == nullptr) {
-      err = shm_manager_->AddCUDASharedMemory(
+      err = shm_manager_->RegisterCUDASharedMemory(
           name.c_str(), cuda_shm_handle, byte_size, device_id);
     }
 #else
@@ -909,9 +909,9 @@ HTTPAPIServer::HandleSharedMemoryControl(
             .c_str());
 #endif  // TRTIS_ENABLE_GPU
   } else if ((action_type_str == "unregister") && (remaining == "all")) {
-    err = shm_manager_->Clear();
+    err = shm_manager_->UnregisterAll();
   } else if (action_type_str == "unregister") {
-    err = shm_manager_->Remove(name);
+    err = shm_manager_->Unregister(name);
 
   } else if (action_type_str == "status") {
     SharedMemoryStatus shm_status;

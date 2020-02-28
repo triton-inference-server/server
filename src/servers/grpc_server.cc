@@ -1726,7 +1726,7 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
     if (request.has_register_()) {
       if (request.register_().has_system_shared_memory()) {
         // system shared memory
-        RETURN_IF_ERR(shm_manager_->AddSystemSharedMemory(
+        RETURN_IF_ERR(shm_manager_->RegisterSystemSharedMemory(
             request.register_().name(),
             request.register_().system_shared_memory().shared_memory_key(),
             request.register_().system_shared_memory().offset(),
@@ -1739,7 +1739,7 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
         char* handle_base = const_cast<char*>(raw_handle.c_str());
         cudaIpcMemHandle_t* cuda_shm_handle =
             reinterpret_cast<cudaIpcMemHandle_t*>(handle_base);
-        RETURN_IF_ERR(shm_manager_->AddCUDASharedMemory(
+        RETURN_IF_ERR(shm_manager_->RegisterCUDASharedMemory(
             request.register_().name(), cuda_shm_handle,
             request.register_().byte_size(),
             request.register_().cuda_shared_memory().device_id()));
@@ -1760,9 +1760,9 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
                 .c_str());
       }
     } else if (request.has_unregister()) {
-      RETURN_IF_ERR(shm_manager_->Remove(request.unregister().name()));
+      RETURN_IF_ERR(shm_manager_->Unregister(request.unregister().name()));
     } else if (request.has_unregister_all()) {
-      RETURN_IF_ERR(shm_manager_->Clear());
+      RETURN_IF_ERR(shm_manager_->UnregisterAll());
     } else if (request.has_status()) {
       auto shm_status_response = response.mutable_shared_memory_status();
       RETURN_IF_ERR(shm_manager_->GetStatus(shm_status_response));

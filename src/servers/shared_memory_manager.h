@@ -27,8 +27,8 @@
 
 #include <mutex>
 #include <unordered_map>
-#include "src/core/trtserver.h"
 #include "src/core/server_status.pb.h"
+#include "src/core/trtserver.h"
 
 #ifdef TRTIS_ENABLE_GRPC
 #include "src/core/grpc_service.grpc.pb.h"
@@ -59,7 +59,7 @@ class SharedMemoryManager {
   /// start of the block.
   /// \param byte_size The size, in bytes of the block.
   /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* AddSystemSharedMemory(
+  TRTSERVER_Error* RegisterSystemSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
       const size_t byte_size);
 
@@ -73,7 +73,7 @@ class SharedMemoryManager {
   /// \param byte_size The size, in bytes of the block.
   /// \param device id The GPU number the shared memory region is in.
   /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* AddCUDASharedMemory(
+  TRTSERVER_Error* RegisterCUDASharedMemory(
       const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
       const size_t byte_size, const int device_id);
 #endif  // TRTIS_ENABLE_GPU
@@ -98,11 +98,11 @@ class SharedMemoryManager {
   /// till another block with the same name is added to the manager.
   /// \param name The name of the shared memory block to remove.
   /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* Remove(const std::string& name);
+  TRTSERVER_Error* Unregister(const std::string& name);
 
-  /// Remove all shared memory blocks from the manager.
+  /// Unregister all shared memory blocks from the manager.
   /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* Clear();
+  TRTSERVER_Error* UnregisterAll();
 
 #if defined(TRTIS_ENABLE_GRPC)
   /// Populates the status of active shared memory regions in the
@@ -122,7 +122,7 @@ class SharedMemoryManager {
 
  private:
   /// A helper function to remove the named shared memory blocks.
-  TRTSERVER_Error* RemoveHelper(const std::string& name);
+  TRTSERVER_Error* UnregisterHelper(const std::string& name);
 
   /// A struct that records the shared memory regions registered by the shared
   /// memory manager.
