@@ -92,6 +92,8 @@ class InferenceBackend {
 
   uint32_t DefaultPriorityLevel() const { return default_priority_level_; }
 
+  uint32_t MaxPriorityLevel() const { return max_priority_level_; }
+
  protected:
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
@@ -168,6 +170,9 @@ class InferenceBackend {
 
   // The default priority level for the backend.
   uint32_t default_priority_level_;
+
+  // The largest priority value for the backend.
+  uint32_t max_priority_level_;
 };
 
 }}  // namespace nvidia::inferenceserver

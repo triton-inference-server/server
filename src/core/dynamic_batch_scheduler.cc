@@ -154,9 +154,9 @@ DynamicBatchScheduler::Create(
     auto thread_exit = std::make_shared<std::atomic<bool>>(false);
     sched->scheduler_threads_exit_.emplace_back(thread_exit);
     sched->scheduler_threads_.emplace_back(new std::thread(
-        [dyna_sched, runner_id, nice, thread_exit, &init_state]() {
+        [dyna_sched, runner_id, c, nice, thread_exit, &init_state]() {
           dyna_sched->SchedulerThread(
-              runner_id, nice, thread_exit, &init_state);
+              runner_id, c, nice, thread_exit, &init_state);
         }));
     if (!init_state.get_future().get()) {
       if (sched->scheduler_threads_.back()->joinable()) {
@@ -175,7 +175,7 @@ DynamicBatchScheduler::Create(
 
   sched->completion_queues_ =
       std::vector<std::queue<std::shared_ptr<std::vector<Scheduler::Payload>>>>(
-          sched->scheduler_threads_.size());
+          sched->scheduler_thread_cnt_);
 
   scheduler->reset(sched.release());
 
@@ -222,17 +222,17 @@ DynamicBatchScheduler::Enqueue(
   // scheduling process
   stats->CaptureTimestamp(ModelInferStats::TimestampKind::kQueueStart);
 
-  auto& request_header = request_provider->RequestHeader();
+  const auto& request = request_provider->Request();
   Status enqueue_status;
   bool wake_runner = false;
   {
     std::lock_guard<std::mutex> lock(mu_);
     enqueue_status = queue_.Enqueue(
-        request_header.priority(),
+        request->Priority(),
         std::move(
             Payload(stats, request_provider, response_provider, OnComplete)));
     if (enqueue_status.IsOk()) {
-      queued_batch_size_ += request_header.batch_size();
+      queued_batch_size_ += request->BatchSize();
     }
 
     // If there are any idle runners and the queued batch size is greater or
@@ -474,9 +474,8 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
   size_t best_preferred_batch_size = 0;
   queued_batch_size_ -= queue_.ApplyPolicyAtCursor();
   while (!queue_.CursorEnd()) {
-    const auto batch_size = queue_.PayloadAtCursor()
-                                .request_provider_->RequestHeader()
-                                .batch_size();
+    const auto batch_size =
+        queue_.PayloadAtCursor().request_provider_->Request()->BatchSize();
 
     // If there is no pending batch, then this request is starting a
     // new batch.

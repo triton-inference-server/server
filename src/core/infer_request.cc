@@ -177,6 +177,10 @@ InferenceRequest::Normalize(const InferenceBackend& backend)
 
   const ModelConfig& model_config = backend.Config();
 
+  if ((priority_ == 0) || (priority_ > backend.MaxPriorityLevel())) {
+    priority_ = backend.DefaultPriorityLevel();
+  }
+
   // FIXMEV2 For V2 protocol we must adjust the shape of the input
   // tensors to remove the batch dimension and instead report that as
   // batch-size.

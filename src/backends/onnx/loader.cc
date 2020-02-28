@@ -28,10 +28,10 @@
 
 #include <future>
 #include <thread>
-#include "src/core/logging.h"
 #include "src/backends/onnx/onnx_utils.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
+#include "src/core/logging.h"
 
 namespace nvidia { namespace inferenceserver {
 

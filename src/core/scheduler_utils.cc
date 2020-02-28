@@ -109,7 +109,7 @@ PriorityQueue::PolicyQueue::Enqueue(Scheduler::Payload&& payload)
   auto timeout_ms = default_timeout_ms_;
   if (allow_timeout_override_) {
     auto override_timeout_ms =
-        queue_.back().request_provider_->RequestHeader().timeout_microseconds();
+        queue_.back().request_provider_->Request()->TimeoutMs();
     if (override_timeout_ms != 0 && override_timeout_ms < timeout_ms) {
       timeout_ms = override_timeout_ms;
     }
@@ -156,9 +156,8 @@ PriorityQueue::PolicyQueue::ApplyPolicy(
       } else {
         rejected_queue_.emplace_back(std::move(queue_[idx]));
         *rejected_count += 1;
-        *rejected_batch_size += rejected_queue_.back()
-                                    .request_provider_->RequestHeader()
-                                    .batch_size();
+        *rejected_batch_size +=
+            rejected_queue_.back().request_provider_->Request()->BatchSize();
       }
       // FIXME: erase on deque is linear, should consider to use different data
       // structure instead. List is the first one to think of, but the traversal
