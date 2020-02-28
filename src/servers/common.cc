@@ -150,6 +150,10 @@ SetInferenceRequestOptions(
   // FIXMEV2 parameters
   // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetFlags(
   //    request_options, request_header.flags()));
+  // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetPriority(
+  //   request_options, request_header.priority()));
+  // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetTimeout(
+  //   request_options, request_header.timeout_microseconds()));
   RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetCorrelationId(
       request_options, request.sequence_id()));
 
