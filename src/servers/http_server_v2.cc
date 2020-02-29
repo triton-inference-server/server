@@ -145,7 +145,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
         trace_manager_(trace_manager), smb_manager_(smb_manager),
         allocator_(nullptr), api_regex_(R"(/v2/(health|models)(.*))"),
         health_regex_(R"(/(live|ready))"),
-        model_regex_(R"(/([^/]+)(/version/(0-9)+)?(/infer|/ready)?)")
+        model_regex_(R"(/([^/]+)(?:/version/([0-9]+))?(/infer|/ready)?)")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -419,34 +419,34 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
   std::string type, rest;
   if (RE2::FullMatch(
           std::string(req->uri->path->full), api_regex_, &type, &rest)) {
-    LOG_VERBOSE(1) << "type: " << type;
-    LOG_VERBOSE(1) << "rest: " << rest;
+    // LOG_VERBOSE(1) << "type: " << type;
+    // LOG_VERBOSE(1) << "rest: " << rest;
     // server health
     if (type == "health") {
       std::string kind;
-      if (RE2::FullMatch(std::string(rest), health_regex_, &kind)) {
+      if (RE2::FullMatch(rest, health_regex_, &kind)) {
         HandleHealth(req, kind);
         return;
       }
     }
     // model health, status or infer
     else if (type == "models") {
-      std::string model_name, model_version, kind;
-      if (RE2::FullMatch(
-              std::string(rest), model_regex_, &model_name, &model_version,
-              &kind)) {
+      std::string model_name, version, kind;
+      if (RE2::FullMatch(rest, model_regex_, &model_name, &version, &kind)) {
+        // LOG_VERBOSE(1) << "model_name: " << model_name;
+        // LOG_VERBOSE(1) << "version: " << version;
+        // LOG_VERBOSE(1) << "kind: " << kind;
         if (kind == "ready") {
-          HandleModelHealth(req, model_name, model_version);
+          HandleModelHealth(req, model_name, version);
           return;
         } else if (kind == "infer") {
-          HandleInfer(req, model_name, model_version);
+          HandleInfer(req, model_name, version);
           return;
-        } else {
-          HandleModelMetadata(req, model_name, model_version);
+        } else if (kind == ""){
+          HandleModelMetadata(req, model_name, version);
           return;
         }
       }
-      LOG_VERBOSE(1) << "model_name" << model_name;
     }
   } else if (std::string(req->uri->path->full) == "/v2") {
     // server metadata
