@@ -442,7 +442,7 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
         } else if (kind == "infer") {
           HandleInfer(req, model_name, version);
           return;
-        } else if (kind == ""){
+        } else if (kind == "") {
           HandleModelMetadata(req, model_name, version);
           return;
         }
@@ -596,6 +596,7 @@ HTTPAPIServerV2::HandleModelMetadata(
     return;
   }
 
+  ServerStatus server_status;
   TRTSERVER_Protobuf* model_status_protobuf = nullptr;
   TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
       server_.get(), model_name.c_str(), &model_status_protobuf);
@@ -605,36 +606,110 @@ HTTPAPIServerV2::HandleModelMetadata(
     err = TRTSERVER_ProtobufSerialize(
         model_status_protobuf, &status_buffer, &status_byte_size);
     if (err == nullptr) {
-      // Request text or binary format for status?
-      std::string format;
-      const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
-      if (format_c_str != NULL) {
-        format = std::string(format_c_str);
-      } else {
-        format = "text";
-      }
-
-      if (format == "binary") {
-        evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
-        evhtp_headers_add_header(
-            req->headers_out,
-            evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
-      } else {
-        ServerStatus server_status;
-        if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
-        } else {
-          std::string server_status_str = server_status.DebugString();
-          evbuffer_add(
-              req->buffer_out, server_status_str.c_str(),
-              server_status_str.size());
-        }
+      if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
+        err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
       }
     }
   }
 
   TRTSERVER_ProtobufDelete(model_status_protobuf);
+  rapidjson::Document document;
+  document.SetObject();
+  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+
+  if (err == nullptr) {
+    const auto& nitr = server_status.model_status().find(model_name);
+    if (nitr == server_status.model_status().end()) {
+      err = TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "no metadata available for unknown model '" + model_name + "'")
+              .c_str());
+    } else {
+      // All models share the same metadata across versions so we ignore
+      // model_version.
+      const ModelStatus& model_status = nitr->second;
+      const ModelConfig& model_config = model_status.config();
+      // std::string name_str(name);
+      rapidjson::Value name_val(
+          model_config.name().c_str(), model_config.name().size());
+      document.AddMember("name", name_val, allocator);
+
+      rapidjson::Value versions_array(rapidjson::kArrayType);
+      for (const auto& pr : model_status.version_status()) {
+        versions_array.PushBack(pr.first, allocator);
+      }
+      document.AddMember("versions", versions_array, allocator);
+
+      rapidjson::Value platform_val(
+          model_config.platform().c_str(), model_config.platform().size());
+      document.AddMember("platform", platform_val, allocator);
+
+      rapidjson::Value inputs_array(rapidjson::kArrayType);
+      rapidjson::Value input_metadata[model_config.input().size()];
+      int i = 0;
+      for (const auto& io : model_config.input()) {
+        input_metadata[i].SetObject();
+        rapidjson::Value name_val(io.name().c_str(), io.name().size());
+        input_metadata[i].AddMember("name", name_val, allocator);
+
+        std::string datatype_str = GetDataTypeProtocolString(io.data_type());
+        rapidjson::Value datatype_val(
+            datatype_str.c_str(), datatype_str.size());
+        input_metadata[i].AddMember("datatype", datatype_val, allocator);
+
+        rapidjson::Value shape_array(rapidjson::kArrayType);
+        for (const auto d : io.dims()) {
+          shape_array.PushBack(d, allocator);
+        }
+        input_metadata[i].AddMember("shape", shape_array, allocator);
+
+        inputs_array.PushBack(input_metadata[i], allocator);
+        i++;
+      }
+      document.AddMember("inputs", inputs_array, allocator);
+
+      rapidjson::Value outputs_array(rapidjson::kArrayType);
+      rapidjson::Value output_metadata[model_config.output().size()];
+      i = 0;
+      for (const auto& io : model_config.output()) {
+        output_metadata[i].SetObject();
+        rapidjson::Value name_val(io.name().c_str(), io.name().size());
+        output_metadata[i].AddMember("name", name_val, allocator);
+
+        std::string datatype_str = GetDataTypeProtocolString(io.data_type());
+        rapidjson::Value datatype_val(
+            datatype_str.c_str(), datatype_str.size());
+        output_metadata[i].AddMember("datatype", datatype_val, allocator);
+
+        rapidjson::Value shape_array(rapidjson::kArrayType);
+        for (const auto d : io.dims()) {
+          shape_array.PushBack(d, allocator);
+        }
+        output_metadata[i].AddMember("shape", shape_array, allocator);
+
+        outputs_array.PushBack(output_metadata[i], allocator);
+        i++;
+      }
+      document.AddMember("outputs", outputs_array, allocator);
+    }
+  }
+
+  if (err == nullptr) {
+    rapidjson::StringBuffer buffer;
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
+    std::string model_metadata(buffer.GetString());
+
+    evbuffer_add(
+        req->buffer_out, model_metadata.c_str(), model_metadata.size());
+  }
+
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new("Content-Type", "application/json", 1, 1));
 
   RequestStatus request_status;
   RequestStatusUtil::Create(
@@ -687,9 +762,8 @@ HTTPAPIServerV2::HandleMetadata(evhtp_request_t* req)
       if (err == nullptr) {
         for (uint64_t i = 0; i < extensions_count; ++i) {
           std::string extension_str(extensions[i]);
-          LOG_VERBOSE(1) << "extensions size: "<< extension_str.size();
-          LOG_VERBOSE(1) << "extensions: "<< extension_str;
-          rapidjson::Value extension_val(extension_str.c_str(), extension_str.size(), allocator);
+          rapidjson::Value extension_val(
+              extension_str.c_str(), extension_str.size(), allocator);
           extensions_array.PushBack(extension_val, allocator);
         }
         document.AddMember("extensions", extensions_array, allocator);
@@ -697,13 +771,16 @@ HTTPAPIServerV2::HandleMetadata(evhtp_request_t* req)
     }
   }
 
-  rapidjson::StringBuffer buffer;
-  buffer.Clear();
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  document.Accept(writer);
-  std::string status_buffer(buffer.GetString());
+  if (err == nullptr) {
+    rapidjson::StringBuffer buffer;
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
+    std::string status_buffer(buffer.GetString());
 
-  evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
+    evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
+  }
+
   evhtp_headers_add_header(
       req->headers_out,
       evhtp_header_new("Content-Type", "application/json", 1, 1));
