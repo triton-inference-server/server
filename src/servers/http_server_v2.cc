@@ -143,9 +143,9 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       const int thread_cnt)
       : HTTPServerV2Impl(port, thread_cnt), server_(server),
         trace_manager_(trace_manager), smb_manager_(smb_manager),
-        allocator_(nullptr), api_regex_(R"(/v2/(health|models|)(.*))"),
+        allocator_(nullptr), api_regex_(R"(/v2/(health|models)(.*))"),
         health_regex_(R"(/(live|ready))"),
-        model_regex_(R"(/([^/]+)(/version/(0-9)+)?(/infer|ready)?)")
+        model_regex_(R"(/([^/]+)(/version/(0-9)+)?(/infer|/ready)?)")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -419,6 +419,8 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
   std::string type, rest;
   if (RE2::FullMatch(
           std::string(req->uri->path->full), api_regex_, &type, &rest)) {
+    LOG_VERBOSE(1) << "type: " << type;
+    LOG_VERBOSE(1) << "rest: " << rest;
     // server health
     if (type == "health") {
       std::string kind;
@@ -430,8 +432,6 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
     // model health, status or infer
     else if (type == "models") {
       std::string model_name, model_version, kind;
-      LOG_VERBOSE(1) << "type: " << type;
-      LOG_VERBOSE(1) << "rest: " << rest;
       if (RE2::FullMatch(
               std::string(rest), model_regex_, &model_name, &model_version,
               &kind)) {
@@ -448,11 +448,10 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
       }
       LOG_VERBOSE(1) << "model_name" << model_name;
     }
+  } else if (std::string(req->uri->path->full) == "/v2") {
     // server metadata
-    else {
-      HandleMetadata(req);
-      return;
-    }
+    HandleMetadata(req);
+    return;
   }
 
   LOG_VERBOSE(1) << "HTTP V2 error: " << req->method << " "
@@ -663,45 +662,51 @@ HTTPAPIServerV2::HandleMetadata(evhtp_request_t* req)
     return;
   }
 
-  TRTSERVER_Protobuf* server_status_protobuf = nullptr;
-  TRTSERVER_Error* err =
-      TRTSERVER_ServerStatus(server_.get(), &server_status_protobuf);
+  rapidjson::Document document;
+  document.SetObject();
+  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+  const char* name = nullptr;
+  TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &name);
   if (err == nullptr) {
-    const char* status_buffer;
-    size_t status_byte_size;
-    err = TRTSERVER_ProtobufSerialize(
-        server_status_protobuf, &status_buffer, &status_byte_size);
-    if (err == nullptr) {
-      // Request text or binary format for status?
-      std::string format;
-      const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
-      if (format_c_str != NULL) {
-        format = std::string(format_c_str);
-      } else {
-        format = "text";
-      }
+    std::string name_str(name);
+    rapidjson::Value name_val(name_str.c_str(), name_str.size());
+    document.AddMember("name", name_val, allocator);
 
-      if (format == "binary") {
-        evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
-        evhtp_headers_add_header(
-            req->headers_out,
-            evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
-      } else {
-        ServerStatus server_status;
-        if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
-        } else {
-          std::string server_status_str = server_status.DebugString();
-          evbuffer_add(
-              req->buffer_out, server_status_str.c_str(),
-              server_status_str.size());
+    const char* version = nullptr;
+    err = TRTSERVER_ServerVersion(server_.get(), &version);
+    if (err == nullptr) {
+      std::string version_str(version);
+      rapidjson::Value version_val(version_str.c_str(), version_str.size());
+      document.AddMember("version", version_val, allocator);
+
+      uint64_t extensions_count;
+      const char* const* extensions;
+      err = TRTSERVER_ServerExtensions(
+          server_.get(), &extensions, &extensions_count);
+      rapidjson::Value extensions_array(rapidjson::kArrayType);
+      if (err == nullptr) {
+        for (uint64_t i = 0; i < extensions_count; ++i) {
+          std::string extension_str(extensions[i]);
+          LOG_VERBOSE(1) << "extensions size: "<< extension_str.size();
+          LOG_VERBOSE(1) << "extensions: "<< extension_str;
+          rapidjson::Value extension_val(extension_str.c_str(), extension_str.size(), allocator);
+          extensions_array.PushBack(extension_val, allocator);
         }
+        document.AddMember("extensions", extensions_array, allocator);
       }
     }
   }
 
-  TRTSERVER_ProtobufDelete(server_status_protobuf);
+  rapidjson::StringBuffer buffer;
+  buffer.Clear();
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+  document.Accept(writer);
+  std::string status_buffer(buffer.GetString());
+
+  evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new("Content-Type", "application/json", 1, 1));
 
   RequestStatus request_status;
   RequestStatusUtil::Create(

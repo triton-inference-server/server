@@ -32,6 +32,10 @@
 #include "src/core/trtserver.h"
 #include "src/servers/shared_memory_block_manager.h"
 #include "src/servers/tracer.h"
+#include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/rapidjson.h"
 
 namespace nvidia { namespace inferenceserver {
 
