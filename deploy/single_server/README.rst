@@ -137,10 +137,14 @@ Deploy Prometheus and Grafana
 -----------------------------
 
 The inference server metrics are collected by Prometheus and viewable
-by Grafana. Use the prometheus-operator to install these
-components. The `serviceMonitorSelectorNilUsesHelmValues` flag is
-needed so that Prometheus can find the inference server metrics in the
-*example* release deployed below::
+by Grafana. The inference server helm chart assumes that Prometheus
+and Grafana are available so this step must be followed even if you
+don't want to use Grafana.
+
+Use the prometheus-operator to install these components. The
+`serviceMonitorSelectorNilUsesHelmValues` flag is needed so that
+Prometheus can find the inference server metrics in the *example*
+release deployed below::
 
   $ helm install --name example-metrics --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false stable/prometheus-operator
 
