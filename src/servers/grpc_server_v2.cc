@@ -2472,11 +2472,11 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
     if (request.has_register_()) {
       if (request.register_().has_system_shared_memory()) {
         // system shared memory
-        RETURN_IF_ERR(shm_manager_->RegisterSystemSharedMemory(
+        err = shm_manager_->RegisterSystemSharedMemory(
             request.register_().name(),
             request.register_().system_shared_memory().shared_memory_key(),
             request.register_().system_shared_memory().offset(),
-            request.register_().byte_size()));
+            request.register_().byte_size());
       } else if (request.register_().has_cuda_shared_memory()) {
         // cuda shared memory
 #ifdef TRTIS_ENABLE_GPU
@@ -2485,10 +2485,10 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
         char* handle_base = const_cast<char*>(raw_handle.c_str());
         cudaIpcMemHandle_t* cuda_shm_handle =
             reinterpret_cast<cudaIpcMemHandle_t*>(handle_base);
-        RETURN_IF_ERR(shm_manager_->RegisterCUDASharedMemory(
+        err = shm_manager_->RegisterCUDASharedMemory(
             request.register_().name(), cuda_shm_handle,
             request.register_().byte_size(),
-            request.register_().cuda_shared_memory().device_id()));
+            request.register_().cuda_shared_memory().device_id());
 #else
         err = TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INVALID_ARG,
@@ -2506,13 +2506,13 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
                 .c_str());
       }
     } else if (request.has_unregister()) {
-      RETURN_IF_ERR(shm_manager_->Unregister(request.unregister().name()));
+      err = shm_manager_->Unregister(request.unregister().name());
     } else if (request.has_unregister_all()) {
-      RETURN_IF_ERR(shm_manager_->UnregisterAll());
+      err = shm_manager_->UnregisterAll();
     } else if (request.has_status()) {
       auto shm_status_response = response.mutable_shared_memory_status();
 #if 0
-      RETURN_IF_ERR(shm_manager_->GetStatus(shm_status_response));
+      err = shm_manager_->GetStatus(shm_status_response);
 #endif
     } else {
       err = TRTSERVER_ErrorNew(

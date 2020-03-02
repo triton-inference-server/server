@@ -467,7 +467,7 @@ message SharedMemoryStatus
   //@@
   //@@     The list of active/registered shared memory regions.
   //@@
-  repeated SharedMemoryRegion shared_memory_region = 2;
+  repeated SharedMemoryRegion shared_memory_region = 1;
 }
 
 
