@@ -226,8 +226,8 @@ class InferenceRequest {
   uint32_t Priority() const { return priority_; }
   void SetPriority(uint32_t p) { priority_ = p; }
 
-  uint64_t TimeoutMs() const { return timeout_ms_; }
-  void SetTimeoutMs(uint64_t t) { timeout_ms_ = t; }
+  uint64_t TimeoutMicroseconds() const { return timeout_us_; }
+  void SetTimeoutMicroseconds(uint64_t t) { timeout_us_ = t; }
 
   std::unordered_map<std::string, Input>* MutableInputs() { return &inputs_; }
   const std::unordered_map<std::string, Input>& Inputs() const
@@ -290,7 +290,7 @@ class InferenceRequest {
   uint64_t correlation_id_;
   uint32_t batch_size_;
   uint32_t priority_;
-  uint64_t timeout_ms_;
+  uint64_t timeout_us_;
 
   std::unordered_map<std::string, Input> inputs_;
   std::unordered_map<std::string, RequestedOutput> requested_outputs_;

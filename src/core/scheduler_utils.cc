@@ -109,7 +109,7 @@ PriorityQueue::PolicyQueue::Enqueue(Scheduler::Payload&& payload)
   auto timeout_ms = default_timeout_ms_;
   if (allow_timeout_override_) {
     auto override_timeout_ms =
-        queue_.back().request_provider_->Request()->TimeoutMs();
+        queue_.back().request_provider_->Request()->TimeoutMicroseconds();
     if (override_timeout_ms != 0 && override_timeout_ms < timeout_ms) {
       timeout_ms = override_timeout_ms;
     }
@@ -254,7 +254,7 @@ PriorityQueue::Enqueue(uint32_t priority_level, Scheduler::Payload&& payload)
     size_++;
     front_priority_level_ = std::min(front_priority_level_, priority_level);
     // Invalidate the pending batch cursor if the enqueued item is placed
-    // in within the pending batch. At the same priority level, the payload is
+    // within the pending batch. At the same priority level, the payload is
     // guaranteed to be after pending batch if the batch hasn't reached
     // delayed queue.
     if ((priority_level < pending_cursor_.curr_it_->first) ||

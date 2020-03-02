@@ -139,7 +139,7 @@ class DynamicBatchScheduler : public Scheduler {
 
   // Map from priority level to queue holding inference requests for the model
   // represented by this scheduler. If priority queues are not supported by the
-  // scheduler, then priority zero entry is used as the single queue?
+  // scheduler, then priority zero entry is used as the single queue.
   PriorityQueue queue_;
 
   std::vector<std::unique_ptr<std::thread>> scheduler_threads_;

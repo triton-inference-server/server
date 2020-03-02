@@ -633,7 +633,7 @@ message ModelQueuePolicy
   //@@
   //@@  .. cpp:enum:: TimeoutAction
   //@@
-  //@@     The action applied on timeout request.
+  //@@     The action applied to timed-out requests.
   //@@
   enum TimeoutAction {
     //@@    .. cpp:enumerator:: Action::REJECT = 0
@@ -655,7 +655,8 @@ message ModelQueuePolicy
   //@@
   //@@  .. cpp:var:: TimeoutAction timeout_action
   //@@
-  //@@     The action applied on timeout request. The default action is REJECT.
+  //@@     The action applied to timed-out request.
+  //@@     The default action is REJECT.
   //@@
   TimeoutAction timeout_action = 1;
 
@@ -730,10 +731,11 @@ message ModelDynamicBatching
   //@@  .. cpp:var:: uint32 priority_levels
   //@@
   //@@     The number of priority levels to be enabled for the model,
-  //@@     the priority level starts from 1. Requests with lower priority level
-  //@@     will be handled before requests with higher priority levels.
-  //@@     Requests with the same priority level will be handled in the order
-  //@@     that they are received.
+  //@@     the priority level starts from 1 and 1 is the highest priority.
+  //@@     Requests are handled in priority order with all priority 1 requests
+  //@@     processed before priority 2, all priority 2 requests processed before
+  //@@     priority 3, etc. Requests with the same priority level will be
+  //@@     handled in the order that they are received.
   //@@
   uint32 priority_levels = 4;
 

@@ -242,6 +242,8 @@ message InferRequestHeader
   //@@     the value is less than the default timeout specified by the model.
   //@@     If the request cannot be processed within this timeout, the request
   //@@     will be handled based on the model's timeout policy.
+  //@@     Note that request for ensemble model cannot override the timeout
+  //@@     values for the composing models.
   //@@     The default value is 0 which indicates that the request does not
   //@@     override the model's timeout value.
   //@@
