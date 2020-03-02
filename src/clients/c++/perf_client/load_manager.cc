@@ -28,6 +28,8 @@
 #include "src/clients/c++/examples/shm_utils.h"
 #include "src/core/model_config.h"
 
+#include <algorithm>
+
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
 
@@ -46,6 +48,18 @@
 #endif  // TRTIS_ENABLE_GPU
 
 namespace {
+
+std::string
+TensorToRegionName(std::string name)
+{
+  // Remove slashes from the name, if any.
+  name.erase(
+      std::remove_if(
+          name.begin(), name.end(),
+          [](const char& c) { return ((c == '/') || (c == '\\')); }),
+      name.end());
+  return name;
+}
 
 #ifdef TRTIS_ENABLE_GPU
 nic::Error
@@ -313,19 +327,20 @@ LoadManager::InitSharedMemory()
     }
     uint8_t* output_shm_ptr;
     size_t alloc_size = batch1_bytesize * batch_size_;
+    std::string region_name(TensorToRegionName(output->Name()));
     if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
-      std::string shm_key("/" + output->Name());
+      std::string shm_key("/" + region_name);
       int shm_fd_op;
       RETURN_IF_ERROR(
           nic::CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_op));
       RETURN_IF_ERROR(nic::MapSharedMemory(
           shm_fd_op, 0, alloc_size, (void**)&output_shm_ptr));
 
-      shared_memory_regions_[output->Name()] =
+      shared_memory_regions_[region_name] =
           std::pair<uint8_t*, size_t>(output_shm_ptr, alloc_size);
 
       RETURN_IF_ERROR(shared_memory_ctx_->RegisterSharedMemory(
-          output->Name(), shm_key, 0, alloc_size));
+          region_name, shm_key, 0, alloc_size));
     } else {
 #ifdef TRTIS_ENABLE_GPU
       cudaError_t cuda_err = cudaMalloc((void**)&output_shm_ptr, alloc_size);
@@ -335,14 +350,14 @@ LoadManager::InitSharedMemory()
             "unable to allocate memory of " + std::to_string(alloc_size) +
                 "bytes on gpu for output " + output->Name());
       }
-      shared_memory_regions_[output->Name()] =
+      shared_memory_regions_[region_name] =
           std::pair<uint8_t*, size_t>(output_shm_ptr, alloc_size);
 
       cudaIpcMemHandle_t cuda_handle;
       RETURN_IF_ERROR(CreateCUDAIPCHandle(&cuda_handle, (void*)output_shm_ptr));
       // Using GPU with device id 0
       RETURN_IF_ERROR(shared_memory_ctx_->RegisterCudaSharedMemory(
-          output->Name(), cuda_handle, alloc_size, 0));
+          region_name, cuda_handle, alloc_size, 0));
 #endif  // TRTIS_ENABLE_GPU
     }
   }
@@ -418,18 +433,19 @@ LoadManager::InitSharedMemory()
         }
 
         // Generate the shared memory region name
-        std::string key_name(
-            input->Name() + "_" + std::to_string(i) + "_" + std::to_string(j));
+        std::string region_name(
+            TensorToRegionName(input->Name()) + "_" + std::to_string(i) + "_" +
+            std::to_string(j));
 
         uint8_t* input_shm_ptr;
         if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
-          std::string shm_key("/" + key_name);
+          std::string shm_key("/" + region_name);
           int shm_fd_ip;
           RETURN_IF_ERROR(
               nic::CreateSharedMemoryRegion(shm_key, alloc_size, &shm_fd_ip));
           RETURN_IF_ERROR(nic::MapSharedMemory(
               shm_fd_ip, 0, alloc_size, (void**)&input_shm_ptr));
-          shared_memory_regions_[key_name] =
+          shared_memory_regions_[region_name] =
               std::pair<uint8_t*, size_t>(input_shm_ptr, alloc_size);
 
           // Populate the region with data
@@ -444,7 +460,7 @@ LoadManager::InitSharedMemory()
 
           // Register the region with TRTIS
           RETURN_IF_ERROR(shared_memory_ctx_->RegisterSharedMemory(
-              key_name, shm_key, 0, alloc_size));
+              region_name, shm_key, 0, alloc_size));
         } else {
 #ifdef TRTIS_ENABLE_GPU
           cudaError_t cuda_err = cudaMalloc((void**)&input_shm_ptr, alloc_size);
@@ -452,10 +468,10 @@ LoadManager::InitSharedMemory()
             return nic::Error(
                 ni::RequestStatusCode::INTERNAL,
                 "unable to allocate memory of " + std::to_string(alloc_size) +
-                    "bytes on gpu for input " + key_name);
+                    "bytes on gpu for input " + region_name);
           }
 
-          shared_memory_regions_[key_name] =
+          shared_memory_regions_[region_name] =
               std::pair<uint8_t*, size_t>(input_shm_ptr, alloc_size);
 
           // Populate the region with data
@@ -469,7 +485,8 @@ LoadManager::InitSharedMemory()
             if (cuda_err != cudaSuccess) {
               return nic::Error(
                   ni::RequestStatusCode::INTERNAL,
-                  "Failed to copy data to cuda shared memory for " + key_name);
+                  "Failed to copy data to cuda shared memory for " +
+                      region_name);
             }
             offset += byte_size[count];
             count++;
@@ -481,7 +498,7 @@ LoadManager::InitSharedMemory()
 
           // Register the region with TRTIS
           RETURN_IF_ERROR(shared_memory_ctx_->RegisterCudaSharedMemory(
-              key_name, cuda_handle, alloc_size, 0));
+              region_name, cuda_handle, alloc_size, 0));
 #endif  // TRTIS_ENABLE_GPU
         }
       }
@@ -592,15 +609,16 @@ LoadManager::PrepareSharedMemoryInfer(
     (*options)->SetBatchSize(batch_size_);
     for (const auto& output : (*ctx)->Outputs()) {
       (*options)->AddSharedMemoryResult(
-          output, output->Name(), 0, output_shm_size_);
+          output, TensorToRegionName(output->Name()), 0, output_shm_size_);
     }
   }
 
   RETURN_IF_ERROR((*ctx)->SetRunOptions(*(*options)));
 
   for (const auto& input : (*ctx)->Inputs()) {
-    std::string key_name(
-        input->Name() + "_" + std::to_string(0) + "_" + std::to_string(0));
+    std::string region_name(
+        TensorToRegionName(input->Name()) + "_" + std::to_string(0) + "_" +
+        std::to_string(0));
     // Set input shape before getting the input data
     const std::vector<int64_t>* shape = nullptr;
     RETURN_IF_ERROR(data_loader_->GetInputShape(input, 0, 0, &shape));
@@ -608,7 +626,7 @@ LoadManager::PrepareSharedMemoryInfer(
       input->SetShape(*shape);
     }
     RETURN_IF_ERROR(input->SetSharedMemory(
-        key_name, 0, shared_memory_regions_[key_name].second));
+        region_name, 0, shared_memory_regions_[region_name].second));
   }
 
   return nic::Error::Success;
@@ -733,8 +751,8 @@ LoadManager::SetInputsSharedMemory(
     RETURN_IF_ERROR(input->Reset());
 
     std::string region_name(
-        input->Name() + '_' + std::to_string(stream_index) + "_" +
-        std::to_string(step_index));
+        TensorToRegionName(input->Name()) + '_' + std::to_string(stream_index) +
+        "_" + std::to_string(step_index));
 
     const std::vector<int64_t>* shape = nullptr;
     RETURN_IF_ERROR(

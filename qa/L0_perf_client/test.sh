@@ -87,6 +87,9 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_sequence_model_repositor
 mkdir $DATADIR/nop_TYPE_FP32_-1/1
 cp libidentity.so $DATADIR/nop_TYPE_FP32_-1/1/
 
+# Copy inception model to the model repository
+cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/inception_v1_graphdef $DATADIR
+
 # Generating test data
 mkdir -p $TESTDATADIR
 for INPUT in INPUT0 INPUT1; do
@@ -136,6 +139,38 @@ for SHARED_MEMORY_TYPE in none system cuda; do
     fi
     set -e
 done
+
+# Testing with inception model
+for SHARED_MEMORY_TYPE in none system cuda; do
+    set +e
+    $PERF_CLIENT -v -m inception_v1_graphdef -t 1 -p2000 -b 1 \
+--shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    $PERF_CLIENT -v -m inception_v1_graphdef -t 1 -p2000 -b 1 -a \
+--shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    set -e
+done
+
 
 # Test perf client behavior on different model with different batch size
 for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
