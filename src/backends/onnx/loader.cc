@@ -26,7 +26,6 @@
 
 #include "src/backends/onnx/loader.h"
 
-#include <src/core/logging.h>
 #include <future>
 #include <thread>
 #include "src/backends/onnx/onnx_utils.h"

@@ -246,36 +246,6 @@ SharedMemoryManager::GetMemoryInfo(
   return nullptr;
 }
 
-#ifdef TRTIS_ENABLE_GRPC
-TRTSERVER_Error*
-SharedMemoryManager::GetStatus(SharedMemoryControlResponse::Status* shm_status)
-{
-  // FIXMEV2: Overload this function to return the status in json format as well
-  // to use in HTTP V2. HTTP V2 should not use protobufs
-
-  // Serialize all operations that write/read current shared memory regions
-  std::lock_guard<std::mutex> lock(mu_);
-
-  shm_status->Clear();
-
-  for (const auto& shm_info : shared_memory_map_) {
-    auto rshm_region = shm_status->add_shared_memory_region();
-    rshm_region->set_name(shm_info.second->name_);
-    if (shm_info.second->kind_ == TRTSERVER_MEMORY_CPU) {
-      auto system_shm_info = rshm_region->mutable_system_shared_memory();
-      system_shm_info->set_shared_memory_key(shm_info.second->shm_key_);
-      system_shm_info->set_offset(shm_info.second->offset_);
-    } else {
-      auto cuda_shm_info = rshm_region->mutable_cuda_shared_memory();
-      cuda_shm_info->set_device_id(shm_info.second->device_id_);
-    }
-    rshm_region->set_byte_size(shm_info.second->byte_size_);
-  }
-
-  return nullptr;
-}
-#endif  // TRTIS_ENABLE_GRPC
-
 TRTSERVER_Error*
 SharedMemoryManager::GetStatus(SharedMemoryStatus* shm_status)
 {

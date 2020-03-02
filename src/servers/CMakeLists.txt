@@ -248,10 +248,15 @@ target_link_libraries(
   ${HTTP_ENDPOINT_LIBRARIES}
   ${GRPC_ENDPOINT_LIBRARIES}
   ${TRACING_LIBRARIES}
-  PRIVATE ${CUDA_LIBRARIES}
   PRIVATE protobuf::libprotobuf
   PRIVATE trtserver
 )
+if(${TRTIS_ENABLE_GPU})
+target_link_libraries(
+  main
+  PRIVATE ${CUDA_LIBRARIES}
+)
+endif() # TRTIS_ENABLE_GPU
 install(
   TARGETS main
   RUNTIME DESTINATION bin

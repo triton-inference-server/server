@@ -98,6 +98,25 @@ message ModelControlRequestStats
 }
 
 //@@
+//@@.. cpp:var:: message SharedMemoryControlRequestStats
+//@@
+//@@   Statistics for SharedMemoryControl requests
+//@@
+//@@   [DEPRECATED] The message has been deprecated and will
+//@@   always report 0.
+//@@
+message SharedMemoryControlRequestStats
+{
+  option deprecated = true;
+  //@@  .. cpp:var:: StatDuration success
+  //@@
+  //@@     Total time required to handle successful SharedMemoryControl
+  //@@     requests, not including HTTP or gRPC endpoint termination time.
+  //@@
+  StatDuration success = 1;
+}
+
+//@@
 //@@.. cpp:var:: message RepositoryRequestStats
 //@@
 //@@   Statistics collected for Repository requests.
@@ -448,6 +467,12 @@ message ServerStatus
   //@@
   ModelControlRequestStats model_control_stats = 9;
 
+  //@@  .. cpp:var:: SharedMemoryControlRequestStats shm_control_stats
+  //@@
+  //@@     [DEPRECATED] Statistics for SharedMemoryControl requests.
+  //@@
+  SharedMemoryControlRequestStats shm_control_stats = 10;
+
   //@@  .. cpp:var:: RepositoryRequestStats repository_stats
   //@@
   //@@     Statistics for Repository requests.
@@ -467,7 +492,7 @@ message SharedMemoryStatus
   //@@
   //@@     The list of active/registered shared memory regions.
   //@@
-  repeated SharedMemoryRegion shared_memory_region = 1;
+  repeated SharedMemoryRegion shared_memory_region = 2;
 }
 
 

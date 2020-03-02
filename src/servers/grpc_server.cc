@@ -1764,8 +1764,18 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
     } else if (request.has_unregister_all()) {
       err = shm_manager_->UnregisterAll();
     } else if (request.has_status()) {
-      auto shm_status_response = response.mutable_shared_memory_status();
-      err = shm_manager_->GetStatus(shm_status_response);
+      SharedMemoryStatus shm_status;
+      err = shm_manager_->GetStatus(&shm_status);
+      if (err == nullptr) {
+        std::string serialized;
+        shm_status.SerializeToString(&serialized);
+        auto shm_status_response = response.mutable_shared_memory_status();
+        if (!shm_status_response->ParseFromArray(
+                serialized.c_str(), serialized.size())) {
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INTERNAL, "failed to parse shared memory status");
+        }
+      }
     } else {
       err = TRTSERVER_ErrorNew(
           TRTSERVER_ERROR_UNKNOWN, "unknown sharedmemorycontrol request type");

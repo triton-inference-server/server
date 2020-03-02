@@ -25,18 +25,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <cstring>
 #include <mutex>
 #include <unordered_map>
 #include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
-
-#ifdef TRTIS_ENABLE_GRPC
-#include "src/core/grpc_service.grpc.pb.h"
-#endif  // TRTIS_ENABLE_GRPC
-
-#ifdef TRTIS_ENABLE_GRPC_V2
-#include "src/core/grpc_service_v2.grpc.pb.h"
-#endif  // TRTIS_ENABLE_GRPC_V2
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -104,18 +97,8 @@ class SharedMemoryManager {
   /// \return a TRTSERVER_Error indicating success or failure.
   TRTSERVER_Error* UnregisterAll();
 
-#if defined(TRTIS_ENABLE_GRPC)
   /// Populates the status of active shared memory regions in the
   /// specified protobuf message.
-  /// \param status Returns status of active shared meeory blocks
-  /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* GetStatus(SharedMemoryControlResponse::Status* status);
-#endif  // TRTIS_ENABLE_GRPC
-
-  /// Populates the status of active shared memory regions in the
-  /// specified protobuf message.
-  /// Is needed because current HTTP V1 server wxpects a protobuf
-  /// response to the request
   /// \param status Returns status of active shared meeory blocks
   /// \return a TRTSERVER_Error indicating success or failure.
   TRTSERVER_Error* GetStatus(SharedMemoryStatus* status);
