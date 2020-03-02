@@ -28,6 +28,7 @@
 import argparse
 import numpy as np
 import os
+import time
 from builtins import range
 from functools import partial
 from PIL import Image
@@ -304,6 +305,7 @@ if __name__ == '__main__':
     responses = []
 
     # Send request
+    start_time = time.perf_counter()
     if FLAGS.streaming:
         responses = grpc_stub.StreamInfer(filledRequestGenerator(result_filenames))
     else:
@@ -323,3 +325,10 @@ if __name__ == '__main__':
         print("Request {}, batch size {}".format(idx, FLAGS.batch_size))
         postprocess(response.meta_data.output, result_filenames[idx], FLAGS.batch_size)
         idx += 1
+
+    end_time = time.perf_counter()
+    total_ms = (end_time - start_time) * 1000
+    total_files = idx * FLAGS.batch_size
+    print("\nInference time: {:0.3f} ms for {} image{}{}".format(total_ms, total_files,
+            "s, {:0.3f} ms per image".format(total_ms / total_files) if total_files > 1 else "",
+            ", ~{:0.1f} images per second".format(round(total_files / total_ms * 1000, 1))))

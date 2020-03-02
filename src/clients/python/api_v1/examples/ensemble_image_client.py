@@ -28,6 +28,7 @@
 import argparse
 import numpy as np
 import os
+import time
 from builtins import range
 from PIL import Image
 from tensorrtserver.api import *
@@ -135,9 +136,17 @@ if __name__ == '__main__':
         input_batch.append(image_data[idx])
 
     # Send request
+    start_time = time.perf_counter()
     result = ctx.run(
         { input_name : input_batch },
         { output_name : (InferContext.ResultFormat.CLASS, FLAGS.classes) },
         batch_size)
+    end_time = time.perf_counter()
 
     postprocess(result, input_filenames, batch_size)
+
+    total_ms = (end_time - start_time) * 1000
+    total_files = batch_size
+    print("\nInference time: {:0.3f} ms for {} image{}{}".format(total_ms, total_files,
+            "s, {:0.3f} ms per image".format(total_ms / total_files) if total_files > 1 else "",
+            ", ~{:0.1f} images per second".format(round(total_files / total_ms * 1000, 1))))

@@ -28,6 +28,7 @@
 import argparse
 import numpy as np
 import os
+import time
 from builtins import range
 from PIL import Image
 from functools import partial
@@ -286,6 +287,7 @@ if __name__ == '__main__':
     last_request = False
     user_data = UserData()
     sent_count=0
+    start_time = time.perf_counter()
     while not last_request:
         input_filenames = []
         input_batch = []
@@ -319,6 +321,14 @@ if __name__ == '__main__':
             result_filenames.append(input_filenames)
             processed_count += 1
 
+    end_time = time.perf_counter()
+
     for idx in range(len(results)):
         print("Request {}, batch size {}".format(idx, FLAGS.batch_size))
         postprocess(results[idx], result_filenames[idx], FLAGS.batch_size)
+
+    total_ms = (end_time - start_time) * 1000
+    total_files = len(result_filenames) * FLAGS.batch_size
+    print("\nInference time: {:0.3f} ms for {} image{}{}".format(total_ms, total_files,
+            "s, {:0.3f} ms per image".format(total_ms / total_files) if total_files > 1 else "",
+            ", ~{:0.1f} images per second".format(round(total_files / total_ms * 1000, 1))))
