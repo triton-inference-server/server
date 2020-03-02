@@ -413,9 +413,11 @@ message ModelOptimizationPolicy
   //@@  .. cpp:var:: message Graph
   //@@
   //@@     Enable generic graph optimization of the model. If not specified
-  //@@     the framework's default level of optimization is used. Currently
-  //@@     only supported for TensorFlow graphdef and savedmodel models and
-  //@@     causes XLA to be enabled/disabled for the model.
+  //@@     the framework's default level of optimization is used. Supports
+  //@@     TensorFlow graphdef and savedmodel and Onnx models. For TensorFlow
+  //@@     causes XLA to be enabled/disabled for the model. For Onnx defaults
+  //@@     to enabling all optimizations, -1 enables only basic optimizations,
+  //@@     +1 enables only basic and extended optimizations.
   //@@
   message Graph
   {
