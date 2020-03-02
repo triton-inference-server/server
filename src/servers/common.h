@@ -119,4 +119,6 @@ std::string MemoryTypeString(TRTSERVER_Memory_Type memory_type);
 
 const char* GetDataTypeProtocolString(const DataType dtype);
 
+size_t GetDataTypeByteSize(const std::string& protocol_dtype);
+
 }}  // namespace nvidia::inferenceserver

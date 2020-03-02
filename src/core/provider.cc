@@ -52,7 +52,8 @@ InferRequestProvider::Create(
   provider->reset(new InferRequestProvider(irequest));
 
   for (const auto& pr : irequest->Inputs()) {
-    if (pr.second.BatchByteSize() != pr.second.Data()->TotalByteSize()) {
+    if ((pr.second.BatchByteSize() != 0) &&
+        pr.second.BatchByteSize() != pr.second.Data()->TotalByteSize()) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unexpected size " +
