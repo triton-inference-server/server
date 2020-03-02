@@ -496,7 +496,7 @@ message InferTensorContents
   //@@
   //@@  .. cpp:var:: bytes byte_contents (repeated)
   //@@
-  //@@     Representation for STRING data type. The size must match what is
+  //@@     Representation for BYTES data type. The size must match what is
   //@@     expected by the tensor's shape. The contents must be the flattened,
   //@@     one-dimensional, row-major order of the tensor elements.
   //@@

@@ -123,7 +123,7 @@ def np_to_trtis_dtype(np_dtype):
         return "FP64"
     # FIXMEPV2 support np.bytes_ or np.str_
     elif np_dtype == np.object:
-        return "STRING"
+        return "BYTES"
     return None
 
 
@@ -152,8 +152,7 @@ def trtis_to_np_dtype(dtype):
         return np.float32
     elif dtype == "FP64":
         return np.float64
-    # FIXMEPV2 support np.bytes_ or np.str_
-    elif dtype == "STRING":
+    elif dtype == "BYTES":
         return np.object
     return None
 
