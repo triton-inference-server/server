@@ -446,7 +446,8 @@ main(int argc, char** argv)
       TRTSERVER_InferenceRequestOptionsSetPriority(request_options, 0),
       "setting priority for the request");
   FAIL_IF_ERR(
-      TRTSERVER_InferenceRequestOptionsSetTimeoutMicroseconds(request_options, 0),
+      TRTSERVER_InferenceRequestOptionsSetTimeoutMicroseconds(
+          request_options, 0),
       "setting timeout for the request");
 
   auto input0 = is_torch_model ? "INPUT__0" : "INPUT0";

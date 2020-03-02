@@ -1113,7 +1113,8 @@ TRTSERVER_InferenceRequestProviderNewV2(
   request->SetCorrelationId(loptions->InferRequestHeader()->correlation_id());
   request->SetBatchSize(loptions->InferRequestHeader()->batch_size());
   request->SetPriority(loptions->InferRequestHeader()->priority());
-  request->SetTimeoutMicroseconds(loptions->InferRequestHeader()->timeout_microseconds());
+  request->SetTimeoutMicroseconds(
+      loptions->InferRequestHeader()->timeout_microseconds());
   for (const auto& io : loptions->InferRequestHeader()->input()) {
     if (io.has_shared_memory()) {
       RETURN_IF_STATUS_ERROR(request->AddInput(
