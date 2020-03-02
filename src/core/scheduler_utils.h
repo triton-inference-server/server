@@ -131,7 +131,7 @@ class PriorityQueue {
     // Construct a policy queue with default policy, which will behave the same
     // as regular queue.
     PolicyQueue()
-        : timeout_action_(ModelQueuePolicy::REJECT), default_timeout_ms_(0),
+        : timeout_action_(ModelQueuePolicy::REJECT), default_timeout_us_(0),
           allow_timeout_override_(false), max_queue_size_(0)
     {
     }
@@ -139,7 +139,7 @@ class PriorityQueue {
     // Construct a policy queue with given 'policy'.
     PolicyQueue(const ModelQueuePolicy& policy)
         : timeout_action_(policy.timeout_action()),
-          default_timeout_ms_(policy.default_timeout_microseconds()),
+          default_timeout_us_(policy.default_timeout_microseconds()),
           allow_timeout_override_(policy.allow_timeout_override()),
           max_queue_size_(policy.max_queue_size())
     {
@@ -184,7 +184,7 @@ class PriorityQueue {
    private:
     // Variables that define the policy for the queue
     const ModelQueuePolicy::TimeoutAction timeout_action_;
-    const uint64_t default_timeout_ms_;
+    const uint64_t default_timeout_us_;
     const bool allow_timeout_override_;
     const uint32_t max_queue_size_;
 

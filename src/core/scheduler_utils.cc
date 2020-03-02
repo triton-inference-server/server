@@ -106,19 +106,19 @@ PriorityQueue::PolicyQueue::Enqueue(Scheduler::Payload&& payload)
     return Status(RequestStatusCode::UNAVAILABLE, "Exceeds maximum queue size");
   }
   queue_.emplace_back(std::move(payload));
-  auto timeout_ms = default_timeout_ms_;
+  auto timeout_us = default_timeout_us_;
   if (allow_timeout_override_) {
-    auto override_timeout_ms =
+    auto override_timeout_us =
         queue_.back().request_provider_->Request()->TimeoutMicroseconds();
-    if (override_timeout_ms != 0 && override_timeout_ms < timeout_ms) {
-      timeout_ms = override_timeout_ms;
+    if (override_timeout_us != 0 && override_timeout_us < timeout_us) {
+      timeout_us = override_timeout_us;
     }
   }
-  if (timeout_ms != 0) {
+  if (timeout_us != 0) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
     timeout_timestamp_ns_.emplace_back(
-        TIMESPEC_TO_NANOS(now) + timeout_ms * 1000);
+        TIMESPEC_TO_NANOS(now) + timeout_us * 1000);
   } else {
     timeout_timestamp_ns_.emplace_back(0);
   }
