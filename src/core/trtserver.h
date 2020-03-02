@@ -547,10 +547,10 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetPriority(
 
 /// Set the timeout for the request in a request options, in microseconds.
 /// \param request_options The request options object.
-/// \param timeout_ms The timeout, in microseconds.
+/// \param timeout_us The timeout, in microseconds.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetTimeout(
-    TRTSERVER_InferenceRequestOptions* request_options, uint64_t timeout_ms);
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsSetTimeoutMicroseconds(
+    TRTSERVER_InferenceRequestOptions* request_options, uint64_t timeout_us);
 
 /// Add a input meta-data associated with the request in a request options.
 /// \param request_options The request options object.

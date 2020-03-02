@@ -401,7 +401,7 @@ class TrtServerRequestOptions {
   TRTSERVER_Error* SetCorrelationId(uint64_t correlation_id);
   TRTSERVER_Error* SetBatchSize(uint64_t batch_size);
   TRTSERVER_Error* SetPriority(uint32_t priority);
-  TRTSERVER_Error* SetTimeoutMs(uint64_t timeout_ms);
+  TRTSERVER_Error* SetTimeoutMicroseconds(uint64_t timeout_us);
 
   TRTSERVER_Error* AddInput(
       const char* input_name, const int64_t* dims, uint64_t dim_count,
@@ -495,10 +495,10 @@ TrtServerRequestOptions::SetPriority(uint32_t priority)
 }
 
 TRTSERVER_Error*
-TrtServerRequestOptions::SetTimeoutMs(uint64_t timeout_ms)
+TrtServerRequestOptions::SetTimeoutMicroseconds(uint64_t timeout_us)
 {
   std::lock_guard<std::mutex> lk(mtx_);
-  request_header_->set_timeout_microseconds(timeout_ms);
+  request_header_->set_timeout_microseconds(timeout_us);
   return nullptr;  // Success
 }
 
@@ -1009,12 +1009,12 @@ TRTSERVER_InferenceRequestOptionsSetPriority(
 }
 
 TRTSERVER_Error*
-TRTSERVER_InferenceRequestOptionsSetTimeout(
-    TRTSERVER_InferenceRequestOptions* request_options, uint64_t timeout_ms)
+TRTSERVER_InferenceRequestOptionsSetTimeoutMicroseconds(
+    TRTSERVER_InferenceRequestOptions* request_options, uint64_t timeout_us)
 {
   TrtServerRequestOptions* loptions =
       reinterpret_cast<TrtServerRequestOptions*>(request_options);
-  loptions->SetTimeoutMs(timeout_ms);
+  loptions->SetTimeoutMicroseconds(timeout_us);
   return nullptr;  // Success
 }
 
@@ -1113,7 +1113,7 @@ TRTSERVER_InferenceRequestProviderNewV2(
   request->SetCorrelationId(loptions->InferRequestHeader()->correlation_id());
   request->SetBatchSize(loptions->InferRequestHeader()->batch_size());
   request->SetPriority(loptions->InferRequestHeader()->priority());
-  request->SetTimeoutMs(loptions->InferRequestHeader()->timeout_microseconds());
+  request->SetTimeoutMicroseconds(loptions->InferRequestHeader()->timeout_microseconds());
   for (const auto& io : loptions->InferRequestHeader()->input()) {
     if (io.has_shared_memory()) {
       RETURN_IF_STATUS_ERROR(request->AddInput(

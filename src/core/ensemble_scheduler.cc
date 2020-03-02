@@ -558,8 +558,10 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   irequest->SetFlags(flags_);
   irequest->SetBatchSize((batch_size == 0 ? 1 : batch_size));
   irequest->SetPriority(priority_);
-  // FIXME: need to think about how to interpret timeout in ensemble.
-  irequest->SetTimeoutMs(0);
+  // Request for ensemble model cannot override the timeout values for the
+  // composing models. Thus currently the timeout field in request has no
+  // effect until we support an overall ensemble timeout.
+  irequest->SetTimeoutMicroseconds(0);
   RETURN_IF_ERROR(irequest->Normalize(*backend));
 
   step->reset(new Step(step_idx));
