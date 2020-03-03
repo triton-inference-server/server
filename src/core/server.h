@@ -39,7 +39,6 @@
 #include "src/core/provider.h"
 #include "src/core/server_status.h"
 #include "src/core/server_status.pb.h"
-#include "src/core/shared_memory_manager.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -91,34 +90,6 @@ class InferenceServer {
 
   // Unload the corresponding model.
   Status UnloadModel(const std::string& model_name);
-
-  // Register the corresponding system shared memory region. If already
-  // registered return an ALREADY_EXISTS error.
-  Status RegisterSharedMemory(
-      const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size);
-
-  // Register the corresponding CUDA shared memory region. If already
-  // registered return an ALREADY_EXISTS error.
-#ifdef TRTIS_ENABLE_GPU
-  Status RegisterCudaSharedMemory(
-      const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
-      const size_t byte_size, const int device_id);
-#endif  // TRTIS_ENABLE_GPU
-
-  // Unregister the corresponding shared memory region.
-  Status UnregisterSharedMemory(const std::string& name);
-
-  // Unregister all active shared memory regions.
-  Status UnregisterAllSharedMemory();
-
-  // Get the address at 'offset' within a shared memory region.
-  Status SharedMemoryAddress(
-      const std::string& name, size_t offset, size_t byte_size,
-      void** shm_mapped_addr);
-
-  // Get list of active shared memory regions.
-  Status GetSharedMemoryStatus(SharedMemoryStatus* shm_status);
 
   // Return the ready state for the server.
   ServerReadyState ReadyState() const { return ready_state_; }
@@ -261,7 +232,6 @@ class InferenceServer {
 
   std::shared_ptr<ServerStatusManager> status_manager_;
   std::unique_ptr<ModelRepositoryManager> model_repository_manager_;
-  std::unique_ptr<SharedMemoryManager> shared_memory_manager_;
 };
 
 }}  // namespace nvidia::inferenceserver

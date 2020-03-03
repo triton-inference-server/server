@@ -100,10 +100,14 @@ message ModelControlRequestStats
 //@@
 //@@.. cpp:var:: message SharedMemoryControlRequestStats
 //@@
-//@@   Statistics collected for SharedMemoryControl requests.
+//@@   Statistics for SharedMemoryControl requests
+//@@
+//@@   [DEPRECATED] The message has been deprecated and will
+//@@   always report 0.
 //@@
 message SharedMemoryControlRequestStats
 {
+  option deprecated = true;
   //@@  .. cpp:var:: StatDuration success
   //@@
   //@@     Total time required to handle successful SharedMemoryControl
@@ -465,7 +469,7 @@ message ServerStatus
 
   //@@  .. cpp:var:: SharedMemoryControlRequestStats shm_control_stats
   //@@
-  //@@     Statistics for SharedMemoryControl requests.
+  //@@     [DEPRECATED] Statistics for SharedMemoryControl requests.
   //@@
   SharedMemoryControlRequestStats shm_control_stats = 10;
 

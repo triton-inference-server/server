@@ -75,7 +75,7 @@ class CudaSharedMemoryTest(unittest.TestCase):
         try:
             shared_memory_ctx.cuda_register(shm_op0_handle)
         except Exception as ex:
-            self.assertTrue("shared memory block 'dummy_data' already in manager" in str(ex))
+            self.assertTrue("shared memory region 'dummy_data' already in manager" in str(ex))
         shm_status = shared_memory_ctx.get_shared_memory_status()
         self.assertTrue(len(shm_status.shared_memory_region) == 1)
         cshm.destroy_shared_memory_region(shm_op0_handle)

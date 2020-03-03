@@ -28,7 +28,7 @@
 #include <grpc++/grpc++.h>
 #include "src/core/grpc_service_v2.grpc.pb.h"
 #include "src/core/trtserver.h"
-#include "src/servers/shared_memory_block_manager.h"
+#include "src/servers/shared_memory_manager.h"
 #include "src/servers/tracer.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -39,8 +39,8 @@ class GRPCServerV2 {
       const std::shared_ptr<TRTSERVER_Server>& server,
       const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
           trace_manager,
-      const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
-      int32_t port, int infer_allocation_pool_size,
+      const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
+      int infer_allocation_pool_size,
       std::unique_ptr<GRPCServerV2>* grpc_server);
 
   ~GRPCServerV2();
@@ -59,13 +59,13 @@ class GRPCServerV2 {
       const std::shared_ptr<TRTSERVER_Server>& server,
       const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
           trace_manager,
-      const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
+      const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const char* server_id, const std::string& server_addr,
       const int infer_allocation_pool_size);
 
   std::shared_ptr<TRTSERVER_Server> server_;
   std::shared_ptr<TraceManager> trace_manager_;
-  std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
+  std::shared_ptr<SharedMemoryManager> shm_manager_;
   const char* server_id_;
   const std::string server_addr_;
 
