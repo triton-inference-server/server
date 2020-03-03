@@ -118,6 +118,7 @@ LoadManager::~LoadManager()
                     << static_cast<void*>(
                            shared_memory_regions_[region.first].first)
                     << ", size: " << shared_memory_regions_[region.first].second
+                    << " bytes, Details: " << cudaGetErrorString(cuda_err)
                     << std::endl;
         }
       }
@@ -348,7 +349,8 @@ LoadManager::InitSharedMemory()
         return nic::Error(
             ni::RequestStatusCode::INTERNAL,
             "unable to allocate memory of " + std::to_string(alloc_size) +
-                "bytes on gpu for output " + output->Name());
+                "bytes on gpu for output " + output->Name() + " : " +
+                std::string(cudaGetErrorString(cuda_err)));
       }
       shared_memory_regions_[region_name] =
           std::pair<uint8_t*, size_t>(output_shm_ptr, alloc_size);
@@ -468,7 +470,8 @@ LoadManager::InitSharedMemory()
             return nic::Error(
                 ni::RequestStatusCode::INTERNAL,
                 "unable to allocate memory of " + std::to_string(alloc_size) +
-                    "bytes on gpu for input " + region_name);
+                    "bytes on gpu for input " + region_name + " : " +
+                    std::string(cudaGetErrorString(cuda_err)));
           }
 
           shared_memory_regions_[region_name] =
@@ -485,8 +488,8 @@ LoadManager::InitSharedMemory()
             if (cuda_err != cudaSuccess) {
               return nic::Error(
                   ni::RequestStatusCode::INTERNAL,
-                  "Failed to copy data to cuda shared memory for " +
-                      region_name);
+                  "Failed to copy data to cuda shared memory for " + region_name +
+                      " : " + std::string(cudaGetErrorString(cuda_err)));
             }
             offset += byte_size[count];
             count++;
