@@ -97,6 +97,15 @@ InferenceBackend::SetModelConfig(
     }
   }
 
+  if (config_.has_dynamic_batching()) {
+    default_priority_level_ =
+        config_.dynamic_batching().default_priority_level();
+    max_priority_level_ = config_.dynamic_batching().priority_levels();
+  } else {
+    default_priority_level_ = 0;
+    max_priority_level_ = 0;
+  }
+
   return Status::Success;
 }
 
@@ -195,7 +204,10 @@ InferenceBackend::SetConfiguredScheduler(
         OnWarmup, OnRun, OnPeek, true /* dynamic_batching_enabled */,
         enforce_equal_shape_tensors,
         config_.dynamic_batching().preserve_ordering(), preferred_batch_sizes,
-        config_.dynamic_batching().max_queue_delay_microseconds(), &scheduler));
+        config_.dynamic_batching().max_queue_delay_microseconds(),
+        config_.dynamic_batching().default_queue_policy(),
+        config_.dynamic_batching().priority_levels(),
+        config_.dynamic_batching().priority_queue_policy(), &scheduler));
   } else {
     // Default scheduler. Use dynamic batch scheduler (with batching
     // disabled) as the default scheduler.

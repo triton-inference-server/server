@@ -29,6 +29,7 @@
 #include <condition_variable>
 #include <deque>
 #include <future>
+#include <map>
 #include <mutex>
 #include <queue>
 #include <set>
@@ -59,6 +60,24 @@ class DynamicBatchScheduler : public Scheduler {
       const uint64_t max_queue_delay_microseconds,
       std::unique_ptr<Scheduler>* scheduler);
 
+  // Create a scheduler to support a given number of runners and a run
+  // function to call when a request is scheduled. And the scheduler also
+  // supports different queue policies for different priority levels.
+  static Status Create(
+      const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
+      const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
+      const StandardRunFunc& OnSchedule,
+      const StandardShapeTensorPeekFunc& OnPeek,
+      const bool dynamic_batching_enabled,
+      const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+      const bool preserve_ordering,
+      const std::set<int32_t>& preferred_batch_sizes,
+      const uint64_t max_queue_delay_microseconds,
+      const ModelQueuePolicy& default_queue_policy,
+      const uint32_t priority_level,
+      const ModelQueuePolicyMap& queue_policy_map,
+      std::unique_ptr<Scheduler>* scheduler);
+
   ~DynamicBatchScheduler();
 
   // \see Scheduler::Enqueue()
@@ -78,7 +97,10 @@ class DynamicBatchScheduler : public Scheduler {
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
-      const uint64_t max_queue_delay_microseconds);
+      const uint64_t max_queue_delay_microseconds,
+      const ModelQueuePolicy& default_queue_policy,
+      const uint32_t priority_levels,
+      const ModelQueuePolicyMap& queue_policy_map);
   void SchedulerThread(
       const uint32_t runner_id, const uint32_t completion_id, const int nice,
       const std::shared_ptr<std::atomic<bool>>& rthread_exit,
@@ -115,9 +137,10 @@ class DynamicBatchScheduler : public Scheduler {
   std::mutex mu_;
   std::condition_variable cv_;
 
-  // Queue holding inference requests for the model represented by
-  // this scheduler.
-  std::deque<Scheduler::Payload> queue_;
+  // Map from priority level to queue holding inference requests for the model
+  // represented by this scheduler. If priority queues are not supported by the
+  // scheduler, then priority zero entry is used as the single queue.
+  PriorityQueue queue_;
 
   std::vector<std::unique_ptr<std::thread>> scheduler_threads_;
   std::vector<std::shared_ptr<std::atomic<bool>>> scheduler_threads_exit_;
@@ -126,7 +149,6 @@ class DynamicBatchScheduler : public Scheduler {
   std::set<int32_t> preferred_batch_sizes_;
   uint64_t pending_batch_delay_ns_;
   size_t pending_batch_size_;
-  size_t pending_batch_queue_cnt_;
   PendingBatchShapes pending_batch_shapes_;
 
   size_t queued_batch_size_;
