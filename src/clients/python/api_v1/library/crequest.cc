@@ -679,7 +679,8 @@ InferContextGetAsyncRunResults(InferContextCtx* ctx, uint64_t request_id)
 nic::Error*
 InferContextOptionsNew(
     nic::InferContext::Options** ctx, uint32_t flags, uint64_t batch_size,
-    ni::CorrelationID corr_id = 0)
+    ni::CorrelationID corr_id = 0, uint32_t priority = 0,
+    uint64_t timeout_ms = 0)
 {
   std::unique_ptr<nic::InferContext::Options> uctx;
   nic::Error err = nic::InferContext::Options::Create(&uctx);
@@ -688,6 +689,8 @@ InferContextOptionsNew(
     (*ctx)->SetFlags(flags);
     (*ctx)->SetBatchSize(batch_size);
     (*ctx)->SetCorrelationId(corr_id);
+    (*ctx)->SetPriority(priority);
+    (*ctx)->SetTimeout(timeout_ms);
     return nullptr;
   }
 

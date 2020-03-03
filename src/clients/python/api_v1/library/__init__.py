@@ -167,7 +167,7 @@ _crequest_infer_ctx_get_async_run_results.argtypes = [c_void_p, c_uint64]
 
 _crequest_infer_ctx_options_new = _crequest.InferContextOptionsNew
 _crequest_infer_ctx_options_new.restype = c_void_p
-_crequest_infer_ctx_options_new.argtypes = [POINTER(c_void_p), c_uint32, c_uint64, c_uint64]
+_crequest_infer_ctx_options_new.argtypes = [POINTER(c_void_p), c_uint32, c_uint64, c_uint64, c_uint32, c_uint64]
 _crequest_infer_ctx_options_del = _crequest.InferContextOptionsDelete
 _crequest_infer_ctx_options_del.argtypes = [c_void_p]
 _crequest_infer_ctx_options_add_raw = _crequest.InferContextOptionsAddRaw
@@ -1178,7 +1178,8 @@ class InferContext:
         _raise_error("unknown result datatype " + ctype.value)
 
     def _prepare_request(self, inputs, outputs,
-                         flags, batch_size, corr_id, contiguous_input_values):
+                         flags, batch_size, corr_id, priority, timeout_ms,
+                         contiguous_input_values):
         # Make sure each input is given as a list (one entry per
         # batch). It is a common error when using batch-size 1 to
         # specify an input directly as an array instead of as a list
@@ -1211,7 +1212,8 @@ class InferContext:
         options = c_void_p()
         try:
             _raise_if_error(c_void_p(
-                _crequest_infer_ctx_options_new(byref(options), flags, batch_size, corr_id)))
+                _crequest_infer_ctx_options_new(
+                    byref(options), flags, batch_size, corr_id, priority, timeout_ms)))
 
             for (output_name, output_format) in iteritems(outputs):
                 if len(output_format) == 2 and isinstance(output_format, (list, tuple)) \
@@ -1508,7 +1510,8 @@ class InferContext:
         """
         return _crequest_correlation_id(self._ctx)
 
-    def run(self, inputs, outputs, batch_size=1, flags=0, corr_id=0):
+    def run(self, inputs, outputs, batch_size=1, flags=0, corr_id=0,
+            priority=0, timeout_ms=0):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -1543,6 +1546,12 @@ class InferContext:
             The correlation id of the inference. Used to differentiate
             sequences.
 
+        priority : int
+            The priority of the inference.
+
+        timeout_ms : int
+            The timeout of the inference, in microseconds.
+
         Returns
         -------
         dict
@@ -1573,14 +1582,16 @@ class InferContext:
         contiguous_input = list()
 
         # Set run option and input values
-        self._prepare_request(inputs, outputs, flags, batch_size, corr_id, contiguous_input)
+        self._prepare_request(
+            inputs, outputs, flags, batch_size, corr_id, priority, timeout_ms, contiguous_input)
 
         # Run inference...
         self._last_request_id = _raise_if_error(c_void_p(_crequest_infer_ctx_run(self._ctx)))
 
         return self._get_results(outputs, batch_size)
 
-    def async_run(self, callback, inputs, outputs, batch_size=1, flags=0, corr_id=0):
+    def async_run(self, callback, inputs, outputs, batch_size=1, flags=0, corr_id=0,
+                  priority=0, timeout_ms=0):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -1628,6 +1639,12 @@ class InferContext:
             The flags to use for the inference. The bitwise-or of
             InferRequestHeader.Flag values.
 
+        priority : int
+            The priority of the inference.
+
+        timeout_ms : int
+            The timeout of the inference, in microseconds.
+
         Raises
         ------
         InferenceServerException
@@ -1641,7 +1658,8 @@ class InferContext:
         contiguous_input = list()
 
         # Set run option and input values
-        self._prepare_request(inputs, outputs, flags, batch_size, corr_id, contiguous_input)
+        self._prepare_request(
+            inputs, outputs, flags, batch_size, corr_id, priority, timeout_ms, contiguous_input)
 
         # Wrap over the provided callback
         wrapped_cb = partial(self._async_callback_wrapper, self._callback_resources_dict_id, callback)

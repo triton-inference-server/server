@@ -134,7 +134,7 @@ nic::Error* InferContextGetAsyncRunResults(
 // InferContext::Options
 nic::Error* InferContextOptionsNew(
     nic::InferContext::Options** ctx, uint32_t flags, uint64_t batch_size,
-    ni::CorrelationID corr_id);
+    ni::CorrelationID corr_id, uint32_t priority, uint64_t timeout_ms);
 void InferContextOptionsDelete(nic::InferContext::Options* ctx);
 nic::Error* InferContextOptionsAddRaw(
     InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,

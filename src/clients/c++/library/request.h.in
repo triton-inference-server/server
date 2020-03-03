@@ -575,6 +575,21 @@ class InferContext {
     /// \param batch_size The batch size.
     virtual void SetBatchSize(size_t batch_size) = 0;
 
+    /// \return The priority to use for all subsequent inferences.
+    virtual uint32_t Priority() const = 0;
+
+    /// Set the priority to use for all subsequent inferences.
+    /// \param priority The priority level.
+    virtual void SetPriority(uint32_t priority) = 0;
+
+    /// \return The timeout to use for all subsequent inferences,
+    /// in microseconds.
+    virtual uint64_t Timeout() const = 0;
+
+    /// Set the timeout to use for all subsequent inferences.
+    /// \param timeout_ms The timeout, in microseconds.
+    virtual void SetTimeout(uint64_t timeout_ms) = 0;
+
     /// \return The correlation id for the inferences.
     virtual CorrelationID CorrelationId() const = 0;
 
