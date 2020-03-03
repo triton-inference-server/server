@@ -561,7 +561,7 @@ def create_plan_dynamic_rf_modelfile(
         models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size):
     # Create the model
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
-    builder = trt.infer.Builder(TRT_LOGGER)
+    builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
     if max_batch == 0:
         shape_with_batchsize = [i for i in shape]
@@ -576,12 +576,12 @@ def create_plan_dynamic_rf_modelfile(
 
         out_node = network.add_identity(in_node)
 
-        out_node.get_output(0).set_name("OUTPUT{}".format(io_num))
-        out_node.get_output(0).set_type(trt_dtype)
+        out_node.get_output(0).name = "OUTPUT{}".format(io_num)
+        out_node.get_output(0).dtype = trt_dtype
         network.mark_output(out_node.get_output(0))
         out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
-        if (trt_dtype == trt.DataType.INT8):
+        if (trt_dtype == trt.int8):
             in_node.dynamic_range = (-128.0, 127.0)
             out_node.get_output(0).dynamic_range = (-128.0, 127.0)
 
@@ -611,9 +611,9 @@ def create_plan_dynamic_rf_modelfile(
     flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
     datatype_set = set([trt_dtype])
     for dt in datatype_set:
-        if (dt == trt.DataType.INT8):
+        if (dt == trt.int8):
             flags |= 1 << int(trt.BuilderFlag.INT8)
-        elif (dt == trt.DataType.HALF):
+        elif (dt == trt.float16):
             flags |= 1 << int(trt.BuilderFlag.FP16)
     config = builder.create_builder_config()
     config.flags=flags
@@ -634,8 +634,8 @@ def create_plan_dynamic_rf_modelfile(
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine.serialize())
 
-    engine.destroy()
-    builder.destroy()
+    del engine
+    del builder
 
 
 def create_plan_shape_tensor_modelfile(
@@ -644,13 +644,13 @@ def create_plan_shape_tensor_modelfile(
     # The model takes two inputs (INPUT and DUMMY_INPUT)
     # and produce two outputs.
     # OUTPUT : The shape of resized output 'DUMMY_OUTPUT'.
-    # DUMMY_OUTPUT : Obtained after resizing 'DUMMY_INPUT' 
+    # DUMMY_OUTPUT : Obtained after resizing 'DUMMY_INPUT'
     # to shape specified in 'INPUT'.
     # Note that values of OUTPUT tensor must be identical
     # to INPUT values
 
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
-    builder = trt.infer.Builder(TRT_LOGGER)
+    builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
     if max_batch == 0:
         shape_with_batchsize = len(shape)
@@ -658,7 +658,7 @@ def create_plan_shape_tensor_modelfile(
     else:
         shape_with_batchsize = len(shape) + 1
         dummy_shape = [-1] * shape_with_batchsize
-       
+
     trt_dtype = np_to_trt_dtype(dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
     for io_num in range(io_cnt):
@@ -675,18 +675,18 @@ def create_plan_shape_tensor_modelfile(
 
         dummy_out_node.name = "DUMMY_OUTPUT{}".format(io_num)
 
-        dummy_out_node.set_type(trt_dtype)
+        dummy_out_node.dtype = trt_dtype
         network.mark_output(dummy_out_node)
         dummy_out_node.allowed_formats = 1 << int(trt_memory_format)
 
-        out_node.get_output(0).set_type(trt.int32)
+        out_node.get_output(0).dtype = trt.int32
         network.mark_output_for_shapes(out_node.get_output(0))
         out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
-        if (trt_dtype == trt.DataType.INT8):
+        if (trt_dtype == trt.int8):
             in_node.dynamic_range = (-128.0, 127.0)
             out_node.get_output(0).dynamic_range = (-128.0, 127.0)
-    
+
     config = builder.create_builder_config()
 
     min_prefix = []
@@ -697,7 +697,7 @@ def create_plan_shape_tensor_modelfile(
         min_prefix = [1]
         opt_prefix = [max(1, max_batch)]
         max_prefix = [max(1, max_batch)]
-    
+
     min_shape = min_prefix + [1] * len(shape)
     opt_shape = opt_prefix + [8] * len(shape)
     max_shape = max_prefix + [profile_max_size] * len(shape)
@@ -706,16 +706,16 @@ def create_plan_shape_tensor_modelfile(
     for io_num in range(io_cnt):
         profile.set_shape_input("INPUT{}".format(io_num),min_shape, opt_shape, max_shape)
         profile.set_shape("DUMMY_INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
-    
+
     config.add_optimization_profile(profile)
 
 
     flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
     datatype_set = set([trt_dtype])
     for dt in datatype_set:
-        if (dt == trt.DataType.INT8):
+        if (dt == trt.int8):
             flags |= 1 << int(trt.BuilderFlag.INT8)
-        elif (dt == trt.DataType.HALF):
+        elif (dt == trt.float16):
             flags |= 1 << int(trt.BuilderFlag.FP16)
     config.flags=flags
 
@@ -735,15 +735,15 @@ def create_plan_shape_tensor_modelfile(
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine.serialize())
 
-    engine.destroy()
-    builder.destroy()
+    del engine
+    del builder
 
 
 def create_plan_dynamic_modelfile(
         models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size):
     # Create the model
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
-    builder = trt.infer.Builder(TRT_LOGGER)
+    builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
     if max_batch == 0:
         shape_with_batchsize = [i for i in shape]
@@ -754,7 +754,7 @@ def create_plan_dynamic_modelfile(
     for io_num in range(io_cnt):
         in_node = network.add_input("INPUT{}".format(io_num), trt_dtype, shape_with_batchsize)
         out_node = network.add_identity(in_node)
-        out_node.get_output(0).set_name("OUTPUT{}".format(io_num))
+        out_node.get_output(0).name = "OUTPUT{}".format(io_num)
         network.mark_output(out_node.get_output(0))
 
     min_shape = []
@@ -795,8 +795,8 @@ def create_plan_dynamic_modelfile(
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine.serialize())
 
-    engine.destroy()
-    builder.destroy()
+    del engine
+    del builder
 
 
 def create_plan_modelconfig(
@@ -996,7 +996,7 @@ if __name__ == '__main__':
         import torch
         from torch import nn
     if FLAGS.tensorrt or FLAGS.tensorrt_big or FLAGS.tensorrt_shape_io:
-        import tensorrt.legacy as trt
+        import tensorrt as trt
 
     import test_util as tu
 
