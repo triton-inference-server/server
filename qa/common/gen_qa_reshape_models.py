@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -424,7 +424,7 @@ def create_plan_modelfile(
 
     # Create the model that copies inputs to corresponding outputs.
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
-    builder = trt.infer.Builder(TRT_LOGGER)
+    builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 
     for io_num in range(io_cnt):
@@ -437,13 +437,14 @@ def create_plan_modelfile(
             out0 = network.add_shuffle(in0)
             out0.set_reshape_dimensions(output_shapes[io_num])
 
-        out0.get_output(0).set_name(output_name)
+        out0.get_output(0).name = output_name
         network.mark_output(out0.get_output(0))
 
-    builder.set_max_batch_size(max(1, max_batch))
-    builder.max_workspace_size = 1 << 20
-    engine = builder.build_cuda_engine(network)
-    network.destroy()
+    config = builder.create_builder_config()
+    config.max_workspace_size = 1 << 20
+    builder.max_batch_size = max(1, max_batch)
+    engine = builder.build_engine(network,config)
+    del network
 
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
@@ -454,11 +455,11 @@ def create_plan_modelfile(
     except OSError as ex:
         pass # ignore existing dir
 
-    lengine = trt.lite.Engine(engine_stream=engine.serialize(),
-                              max_batch_size=max(1, max_batch))
-    lengine.save(model_version_dir + "/model.plan")
-    engine.destroy()
-    builder.destroy()
+    with open(model_version_dir + "/model.plan", "wb") as f:
+        f.write(engine.serialize())
+
+    del engine
+    del builder
 
 
 def create_plan_modelconfig(
@@ -926,7 +927,7 @@ if __name__ == '__main__':
         import tensorflow as tf
         from tensorflow.python.framework import graph_io, graph_util
     if FLAGS.tensorrt:
-        import tensorrt.legacy as trt
+        import tensorrt as trt
     if FLAGS.onnx:
         import onnx
     if FLAGS.libtorch:

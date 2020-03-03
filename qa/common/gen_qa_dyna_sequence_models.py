@@ -494,7 +494,7 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch, dty
     # Note that resize layer does not support int tensors.
     # The model takes three inputs (INPUT, DUMMY_INPUT and SHAPE_INPUT)
     # and four control inputs(START, END, READY, CORR_ID).
-    # In absence of proper accumulator, 
+    # In absence of proper accumulator,
     # OUTPUT : 0 if not-ready and 'DUMMY_INPUT'+'START'+('END'*'CORRID')
     #          otherwise
     # RESIZED_OUTPUT : Obtained after resizing 'INPUT' to shape specified
@@ -505,7 +505,7 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch, dty
     trt_memory_format = trt.TensorFormat.LINEAR
 
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
-    builder = trt.infer.Builder(TRT_LOGGER)
+    builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
 
     unit_shape = ([1] * len(shape))
@@ -527,11 +527,11 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch, dty
         ready0 = network.add_input("READY", trt.int32, unit_shape)
         corrid0 = network.add_input("CORRID", trt.int32, unit_shape)
 
-    add0 = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
-    mul0 = network.add_elementwise(end0, corrid0, trt.infer.ElementWiseOperation.PROD)
+    add0 = network.add_elementwise(in0, start0, trt.ElementWiseOperation.SUM)
+    mul0 = network.add_elementwise(end0, corrid0, trt.ElementWiseOperation.PROD)
     sum0 = network.add_elementwise(add0.get_output(0), mul0.get_output(0),
-                                   trt.infer.ElementWiseOperation.SUM)
-    out0 = network.add_elementwise(sum0.get_output(0), ready0, trt.infer.ElementWiseOperation.PROD).get_output(0)
+                                   trt.ElementWiseOperation.SUM)
+    out0 = network.add_elementwise(sum0.get_output(0), ready0, trt.ElementWiseOperation.PROD).get_output(0)
 
     resize_layer = network.add_resize(dummy_in0)
     resize_layer.set_input(1, shape_in0)
@@ -539,15 +539,15 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch, dty
     resized_out0 = resize_layer.get_output(0)
 
     shape_out0.get_output(0).name = "SHAPE_OUTPUT"
-    shape_out0.get_output(0).set_type(trt.int32)
+    shape_out0.get_output(0).dtype = trt.int32
     network.mark_output_for_shapes(shape_out0.get_output(0))
 
     out0.name = "OUTPUT"
-    out0.set_type(trt.int32)
+    out0.dtype = trt.int32
     network.mark_output(out0)
 
     resized_out0.name = "RESIZED_OUTPUT"
-    resized_out0.set_type(trt_dtype)
+    resized_out0.dtype = trt_dtype
     network.mark_output(resized_out0)
 
     shape_in0.allowed_formats = 1 << int(trt_memory_format)
@@ -558,7 +558,7 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch, dty
     shape_out0.get_output(0).allowed_formats = 1 << int(trt_memory_format)
     resized_out0.allowed_formats = 1 << int(trt_memory_format)
 
-    if (trt_dtype == trt.DataType.INT8):
+    if (trt_dtype == trt.int8):
         dummy_in0.dynamic_range = (-128.0, 127.0)
         resized_out0.dynamic_range = (-128.0, 127.0)
         start0.dynamic_range = (-128.0, 127.0)
@@ -566,9 +566,9 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch, dty
         ready0.dynamic_range = (-128.0, 127.0)
 
     flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
-    if (trt_dtype == trt.DataType.INT8):
+    if (trt_dtype == trt.int8):
         flags |= 1 << int(trt.BuilderFlag.INT8)
-    elif (trt_dtype == trt.DataType.HALF):
+    elif (trt_dtype == trt.float16):
         flags |= 1 << int(trt.BuilderFlag.FP16)
 
     min_prefix = []
@@ -579,7 +579,7 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch, dty
         min_prefix = [1]
         opt_prefix = [max(1, max_batch)]
         max_prefix = [max(1, max_batch)]
-    
+
     min_shape = min_prefix + [1] * len(shape)
     opt_shape = opt_prefix + [8] * len(shape)
     max_shape = max_prefix + [32] * len(shape)
@@ -611,35 +611,36 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch, dty
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine.serialize())
 
-    engine.destroy()
-    builder.destroy()
-    
+    del engine
+    del builder
+
 def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START'+('END'*'CORRID')
     # otherwise...  the tests know to expect this.
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
-    builder = trt.infer.Builder(TRT_LOGGER)
+    builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
     in0 = network.add_input("INPUT", trt_dtype, shape)
     start0 = network.add_input("START", trt_dtype, [1 for i in shape])
     end0 = network.add_input("END", trt_dtype, [1 for i in shape])
     ready0 = network.add_input("READY", trt_dtype, [1 for i in shape])
     corrid0 = network.add_input("CORRID", trt.int32, [1 for i in shape])
-    add0 = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
-    mul0 = network.add_elementwise(end0, corrid0, trt.infer.ElementWiseOperation.PROD)
+    add0 = network.add_elementwise(in0, start0, trt.ElementWiseOperation.SUM)
+    mul0 = network.add_elementwise(end0, corrid0, trt.ElementWiseOperation.PROD)
     sum0 = network.add_elementwise(add0.get_output(0), mul0.get_output(0),
-                                   trt.infer.ElementWiseOperation.SUM)
-    out0 = network.add_elementwise(sum0.get_output(0), ready0, trt.infer.ElementWiseOperation.PROD)
+                                   trt.ElementWiseOperation.SUM)
+    out0 = network.add_elementwise(sum0.get_output(0), ready0, trt.ElementWiseOperation.PROD)
 
-    out0.get_output(0).set_name("OUTPUT")
+    out0.get_output(0).name = "OUTPUT"
     network.mark_output(out0.get_output(0))
 
-    builder.set_max_batch_size(max(1, max_batch))
-    builder.max_workspace_size = 1 << 20
-    engine = builder.build_cuda_engine(network)
-    network.destroy()
+    config = builder.create_builder_config()
+    config.max_workspace_size = 1 << 20
+    builder.max_batch_size = max(1, max_batch)
+    engine = builder.build_engine(network,config)
+    del network
 
     model_name = tu.get_dyna_sequence_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", dtype)
@@ -650,11 +651,11 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype, sha
     except OSError as ex:
         pass # ignore existing dir
 
-    lengine = trt.lite.Engine(engine_stream=engine.serialize(),
-                              max_batch_size=max(1, max_batch))
-    lengine.save(model_version_dir + "/model.plan")
-    engine.destroy()
-    builder.destroy()
+    with open(model_version_dir + "/model.plan", "wb") as f:
+        f.write(engine.serialize())
+
+    del engine
+    del builder
 
 def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
@@ -663,23 +664,23 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype, 
     # just return 0 if not-ready and 'INPUT'+'START'*('END'*'CORRID')
     # otherwise...  the tests know to expect this.
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
-    builder = trt.infer.Builder(TRT_LOGGER)
+    builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
     in0 = network.add_input("INPUT", trt_dtype, shape)
     start0 = network.add_input("START", trt_dtype, [1 for i in shape])
     end0 = network.add_input("END", trt_dtype, [1 for i in shape])
     ready0 = network.add_input("READY", trt_dtype, [1 for i in shape])
     corrid0 = network.add_input("CORRID", trt.int32, [1 for i in shape])
-    add0 = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
-    mul0 = network.add_elementwise(end0, corrid0, trt.infer.ElementWiseOperation.PROD)
+    add0 = network.add_elementwise(in0, start0, trt.ElementWiseOperation.SUM)
+    mul0 = network.add_elementwise(end0, corrid0, trt.ElementWiseOperation.PROD)
     sum0 = network.add_elementwise(add0.get_output(0), mul0.get_output(0),
-                                   trt.infer.ElementWiseOperation.SUM)
-    out0 = network.add_elementwise(sum0.get_output(0), ready0, trt.infer.ElementWiseOperation.PROD)
+                                   trt.ElementWiseOperation.SUM)
+    out0 = network.add_elementwise(sum0.get_output(0), ready0, trt.ElementWiseOperation.PROD)
 
-    out0.get_output(0).set_name("OUTPUT")
+    out0.get_output(0).name = "OUTPUT"
     network.mark_output(out0.get_output(0))
 
-    out0.get_output(0).set_type(trt_dtype)
+    out0.get_output(0).dtype = trt_dtype
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     start0.allowed_formats = 1 << int(trt_memory_format)
@@ -688,7 +689,7 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype, 
     corrid0.allowed_formats = 1 << int(trt_memory_format)
     out0.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
-    if (trt_dtype == trt.DataType.INT8):
+    if (trt_dtype == trt.int8):
         in0.dynamic_range = (-128.0, 127.0)
         out0.dynamic_range = (-128.0, 127.0)
         start0.dynamic_range = (-128.0, 127.0)
@@ -697,15 +698,15 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype, 
         corrid0.dynamic_range = (-128.0, 127.0)
 
     flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
-    if (trt_dtype == trt.DataType.INT8):
+    if (trt_dtype == trt.int8):
         flags |= 1 << int(trt.BuilderFlag.INT8)
-    elif (trt_dtype == trt.DataType.HALF):
+    elif (trt_dtype == trt.float16):
         flags |= 1 << int(trt.BuilderFlag.FP16)
 
     config = builder.create_builder_config()
     config.flags=flags
     config.max_workspace_size = 1 << 20
-    builder.set_max_batch_size(max(1, max_batch))
+    builder.max_batch_size = max(1, max_batch)
     engine = builder.build_engine(network,config)
 
     model_name = tu.get_dyna_sequence_model_name(
@@ -720,8 +721,8 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype, 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine.serialize())
 
-    engine.destroy()
-    builder.destroy()
+    del engine
+    del builder
 
 
 def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, shape):
@@ -730,7 +731,7 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, s
     # just return 0 if not-ready and 'INPUT'+'START'*('END'*'CORRID')
     # otherwise...  the tests know to expect this.
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
-    builder = trt.infer.Builder(TRT_LOGGER)
+    builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
 
     unit_shape = ([1] * len(shape))
@@ -747,13 +748,13 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, s
         ready0 = network.add_input("READY", trt_dtype, unit_shape)
         corrid0 = network.add_input("CORRID", trt.int32, unit_shape)
 
-    add0 = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
-    mul0 = network.add_elementwise(end0, corrid0, trt.infer.ElementWiseOperation.PROD)
+    add0 = network.add_elementwise(in0, start0, trt.ElementWiseOperation.SUM)
+    mul0 = network.add_elementwise(end0, corrid0, trt.ElementWiseOperation.PROD)
     sum0 = network.add_elementwise(add0.get_output(0), mul0.get_output(0),
-                                   trt.infer.ElementWiseOperation.SUM)
-    out0 = network.add_elementwise(sum0.get_output(0), ready0, trt.infer.ElementWiseOperation.PROD)
+                                   trt.ElementWiseOperation.SUM)
+    out0 = network.add_elementwise(sum0.get_output(0), ready0, trt.ElementWiseOperation.PROD)
 
-    out0.get_output(0).set_name("OUTPUT")
+    out0.get_output(0).name = "OUTPUT"
     network.mark_output(out0.get_output(0))
 
     min_shape = []
@@ -803,8 +804,8 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, s
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine.serialize())
 
-    engine.destroy()
-    builder.destroy()
+    del engine
+    del builder
 
 def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
@@ -814,7 +815,7 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype
     # just return 0 if not-ready and 'INPUT'+'START'*('END'*'CORRID')
     # otherwise...  the tests know to expect this.
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
-    builder = trt.infer.Builder(TRT_LOGGER)
+    builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
 
     unit_shape = ([1] * len(shape))
@@ -831,23 +832,23 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype
         ready0 = network.add_input("READY", trt_dtype, unit_shape)
         corrid0 = network.add_input("CORRID", trt.int32, unit_shape)
 
-    add0 = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
-    mul0 = network.add_elementwise(end0, corrid0, trt.infer.ElementWiseOperation.PROD)
+    add0 = network.add_elementwise(in0, start0, trt.ElementWiseOperation.SUM)
+    mul0 = network.add_elementwise(end0, corrid0, trt.ElementWiseOperation.PROD)
     sum0 = network.add_elementwise(add0.get_output(0), mul0.get_output(0),
-                                   trt.infer.ElementWiseOperation.SUM)
-    out0 = network.add_elementwise(sum0.get_output(0), ready0, trt.infer.ElementWiseOperation.PROD)
+                                   trt.ElementWiseOperation.SUM)
+    out0 = network.add_elementwise(sum0.get_output(0), ready0, trt.ElementWiseOperation.PROD)
 
-    out0.get_output(0).set_name("OUTPUT")
+    out0.get_output(0).name = "OUTPUT"
     network.mark_output(out0.get_output(0))
 
-    out0.get_output(0).set_type(trt_dtype)
+    out0.get_output(0).dtype = trt_dtype
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     start0.allowed_formats = 1 << int(trt_memory_format)
     ready0.allowed_formats = 1 << int(trt_memory_format)
     out0.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
-    if (trt_dtype == trt.DataType.INT8):
+    if (trt_dtype == trt.int8):
         in0.dynamic_range = (-128.0, 127.0)
         out0.dynamic_range = (-128.0, 127.0)
         start0.dynamic_range = (-128.0, 127.0)
@@ -856,9 +857,9 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype
         corrid0.dynamic_range = (-128.0, 127.0)
 
     flags = 1 <<  int(trt.BuilderFlag.STRICT_TYPES)
-    if (trt_dtype == trt.DataType.INT8):
+    if (trt_dtype == trt.int8):
         flags |= 1 << int(trt.BuilderFlag.INT8)
-    elif (trt_dtype == trt.DataType.HALF):
+    elif (trt_dtype == trt.float16):
         flags |= 1 << int(trt.BuilderFlag.FP16)
 
     min_shape = []
@@ -909,8 +910,8 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine.serialize())
 
-    engine.destroy()
-    builder.destroy()
+    del engine
+    del builder
 
 
 def create_plan_modelfile(
@@ -1500,7 +1501,7 @@ if __name__ == '__main__':
         import tensorflow as tf
         from tensorflow.python.framework import graph_io, graph_util
     if FLAGS.tensorrt or FLAGS.tensorrt_shape_io:
-        import tensorrt.legacy as trt
+        import tensorrt as trt
     if FLAGS.onnx:
         import onnx
     if FLAGS.libtorch:
