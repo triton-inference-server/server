@@ -139,11 +139,11 @@ class HTTPAPIServer : public HTTPServerImpl {
       const std::shared_ptr<TRTSERVER_Server>& server,
       const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
           trace_manager,
-      const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
+      const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const std::vector<std::string>& endpoints, const int32_t port,
       const int thread_cnt)
       : HTTPServerImpl(port, thread_cnt), server_(server),
-        trace_manager_(trace_manager), smb_manager_(smb_manager),
+        trace_manager_(trace_manager), shm_manager_(shm_manager),
         allocator_(nullptr),
         api_regex_(R"(/v1/models/([^(/|:)]+)(:predict|/metadata)?)")
   {
@@ -249,7 +249,7 @@ class HTTPAPIServer : public HTTPServerImpl {
   const char* server_id_;
 
   std::shared_ptr<TraceManager> trace_manager_;
-  std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
+  std::shared_ptr<SharedMemoryManager> shm_manager_;
 
   // The allocator that will be used to allocate buffers for the
   // inference result tensors.
@@ -586,14 +586,10 @@ HTTPAPIServer::EVBufferToInput(
 
         void* base;
         TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
-        int64_t memory_type_id;
-        TRTSERVER_SharedMemoryBlock* smb = nullptr;
-        RETURN_IF_ERR(smb_manager_->Get(&smb, io.shared_memory().name()));
-        RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
-            server_.get(), smb, io.shared_memory().offset(),
-            io.shared_memory().byte_size(), &base));
-        TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
-        TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
+        int memory_type_id;
+        RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
+            io.shared_memory().name(), io.shared_memory().offset(), &base,
+            &memory_type, &memory_type_id));
         RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
             request_provider, io.name().c_str(), base, byte_size, memory_type,
             memory_type_id));
@@ -623,16 +619,12 @@ HTTPAPIServer::EVBufferToInput(
   for (const auto& io : request_header.output()) {
     if (io.has_shared_memory()) {
       void* base;
-      TRTSERVER_SharedMemoryBlock* smb = nullptr;
-      RETURN_IF_ERR(smb_manager_->Get(&smb, io.shared_memory().name()));
-      RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
-          server_.get(), smb, io.shared_memory().offset(),
-          io.shared_memory().byte_size(), &base));
-
       TRTSERVER_Memory_Type memory_type;
-      int64_t memory_type_id;
-      TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
-      TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
+      int memory_type_id;
+      RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
+          io.shared_memory().name(), io.shared_memory().offset(), &base,
+          &memory_type, &memory_type_id));
+
       output_shm_map.emplace(
           io.name(),
           std::make_tuple(
@@ -957,7 +949,7 @@ TRTSERVER_Error*
 HTTPServer::CreateAPIServer(
     const std::shared_ptr<TRTSERVER_Server>& server,
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
-    const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
     std::vector<std::unique_ptr<HTTPServer>>* http_servers)
 {
@@ -972,7 +964,7 @@ HTTPServer::CreateAPIServer(
     std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
     LOG_INFO << "Starting HTTPV2Service at " << addr;
     http_servers->emplace_back(new HTTPAPIServer(
-        server, trace_manager, smb_manager, ep_map.second, ep_map.first,
+        server, trace_manager, shm_manager, ep_map.second, ep_map.first,
         thread_cnt));
   }
 

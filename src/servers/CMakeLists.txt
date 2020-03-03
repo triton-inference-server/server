@@ -211,14 +211,14 @@ set(
   TRTSERVER_SRCS
   main.cc
   common.cc
-  shared_memory_block_manager.cc
+  shared_memory_manager.cc
   ../core/logging.cc
 )
 
 set(
   TRTSERVER_HDRS
   common.h
-  shared_memory_block_manager.h
+  shared_memory_manager.h
   ../core/logging.h
 )
 
@@ -251,6 +251,12 @@ target_link_libraries(
   PRIVATE protobuf::libprotobuf
   PRIVATE trtserver
 )
+if(${TRTIS_ENABLE_GPU})
+target_link_libraries(
+  main
+  PRIVATE ${CUDA_LIBRARIES}
+)
+endif() # TRTIS_ENABLE_GPU
 install(
   TARGETS main
   RUNTIME DESTINATION bin

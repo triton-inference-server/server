@@ -25,24 +25,26 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <cstring>
 #include <mutex>
 #include <unordered_map>
+#include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
+
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
-///
-/// Manage TRTSERVER_SharedMemoryBlock created by trtserver
-///
-class SharedMemoryBlockManager {
+class SharedMemoryManager {
  public:
-  SharedMemoryBlockManager() = default;
-  ~SharedMemoryBlockManager();
+  SharedMemoryManager() = default;
+  ~SharedMemoryManager();
 
   /// Add a shared memory block representing shared memory in system
   /// (CPU) memory to the manager. Return TRTSERVER_ERROR_ALREADY_EXISTS
   /// if a shared memory block of the same name already exists in the manager.
-  /// \param smb Returns the shared memory block.
   /// \param name The name of the memory block.
   /// \param shm_key The name of the posix shared memory object
   /// containing the block of memory.
@@ -50,60 +52,92 @@ class SharedMemoryBlockManager {
   /// start of the block.
   /// \param byte_size The size, in bytes of the block.
   /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* CpuCreate(
-      TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
-      const std::string& shm_key, const size_t offset, const size_t byte_size);
+  TRTSERVER_Error* RegisterSystemSharedMemory(
+      const std::string& name, const std::string& shm_key, const size_t offset,
+      const size_t byte_size);
 
 #ifdef TRTIS_ENABLE_GPU
   /// Add a shared memory block representing shared memory in CUDA
   /// (GPU) memory to the manager. Return TRTSERVER_ERROR_ALREADY_EXISTS
   /// if a shared memory block of the same name already exists in the manager.
-  /// \param smb Returns the shared memory block.
   /// \param name The name of the memory block.
   /// \param cuda_shm_handle The unique memory handle to the cuda shared
   /// memory block.
   /// \param byte_size The size, in bytes of the block.
   /// \param device id The GPU number the shared memory region is in.
   /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* GpuCreate(
-      TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
-      const cudaIpcMemHandle_t* cuda_shm_handle, const size_t byte_size,
-      const int device_id);
+  TRTSERVER_Error* RegisterCUDASharedMemory(
+      const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
+      const size_t byte_size, const int device_id);
 #endif  // TRTIS_ENABLE_GPU
 
-  /// Get a named shared memory block. Return
-  /// TRTSERVER_ERROR_NOT_FOUND if named block doesn't exist.
-  /// \param smb Returns the shared memory block.
+  /// Get the access information for the shared memory block
+  /// with the specified name. Return TRTSERVER_ERROR_NOT_FOUND
+  /// if named block doesn't exist.
   /// \param name The name of the shared memory block to get.
+  /// \param offset The offset in the block
+  /// \param shm_mapped_addr Returns the pointer to the shared
+  /// memory block with the specified name and offset
+  /// \param memory_type Returns the type of the memory
+  /// \param device_id Returns the device id associated with the
+  /// memory block
   /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* Get(
-      TRTSERVER_SharedMemoryBlock** smb, const std::string& name);
+  TRTSERVER_Error* GetMemoryInfo(
+      const std::string& name, size_t offset, void** shm_mapped_addr,
+      TRTSERVER_Memory_Type* memory_type, int* device_id);
 
-  /// Find a named shared memory block. Return 'smb' == nullptr if the
-  /// named block doesn't exist.
-  /// \param smb Returns the shared memory block.
-  /// \param name The name of the shared memory block to find.
-  /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* Find(
-      TRTSERVER_SharedMemoryBlock** smb, const std::string& name);
-
-  /// Remove from manager and return a named shared memory block
-  /// Ownership of 'smb' is transferred to the caller which is
-  /// responsible for deleting the object. Return 'smb' == nullptr if
-  /// the named block doesn't exist.
-  /// \param smb Returns the shared memory block.
+  /// Removes the named shared memory block from the manager. Any future
+  /// attempt to get the details of this block will result in an array
+  /// till another block with the same name is added to the manager.
   /// \param name The name of the shared memory block to remove.
   /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* Remove(
-      TRTSERVER_SharedMemoryBlock** smb, const std::string& name);
+  TRTSERVER_Error* Unregister(const std::string& name);
 
-  /// Remove all shared memory blocks from the manager.
+  /// Unregister all shared memory blocks from the manager.
   /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* Clear();
+  TRTSERVER_Error* UnregisterAll();
+
+  /// Populates the status of active shared memory regions in the
+  /// specified protobuf message.
+  /// \param status Returns status of active shared meeory blocks
+  /// \return a TRTSERVER_Error indicating success or failure.
+  TRTSERVER_Error* GetStatus(SharedMemoryStatus* status);
 
  private:
+  /// A helper function to remove the named shared memory blocks.
+  TRTSERVER_Error* UnregisterHelper(const std::string& name);
+
+  /// A struct that records the shared memory regions registered by the shared
+  /// memory manager.
+  struct SharedMemoryInfo {
+    SharedMemoryInfo(
+        const std::string& name, const std::string& shm_key,
+        const size_t offset, const size_t byte_size, int shm_fd,
+        void* mapped_addr, const TRTSERVER_Memory_Type kind,
+        const int device_id)
+        : name_(name), shm_key_(shm_key), offset_(offset),
+          byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr),
+          kind_(kind), device_id_(device_id)
+    {
+    }
+
+    std::string name_;
+    std::string shm_key_;
+    size_t offset_;
+    size_t byte_size_;
+    int shm_fd_;
+    void* mapped_addr_;
+    TRTSERVER_Memory_Type kind_;
+    int device_id_;
+  };
+
+  using SharedMemoryStateMap =
+      std::map<std::string, std::unique_ptr<SharedMemoryInfo>>;
+  // A map between the name and the details of the associated
+  // shared memory block
+  SharedMemoryStateMap shared_memory_map_;
+  // A mutex to protect the concurrent access to shared_memory_map_
   std::mutex mu_;
-  std::unordered_map<std::string, TRTSERVER_SharedMemoryBlock*> blocks_;
 };
 
 }}  // namespace nvidia::inferenceserver

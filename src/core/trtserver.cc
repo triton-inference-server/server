@@ -114,69 +114,6 @@ TrtServerError::TrtServerError(
   } while (false)
 
 //
-// TrtServerSharedMemoryBlock
-//
-// Implementation for TRTSERVER_SharedMemoryBlock.
-//
-class TrtServerSharedMemoryBlock {
- public:
-  explicit TrtServerSharedMemoryBlock(
-      TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
-      const size_t offset, const size_t byte_size);
-#ifdef TRTIS_ENABLE_GPU
-  explicit TrtServerSharedMemoryBlock(
-      TRTSERVER_Memory_Type type, const char* name,
-      const cudaIpcMemHandle_t* cuda_shm_handle, const int device_id,
-      const size_t byte_size);
-#endif  // TRTIS_ENABLE_GPU
-
-  TRTSERVER_Memory_Type Type() const { return type_; }
-  const std::string& Name() const { return name_; }
-  const std::string& ShmKey() const { return shm_key_; }
-#ifdef TRTIS_ENABLE_GPU
-  const cudaIpcMemHandle_t* CudaHandle() const { return cuda_shm_handle_; }
-  size_t DeviceId() const { return device_id_; }
-#endif  // TRTIS_ENABLE_GPU
-  size_t Offset() const { return offset_; }
-  size_t ByteSize() const { return byte_size_; }
-
- private:
-  const TRTSERVER_Memory_Type type_;
-  const std::string name_;
-  const std::string shm_key_;
-#ifdef TRTIS_ENABLE_GPU
-  const cudaIpcMemHandle_t* cuda_shm_handle_;
-  const int device_id_;
-#endif  // TRTIS_ENABLE_GPU
-  const size_t offset_;
-  const size_t byte_size_;
-};
-
-TrtServerSharedMemoryBlock::TrtServerSharedMemoryBlock(
-    TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
-    const size_t offset, const size_t byte_size)
-#ifdef TRTIS_ENABLE_GPU
-    : type_(type), name_(name), shm_key_(shm_key), cuda_shm_handle_(nullptr),
-      device_id_(0), offset_(offset), byte_size_(byte_size)
-#else
-    : type_(type), name_(name), shm_key_(shm_key), offset_(offset),
-      byte_size_(byte_size)
-#endif  // TRTIS_ENABLE_GPU
-{
-}
-
-#ifdef TRTIS_ENABLE_GPU
-TrtServerSharedMemoryBlock::TrtServerSharedMemoryBlock(
-    TRTSERVER_Memory_Type type, const char* name,
-    const cudaIpcMemHandle_t* cuda_shm_handle, const int device_id,
-    const size_t byte_size)
-    : type_(type), name_(name), shm_key_(""), cuda_shm_handle_(cuda_shm_handle),
-      device_id_(device_id), offset_(0), byte_size_(byte_size)
-{
-}
-#endif  // TRTIS_ENABLE_GPU
-
-//
 // TrtServerResponseAllocator
 //
 // Implementation for TRTSERVER_ResponseAllocator.
@@ -668,70 +605,6 @@ TRTSERVER_ErrorMessage(TRTSERVER_Error* error)
   return lerror->Message().c_str();
 }
 
-TRTSERVER_Error*
-TRTSERVER_SharedMemoryBlockCpuNew(
-    TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const char* shm_key, const size_t offset, const size_t byte_size)
-{
-  *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
-      new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size));
-  return nullptr;  // Success
-}
-
-TRTSERVER_Error*
-TRTSERVER_SharedMemoryBlockGpuNew(
-    TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const cudaIpcMemHandle_t* cuda_shm_handle, const size_t byte_size,
-    const int device_id)
-{
-#ifdef TRTIS_ENABLE_GPU
-  *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
-      new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_GPU, name, cuda_shm_handle, device_id, byte_size));
-  return nullptr;  // Success
-#else
-  return TRTSERVER_ErrorNew(
-      TRTSERVER_ERROR_UNSUPPORTED,
-      "CUDA shared memory not supported when TRTIS_ENABLE_GPU=0");
-#endif  // TRTIS_ENABLE_GPU
-}
-
-TRTSERVER_Error*
-TRTSERVER_SharedMemoryBlockDelete(
-    TRTSERVER_SharedMemoryBlock* shared_memory_block)
-{
-  TrtServerSharedMemoryBlock* lsmb =
-      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
-  delete lsmb;
-  return nullptr;  // Success
-}
-
-TRTSERVER_Error*
-TRTSERVER_SharedMemoryBlockMemoryType(
-    TRTSERVER_SharedMemoryBlock* shared_memory_block,
-    TRTSERVER_Memory_Type* memory_type)
-{
-  TrtServerSharedMemoryBlock* lsmb =
-      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
-  *memory_type = lsmb->Type();
-  return nullptr;  // Success
-}
-
-TRTSERVER_Error*
-TRTSERVER_SharedMemoryBlockMemoryTypeId(
-    TRTSERVER_SharedMemoryBlock* shared_memory_block, int64_t* memory_type_id)
-{
-#ifdef TRTIS_ENABLE_GPU
-  TrtServerSharedMemoryBlock* lsmb =
-      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
-  *memory_type_id = lsmb->DeviceId();
-#else
-  *memory_type_id = 0;
-#endif             // TRTIS_ENABLE_GPU
-  return nullptr;  // Success
-}
-
 //
 // TRTSERVER_ResponseAllocator
 //
@@ -1116,22 +989,13 @@ TRTSERVER_InferenceRequestProviderNewV2(
   request->SetTimeoutMicroseconds(
       loptions->InferRequestHeader()->timeout_microseconds());
   for (const auto& io : loptions->InferRequestHeader()->input()) {
-    if (io.has_shared_memory()) {
-      RETURN_IF_STATUS_ERROR(request->AddInput(
-          io.name(), io.dims(), io.batch_byte_size(), io.shared_memory()));
-    } else {
-      RETURN_IF_STATUS_ERROR(
-          request->AddInput(io.name(), io.dims(), io.batch_byte_size()));
-    }
+    RETURN_IF_STATUS_ERROR(
+        request->AddInput(io.name(), io.dims(), io.batch_byte_size()));
   }
+
   for (const auto& io : loptions->InferRequestHeader()->output()) {
     uint32_t cls_cnt = io.has_cls() ? io.cls().count() : 0;
-    if (io.has_shared_memory()) {
-      RETURN_IF_STATUS_ERROR(
-          request->RequestOutput(io.name(), cls_cnt, io.shared_memory()));
-    } else {
-      RETURN_IF_STATUS_ERROR(request->RequestOutput(io.name(), cls_cnt));
-    }
+    RETURN_IF_STATUS_ERROR(request->RequestOutput(io.name(), cls_cnt));
   }
 
   RETURN_IF_STATUS_ERROR(request->Normalize(*backend));
@@ -1735,110 +1599,6 @@ TRTSERVER_ServerUnloadModel(TRTSERVER_Server* server, const char* model_name)
 #endif  // TRTIS_ENABLE_STATS
 
   RETURN_IF_STATUS_ERROR(lserver->UnloadModel(std::string(model_name)));
-
-  return nullptr;  // success
-}
-
-TRTSERVER_Error*
-TRTSERVER_ServerRegisterSharedMemory(
-    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block)
-{
-  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-  TrtServerSharedMemoryBlock* lsmb =
-      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
-
-#ifdef TRTIS_ENABLE_STATS
-  ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(),
-      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
-#endif  // TRTIS_ENABLE_STATS
-
-  if (lsmb->Type() == TRTSERVER_MEMORY_CPU) {
-    RETURN_IF_STATUS_ERROR(lserver->RegisterSharedMemory(
-        lsmb->Name(), lsmb->ShmKey(), lsmb->Offset(), lsmb->ByteSize()));
-  } else {
-#ifdef TRTIS_ENABLE_GPU
-    RETURN_IF_STATUS_ERROR(lserver->RegisterCudaSharedMemory(
-        lsmb->Name(), lsmb->CudaHandle(), lsmb->ByteSize(), lsmb->DeviceId()));
-#endif  // TRTIS_ENABLE_GPU
-  }
-
-  return nullptr;  // success
-}
-
-TRTSERVER_Error*
-TRTSERVER_ServerUnregisterSharedMemory(
-    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block)
-{
-  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-  TrtServerSharedMemoryBlock* lsmb =
-      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
-
-#ifdef TRTIS_ENABLE_STATS
-  ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(),
-      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
-#endif  // TRTIS_ENABLE_STATS
-
-  RETURN_IF_STATUS_ERROR(lserver->UnregisterSharedMemory(lsmb->Name()));
-
-  return nullptr;  // success
-}
-
-TRTSERVER_Error*
-TRTSERVER_ServerUnregisterAllSharedMemory(TRTSERVER_Server* server)
-{
-  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-
-#ifdef TRTIS_ENABLE_STATS
-  ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(),
-      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
-#endif  // TRTIS_ENABLE_STATS
-
-  RETURN_IF_STATUS_ERROR(lserver->UnregisterAllSharedMemory());
-
-  return nullptr;  // success
-}
-
-TRTSERVER_Error*
-TRTSERVER_ServerSharedMemoryAddress(
-    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block,
-    size_t offset, size_t byte_size, void** base)
-{
-  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-  TrtServerSharedMemoryBlock* lsmb =
-      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
-
-#ifdef TRTIS_ENABLE_STATS
-  ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(),
-      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
-#endif  // TRTIS_ENABLE_STATS
-
-  RETURN_IF_STATUS_ERROR(
-      lserver->SharedMemoryAddress(lsmb->Name(), offset, byte_size, base));
-
-  return nullptr;  // success
-}
-
-TRTSERVER_Error*
-TRTSERVER_ServerSharedMemoryStatus(
-    TRTSERVER_Server* server, TRTSERVER_Protobuf** status)
-{
-  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-
-#ifdef TRTIS_ENABLE_STATS
-  ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(),
-      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
-#endif  // TRTIS_ENABLE_STATS
-
-  ni::SharedMemoryStatus shm_status;
-  RETURN_IF_STATUS_ERROR(lserver->GetSharedMemoryStatus(&shm_status));
-
-  TrtServerProtobuf* protobuf = new TrtServerProtobuf(shm_status);
-  *status = reinterpret_cast<TRTSERVER_Protobuf*>(protobuf);
 
   return nullptr;  // success
 }

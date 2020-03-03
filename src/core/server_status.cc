@@ -183,14 +183,6 @@ ServerStatusManager::UpdateServerStat(
       break;
     }
 
-    case ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL: {
-      StatDuration* d =
-          server_status_.mutable_shm_control_stats()->mutable_success();
-      d->set_count(d->count() + 1);
-      d->set_total_time_ns(d->total_time_ns() + duration);
-      break;
-    }
-
     case ServerStatTimerScoped::Kind::REPOSITORY: {
       StatDuration* d =
           server_status_.mutable_repository_stats()->mutable_success();
