@@ -512,6 +512,29 @@ ValidateModelConfig(
                 config.name());
       }
     }
+
+    // Priority queue is specified
+    const auto priority_levels = config.dynamic_batching().priority_levels();
+    if (priority_levels != 0) {
+      if ((config.dynamic_batching().default_priority_level() == 0) ||
+          (config.dynamic_batching().default_priority_level() >
+           priority_levels)) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "default priority level must be in range [1, " +
+                std::to_string(priority_levels) + "]");
+      }
+      for (const auto& queue_policy :
+           config.dynamic_batching().priority_queue_policy()) {
+        if ((queue_policy.first == 0) ||
+            (queue_policy.first > priority_levels)) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "priority queue policy must have priority level in range [1, " +
+                  std::to_string(priority_levels) + "]");
+        }
+      }
+    }
   }
 
   // If sequence batching is specified make sure the control is

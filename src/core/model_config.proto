@@ -626,6 +626,72 @@ message ModelOptimizationPolicy
 }
 
 //@@
+//@@.. cpp:var:: message ModelQueuePolicy
+//@@
+//@@   Queue policy for inference requests.
+//@@
+message ModelQueuePolicy
+{
+  //@@
+  //@@  .. cpp:enum:: TimeoutAction
+  //@@
+  //@@     The action applied to timed-out requests.
+  //@@
+  enum TimeoutAction {
+    //@@    .. cpp:enumerator:: Action::REJECT = 0
+    //@@
+    //@@       Reject the request and return error message accordingly.
+    //@@
+    REJECT = 0;
+
+    //@@    .. cpp:enumerator:: Action::DELAY = 1
+    //@@
+    //@@       Delay the request until all other requests at the same
+    //@@       (or higher) priority levels that have not reached their timeouts
+    //@@       are processed. A delayed request will eventually be processed,
+    //@@       but may be delayed indefinitely due to newly arriving requests.
+    //@@
+    DELAY = 1;
+  }
+
+  //@@
+  //@@  .. cpp:var:: TimeoutAction timeout_action
+  //@@
+  //@@     The action applied to timed-out request.
+  //@@     The default action is REJECT.
+  //@@
+  TimeoutAction timeout_action = 1;
+
+  //@@
+  //@@  .. cpp:var:: uint64 default_timeout_microseconds
+  //@@
+  //@@     The default timeout for every request, in microseconds.
+  //@@     The default value is 0 which indicates that no timeout is set.
+  //@@
+  uint64 default_timeout_microseconds = 2;
+
+  //@@
+  //@@  .. cpp:var:: bool allow_timeout_override
+  //@@
+  //@@     Whether individual request can override the default timeout value.
+  //@@     When true, individual requests can set a timeout that is less than
+  //@@     the default timeout value but may not increase the timeout.
+  //@@     The default value is false.
+  //@@
+  bool allow_timeout_override = 3;
+
+  //@@
+  //@@  .. cpp:var:: uint32 max_queue_size
+  //@@
+  //@@     The maximum queue size for holding requests. A request will be
+  //@@     rejected immediately if it can't be enqueued because the queue is
+  //@@     full. The default value is 0 which indicates that no maximum
+  //@@     queue size is enforced.
+  //@@
+  uint32 max_queue_size = 4;
+}
+
+//@@
 //@@.. cpp:var:: message ModelDynamicBatching
 //@@
 //@@   Dynamic batching configuration. These settings control how dynamic
@@ -663,6 +729,41 @@ message ModelDynamicBatching
   //@@     order.
   //@@
   bool preserve_ordering = 3;
+
+  //@@  .. cpp:var:: uint32 priority_levels
+  //@@
+  //@@     The number of priority levels to be enabled for the model,
+  //@@     the priority level starts from 1 and 1 is the highest priority.
+  //@@     Requests are handled in priority order with all priority 1 requests
+  //@@     processed before priority 2, all priority 2 requests processed before
+  //@@     priority 3, etc. Requests with the same priority level will be
+  //@@     handled in the order that they are received.
+  //@@
+  uint32 priority_levels = 4;
+
+  //@@  .. cpp:var:: uint32 default_priority_level
+  //@@
+  //@@     The priority level used for requests that don't specify their
+  //@@     priority. The value must be in the range [ 1, 'priority_levels' ].
+  //@@
+  uint32 default_priority_level = 5;
+
+  //@@  .. cpp:var:: ModelQueuePolicy default_queue_policy
+  //@@
+  //@@     The default queue policy used for requests that don't require
+  //@@     priority handling and requests that specify priority levels where
+  //@@     there is no specific policy given. If not specified, a policy with
+  //@@     default field values will be used.
+  //@@
+  ModelQueuePolicy default_queue_policy = 6;
+
+  //@@  .. cpp:var:: map<uint32, ModelQueuePolicy> priority_queue_policy
+  //@@
+  //@@     Specify the queue policy for the priority level. The default queue
+  //@@     policy will be used if a priority level doesn't specify a queue
+  //@@     policy.
+  //@@
+  map<uint32, ModelQueuePolicy> priority_queue_policy = 7;
 }
 
 //@@
