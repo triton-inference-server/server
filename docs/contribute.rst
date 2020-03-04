@@ -31,7 +31,7 @@ Contributing
 Contributions to Triton Inference Server are more than welcome. To
 contribute make a pull request and follow the guidelines outlined in
 the `CONTRIBUTING
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/CONTRIBUTING.md>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master/CONTRIBUTING.md>`_
 document.
 
 Coding Convention
@@ -47,5 +47,5 @@ before submitting a pull request::
 For convenience there is a format.py script in tools/ that can be used
 to clang-format all files within the repo::
 
-  $ cd .../tensorrt-inference-server    # top-level of repo
+  $ cd .../triton-inference-server    # top-level of repo
   $ python format.py *
