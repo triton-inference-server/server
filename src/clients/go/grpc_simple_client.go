@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -54,7 +54,7 @@ type Flags struct {
 
 func parseFlags() Flags {
 	var flags Flags
-	// https://github.com/NVIDIA/tensorrt-inference-server/tree/master/docs/examples/model_repository/simple
+	// https://github.com/NVIDIA/triton-inference-server/tree/master/docs/examples/model_repository/simple
 	flag.StringVar(&flags.ModelName, "m", "simple", "Name of model being served. (Required)")
 	flag.Int64Var(&flags.ModelVersion, "x", -1, "Version of model. Default: Latest Version.")
 	flag.IntVar(&flags.BatchSize, "b", 1, "Batch size. Default: 1.")

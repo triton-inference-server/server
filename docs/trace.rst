@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -95,7 +95,7 @@ Trace Summary Tool
 ^^^^^^^^^^^^^^^^^^
 
 An example `trace summary tool
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/qa/common/trace_summary.py>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master/qa/common/trace_summary.py>`_
 can be used to summarize a set of traces collected from the inference
 server. Basic usage is::
 

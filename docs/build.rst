@@ -365,7 +365,7 @@ Building A Custom Backend
 
 The source repository contains several example custom backends in the
 `src/custom directory
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom>`_.
+<https://github.com/NVIDIA/triton-inference-server/blob/master/src/custom>`_.
 These custom backends are built using CMake::
 
   $ mkdir builddir
@@ -405,7 +405,7 @@ Dockerfile.custombackend::
 
 Or you can download a pre-build version of the SDK from the `GitHub
 release page
-<https://github.com/NVIDIA/tensorrt-inference-server/releases>`_
+<https://github.com/NVIDIA/triton-inference-server/releases>`_
 corresponding to the release you are interested in. The custom backend
 SDK is found in the "Assets" section of the release page in a tar file
 named after the version of the release and the OS, for example,
@@ -423,11 +423,11 @@ Using the Custom Instance Wrapper Class
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The custom backend SDK provides a `CustomInstance Class
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom/sdk/custom_instance.h>`_.
+<https://github.com/NVIDIA/triton-inference-server/blob/master/src/custom/sdk/custom_instance.h>`_.
 The CustomInstance class is a C++ wrapper class that abstracts away the
 backend C-API for ease of use. All of the example custom backends in
 `src/custom directory
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master/src/custom>`_
 derive from the CustomInstance class and can be referenced for usage.
 
 Building the Client Libraries and Examples

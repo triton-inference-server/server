@@ -254,9 +254,9 @@ texinfo_documents = [
 
 
 # -- Extension configuration -------------------------------------------------
-extlinks = {'issue': ('https://github.com/NVIDIA/tensorrt-inference-server/issues/%s',
+extlinks = {'issue': ('https://github.com/NVIDIA/triton-inference-server/issues/%s',
                       'issue '),
-            'fileref': ('https://github.com/NVIDIA/tensorrt-inference-server/tree/' +
+            'fileref': ('https://github.com/NVIDIA/triton-inference-server/tree/' +
                         (git_sha if git_sha != u'0000000' else "master") + '/%s', ''),}
 
 def setup(app):
