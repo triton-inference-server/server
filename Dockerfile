@@ -235,7 +235,7 @@ COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/l
 COPY --from=trtserver_pytorch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_nvrtc.so \
      /opt/tensorrtserver/lib/pytorch/
 RUN cd /opt/tensorrtserver/lib/pytorch && \
-    for i in `find . -mindepth 1 -maxdepth 1 -type f`; do \
+    for i in `find . -mindepth 1 -maxdepth 1 -type f -name '*\.so*'`; do \
         patchelf --set-rpath '$ORIGIN' $i; \
     done
 
@@ -272,7 +272,7 @@ COPY --from=trtserver_onnx /data/dldt/openvino_2019.3.376/deployment_tools/infer
      /opt/tensorrtserver/lib/onnx/
 RUN cd /opt/tensorrtserver/lib/onnx && \
     ln -sf libtbb.so.2 libtbb.so && \
-    for i in `find . -mindepth 1 -maxdepth 1 -type f`; do \
+    for i in `find . -mindepth 1 -maxdepth 1 -type f -name '*\.so*'`; do \
         patchelf --set-rpath '$ORIGIN' $i; \
     done
 
