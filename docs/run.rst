@@ -55,7 +55,7 @@ model (used by the :ref:`simple_client example <section-client-api>`),
 and a simple TensorFlow GraphDef model using String tensors (used by
 the :ref:`simple_string_client example <section-client-api>`) are
 provided in the `docs/examples/model_repository
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/docs/examples/model_repository>`_
+<https://github.com/NVIDIA/triton-inference-server/tree/master/docs/examples/model_repository>`_
 directory. Before using the example model repository you must fetch
 any missing model definition files from their public model zoos. Be
 sure to checkout the release version of the branch that corresponds to
@@ -68,7 +68,7 @@ server build from master)::
 
 An example ensemble model repository is also provided in the
 `docs/examples/ensemble_model_repository
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/docs/examples/ensemble_model_repository>`_
+<https://github.com/NVIDIA/triton-inference-server/tree/master/docs/examples/ensemble_model_repository>`_
 directory. It contains a custom image preprocess model, Caffe2
 ResNet50, and an ensemble (used by the :ref:`ensemble_image_client
 example <section-ensemble-image-classification-example>`).

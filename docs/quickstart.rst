@@ -53,7 +53,7 @@ following prerequisite steps:
   to get the pre-built inference server from NGC, you need the GitHub
   repo for the example model repository and to build the example
   applications. Go to
-  https://github.com/NVIDIA/tensorrt-inference-server and then select
+  https://github.com/NVIDIA/triton-inference-server and then select
   the *clone* or *download* drop down button. After clone the repo be
   sure to select the r<xx.yy> release branch that corresponds to the
   version of the server you want to use::
@@ -99,7 +99,7 @@ Where <xx.yy> is the version of the inference server that you want to
 pull. Once you have the container follow these steps to run the server
 and the example client applications.
 
-#. :ref:`Run the inference server <section-quickstart-run-tensorrt-inference-server>`.
+#. :ref:`Run the inference server <section-quickstart-run-triton-inference-server>`.
 #. :ref:`Verify that the server is running correct <section-quickstart-verify-inference-server-status>`.
 #. :ref:`Get the example client applications <section-quickstart-getting-the-examples>`.
 #. :ref:`Run the image classification example <section-quickstart-running-the-image-classification-example>`.
@@ -125,7 +125,7 @@ Then use docker to build::
 After the build completes follow these steps to run the server and the
 example client applications.
 
-#. :ref:`Run the inference server <section-quickstart-run-tensorrt-inference-server>`.
+#. :ref:`Run the inference server <section-quickstart-run-triton-inference-server>`.
 #. :ref:`Verify that the server is running correct <section-quickstart-verify-inference-server-status>`.
 #. :ref:`Get the example client applications <section-quickstart-getting-the-examples>`.
 #. :ref:`Run the image classification example <section-quickstart-running-the-image-classification-example>`.
@@ -145,12 +145,12 @@ details on how to build with CMake.
 After the build completes follow these steps to run the server and the
 example client applications.
 
-#. :ref:`Run the inference server <section-quickstart-run-tensorrt-inference-server>`.
+#. :ref:`Run the inference server <section-quickstart-run-triton-inference-server>`.
 #. :ref:`Verify that the server is running correct <section-quickstart-verify-inference-server-status>`.
 #. :ref:`Get the example client applications <section-quickstart-getting-the-examples>`.
 #. :ref:`Run the image classification example <section-quickstart-running-the-image-classification-example>`.
 
-.. _section-quickstart-run-tensorrt-inference-server:
+.. _section-quickstart-run-triton-inference-server:
 
 Run Triton Inference Server
 ---------------------------
