@@ -43,7 +43,7 @@ TRT_OP_TEST=trt_dynamic_shape_test.py
 
 DATADIR="./models"
 
-rm -rf ${DATADIR} 
+rm -rf ${DATADIR}
 mkdir -p ${DATADIR}
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_float32_float32_float32-4-32 ${DATADIR}/
 
@@ -237,19 +237,18 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # TrtDynamicShapeTest.test_load_wrong_optimization_profile
-SERVER_ARGS="--model-repository=$DATADIR --exit-on-error=false"
+SERVER_ARGS="--model-repository=$DATADIR --exit-on-error=false --strict-readiness=false"
 CLIENT_LOG="./test_load_wrong_optimization_profile.client.log"
 SERVER_LOG="./test_load_wrong_optimization_profile.inference_server.log"
 cp config.pbtxt ${DATADIR}/plan_float32_float32_float32/config.pbtxt && \
 sed -i "s/profile:.*/profile: [\"7\"]/" ${DATADIR}/plan_float32_float32_float32/config.pbtxt
 
-run_server_nowait
+run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
 fi
-sleep 10
 
 set +e
 python $TRT_OP_TEST TrtDynamicShapeTest.test_load_wrong_optimization_profile >>$CLIENT_LOG 2>&1
@@ -271,5 +270,3 @@ else
 fi
 
 exit $RET
-
-
