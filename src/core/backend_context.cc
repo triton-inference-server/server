@@ -176,7 +176,7 @@ BackendContext::SetInputBuffer(
                 name, pinned_buffer_info, payloads, stream, input);
           }
           // always reset 'pinned_buffer_info' to maintain proper input offset
-          pinned_buffer_info = {
+          pinned_buffer_info = BufferInfo{
               buffer_copy_offset + copied_byte_size + content_byte_size, 0, {}};
         }
       }
@@ -202,7 +202,8 @@ BackendContext::SetInputBuffer(
             name, pinned_buffer_info, payloads, stream, input);
       }
       // reset 'pinned_buffer_info'
-      pinned_buffer_info = {buffer_copy_offset + expected_byte_size, 0, {}};
+      pinned_buffer_info =
+          BufferInfo{buffer_copy_offset + expected_byte_size, 0, {}};
     }
 
     buffer_copy_offset += expected_byte_size;
@@ -408,7 +409,8 @@ BackendContext::SetFixedSizeOutputBuffer(
                   name, pinned_buffer_info, payloads, stream_, output);
             }
             // reset 'pinned_buffer_info'
-            pinned_buffer_info = {output_offset + expected_byte_size, 0, {}};
+            pinned_buffer_info =
+                OutputBufferInfo{output_offset + expected_byte_size, 0, {}};
           }
         }
       }
@@ -429,7 +431,8 @@ BackendContext::SetFixedSizeOutputBuffer(
             name, pinned_buffer_info, payloads, stream_, output);
       }
       // reset 'pinned_buffer_info'
-      pinned_buffer_info = {output_offset + expected_byte_size, 0, {}};
+      pinned_buffer_info =
+          OutputBufferInfo{output_offset + expected_byte_size, 0, {}};
     }
 
     output_offset += expected_byte_size;
