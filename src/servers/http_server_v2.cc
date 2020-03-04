@@ -410,6 +410,147 @@ HTTPAPIServerV2::ResponseRelease(
   return nullptr;  // Success
 }
 
+TRTSERVER_Error*
+ReadDataArrayFromJson(
+    const rapidjson::Value& request_input, char** base, size_t* base_size)
+{
+  const rapidjson::Value& tensor_data = request_input["data"];
+  const rapidjson::Value& shape = request_input["shape"];
+  const char* dtype = request_input["datatype"].GetString();
+
+  // Must be an array
+  if (!tensor_data.IsArray()) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        "failed to parse request buffer, tensor data must be an array");
+  }
+
+  std::vector<int> shape_vec;
+  int element_cnt = 0;
+  for (rapidjson::SizeType i = 0; i < shape.Size(); i++) {
+    shape_vec.push_back(shape[i].GetInt());
+    if (element_cnt == 0) {
+      element_cnt = shape[i].GetInt();
+    } else {
+      element_cnt *= shape[i].GetInt();
+    }
+  }
+
+  // If flat
+  if (!tensor_data[0].IsArray()) {
+    // BOOL vector is broken
+    if (strcmp(dtype, "BOOL")) {
+      // std::vector<bool> bool_tensor;
+      // for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
+      //      itr != tensor_data.End(); ++itr) {
+      //   bool_tensor.push_back(itr->GetBool());
+      // }
+      // *base = reinterpret_cast<char*>(&bool_tensor[0]);
+      // *base_size = element_cnt;
+    } else if (strcmp(dtype, "UINT8")) {
+      std::vector<uint8_t> uint8_t_tensor;
+      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
+           itr != tensor_data.End(); ++itr) {
+        uint8_t_tensor.push_back((uint8_t)itr->GetInt());
+      }
+      *base = reinterpret_cast<char*>(&uint8_t_tensor[0]);
+      *base_size = element_cnt;
+    } else if (strcmp(dtype, "UINT16")) {
+      std::vector<uint16_t> uint16_t_tensor;
+      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
+           itr != tensor_data.End(); ++itr) {
+        uint16_t_tensor.push_back((uint16_t)itr->GetInt());
+      }
+      *base = reinterpret_cast<char*>(&uint16_t_tensor[0]);
+      *base_size = element_cnt * 2;
+    } else if (strcmp(dtype, "UINT32")) {
+      std::vector<uint32_t> uint32_t_tensor;
+      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
+           itr != tensor_data.End(); ++itr) {
+        uint32_t_tensor.push_back((uint32_t)itr->GetInt());
+      }
+      *base = reinterpret_cast<char*>(&uint32_t_tensor[0]);
+      *base_size = element_cnt * 4;
+    } else if (strcmp(dtype, "UINT64")) {
+      std::vector<uint64_t> uint64_t_tensor;
+      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
+           itr != tensor_data.End(); ++itr) {
+        uint64_t_tensor.push_back((uint64_t)itr->GetInt());
+      }
+      *base = reinterpret_cast<char*>(&uint64_t_tensor[0]);
+      *base_size = element_cnt * 8;
+    } else if (strcmp(dtype, "INT8")) {
+      std::vector<int8_t> int8_t_tensor;
+      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
+           itr != tensor_data.End(); ++itr) {
+        int8_t_tensor.push_back((int8_t)itr->GetInt());
+      }
+      *base = reinterpret_cast<char*>(&int8_t_tensor[0]);
+      *base_size = element_cnt;
+    } else if (strcmp(dtype, "INT16")) {
+      std::vector<int8_t> int16_t_tensor;
+      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
+           itr != tensor_data.End(); ++itr) {
+        int16_t_tensor.push_back((int16_t)itr->GetInt());
+      }
+      *base = reinterpret_cast<char*>(&int16_t_tensor[0]);
+      *base_size = element_cnt * 2;
+    } else if (strcmp(dtype, "INT32")) {
+      std::vector<int32_t> int32_t_tensor;
+      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
+           itr != tensor_data.End(); ++itr) {
+        int32_t_tensor.push_back((int32_t)itr->GetInt());
+      }
+      *base = reinterpret_cast<char*>(&int32_t_tensor[0]);
+      *base_size = element_cnt * 4;
+    } else if (strcmp(dtype, "INT64")) {
+      std::vector<int64_t> int64_t_tensor;
+      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
+           itr != tensor_data.End(); ++itr) {
+        int64_t_tensor.push_back((int64_t)itr->GetInt());
+      }
+      *base = reinterpret_cast<char*>(&int64_t_tensor[0]);
+      *base_size = element_cnt * 8;
+    }
+    // FP16 needs a work around
+    else if (strcmp(dtype, "FP16")) {
+      // std::vector<float> float_tensor;
+      // for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
+      //      itr != tensor_data.End(); ++itr) {
+      //   float_tensor.push_back((float)itr->GetFloat());
+      // }
+      // *base = reinterpret_cast<char*>(&float_tensor[0]);
+      // *base_size = element_cnt;
+    } else if (strcmp(dtype, "FP32")) {
+      std::vector<float> float_tensor;
+      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
+           itr != tensor_data.End(); ++itr) {
+        float_tensor.push_back((float)itr->GetFloat());
+      }
+      *base = reinterpret_cast<char*>(&float_tensor[0]);
+      *base_size = element_cnt * 4;
+    } else if (strcmp(dtype, "FP64")) {
+      std::vector<double> double_tensor;
+      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
+           itr != tensor_data.End(); ++itr) {
+        double_tensor.push_back((double)itr->GetDouble());
+      }
+      *base = reinterpret_cast<char*>(&double_tensor[0]);
+      *base_size = element_cnt * 8;
+    }
+    // BYTES (String) needs a work around
+    else if (strcmp(dtype, "BYTES")) {
+    } else {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG, std::string("invalid datatype " + std::string(dtype) +
+                                           " of input " +
+                                           request_input["name"].GetString()).c_str());
+    }
+  }
+
+  return nullptr;
+}
+
 void
 HTTPAPIServerV2::Handle(evhtp_request_t* req)
 {
@@ -816,33 +957,57 @@ HTTPAPIServerV2::EVBufferToInput(
   //
   // Get the addr and size of each chunk of input data from the
   // evbuffer.
-  struct evbuffer_iovec* v = nullptr;
-  int v_idx = 0;
+  // struct evbuffer_iovec* v = nullptr;
+  // int v_idx = 0;
+  //
+  // int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
+  // if (n > 0) {
+  //   v = static_cast<struct evbuffer_iovec*>(
+  //       alloca(sizeof(struct evbuffer_iovec) * n));
+  //   if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
+  //     return TRTSERVER_ErrorNew(
+  //         TRTSERVER_ERROR_INTERNAL, "unexpected error getting input buffers
+  //         ");
+  //   }
+  // }
 
-  int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
-  if (n > 0) {
-    v = static_cast<struct evbuffer_iovec*>(
-        alloca(sizeof(struct evbuffer_iovec) * n));
-    if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INTERNAL, "unexpected error getting input buffers ");
-    }
+  int buffer_len = evbuffer_get_length(input_buffer);
+  char json_buffer[buffer_len];
+  ev_ssize_t extracted_size =
+      evbuffer_copyout(input_buffer, &json_buffer, buffer_len);
+  if (extracted_size != buffer_len) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        "failed to parse request buffer into json");
+  }
+
+  rapidjson::Document document;
+  document.Parse(json_buffer);
+
+  if (document.HasParseError()) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "failed to parse the request buffer: " +
+            std::string(GetParseError_En(document.GetParseError())) + " at " +
+            std::to_string(document.GetErrorOffset()))
+            .c_str());
   }
 
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
-  for (const auto& io : request_header.input()) {
+  const rapidjson::Value& inputs = document["inputs"];
+  int count = inputs.Size();
+  for (int i = 0; i < count; i++) {
+    const rapidjson::Value& request_input = inputs[i];
     uint64_t byte_size = 0;
     RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
-        request_provider, io.name().c_str(), &byte_size));
+        request_provider, request_input["name"].GetString(), &byte_size));
 
-    // If 'byte_size' is zero then need to add an empty input data
-    // block... the provider expects at least one data block for every
-    // input.
     if (byte_size == 0) {
       RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, io.name().c_str(), nullptr, 0 /* byte_size */,
-          TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+          request_provider, request_input["name"].GetString(), nullptr,
+          0 /* byte_size */, TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
     } else {
       // If input is in shared memory then verify that the size is
       // correct and set input from the shared memory.
@@ -872,46 +1037,28 @@ HTTPAPIServerV2::EVBufferToInput(
       else {
 #endif
       // FIXMEV2 handle non-raw content types
-      while ((byte_size > 0) && (v_idx < n)) {
-        char* base = static_cast<char*>(v[v_idx].iov_base);
-        size_t base_size;
-        if (v[v_idx].iov_len > byte_size) {
-          base_size = byte_size;
-          v[v_idx].iov_base = static_cast<void*>(base + byte_size);
-          v[v_idx].iov_len -= byte_size;
-          byte_size = 0;
-        } else {
-          base_size = v[v_idx].iov_len;
-          byte_size -= v[v_idx].iov_len;
-          v_idx++;
-        }
+      char* base;
+      size_t base_size;
+      RETURN_IF_ERR(ReadDataArrayFromJson(request_input, &base, &base_size));
 
-        RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-            request_provider, io.name().c_str(), base, base_size,
-            TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
-      }
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
+          request_provider, request_input["name"].GetString(), base, base_size,
+          TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
 
       if (byte_size != 0) {
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INVALID_ARG,
             std::string(
-                "unexpected size for input '" + io.name() + "', expecting " +
-                std::to_string(byte_size) + " bytes for model '" + model_name +
-                "'")
+                "unexpected size for input '" +
+                std::string(request_input["name"].GetString()) +
+                "', expecting " + std::to_string(byte_size) +
+                " bytes for model '" + model_name + "'")
                 .c_str());
       }
 #if 0
       }
 #endif
     }
-  }
-
-  if (v_idx != n) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "unexpected additional input data for model '" + model_name + "'")
-            .c_str());
   }
 
 #if 0
