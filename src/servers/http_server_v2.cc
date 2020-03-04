@@ -142,7 +142,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       const std::vector<std::string>& endpoints, const int32_t port,
       const int thread_cnt)
       : HTTPServerV2Impl(port, thread_cnt), server_(server),
-        trace_manager_(trace_manager), smb_manager_(smb_manager),
+        trace_manager_(trace_manager), shm_manager_(shm_manager),
         allocator_(nullptr), api_regex_(R"(/v2/(health|models)(.*))"),
         health_regex_(R"(/(live|ready))"),
         model_regex_(R"(/([^/]+)(?:/version/([0-9]+))?(/infer|/ready)?)")
@@ -1241,7 +1241,7 @@ HTTPServerV2::CreateAPIServer(
     std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
     LOG_INFO << "Starting HTTPV2Service at " << addr;
     http_servers->emplace_back(new HTTPAPIServerV2(
-        server, trace_manager, smb_manager, ep_map.second, ep_map.first,
+        server, trace_manager, shm_manager, ep_map.second, ep_map.first,
         thread_cnt));
   }
 

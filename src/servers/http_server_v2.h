@@ -30,11 +30,12 @@
 #include <string>
 #include <vector>
 #include "rapidjson/document.h"
+#include "rapidjson/error/en.h"
 #include "rapidjson/rapidjson.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 #include "src/core/trtserver.h"
-#include "src/servers/shared_memory_block_manager.h"
+#include "src/servers/shared_memory_manager.h"
 #include "src/servers/tracer.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -45,7 +46,7 @@ class HTTPServerV2 {
       const std::shared_ptr<TRTSERVER_Server>& server,
       const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
           trace_manager,
-      const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
+      const std::shared_ptr<SharedMemoryManager>& smb_manager,
       const std::map<int32_t, std::vector<std::string>>& port_map,
       const int thread_cnt,
       std::vector<std::unique_ptr<HTTPServerV2>>* http_servers);

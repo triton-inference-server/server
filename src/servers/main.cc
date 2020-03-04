@@ -512,12 +512,12 @@ StartHttpV2Service(
         services,
     const std::shared_ptr<TRTSERVER_Server>& server,
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
-    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>&
-        smb_manager,
+    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
+        shm_manager,
     std::map<int32_t, std::vector<std::string>>& port_map)
 {
   TRTSERVER_Error* err = nvidia::inferenceserver::HTTPServerV2::CreateAPIServer(
-      server, trace_manager, smb_manager, port_map, http_thread_cnt_, services);
+      server, trace_manager, shm_manager, port_map, http_thread_cnt_, services);
   if (err == nullptr) {
     for (auto& http_eps : *services) {
       if (http_eps != nullptr) {
@@ -627,7 +627,7 @@ StartEndpoints(
     }
 
     TRTSERVER_Error* err = StartHttpV2Service(
-        &http_services_v2_, server, trace_manager, smb_manager, port_map);
+        &http_services_v2_, server, trace_manager, shm_manager, port_map);
     if (err != nullptr) {
       LOG_TRTSERVER_ERROR(err, "failed to start HTTP service");
       return false;
