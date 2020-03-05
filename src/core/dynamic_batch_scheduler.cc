@@ -323,9 +323,20 @@ DynamicBatchScheduler::SchedulerThread(
         if ((wait_microseconds == 0) && (pending_batch_queue_cnt != 0)) {
           payloads = std::make_shared<std::vector<Scheduler::Payload>>();
           for (size_t idx = 0; idx < pending_batch_queue_cnt; ++idx) {
-            payloads->emplace_back(std::move(queue_.Dequeue()));
+            Scheduler::Payload payload;
+            if (queue_.Dequeue(&payload).IsOk()) {
+              payloads->emplace_back(std::move(payload));
+            } else {
+              // The queue is empty which conflicts with pending batch count.
+              // Send the current batch if any and reset related variables.
+              LOG_ERROR << "Failed to retrieve payload from scheduler queue";
+              queue_.ResetCursor();
+              queued_batch_size_ = 0;
+              pending_batch_size_ = 0;
+              break;
+            }
           }
-          if (preserve_ordering_) {
+          if (preserve_ordering_ && !payloads->empty()) {
             std::lock_guard<std::mutex> lock(completion_id_queue_mtx_);
             completion_id_queue_.push(completion_id);
           }
@@ -355,10 +366,15 @@ DynamicBatchScheduler::SchedulerThread(
       } else {
         // No batching... execute next request payload
         payloads = std::make_shared<std::vector<Scheduler::Payload>>();
-        payloads->emplace_back(std::move(queue_.Dequeue()));
-        if (preserve_ordering_) {
-          std::lock_guard<std::mutex> lock(completion_id_queue_mtx_);
-          completion_id_queue_.push(completion_id);
+        Scheduler::Payload payload;
+        if (queue_.Dequeue(&payload).IsOk()) {
+          payloads->emplace_back(std::move(payload));
+          if (preserve_ordering_) {
+            std::lock_guard<std::mutex> lock(completion_id_queue_mtx_);
+            completion_id_queue_.push(completion_id);
+          }
+        } else {
+          LOG_ERROR << "Failed to retrieve payload from scheduler queue";
         }
       }
 

@@ -67,7 +67,7 @@ class PriorityQueue {
   Status Enqueue(uint32_t priority_level, Scheduler::Payload&& payload);
 
   // Dequeue the payload at the front of the queue.
-  Scheduler::Payload Dequeue();
+  Status Dequeue(Scheduler::Payload* payload);
 
   // Retrieve the payloads that are rejected based on the queue policies.
   std::shared_ptr<std::vector<std::deque<Scheduler::Payload>>>
