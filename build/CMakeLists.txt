@@ -47,7 +47,7 @@ option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" OFF)
 option(TRTIS_ENABLE_HTTP "Include HTTP API in server" ON)
 option(TRTIS_ENABLE_GRPC "Include GRPC API in server" ON)
 option(TRTIS_ENABLE_HTTP_V2 "Enable version 2 of the HTTP API in server" OFF)
-option(TRTIS_ENABLE_GRPC_V2 "Enable version 2 of the GRPC API in server" ON)
+option(TRTIS_ENABLE_GRPC_V2 "Enable version 2 of the GRPC API in server" OFF)
 option(TRTIS_ENABLE_METRICS "Include metrics support in server" ON)
 option(TRTIS_ENABLE_METRICS_GPU "Include GPU metrics support in server" ON)
 
