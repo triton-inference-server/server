@@ -1,0 +1,24 @@
+name: "preserve_ordering1"
+platform: "custom"
+max_batch_size: 8
+dynamic_batching {
+  preserve_ordering: true
+  default_queue_policy {
+    timeout_action: DELAY
+    default_timeout_microseconds: 1000
+  }
+}
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]

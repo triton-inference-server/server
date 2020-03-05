@@ -1,0 +1,1 @@
+Queue policy can not have DELAY as timeout action when 'preserve_ordering' is true for preserve_ordering2

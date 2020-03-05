@@ -522,7 +522,7 @@ ValidateModelConfig(
         return Status(
             RequestStatusCode::INVALID_ARG,
             "default priority level must be in range [1, " +
-                std::to_string(priority_levels) + "]");
+                std::to_string(priority_levels) + "] for " + config.name());
       }
       for (const auto& queue_policy :
            config.dynamic_batching().priority_queue_policy()) {
@@ -531,7 +531,41 @@ ValidateModelConfig(
           return Status(
               RequestStatusCode::INVALID_ARG,
               "priority queue policy must have priority level in range [1, " +
-                  std::to_string(priority_levels) + "]");
+                  std::to_string(priority_levels) + "] for " + config.name());
+        }
+      }
+    }
+
+    // preserve ordering option will conflict with priorities and delay policy
+    if (config.dynamic_batching().preserve_ordering()) {
+      if (priority_levels > 1) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "Only one priority level is allowed when 'preserve_ordering' is "
+            "true for " +
+                config.name());
+      }
+      const auto& default_policy =
+          config.dynamic_batching().default_queue_policy();
+      if ((default_policy.default_timeout_microseconds() != 0) &&
+          (default_policy.timeout_action() == ModelQueuePolicy::DELAY)) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "Queue policy can not have DELAY as timeout action when "
+            "'preserve_ordering' is true for " +
+                config.name());
+      }
+      // Also need to check policy in 'priority_queue_policy'
+      // for single priority case
+      for (const auto& policy :
+           config.dynamic_batching().priority_queue_policy()) {
+        if ((policy.second.default_timeout_microseconds() != 0) &&
+            (policy.second.timeout_action() == ModelQueuePolicy::DELAY)) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "Queue policy can not have DELAY as timeout action when "
+              "'preserve_ordering' is true for " +
+                  config.name());
         }
       }
     }
