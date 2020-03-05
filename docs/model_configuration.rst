@@ -518,21 +518,125 @@ Dynamic batching is enabled and configured independently for each
 model using the :cpp:var:`ModelDynamicBatching
 <nvidia::inferenceserver::ModelDynamicBatching>` settings in the model
 configuration. These settings control the preferred size(s) of the
-dynamically created batches as well as a maximum time that requests
-can be delayed in the scheduler to allow other requests to join the
-dynamic batch.
+dynamically created batches, the maximum time that requests can be
+delayed in the scheduler to allow other requests to join the dynamic
+batch, and queue properties such a queue size, priorities, and
+time-outs.
 
-The following configuration enables dynamic batching with preferred
-batch sizes of 4 and 8, and a maximum delay time of 100 microseconds::
+Preferred Batch Sizes
+.....................
+
+The :cpp:var:`preferred_batch_size
+<nvidia::inferenceserver::ModelDynamicBatching::preferred_batch_size>`
+setting indicates the batch sizes that the dynamic batcher should
+attempt to create. For example, the following configuration enables
+dynamic batching with preferred batch sizes of 4 and 8::
+
+  dynamic_batching {
+    preferred_batch_size: [ 4, 8 ]
+  }
+
+When a model instance becomes available for inferencing, the dynamic
+batcher will attempt to create batches from the requests that are
+available in the scheduler. Requests are added to the batch in the
+order the requests were received. If the dynamic batcher can form a
+batch of a preferred size(s) it will create a batch of the largest
+possible preferred size and send it for inferencing. If the dynamic
+batcher cannot form a batch of a preferred size, it will send a batch
+of the largest size possible that is less than the max batch size
+allowed by the model. But see the following section for the delay
+option that changes this behavior.
+
+The size of generated batches can be examined in aggregate using Count
+metrics, see :ref:`section-metrics`. Inference server verbose logging
+can be used to examine the size of individual batches.
+
+Delayed Batching
+................
+
+The dynamic batcher can be configured to allow requests to be delayed
+for a limited time in the scheduler to allow other requests to join
+the dynamic batch. For example, the following configuration sets the
+maximum delay time of 100 microseconds for a request::
 
   dynamic_batching {
     preferred_batch_size: [ 4, 8 ]
     max_queue_delay_microseconds: 100
   }
 
-The size of generated batches can be examined in aggregate using Count
-metrics, see :ref:`section-metrics`. Inference server verbose logging
-can be used to examine the size of individual batches.
+The :cpp:var:`max_queue_delay_microseconds
+<nvidia::inferenceserver::ModelDynamicBatching::max_queue_delay_microseconds>`
+setting changes the dynamic batcher behavior when a batch of a
+preferred size cannot be created. When a batch of a preferred size
+cannot be created from the available requests, the dynamic batcher
+will delay sending the batch as long as no request is delayed longer
+than the configured :cpp:var:`max_queue_delay_microseconds
+<nvidia::inferenceserver::ModelDynamicBatching::max_queue_delay_microseconds>`
+setting. If a new request arrives during this delay and allows the
+dynamic batcher to form a batch of a preferred batch size, then that
+batch is sent immediately for inferencing. If the delay expires the
+dynamic batcher sends the batch as is, even though it is not a
+preferred size.
+
+Preserve Ordering
+.................
+
+The :cpp:var:`preserve_ordering
+<nvidia::inferenceserver::ModelDynamicBatching::preserve_ordering>`
+setting is used to force all responses to be returned in the same
+order as requests were received. See the protobuf documentation for
+details.
+
+Priority Levels
+...............
+
+By default the dynamic batcher maintains a single queue that holds all
+inference requests for a model. The requests are processed and batched
+in order.  The :cpp:var:`priority_levels
+<nvidia::inferenceserver::ModelDynamicBatching::priority_levels>`
+setting can be used to create multiple priority levels within the
+dynamic batcher so that requests with higher priority are allowed to
+bypass requests with lower priority. Requests at the same priority
+level are processed in order. Inference requests that do not set a
+priority are scheduled using the :cpp:var:`default_priority_level
+<nvidia::inferenceserver::ModelDynamicBatching::default_priority_level>`.
+
+Queue Policy
+............
+
+The dynamic batcher provides several settings that control how
+requests are queued for batching.
+
+When :cpp:var:`priority_levels
+<nvidia::inferenceserver::ModelDynamicBatching::priority_levels>` is
+not defined the :cpp:var:`ModelQueuePolicy
+<nvidia::inferenceserver::ModelQueuePolicy>` for the single queue can
+be set with :cpp:var:`default_queue_policy
+<nvidia::inferenceserver::ModelDynamicBatching::default_queue_policy>`.
+
+When :cpp:var:`priority_levels
+<nvidia::inferenceserver::ModelDynamicBatching::priority_levels>` is
+defined, each priority level can have a different
+:cpp:var:`ModelQueuePolicy
+<nvidia::inferenceserver::ModelQueuePolicy>` as specified by
+:cpp:var:`default_queue_policy
+<nvidia::inferenceserver::ModelDynamicBatching::default_queue_policy>`
+and :cpp:var:`priority_queue_policy
+<nvidia::inferenceserver::ModelDynamicBatching::priority_queue_policy>`.
+
+The :cpp:var:`ModelQueuePolicy
+<nvidia::inferenceserver::ModelQueuePolicy>` allows a maximum queue
+size to be set using the :cpp:var:`max_queue_size
+<nvidia::inferenceserver::ModelQueuePolicy::max_queue_size>`
+setting. The queue policy :cpp:var:`timeout_action
+<nvidia::inferenceserver::ModelQueuePolicy::timeout_action>`,
+:cpp:var:`default_timeout_microseconds
+<nvidia::inferenceserver::ModelQueuePolicy::default_timeout_microseconds>`,
+and :cpp:var:`allow_timeout_override
+<nvidia::inferenceserver::ModelQueuePolicy::allow_timeout_override>`
+settings allow the queue to be configured so that individual requests
+are rejected or deferred if their time in the queue exceeds a
+specified timeout.
 
 .. _section-sequence-batcher:
 
