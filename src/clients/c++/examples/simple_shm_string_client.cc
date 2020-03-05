@@ -280,6 +280,7 @@ main(int argc, char** argv)
           shm_fd_op, 0, output0_byte_size + output1_byte_size,
           (void**)&output0_shm),
       "");
+  FAIL_IF_ERR(nic::CloseSharedMemory(shm_fd_op), "");
   uint8_t* output1_shm =
       reinterpret_cast<uint8_t*>(output0_shm + output0_byte_size);
 
@@ -318,6 +319,7 @@ main(int argc, char** argv)
           shm_fd_ip, 0, input0_byte_size + input1_byte_size,
           (void**)&input0_shm),
       "");
+  FAIL_IF_ERR(nic::CloseSharedMemory(shm_fd_ip), "");
   uint8_t* input1_shm =
       reinterpret_cast<uint8_t*>(input0_shm + input0_byte_size);
   memcpy(input0_shm, input0_data.data(), input0_byte_size);

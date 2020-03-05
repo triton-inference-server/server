@@ -172,6 +172,16 @@ SharedMemoryManager::RegisterSystemSharedMemory(
             .c_str());
   }
 
+  err = CloseSharedMemoryRegion(shm_fd);
+  if (err != nullptr) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "failed to close shared memory descriptor for region '" + name +
+            "'")
+            .c_str());
+  }
+
   shared_memory_map_.insert(std::make_pair(
       name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
                 name, shm_key, offset, byte_size, shm_fd, mapped_addr,
@@ -317,18 +327,6 @@ SharedMemoryManager::UnregisterHelper(const std::string& name)
     if (it->second->kind_ == TRTSERVER_MEMORY_CPU) {
       RETURN_IF_ERR(
           UnmapSharedMemory(it->second->mapped_addr_, it->second->byte_size_));
-      // if no other region with same shm_key then close
-      bool last_one = true;
-      for (auto itr = shared_memory_map_.begin();
-           itr != shared_memory_map_.end(); ++itr) {
-        if (itr->second->shm_key_ == it->second->shm_key_) {
-          last_one = false;
-          break;
-        }
-      }
-      if (last_one) {
-        RETURN_IF_ERR(CloseSharedMemoryRegion(it->second->shm_fd_));
-      }
     } else {
 #ifdef TRTIS_ENABLE_GPU
       cudaError_t err = cudaIpcCloseMemHandle(it->second->mapped_addr_);
