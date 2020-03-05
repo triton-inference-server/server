@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -57,7 +57,7 @@
     directories named `L0_...`.  See the Testing section in the
     Developer Guide for instructions on running these tests.
 
-- TensorRT Inference Server's default build assumes recent versions of
+- Triton Inference Server's default build assumes recent versions of
   dependencies (CUDA, TensorFlow, PyTorch, TensorRT,
   etc.). Contributions that add compatibility with older versions of
   those dependencies will be considered, but NVIDIA cannot guarantee
