@@ -38,10 +38,10 @@
 ## local system that you want to target for the generated models.
 ##
 ## 3. Run this script to create /tmp/qa_model_repository,
-## /tmp/qa_variable_model_repository,
-## /tmp/qa_identity_model_repository,
+## /tmp/qa_variable_model_repository, /tmp/qa_shapetensor_model_repository
+## /tmp/qa_identity_model_repository, /tmp/qa_identity_big_model_repository
 ## /tmp/qa_reshape_model_repository, /tmp/qa_noshape_model_repository,
-## /tmp/qa_sequence_model_repository,
+## /tmp/qa_sequence_model_repository, /tmp/qa_ensemble_model_repository
 ## /tmp/qa_dyna_sequence_model_repository, and
 ## /tmp/qa_variable_sequence_model_repository directories containing
 ## all the models needed for CI testing.
