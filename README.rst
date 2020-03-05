@@ -27,31 +27,39 @@
 
 |License|
 
-NVIDIA TensorRT Inference Server
-================================
+NVIDIA Triton Inference Server
+==============================
+
+    **NEW NAME: We have a new name: Triton Inference Server. Read
+    about why we are making this change and our plans for version 2 of
+    the inference server in** `Roadmap
+    <https://github.com/NVIDIA/triton-inference-server#roadmap>`_.
 
     **LATEST RELEASE: You are currently on the master branch which
     tracks under-development progress towards the next release. The
-    latest release of the TensorRT Inference Server is 1.11.0 and
+    latest release of the Triton Inference Server is 1.11.0 and
     is available on branch** `r20.02
-    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r20.02>`_.
+    <https://github.com/NVIDIA/triton-inference-server/tree/r20.02>`_.
 
 .. overview-begin-marker-do-not-remove
 
-The NVIDIA TensorRT Inference Server provides a cloud inferencing
-solution optimized for NVIDIA GPUs. The server provides an inference
-service via an HTTP or GRPC endpoint, allowing remote clients to
-request inferencing for any model being managed by the server. The
-inference server provides the following features:
+NVIDIA Triton Inference Server provides a cloud inferencing solution
+optimized for NVIDIA GPUs. The server provides an inference service
+via an HTTP or GRPC endpoint, allowing remote clients to request
+inferencing for any model being managed by the server. For edge
+deployments, Triton Server is also available as a shared library with
+an API that allows the full functionality of the server to be included
+directly in an application. Triton Server provides the following
+features:
 
 * `Multiple framework support
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#framework-model-definition>`_. The
   server can manage any number and mix of models (limited by system
   disk and memory resources). Supports TensorRT, TensorFlow GraphDef,
   TensorFlow SavedModel, ONNX, PyTorch, and Caffe2 NetDef model
-  formats. Also supports TensorFlow-TensorRT integrated
-  models. Variable-size input and output tensors are allowed if
-  supported by the framework. See `Capabilities
+  formats. Also supports TensorFlow-TensorRT and ONNX-TensorRT
+  integrated models. Variable-size input and output tensors are
+  allowed if supported by the framework. See `Capabilities
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/capabilities.html#capabilities>`_
   for detailed support information for each framework.
 
@@ -60,22 +68,22 @@ inference server provides the following features:
   models (or multiple instances of the same model) can run
   simultaneously on the same GPU.
 
-* Batching support. For models that support batching, the server can
-  accept requests for a batch of inputs and respond with the
-  corresponding batch of outputs. The inference server also supports
-  multiple `scheduling and batching
+* Batching support. For models that support batching, Triton Server
+  can accept requests for a batch of inputs and respond with the
+  corresponding batch of outputs. Triton Server also supports multiple
+  `scheduling and batching
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html#scheduling-and-batching>`_
   algorithms that combine individual inference requests together to
   improve inference throughput. These scheduling and batching
   decisions are transparent to the client requesting inference.
 
 * `Custom backend support
-  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#custom-backends>`_. The inference server
-  allows individual models to be implemented with custom backends
-  instead of by a deep-learning framework. With a custom backend a
-  model can implement any logic desired, while still benefiting from
-  the GPU support, concurrent execution, dynamic batching and other
-  features provided by the server.
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#custom-backends>`_. Triton
+  Server allows individual models to be implemented with custom
+  backends instead of by a deep-learning framework. With a custom
+  backend a model can implement any logic desired, while still
+  benefiting from the GPU support, concurrent execution, dynamic
+  batching and other features provided by the server.
 
 * `Ensemble support
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/models_and_schedulers.html#ensemble-models>`_. An
@@ -84,10 +92,10 @@ inference server provides the following features:
   single inference request to an ensemble will trigger the execution
   of the entire pipeline.
 
-* Multi-GPU support. The server can distribute inferencing across all
-  system GPUs.
+* Multi-GPU support. Triton Server can distribute inferencing across
+  all system GPUs.
 
-* The inference server provides `multiple modes for model management
+* Triton Server provides `multiple modes for model management
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_management.html>`_. These
   model management modes allow for both implicit and explicit loading
   and unloading of models without requiring a server restart.
@@ -108,16 +116,16 @@ inference server provides the following features:
 
 * `C library inferface
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/library_api.html>`_
-  allows the full functionality of the inference server to be included
+  allows the full functionality of Triton Server to be included
   directly in an application.
 
 .. overview-end-marker-do-not-remove
 
-The current release of the TensorRT Inference Server is 1.11.0 and
+The current release of the Triton Inference Server is 1.11.0 and
 corresponds to the 20.02 release of the tensorrtserver container on
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. The branch for
 this release is `r20.02
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/r20.02>`_.
+<https://github.com/NVIDIA/triton-inference-server/tree/r20.02>`_.
 
 Backwards Compatibility
 -----------------------
@@ -133,16 +141,16 @@ The following inferfaces will maintain backwards compatibility for all
 future 1.x.y releases (see below for exceptions):
 
 * Model configuration as defined in `model_config.proto
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/model_config.proto>`_.
+  <https://github.com/NVIDIA/triton-inference-server/blob/master/src/core/model_config.proto>`_.
 
 * The inference server HTTP and GRPC APIs as defined in `api.proto
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/api.proto>`_
+  <https://github.com/NVIDIA/triton-inference-server/blob/master/src/core/api.proto>`_
   and `grpc_service.proto
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/grpc_service.proto>`_,
+  <https://github.com/NVIDIA/triton-inference-server/blob/master/src/core/grpc_service.proto>`_,
   except as noted below.
 
-* The V1 custom backend interface as defined in `custom.h
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/backends/custom/custom.h>`_.
+* The V1 and V2 custom backend interfaces as defined in `custom.h
+  <https://github.com/NVIDIA/triton-inference-server/blob/master/src/backends/custom/custom.h>`_.
 
 As new features are introduced they may temporarily have beta status
 where they are subject to change in non-backwards-compatible
@@ -151,16 +159,7 @@ backwards-compatibility guarantees described above. Currently the
 following features are in beta:
 
 * The inference server library API as defined in `trtserver.h
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/trtserver.h>`_
-  is currently in beta and may undergo non-backwards-compatible
-  changes.
-
-* The inference server HTTP and GRPC APIs related to system and CUDA
-  shared memory are currently in beta and may undergo
-  non-backwards-compatible changes.
-
-* The V2 custom backend interface as defined in `custom.h
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/backends/custom/custom.h>`_
+  <https://github.com/NVIDIA/triton-inference-server/blob/master/src/core/trtserver.h>`_
   is currently in beta and may undergo non-backwards-compatible
   changes.
 
@@ -168,14 +167,73 @@ following features are in beta:
   inference server compatibility guarantees and so should be
   considered as beta status.
 
+Roadmap
+-------
+
+The inference server's new name is Triton Inference Server, which can
+be shortened to just Triton Server in contexts where inferencing is
+already understood. The primary reasons for the name change are to :
+
+* Avoid confusion with the `NVIDIA TensorRT Programmable Inference
+  Accelerator <https://developer.nvidia.com/tensorrt>`_.
+
+* Avoid the perception that Triton Server only supports TensorRT
+  models when in fact the server supports a wide range of model
+  frameworks and formats.
+
+* Highlight that the server is aligning HTTP/REST and GRPC protocols
+  with a set of `community standard inference protocols
+  <https://github.com/kubeflow/kfserving/docs/predict-api/v2>`_ that
+  have been proposed by the `KFServing project
+  <https://github.com/kubeflow/kfserving>`_.
+
+Transitioning from the current protocols (version 1) to the new
+protocols (version 2) will take place over several releases.
+
+* 20.03
+
+  * Change name to Triton Inference Server.
+  * Beta release of server support for community standard GRPC
+    inference protocol.
+  * Beta release of Python client library that uses community standard
+    GRPC inference protocol.
+  * See `client documentation
+    <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/client_experimental.html>`_
+    for description and examples showing how to enable and use the new
+    GRPC inference protocol and Python client library.
+  * Existing HTTP/REST and GRPC protocols, and existing client APIs
+    continue to be supported and remain the default protocols.
+
+* 20.05
+
+  * Full release of community standard HTTP/REST and GRPC inference
+    protocol support in server, Python client, and C++ client.
+  * Existing HTTP/REST and GRPC protocols are deprecated but remain
+    the default.
+  * Shared library inferface defined in trtserver.h is deprecated.
+  * New shared library interface is defined in tritonserver.h.
+
+* 20.06
+
+  * Triton Server version 2.0.0.
+  * Community standard HTTP/REST and GRPC inference protocols become
+    the default and only supported protocols for the server.
+  * Original Python and C++ client libraries and examples are removed.
+  * Shared library interface defined in trtserver.h is removed.
+
+Throughout transition the model configuration schema, model repository
+struture, and custom backend APIs will remain unchanged so that any
+existing models, model repository, and custom backends will continue
+to work with Triton Server.
+
 Documentation
 -------------
 
 The User Guide, Developer Guide, and API Reference `documentation for
 the current release
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/index.html>`_
-provide guidance on installing, building, and running the TensorRT
-Inference Server.
+provide guidance on installing, building, and running Triton Inference
+Server.
 
 You can also view the `documentation for the master branch
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/index.html>`_
@@ -188,14 +246,14 @@ provides answers for frequently asked questions.
 
 READMEs for deployment examples can be found in subdirectories of
 deploy/, for example, `deploy/single_server/README.rst
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/deploy/single_server/README.rst>`_.
+<https://github.com/NVIDIA/triton-inference-server/tree/master/deploy/single_server/README.rst>`_.
 
 The `Release Notes
 <https://docs.nvidia.com/deeplearning/sdk/inference-release-notes/index.html>`_
 and `Support Matrix
 <https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html>`_
 indicate the required versions of the NVIDIA Driver and CUDA, and also
-describe which GPUs are supported by the inference server.
+describe which GPUs are supported by Triton Server.
 
 Other Documentation
 ^^^^^^^^^^^^^^^^^^^
@@ -214,7 +272,7 @@ Other Documentation
 Contributing
 ------------
 
-Contributions to TensorRT Inference Server are more than welcome. To
+Contributions to Triton Inference Server are more than welcome. To
 contribute make a pull request and follow the guidelines outlined in
 the `Contributing <CONTRIBUTING.md>`_ document.
 
