@@ -66,7 +66,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
                 skip_request_id_check=False, use_streaming=True,
                 correlation_id=0, shm_region_names=None, precreated_shm_regions=None,
-                use_system_shared_memory=False, use_cuda_shared_memory=False):
+                use_system_shared_memory=False, use_cuda_shared_memory=False,
+                priority=0, timeout_us=0):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
@@ -208,11 +209,13 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             results = ctx.run(
                     { INPUT0 : (shm_handles[0], tensor_shape),
                     INPUT1 : (shm_handles[1], tensor_shape) },
-                    output_req, batch_size)
+                    output_req, batch_size,
+                    priority=priority, timeout_us=timeout_us)
         else:
             results = ctx.run(
                     { INPUT0 : input0_list, INPUT1 : input1_list },
-                    output_req, batch_size)
+                    output_req, batch_size,
+                    priority=priority, timeout_us=timeout_us)
 
         if not skip_request_id_check:
             global _seen_request_ids
@@ -279,7 +282,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes,
                model_version=None, use_http=True, use_grpc=True,
                use_streaming=True, shm_region_name_prefix=None,
-               use_system_shared_memory=False, use_cuda_shared_memory=False):
+               use_system_shared_memory=False, use_cuda_shared_memory=False,
+               priority=0, timeout_us=0):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
@@ -360,7 +364,8 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         ctx = InferContext(config[0], config[1], model_name, model_version,
                            correlation_id=0, streaming=config[2],
                            verbose=True)
-        results = ctx.run(input_dict, output_dict, batch_size)
+        results = ctx.run(input_dict, output_dict, batch_size,
+                          priority=priority, timeout_us=timeout_us)
 
         tester.assertEqual(ctx.get_last_request_model_name(), model_name)
         if model_version is not None:
@@ -392,7 +397,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
 def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values, dummy_input_shapes,
                model_version=None, use_http=True, use_grpc=True,
                use_streaming=True, shm_suffix="", use_system_shared_memory=False,
-               use_cuda_shared_memory=False):
+               use_cuda_shared_memory=False, priority=0, timeout_us=0):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
@@ -513,7 +518,8 @@ def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values,
         ctx = InferContext(config[0], config[1], model_name, model_version,
                            correlation_id=0, streaming=config[2],
                            verbose=True)
-        results = ctx.run(input_dict, output_dict, batch_size)
+        results = ctx.run(input_dict, output_dict, batch_size,
+                          priority=priority, timeout_us=timeout_us)
 
         tester.assertEqual(ctx.get_last_request_model_name(), model_name)
         if model_version is not None:
