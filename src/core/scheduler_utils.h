@@ -122,6 +122,12 @@ class PriorityQueue {
     return pending_cursor_.pending_batch_oldest_enqueue_time_ns_;
   }
 
+  // Return the closest timeout of payloads in pending batch.
+  uint64_t ClosestTimeout()
+  {
+    return pending_cursor_.pending_batch_closest_timeout_ns_;
+  }
+
   // Return the number of payloads in pending batch.
   size_t PendingBatchCount() { return pending_cursor_.pending_batch_count_; }
 

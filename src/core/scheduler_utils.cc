@@ -158,13 +158,13 @@ PriorityQueue::PolicyQueue::ApplyPolicy(
         } else {
           rejected_queue_.emplace_back(std::move(queue_[curr_idx]));
           *rejected_count += 1;
-          *rejected_batch_size += rejected_queue_.back()
-                                      .request_provider_->Request()
-                                      ->BatchSize();
+          *rejected_batch_size +=
+              rejected_queue_.back().request_provider_->Request()->BatchSize();
         }
         curr_idx++;
+      } else {
+        break;
       }
-      break;
     }
 
     // Use range erasure on deque as all erasure functions are linear,
@@ -270,11 +270,18 @@ Scheduler::Payload
 PriorityQueue::Dequeue()
 {
   pending_cursor_.valid_ = false;
-  if (!queues_[front_priority_level_].Empty()) {
-    size_--;
-    return queues_[front_priority_level_].Dequeue();
-  } else if (front_priority_level_ != last_priority_level_) {
-    front_priority_level_++;
+  while (true) {
+    if (!queues_[front_priority_level_].Empty()) {
+      size_--;
+      return queues_[front_priority_level_].Dequeue();
+    } else if (front_priority_level_ != last_priority_level_) {
+      front_priority_level_++;
+      continue;
+    }
+
+    // Control reach here if the queue for last priority level is also empty,
+    // then raise exception
+    break;
   }
   throw std::out_of_range("dequeue on empty queue");
 }
