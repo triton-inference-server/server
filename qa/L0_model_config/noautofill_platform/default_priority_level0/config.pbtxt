@@ -1,0 +1,20 @@
+name: "default_priority_level0"
+platform: "custom"
+max_batch_size: 8
+dynamic_batching {
+  priority_levels: 3
+}
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
