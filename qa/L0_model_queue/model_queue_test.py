@@ -28,17 +28,12 @@ import sys
 sys.path.append("../common")
 
 from builtins import range
-from future.utils import iteritems
-import os
 import time
 import threading
-import traceback
 import unittest
 import numpy as np
 import infer_util as iu
-import test_util as tu
 from tensorrtserver.api import *
-import tensorrtserver.api.server_status_pb2 as server_status
 from ctypes import *
 
 _max_queue_delay_ms = 10000
