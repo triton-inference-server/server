@@ -760,29 +760,31 @@ ModelReadyHandler::Process(Handler::State* state, bool rpc_ok)
       } else {
         const ModelStatus& model_status = nitr->second;
 
-        int64_t requested_version = -1;
-        // If request doesn't specify the version then find the highest valued
-        // version.
-        if (!request.version().empty()) {
-          requested_version = std::stol(request.version());
-        } else {
-          for (const auto& pr : model_status.version_status()) {
-            requested_version = std::max(requested_version, pr.first);
+        int64_t requested_version;
+        err = GetModelVersionFromString(request.version(), &requested_version);
+        if (err == nullptr) {
+          // If requested_version is -1 then find the highest valued
+          // version.
+          if (requested_version == -1) {
+            for (const auto& pr : model_status.version_status()) {
+              requested_version = std::max(requested_version, pr.first);
+            }
           }
-        }
 
-        const auto& vitr =
-            model_status.version_status().find(requested_version);
-        if (vitr == model_status.version_status().end()) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INVALID_ARG,
-              std::string(
-                  "no status available for model '" + request.name() +
-                  "', version " + std::to_string(requested_version))
-                  .c_str());
-        } else {
-          const ModelVersionStatus& version_status = vitr->second;
-          ready = version_status.ready_state() == ModelReadyState::MODEL_READY;
+          const auto& vitr =
+              model_status.version_status().find(requested_version);
+          if (vitr == model_status.version_status().end()) {
+            err = TRTSERVER_ErrorNew(
+                TRTSERVER_ERROR_INVALID_ARG,
+                std::string(
+                    "no status available for model '" + request.name() +
+                    "', version " + std::to_string(requested_version))
+                    .c_str());
+          } else {
+            const ModelVersionStatus& version_status = vitr->second;
+            ready =
+                version_status.ready_state() == ModelReadyState::MODEL_READY;
+          }
         }
       }
     }
@@ -1628,14 +1630,21 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
   const ModelInferRequest& request = state->request_;
   ModelInferResponse& response = state->response_;
 
-  int64_t requested_model_version =
-      request.model_version().empty() ? -1 : std::stol(request.model_version());
-
   if (state->step_ == Steps::START) {
+    int64_t requested_model_version;
+    TRTSERVER_Error* err = GetModelVersionFromString(
+        request.model_version(), &requested_model_version);
 #ifdef TRTIS_ENABLE_TRACING
     if (state->trace_meta_data_ != nullptr) {
-      state->trace_meta_data_->tracer_->SetModel(
-          request.model_name(), requested_model_version);
+      if (err == nullptr) {
+        state->trace_meta_data_->tracer_->SetModel(
+            request.model_name(), requested_model_version);
+      } else {
+        // If failed to retrieve the requested_model_version
+        // then use the default model version just to record
+        // the timestamps in the tracer
+        state->trace_meta_data_->tracer_->SetModel(request.model_name(), -1);
+      }
       state->trace_meta_data_->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
     }
@@ -1645,13 +1654,14 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
     if (!shutdown) {
       StartNewRequest();
     }
-
     // Create the inference request provider which provides all the
     // input information needed for an inference.
     TRTSERVER_InferenceRequestOptions* request_options = nullptr;
-    TRTSERVER_Error* err = TRTSERVER_InferenceRequestOptionsNew(
-        &request_options, request.model_name().c_str(),
-        requested_model_version);
+    if (err == nullptr) {
+      err = TRTSERVER_InferenceRequestOptionsNew(
+          &request_options, request.model_name().c_str(),
+          requested_model_version);
+    }
     if (err == nullptr) {
       err = SetInferenceRequestOptions(request_options, request);
     }
@@ -1662,8 +1672,8 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
           &request_provider, trtserver_.get(), request_options);
     }
 
-    // Will be used to hold the serialized data in case explicit string tensors
-    // are present in the request.
+    // Will be used to hold the serialized data in case explicit string
+    // tensors are present in the request.
     AllocPayload::TensorSerializedDataMap* serialized_data_map =
         new AllocPayload::TensorSerializedDataMap();
 
@@ -1952,14 +1962,21 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     state->context_->responder_->Read(&state->request_, state);
 
   } else if (state->step_ == Steps::READ) {
-    int64_t requested_model_version = request.model_version().empty()
-                                          ? -1
-                                          : std::stol(request.model_version());
-
+    int64_t requested_model_version;
+    TRTSERVER_Error* err = GetModelVersionFromString(
+        request.model_version(), &requested_model_version);
 #ifdef TRTIS_ENABLE_TRACING
     if (state->trace_meta_data_ != nullptr) {
-      state->trace_meta_data_->tracer_->SetModel(
-          state->request_.model_name(), requested_model_version);
+      if (err == nullptr) {
+        state->trace_meta_data_->tracer_->SetModel(
+            state->request_.model_name(), requested_model_version);
+      } else {
+        // If failed to retrieve the requested_model_version
+        // then use the default model version just to record
+        // the timestamps in the tracer
+        state->trace_meta_data_->tracer_->SetModel(
+            state->request_.model_name(), -1);
+      }
       state->trace_meta_data_->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
     }
@@ -2002,9 +2019,11 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // Create the inference request provider which provides all the
     // input information needed for an inference.
     TRTSERVER_InferenceRequestOptions* request_options = nullptr;
-    TRTSERVER_Error* err = TRTSERVER_InferenceRequestOptionsNew(
-        &request_options, request.model_name().c_str(),
-        requested_model_version);
+    if (err == nullptr) {
+      err = TRTSERVER_InferenceRequestOptionsNew(
+          &request_options, request.model_name().c_str(),
+          requested_model_version);
+    }
     if (err == nullptr) {
       err = SetTRTSERVER_InferenceRequestOptions(
           request_options, request.meta_data());

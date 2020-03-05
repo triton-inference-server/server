@@ -268,4 +268,37 @@ GetDataTypeByteSize(const std::string& protocol_dtype)
   }
 }
 
+TRTSERVER_Error*
+GetModelVersionFromString(
+    const std::string& version_string, int64_t* version_int)
+{
+  if (version_string.empty()) {
+    *version_int = -1;
+  } else {
+    try {
+      *version_int = std::stol(version_string);
+    }
+    catch (std::exception& e) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "failed to get model version from specified version string '" +
+              version_string + "' (details: " + e.what() +
+              "), version should be an integral value > 0")
+              .c_str());
+    }
+    if (*version_int < 0) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "invalid model version specified '" +
+              std::to_string(*version_int) +
+              "' , version should be an integral value > 0")
+              .c_str());
+    }
+  }
+
+  return nullptr;  // Success
+}
+
 }}  // namespace nvidia::inferenceserver
