@@ -587,8 +587,8 @@ class InferContext {
     virtual uint64_t Timeout() const = 0;
 
     /// Set the timeout to use for all subsequent inferences.
-    /// \param timeout_ms The timeout, in microseconds.
-    virtual void SetTimeout(uint64_t timeout_ms) = 0;
+    /// \param timeout_us The timeout, in microseconds.
+    virtual void SetTimeout(uint64_t timeout_us) = 0;
 
     /// \return The correlation id for the inferences.
     virtual CorrelationID CorrelationId() const = 0;

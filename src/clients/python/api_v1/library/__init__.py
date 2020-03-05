@@ -1178,7 +1178,7 @@ class InferContext:
         _raise_error("unknown result datatype " + ctype.value)
 
     def _prepare_request(self, inputs, outputs,
-                         flags, batch_size, corr_id, priority, timeout_ms,
+                         flags, batch_size, corr_id, priority, timeout_us,
                          contiguous_input_values):
         # Make sure each input is given as a list (one entry per
         # batch). It is a common error when using batch-size 1 to
@@ -1213,7 +1213,7 @@ class InferContext:
         try:
             _raise_if_error(c_void_p(
                 _crequest_infer_ctx_options_new(
-                    byref(options), flags, batch_size, corr_id, priority, timeout_ms)))
+                    byref(options), flags, batch_size, corr_id, priority, timeout_us)))
 
             for (output_name, output_format) in iteritems(outputs):
                 if len(output_format) == 2 and isinstance(output_format, (list, tuple)) \
@@ -1511,7 +1511,7 @@ class InferContext:
         return _crequest_correlation_id(self._ctx)
 
     def run(self, inputs, outputs, batch_size=1, flags=0, corr_id=0,
-            priority=0, timeout_ms=0):
+            priority=0, timeout_us=0):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -1549,7 +1549,7 @@ class InferContext:
         priority : int
             The priority of the inference.
 
-        timeout_ms : int
+        timeout_us : int
             The timeout of the inference, in microseconds.
 
         Returns
@@ -1583,7 +1583,7 @@ class InferContext:
 
         # Set run option and input values
         self._prepare_request(
-            inputs, outputs, flags, batch_size, corr_id, priority, timeout_ms, contiguous_input)
+            inputs, outputs, flags, batch_size, corr_id, priority, timeout_us, contiguous_input)
 
         # Run inference...
         self._last_request_id = _raise_if_error(c_void_p(_crequest_infer_ctx_run(self._ctx)))
@@ -1591,7 +1591,7 @@ class InferContext:
         return self._get_results(outputs, batch_size)
 
     def async_run(self, callback, inputs, outputs, batch_size=1, flags=0, corr_id=0,
-                  priority=0, timeout_ms=0):
+                  priority=0, timeout_us=0):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -1642,7 +1642,7 @@ class InferContext:
         priority : int
             The priority of the inference.
 
-        timeout_ms : int
+        timeout_us : int
             The timeout of the inference, in microseconds.
 
         Raises
@@ -1659,7 +1659,7 @@ class InferContext:
 
         # Set run option and input values
         self._prepare_request(
-            inputs, outputs, flags, batch_size, corr_id, priority, timeout_ms, contiguous_input)
+            inputs, outputs, flags, batch_size, corr_id, priority, timeout_us, contiguous_input)
 
         # Wrap over the provided callback
         wrapped_cb = partial(self._async_callback_wrapper, self._callback_resources_dict_id, callback)

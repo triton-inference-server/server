@@ -129,7 +129,7 @@ class RequestTimers {
 class InferOptionsImpl : public InferContext::Options {
  public:
   InferOptionsImpl()
-      : flags_(0), batch_size_(0), priority_(0), timeout_ms_(0),
+      : flags_(0), batch_size_(0), priority_(0), timeout_us_(0),
         correlation_id_(0)
   {
   }
@@ -146,8 +146,8 @@ class InferOptionsImpl : public InferContext::Options {
   uint32_t Priority() const override { return priority_; }
   void SetPriority(uint32_t priority) override { priority_ = priority; }
 
-  uint64_t Timeout() const override { return timeout_ms_; }
-  void SetTimeout(uint64_t timeout_ms) override { timeout_ms_ = timeout_ms; }
+  uint64_t Timeout() const override { return timeout_us_; }
+  void SetTimeout(uint64_t timeout_us) override { timeout_us_ = timeout_us; }
 
   CorrelationID CorrelationId() const override { return correlation_id_; }
   void SetCorrelationId(CorrelationID correlation_id) override
@@ -187,7 +187,7 @@ class InferOptionsImpl : public InferContext::Options {
   uint32_t flags_;
   size_t batch_size_;
   uint32_t priority_;
-  uint64_t timeout_ms_;
+  uint64_t timeout_us_;
   CorrelationID correlation_id_;
   std::deque<OutputOptionsPair> outputs_;
 };
