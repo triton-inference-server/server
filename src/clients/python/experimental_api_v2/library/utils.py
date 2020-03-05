@@ -46,8 +46,14 @@ class InferenceServerException(Exception):
 
     Parameters
     ----------
-    err : RequestStatus Protobuf
-        The protobuf message describing the error
+    msg : str
+        A brief description of error
+
+    status : str
+        The error code
+    
+    debug_details : str
+        The additional details on the error
 
     """
 
@@ -85,12 +91,13 @@ class InferenceServerException(Exception):
         return self._status
 
     def debug_details(self):
-        """Get the detailed information about the exception for debugging purposes
+        """Get the detailed information about the exception
+        for debugging purposes
 
         Returns
         -------
         str
-            Returns string in JSON format containing the exception details            
+            Returns the exception details
 
         """
         return self._debug_details
