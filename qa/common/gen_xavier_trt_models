@@ -31,7 +31,7 @@
 ## TensorRT on the system.
 ##
 ## 1. Update Jetpack version to match what is being used by the
-## tritionserver release being tested.
+## tritonserver release being tested.
 ##
 ## 2. Set CUDA_DEVICE to the ID of the CUDA device present on the
 ## system that you want to target for the generated models.
