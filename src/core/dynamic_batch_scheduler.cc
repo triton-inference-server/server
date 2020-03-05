@@ -324,12 +324,14 @@ DynamicBatchScheduler::SchedulerThread(
           payloads = std::make_shared<std::vector<Scheduler::Payload>>();
           for (size_t idx = 0; idx < pending_batch_queue_cnt; ++idx) {
             Scheduler::Payload payload;
-            if (queue_.Dequeue(&payload).IsOk()) {
+            auto status = queue_.Dequeue(&payload);
+            if (status.IsOk()) {
               payloads->emplace_back(std::move(payload));
             } else {
               // The queue is empty which conflicts with pending batch count.
               // Send the current batch if any and reset related variables.
-              LOG_ERROR << "Failed to retrieve payload from scheduler queue";
+              LOG_ERROR << "Failed to retrieve payload from scheduler queue: "
+                        << status.Message();
               queue_.ResetCursor();
               queued_batch_size_ = 0;
               pending_batch_size_ = 0;
@@ -367,14 +369,16 @@ DynamicBatchScheduler::SchedulerThread(
         // No batching... execute next request payload
         payloads = std::make_shared<std::vector<Scheduler::Payload>>();
         Scheduler::Payload payload;
-        if (queue_.Dequeue(&payload).IsOk()) {
+        auto status = queue_.Dequeue(&payload);
+        if (status.IsOk()) {
           payloads->emplace_back(std::move(payload));
           if (preserve_ordering_) {
             std::lock_guard<std::mutex> lock(completion_id_queue_mtx_);
             completion_id_queue_.push(completion_id);
           }
         } else {
-          LOG_ERROR << "Failed to retrieve payload from scheduler queue";
+          LOG_ERROR << "Failed to retrieve payload from scheduler queue: "
+                    << status.Message();
         }
       }
 
