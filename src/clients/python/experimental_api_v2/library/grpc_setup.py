@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,46 +24,46 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-TEST_LOG="./docs.log"
+import os
+from setuptools import find_packages
+from setuptools import setup
 
-rm -f $TEST_LOG
-RET=0
+if 'VERSION' not in os.environ:
+    raise Exception('envvar VERSION must be specified')
 
-apt-get update && \
-    apt-get install -y --no-install-recommends python3-pip zip doxygen && \
-    pip3 install --upgrade setuptools && \
-    pip3 install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale && \
-    pip3 install --upgrade ../pkgs/tensorrtserver*.whl && \
-    pip3 install --upgrade ../pkgs/triton*.whl
+VERSION = os.environ['VERSION']
 
-set +e
+REQUIRED = [
+    'numpy', 'python-rapidjson', 'protobuf>=3.5.0', 'grpcio'
+]
 
-(cd src/clients/c++/library &&
-    cp -f request.h.in request.h
-    cp -f request_grpc.h.in request_grpc.h
-    cp -f request_http.h.in request_http.h)
+try:
+    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
-# Set visitor script to be included on every HTML page
-export VISITS_COUNTING_SCRIPT=//assets.adobedtm.com/b92787824f2e0e9b68dc2e993f9bd995339fe417/satelliteLib-7ba51e58dc61bcb0e9311aadd02a0108ab24cc6c.js
+    class bdist_wheel(_bdist_wheel):
 
-(cd docs && rm -f trtis_docs.zip && \
-        make BUILDDIR=/opt/tensorrtserver/qa/L0_docs/build clean html) > $TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
+        def finalize_options(self):
+            _bdist_wheel.finalize_options(self)
+            self.root_is_pure = False
 
-(cd build && zip -r ../trtis_docs.zip html)
-if [ $? -ne 0 ]; then
-    RET=1
-fi
+        def get_tag(self):
+            pyver, abi, plat = _bdist_wheel.get_tag(self)
+            pyver, abi = 'py3', 'none'
+            return pyver, abi, plat
+except ImportError:
+    bdist_wheel = None
 
-set -e
-
-if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
-else
-    cat $TEST_LOG
-    echo -e "\n***\n*** Test FAILED\n***"
-fi
-
-exit $RET
+setup(
+    name='tritongrpcclient',
+    version=VERSION,
+    author='NVIDIA Inc.',
+    author_email='tanmayv@nvidia.com',
+    description='Python client library for communicating with NVIDIA Triton Inference Server using gRPC',
+    license='BSD',
+    url='http://nvidia.com',
+    keywords='triton tensorrt inference server service client',
+    packages=find_packages(),
+    install_requires=REQUIRED,
+    zip_safe=False,
+    cmdclass={'bdist_wheel': bdist_wheel},
+)

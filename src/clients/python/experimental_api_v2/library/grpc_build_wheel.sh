@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,46 +25,58 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-TEST_LOG="./docs.log"
-
-rm -f $TEST_LOG
-RET=0
-
-apt-get update && \
-    apt-get install -y --no-install-recommends python3-pip zip doxygen && \
-    pip3 install --upgrade setuptools && \
-    pip3 install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale && \
-    pip3 install --upgrade ../pkgs/tensorrtserver*.whl && \
-    pip3 install --upgrade ../pkgs/triton*.whl
-
-set +e
-
-(cd src/clients/c++/library &&
-    cp -f request.h.in request.h
-    cp -f request_grpc.h.in request_grpc.h
-    cp -f request_http.h.in request_http.h)
-
-# Set visitor script to be included on every HTML page
-export VISITS_COUNTING_SCRIPT=//assets.adobedtm.com/b92787824f2e0e9b68dc2e993f9bd995339fe417/satelliteLib-7ba51e58dc61bcb0e9311aadd02a0108ab24cc6c.js
-
-(cd docs && rm -f trtis_docs.zip && \
-        make BUILDDIR=/opt/tensorrtserver/qa/L0_docs/build clean html) > $TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-(cd build && zip -r ../trtis_docs.zip html)
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
 set -e
 
-if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
-else
-    cat $TEST_LOG
-    echo -e "\n***\n*** Test FAILED\n***"
-fi
+function main() {
+  if [[ $# -lt 1 ]] ; then
+    echo "usage: $0 <destination dir>"
+    exit 1
+  fi
 
-exit $RET
+  if [[ ! -f "VERSION" ]]; then
+    echo "Could not find VERSION"
+    exit 1
+  fi
+
+  VERSION=`cat VERSION`
+  DEST="$1"
+  WHLDIR="$DEST/wheel"
+
+  echo $(date) : "=== Using builddir: ${WHLDIR}"
+  mkdir -p ${WHLDIR}/tritongrpcclient/
+
+  echo "Adding package files"
+  cp ../../../../core/*_pb2.py \
+    "${WHLDIR}/tritongrpcclient/."
+
+  cp ../../../../core/*_grpc.py \
+    "${WHLDIR}/tritongrpcclient/."
+  
+  cp grpcclient.py \
+    "${WHLDIR}/tritongrpcclient/core.py"
+
+  cp utils.py \
+    "${WHLDIR}/tritongrpcclient/."
+
+  cp grpc_setup.py "${WHLDIR}"
+  touch ${WHLDIR}/tritongrpcclient/__init__.py
+
+  # Use 'sed' command to fix protoc compiled imports (see
+  # https://github.com/google/protobuf/issues/1491).
+  sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tritongrpcclient import \1_pb2 as \2/" \
+    ${WHLDIR}/tritongrpcclient/*_pb2.py
+  sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tritongrpcclient import \1_pb2 as \2/" \
+    ${WHLDIR}/tritongrpcclient/*_pb2_grpc.py
+
+  pushd "${WHLDIR}"
+  echo $(date) : "=== Building wheel"
+  VERSION=$VERSION python${PYVER} grpc_setup.py bdist_wheel
+  mkdir -p "${DEST}"
+  cp dist/* "${DEST}"
+  popd
+  echo $(date) : "=== Output wheel file is in: ${DEST}"
+
+  touch ${DEST}/stamp.whl
+}
+
+main "$@"

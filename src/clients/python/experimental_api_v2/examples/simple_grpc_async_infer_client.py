@@ -31,8 +31,7 @@ import numpy as np
 import time
 import sys
 
-from tensorrtserverV2.api import grpcclient
-from tensorrtserverV2.common import InferenceServerException
+import tritongrpcclient.core as grpcclient
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

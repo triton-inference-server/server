@@ -29,9 +29,9 @@ import grpc
 import rapidjson as json
 from google.protobuf.json_format import MessageToJson
 
-from tensorrtserverV2.api import grpc_service_v2_pb2
-from tensorrtserverV2.api import grpc_service_v2_pb2_grpc
-from tensorrtserverV2.common import *
+from tritongrpcclient import grpc_service_v2_pb2
+from tritongrpcclient import grpc_service_v2_pb2_grpc
+from tritongrpcclient.utils import *
 
 def raise_error_grpc(rpc_error):
     raise InferenceServerException(
@@ -531,11 +531,11 @@ class InferInput:
         """
         if not isinstance(input_tensor, (np.ndarray,)):
             raise_error("input_tensor must be a numpy array")
-        self._input.datatype = np_to_trtis_dtype(input_tensor.dtype)
+        self._input.datatype = np_to_triton_dtype(input_tensor.dtype)
         self._input.ClearField('shape')
         self._input.shape.extend(input_tensor.shape)
         if self._input.datatype == "BYTES":
-            self._input.contents.raw_contents = serialize_string_tensor(
+            self._input.contents.raw_contents = serialize_byte_tensor(
                 input_tensor).tobytes()
         else:
             self._input.contents.raw_contents = input_tensor.tobytes()
@@ -658,12 +658,12 @@ class InferResult:
                         # followed by the actual string characters. Hence,
                         # need to decode the raw bytes to convert into
                         # array elements.
-                        np_array = deserialize_string_tensor(
+                        np_array = deserialize_bytes_tensor(
                             output.contents.raw_contents)
                     else:
                         np_array = np.frombuffer(
                             output.contents.raw_contents,
-                            dtype=trtis_to_np_dtype(datatype))
+                            dtype=triton_to_np_dtype(datatype))
                 elif len(output.contents.byte_contents) != 0:
                     np_array = np.array(output.contents.byte_contents)
                 np_array = np.resize(np_array, shape)

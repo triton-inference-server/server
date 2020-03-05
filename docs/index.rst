@@ -82,6 +82,7 @@ NVIDIA TensorRT Inference Server
    protobuf_api/protobuf_api_root
    cpp_api/cpp_api_root
    python_api
+   experimental_grpc_python_api
 
 
 Indices and tables
