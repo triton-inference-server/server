@@ -60,12 +60,12 @@ Build QA Container
 Next you need to build a QA version of the inference server
 container. This container will contain the inference server, the QA
 tests, and all the dependencies needed to run the QA tests. You must
-first build the tensorrtserver_client, tensorrtserver_cbe,
-tensorrtserver_build and tensorrtserver containers as described in
+first build the tritonserver_client, tritonserver_cbe,
+tritonserver_build and tritonserver containers as described in
 :ref:`section-getting-the-client-libraries` and
 :ref:`section-building` and then build the QA container::
 
-  $ docker build -t tensorrtserver_qa -f Dockerfile.QA .
+  $ docker build -t tritonserver_qa -f Dockerfile.QA .
 
 Run QA Container
 ----------------
@@ -73,7 +73,7 @@ Run QA Container
 Now run the QA container and mount the QA model repositories into the
 container so the tests will be able to access them::
 
-  $ nvidia-docker run -it --rm -v/tmp:/data/inferenceserver tensorrtserver_qa
+  $ nvidia-docker run -it --rm -v/tmp:/data/inferenceserver tritonserver_qa
 
 Within the container the QA tests are in /opt/tensorrtserver/qa. To run a test::
 

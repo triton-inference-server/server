@@ -28,10 +28,10 @@
 # Multistage build.
 #
 
-ARG BASE_IMAGE=tensorrtserver
-ARG BUILD_IMAGE=tensorrtserver_build
-ARG CBE_IMAGE=tensorrtserver_cbe
-ARG CLIENT_IMAGE=tensorrtserver_client
+ARG BASE_IMAGE=tritonserver
+ARG BUILD_IMAGE=tritonserver_build
+ARG CBE_IMAGE=tritonserver_cbe
+ARG CLIENT_IMAGE=tritonserver_client
 
 ############################################################################
 ## Build test utilities and custom backends in the BUILD_IMAGE since
