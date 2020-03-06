@@ -41,6 +41,7 @@ BATCHER_TEST=sequence_batcher_test.py
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
 SERVER=${OPTDIR}/tensorrtserver/bin/trtserver
+
 source ../common/util.sh
 
 RET=0
