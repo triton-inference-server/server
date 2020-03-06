@@ -240,9 +240,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '-x',
         '--model-version',
-        type=int,
+        type=str,
         required=False,
-        default=-1,
+        default="",
         help='Version of model. Default is to use latest version.')
     parser.add_argument('-b',
                         '--batch-size',
@@ -303,3 +303,5 @@ if __name__ == '__main__':
 
     for response in responses:
         postprocess(response.outputs, FLAGS.batch_size)
+
+    print("PASS")

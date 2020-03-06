@@ -92,7 +92,7 @@ fi
     cp -r trtis/install/include /opt/tensorrtserver/include/trtserver)
 
 # install the tensorrtserver wheel file
-pip3 install /workspace/builddir/trtis-clients/install/python/tensorrtserverV2-*.whl
+pip3 install --upgrade /workspace/builddir/trtis-clients/install/python/tensorrtserverV2-*.whl
 
 if [ $? -eq 0 ]; then
     echo -e "\n***\n*** GRPC V2 Build Passed\n***"
@@ -110,6 +110,8 @@ SIMPLE_CLASS_CLIENT=/workspace/builddir/trtis-clients/install/python/simple_grpc
 EXPLICIT_BYTE_CONTENT_CLIENT=/workspace/builddir/trtis-clients/install/python/grpc_v2_explicit_byte_content_client.py
 EXPLICIT_INT_CONTENT_CLIENT=/workspace/builddir/trtis-clients/install/python/grpc_v2_explicit_int_content_client.py
 EXPLICIT_INT8_CONTENT_CLIENT=/workspace/builddir/trtis-clients/install/python/grpc_v2_explicit_int8_content_client.py
+GRPC_V2_CLIENT=/workspace/builddir/trtis-clients/install/python/grpc_v2_client.py
+GRPC_IMAGE_CLIENT=/workspace/builddir/trtis-clients/install/python/grpc_v2_image_client.py
 
 rm -f *.log
 rm -f *.log.*
@@ -125,6 +127,7 @@ wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
 (cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
 mv /tmp/inception_v3_2016_08_28_frozen.pb models/inception_graphdef/1/model.graphdef
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_int8_int32_int32 models/
+cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/resnet_v1_50_graphdef models/
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
@@ -164,10 +167,12 @@ for i in \
         $EXPLICIT_BYTE_CONTENT_CLIENT \
         $EXPLICIT_INT_CONTENT_CLIENT \
         $EXPLICIT_INT8_CONTENT_CLIENT \
+        $GRPC_V2_CLIENT \
+        $GRPC_IMAGE_CLIENT \
         ; do
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"
-    if [ $SUFFIX == "simple_grpc_class_client" ]; then
+    if [[ $SUFFIX == "simple_grpc_class_client" || $SUFFIX == "grpc_v2_image_client" ]]; then
         python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     else
         python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1

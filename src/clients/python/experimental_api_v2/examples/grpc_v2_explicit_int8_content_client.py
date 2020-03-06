@@ -54,7 +54,7 @@ if __name__ == '__main__':
     # output tensor is the element-wise sum of the inputs and one
     # output is the element-wise difference.
     model_name = "graphdef_int8_int32_int32"
-    model_version = -1
+    model_version = ""
     batch_size = 1
 
     # Create gRPC stub for communicating with the server
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     # Generate the request
     request = grpc_service_v2_pb2.ModelInferRequest()
     request.model_name = model_name
-    request.model_version = -1
+    request.model_version = model_version
 
     # Input data
     input0_data = [i for i in range(16)]
@@ -119,5 +119,11 @@ if __name__ == '__main__':
         if (input0_data[i] - input1_data[i]) != output_results[1][0][i]:
             print("sync infer error: incorrect difference")
             sys.exit(1)
-    
-    print('PASS: explicit int8')
+
+    # Server should catch wrong model version specification
+    request.model_version = "wrong_specification"
+    try:
+        response = grpc_stub.ModelInfer(request)
+    except Exception as e:
+        if "failed to get model version from specified version string 'wrong_specification'" in e.__str__():
+            print('PASS: explicit int8')

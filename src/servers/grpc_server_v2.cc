@@ -760,27 +760,31 @@ ModelReadyHandler::Process(Handler::State* state, bool rpc_ok)
       } else {
         const ModelStatus& model_status = nitr->second;
 
-        // If requested version is -1 then find the highest valued
-        // version.
-        int64_t requested_version = request.version();
-        if (requested_version == -1) {
-          for (const auto& pr : model_status.version_status()) {
-            requested_version = std::max(requested_version, pr.first);
+        int64_t requested_version;
+        err = GetModelVersionFromString(request.version(), &requested_version);
+        if (err == nullptr) {
+          // If requested_version is -1 then find the highest valued
+          // version.
+          if (requested_version == -1) {
+            for (const auto& pr : model_status.version_status()) {
+              requested_version = std::max(requested_version, pr.first);
+            }
           }
-        }
 
-        const auto& vitr =
-            model_status.version_status().find(requested_version);
-        if (vitr == model_status.version_status().end()) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INVALID_ARG,
-              std::string(
-                  "no status available for model '" + request.name() +
-                  "', version " + std::to_string(request.version()))
-                  .c_str());
-        } else {
-          const ModelVersionStatus& version_status = vitr->second;
-          ready = version_status.ready_state() == ModelReadyState::MODEL_READY;
+          const auto& vitr =
+              model_status.version_status().find(requested_version);
+          if (vitr == model_status.version_status().end()) {
+            err = TRTSERVER_ErrorNew(
+                TRTSERVER_ERROR_INVALID_ARG,
+                std::string(
+                    "no status available for model '" + request.name() +
+                    "', version " + std::to_string(requested_version))
+                    .c_str());
+          } else {
+            const ModelVersionStatus& version_status = vitr->second;
+            ready =
+                version_status.ready_state() == ModelReadyState::MODEL_READY;
+          }
         }
       }
     }
@@ -995,7 +999,7 @@ ModelMetadataHandler::Process(Handler::State* state, bool rpc_ok)
         response.set_name(model_config.name());
         response.set_platform(model_config.platform());
         for (const auto& pr : model_status.version_status()) {
-          response.add_versions(pr.first);
+          response.add_versions(std::to_string(pr.first));
         }
 
         for (const auto& io : model_config.input()) {
@@ -1627,10 +1631,20 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
   ModelInferResponse& response = state->response_;
 
   if (state->step_ == Steps::START) {
+    int64_t requested_model_version;
+    TRTSERVER_Error* err = GetModelVersionFromString(
+        request.model_version(), &requested_model_version);
 #ifdef TRTIS_ENABLE_TRACING
     if (state->trace_meta_data_ != nullptr) {
-      state->trace_meta_data_->tracer_->SetModel(
-          request.model_name(), request.model_version());
+      if (err == nullptr) {
+        state->trace_meta_data_->tracer_->SetModel(
+            request.model_name(), requested_model_version);
+      } else {
+        // If failed to retrieve the requested_model_version
+        // then use the default model version just to record
+        // the timestamps in the tracer
+        state->trace_meta_data_->tracer_->SetModel(request.model_name(), -1);
+      }
       state->trace_meta_data_->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
     }
@@ -1640,13 +1654,14 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
     if (!shutdown) {
       StartNewRequest();
     }
-
     // Create the inference request provider which provides all the
     // input information needed for an inference.
     TRTSERVER_InferenceRequestOptions* request_options = nullptr;
-    TRTSERVER_Error* err = TRTSERVER_InferenceRequestOptionsNew(
-        &request_options, request.model_name().c_str(),
-        request.model_version());
+    if (err == nullptr) {
+      err = TRTSERVER_InferenceRequestOptionsNew(
+          &request_options, request.model_name().c_str(),
+          requested_model_version);
+    }
     if (err == nullptr) {
       err = SetInferenceRequestOptions(request_options, request);
     }
@@ -1657,8 +1672,8 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
           &request_provider, trtserver_.get(), request_options);
     }
 
-    // Will be used to hold the serialized data in case explicit string tensors
-    // are present in the request.
+    // Will be used to hold the serialized data in case explicit string
+    // tensors are present in the request.
     AllocPayload::TensorSerializedDataMap* serialized_data_map =
         new AllocPayload::TensorSerializedDataMap();
 
@@ -1774,7 +1789,7 @@ ModelInferHandler::InferComplete(
   // Convert the InferResponseHeader to the V2 response
   if (err == nullptr) {
     response.set_model_name(response_header.model_name());
-    response.set_model_version(response_header.model_version());
+    response.set_model_version(std::to_string(response_header.model_version()));
     response.set_id(id);
     for (const auto& io : response_header.output()) {
       // Find the tensor in the response and set its shape.
@@ -1947,10 +1962,21 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     state->context_->responder_->Read(&state->request_, state);
 
   } else if (state->step_ == Steps::READ) {
+    int64_t requested_model_version;
+    TRTSERVER_Error* err = GetModelVersionFromString(
+        request.model_version(), &requested_model_version);
 #ifdef TRTIS_ENABLE_TRACING
     if (state->trace_meta_data_ != nullptr) {
-      state->trace_meta_data_->tracer_->SetModel(
-          state->request_.model_name(), state->request_.model_version());
+      if (err == nullptr) {
+        state->trace_meta_data_->tracer_->SetModel(
+            state->request_.model_name(), requested_model_version);
+      } else {
+        // If failed to retrieve the requested_model_version
+        // then use the default model version just to record
+        // the timestamps in the tracer
+        state->trace_meta_data_->tracer_->SetModel(
+            state->request_.model_name(), -1);
+      }
       state->trace_meta_data_->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
     }
@@ -1993,9 +2019,11 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // Create the inference request provider which provides all the
     // input information needed for an inference.
     TRTSERVER_InferenceRequestOptions* request_options = nullptr;
-    TRTSERVER_Error* err = TRTSERVER_InferenceRequestOptionsNew(
-        &request_options, request.model_name().c_str(),
-        request.model_version());
+    if (err == nullptr) {
+      err = TRTSERVER_InferenceRequestOptionsNew(
+          &request_options, request.model_name().c_str(),
+          requested_model_version);
+    }
     if (err == nullptr) {
       err = SetTRTSERVER_InferenceRequestOptions(
           request_options, request.meta_data());
@@ -2009,7 +2037,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
     // Will be used when GRPC request contains explicit bytes tensors
     AllocPayload::TensorSerializedDataMap* serialized_data_map =
-      new AllocPayload::TensorSerializedDataMap();
+        new AllocPayload::TensorSerializedDataMap();
 
     if (err == nullptr) {
       err = InferGRPCToInput(
@@ -2018,8 +2046,8 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     }
     if (err == nullptr) {
       err = InferAllocatorPayload(
-          trtserver_, shm_manager_, request.meta_data(),
-          serialized_data_map, response, &state->alloc_payload_);
+          trtserver_, shm_manager_, request.meta_data(), serialized_data_map,
+          response, &state->alloc_payload_);
     }
     if (err == nullptr) {
       // Provide the trace manager object to use for this request, if

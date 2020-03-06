@@ -54,7 +54,7 @@ if __name__ == '__main__':
     # output tensor is the element-wise sum of the inputs and one
     # output is the element-wise difference.
     model_name = "simple"
-    model_version = -1
+    model_version = ""
     batch_size = 1
 
     # Create gRPC stub for communicating with the server
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     # Generate the request
     request = grpc_service_v2_pb2.ModelInferRequest()
     request.model_name = model_name
-    request.model_version = -1
+    request.model_version = model_version
 
     # Input data
     input0_data = [i for i in range(16)]

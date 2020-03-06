@@ -33,7 +33,6 @@ from tensorrtserverV2.api import grpc_service_v2_pb2
 from tensorrtserverV2.api import grpc_service_v2_pb2_grpc
 from tensorrtserverV2.common import *
 
-
 def raise_error_grpc(rpc_error):
     raise InferenceServerException(
         msg=rpc_error.details(),
@@ -126,7 +125,7 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def is_model_ready(self, model_name, model_version=-1):
+    def is_model_ready(self, model_name, model_version=""):
         """Contact the inference server and get the readiness of specified model.
 
         Parameters
@@ -134,9 +133,10 @@ class InferenceServerClient:
         model_name: str
             The name of the model to check for readiness.
 
-        model_version: int
-            The version of the model to check for readiness. If -1 is given the 
-            server will choose a version based on the model and internal policy.
+        model_version: str
+            The version of the model to check for readiness. The default value
+            is an empty string which means then the server will choose a version
+            based on the model and internal policy.
 
         Returns
         -------
@@ -151,7 +151,8 @@ class InferenceServerClient:
         """
         try:
             request = grpc_service_v2_pb2.ModelReadyRequest(
-                name=model_name, version=model_version)
+                name=model_name,
+                version=model_version)
             response = self._client_stub.ModelReady(request)
             return response.ready
         except grpc.RpcError as rpc_error:
@@ -188,16 +189,17 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def get_model_metadata(self, model_name, model_version=-1, as_json=False):
+    def get_model_metadata(self, model_name, model_version="", as_json=False):
         """Contact the inference server and get the metadata for specified model.
 
         Parameters
         ----------
         model_name: str
             The name of the model
-        model_version: int
-            The version of the model to get metadata. If -1 is given the 
-            server will choose a version based on the model and internal policy.
+        model_version: str
+            The version of the model to get metadata. The default value
+            is an empty string which means then the server will choose
+            a version based on the model and internal policy.
         as_json : bool
             If true then returns model metadata as a json dict, otherwise
             as a protobuf message. Default value is False.
@@ -216,7 +218,8 @@ class InferenceServerClient:
         """
         try:
             request = grpc_service_v2_pb2.ModelMetadataRequest(
-                name=model_name, version=model_version)
+                name=model_name,
+                version=model_version)
             response = self._client_stub.ModelMetadata(request)
             if as_json:
                 return json.loads(MessageToJson(response))
@@ -225,16 +228,17 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def get_model_config(self, model_name, model_version=-1, as_json=False):
+    def get_model_config(self, model_name, model_version="", as_json=False):
         """Contact the inference server and get the configuration for specified model.
 
         Parameters
         ----------
         model_name: str
             The name of the model
-        model_version: int
-            The version of the model to get configuration. If -1 is given the 
-            server will choose a version based on the model and internal policy.
+        model_version: str
+            The version of the model to get configuration. The default value
+            is an empty string which means then the server will choose
+            a version based on the model and internal policy.
         as_json : bool
             If true then returns configuration as a json dict, otherwise
             as a protobuf message. Default value is False.
@@ -253,7 +257,8 @@ class InferenceServerClient:
         """
         try:
             request = grpc_service_v2_pb2.ModelConfigRequest(
-                name=model_name, version=model_version)
+                name=model_name,
+                version=model_version)
             response = self._client_stub.ModelConfig(request)
             if as_json:
                 return json.loads(MessageToJson(response))
@@ -305,7 +310,7 @@ class InferenceServerClient:
               inputs,
               outputs,
               model_name,
-              model_version=-1,
+              model_version="",
               request_id=None,
               sequence_id=0):
         """Run synchronous inference using the supplied 'inputs' requesting
@@ -322,10 +327,11 @@ class InferenceServerClient:
             list will be requested from the server.
         model_name: str
             The name of the model to run inference.
-        model_version: int
-            The version of the model to run inference. If -1 is given the 
-            server will choose a version based on the model and internal policy.
-        request_id: string
+        model_version: str
+            The version of the model to run inference.The default value
+            is an empty string which means then the server will choose
+            a version based on the model and internal policy.
+        request_id: str
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
@@ -362,7 +368,7 @@ class InferenceServerClient:
                     inputs,
                     outputs,
                     model_name,
-                    model_version=-1,
+                    model_version="",
                     request_id=None,
                     sequence_id=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
@@ -386,10 +392,11 @@ class InferenceServerClient:
             list will be requested from the server.
         model_name: str
             The name of the model to run inference.
-        model_version: int
-            The version of the model to run inference. If -1 is given the 
-            server will choose a version based on the model and internal policy.
-        request_id: string
+        model_version: str
+            The version of the model to run inference.The default value
+            is an empty string which means then the server will choose
+            a version based on the model and internal policy.
+        request_id: str
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
@@ -437,10 +444,11 @@ class InferenceServerClient:
             list will be requested from the server.
         model_name: str
             The name of the model to run inference.
-        model_version: int
-            The version of the model to run inference. If -1 is given the 
-            server will choose a version based on the model and internal policy.
-        request_id: string
+        model_version: str
+            The version of the model to run inference. The default value
+            is an empty string which means then the server will choose
+            a version based on the model and internal policy.
+        request_id: str
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
@@ -628,7 +636,7 @@ class InferResult:
 
         Parameters
         ----------
-        name : string
+        name : str
             The name of the output tensor whose result is to be retrieved.
     
         Returns
