@@ -158,13 +158,13 @@ PriorityQueue::PolicyQueue::ApplyPolicy(
         } else {
           rejected_queue_.emplace_back(std::move(queue_[curr_idx]));
           *rejected_count += 1;
-          *rejected_batch_size += rejected_queue_.back()
-                                      .request_provider_->Request()
-                                      ->BatchSize();
+          *rejected_batch_size +=
+              rejected_queue_.back().request_provider_->Request()->BatchSize();
         }
         curr_idx++;
+      } else {
+        break;
       }
-      break;
     }
 
     // Use range erasure on deque as all erasure functions are linear,
@@ -266,17 +266,25 @@ PriorityQueue::Enqueue(uint32_t priority_level, Scheduler::Payload&& payload)
   return status;
 }
 
-Scheduler::Payload
-PriorityQueue::Dequeue()
+Status
+PriorityQueue::Dequeue(Scheduler::Payload* payload)
 {
   pending_cursor_.valid_ = false;
-  if (!queues_[front_priority_level_].Empty()) {
-    size_--;
-    return queues_[front_priority_level_].Dequeue();
-  } else if (front_priority_level_ != last_priority_level_) {
-    front_priority_level_++;
+  while (true) {
+    if (!queues_[front_priority_level_].Empty()) {
+      size_--;
+      *payload = std::move(queues_[front_priority_level_].Dequeue());
+      return Status::Success;
+    } else if (front_priority_level_ != last_priority_level_) {
+      front_priority_level_++;
+      continue;
+    }
+
+    // Control reach here if the queue for last priority level is also empty,
+    // then raise exception
+    break;
   }
-  throw std::out_of_range("dequeue on empty queue");
+  return Status(RequestStatusCode::UNAVAILABLE, "dequeue on empty queue");
 }
 
 std::shared_ptr<std::vector<std::deque<Scheduler::Payload>>>
@@ -331,10 +339,6 @@ PriorityQueue::ApplyPolicyAtCursor()
     // for pending batch, or if all payloads are in pending batch.
     break;
   }
-  // DEBUG: remove the check below. We don't want cursor to go beyond 'queues_'
-  // so that we can simply call ApplyPolicyAtCursor() again when new payloads
-  // are added, and we can make sure that curr_it_ can be dereferenced safely.
-  assert(pending_cursor_.curr_it_ != queues_.end());
   size_ -= rejected_count;
   return rejected_batch_size;
 }

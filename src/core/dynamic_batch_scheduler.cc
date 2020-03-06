@@ -323,9 +323,22 @@ DynamicBatchScheduler::SchedulerThread(
         if ((wait_microseconds == 0) && (pending_batch_queue_cnt != 0)) {
           payloads = std::make_shared<std::vector<Scheduler::Payload>>();
           for (size_t idx = 0; idx < pending_batch_queue_cnt; ++idx) {
-            payloads->emplace_back(std::move(queue_.Dequeue()));
+            Scheduler::Payload payload;
+            auto status = queue_.Dequeue(&payload);
+            if (status.IsOk()) {
+              payloads->emplace_back(std::move(payload));
+            } else {
+              // The queue is empty which conflicts with pending batch count.
+              // Send the current batch if any and reset related variables.
+              LOG_ERROR << "Failed to retrieve payload from scheduler queue: "
+                        << status.Message();
+              queue_.ResetCursor();
+              queued_batch_size_ = 0;
+              pending_batch_size_ = 0;
+              break;
+            }
           }
-          if (preserve_ordering_) {
+          if (preserve_ordering_ && !payloads->empty()) {
             std::lock_guard<std::mutex> lock(completion_id_queue_mtx_);
             completion_id_queue_.push(completion_id);
           }
@@ -355,10 +368,17 @@ DynamicBatchScheduler::SchedulerThread(
       } else {
         // No batching... execute next request payload
         payloads = std::make_shared<std::vector<Scheduler::Payload>>();
-        payloads->emplace_back(std::move(queue_.Dequeue()));
-        if (preserve_ordering_) {
-          std::lock_guard<std::mutex> lock(completion_id_queue_mtx_);
-          completion_id_queue_.push(completion_id);
+        Scheduler::Payload payload;
+        auto status = queue_.Dequeue(&payload);
+        if (status.IsOk()) {
+          payloads->emplace_back(std::move(payload));
+          if (preserve_ordering_) {
+            std::lock_guard<std::mutex> lock(completion_id_queue_mtx_);
+            completion_id_queue_.push(completion_id);
+          }
+        } else {
+          LOG_ERROR << "Failed to retrieve payload from scheduler queue: "
+                    << status.Message();
         }
       }
 
@@ -516,7 +536,8 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
   // a thread to check again at the maximum allowed delay.
   struct timespec now;
   clock_gettime(CLOCK_MONOTONIC, &now);
-  uint64_t delay_ns = TIMESPEC_TO_NANOS(now) - queue_.OldestEnqueueTime();
+  uint64_t now_ns = TIMESPEC_TO_NANOS(now);
+  uint64_t delay_ns = now_ns - queue_.OldestEnqueueTime();
 
   if (delay_ns >= pending_batch_delay_ns_) {
     return 0;
@@ -532,14 +553,31 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
         preferred_batch_sizes_.empty() ? 0 : *preferred_batch_sizes_.begin();
   }
 
+  uint64_t wait_ns = pending_batch_delay_ns_ - delay_ns;
+  // Note that taking request timeout into consideration allows us to reset
+  // pending batch as soon as it is invalidated. But the cost is that in edge
+  // case where the timeout will be expired one by one, the thread will be
+  // waken frequently.
+  if (queue_.ClosestTimeout() != 0) {
+    if (now_ns <= queue_.ClosestTimeout()) {
+      wait_ns = std::min(queue_.ClosestTimeout() - now_ns, wait_ns);
+    } else {
+      // A request in pending batch is timed-out, wait for 1 us to force the
+      // thread to reset the pending batch right the way.
+      wait_ns = 1000;
+    }
+  }
+
+  LOG_ERROR << "Wait: " << wait_ns << " us";
+
   // Return non-zero wait microseconds to cause this thread to wait
-  // until the queue delay has expired. Another thread may be awaken
-  // due to incoming request to handle the pending batch before this
-  // thread wakes and that is ok. But if no other request comes in
-  // then this thread will wake and revisit the pending batch (and at
-  // that time will then see the delay has been exceeded and will send
+  // until the queue delay or the closest timeout has expired.
+  // Another thread may be awaken due to incoming request to handle the pending
+  // batch before this thread wakes and that is ok. But if no other request
+  // comes in then this thread will wake and revisit the pending batch
+  // (and at that time will then see the delay has been exceeded and will send
   // the batch).
-  return (pending_batch_delay_ns_ - delay_ns) / 1000;
+  return wait_ns / 1000;
 }
 
 void

@@ -156,6 +156,8 @@ RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_model_config/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_model_queue/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_simple_lib/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_pinned_memory/. && \
