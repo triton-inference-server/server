@@ -222,6 +222,7 @@ set(
   status.h
   tracing.h
   trtserver.h
+  trtserver2.h
 )
 
 if(${TRTIS_ENABLE_GPU})

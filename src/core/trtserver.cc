@@ -32,16 +32,55 @@
 #include "src/core/infer_request.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
+#include "src/core/model_config_utils.h"
 #include "src/core/nvtx.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/server.h"
 #include "src/core/server_status.h"
 #include "src/core/status.h"
 #include "src/core/tracing.h"
+#include "src/core/trtserver2.h"
 
 namespace ni = nvidia::inferenceserver;
 
 namespace {
+
+const char*
+GetDataTypeProtocolString(const ni::DataType dtype)
+{
+  switch (dtype) {
+    case ni::DataType::TYPE_BOOL:
+      return "BOOL";
+    case ni::DataType::TYPE_UINT8:
+      return "UINT8";
+    case ni::DataType::TYPE_UINT16:
+      return "UINT16";
+    case ni::DataType::TYPE_UINT32:
+      return "UINT32";
+    case ni::DataType::TYPE_UINT64:
+      return "UINT64";
+    case ni::DataType::TYPE_INT8:
+      return "INT8";
+    case ni::DataType::TYPE_INT16:
+      return "INT16";
+    case ni::DataType::TYPE_INT32:
+      return "INT32";
+    case ni::DataType::TYPE_INT64:
+      return "INT64";
+    case ni::DataType::TYPE_FP16:
+      return "FP16";
+    case ni::DataType::TYPE_FP32:
+      return "FP32";
+    case ni::DataType::TYPE_FP64:
+      return "FP64";
+    case ni::DataType::TYPE_STRING:
+      return "BYTES";
+    default:
+      break;
+  }
+
+  return "";
+}
 
 //
 // TrtServerError
@@ -500,7 +539,7 @@ class TrtInferenceRequest {
   TrtInferenceRequest(
       const std::shared_ptr<ni::InferenceBackend>& backend,
       ni::InferenceRequest* request)
-      : backend_(backend), request_(request)
+      : backend_(backend), request_(request), status_(ni::Status::Success)
   {
   }
 
@@ -514,9 +553,23 @@ class TrtInferenceRequest {
     return request_;
   }
 
+  const ni::Status& RequestStatus() const { return status_; }
+  void SetRequestStatus(const ni::Status& s) { status_ = s; }
+
+  const std::shared_ptr<ni::InferResponseProvider>& Response() const
+  {
+    return response_provider_;
+  }
+  void SetResponse(const std::shared_ptr<ni::InferResponseProvider>& r)
+  {
+    response_provider_ = r;
+  }
+
  private:
   std::shared_ptr<ni::InferenceBackend> backend_;
   std::shared_ptr<ni::InferenceRequest> request_;
+  ni::Status status_;
+  std::shared_ptr<ni::InferResponseProvider> response_provider_;
 };
 
 //
@@ -986,9 +1039,8 @@ TRTSERVER_InferenceRequestProviderNewV2(
       loptions->ModelName(), loptions->ModelVersion(), &backend));
 
   std::unique_ptr<ni::InferenceRequest> request(new ni::InferenceRequest(
-      loptions->ModelName(), loptions->ModelVersion(),
+      loptions->ModelName(), loptions->ModelVersion(), backend->Version(),
       lserver->ProtocolVersion()));
-  request->SetActualModelVersion(backend->Version());
   request->SetId(loptions->InferRequestHeader()->id());
 #ifdef TRTIS_ENABLE_GRPC_V2
   request->SetIdStr(loptions->IdStr());
@@ -1006,10 +1058,10 @@ TRTSERVER_InferenceRequestProviderNewV2(
 
   for (const auto& io : loptions->InferRequestHeader()->output()) {
     uint32_t cls_cnt = io.has_cls() ? io.cls().count() : 0;
-    RETURN_IF_STATUS_ERROR(request->RequestOutput(io.name(), cls_cnt));
+    RETURN_IF_STATUS_ERROR(request->AddRequestedOutput(io.name(), cls_cnt));
   }
 
-  RETURN_IF_STATUS_ERROR(request->Normalize(*backend));
+  RETURN_IF_STATUS_ERROR(request->PrepareForInference(*backend));
 
   *request_provider = reinterpret_cast<TRTSERVER_InferenceRequestProvider*>(
       new TrtInferenceRequest(backend, request.release()));
@@ -1716,6 +1768,418 @@ TRTSERVER_ServerInferAsync(
         complete_fn(
             server, trace_manager,
             reinterpret_cast<TRTSERVER_InferenceResponse*>(response),
+            complete_userp);
+      });
+
+  return nullptr;  // Success
+}
+
+
+//
+// TRTSERVER2
+//
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestNew(
+    TRTSERVER2_InferenceRequest** inference_request, TRTSERVER_Server* server,
+    const char* model_name, const char* model_version)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  int64_t model_int_version = -1;
+  if (model_version != nullptr) {
+    RETURN_IF_STATUS_ERROR(
+        ni::GetModelVersionFromString(model_version, &model_int_version));
+  }
+
+  std::shared_ptr<ni::InferenceBackend> backend;
+  RETURN_IF_STATUS_ERROR(
+      lserver->GetInferenceBackend(model_name, model_int_version, &backend));
+
+  std::unique_ptr<ni::InferenceRequest> request(new ni::InferenceRequest(
+      model_name, model_int_version, backend->Version(),
+      lserver->ProtocolVersion()));
+
+  *inference_request = reinterpret_cast<TRTSERVER2_InferenceRequest*>(
+      new TrtInferenceRequest(backend, request.release()));
+
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestDelete(
+    TRTSERVER2_InferenceRequest* inference_request)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  delete lrequest;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestId(
+    TRTSERVER2_InferenceRequest* inference_request, const char** id)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  *id = lrequest->Request()->IdStr().c_str();
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestSetId(
+    TRTSERVER2_InferenceRequest* inference_request, const char* id)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  lrequest->Request()->SetIdStr(id);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestFlags(
+    TRTSERVER2_InferenceRequest* inference_request, uint32_t* flags)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  *flags = lrequest->Request()->Flags();
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestSetFlags(
+    TRTSERVER2_InferenceRequest* inference_request, uint32_t flags)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  lrequest->Request()->SetFlags(flags);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestCorrelationId(
+    TRTSERVER2_InferenceRequest* inference_request, uint64_t* correlation_id)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  *correlation_id = lrequest->Request()->CorrelationId();
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestSetCorrelationId(
+    TRTSERVER2_InferenceRequest* inference_request, uint64_t correlation_id)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  lrequest->Request()->SetCorrelationId(correlation_id);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestPriority(
+    TRTSERVER2_InferenceRequest* inference_request, uint32_t* priority)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  *priority = lrequest->Request()->Priority();
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestSetPriority(
+    TRTSERVER2_InferenceRequest* inference_request, uint32_t priority)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  lrequest->Request()->SetPriority(priority);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestTimeoutMicroseconds(
+    TRTSERVER2_InferenceRequest* inference_request, uint64_t* timeout_us)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  *timeout_us = lrequest->Request()->TimeoutMicroseconds();
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestSetTimeoutMicroseconds(
+    TRTSERVER2_InferenceRequest* inference_request, uint64_t timeout_us)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  lrequest->Request()->SetTimeoutMicroseconds(timeout_us);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestAddInput(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name,
+    const char* datatype, const int64_t* shape, uint64_t dim_count)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(
+      lrequest->Request()->AddInput(name, datatype, shape, dim_count));
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestRemoveInput(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->Request()->RemoveInput(name));
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestRemoveAllInputs(
+    TRTSERVER2_InferenceRequest* inference_request)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->Request()->RemoveAllInputs());
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestAppendInputData(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name,
+    const void* base, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+    int64_t memory_type_id)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+
+  ni::InferenceRequest::Input* input;
+  RETURN_IF_STATUS_ERROR(lrequest->Request()->MutableInput(name, &input));
+  RETURN_IF_STATUS_ERROR(
+      input->AppendData(base, byte_size, memory_type, memory_type_id));
+
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestRemoveAllInputData(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+
+  ni::InferenceRequest::Input* input;
+  RETURN_IF_STATUS_ERROR(lrequest->Request()->MutableInput(name, &input));
+  RETURN_IF_STATUS_ERROR(input->RemoveAllData());
+
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestAddRequestedOutput(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->Request()->AddRequestedOutput(name));
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestRemoveRequestedOutput(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->Request()->RemoveRequestedOutput(name));
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestRemoveAllRequestedOutputs(
+    TRTSERVER2_InferenceRequest* inference_request)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->Request()->RemoveAllRequestedOutputs());
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestSetRequestedOutputClassificationCount(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name,
+    uint32_t count)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+
+  ni::InferenceRequest::RequestedOutput* requested;
+  RETURN_IF_STATUS_ERROR(
+      lrequest->Request()->MutableRequestedOutput(name, &requested));
+  requested->SetClassificationCount(count);
+
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestError(TRTSERVER2_InferenceRequest* inference_request)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->RequestStatus());
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestOutputData(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name,
+    const void** base, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
+    int64_t* memory_type_id)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->Response()->OutputBufferContents(
+      name, base, byte_size, memory_type, memory_type_id));
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestOutputDataType(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name,
+    const char** datatype)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  const auto& response_header = lrequest->Response()->ResponseHeader();
+  for (const auto& output : response_header.output()) {
+    if (output.name() == name) {
+      *datatype = GetDataTypeProtocolString(output.data_type());
+      return nullptr;  // Success
+    }
+  }
+
+  return TRTSERVER_ErrorNew(TRTSERVER_ERROR_INVALID_ARG, "unknown output");
+}
+
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestOutputShape(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name,
+    int64_t* shape, uint64_t* dim_count)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  const auto& response_header = lrequest->Response()->ResponseHeader();
+  for (const auto& output : response_header.output()) {
+    if (output.name() == name) {
+      if (!output.has_raw()) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            "output shape not available for classification");
+      }
+
+      if ((uint64_t)output.raw().dims_size() > *dim_count) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "output shape has " + std::to_string(output.raw().dims_size()) +
+                " dimensions, shape buffer too small")
+                .c_str());
+      }
+
+      *dim_count = output.raw().dims_size();
+      for (int d = 0; d < output.raw().dims_size(); ++d) {
+        shape[d] = output.raw().dims(d);
+      }
+
+      return nullptr;  // Success
+    }
+  }
+
+  return TRTSERVER_ErrorNew(TRTSERVER_ERROR_INVALID_ARG, "unknown output");
+}
+
+TRTSERVER_Error*
+TRTSERVER2_ServerInferAsync(
+    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
+    TRTSERVER2_InferenceRequest* inference_request,
+    TRTSERVER_ResponseAllocator* response_allocator,
+    void* response_allocator_userp,
+    TRTSERVER2_InferenceCompleteFn_t complete_fn, void* complete_userp)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  TrtInferenceRequest* ltrtrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  TrtServerResponseAllocator* lresponsealloc =
+      reinterpret_cast<TrtServerResponseAllocator*>(response_allocator);
+
+  const auto& lrequest = ltrtrequest->Request();
+  const auto& lbackend = ltrtrequest->Backend();
+
+  RETURN_IF_STATUS_ERROR(lrequest->PrepareForInference(*lbackend));
+
+#ifdef TRTIS_ENABLE_STATS
+  auto infer_stats = std::make_shared<ni::ModelInferStats>(
+      lserver->StatusManager(), lrequest->ModelName());
+  infer_stats->CaptureTimestamp(
+      ni::ModelInferStats::TimestampKind::kRequestStart);
+  infer_stats->SetRequestedVersion(lrequest->RequestedModelVersion());
+  infer_stats->SetMetricReporter(lbackend->MetricReporter());
+  infer_stats->SetBatchSize(lrequest->BatchSize());
+  infer_stats->SetFailed(true);
+  infer_stats->SetTraceManager(trace_manager);
+  infer_stats->NewTrace();
+#else
+  auto infer_stats = std::make_shared<ni::ModelInferStats>();
+#endif  // TRTIS_ENABLE_STATS
+
+  std::shared_ptr<ni::InferRequestProvider> infer_request_provider;
+  RETURN_IF_STATUS_ERROR(
+      ni::InferRequestProvider::Create(lrequest, &infer_request_provider));
+
+  std::shared_ptr<ni::InferResponseProvider> infer_response_provider;
+  {
+    std::shared_ptr<ni::InferResponseProvider> del_response_provider;
+    RETURN_IF_STATUS_ERROR(ni::InferResponseProvider::Create(
+        lrequest, lbackend->GetLabelProvider(), response_allocator,
+        lresponsealloc->AllocFn(), response_allocator_userp,
+        lresponsealloc->ReleaseFn(), &del_response_provider));
+    infer_response_provider = del_response_provider;
+  }
+
+  lserver->InferAsync(
+      lbackend, infer_request_provider, infer_response_provider, infer_stats,
+      [infer_stats, trace_manager, ltrtrequest, infer_response_provider, server,
+       complete_fn, complete_userp](const ni::Status& status) mutable {
+        if (!status.IsOk()) {
+          LOG_VERBOSE(1) << "Infer failed: " << status.Message();
+        }
+
+#ifdef TRTIS_ENABLE_STATS
+        infer_stats->SetFailed(!status.IsOk());
+        infer_stats->CaptureTimestamp(
+            ni::ModelInferStats::TimestampKind::kRequestEnd);
+
+        // We must explicitly update the inference stats before
+        // sending the response... otherwise it is possible that the
+        // client will be able to query the stats after the response
+        // is received but before they've been updated for the request
+        // (this is especially important for testing).
+        infer_stats->Report();
+#endif  // TRTIS_ENABLE_STATS
+
+        // FIXMEV2 status should live in InferenceRequest instead of
+        // being a callback arg.
+        ltrtrequest->SetRequestStatus(status);
+
+        ltrtrequest->SetResponse(infer_response_provider);
+
+        complete_fn(
+            server, trace_manager,
+            reinterpret_cast<TRTSERVER2_InferenceRequest*>(ltrtrequest),
             complete_userp);
       });
 

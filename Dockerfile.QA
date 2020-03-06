@@ -80,6 +80,7 @@ RUN mkdir -p qa/common && \
     cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_grpc_v2/models && \
     cp -r /workspace/docs/examples/model_repository/inception_graphdef qa/L0_grpc_v2/models && \
     cp /opt/tensorrtserver/bin/simple qa/L0_simple_lib/. && \
+    cp /opt/tensorrtserver/bin/simplev2 qa/L0_simple_lib/. && \
     cp /opt/tensorrtserver/bin/memory_alloc qa/L0_io/.
 
 RUN cp /workspace/builddir/trtis-test-utils/install/bin/caffe2plan qa/common/.

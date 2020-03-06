@@ -39,7 +39,12 @@ class InferenceServer;
 class InferSharedMemory;
 
 //
-// An inference request
+// An inference request. A request can be used multiple times for
+// inference but before each inference PrepareForInference() must be
+// called to verify and prepare the request. Verification involves
+// ensuring that any changes made since the last inference are
+// valid. Preparing involves removing/reseting any state left over
+// from the previous inference.
 //
 class InferenceRequest {
  public:
@@ -50,13 +55,24 @@ class InferenceRequest {
     Input(
         const std::string& name, const std::vector<int64_t>& shape,
         const uint64_t batch_byte_size);
+    Input(
+        const std::string& name, const std::string& datatype,
+        const int64_t* shape, const uint64_t dim_count);
 
     // The name of the input tensor. There is no mutable operator for
     // the name because it is used in a InferenceReference map and a
     // mutable method would allow it to get out-of-sync.
     const std::string& Name() const { return name_; }
 
-    // The shape of the input tensor.
+    // Or original shape of the input tensor.
+    const std::vector<int64_t>& OriginalShape() const
+    {
+      return original_shape_;
+    }
+
+    // The shape of the input tensor after normalization. This shape
+    // is the original shape modified as required/expected by
+    // inference processing.
     const std::vector<int64_t>& Shape() const { return shape_; }
     std::vector<int64_t>* MutableShape() { return &shape_; }
 
@@ -75,6 +91,12 @@ class InferenceRequest {
     // Set the data for this input. Error is input already has some
     // data.
     Status SetData(const std::shared_ptr<Memory>& data);
+
+    // Remove all existing data for the input.
+    Status RemoveAllData();
+
+    // Prepare this input for inference.
+    void PrepareForInference();
 
     // Get the next contiguous chunk of bytes for the input. Return a
     // pointer to the chunk in 'content'.  If there are no more bytes
@@ -98,7 +120,11 @@ class InferenceRequest {
 
    private:
     std::string name_;
+    std::string datatype_;
+    std::vector<int64_t> original_shape_;
     std::vector<int64_t> shape_;
+
+    // FIXMEV2 why needed? Should get total data size from data_.
     uint64_t batch_byte_size_;
 
     std::shared_ptr<Memory> data_;
@@ -121,6 +147,7 @@ class InferenceRequest {
     // returned as a classification of the indicated number of
     // classes.
     uint32_t ClassificationCount() const { return classification_cnt_; }
+    void SetClassificationCount(uint32_t c) { classification_cnt_ = c; }
 
    private:
     std::string name_;
@@ -130,25 +157,14 @@ class InferenceRequest {
     uint32_t classification_cnt_;
   };
 
-  InferenceRequest();
   InferenceRequest(
-      const std::string& model_name, const int64_t model_version,
-      const uint32_t protocol_version);
-
-  // Initialize this request so that it is prepared to run on
-  // 'server'. All options and tensor data must be set before calling.
-  Status Init(InferenceServer* server);
+      const std::string& model_name, const int64_t requested_model_version,
+      const int64_t actual_model_version, const uint32_t protocol_version);
 
   uint32_t ProtocolVersion() const { return protocol_version_; }
-
   const std::string& ModelName() const { return model_name_; }
-  void SetModelName(const std::string& n) { model_name_ = n; }
-
   int64_t RequestedModelVersion() const { return requested_model_version_; }
-  void SetRequestedModelVersion(int64_t v) { requested_model_version_ = v; }
-
   int64_t ActualModelVersion() const { return actual_model_version_; }
-  void SetActualModelVersion(int64_t v) { actual_model_version_ = v; }
 
   uint64_t Id() const { return id_; }
   void SetId(uint64_t i) { id_ = i; }
@@ -163,8 +179,14 @@ class InferenceRequest {
   uint64_t CorrelationId() const { return correlation_id_; }
   void SetCorrelationId(uint64_t c) { correlation_id_ = c; }
 
+  // FIXMEV2 remove setter as batch size will only be set during
+  // normalization
   uint32_t BatchSize() const { return batch_size_; }
-  void SetBatchSize(uint32_t b) { batch_size_ = b; }
+  void SetBatchSize(uint32_t b)
+  {
+    needs_normalization_ = true;
+    batch_size_ = b;
+  }
 
   uint32_t Priority() const { return priority_; }
   void SetPriority(uint32_t p) { priority_ = p; }
@@ -172,12 +194,19 @@ class InferenceRequest {
   uint64_t TimeoutMicroseconds() const { return timeout_us_; }
   void SetTimeoutMicroseconds(uint64_t t) { timeout_us_ = t; }
 
-  std::unordered_map<std::string, Input>* MutableInputs() { return &inputs_; }
+  Status MutableInput(const std::string& name, Input** input);
+  std::unordered_map<std::string, Input>* MutableInputs()
+  {
+    needs_normalization_ = true;
+    return &inputs_;
+  }
   const std::unordered_map<std::string, Input>& Inputs() const
   {
     return inputs_;
   }
 
+  Status MutableRequestedOutput(
+      const std::string& name, RequestedOutput** output);
   const std::unordered_map<std::string, RequestedOutput>& RequestedOutputs()
       const
   {
@@ -192,18 +221,36 @@ class InferenceRequest {
   Status AddInput(
       const std::string& name, const std::vector<int64_t>& shape,
       const uint64_t batch_byte_size, Input** input = nullptr);
+  Status AddInput(
+      const std::string& name, const std::string& datatype,
+      const int64_t* shape, const uint64_t dim_count, Input** input = nullptr);
+
+  // Remove a single input or all inputs.
+  Status RemoveInput(const std::string& name);
+  Status RemoveAllInputs();
 
   // Request an output.
-  Status RequestOutput(
-      const std::string& name, const uint32_t classification_cnt);
+  Status AddRequestedOutput(
+      const std::string& name, const uint32_t classification_cnt = 0);
 
-  // Normalize the request by checking and conforming it to the model
-  // configuration. We pass backend here as non-shared-ptr because
-  // normalize must be used in contexts where the backend shared_ptr
-  // does not yet exist (e.g. warmup).
-  Status Normalize(const InferenceBackend& backend);
+  // Remove a single requested output or all requested outputs.
+  Status RemoveRequestedOutput(const std::string& name);
+  Status RemoveAllRequestedOutputs();
+
+  // Prepare this request for inference. We pass backend here as
+  // non-shared-ptr because normalize must be used in contexts where
+  // the backend shared_ptr does not yet exist (e.g. warmup).
+  Status PrepareForInference(const InferenceBackend& backend);
 
  private:
+  Status NormalizeV1(const InferenceBackend& backend);
+  Status NormalizeV2(const InferenceBackend& backend);
+
+  // Has anything in the request potentially changed in a way that
+  // causes normalization to be required when preparing the request
+  // for inference.
+  bool needs_normalization_;
+
   std::string model_name_;
 
   // The model version as requested and based on version policy the
