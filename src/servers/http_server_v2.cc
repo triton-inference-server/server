@@ -779,7 +779,7 @@ HTTPAPIServerV2::HandleModelMetadata(
 
       rapidjson::Value versions_array(rapidjson::kArrayType);
       for (const auto& pr : model_status.version_status()) {
-        versions_array.PushBack(pr.first, allocator);
+        versions_array.PushBack(std::to_string(pr.first), allocator);
       }
       document.AddMember("versions", versions_array, allocator);
 
@@ -1094,10 +1094,9 @@ HTTPAPIServerV2::HandleInfer(
     return;
   }
 
-  int64_t model_version = -1;
-  if (!model_version_str.empty()) {
-    model_version = std::atoll(model_version_str.c_str());
-  }
+  int64_t requested_model_version;
+  TRTSERVER_Error* err = GetModelVersionFromString(
+      model_version_str.c_str(), &requested_model_version);
 
 #ifdef TRTIS_ENABLE_TRACING
   // Timestamps from evhtp are capture in 'req'. We record here since
@@ -1106,7 +1105,15 @@ HTTPAPIServerV2::HandleInfer(
   if (trace_manager_ != nullptr) {
     trace_meta_data.reset(trace_manager_->SampleTrace());
     if (trace_meta_data != nullptr) {
-      trace_meta_data->tracer_->SetModel(model_name, model_version);
+      if (err == nullptr) {
+          request.model_name(), request.model_version());
+            request.model_name(), requested_model_version);
+      } else {
+        // If failed to retrieve the requested_model_version
+        // then use the default model version just to record
+        // the timestamps in the tracer
+        state->trace_meta_data_->tracer_->SetModel(request.model_name(), -1);
+      }
       trace_meta_data->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "http recv start",
           TIMESPEC_TO_NANOS(req->recv_start_ts));
@@ -1133,7 +1140,7 @@ HTTPAPIServerV2::HandleInfer(
   // input information needed for an inference.
   TRTSERVER_InferenceRequestOptions* request_options = nullptr;
   TRTSERVER_Error* err = TRTSERVER_InferenceRequestOptionsNew(
-      &request_options, model_name.c_str(), model_version);
+      &request_options, model_name.c_str(), requested_model_version);
   if (err == nullptr) {
     err = SetTRTSERVER_InferenceRequestOptions(
         request_options, request_header_protobuf);
