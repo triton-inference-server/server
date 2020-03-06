@@ -225,6 +225,7 @@ main(int argc, char** argv)
       nic::MapSharedMemory(
           shm_fd_op, 0, output_byte_size * 2, (void**)&output0_shm),
       "");
+  FAIL_IF_ERR(nic::CloseSharedMemory(shm_fd_op), "");
   int* output1_shm = (int*)(output0_shm + 16);
 
   // Register Output shared memory with TRTIS
@@ -262,11 +263,13 @@ main(int argc, char** argv)
       nic::MapSharedMemory(
           shm_fd_ip, 0, input_byte_size * 2, (void**)&input0_shm),
       "");
+  FAIL_IF_ERR(nic::CloseSharedMemory(shm_fd_ip), "");
   int* input1_shm = (int*)(input0_shm + 16);
   for (size_t i = 0; i < 16; ++i) {
     *(input0_shm + i) = i;
     *(input1_shm + i) = 1;
   }
+
   // Register Input shared memory with TRTIS
   FAIL_IF_ERR(
       shared_memory_ctx->RegisterSharedMemory(

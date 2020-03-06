@@ -49,6 +49,7 @@ OpenSharedMemoryRegion(const std::string& shm_key, int* shm_fd)
         std::string("Unable to open shared memory region: '" + shm_key + "'")
             .c_str());
   }
+
   return nullptr;
 }
 
@@ -60,10 +61,11 @@ MapSharedMemory(
   // map shared memory to process address space
   *mapped_addr = mmap(NULL, byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
   if (*mapped_addr == MAP_FAILED) {
-    LOG_VERBOSE(1) << "mmap failed, errno: " << errno;
     return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INTERNAL,
-        std::string("Unable to process address space").c_str());
+        TRTSERVER_ERROR_INTERNAL, std::string(
+                                      "unable to process address space" +
+                                      std::string(std::strerror(errno)))
+                                      .c_str());
   }
 
   return nullptr;
@@ -77,10 +79,11 @@ CloseSharedMemoryRegion(int shm_fd)
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INTERNAL,
         std::string(
-            "Unable to close shared memory region, errno: " +
+            "unable to close shared memory descriptor, errno: " +
             std::string(std::strerror(errno)))
             .c_str());
   }
+
   return nullptr;
 }
 
@@ -92,7 +95,7 @@ UnmapSharedMemory(void* mapped_addr, size_t byte_size)
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INTERNAL,
         std::string(
-            "Unable to munmap shared memory region, errno: " +
+            "unable to munmap shared memory region, errno: " +
             std::string(std::strerror(errno)))
             .c_str());
   }
@@ -162,13 +165,25 @@ SharedMemoryManager::RegisterSystemSharedMemory(
     RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_fd));
   }
 
-
-  TRTSERVER_Error* err =
+  // Mmap and then close the shared memory descriptor
+  TRTSERVER_Error* err_mmap =
       MapSharedMemory(shm_fd, offset, byte_size, &mapped_addr);
-  if (err != nullptr) {
+  TRTSERVER_Error* err_close = CloseSharedMemoryRegion(shm_fd);
+  if (err_mmap != nullptr) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INVALID_ARG,
-        std::string("failed to register shared memory region '" + name + "'")
+        std::string(
+            "failed to register shared memory region '" + name +
+            "': " + TRTSERVER_ErrorMessage(err_mmap))
+            .c_str());
+  }
+
+  if (err_close != nullptr) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "failed to register shared memory region '" + name +
+            "': " + TRTSERVER_ErrorMessage(err_close))
             .c_str());
   }
 
@@ -317,18 +332,6 @@ SharedMemoryManager::UnregisterHelper(const std::string& name)
     if (it->second->kind_ == TRTSERVER_MEMORY_CPU) {
       RETURN_IF_ERR(
           UnmapSharedMemory(it->second->mapped_addr_, it->second->byte_size_));
-      // if no other region with same shm_key then close
-      bool last_one = true;
-      for (auto itr = shared_memory_map_.begin();
-           itr != shared_memory_map_.end(); ++itr) {
-        if (itr->second->shm_key_ == it->second->shm_key_) {
-          last_one = false;
-          break;
-        }
-      }
-      if (last_one) {
-        RETURN_IF_ERR(CloseSharedMemoryRegion(it->second->shm_fd_));
-      }
     } else {
 #ifdef TRTIS_ENABLE_GPU
       cudaError_t err = cudaIpcCloseMemHandle(it->second->mapped_addr_);

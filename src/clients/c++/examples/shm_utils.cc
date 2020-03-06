@@ -78,6 +78,19 @@ MapSharedMemory(int shm_fd, size_t offset, size_t byte_size, void** shm_addr)
 }
 
 nic::Error
+CloseSharedMemory(int shm_fd)
+{
+  // close shared memory descriptor
+  if (close(shm_fd) == -1) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "unable to close shared-memory descriptor: " + std::to_string(shm_fd));
+  }
+
+  return nic::Error::Success;
+}
+
+nic::Error
 UnlinkSharedMemoryRegion(std::string shm_key)
 {
   int shm_fd = shm_unlink(shm_key.c_str());
