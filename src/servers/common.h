@@ -121,4 +121,7 @@ const char* GetDataTypeProtocolString(const DataType dtype);
 
 size_t GetDataTypeByteSize(const std::string& protocol_dtype);
 
+TRTSERVER_Error* GetModelVersionFromString(
+    const std::string& version_string, int64_t* version_int);
+
 }}  // namespace nvidia::inferenceserver

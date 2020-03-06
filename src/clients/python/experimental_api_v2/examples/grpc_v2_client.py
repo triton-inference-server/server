@@ -55,7 +55,7 @@ if __name__ == '__main__':
     # output tensor is the element-wise sum of the inputs and one
     # output is the element-wise difference.
     model_name = "simple"
-    model_version = -1
+    model_version = ""
     batch_size = 1
 
     # Create gRPC stub for communicating with the server
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     print("server {}".format(response))
 
     request = grpc_service_v2_pb2.ModelReadyRequest(
-        name="resnet_v1_50_graphdef", version=-1)
+        name="resnet_v1_50_graphdef", version=model_version)
     response = grpc_stub.ModelReady(request)
     print("model {}".format(response))
 
@@ -85,20 +85,20 @@ if __name__ == '__main__':
     print("server metadata:\n{}".format(response))
 
     request = grpc_service_v2_pb2.ModelMetadataRequest(
-        name="resnet_v1_50_graphdef", version=-1)
+        name="resnet_v1_50_graphdef", version=model_version)
     response = grpc_stub.ModelMetadata(request)
     print("model metadata:\n{}".format(response))
 
     # Configuration
     request = grpc_service_v2_pb2.ModelConfigRequest(
-        name="resnet_v1_50_graphdef", version=-1)
+        name="resnet_v1_50_graphdef", version=model_version)
     response = grpc_stub.ModelConfig(request)
     print("model config:\n{}".format(response))
 
     # Infer
     request = grpc_service_v2_pb2.ModelInferRequest()
     request.model_name = "resnet_v1_50_graphdef"
-    request.model_version = -1
+    request.model_version = model_version
     request.id = "my request id"
 
     input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
@@ -112,10 +112,11 @@ if __name__ == '__main__':
 
     request.inputs.extend([input])
 
-    output = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor(
-    )
+    output = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output.name = "resnet_v1_50/predictions/Softmax"
     request.outputs.extend([output])
 
     response = grpc_stub.ModelInfer(request)
     print("model infer:\n{}".format(response))
+
+    print("PASS")
