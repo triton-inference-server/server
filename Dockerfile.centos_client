@@ -61,7 +61,10 @@ COPY src/clients src/clients
 COPY src/core src/core
 
 RUN cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install . && \
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install
+          -DTRTIS_ENABLE_GRPC_V2=ON \
+          . && \
     make -j16 trtis-clients
 RUN cd install && \
     export VERSION=`cat /workspace/VERSION` && \
@@ -77,7 +80,10 @@ COPY qa/images/mug.jpg images/mug.jpg
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
 RUN python -m pip install --user --upgrade pip && \
-    python -m pip install --upgrade --ignore-installed install/python/tensorrtserver*.whl numpy pillow
+    python -m pip install --upgrade --ignore-installed \
+            install/python/tensorrtserver*.whl \
+            install/python/triton*.whl \
+            numpy pillow
 
 ENV PATH //workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}

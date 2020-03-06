@@ -25,11 +25,13 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from functools import partial
 import argparse
 import numpy as np
+import time
+import sys
 
-from tensorrtserverV2.api import grpcclient
-from tensorrtserverV2.common import InferenceServerException
+import tritongrpcclient.core as grpcclient
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -53,8 +55,9 @@ if __name__ == '__main__':
         print("context creation failed: " + str(e))
         sys.exit()
 
-    model_name = 'simple_string'
+    model_name = 'simple'
 
+    # Infer
     inputs = []
     outputs = []
     inputs.append(grpcclient.InferInput('INPUT0'))
@@ -62,16 +65,9 @@ if __name__ == '__main__':
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
-    in0 = np.arange(start=0, stop=16, dtype=np.int32)
-    in0 = np.expand_dims(in0, axis=0)
-    in1 = np.ones(shape=(1, 16), dtype=np.int32)
-    expected_sum = np.add(in0, in1)
-    expected_diff = np.subtract(in0, in1)
-
-    in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
-    input0_data = in0n.reshape(in0.shape)
-    in1n = np.array([str(x) for x in in1.reshape(in1.size)], dtype=object)
-    input1_data = in1n.reshape(in1.shape)
+    input0_data = np.arange(start=0, stop=16, dtype=np.int32)
+    input0_data = np.expand_dims(input0_data, axis=0)
+    input1_data = np.ones(shape=(1, 16), dtype=np.int32)
 
     # Initialize the data
     inputs[0].set_data_from_numpy(input0_data)
@@ -80,28 +76,42 @@ if __name__ == '__main__':
     outputs.append(grpcclient.InferOutput('OUTPUT0'))
     outputs.append(grpcclient.InferOutput('OUTPUT1'))
 
-    results = TRTISClient.infer(inputs, outputs, model_name)
+    # Define the callback function. Note the last parameter should be
+    # result InferenceServerClient would povide the results of an
+    # inference in the same parameter.
+    def callback(user_data, result):
+        user_data.append(result)
 
-    # Get the output arrays from the
-    output0_data = results.as_numpy('OUTPUT0')
-    output1_data = results.as_numpy('OUTPUT1')
+    # list to hold the results of inference.
+    user_data = []
 
-    for i in range(16):
-        print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
-              str(output0_data[0][i]))
-        print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
-              str(output1_data[0][i]))
+    # Inference call
+    TRTISClient.async_infer(partial(callback, user_data), inputs, outputs,
+                            model_name)
 
-        # Convert result from string to int to check result
-        r0 = int(output0_data[0][i])
-        r1 = int(output1_data[0][i])
-        if expected_sum[0][i] != r0:
-            print("error: incorrect sum")
-            sys.exit(1)
-        if expected_diff[0][i] != r1:
-            print("error: incorrect difference")
-            sys.exit(1)
+    # Wait until the results are available in user_data
+    time_out = 10
+    while ((len(user_data) == 0) and time_out > 0):
+        time_out = time_out - 1
+        time.sleep(1)
 
-    print('PASS: string')
+    # Display and validate the available results
+    if ((len(user_data) == 1)):
+        # Validate the values by matching with already computed expected
+        # values.
+        output0_data = user_data[0].as_numpy('OUTPUT0')
+        output1_data = user_data[0].as_numpy('OUTPUT1')
+        for i in range(16):
+            print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) +
+                  " = " + str(output0_data[0][i]))
+            print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) +
+                  " = " + str(output1_data[0][i]))
+            if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
+                print("sync infer error: incorrect sum")
+                sys.exit(1)
+            if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
+                print("sync infer error: incorrect difference")
+                sys.exit(1)
+        print("PASS: Async infer")
 
     TRTISClient.close()

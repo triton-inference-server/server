@@ -32,10 +32,10 @@ from builtins import range
 from functools import partial
 from PIL import Image
 
-from tensorrtserverV2.api import grpcclient
-from tensorrtserverV2.common import InferenceServerException
-from tensorrtserverV2.common import trtis_to_np_dtype
-import tensorrtserverV2.api.model_config_pb2 as mc
+import tritongrpcclient.core as grpcclient
+from tritongrpcclient.utils import InferenceServerException
+from tritongrpcclient.utils import triton_to_np_dtype
+import tritongrpcclient.model_config_pb2 as mc
 
 FLAGS = None
 
@@ -122,7 +122,7 @@ def preprocess(img, format, dtype, c, h, w, scaling):
     if resized.ndim == 2:
         resized = resized[:, :, np.newaxis]
 
-    npdtype = trtis_to_np_dtype(dtype)
+    npdtype = triton_to_np_dtype(dtype)
     typed = resized.astype(npdtype)
 
     if scaling == 'INCEPTION':

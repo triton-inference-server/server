@@ -24,19 +24,46 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.5)
+import os
+from setuptools import find_packages
+from setuptools import setup
 
-install(
-  PROGRAMS
-    grpc_v2_client.py
-    grpc_v2_explicit_byte_content_client.py
-    grpc_v2_explicit_int_content_client.py
-    grpc_v2_explicit_int8_content_client.py
-    grpc_v2_image_client.py
-    simple_grpc_v2_class_client.py
-    simple_grpc_v2_health_metadata.py
-    simple_grpc_v2_async_infer_client.py
-    simple_grpc_v2_infer_client.py
-    simple_grpc_v2_string_infer_client.py
-  DESTINATION python
+if 'VERSION' not in os.environ:
+    raise Exception('envvar VERSION must be specified')
+
+VERSION = os.environ['VERSION']
+
+REQUIRED = [
+    'numpy', 'python-rapidjson', 'protobuf>=3.5.0', 'grpcio'
+]
+
+try:
+    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
+
+    class bdist_wheel(_bdist_wheel):
+
+        def finalize_options(self):
+            _bdist_wheel.finalize_options(self)
+            self.root_is_pure = False
+
+        def get_tag(self):
+            pyver, abi, plat = _bdist_wheel.get_tag(self)
+            pyver, abi = 'py3', 'none'
+            return pyver, abi, plat
+except ImportError:
+    bdist_wheel = None
+
+setup(
+    name='tritongrpcclient',
+    version=VERSION,
+    author='NVIDIA Inc.',
+    author_email='tanmayv@nvidia.com',
+    description='Python client library for communicating with NVIDIA Triton Inference Server using gRPC',
+    license='BSD',
+    url='http://nvidia.com',
+    keywords='triton tensorrt inference server service client',
+    packages=find_packages(),
+    install_requires=REQUIRED,
+    zip_safe=False,
+    cmdclass={'bdist_wheel': bdist_wheel},
 )

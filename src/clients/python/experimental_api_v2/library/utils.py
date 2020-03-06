@@ -28,9 +28,9 @@ import numpy as np
 import struct
 
 __all__ = [
-    'raise_error', 'np_to_trtis_dtype', 'trtis_to_np_dtype',
-    'InferenceServerException', 'serialize_string_tensor',
-    'deserialize_string_tensor'
+    'raise_error', 'np_to_triton_dtype', 'triton_to_np_dtype',
+    'InferenceServerException', 'serialize_byte_tensor',
+    'deserialize_bytes_tensor'
 ]
 
 
@@ -46,8 +46,14 @@ class InferenceServerException(Exception):
 
     Parameters
     ----------
-    err : RequestStatus Protobuf
-        The protobuf message describing the error
+    msg : str
+        A brief description of error
+
+    status : str
+        The error code
+    
+    debug_details : str
+        The additional details on the error
 
     """
 
@@ -85,18 +91,19 @@ class InferenceServerException(Exception):
         return self._status
 
     def debug_details(self):
-        """Get the detailed information about the exception for debugging purposes
+        """Get the detailed information about the exception
+        for debugging purposes
 
         Returns
         -------
         str
-            Returns string in JSON format containing the exception details            
+            Returns the exception details
 
         """
         return self._debug_details
 
 
-def np_to_trtis_dtype(np_dtype):
+def np_to_triton_dtype(np_dtype):
     if np_dtype == np.bool:
         return "BOOL"
     elif np_dtype == np.int8:
@@ -127,7 +134,7 @@ def np_to_trtis_dtype(np_dtype):
     return None
 
 
-def trtis_to_np_dtype(dtype):
+def triton_to_np_dtype(dtype):
     if dtype == "BOOL":
         return np.bool
     elif dtype == "INT8":
@@ -157,21 +164,21 @@ def trtis_to_np_dtype(dtype):
     return None
 
 
-def serialize_string_tensor(input_tensor):
+def serialize_byte_tensor(input_tensor):
     """
-        Serializes a string tensor into a flat numpy array of length prepend strings.
-        Can pass string tensor as numpy array of bytes with dtype of np.bytes_,
+        Serializes a bytes tensor into a flat numpy array of length prepend bytes.
+        Can pass bytes tensor as numpy array of bytes with dtype of np.bytes_,
         numpy strings with dtype of np.str_ or python strings with dtype of np.object.
 
         Parameters
         ----------
         input_tensor : np.array
-            The string tensor to serialize.
+            The bytes tensor to serialize.
 
         Returns
         -------
-        serialized_string_tensor : np.array
-            The 1-D numpy array of type uint8 containing the serialized string in 'C' order.
+        serialized_bytes_tensor : np.array
+            The 1-D numpy array of type uint8 containing the serialized bytes in 'C' order.
 
         Raises
         ------
@@ -182,15 +189,15 @@ def serialize_string_tensor(input_tensor):
     if input_tensor.size == 0:
         raise_error("input cannot be empty")
 
-    # If the input is a tensor of string objects, then must flatten those into
-    # a 1-dimensional array containing the 4-byte string length followed by the
-    # actual string characters. All strings are concatenated together in "C"
+    # If the input is a tensor of string/bytes objects, then must flatten those into
+    # a 1-dimensional array containing the 4-byte byte size followed by the
+    # actual element bytes. All elements are concatenated together in "C"
     # order.
     if (input_tensor.dtype == np.object) or (
             input_tensor.dtype.type == np.bytes_):
         flattened = bytes()
         for obj in np.nditer(input_tensor, flags=["refs_ok"], order='C'):
-            # If directly passing bytes to STRING type,
+            # If directly passing bytes to BYTES type,
             # don't convert it to str as Python will encode the
             # bytes which may distort the meaning
             if obj.dtype.type == np.bytes_:
@@ -207,26 +214,26 @@ def serialize_string_tensor(input_tensor):
             flattened_array = np.ascontiguousarray(flattened_array)
         return flattened_array
     else:
-        raise_error("cannot serialize string tensor: invalid datatype")
+        raise_error("cannot serialize bytes tensor: invalid datatype")
     return None
 
 
-def deserialize_string_tensor(encoded_tensor):
+def deserialize_bytes_tensor(encoded_tensor):
     """
-    Deserializes an encoded string tensor into an
+    Deserializes an encoded bytes tensor into an
     numpy array of dtype of python objects
 
     Parameters
     ----------
     encoded_tensor : bytes
-        The encoded string tensor where each element
+        The encoded bytes tensor where each element
         has its length in first 4 bytes followed by
         the content
     Returns
     -------
     string_tensor : np.array
         The 1-D numpy array of type object containing the
-        deserialized string in 'C' order.
+        deserialized bytes in 'C' order.
    
     """
     strs = list()

@@ -34,7 +34,7 @@ if 'VERSION' not in os.environ:
 VERSION = os.environ['VERSION']
 
 REQUIRED = [
-    'numpy', 'geventhttpclient', 'python-rapidjson', 'protobuf>=3.5.0', 'grpcio'
+    'numpy', 'geventhttpclient', 'python-rapidjson'
 ]
 
 try:
@@ -54,14 +54,14 @@ except ImportError:
     bdist_wheel = None
 
 setup(
-    name='tensorrtserverV2',
+    name='tritonhttpclient',
     version=VERSION,
     author='NVIDIA Inc.',
     author_email='tanmayv@nvidia.com',
-    description='Python client library version 2 for TensorRT Inference Server',
+    description='Python client library for communicating with NVIDIA Triton Inference Server using HTTP',
     license='BSD',
     url='http://nvidia.com',
-    keywords='tensorrt inference server service client',
+    keywords='triton tensorrt inference server service client',
     packages=find_packages(),
     install_requires=REQUIRED,
     zip_safe=False,
