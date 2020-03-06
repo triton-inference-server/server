@@ -912,6 +912,8 @@ InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
   infer_request_.Clear();
   infer_request_.set_flags(options.Flags());
   infer_request_.set_batch_size(batch_size_);
+  infer_request_.set_priority(options.Priority());
+  infer_request_.set_timeout_microseconds(options.Timeout());
   infer_request_.set_correlation_id(correlation_id_);
 
   for (const auto& io : inputs_) {

@@ -67,7 +67,7 @@ class PriorityQueue {
   Status Enqueue(uint32_t priority_level, Scheduler::Payload&& payload);
 
   // Dequeue the payload at the front of the queue.
-  Scheduler::Payload Dequeue();
+  Status Dequeue(Scheduler::Payload* payload);
 
   // Retrieve the payloads that are rejected based on the queue policies.
   std::shared_ptr<std::vector<std::deque<Scheduler::Payload>>>
@@ -120,6 +120,12 @@ class PriorityQueue {
   uint64_t OldestEnqueueTime()
   {
     return pending_cursor_.pending_batch_oldest_enqueue_time_ns_;
+  }
+
+  // Return the closest timeout of payloads in pending batch.
+  uint64_t ClosestTimeout()
+  {
+    return pending_cursor_.pending_batch_closest_timeout_ns_;
   }
 
   // Return the number of payloads in pending batch.
