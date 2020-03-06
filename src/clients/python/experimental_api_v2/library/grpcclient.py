@@ -29,9 +29,9 @@ import grpc
 import rapidjson as json
 from google.protobuf.json_format import MessageToJson
 
-from tensorrtserverV2.api import grpc_service_v2_pb2
-from tensorrtserverV2.api import grpc_service_v2_pb2_grpc
-from tensorrtserverV2.common import *
+from tritongrpcclient import grpc_service_v2_pb2
+from tritongrpcclient import grpc_service_v2_pb2_grpc
+from tritongrpcclient.utils import *
 
 def raise_error_grpc(rpc_error):
     raise InferenceServerException(
@@ -141,7 +141,7 @@ class InferenceServerClient:
         Returns
         -------
         bool
-            True if the model is ready, false if not ready.
+            True if the model is ready, False if not ready.
 
         Raises
         ------
@@ -164,7 +164,7 @@ class InferenceServerClient:
         Parameters
         ----------
         as_json : bool
-            If true then returns server metadata as a json dict,
+            If True then returns server metadata as a json dict,
             otherwise as a protobuf message. Default value is False.
 
         Returns
@@ -201,7 +201,7 @@ class InferenceServerClient:
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
         as_json : bool
-            If true then returns model metadata as a json dict, otherwise
+            If True then returns model metadata as a json dict, otherwise
             as a protobuf message. Default value is False.
 
         Returns
@@ -240,7 +240,7 @@ class InferenceServerClient:
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
         as_json : bool
-            If true then returns configuration as a json dict, otherwise
+            If True then returns configuration as a json dict, otherwise
             as a protobuf message. Default value is False.
 
         Returns
@@ -302,7 +302,6 @@ class InferenceServerClient:
         raise_error("Not implemented yet")
 
     # FIXMEPV2: Add parameter support
-    @property
     def parameters(self):
         raise_error("Not implemented yet")
 
@@ -328,7 +327,7 @@ class InferenceServerClient:
         model_name: str
             The name of the model to run inference.
         model_version: str
-            The version of the model to run inference.The default value
+            The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
         request_id: str
@@ -393,7 +392,7 @@ class InferenceServerClient:
         model_name: str
             The name of the model to run inference.
         model_version: str
-            The version of the model to run inference.The default value
+            The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
         request_id: str
@@ -487,7 +486,6 @@ class InferInput:
         self._input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
         self._input.name = name
 
-    @property
     def name(self):
         """Get the name of input associated with this object.
 
@@ -498,7 +496,6 @@ class InferInput:
         """
         return self._input.name
 
-    @property
     def datatype(self):
         """Get the datatype of input associated with this object.
 
@@ -509,20 +506,19 @@ class InferInput:
         """
         return self._input.datatype
 
-    @property
     def shape(self):
         """Get the shape of input associated with this object.
 
         Returns
         -------
-        str
+        list
             The shape of input
         """
         return self._input.shape
 
     def set_data_from_numpy(self, input_tensor):
-        """Set the tensor data (datatype, shape, contents) for
-        input associated with this object.
+        """Set the tensor data (datatype, shape, contents) from the
+        specified numpy array for input associated with this object.
 
         Parameters
         ----------
@@ -531,17 +527,16 @@ class InferInput:
         """
         if not isinstance(input_tensor, (np.ndarray,)):
             raise_error("input_tensor must be a numpy array")
-        self._input.datatype = np_to_trtis_dtype(input_tensor.dtype)
+        self._input.datatype = np_to_triton_dtype(input_tensor.dtype)
         self._input.ClearField('shape')
         self._input.shape.extend(input_tensor.shape)
         if self._input.datatype == "BYTES":
-            self._input.contents.raw_contents = serialize_string_tensor(
+            self._input.contents.raw_contents = serialize_byte_tensor(
                 input_tensor).tobytes()
         else:
             self._input.contents.raw_contents = input_tensor.tobytes()
 
     # FIXMEPV2: Add parameter support
-    @property
     def parameters(self):
         raise_error("Not implemented yet")
 
@@ -549,7 +544,7 @@ class InferInput:
         """Retrieve the underlying InferInputTensor message.
         Returns
         -------
-        Protobuf Message 
+        protobuf message 
             The underlying InferInputTensor protobuf message.
         """
         return self._input
@@ -570,7 +565,6 @@ class InferOutput:
         ).InferRequestedOutputTensor()
         self._output.name = name
 
-    @property
     def name(self):
         """Get the name of output associated with this object.
 
@@ -584,8 +578,8 @@ class InferOutput:
     def set_parameter(self, key, value):
         """Adds the specified key-value pair in the requested output parameters
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         key : str
             The name of the parameter to be included in the request. 
         value : str/int/bool
@@ -610,7 +604,7 @@ class InferOutput:
         """Retrieve the underlying InferRequestedOutputTensor message.
         Returns
         -------
-        Protobuf Message 
+        protobuf message 
             The underlying InferRequestedOutputTensor protobuf message.
         """
         return self._output
@@ -623,7 +617,7 @@ class InferResult:
 
     Parameters
     ----------
-    result : Protobuf Message
+    result : protobuf message
         The ModelInferResponse returned by the server
     """
 
@@ -631,8 +625,8 @@ class InferResult:
         self._result = result
 
     def as_numpy(self, name):
-        """Get the output tensor data (datatype, shape, contents) for
-        output associated with this object in numpy format
+        """Get the tensor data for output associated with this object
+        in numpy format
 
         Parameters
         ----------
@@ -658,12 +652,12 @@ class InferResult:
                         # followed by the actual string characters. Hence,
                         # need to decode the raw bytes to convert into
                         # array elements.
-                        np_array = deserialize_string_tensor(
+                        np_array = deserialize_bytes_tensor(
                             output.contents.raw_contents)
                     else:
                         np_array = np.frombuffer(
                             output.contents.raw_contents,
-                            dtype=trtis_to_np_dtype(datatype))
+                            dtype=triton_to_np_dtype(datatype))
                 elif len(output.contents.byte_contents) != 0:
                     np_array = np.array(output.contents.byte_contents)
                 np_array = np.resize(np_array, shape)
@@ -677,12 +671,12 @@ class InferResult:
         Parameters
         ----------
         as_json : bool
-            If true then returns request as a json dict, otherwise
+            If True then returns request as a json dict, otherwise
             as a protobuf message. Default value is False.
 
         Returns
         -------
-        Protobuf Message or dict
+        protobuf message or dict
             The ModelInferRequest protobuf message or dict for the request
             associated  with this response.
         """
@@ -698,12 +692,12 @@ class InferResult:
         Parameters
         ----------
         as_json : bool
-            If true then returns statistics as a json dict, otherwise
+            If True then returns statistics as a json dict, otherwise
             as a protobuf message. Default value is False.
         
         Returns
         -------
-        Protobuf Message or dict
+        protobuf message or dict
             The InferStatistics protobuf message or dict for this response.
         """
         if as_json:
@@ -718,12 +712,12 @@ class InferResult:
         Parameters
         ----------
         as_json : bool
-            If true then returns response as a json dict, otherwise
+            If True then returns response as a json dict, otherwise
             as a protobuf message. Default value is False.
     
         Returns
         -------
-        Protobuf Message or dict
+        protobuf message or dict
             The underlying ModelInferResponse as a protobuf message or dict.
         """
         if as_json:

@@ -30,9 +30,9 @@ import sys
 import numpy as np
 
 import grpc
-from tensorrtserverV2.api import grpc_service_v2_pb2
-from tensorrtserverV2.api import grpc_service_v2_pb2_grpc
-from tensorrtserverV2.common import deserialize_string_tensor
+from tritongrpcclient import grpc_service_v2_pb2
+from tritongrpcclient import grpc_service_v2_pb2_grpc
+from tritongrpcclient import utils
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -101,7 +101,7 @@ if __name__ == '__main__':
         shape = []
         for value in output.shape:
             shape.append(value)
-        output_results.append(deserialize_string_tensor(output.contents.raw_contents))
+        output_results.append(utils.deserialize_bytes_tensor(output.contents.raw_contents))
         output_results[-1] = np.resize(output_results[-1], shape)
 
     if len(output_results) != 2:

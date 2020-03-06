@@ -43,44 +43,26 @@ function main() {
   WHLDIR="$DEST/wheel"
 
   echo $(date) : "=== Using builddir: ${WHLDIR}"
-  mkdir -p ${WHLDIR}/tensorrtserverV2/api
-
-  echo "Adding package files"
-  cp ../../../../core/*_pb2.py \
-    "${WHLDIR}/tensorrtserverV2/api/."
-
-  cp ../../../../core/*_grpc.py \
-  "${WHLDIR}/tensorrtserverV2/api/."
+  mkdir -p ${WHLDIR}/tritonhttpclient/
 
   cp httpclient.py \
-    "${WHLDIR}/tensorrtserverV2/api/."
-  
-  cp grpcclient.py \
-    "${WHLDIR}/tensorrtserverV2/api/."
+    "${WHLDIR}/tritonhttpclient/core.py"
 
-  cp common.py \
-    "${WHLDIR}/tensorrtserverV2/."
+  cp utils.py \
+    "${WHLDIR}/tritonhttpclient/."
 
-  cp setup.py "${WHLDIR}"
-	touch ${WHLDIR}/tensorrtserverV2/__init__.py
-  touch ${WHLDIR}/tensorrtserverV2/api/__init__.py
-
-  # Use 'sed' command to fix protoc compiled imports (see
-  # https://github.com/google/protobuf/issues/1491).
-	sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tensorrtserverV2.api import \1_pb2 as \2/" \
-    ${WHLDIR}/tensorrtserverV2/api/*_pb2.py
-	sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tensorrtserverV2.api import \1_pb2 as \2/" \
-    ${WHLDIR}/tensorrtserverV2/api/*_pb2_grpc.py
+  cp http_setup.py "${WHLDIR}"
+  touch ${WHLDIR}/tritonhttpclient/__init__.py
 
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"
-  VERSION=$VERSION python${PYVER} setup.py bdist_wheel
+  VERSION=$VERSION python${PYVER} http_setup.py bdist_wheel
   mkdir -p "${DEST}"
   cp dist/* "${DEST}"
   popd
   echo $(date) : "=== Output wheel file is in: ${DEST}"
 
-	touch ${DEST}/stamp.whl
+  touch ${DEST}/stamp.whl
 }
 
 main "$@"
