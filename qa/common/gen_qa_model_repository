@@ -27,11 +27,11 @@
 
 ############################################################################
 ## This script generates the model repository needed by some of the
-## tensorrtserver CI tests. Generating these models requires using
+## tritonserver CI tests. Generating these models requires using
 ## the TensorFlow and PyTorch containers.
 ##
 ## 1. Update TENSORRT_IMAGE, PYTORCH_IMAGE and TENSORFLOW_IMAGE to
-## match what is being used by the tensorrtserver release being
+## match what is being used by the tritonserver release being
 ## tested.
 ##
 ## 2. Set CUDA_DEVICE to the ID of the CUDA device present on the

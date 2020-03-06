@@ -93,7 +93,7 @@ Make sure you log into NGC as described in
 section.  Use docker pull to get the Triton Inference Server
 container from NGC::
 
-  $ docker pull nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3
+  $ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3
 
 Where <xx.yy> is the version of the inference server that you want to
 pull. Once you have the container follow these steps to run the server
@@ -120,7 +120,7 @@ under-development version)::
 
 Then use docker to build::
 
-  $ docker build --pull -t tensorrtserver .
+  $ docker build --pull -t tritonserver .
 
 After the build completes follow these steps to run the server and the
 example client applications.
@@ -161,9 +161,9 @@ the following command to run the inference server container::
 
   $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/example/model/repository:/models <docker image> trtserver --model-repository=/models
 
-Where <docker image> is *nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3* if
+Where <docker image> is *nvcr.io/nvidia/tritonserver:<xx.yy>-py3* if
 you pulled the inference server container from NGC, or is
-*tensorrtserver* if you built the inference server from source.
+*tritonserver* if you built the inference server from source.
 
 If you built using CMake run the inference server directly on your host system::
 
@@ -229,12 +229,12 @@ Make sure you log into NGC as described in
 section. Use docker pull to get the client libraries and examples
 container from NGC::
 
-  $ docker pull nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3-clientsdk
+  $ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3-clientsdk
 
 Where <xx.yy> is the version that you want to pull. Run the client
 image so that the client examples can access the inference server::
 
-  $ docker run -it --rm --net=host nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3-clientsdk
+  $ docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:<xx.yy>-py3-clientsdk
 
 It is also possible to build the client examples with or without
 Docker and for some platforms pre-compiled client examples are
@@ -246,7 +246,7 @@ available. For more information, see
 Running The Image Classification Example
 ----------------------------------------
 
-From within the tensorrtserver_client image, run the example
+From within the tritonserver_client image, run the example
 image-client application to perform image classification using the
 example resnet50_netdef from the example model repository.
 

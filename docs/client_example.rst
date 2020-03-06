@@ -75,7 +75,7 @@ Build Using Dockerfile
 To build the examples using Docker follow the description in
 :ref:`section-client-libraries-build-using-dockerfile`.
 
-After the build completes the tensorrtserver_client docker image will
+After the build completes the tritonserver_client docker image will
 contain the built client examples, and will also be configured with
 all the dependencies required to run those examples within the
 container. The easiest way to try the examples described in the
@@ -90,9 +90,9 @@ to use CUDA shared memory you need to use nvidia-docker instead of Docker
 to run the client image. (see :ref:`section-running-the-inference-server`
 for more information about running the inference server)::
 
-  $ docker run -it --rm --net=host tensorrtserver_client
+  $ docker run -it --rm --net=host tritonserver_client
 
-In the tensorrtserver_client image you can find the example
+In the tritonserver_client image you can find the example
 executables in /workspace/install/bin, and the
 Python examples in /workspace/install/python.
 
@@ -109,7 +109,7 @@ When the build completes the examples can be found in
 trtis-clients/install. To use the examples, you need to include the
 path to the client library in environment variable "LD_LIBRARY_PATH",
 by default it is
-/path/to/tensorrtserver/repo/build/trtis-clients/install/lib. In
+/path/to/tritonserver/repo/build/trtis-clients/install/lib. In
 addition to that, you also need to install the tensorrtserver Python
 package and other packages required by the examples::
 
@@ -176,7 +176,7 @@ to use CUDA shared memory you need to use nvidia-docker instead of Docker
 to run the client image. (see :ref:`section-running-the-inference-server`
 for more information about running the inference server)::
 
-  $ docker run -it --rm --net=host nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3-clientsdk
+  $ docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:<xx.yy>-py3-clientsdk
 
 In the image you can find the example executables in
 /workspace/install/bin, and the Python examples in
