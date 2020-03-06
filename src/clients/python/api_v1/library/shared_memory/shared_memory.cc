@@ -63,7 +63,9 @@ SharedMemoryRegionMap(
   if (*shm_addr == MAP_FAILED) {
     return -1;
   }
-  return 0;
+
+  // close shared memory descriptor, return 0 if success else return -1
+  return close(shm_fd);
 }
 
 }  // namespace
