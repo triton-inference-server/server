@@ -29,8 +29,8 @@ import argparse
 import numpy as np
 
 import grpc
-from tensorrtserverV2.api import grpc_service_v2_pb2
-from tensorrtserverV2.api import grpc_service_v2_pb2_grpc
+from tritongrpcclient import grpc_service_v2_pb2
+from tritongrpcclient import grpc_service_v2_pb2_grpc
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

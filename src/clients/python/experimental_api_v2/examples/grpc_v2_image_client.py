@@ -30,9 +30,9 @@ import numpy as np
 from PIL import Image
 
 import grpc
-from tensorrtserverV2.api import grpc_service_v2_pb2
-from tensorrtserverV2.api import grpc_service_v2_pb2_grpc
-import tensorrtserverV2.api.model_config_pb2 as mc
+from tritongrpcclient import grpc_service_v2_pb2
+from tritongrpcclient import grpc_service_v2_pb2_grpc
+import tritongrpcclient.model_config_pb2 as mc
 
 FLAGS = None
 

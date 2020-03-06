@@ -27,8 +27,8 @@
 
 import argparse
 
-from tensorrtserverV2.api import grpcclient
-from tensorrtserverV2.common import InferenceServerException
+import tritongrpcclient.core as grpcclient
+from tritongrpcclient.utils import InferenceServerException
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -25,67 +25,23 @@
   # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-NVIDIA TensorRT Inference Server
-================================
+Experimental gRPC Python API
+============================
 
-.. ifconfig:: "dev" in release
+Client Core
+-----------
 
-   .. warning::
-     You are currently viewing unstable developer preview
-     of the documentation. To see the documentation for the latest
-     stable release click `here
-     <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/index.html>`_.
+This module contains most of the core functionality of the library
+including setting up a connection, sending requests and receiving
+response to/from an active Triton server.
 
-.. include:: ../README.rst
-   :start-after: overview-begin-marker-do-not-remove
-   :end-before: overview-end-marker-do-not-remove
+.. automodule:: tritongrpcclient.core
+   :members:
 
-.. toctree::
-   :hidden:
+Client Utils
+------------
 
-   Documentation home <self>
+This module exposes additional supporting utilities.
 
-.. toctree::
-   :maxdepth: 2
-   :caption: User Guide
-
-   quickstart
-   install
-   run
-   client
-   client_example
-   models_and_schedulers
-   model_repository
-   model_configuration
-   model_management
-   optimization
-   metrics
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Developer Guide
-
-   architecture
-   custom_operation
-   http_grpc_api
-   library_api
-   build
-   test
-   contribute
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Reference
-
-   faq
-   capabilities
-   protobuf_api/protobuf_api_root
-   cpp_api/cpp_api_root
-   python_api
-   experimental_grpc_python_api
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
+.. automodule:: tritongrpcclient.utils
+   :members:
