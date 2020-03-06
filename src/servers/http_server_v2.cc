@@ -252,7 +252,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
   void HandleModelHealth(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
-  void HandleMetadata(evhtp_request_t* req);
+  void HandleServerMetadata(evhtp_request_t* req);
   void HandleModelMetadata(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
@@ -591,7 +591,7 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
     }
   } else if (std::string(req->uri->path->full) == "/v2") {
     // server metadata
-    HandleMetadata(req);
+    HandleServerMetadata(req);
     return;
   }
 
@@ -671,11 +671,21 @@ HTTPAPIServerV2::HandleModelHealth(
               std::string("unable to find health of \"" + model_name + "\"")
                   .c_str());
         } else {
-          auto model_status = itr->second;
+          const ModelStatus& model_status = itr->second;
 
           // If requested version is -1 then find the highest valued
           // version.
           int64_t requested_version = -1;
+          err = GetModelVersionFromString(request.version(), &requested_version);
+          if (err == nullptr) {
+            // If requested_version is -1 then find the highest valued
+            // version.
+            if (requested_version == -1) {
+              for (const auto& pr : model_status.version_status()) {
+                requested_version = std::max(requested_version, pr.first);
+              }
+            }
+
           if (!model_version_str.empty()) {
             requested_version = std::atoll(model_version_str.c_str());
           }
@@ -871,7 +881,7 @@ HTTPAPIServerV2::HandleModelMetadata(
 }
 
 void
-HTTPAPIServerV2::HandleMetadata(evhtp_request_t* req)
+HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
