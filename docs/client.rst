@@ -79,7 +79,7 @@ should match the version of the inference server you are using::
 Then, issue the following command to build the C++ client library and
 a Python wheel file for the Python client library::
 
-  $ docker build -t tensorrtserver_client -f Dockerfile.client .
+  $ docker build -t tritonserver_client -f Dockerfile.client .
 
 You can optionally add *-\\-build-arg "BASE_IMAGE=<base_image>"* to set
 the base image that you want the client library built for. Must be a
@@ -87,7 +87,7 @@ Ubuntu CUDA devel image to be able to build CUDA shared memory support.
 If CUDA shared memory support is not required, you can use an Ubuntu
 16.04 or 18.04 as the base image.
 
-After the build completes the tensorrtserver_client docker image will
+After the build completes the tritonserver_client docker image will
 contain the built client libraries in /workspace/install/lib, the
 corresponding headers in /workspace/install/include, and the Python
 wheel file in /workspace/install/python. The image will also contain
@@ -219,7 +219,7 @@ instructions, see the `NGC Getting Started Guide
 Use docker pull to get the client libraries and examples container
 from NGC::
 
-  $ docker pull nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3-clientsdk
+  $ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3-clientsdk
 
 Where <xx.yy> is the version that you want to pull.
 

@@ -28,7 +28,7 @@
 # Multistage build.
 #
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:20.03-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:20.03-py3
 ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:20.03-py3
 ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:20.03-tf1-py3
 

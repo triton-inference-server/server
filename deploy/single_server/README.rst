@@ -192,7 +192,7 @@ want to override and pass it to helm::
   $ cat << EOF > config.yaml
   namespace: MyCustomNamespace
   image:
-    imageName: nvcr.io/nvidia/tensorrtserver:custom-tag
+    imageName: nvcr.io/nvidia/tritonserver:custom-tag
     modelRepositoryPath: gs://my_model_repository
   EOF
 

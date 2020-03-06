@@ -63,7 +63,7 @@ you want to build the under-development version)::
 
 Then use docker to build::
 
-  $ docker build --pull -t tensorrtserver .
+  $ docker build --pull -t tritonserver .
 
 Incremental Builds with Docker
 ..............................
@@ -71,15 +71,15 @@ Incremental Builds with Docker
 For typical development you will want to run the *build* container
 with your local repo’s source files mounted so that your local changes
 can be incrementally built. This is done by first building the
-*tensorrtserver_build* container::
+*tritonserver_build* container::
 
-  $ docker build --pull -t tensorrtserver_build --target trtserver_build .
+  $ docker build --pull -t tritonserver_build --target trtserver_build .
 
-By mounting /path/to/tensorrtserver/src into the container at
+By mounting /path/to/tritonserver/src into the container at
 /workspace/src, changes to your local repo will be reflected in the
 container::
 
-  $ nvidia-docker run -it --rm -v/path/to/tensorrtserver/src:/workspace/src tensorrtserver_build
+  $ nvidia-docker run -it --rm -v/path/to/tritonserver/src:/workspace/src tritonserver_build
 
 Within the container you can perform an incremental server build
 with::
@@ -401,7 +401,7 @@ model configuration and protobuf utility functions you will need. You
 can either build the custom backend SDK yourself using
 Dockerfile.custombackend::
 
-  docker build -t tensorrtserver_cbe -f Dockerfile.custombackend .
+  docker build -t tritonserver_cbe -f Dockerfile.custombackend .
 
 Or you can download a pre-build version of the SDK from the `GitHub
 release page
