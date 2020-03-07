@@ -488,8 +488,9 @@ LoadManager::InitSharedMemory()
             if (cuda_err != cudaSuccess) {
               return nic::Error(
                   ni::RequestStatusCode::INTERNAL,
-                  "Failed to copy data to cuda shared memory for " + region_name +
-                      " : " + std::string(cudaGetErrorString(cuda_err)));
+                  "Failed to copy data to cuda shared memory for " +
+                      region_name + " : " +
+                      std::string(cudaGetErrorString(cuda_err)));
             }
             offset += byte_size[count];
             count++;
