@@ -193,6 +193,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
     }
 
     std::vector<evbuffer*> response_buffer_;
+    rapidjson::Document response_json_;
     TensorShmMap* shm_map_;
   };
 
@@ -248,7 +249,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       int64_t memory_type_id);
 
   void Handle(evhtp_request_t* req) override;
-  void HandleHealth(evhtp_request_t* req, const std::string& kind);
+  void HandleServerReady(evhtp_request_t* req, const std::string& kind);
   void HandleModelHealth(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
@@ -268,7 +269,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       const std::string& model_name, const InferRequestHeader& request_header,
       evbuffer* input_buffer,
       TRTSERVER_InferenceRequestProvider* request_provider,
-      TensorShmMap* shm_map);
+      AllocPayload* alloc_payload);
 
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
@@ -297,6 +298,8 @@ HTTPAPIServerV2::InferResponseAlloc(
     int64_t* actual_memory_type_id)
 {
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
+
+#if 0
   evbuffer* evhttp_buffer = evbuffer_new();
   if (evhttp_buffer == nullptr) {
     return TRTSERVER_ErrorNew(
@@ -305,7 +308,8 @@ HTTPAPIServerV2::InferResponseAlloc(
   } else {
     payload->response_buffer_.push_back(evhttp_buffer);
   }
-
+#endif
+  // rapidjson::Document& response_json = payload->response_json_;
   const TensorShmMap* shm_map = payload->shm_map_;
 
   *buffer = nullptr;
@@ -353,6 +357,27 @@ HTTPAPIServerV2::InferResponseAlloc(
         *actual_memory_type_id = 0;
       }
 
+      // rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+      // rapidjson::Value response_output;
+      // response_output.SetObject();
+      // rapidjson::Value name_val(tensor_name);
+      // response_output.AddMember("name", name_val, allocator);
+      //
+      // std::string datatype_str = GetDataTypeProtocolString(io.data_type());
+      // rapidjson::Value datatype_val(
+      //     datatype_str.c_str(), datatype_str.size());
+      // response_output.AddMember("datatype", datatype_val, allocator);
+      //
+      // rapidjson::Value shape_array(rapidjson::kArrayType);
+      // for (const auto d : io.dims()) {
+      //   shape_array.PushBack(d, allocator);
+      // }
+      // response_output.AddMember("shape", shape_array, allocator);
+
+      // outputs_array.PushBack(output_metadata[i], allocator);
+
+
+#if 0
       // Reserve requested space in evbuffer...
       struct evbuffer_iovec output_iovec;
       if (evbuffer_reserve_space(evhttp_buffer, byte_size, &output_iovec, 1) !=
@@ -388,6 +413,7 @@ HTTPAPIServerV2::InferResponseAlloc(
             TRTSERVER_ERROR_INTERNAL,
             "failed to commit output tensors to output buffer");
       }
+#endif
 
       LOG_VERBOSE(1) << "HTTP using buffer for: '" << tensor_name
                      << "', size: " << byte_size << ", addr: " << *buffer;
@@ -542,9 +568,11 @@ ReadDataArrayFromJson(
     else if (strcmp(dtype, "BYTES")) {
     } else {
       return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG, std::string("invalid datatype " + std::string(dtype) +
-                                           " of input " +
-                                           request_input["name"].GetString()).c_str());
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "invalid datatype " + std::string(dtype) + " of input " +
+              request_input["name"].GetString())
+              .c_str());
     }
   }
 
@@ -566,7 +594,7 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
     if (type == "health") {
       std::string kind;
       if (RE2::FullMatch(rest, health_regex_, &kind)) {
-        HandleHealth(req, kind);
+        HandleServerReady(req, kind);
         return;
       }
     }
@@ -602,7 +630,8 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
 }
 
 void
-HTTPAPIServerV2::HandleHealth(evhtp_request_t* req, const std::string& kind)
+HTTPAPIServerV2::HandleServerReady(
+    evhtp_request_t* req, const std::string& kind)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -610,12 +639,12 @@ HTTPAPIServerV2::HandleHealth(evhtp_request_t* req, const std::string& kind)
   }
 
   TRTSERVER_Error* err = nullptr;
-  bool health = false;
+  bool ready = false;
 
   if (kind == "live") {
-    err = TRTSERVER_ServerIsLive(server_.get(), &health);
+    err = TRTSERVER_ServerIsLive(server_.get(), &ready);
   } else {
-    err = TRTSERVER_ServerIsReady(server_.get(), &health);
+    err = TRTSERVER_ServerIsReady(server_.get(), &ready);
   }
 
   RequestStatus request_status;
@@ -629,7 +658,7 @@ HTTPAPIServerV2::HandleHealth(evhtp_request_t* req, const std::string& kind)
           kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
 
   evhtp_send_reply(
-      req, (health && (err == nullptr)) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
+      req, (ready && (err == nullptr)) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
 
   TRTSERVER_ErrorDelete(err);
 }
@@ -668,15 +697,14 @@ HTTPAPIServerV2::HandleModelHealth(
         if (itr == server_status.model_status().end()) {
           err = TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_INTERNAL,
-              std::string("unable to find health of \"" + model_name + "\"")
+              std::string(
+                  "no status available for unknown model '" + model_name + "'")
                   .c_str());
         } else {
           const ModelStatus& model_status = itr->second;
-
-          // If requested version is -1 then find the highest valued
-          // version.
           int64_t requested_version = -1;
-          err = GetModelVersionFromString(request.version(), &requested_version);
+          err =
+              GetModelVersionFromString(model_version_str, &requested_version);
           if (err == nullptr) {
             // If requested_version is -1 then find the highest valued
             // version.
@@ -686,29 +714,20 @@ HTTPAPIServerV2::HandleModelHealth(
               }
             }
 
-          if (!model_version_str.empty()) {
-            requested_version = std::atoll(model_version_str.c_str());
-          }
-
-          if (requested_version == -1) {
-            for (const auto& pr : model_status.version_status()) {
-              requested_version = std::max(requested_version, pr.first);
+            const auto& vitr =
+                model_status.version_status().find(requested_version);
+            if (vitr == model_status.version_status().end()) {
+              err = TRTSERVER_ErrorNew(
+                  TRTSERVER_ERROR_INVALID_ARG,
+                  std::string(
+                      "no status available for model '" + model_name +
+                      "', version " + model_version_str)
+                      .c_str());
+            } else {
+              const ModelVersionStatus& version_status = vitr->second;
+              ready =
+                  version_status.ready_state() == ModelReadyState::MODEL_READY;
             }
-          }
-
-          const auto& vitr =
-              model_status.version_status().find(requested_version);
-          if (vitr == model_status.version_status().end()) {
-            err = TRTSERVER_ErrorNew(
-                TRTSERVER_ERROR_INVALID_ARG,
-                std::string(
-                    "no status available for model '" + model_name +
-                    "', version " + model_version_str)
-                    .c_str());
-          } else {
-            const ModelVersionStatus& version_status = vitr->second;
-            ready =
-                version_status.ready_state() == ModelReadyState::MODEL_READY;
           }
         }
       }
@@ -789,7 +808,9 @@ HTTPAPIServerV2::HandleModelMetadata(
 
       rapidjson::Value versions_array(rapidjson::kArrayType);
       for (const auto& pr : model_status.version_status()) {
-        versions_array.PushBack(std::to_string(pr.first), allocator);
+        std::string version_str = std::to_string(pr.first);
+        rapidjson::Value version_val(version_str.c_str(), version_str.size());
+        versions_array.PushBack(version_val, allocator);
       }
       document.AddMember("versions", versions_array, allocator);
 
@@ -958,7 +979,7 @@ TRTSERVER_Error*
 HTTPAPIServerV2::EVBufferToInput(
     const std::string& model_name, const InferRequestHeader& request_header,
     evbuffer* input_buffer,
-    TRTSERVER_InferenceRequestProvider* request_provider, TensorShmMap* shm_map)
+    TRTSERVER_InferenceRequestProvider* request_provider, AllocPayload* alloc_payload)
 {
   // Extract individual input data from HTTP body and register in
   // 'request_provider'. The input data from HTTP body is not
@@ -980,6 +1001,10 @@ HTTPAPIServerV2::EVBufferToInput(
   //         ");
   //   }
   // }
+  // TensorShmMap* shm_map = alloc_payload->shm_map_;
+  rapidjson::Document& response_json = alloc_payload->response_json_;
+  response_json.SetObject();
+  // rapidjson::Document::AllocatorType& response_allocator = response_json.GetAllocator();
 
   int buffer_len = evbuffer_get_length(input_buffer);
   char json_buffer[buffer_len];
@@ -992,6 +1017,7 @@ HTTPAPIServerV2::EVBufferToInput(
   }
 
   rapidjson::Document document;
+  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
   document.Parse(json_buffer);
 
   if (document.HasParseError()) {
@@ -1071,6 +1097,12 @@ HTTPAPIServerV2::EVBufferToInput(
     }
   }
 
+  const rapidjson::Value& id_val = document["id"];
+  response_json.CopyFrom(id_val, allocator);
+  const rapidjson::Value& outputs_array = document["outputs"];
+  response_json.CopyFrom(outputs_array, allocator);
+  // response_json.AddMember("outputs", outputs_array, allocator);
+
 #if 0
   // Initialize System Memory for Output if it uses shared memory
   for (const auto& io : request_header.output()) {
@@ -1116,13 +1148,12 @@ HTTPAPIServerV2::HandleInfer(
     trace_meta_data.reset(trace_manager_->SampleTrace());
     if (trace_meta_data != nullptr) {
       if (err == nullptr) {
-          request.model_name(), request.model_version());
-            request.model_name(), requested_model_version);
+        trace_meta_data->tracer_->SetModel(model_name, requested_model_version);
       } else {
         // If failed to retrieve the requested_model_version
         // then use the default model version just to record
         // the timestamps in the tracer
-        state->trace_meta_data_->tracer_->SetModel(request.model_name(), -1);
+        trace_meta_data->tracer_->SetModel(model_name, -1);
       }
       trace_meta_data->tracer_->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "http recv start",
@@ -1149,7 +1180,7 @@ HTTPAPIServerV2::HandleInfer(
   // Create the inference request provider which provides all the
   // input information needed for an inference.
   TRTSERVER_InferenceRequestOptions* request_options = nullptr;
-  TRTSERVER_Error* err = TRTSERVER_InferenceRequestOptionsNew(
+  err = TRTSERVER_InferenceRequestOptionsNew(
       &request_options, model_name.c_str(), requested_model_version);
   if (err == nullptr) {
     err = SetTRTSERVER_InferenceRequestOptions(
@@ -1165,7 +1196,7 @@ HTTPAPIServerV2::HandleInfer(
         req, request_header_protobuf.id(), server_id_, unique_id));
     err = EVBufferToInput(
         model_name, request_header_protobuf, req->buffer_in, request_provider,
-        infer_request->response_meta_data_.shm_map_);
+        &infer_request->response_meta_data_);
     if (err == nullptr) {
       // Provide the trace manager object to use for this request, if nullptr
       // then no tracing will be performed.
@@ -1178,6 +1209,13 @@ HTTPAPIServerV2::HandleInfer(
             TraceManager::ReleaseTrace, infer_request->trace_meta_data_.get());
       }
 #endif  // TRTIS_ENABLE_TRACING
+
+      // rapidjson::Document& response_json = infer_request->response_meta_data_.response_json_;
+      rapidjson::Document::AllocatorType& allocator = infer_request->response_meta_data_.response_json_.GetAllocator();
+      rapidjson::Value model_name_val(model_name.c_str(), model_name.size());
+      infer_request->response_meta_data_.response_json_.AddMember("model_name", model_name_val, allocator);
+      rapidjson::Value model_version_val(model_version_str.c_str(), model_version_str.size());
+      infer_request->response_meta_data_.response_json_.AddMember("model_version", model_version_val, allocator);
 
       err = TRTSERVER_ServerInferAsync(
           server_.get(), trace_manager, request_provider, allocator_,
@@ -1294,6 +1332,8 @@ HTTPAPIServerV2::InferRequestClass::InferComplete(
   for (auto buffer : infer_request->response_meta_data_.response_buffer_) {
     evbuffer_add_buffer(infer_request->req_->buffer_out, buffer);
   }
+  // write json string into buffer
+
   if (infer_request->FinalizeResponse(response) == EVHTP_RES_OK) {
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
@@ -1411,5 +1451,4 @@ HTTPServerV2::CreateAPIServer(
 
   return nullptr;
 }
-
 }}  // namespace nvidia::inferenceserver
