@@ -43,7 +43,7 @@ PERF_CLIENT=../clients/perf_client
 DATADIR="/data/inferenceserver/${REPO_VERSION}/tf_model_store"
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS="--log-verbose=1 --model-repository=s3://localhost:4572/demo-bucket"
+SERVER_ARGS="--log-verbose=1 --model-repository=s3://127.0.0.1:4572/demo-bucket"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
