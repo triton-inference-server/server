@@ -299,7 +299,6 @@ HTTPAPIServerV2::InferResponseAlloc(
 {
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
 
-#if 0
   evbuffer* evhttp_buffer = evbuffer_new();
   if (evhttp_buffer == nullptr) {
     return TRTSERVER_ErrorNew(
@@ -308,14 +307,33 @@ HTTPAPIServerV2::InferResponseAlloc(
   } else {
     payload->response_buffer_.push_back(evhttp_buffer);
   }
-#endif
-  // rapidjson::Document& response_json = payload->response_json_;
+
   const TensorShmMap* shm_map = payload->shm_map_;
 
   *buffer = nullptr;
   *buffer_userp = nullptr;
   *actual_memory_type = preferred_memory_type;
   *actual_memory_type_id = preferred_memory_type_id;
+
+  // rapidjson::Document::AllocatorType& allocator =
+  //     payload->response_json_.GetAllocator();
+  // rapidjson::Value response_output;
+  // response_output.SetObject();
+  // std::string tensor_name_str = std::string(tensor_name);
+  // rapidjson::Value name_val(tensor_name_str.c_str(), tensor_name_str.size());
+  // response_output.AddMember("name", name_val, allocator);
+
+  // std::string datatype_str = GetDataTypeProtocolString(io.data_type());
+  // rapidjson::Value datatype_val(datatype_str.c_str(), datatype_str.size());
+  // response_output.AddMember("datatype", datatype_val, allocator);
+
+  // rapidjson::Value shape_array(rapidjson::kArrayType);
+  // for (const auto d : io.dims()) {
+  //   shape_array.PushBack(d, allocator);
+  // }
+  // response_output.AddMember("shape", shape_array, allocator);
+
+  // outputs_array.PushBack(response_output, allocator);
 
   // Don't need to do anything if no memory was requested.
   if (byte_size > 0) {
@@ -356,26 +374,6 @@ HTTPAPIServerV2::InferResponseAlloc(
         *actual_memory_type = TRTSERVER_MEMORY_CPU;
         *actual_memory_type_id = 0;
       }
-
-      // rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-      // rapidjson::Value response_output;
-      // response_output.SetObject();
-      // rapidjson::Value name_val(tensor_name);
-      // response_output.AddMember("name", name_val, allocator);
-      //
-      // std::string datatype_str = GetDataTypeProtocolString(io.data_type());
-      // rapidjson::Value datatype_val(
-      //     datatype_str.c_str(), datatype_str.size());
-      // response_output.AddMember("datatype", datatype_val, allocator);
-      //
-      // rapidjson::Value shape_array(rapidjson::kArrayType);
-      // for (const auto d : io.dims()) {
-      //   shape_array.PushBack(d, allocator);
-      // }
-      // response_output.AddMember("shape", shape_array, allocator);
-
-      // outputs_array.PushBack(output_metadata[i], allocator);
-
 
 #if 0
       // Reserve requested space in evbuffer...
@@ -438,7 +436,7 @@ HTTPAPIServerV2::ResponseRelease(
 
 TRTSERVER_Error*
 ReadDataArrayFromJson(
-    const rapidjson::Value& request_input, char** base, size_t* base_size)
+    const rapidjson::Value& request_input, char** base, size_t* byte_size)
 {
   const rapidjson::Value& tensor_data = request_input["data"];
   const rapidjson::Value& shape = request_input["shape"];
@@ -472,7 +470,7 @@ ReadDataArrayFromJson(
       //   bool_tensor.push_back(itr->GetBool());
       // }
       // *base = reinterpret_cast<char*>(&bool_tensor[0]);
-      // *base_size = element_cnt;
+      // *byte_size = element_cnt;
     } else if (strcmp(dtype, "UINT8")) {
       std::vector<uint8_t> uint8_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -480,7 +478,7 @@ ReadDataArrayFromJson(
         uint8_t_tensor.push_back((uint8_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&uint8_t_tensor[0]);
-      *base_size = element_cnt;
+      *byte_size = element_cnt;
     } else if (strcmp(dtype, "UINT16")) {
       std::vector<uint16_t> uint16_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -488,7 +486,7 @@ ReadDataArrayFromJson(
         uint16_t_tensor.push_back((uint16_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&uint16_t_tensor[0]);
-      *base_size = element_cnt * 2;
+      *byte_size = element_cnt * 2;
     } else if (strcmp(dtype, "UINT32")) {
       std::vector<uint32_t> uint32_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -496,7 +494,7 @@ ReadDataArrayFromJson(
         uint32_t_tensor.push_back((uint32_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&uint32_t_tensor[0]);
-      *base_size = element_cnt * 4;
+      *byte_size = element_cnt * 4;
     } else if (strcmp(dtype, "UINT64")) {
       std::vector<uint64_t> uint64_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -504,7 +502,7 @@ ReadDataArrayFromJson(
         uint64_t_tensor.push_back((uint64_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&uint64_t_tensor[0]);
-      *base_size = element_cnt * 8;
+      *byte_size = element_cnt * 8;
     } else if (strcmp(dtype, "INT8")) {
       std::vector<int8_t> int8_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -512,7 +510,7 @@ ReadDataArrayFromJson(
         int8_t_tensor.push_back((int8_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&int8_t_tensor[0]);
-      *base_size = element_cnt;
+      *byte_size = element_cnt;
     } else if (strcmp(dtype, "INT16")) {
       std::vector<int8_t> int16_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -520,7 +518,7 @@ ReadDataArrayFromJson(
         int16_t_tensor.push_back((int16_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&int16_t_tensor[0]);
-      *base_size = element_cnt * 2;
+      *byte_size = element_cnt * 2;
     } else if (strcmp(dtype, "INT32")) {
       std::vector<int32_t> int32_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -528,7 +526,7 @@ ReadDataArrayFromJson(
         int32_t_tensor.push_back((int32_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&int32_t_tensor[0]);
-      *base_size = element_cnt * 4;
+      *byte_size = element_cnt * 4;
     } else if (strcmp(dtype, "INT64")) {
       std::vector<int64_t> int64_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -536,7 +534,7 @@ ReadDataArrayFromJson(
         int64_t_tensor.push_back((int64_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&int64_t_tensor[0]);
-      *base_size = element_cnt * 8;
+      *byte_size = element_cnt * 8;
     }
     // FP16 needs a work around
     else if (strcmp(dtype, "FP16")) {
@@ -546,7 +544,7 @@ ReadDataArrayFromJson(
       //   float_tensor.push_back((float)itr->GetFloat());
       // }
       // *base = reinterpret_cast<char*>(&float_tensor[0]);
-      // *base_size = element_cnt;
+      // *byte_size = element_cnt;
     } else if (strcmp(dtype, "FP32")) {
       std::vector<float> float_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -554,7 +552,7 @@ ReadDataArrayFromJson(
         float_tensor.push_back((float)itr->GetFloat());
       }
       *base = reinterpret_cast<char*>(&float_tensor[0]);
-      *base_size = element_cnt * 4;
+      *byte_size = element_cnt * 4;
     } else if (strcmp(dtype, "FP64")) {
       std::vector<double> double_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -562,7 +560,7 @@ ReadDataArrayFromJson(
         double_tensor.push_back((double)itr->GetDouble());
       }
       *base = reinterpret_cast<char*>(&double_tensor[0]);
-      *base_size = element_cnt * 8;
+      *byte_size = element_cnt * 8;
     }
     // BYTES (String) needs a work around
     else if (strcmp(dtype, "BYTES")) {
@@ -580,6 +578,105 @@ ReadDataArrayFromJson(
 }
 
 void
+WriteDataArrayToJson(
+    rapidjson::Document* response_json, int index, char* base,
+    const size_t byte_size)
+{
+  // const rapidjson::Value& shape = response_output["shape"];
+  rapidjson::Document::AllocatorType& allocator = response_json->GetAllocator();
+  rapidjson::Value& response_outputs = (*response_json)["outputs"];
+  rapidjson::Value& response_output = response_outputs[index];
+  const char* dtype = response_output["datatype"].GetString();
+
+  rapidjson::Value data_array(rapidjson::kArrayType);
+
+  // If flat
+  if (byte_size > 0) {
+    // BOOL vector is broken
+    if (strcmp(dtype, "BOOL")) {
+      // bool* bool_tensor = reinterpret_cast<bool*>(base);
+      // for (size_t i = 0; i < (byte_size/4); i++) {
+      //   rapidjson::Value data_val((bool)(bool_tensor[i]));
+      //   data_array.PushBack(data_val, allocator);
+      // }
+    } else if (strcmp(dtype, "UINT8")) {
+      uint8_t* uint8_t_tensor = reinterpret_cast<uint8_t*>(base);
+      for (size_t i = 0; i < byte_size; i++) {
+        rapidjson::Value data_val((uint8_t)(uint8_t_tensor[i]));
+        data_array.PushBack(data_val, allocator);
+      }
+    } else if (strcmp(dtype, "UINT16")) {
+      uint16_t* uint16_t_tensor = reinterpret_cast<uint16_t*>(base);
+      for (size_t i = 0; i < (byte_size / 2); i++) {
+        rapidjson::Value data_val((uint16_t)(uint16_t_tensor[i]));
+        data_array.PushBack(data_val, allocator);
+      }
+    } else if (strcmp(dtype, "UINT32")) {
+      uint32_t* uint32_t_tensor = reinterpret_cast<uint32_t*>(base);
+      for (size_t i = 0; i < (byte_size / 4); i++) {
+        rapidjson::Value data_val((uint32_t)(uint32_t_tensor[i]));
+        data_array.PushBack(data_val, allocator);
+      }
+    } else if (strcmp(dtype, "UINT64")) {
+      uint64_t* uint64_t_tensor = reinterpret_cast<uint64_t*>(base);
+      for (size_t i = 0; i < (byte_size / 8); i++) {
+        rapidjson::Value data_val((uint64_t)(uint64_t_tensor[i]));
+        data_array.PushBack(data_val, allocator);
+      }
+    } else if (strcmp(dtype, "INT8")) {
+      int8_t* int8_t_tensor = reinterpret_cast<int8_t*>(base);
+      for (size_t i = 0; i < byte_size; i++) {
+        rapidjson::Value data_val((int8_t)(int8_t_tensor[i]));
+        data_array.PushBack(data_val, allocator);
+      }
+    } else if (strcmp(dtype, "INT16")) {
+      int16_t* int16_t_tensor = reinterpret_cast<int16_t*>(base);
+      for (size_t i = 0; i < (byte_size / 2); i++) {
+        rapidjson::Value data_val((int16_t)(int16_t_tensor[i]));
+        data_array.PushBack(data_val, allocator);
+      }
+    } else if (strcmp(dtype, "INT32")) {
+      int32_t* int32_t_tensor = reinterpret_cast<int32_t*>(base);
+      for (size_t i = 0; i < (byte_size / 4); i++) {
+        rapidjson::Value data_val((int32_t)(int32_t_tensor[i]));
+        data_array.PushBack(data_val, allocator);
+      }
+    } else if (strcmp(dtype, "INT64")) {
+      int64_t* int64_t_tensor = reinterpret_cast<int64_t*>(base);
+      for (size_t i = 0; i < (byte_size / 8); i++) {
+        rapidjson::Value data_val((int64_t)(int64_t_tensor[i]));
+        data_array.PushBack(data_val, allocator);
+      }
+    }
+    // FP16 needs a work around
+    else if (strcmp(dtype, "FP16")) {
+      // fp16* fp16_tensor = reinterpret_cast<fp16*>(base);
+      // for (size_t i = 0; i < (byte_size / 2); i++) {
+      //   rapidjson::Value data_val((fp16)(fp16_tensor[i]));
+      //   data_array.PushBack(data_val, allocator);
+      // }
+    } else if (strcmp(dtype, "FP32")) {
+      float* float_tensor = reinterpret_cast<float*>(base);
+      for (size_t i = 0; i < (byte_size / 4); i++) {
+        rapidjson::Value data_val((float)(float_tensor[i]));
+        data_array.PushBack(data_val, allocator);
+      }
+    } else if (strcmp(dtype, "FP64")) {
+      double* double_tensor = reinterpret_cast<double*>(base);
+      for (size_t i = 0; i < (byte_size / 8); i++) {
+        rapidjson::Value data_val((double)(double_tensor[i]));
+        data_array.PushBack(data_val, allocator);
+      }
+    }
+    // BYTES (String) needs a work around
+    else if (strcmp(dtype, "BYTES")) {
+    }
+  }
+
+  response_output.AddMember("data", data_array, allocator);
+}
+
+void
 HTTPAPIServerV2::Handle(evhtp_request_t* req)
 {
   LOG_VERBOSE(1) << "HTTP V2 request: " << req->method << " "
@@ -588,8 +685,6 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
   std::string type, rest;
   if (RE2::FullMatch(
           std::string(req->uri->path->full), api_regex_, &type, &rest)) {
-    // LOG_VERBOSE(1) << "type: " << type;
-    // LOG_VERBOSE(1) << "rest: " << rest;
     // server health
     if (type == "health") {
       std::string kind;
@@ -602,9 +697,6 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
     else if (type == "models") {
       std::string model_name, version, kind;
       if (RE2::FullMatch(rest, model_regex_, &model_name, &version, &kind)) {
-        // LOG_VERBOSE(1) << "model_name: " << model_name;
-        // LOG_VERBOSE(1) << "version: " << version;
-        // LOG_VERBOSE(1) << "kind: " << kind;
         if (kind == "ready") {
           HandleModelHealth(req, model_name, version);
           return;
@@ -979,7 +1071,8 @@ TRTSERVER_Error*
 HTTPAPIServerV2::EVBufferToInput(
     const std::string& model_name, const InferRequestHeader& request_header,
     evbuffer* input_buffer,
-    TRTSERVER_InferenceRequestProvider* request_provider, AllocPayload* alloc_payload)
+    TRTSERVER_InferenceRequestProvider* request_provider,
+    AllocPayload* alloc_payload)
 {
   // Extract individual input data from HTTP body and register in
   // 'request_provider'. The input data from HTTP body is not
@@ -1004,7 +1097,6 @@ HTTPAPIServerV2::EVBufferToInput(
   // TensorShmMap* shm_map = alloc_payload->shm_map_;
   rapidjson::Document& response_json = alloc_payload->response_json_;
   response_json.SetObject();
-  // rapidjson::Document::AllocatorType& response_allocator = response_json.GetAllocator();
 
   int buffer_len = evbuffer_get_length(input_buffer);
   char json_buffer[buffer_len];
@@ -1074,11 +1166,11 @@ HTTPAPIServerV2::EVBufferToInput(
 #endif
       // FIXMEV2 handle non-raw content types
       char* base;
-      size_t base_size;
-      RETURN_IF_ERR(ReadDataArrayFromJson(request_input, &base, &base_size));
+      size_t byte_size;
+      RETURN_IF_ERR(ReadDataArrayFromJson(request_input, &base, &byte_size));
 
       RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, request_input["name"].GetString(), base, base_size,
+          request_provider, request_input["name"].GetString(), base, byte_size,
           TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
 
       if (byte_size != 0) {
@@ -1101,7 +1193,6 @@ HTTPAPIServerV2::EVBufferToInput(
   response_json.CopyFrom(id_val, allocator);
   const rapidjson::Value& outputs_array = document["outputs"];
   response_json.CopyFrom(outputs_array, allocator);
-  // response_json.AddMember("outputs", outputs_array, allocator);
 
 #if 0
   // Initialize System Memory for Output if it uses shared memory
@@ -1210,12 +1301,15 @@ HTTPAPIServerV2::HandleInfer(
       }
 #endif  // TRTIS_ENABLE_TRACING
 
-      // rapidjson::Document& response_json = infer_request->response_meta_data_.response_json_;
-      rapidjson::Document::AllocatorType& allocator = infer_request->response_meta_data_.response_json_.GetAllocator();
+      rapidjson::Document::AllocatorType& allocator =
+          infer_request->response_meta_data_.response_json_.GetAllocator();
       rapidjson::Value model_name_val(model_name.c_str(), model_name.size());
-      infer_request->response_meta_data_.response_json_.AddMember("model_name", model_name_val, allocator);
-      rapidjson::Value model_version_val(model_version_str.c_str(), model_version_str.size());
-      infer_request->response_meta_data_.response_json_.AddMember("model_version", model_version_val, allocator);
+      infer_request->response_meta_data_.response_json_.AddMember(
+          "model_name", model_name_val, allocator);
+      rapidjson::Value model_version_val(
+          model_version_str.c_str(), model_version_str.size());
+      infer_request->response_meta_data_.response_json_.AddMember(
+          "model_version", model_version_val, allocator);
 
       err = TRTSERVER_ServerInferAsync(
           server_.get(), trace_manager, request_provider, allocator_,
@@ -1329,10 +1423,28 @@ HTTPAPIServerV2::InferRequestClass::InferComplete(
 {
   HTTPAPIServerV2::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServerV2::InferRequestClass*>(userp);
-  for (auto buffer : infer_request->response_meta_data_.response_buffer_) {
-    evbuffer_add_buffer(infer_request->req_->buffer_out, buffer);
+
+  // write outputs into json array
+  int i = 0;
+  for (auto ev_buffer : infer_request->response_meta_data_.response_buffer_) {
+    size_t buffer_len = evbuffer_get_length(ev_buffer);
+    char json_buffer[buffer_len];
+    evbuffer_copyout(ev_buffer, &json_buffer, buffer_len);
+    WriteDataArrayToJson(
+        &infer_request->response_meta_data_.response_json_, i++, json_buffer,
+        buffer_len);
   }
+
   // write json string into buffer
+  rapidjson::StringBuffer buffer;
+  buffer.Clear();
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+  infer_request->response_meta_data_.response_json_.Accept(writer);
+  std::string infer_metadata(buffer.GetString());
+
+  evbuffer_add(
+      infer_request->req_->buffer_out, infer_metadata.c_str(),
+      infer_metadata.size());
 
   if (infer_request->FinalizeResponse(response) == EVHTP_RES_OK) {
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
