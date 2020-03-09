@@ -605,7 +605,7 @@ S3FileSystem::ParsePath(
 {
   // Get the bucket name and the object path. Return error if input is malformed
   re2::RE2 s3_regex(
-      "s3://([a-z]+):([0-9]+)/([0-9a-z.-]+)(((/[0-9a-z.-_]+)*)?)");
+      "s3://([0-9a-z-.]+):([0-9]+)/([0-9a-z.-]+)(((/[0-9a-zA-Z.-_]+)*)?)");
   std::string host_name, host_port;
   if (!RE2::FullMatch(path, s3_regex, &host_name, &host_port, bucket, object)) {
     int bucket_start = path.find("s3://") + strlen("s3://");
@@ -1042,7 +1042,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
         "-DTRTIS_ENABLE_S3=ON.");
 #else
     re2::RE2 s3_regex(
-        "s3://([a-z]+):([0-9]+)/([0-9a-z.-]+)(((/[0-9a-zA-Z.-_]+)*)?)");
+        "s3://([0-9a-z-.]+):([0-9]+)/([0-9a-z.-]+)(((/[0-9a-zA-Z.-_]+)*)?)");
     std::string host_name, host_port, bucket, object;
     if (!RE2::FullMatch(
             path, s3_regex, &host_name, &host_port, &bucket, &object)) {
