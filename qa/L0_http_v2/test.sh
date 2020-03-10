@@ -29,65 +29,6 @@ set +e
 
 RET=0
 
-# Install client dependencies
-(apt-get update && \
-    ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime && \
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get install -y tzdata && \
-    dpkg-reconfigure --frontend noninteractive tzdata && \
-    apt-get install -y --no-install-recommends \
-        libopencv-dev \
-        libopencv-core-dev \
-        pkg-config \
-        python3 \
-        python3-pip \
-        python3-dev \
-        rapidjson-dev && \
-    rm -f /usr/bin/python && \
-    ln -s /usr/bin/python3 /usr/bin/python && \
-    pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade grpcio-tools)
-if [ $? -eq 0 ]; then
-    echo -e "\n***\n*** Dependency install Passed\n***"
-else
-    echo -e "\n***\n*** Dependency install Failed\n***"
-    exit 1
-fi
-
-# Build Server and clients with HTTP V2 Support
-(cd /workspace/builddir && \
-    rm -fr trtis trtis-clients && \
-    cmake -DCMAKE_BUILD_TYPE=Release \
-        -DTRTIS_ENABLE_METRICS=OFF \
-        -DTRTIS_ENABLE_METRICS_GPU=OFF \
-        -DTRTIS_ENABLE_GCS=OFF \
-        -DTRTIS_ENABLE_S3=OFF \
-        -DTRTIS_ENABLE_CUSTOM=ON \
-        -DTRTIS_ENABLE_TENSORRT=OFF \
-        -DTRTIS_ENABLE_TENSORFLOW=ON \
-        -DTRTIS_ENABLE_CAFFE2=OFF \
-        -DTRTIS_ENABLE_ONNXRUNTIME=OFF \
-        -DTRTIS_ENABLE_ONNXRUNTIME_TENSORRT=OFF \
-        -DTRTIS_ENABLE_ONNXRUNTIME_OPENVINO=OFF \
-        -DTRTIS_ENABLE_PYTORCH=OFF \
-        -DTRTIS_ENABLE_GPU=OFF \
-        -DTRTIS_ENABLE_GRPC=OFF \
-        -DTRTIS_ENABLE_GRPC_V2=ON \
-        -DTRTIS_ENABLE_HTTP=OFF \
-        -DTRTIS_ENABLE_HTTP_V2=ON \
-        ../build && \
-    make -j16 trtis trtis-clients && \
-    cp -r trtis/install/bin /opt/tensorrtserver/. && \
-    cp -r trtis/install/lib /opt/tensorrtserver/. && \
-    cp -r trtis/install/include /opt/tensorrtserver/include/trtserver)
-if [ $? -eq 0 ]; then
-    echo -e "\n***\n*** HTTP V2 Build Passed\n***"
-else
-    echo -e "\n***\n*** HTTP V2 Build Failed\n***"
-    exit 1
-fi
-
-
 SIMPLE_V2_CLIENT=/workspace/builddir/trtis-clients/install/bin/simple_v2_client
 
 (rm -fr models && mkdir models && \

@@ -286,6 +286,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRTIS_ENABLE_ONNXRUNTIME_OPENVINO=ON \
                   -DTRTIS_ENABLE_PYTORCH=ON \
                   -DTRTIS_ENABLE_GRPC_V2=ON \
+                  -DTRTIS_ENABLE_HTTP_V2=ON \
                   -DTRTIS_ONNXRUNTIME_INCLUDE_PATHS="/opt/tensorrtserver/include/onnxruntime" \
                   -DTRTIS_PYTORCH_INCLUDE_PATHS="/opt/tensorrtserver/include/torch" \
                   -DTRTIS_EXTRA_LIB_PATHS="/opt/tensorrtserver/lib;/opt/tensorrtserver/lib/tensorflow;/opt/tensorrtserver/lib/pytorch;/opt/tensorrtserver/lib/onnx" \
