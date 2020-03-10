@@ -143,9 +143,9 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       const int thread_cnt)
       : HTTPServerV2Impl(port, thread_cnt), server_(server),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
-        allocator_(nullptr), api_regex_(R"(/v2/(health|models)(.*))"),
-        health_regex_(R"(/(live|ready))"),
-        model_regex_(R"(/([^/]+)(?:/version/([0-9]+))?(/infer|/ready)?)")
+        allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
+        model_regex_(
+            R"(/v2/models/([^/]+)(?:/version/([0-9]+))?(/infer|/ready)?)")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -284,8 +284,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
   // inference result tensors.
   TRTSERVER_ResponseAllocator* allocator_;
 
-  re2::RE2 api_regex_;
-  re2::RE2 health_regex_;
+  re2::RE2 server_regex_;
   re2::RE2 model_regex_;
 };
 
@@ -682,36 +681,34 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
   LOG_VERBOSE(1) << "HTTP V2 request: " << req->method << " "
                  << req->uri->path->full;
 
-  std::string type, rest;
+  std::string model_name, version, kind;
   if (RE2::FullMatch(
-          std::string(req->uri->path->full), api_regex_, &type, &rest)) {
-    // server health
-    if (type == "health") {
-      std::string kind;
-      if (RE2::FullMatch(rest, health_regex_, &kind)) {
-        HandleServerReady(req, kind);
-        return;
-      }
+          std::string(req->uri->path->full), model_regex_, &model_name,
+          &version, &kind)) {
+    if (kind == "ready") {
+      // model health
+      HandleModelHealth(req, model_name, version);
+      return;
+    } else if (kind == "infer") {
+      // model infer
+      HandleInfer(req, model_name, version);
+      return;
+    } else if (kind == "") {
+      // model metadata
+      HandleModelMetadata(req, model_name, version);
+      return;
     }
-    // model health, status or infer
-    else if (type == "models") {
-      std::string model_name, version, kind;
-      if (RE2::FullMatch(rest, model_regex_, &model_name, &version, &kind)) {
-        if (kind == "ready") {
-          HandleModelHealth(req, model_name, version);
-          return;
-        } else if (kind == "infer") {
-          HandleInfer(req, model_name, version);
-          return;
-        } else if (kind == "") {
-          HandleModelMetadata(req, model_name, version);
-          return;
-        }
-      }
-    }
-  } else if (std::string(req->uri->path->full) == "/v2") {
+  }
+
+  std::string rest;
+  if (std::string(req->uri->path->full) == "/v2") {
     // server metadata
     HandleServerMetadata(req);
+    return;
+  } else if (RE2::FullMatch(
+                 std::string(req->uri->path->full), server_regex_, &rest)) {
+    // server health
+    HandleServerReady(req, rest);
     return;
   }
 
@@ -1486,30 +1483,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     }
   }
 
-  if (response_status == nullptr) {
-    std::string format;
-    const char* format_c_str = evhtp_kv_find(req_->uri->query, "format");
-    if (format_c_str != NULL) {
-      format = std::string(format_c_str);
-    } else {
-      format = "text";
-    }
-
-    // The description of the raw outputs needs to go in the
-    // kInferResponseHTTPHeader since it is needed to interpret the
-    // body. The entire response (including classifications) is
-    // serialized at the end of the body.
-    response_header.set_id(request_id_);
-
-    std::string rstr;
-    if (format == "binary") {
-      response_header.SerializeToString(&rstr);
-    } else {
-      rstr = response_header.DebugString();
-    }
-
-    evbuffer_add(req_->buffer_out, rstr.c_str(), rstr.size());
-  } else {
+  if (response_status != nullptr) {
     evbuffer_drain(req_->buffer_out, -1);
     response_header.Clear();
     response_header.set_id(request_id_);
@@ -1529,7 +1503,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
           kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
   evhtp_headers_add_header(
       req_->headers_out,
-      evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
+      evhtp_header_new("Content-Type", "application/json", 1, 1));
 
   TRTSERVER_ErrorDelete(response_status);
 
