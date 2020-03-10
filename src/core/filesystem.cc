@@ -573,7 +573,7 @@ namespace s3 = Aws::S3;
 
 class S3FileSystem : public FileSystem {
  public:
-  S3FileSystem(const Aws::SDKOptions& options, const std::string& local_path);
+  S3FileSystem(const Aws::SDKOptions& options, const std::string& s3_path);
   ~S3FileSystem();
   Status FileExists(const std::string& path, bool* exists) override;
   Status IsDirectory(const std::string& path, bool* is_dir) override;
@@ -631,7 +631,7 @@ S3FileSystem::ParsePath(
 
 
 S3FileSystem::S3FileSystem(
-    const Aws::SDKOptions& options, const std::string& local_path)
+    const Aws::SDKOptions& options, const std::string& s3_path)
     : options_(options), s3_regex_(
                              "s3://([0-9a-zA-Z-.]+):([0-9]+)/([0-9a-z.-]+)(((/"
                              "[0-9a-zA-Z.-_]+)*)?)")
@@ -643,8 +643,10 @@ S3FileSystem::S3FileSystem(
     config = Aws::Client::ClientConfiguration("default");
   }
 
-  if (local_path != ":") {
-    config.endpointOverride = Aws::String(local_path);
+  std::string host_name, host_port, bucket, object;
+  if (RE2::FullMatch(
+          path, s3_regex_, &host_name, &host_port, &bucket, &object)) {
+    config.endpointOverride = Aws::String(host_name + ":" + host_port);
     config.scheme = Aws::Http::Scheme::HTTP;
   }
 
@@ -1043,19 +1045,9 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
         "s3:// file-system not supported. To enable, build with "
         "-DTRTIS_ENABLE_S3=ON.");
 #else
-    re2::RE2 s3_regex(
-        "s3://([0-9a-zA-Z-.]+):([0-9]+)/([0-9a-z.-]+)(((/[0-9a-zA-Z.-_]+)*)?)");
-    std::string host_name, host_port, bucket, object;
-    if (!RE2::FullMatch(
-            path, s3_regex, &host_name, &host_port, &bucket, &object)) {
-      host_name = "";
-      host_port = "";
-    }
-
     Aws::SDKOptions options;
     Aws::InitAPI(options);
-    static S3FileSystem s3_fs(options, host_name + ":" + host_port);
-    // RETURN_IF_ERROR(s3_fs.CheckClient());
+    static S3FileSystem s3_fs(options, path);
     *file_system = &s3_fs;
     return Status::Success;
 #endif  // TRTIS_ENABLE_S3
