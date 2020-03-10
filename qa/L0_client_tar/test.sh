@@ -64,7 +64,7 @@ if [ $? -ne 1 ]; then
     exit 1
 fi
 
-grep -c "Connect Failed" $CLIENT_LOG
+grep -c "failed to connect" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -94,7 +94,7 @@ if [ $? -ne 1 ]; then
     exit 1
 fi
 
-grep -c "Connect Failed" $CLIENT_LOG
+grep -c "failed to connect" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
