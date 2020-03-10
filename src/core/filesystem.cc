@@ -597,6 +597,7 @@ class S3FileSystem : public FileSystem {
       const std::string& path, std::string* bucket, std::string* object);
   Aws::SDKOptions options_;
   s3::S3Client client_;
+  re2::RE2 s3_regex_;
 };
 
 Status
@@ -604,10 +605,9 @@ S3FileSystem::ParsePath(
     const std::string& path, std::string* bucket, std::string* object)
 {
   // Get the bucket name and the object path. Return error if input is malformed
-  re2::RE2 s3_regex(
-      "s3://([0-9a-z-.]+):([0-9]+)/([0-9a-z.-]+)(((/[0-9a-zA-Z.-_]+)*)?)");
   std::string host_name, host_port;
-  if (!RE2::FullMatch(path, s3_regex, &host_name, &host_port, bucket, object)) {
+  if (!RE2::FullMatch(
+          path, s3_regex_, &host_name, &host_port, bucket, object)) {
     int bucket_start = path.find("s3://") + strlen("s3://");
     int bucket_end = path.find("/", bucket_start);
 
@@ -632,7 +632,9 @@ S3FileSystem::ParsePath(
 
 S3FileSystem::S3FileSystem(
     const Aws::SDKOptions& options, const std::string& local_path)
-    : options_(options)
+    : options_(options), s3_regex_(
+                             "s3://([0-9a-zA-Z-.]+):([0-9]+)/([0-9a-z.-]+)(((/"
+                             "[0-9a-zA-Z.-_]+)*)?)")
 {
   Aws::Client::ClientConfiguration config;
   if (const char* profile_name = std::getenv("AWS_PROFILE")) {
@@ -1042,7 +1044,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
         "-DTRTIS_ENABLE_S3=ON.");
 #else
     re2::RE2 s3_regex(
-        "s3://([0-9a-z-.]+):([0-9]+)/([0-9a-z.-]+)(((/[0-9a-zA-Z.-_]+)*)?)");
+        "s3://([0-9a-zA-Z-.]+):([0-9]+)/([0-9a-z.-]+)(((/[0-9a-zA-Z.-_]+)*)?)");
     std::string host_name, host_port, bucket, object;
     if (!RE2::FullMatch(
             path, s3_regex, &host_name, &host_port, &bucket, &object)) {
@@ -1086,7 +1088,8 @@ JoinPath(std::initializer_list<std::string> segments)
       // Check if S3 path (s3://<bucket> or s3://<host>:<port>/<bucket>)
       if (!seg.empty() && !seg.rfind("s3://", 0)) {
         re2::RE2 s3_regex(
-            "s3://([a-z]+):([0-9]+)/([0-9a-z.-]+)(((/[0-9a-zA-Z.-_]+)*)?)");
+            "s3://([0-9a-zA-Z-.]+):([0-9]+)/([0-9a-z.-]+)(((/"
+            "[0-9a-zA-Z.-_]+)*)?)");
         std::string host_name, host_port, bucket, object;
         if (!RE2::FullMatch(
                 seg, s3_regex, &host_name, &host_port, &bucket, &object)) {
