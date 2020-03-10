@@ -477,7 +477,6 @@ ReadDataArrayFromJson(
         uint8_t_tensor.push_back((uint8_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&uint8_t_tensor[0]);
-      *byte_size = element_cnt;
     } else if (strcmp(dtype, "UINT16")) {
       std::vector<uint16_t> uint16_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -485,7 +484,6 @@ ReadDataArrayFromJson(
         uint16_t_tensor.push_back((uint16_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&uint16_t_tensor[0]);
-      *byte_size = element_cnt * 2;
     } else if (strcmp(dtype, "UINT32")) {
       std::vector<uint32_t> uint32_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -493,7 +491,6 @@ ReadDataArrayFromJson(
         uint32_t_tensor.push_back((uint32_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&uint32_t_tensor[0]);
-      *byte_size = element_cnt * 4;
     } else if (strcmp(dtype, "UINT64")) {
       std::vector<uint64_t> uint64_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -501,7 +498,6 @@ ReadDataArrayFromJson(
         uint64_t_tensor.push_back((uint64_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&uint64_t_tensor[0]);
-      *byte_size = element_cnt * 8;
     } else if (strcmp(dtype, "INT8")) {
       std::vector<int8_t> int8_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -509,7 +505,6 @@ ReadDataArrayFromJson(
         int8_t_tensor.push_back((int8_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&int8_t_tensor[0]);
-      *byte_size = element_cnt;
     } else if (strcmp(dtype, "INT16")) {
       std::vector<int8_t> int16_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -517,7 +512,6 @@ ReadDataArrayFromJson(
         int16_t_tensor.push_back((int16_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&int16_t_tensor[0]);
-      *byte_size = element_cnt * 2;
     } else if (strcmp(dtype, "INT32")) {
       std::vector<int32_t> int32_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -525,7 +519,6 @@ ReadDataArrayFromJson(
         int32_t_tensor.push_back((int32_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&int32_t_tensor[0]);
-      *byte_size = element_cnt * 4;
     } else if (strcmp(dtype, "INT64")) {
       std::vector<int64_t> int64_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -533,7 +526,6 @@ ReadDataArrayFromJson(
         int64_t_tensor.push_back((int64_t)itr->GetInt());
       }
       *base = reinterpret_cast<char*>(&int64_t_tensor[0]);
-      *byte_size = element_cnt * 8;
     }
     // FP16 needs a work around
     else if (strcmp(dtype, "FP16")) {
@@ -543,7 +535,6 @@ ReadDataArrayFromJson(
       //   float_tensor.push_back((float)itr->GetFloat());
       // }
       // *base = reinterpret_cast<char*>(&float_tensor[0]);
-      // *byte_size = element_cnt;
     } else if (strcmp(dtype, "FP32")) {
       std::vector<float> float_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -551,7 +542,6 @@ ReadDataArrayFromJson(
         float_tensor.push_back((float)itr->GetFloat());
       }
       *base = reinterpret_cast<char*>(&float_tensor[0]);
-      *byte_size = element_cnt * 4;
     } else if (strcmp(dtype, "FP64")) {
       std::vector<double> double_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -559,7 +549,6 @@ ReadDataArrayFromJson(
         double_tensor.push_back((double)itr->GetDouble());
       }
       *base = reinterpret_cast<char*>(&double_tensor[0]);
-      *byte_size = element_cnt * 8;
     }
     // BYTES (String) needs a work around
     else if (strcmp(dtype, "BYTES")) {
@@ -571,6 +560,7 @@ ReadDataArrayFromJson(
               request_input["name"].GetString())
               .c_str());
     }
+    *byte_size = element_cnt * GetDataTypeByteSize(dtype);
   }
 
   return nullptr;
