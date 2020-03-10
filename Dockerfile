@@ -110,23 +110,6 @@ RUN _CUDNN_VERSION=$(echo $CUDNN_VERSION | cut -d. -f1-2) && \
     mkdir -p /usr/local/cudnn-$_CUDNN_VERSION/cuda/lib64 && \
     ln -s /etc/alternatives/libcudnn_so /usr/local/cudnn-$_CUDNN_VERSION/cuda/lib64/libcudnn.so
 
-# Build and Install LLVM
-ARG LLVM_VERSION=6.0.1
-RUN cd /tmp && \
-    wget --no-verbose http://releases.llvm.org/$LLVM_VERSION/llvm-$LLVM_VERSION.src.tar.xz && \
-    xz -d llvm-$LLVM_VERSION.src.tar.xz && \
-    tar xvf llvm-$LLVM_VERSION.src.tar && \
-    cd llvm-$LLVM_VERSION.src && \
-    mkdir -p build && \
-    cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build . -- -j$(nproc) && \
-    cmake -DCMAKE_INSTALL_PREFIX=/usr/local/llvm-$LLVM_VERSION -DBUILD_TYPE=Release -P cmake_install.cmake && \
-    cd /tmp && \
-    rm -rf llvm*
-
-ENV LD_LIBRARY_PATH /usr/local/openblas/lib:$LD_LIBRARY_PATH
-
 # Build files will be in /workspace/build
 ARG COMMON_BUILD_ARGS="--skip_submodule_sync --parallel --build_shared_lib --use_openmp"
 RUN mkdir -p /workspace/build
@@ -156,7 +139,6 @@ ARG TRTIS_CONTAINER_VERSION=20.04dev
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl4-openSSL-dev is needed for GCS
-# libh2o-dev is needed for h2o variant of HTTP server
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             autoconf \
@@ -169,11 +151,6 @@ RUN apt-get update && \
             libssl-dev \
             libtool \
             libboost-dev \
-            libh2o-dev \
-            libh2o-evloop-dev \
-            libnuma-dev \
-            libwslay-dev \
-            libuv1-dev \
             patchelf \
             software-properties-common && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
@@ -379,12 +356,7 @@ RUN apt-get update && \
         exit 1; \
     fi && \
     # Install common libraries for 18.04 and 16.04 (Including h2o dependencies)
-    apt-get install -y --no-install-recommends \
-            libgoogle-glog0v5 \
-            libh2o0.13 \
-            libh2o-evloop0.13 \
-            libnuma1 \
-            libwslay1 && \
+    apt-get install -y --no-install-recommends libgoogle-glog0v5 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/tensorrtserver
