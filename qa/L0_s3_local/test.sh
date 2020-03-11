@@ -43,8 +43,6 @@ PERF_CLIENT=../clients/perf_client
 DATADIR="/data/inferenceserver/${REPO_VERSION}/tf_model_store"
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS="--log-verbose=1 --model-repository=s3://localhost:4572/demo-bucket"
-SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 rm -f *.log*
@@ -78,6 +76,10 @@ python -m pip install awscli-local && \
 
 RET=0
 
+# Test with hostname
+SERVER_ARGS="--log-verbose=1 --model-repository=s3://localhost:4572/demo-bucket"
+SERVER_LOG="./inference_server_hostname.log"
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -87,6 +89,38 @@ if [ "$SERVER_PID" == "0" ]; then
     wait $MINIO_PID
     exit 1
 fi
+
+sleep 5 
+
+set +e
+for MODEL_NAME in resnet_v1_50_graphdef resnet_v1_50_savedmodel; do
+  $PERF_CLIENT -m $MODEL_NAME -p 3000 -t 1 >$CLIENT_LOG 2>&1
+  if [ $? -ne 0 ]; then
+      echo -e "\n***\n*** Test Failed\n***"
+      cat $CLIENT_LOG
+      RET=1
+  fi
+done
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Test with IP
+SERVER_ARGS="--log-verbose=1 --model-repository=s3://127.0.0.1:4572/demo-bucket"
+SERVER_LOG="./inference_server_ip.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    # Kill minio server
+    kill $MINIO_PID
+    wait $MINIO_PID
+    exit 1
+fi
+
+sleep 5 
 
 set +e
 for MODEL_NAME in resnet_v1_50_graphdef resnet_v1_50_savedmodel; do
