@@ -70,26 +70,53 @@ CudaMemoryManager::~CudaMemoryManager()
 Status
 CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
 {
-  std::set<int> supported_gpus;
-  RETURN_IF_ERROR(GetSupportedGPUs(
-      &supported_gpus, options.min_supported_compute_capability_));
-  std::vector<cnmemDevice_t> devices;
-  for (auto gpu : supported_gpus) {
-    devices.emplace_back();
-    auto& device = devices.back();
-    memset(&device, 0, sizeof(device));
-    device.device = gpu;
-    device.size = options.memory_pool_byte_size_;
+  if (instance_ != nullptr) {
+    return Status(
+        RequestStatusCode::ALREADY_EXISTS,
+        "CudaMemoryManager has been created");
   }
-  RETURN_IF_CNMEM_ERROR(
-      cnmemInit(devices.size(), devices.data(), CNMEM_FLAGS_CANNOT_GROW),
-      std::string("Failed to initialize CUDA memory manager"));
+
+  // Log error instead of returning failure at initialization so that
+  // server can start up.
+  std::set<int> supported_gpus;
+  auto status = GetSupportedGPUs(
+      &supported_gpus, options.min_supported_compute_capability_);
+  if (status.IsOk()) {
+    std::vector<cnmemDevice_t> devices;
+    for (auto gpu : supported_gpus) {
+      devices.emplace_back();
+      auto& device = devices.back();
+      memset(&device, 0, sizeof(device));
+      device.device = gpu;
+      device.size = options.memory_pool_byte_size_;
+    }
+
+    auto status =
+        cnmemInit(devices.size(), devices.data(), CNMEM_FLAGS_CANNOT_GROW);
+    if (status == CNMEM_STATUS_SUCCESS) {
+      // Use to finalize CNMeM properly when out of scope
+      instance_.reset(new CudaMemoryManager());
+    } else {
+      LOG_ERROR << "Failed to finalize CUDA memory manager: "
+                << cnmemGetErrorString(status);
+    }
+  } else {
+    LOG_ERROR << "Failed to initialize CUDA memory manager: "
+              << status.Message();
+  }
+
   return Status::Success;
 }
 
 Status
 CudaMemoryManager::Alloc(void** ptr, uint64_t size, int64_t device_id)
 {
+  if (instance_ == nullptr) {
+    return Status(
+        RequestStatusCode::UNAVAILABLE,
+        "CudaMemoryManager has not been created");
+  }
+
   int current_device;
   RETURN_IF_CUDA_ERR(
       cudaGetDevice(&current_device), std::string("Failed to get device"));
@@ -115,6 +142,12 @@ CudaMemoryManager::Alloc(void** ptr, uint64_t size, int64_t device_id)
 Status
 CudaMemoryManager::Free(void* ptr, int64_t device_id)
 {
+  if (instance_ == nullptr) {
+    return Status(
+        RequestStatusCode::UNAVAILABLE,
+        "CudaMemoryManager has not been created");
+  }
+
   int current_device;
   RETURN_IF_CUDA_ERR(
       cudaGetDevice(&current_device), std::string("Failed to get device"));
