@@ -54,6 +54,14 @@ class GRPCServerV2 {
     virtual ~HandlerBase() = default;
   };
 
+  class ICallData {
+   public:
+    virtual ~ICallData() = default;
+    virtual bool Process(bool ok) = 0;
+    virtual std::string Name() = 0;
+    virtual uint64_t Id() = 0;
+  };
+
  private:
   GRPCServerV2(
       const std::shared_ptr<TRTSERVER_Server>& server,

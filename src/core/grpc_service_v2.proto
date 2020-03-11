@@ -812,7 +812,8 @@ message SystemSharedMemoryStatusResponse
   //@@
   //@@     Status for a shared memory region.
   //@@
-  message RegionStatus {
+  message RegionStatus
+  {
     //@@
     //@@    .. cpp:var:: string name
     //@@
@@ -890,9 +891,7 @@ message SystemSharedMemoryRegisterRequest
 //@@
 //@@   Response message for SystemSharedMemoryRegister.
 //@@
-message SystemSharedMemoryRegisterResponse
-{
-}
+message SystemSharedMemoryRegisterResponse {}
 
 //@@
 //@@.. cpp:var:: message SystemSharedMemoryUnregisterRequest
@@ -904,8 +903,8 @@ message SystemSharedMemoryUnregisterRequest
   //@@
   //@@  .. cpp:var:: string name
   //@@
-  //@@     The name of the region to unregister. If empty all
-  //@@     shared-memory regions are unregistered.
+  //@@     The name of the system region to unregister. If empty
+  //@@     all system shared-memory regions are unregistered.
   //@@
   string name = 1;
 }
@@ -915,9 +914,7 @@ message SystemSharedMemoryUnregisterRequest
 //@@
 //@@   Response message for SystemSharedMemoryUnregister.
 //@@
-message SystemSharedMemoryUnregisterResponse
-{
-}
+message SystemSharedMemoryUnregisterResponse {}
 
 //@@
 //@@.. cpp:var:: message CudaSharedMemoryStatusRequest
@@ -947,7 +944,8 @@ message CudaSharedMemoryStatusResponse
   //@@
   //@@     Status for a shared memory region.
   //@@
-  message RegionStatus {
+  message RegionStatus
+  {
     //@@
     //@@    .. cpp:var:: string name
     //@@
@@ -1015,9 +1013,7 @@ message CudaSharedMemoryRegisterRequest
 //@@
 //@@   Response message for CudaSharedMemoryRegister.
 //@@
-message CudaSharedMemoryRegisterResponse
-{
-}
+message CudaSharedMemoryRegisterResponse {}
 
 //@@
 //@@.. cpp:var:: message CudaSharedMemoryUnregisterRequest
@@ -1029,8 +1025,8 @@ message CudaSharedMemoryUnregisterRequest
   //@@
   //@@  .. cpp:var:: string name
   //@@
-  //@@     The name of the region to unregister. If empty all
-  //@@     shared-memory regions are unregistered.
+  //@@     The name of the cuda region to unregister. If empty
+  //@@     all cuda shared-memory regions are unregistered.
   //@@
   string name = 1;
 }
@@ -1040,6 +1036,4 @@ message CudaSharedMemoryUnregisterRequest
 //@@
 //@@   Response message for CudaSharedMemoryUnregister.
 //@@
-message CudaSharedMemoryUnregisterResponse
-{
-}
+message CudaSharedMemoryUnregisterResponse {}
