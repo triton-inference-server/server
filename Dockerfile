@@ -151,6 +151,7 @@ RUN apt-get update && \
             libssl-dev \
             libtool \
             libboost-dev \
+            rapidjson-dev \
             patchelf \
             software-properties-common && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
