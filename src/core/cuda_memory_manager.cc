@@ -28,30 +28,37 @@
 
 #include <cnmem.h>
 #include <set>
+#include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 
 namespace {
 
-#define RETURN_IF_CNMEM_ERROR(S)                                             \
-  do {                                                                       \
-    auto status__ = (S);                                                     \
-    if (status__ != CNMEM_STATUS_SUCCESS) {                                  \
-      std::string msg = std::string(cnmemGetErrorString(status__));          \
-      return Status(                                                         \
-          RequestStatusCode::INTERNAL, "CUDA memory manager error " +        \
-                                           std::to_string(status__) + ": " + \
-                                           std::string(msg));                \
-    }                                                                        \
+#define RETURN_IF_CNMEM_ERROR(S, MSG)                    \
+  do {                                                   \
+    auto status__ = (S);                                 \
+    if (status__ != CNMEM_STATUS_SUCCESS) {              \
+      return Status(                                     \
+          RequestStatusCode::INTERNAL,                   \
+          (MSG) + ": " + cnmemGetErrorString(status__)); \
+    }                                                    \
   } while (false)
+
+std::string
+PointerToString(void* ptr)
+{
+  std::stringstream ss;
+  ss << ptr;
+  return ss.str();
+}
 
 }  // namespace
 
 namespace nvidia { namespace inferenceserver {
 
-std::unique_ptr<CUDAMemoryManager> CUDAMemoryManager::instance_;
+std::unique_ptr<CudaMemoryManager> CudaMemoryManager::instance_;
 
-CUDAMemoryManager::~CUDAMemoryManager()
+CudaMemoryManager::~CudaMemoryManager()
 {
   auto status = cnmemFinalize();
   if (status != CNMEM_STATUS_SUCCESS) {
@@ -61,7 +68,7 @@ CUDAMemoryManager::~CUDAMemoryManager()
 }
 
 Status
-CUDAMemoryManager::Create(const Options& options)
+CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
 {
   std::set<int> supported_gpus;
   RETURN_IF_ERROR(GetSupportedGPUs(
@@ -75,24 +82,59 @@ CUDAMemoryManager::Create(const Options& options)
     device.size = options.memory_pool_byte_size_;
   }
   RETURN_IF_CNMEM_ERROR(
-      cnmemInit(devices.size(), devices.data(), CNMEM_FLAGS_CANNOT_GROW));
+      cnmemInit(devices.size(), devices.data(), CNMEM_FLAGS_CANNOT_GROW),
+      std::string("Failed to initialize CUDA memory manager"));
   return Status::Success;
 }
 
 Status
-CUDAMemoryManager::Alloc(void** ptr, uint64_t size)
+CudaMemoryManager::Alloc(void** ptr, uint64_t size, int64_t device_id)
 {
-  return Status(
-      RequestStatusCode::UNSUPPORTED,
-      "CUDAMemoryManager::Alloc() not implemented");
+  int current_device;
+  RETURN_IF_CUDA_ERR(
+      cudaGetDevice(&current_device), std::string("Failed to get device"));
+  bool overridden = (current_device != device_id);
+  if (overridden) {
+    RETURN_IF_CUDA_ERR(
+        cudaSetDevice(device_id), std::string("Failed to set device"));
+  }
+
+  // Defer returning error to make sure the device is recovered
+  auto err = cnmemMalloc(ptr, size, nullptr);
+
+  if (overridden) {
+    cudaSetDevice(current_device);
+  }
+
+  RETURN_IF_CNMEM_ERROR(
+      err, std::string("Failed to allocate CUDA memory with byte size ") +
+               std::to_string(size) + " on GPU " + std::to_string(device_id));
+  return Status::Success;
 }
 
 Status
-CUDAMemoryManager::Free(void* ptr)
+CudaMemoryManager::Free(void* ptr, int64_t device_id)
 {
-  return Status(
-      RequestStatusCode::UNSUPPORTED,
-      "CUDAMemoryManager::Free() not implemented");
+  int current_device;
+  RETURN_IF_CUDA_ERR(
+      cudaGetDevice(&current_device), std::string("Failed to get device"));
+  bool overridden = (current_device != device_id);
+  if (overridden) {
+    RETURN_IF_CUDA_ERR(
+        cudaSetDevice(device_id), std::string("Failed to set device"));
+  }
+
+  // Defer returning error to make sure the device is recovered
+  auto err = cnmemFree(ptr, nullptr);
+
+  if (overridden) {
+    cudaSetDevice(current_device);
+  }
+
+  RETURN_IF_CNMEM_ERROR(
+      err, std::string("Failed to deallocate CUDA memory at address ") +
+               PointerToString(ptr) + " on GPU " + std::to_string(device_id));
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

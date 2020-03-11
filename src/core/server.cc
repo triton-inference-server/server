@@ -50,6 +50,10 @@
 #include "src/core/server.h"
 #include "src/core/server_status.pb.h"
 
+#ifdef TRTIS_ENABLE_GPU
+#include "src/core/cuda_memory_manager.h"
+#endif  // TRTIS_ENABLE_GPU
+
 namespace nvidia { namespace inferenceserver {
 
 namespace {
@@ -95,6 +99,7 @@ InferenceServer::InferenceServer()
   strict_readiness_ = true;
   exit_timeout_secs_ = 30;
   pinned_memory_pool_size_ = 1 << 28;
+  cuda_memory_pool_size_ = 1 << 28;
 #ifdef TRTIS_ENABLE_GPU
   min_supported_compute_capability_ = TRTIS_MIN_COMPUTE_CAPABILITY;
 #else
@@ -131,6 +136,17 @@ InferenceServer::Init()
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
     return status;
   }
+
+#ifdef TRTIS_ENABLE_GPU
+  CudaMemoryManager::Options cuda_options(
+      min_supported_compute_capability_, cuda_memory_pool_size_);
+  status = CudaMemoryManager::Create(cuda_options);
+  if (!status.IsOk()) {
+    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+    return status;
+  }
+#endif  // TRTIS_ENABLE_GPU
+
 
   status = EnablePeerAccess(min_supported_compute_capability_);
   if (!status.IsOk()) {

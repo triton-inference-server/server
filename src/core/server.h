@@ -216,6 +216,7 @@ class InferenceServer {
   bool strict_readiness_;
   uint32_t exit_timeout_secs_;
   uint64_t pinned_memory_pool_size_;
+  uint64_t cuda_memory_pool_size_;
   double min_supported_compute_capability_;
 
   // Tensorflow options

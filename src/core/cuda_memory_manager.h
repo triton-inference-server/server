@@ -34,7 +34,7 @@ namespace nvidia { namespace inferenceserver {
 // This is a singleton class responsible for maintaining CUDA memory pool
 // used by the inference server. CUDA memory allocations and deallocations
 // must be requested via functions provided by this class.
-class CUDAMemoryManager {
+class CudaMemoryManager {
  public:
   // Options to configure CUDA memeory manager.
   struct Options {
@@ -50,26 +50,26 @@ class CUDAMemoryManager {
     uint64_t memory_pool_byte_size_;
   };
 
-  ~CUDAMemoryManager();
+  ~CudaMemoryManager();
 
   // Create the memory manager based on 'options' specified.
   // Return Status object indicating success or failure.
   static Status Create(const Options& options);
 
-  // Allocate CUDA memory with the requested 'size' and return the pointer
-  // in 'ptr'.
+  // Allocate CUDA memory on GPU 'device_id' with
+  // the requested 'size' and return the pointer in 'ptr'.
   // Return Status object indicating success or failure.
-  static Status Alloc(void** ptr, uint64_t size);
+  static Status Alloc(void** ptr, uint64_t size, int64_t device_id);
 
-  // Free the memory allocated by the memory manager.
+  // Free the memory allocated by the memory manager on 'device_id'.
   // Return Status object indicating success or failure.
-  static Status Free(void* ptr);
+  static Status Free(void* ptr, int64_t device_id);
 
  protected:
-  CUDAMemoryManager() = default;
+  CudaMemoryManager() = default;
 
  private:
-  static std::unique_ptr<CUDAMemoryManager> instance_;
+  static std::unique_ptr<CudaMemoryManager> instance_;
 };
 
 }}  // namespace nvidia::inferenceserver
