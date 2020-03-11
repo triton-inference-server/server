@@ -492,6 +492,8 @@ if(${TRTIS_ENABLE_GPU})
     PUBLIC -L/usr/local/cuda/lib64/stubs
     PUBLIC -lnvidia-ml
     PRIVATE ${CUDA_LIBRARIES}
+    PRIVATE -L${cnmem_DIR}/lib
+    PRIVATE -lcnmem
   )
 endif() # TRTIS_ENABLE_GPU
 
