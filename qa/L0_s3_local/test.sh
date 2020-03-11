@@ -90,6 +90,8 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+sleep 5 
+
 set +e
 for MODEL_NAME in resnet_v1_50_graphdef resnet_v1_50_savedmodel; do
   $PERF_CLIENT -m $MODEL_NAME -p 3000 -t 1 >$CLIENT_LOG 2>&1
@@ -117,6 +119,8 @@ if [ "$SERVER_PID" == "0" ]; then
     wait $MINIO_PID
     exit 1
 fi
+
+sleep 5 
 
 set +e
 for MODEL_NAME in resnet_v1_50_graphdef resnet_v1_50_savedmodel; do
