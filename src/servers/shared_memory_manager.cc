@@ -244,7 +244,7 @@ SharedMemoryManager::RegisterCUDASharedMemory(
 TRTSERVER_Error*
 SharedMemoryManager::GetMemoryInfo(
     const std::string& name, size_t offset, void** shm_mapped_addr,
-    TRTSERVER_Memory_Type* memory_type, int* device_id)
+    TRTSERVER_Memory_Type* memory_type, int64_t* device_id)
 {
   auto it = shared_memory_map_.find(name);
   if (it == shared_memory_map_.end()) {

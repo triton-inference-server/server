@@ -88,7 +88,7 @@ class SharedMemoryManager {
   /// \return a TRTSERVER_Error indicating success or failure.
   TRTSERVER_Error* GetMemoryInfo(
       const std::string& name, size_t offset, void** shm_mapped_addr,
-      TRTSERVER_Memory_Type* memory_type, int* device_id);
+      TRTSERVER_Memory_Type* memory_type, int64_t* device_id);
 
   /// Removes the named shared memory block from the manager. Any future
   /// attempt to get the details of this block will result in an array
@@ -157,7 +157,7 @@ class SharedMemoryManager {
         const std::string& name, const std::string& shm_key,
         const size_t offset, const size_t byte_size, int shm_fd,
         void* mapped_addr, const TRTSERVER_Memory_Type kind,
-        const int device_id)
+        const int64_t device_id)
         : name_(name), shm_key_(shm_key), offset_(offset),
           byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr),
           kind_(kind), device_id_(device_id)
@@ -171,7 +171,7 @@ class SharedMemoryManager {
     int shm_fd_;
     void* mapped_addr_;
     TRTSERVER_Memory_Type kind_;
-    int device_id_;
+    int64_t device_id_;
   };
 
   using SharedMemoryStateMap =

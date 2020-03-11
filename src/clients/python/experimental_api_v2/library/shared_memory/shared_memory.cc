@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/clients/python/api_v1/library/shared_memory/shared_memory.h"
+#include "src/clients/python/experimental_api_v2/library/shared_memory/shared_memory.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -32,7 +32,7 @@
 #include <unistd.h>
 #include <cstring>
 #include <iostream>
-#include "src/clients/python/api_v1/library/shared_memory/shared_memory_handle.h"
+#include "src/clients/python/experimental_api_v2/library/shared_memory/shared_memory_handle.h"
 
 //==============================================================================
 // SharedMemoryControlContext
@@ -41,11 +41,11 @@ namespace {
 
 void*
 SharedMemoryHandleCreate(
-    std::string trtis_shm_name, void* shm_addr, std::string shm_key, int shm_fd,
-    size_t offset, size_t byte_size)
+    std::string triton_shm_name, void* shm_addr, std::string shm_key,
+    int shm_fd, size_t offset, size_t byte_size)
 {
   SharedMemoryHandle* handle = new SharedMemoryHandle();
-  handle->trtis_shm_name_ = trtis_shm_name;
+  handle->triton_shm_name_ = triton_shm_name;
   handle->base_addr_ = shm_addr;
   handle->shm_key_ = shm_key;
   handle->shm_fd_ = shm_fd;
@@ -72,7 +72,7 @@ SharedMemoryRegionMap(
 
 int
 SharedMemoryRegionCreate(
-    const char* trtis_shm_name, const char* shm_key, size_t byte_size,
+    const char* triton_shm_name, const char* shm_key, size_t byte_size,
     void** shm_handle)
 {
   // get shared memory region descriptor
@@ -96,7 +96,7 @@ SharedMemoryRegionCreate(
 
   // create a handle for the shared memory region
   *shm_handle = SharedMemoryHandleCreate(
-      std::string(trtis_shm_name), shm_addr, std::string(shm_key), shm_fd, 0,
+      std::string(triton_shm_name), shm_addr, std::string(shm_key), shm_fd, 0,
       byte_size);
   return 0;
 }

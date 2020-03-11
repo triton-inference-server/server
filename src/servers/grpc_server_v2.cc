@@ -49,8 +49,7 @@
 #include "src/servers/tracer.h"
 #endif  // TRTIS_ENABLE_TRACING
 
-namespace nvidia {
-namespace inferenceserver {
+namespace nvidia { namespace inferenceserver {
 
 namespace {
 
@@ -1643,10 +1642,10 @@ ParseSharedMemoryParams(
 {
   *has_shared_memory = false;
   *offset = 0 /* default value */;
-  if (tensor.parameters().find("shared_memory_region") !=
-      tensor.parameters().end()) {
+  const auto& region_it = tensor.parameters().find("shared_memory_region");
+  if (region_it != tensor.parameters().end()) {
     *has_shared_memory = true;
-    const auto& infer_param = tensor.parameters().at("shared_memory_region");
+    const auto& infer_param = region_it->second;
     if (infer_param.parameter_choice_case() !=
         InferParameter::ParameterChoiceCase::kStringParam) {
       return TRTSERVER_ErrorNew(
@@ -1660,8 +1659,8 @@ ParseSharedMemoryParams(
     *region_name = infer_param.string_param();
   }
 
-  if (tensor.parameters().find("shared_memory_offset") !=
-      tensor.parameters().end()) {
+  const auto& offset_it = tensor.parameters().find("shared_memory_offset");
+  if (offset_it != tensor.parameters().end()) {
     if (!*has_shared_memory) {
       return TRTSERVER_ErrorNew(
           TRTSERVER_ERROR_INVALID_ARG,
@@ -1671,7 +1670,7 @@ ParseSharedMemoryParams(
               tensor.name() + "'")
               .c_str());
     }
-    const auto& infer_param = tensor.parameters().at("shared_memory_offset");
+    const auto& infer_param = offset_it->second;
     if (infer_param.parameter_choice_case() !=
         InferParameter::ParameterChoiceCase::kInt64Param) {
       return TRTSERVER_ErrorNew(
@@ -1685,8 +1684,8 @@ ParseSharedMemoryParams(
     *offset = infer_param.int64_param();
   }
 
-  if (tensor.parameters().find("shared_memory_byte_size") !=
-      tensor.parameters().end()) {
+  const auto& bs_it = tensor.parameters().find("shared_memory_byte_size");
+  if (bs_it != tensor.parameters().end()) {
     if (!*has_shared_memory) {
       return TRTSERVER_ErrorNew(
           TRTSERVER_ERROR_INVALID_ARG,
@@ -1696,7 +1695,7 @@ ParseSharedMemoryParams(
               tensor.name() + "'")
               .c_str());
     }
-    const auto& infer_param = tensor.parameters().at("shared_memory_byte_size");
+    const auto& infer_param = bs_it->second;
     if (infer_param.parameter_choice_case() !=
         InferParameter::ParameterChoiceCase::kInt64Param) {
       return TRTSERVER_ErrorNew(
@@ -1759,7 +1758,7 @@ InferAllocatorPayload(
     if (has_shared_memory) {
       void* base;
       TRTSERVER_Memory_Type memory_type;
-      int memory_type_id;
+      int64_t memory_type_id;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, &base, &memory_type, &memory_type_id));
 
@@ -1818,7 +1817,7 @@ InferGRPCToInput(
     const void* base;
     size_t byte_size;
     TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
-    int memory_type_id = 0;
+    int64_t memory_type_id = 0;
     bool has_byte_contents = false;
 
     std::string region_name;

@@ -24,11 +24,11 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/clients/python/api_v1/library/cuda_shared_memory/cuda_shared_memory.h"
+#include "src/clients/python/experimental_api_v2/library/cuda_shared_memory/cuda_shared_memory.h"
 
 #include <cuda_runtime_api.h>
 #include <iostream>
-#include "src/clients/python/api_v1/library/shared_memory/shared_memory_handle.h"
+#include "src/clients/python/experimental_api_v2/library/shared_memory/shared_memory_handle.h"
 
 //==============================================================================
 // SharedMemoryControlContext
@@ -37,11 +37,11 @@ namespace {
 
 void*
 CudaSharedMemoryHandleCreate(
-    std::string trtis_shm_name, cudaIpcMemHandle_t cuda_shm_handle,
+    std::string triton_shm_name, cudaIpcMemHandle_t cuda_shm_handle,
     void* base_addr, size_t byte_size, int device_id)
 {
   SharedMemoryHandle* handle = new SharedMemoryHandle();
-  handle->trtis_shm_name_ = trtis_shm_name;
+  handle->triton_shm_name_ = triton_shm_name;
   handle->cuda_shm_handle_ = cuda_shm_handle;
   handle->base_addr_ = base_addr;
   handle->byte_size_ = byte_size;
@@ -56,7 +56,7 @@ CudaSharedMemoryHandleCreate(
 
 int
 CudaSharedMemoryRegionCreate(
-    const char* trtis_shm_name, size_t byte_size, int device_id,
+    const char* triton_shm_name, size_t byte_size, int device_id,
     void** cuda_shm_handle)
 {
   // remember previous device and set to new device
@@ -81,7 +81,7 @@ CudaSharedMemoryRegionCreate(
 
   // create a handle for the shared memory region
   *cuda_shm_handle = CudaSharedMemoryHandleCreate(
-      std::string(trtis_shm_name), cuda_handle, base_addr, byte_size,
+      std::string(triton_shm_name), cuda_handle, base_addr, byte_size,
       device_id);
 
   // Set device to previous GPU

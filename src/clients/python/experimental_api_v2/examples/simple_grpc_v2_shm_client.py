@@ -58,6 +58,8 @@ if __name__ == '__main__':
         print("channel creation failed: " + str(e))
         sys.exit()
     
+    # To make sure no shared memory regions are registered with the
+    # server.
     triton_client.unregister_system_shared_memory()
     triton_client.unregister_cuda_shared_memory()
 
@@ -80,7 +82,7 @@ if __name__ == '__main__':
     shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0_simple", output_byte_size)
     shm_op1_handle = shm.create_shared_memory_region("output1_data", "/output1_simple", output_byte_size)
 
-    # Register Output0 and Output1 shared memory with TRTIS
+    # Register Output0 and Output1 shared memory with Triton Server
     triton_client.register_system_shared_memory("output0_data", "/output0_simple", output_byte_size)
     triton_client.register_system_shared_memory("output1_data", "/output1_simple", output_byte_size)
 
@@ -121,7 +123,11 @@ if __name__ == '__main__':
 
     results = triton_client.infer(inputs, outputs, model_name)
 
-    # Get the output arrays from the
+    # TODO : Currently, this example doesn't use shared memory for output.
+    # This is done to effectively validate the results.
+    # tritongrpcclient.shared_memory module will be enhanced to read
+    # data from a specified shared memory handle, data_type and shape;
+    # and later return the numpy array.
     output0_data = results.as_numpy('OUTPUT0')
     output1_data = results.as_numpy('OUTPUT1')
 

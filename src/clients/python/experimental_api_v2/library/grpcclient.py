@@ -310,6 +310,10 @@ class InferenceServerClient:
             The name of the region to query status. The default
             value is an empty string, which means that the status
             of all active system shared memory will be returned.
+        as_json : bool
+            If True then returns system shared memory status as a 
+            json dict, otherwise as a protobuf message. Default
+            value is False.
 
         Returns
         -------
@@ -400,6 +404,10 @@ class InferenceServerClient:
             The name of the region to query status. The default
             value is an empty string, which means that the status
             of all active cuda shared memory will be returned.
+        as_json : bool
+            If True then returns cuda shared memory status as a 
+            json dict, otherwise as a protobuf message. Default
+            value is False.
 
         Returns
         -------
@@ -748,8 +756,6 @@ class InferInput:
         elif type(value) is bool:
             param.bool_param = value
         elif type(value) is str:
-            param.string_param = value.encode()
-        elif type(value) is bytes:
             param.string_param = value
         else:
             raise_error("unsupported value type for the parameter")
@@ -810,8 +816,6 @@ class InferOutput:
         elif type(value) is bool:
             param.bool_param = value
         elif type(value) is str:
-            param.string_param = value.encode()
-        elif type(value) is bytes:
             param.string_param = value
         else:
             raise_error("unsupported value type for the parameter")

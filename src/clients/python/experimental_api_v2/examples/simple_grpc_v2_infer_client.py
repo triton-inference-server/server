@@ -90,5 +90,3 @@ if __name__ == '__main__':
             print("sync infer error: incorrect difference")
             sys.exit(1)
     print('PASS: infer')
-
-    triton_client.close()

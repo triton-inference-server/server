@@ -37,7 +37,7 @@ extern "C" {
 //==============================================================================
 // SharedMemoryControlContext
 int SharedMemoryRegionCreate(
-    const char* trtis_shm_name, const char* shm_key, size_t byte_size,
+    const char* triton_shm_name, const char* shm_key, size_t byte_size,
     void** shm_handle);
 int SharedMemoryRegionSet(
     void* shm_handle, size_t offset, size_t byte_size, const void* data);

@@ -84,5 +84,3 @@ if __name__ == '__main__':
     config = triton_client.get_model_config(model_name)
     if (config.config.name == model_name):
         print("PASS: get_model_config")
-
-    triton_client.close()

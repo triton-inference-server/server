@@ -76,12 +76,12 @@ def _raise_error(msg):
     ex = CudaSharedMemoryException(msg)
     raise ex
 
-def create_shared_memory_region(trtis_shm_name, byte_size, device_id):
+def create_shared_memory_region(triton_shm_name, byte_size, device_id):
     """Creates a shared memory region with the specified name and size.
 
     Parameters
     ----------
-    trtis_shm_name : str
+    triton_shm_name : str
         The unique name of the cuda shared memory region to be created.
     byte_size : int
         The size in bytes of the cuda shared memory region to be created.
@@ -100,7 +100,7 @@ def create_shared_memory_region(trtis_shm_name, byte_size, device_id):
 
     cuda_shm_handle = c_void_p()
     _raise_if_error(
-        c_int(_ccudashm_shared_memory_region_create(trtis_shm_name, byte_size, device_id, byref(cuda_shm_handle))))
+        c_int(_ccudashm_shared_memory_region_create(triton_shm_name, byte_size, device_id, byref(cuda_shm_handle))))
 
     return cuda_shm_handle
 

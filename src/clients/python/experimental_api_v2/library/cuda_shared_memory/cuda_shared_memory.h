@@ -34,7 +34,7 @@ extern "C" {
 //==============================================================================
 // SharedMemoryControlContext
 int CudaSharedMemoryRegionCreate(
-    const char* trtis_shm_name, size_t byte_size, int device_id,
+    const char* triton_shm_name, size_t byte_size, int device_id,
     void** cuda_shm_handle);
 int CudaSharedMemoryRegionSet(
     void* cuda_shm_handle, size_t offset, size_t byte_size, const void* data);

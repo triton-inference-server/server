@@ -73,12 +73,12 @@ def _raise_error(msg):
     ex = SharedMemoryException(msg)
     raise ex
 
-def create_shared_memory_region(trtis_shm_name, shm_key, byte_size):
+def create_shared_memory_region(triton_shm_name, shm_key, byte_size):
     """Creates a shared memory region with the specified name and size.
 
     Parameters
     ----------
-    trtis_shm_name : str
+    triton_shm_name : str
         The unique name of the shared memory region to be created.
     shm_key : str
         The unique key of the shared memory object.
@@ -98,7 +98,7 @@ def create_shared_memory_region(trtis_shm_name, shm_key, byte_size):
 
     shm_handle = c_void_p()
     _raise_if_error(
-        c_int(_cshm_shared_memory_region_create(trtis_shm_name, shm_key, byte_size, byref(shm_handle))))
+        c_int(_cshm_shared_memory_region_create(triton_shm_name, shm_key, byte_size, byref(shm_handle))))
 
     return shm_handle
 
