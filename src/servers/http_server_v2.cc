@@ -441,15 +441,13 @@ ReadDataArrayFromJson(
 
   // If flat
   if (!tensor_data[0].IsArray()) {
-    // BOOL vector is broken
     if (strcmp(dtype, "BOOL")) {
-      // std::vector<bool> bool_tensor;
-      // for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
-      //      itr != tensor_data.End(); ++itr) {
-      //   bool_tensor.push_back(itr->GetBool());
-      // }
-      // *base = reinterpret_cast<char*>(&bool_tensor[0]);
-      // *byte_size = element_cnt;
+      std::vector<uint8_t> bool_tensor;
+      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
+           itr != tensor_data.End(); ++itr) {
+        bool_tensor.push_back((uint8_t)itr->GetBool());
+      }
+      *base = reinterpret_cast<char*>(&bool_tensor[0]);
     } else if (strcmp(dtype, "UINT8")) {
       std::vector<uint8_t> uint8_t_tensor;
       for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
@@ -561,13 +559,12 @@ WriteDataArrayToJson(
 
   // If flat
   if (byte_size > 0) {
-    // BOOL vector is broken
     if (strcmp(dtype, "BOOL")) {
-      // bool* bool_tensor = reinterpret_cast<bool*>(base);
-      // for (size_t i = 0; i < (byte_size/4); i++) {
-      //   rapidjson::Value data_val((bool)(bool_tensor[i]));
-      //   data_array.PushBack(data_val, allocator);
-      // }
+      uint8_t* bool_tensor = reinterpret_cast<uint8_t*>(base);
+      for (size_t i = 0; i < byte_size; i++) {
+        rapidjson::Value data_val((uint8_t)(bool_tensor[i]));
+        data_array.PushBack(data_val, allocator);
+      }
     } else if (strcmp(dtype, "UINT8")) {
       uint8_t* uint8_t_tensor = reinterpret_cast<uint8_t*>(base);
       for (size_t i = 0; i < byte_size; i++) {
@@ -1043,28 +1040,10 @@ HTTPAPIServerV2::EVBufferToInput(
 {
   // Extract individual input data from HTTP body and register in
   // 'request_provider'. The input data from HTTP body is not
-  // necessarily contiguous so may need to register multiple input
-  // "blocks" for a given input.
+  // necessarily contiguous so need to copy into a contiguous
+  // buffer to be able to parse it into a json.
   //
-  // Get the addr and size of each chunk of input data from the
-  // evbuffer.
-  // struct evbuffer_iovec* v = nullptr;
-  // int v_idx = 0;
-  //
-  // int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
-  // if (n > 0) {
-  //   v = static_cast<struct evbuffer_iovec*>(
-  //       alloca(sizeof(struct evbuffer_iovec) * n));
-  //   if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
-  //     return TRTSERVER_ErrorNew(
-  //         TRTSERVER_ERROR_INTERNAL, "unexpected error getting input buffers
-  //         ");
-  //   }
-  // }
-  // TensorShmMap* shm_map = alloc_payload->shm_map_;
-  rapidjson::Document& response_json = alloc_payload->response_json_;
-  response_json.SetObject();
-
+  // Get the addr and size of from the evbuffer.
   int buffer_len = evbuffer_get_length(input_buffer);
   char json_buffer[buffer_len];
   ev_ssize_t extracted_size =
@@ -1078,7 +1057,6 @@ HTTPAPIServerV2::EVBufferToInput(
   rapidjson::Document document;
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
   document.Parse(json_buffer);
-
   if (document.HasParseError()) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INVALID_ARG,
@@ -1156,6 +1134,8 @@ HTTPAPIServerV2::EVBufferToInput(
     }
   }
 
+  rapidjson::Document& response_json = alloc_payload->response_json_;
+  response_json.SetObject();
   const rapidjson::Value& id_val = document["id"];
   response_json.CopyFrom(id_val, allocator);
   const rapidjson::Value& outputs_array = document["outputs"];
