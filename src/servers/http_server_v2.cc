@@ -547,95 +547,94 @@ ReadDataArrayFromJson(
   return nullptr;
 }
 
+template <typename T>
+void
+WriteDataToJsonHelper(
+    rapidjson::Value* response_output_val,
+    rapidjson::Document::AllocatorType& allocator,
+    const rapidjson::Value& shape, int shape_index, T* base, int* counter)
+{
+  for (int i = 0; i < shape[shape_index].GetInt(); i++) {
+    if (shape_index != (int)shape.Size()) {
+      rapidjson::Value response_output_array(rapidjson::kArrayType);
+      WriteDataToJsonHelper(
+          &response_output_array, allocator, shape, shape_index + 1, base,
+          counter);
+      response_output_val->PushBack(response_output_array, allocator);
+    } else {
+      rapidjson::Value data_val((T)(base[*counter]));
+      response_output_val->PushBack(data_val, allocator);
+      *counter += 1;
+    }
+  }
+}
+
+
 void
 WriteDataArrayToJson(
     rapidjson::Document* response_json, int index, char* base,
     const size_t byte_size)
 {
-  // const rapidjson::Value& shape = response_output["shape"];
   rapidjson::Document::AllocatorType& allocator = response_json->GetAllocator();
   rapidjson::Value& response_outputs = (*response_json)["outputs"];
   rapidjson::Value& response_output = response_outputs[index];
   const char* dtype = response_output["datatype"].GetString();
+  const rapidjson::Value& shape = response_output["shape"];
 
   rapidjson::Value data_array(rapidjson::kArrayType);
+  int counter = 0;
 
-  // If not empty
-  if (byte_size > 0) {
+  for (int i = 0; i < shape[0].GetInt(); i++) {
     if (strcmp(dtype, "BOOL")) {
-      uint8_t* bool_tensor = reinterpret_cast<uint8_t*>(base);
-      for (size_t i = 0; i < byte_size; i++) {
-        rapidjson::Value data_val((uint8_t)(bool_tensor[i]));
-        data_array.PushBack(data_val, allocator);
-      }
+      uint8_t* bool_base = reinterpret_cast<uint8_t*>(base);
+      WriteDataToJsonHelper(
+          &data_array, allocator, shape, 1, bool_base, &counter);
     } else if (strcmp(dtype, "UINT8")) {
-      uint8_t* uint8_t_tensor = reinterpret_cast<uint8_t*>(base);
-      for (size_t i = 0; i < byte_size; i++) {
-        rapidjson::Value data_val((uint8_t)(uint8_t_tensor[i]));
-        data_array.PushBack(data_val, allocator);
-      }
+      uint8_t* uint8_t_base = reinterpret_cast<uint8_t*>(base);
+      WriteDataToJsonHelper(
+          &data_array, allocator, shape, 1, uint8_t_base, &counter);
     } else if (strcmp(dtype, "UINT16")) {
-      uint16_t* uint16_t_tensor = reinterpret_cast<uint16_t*>(base);
-      for (size_t i = 0; i < (byte_size / 2); i++) {
-        rapidjson::Value data_val((uint16_t)(uint16_t_tensor[i]));
-        data_array.PushBack(data_val, allocator);
-      }
+      uint16_t* uint16_t_base = reinterpret_cast<uint16_t*>(base);
+      WriteDataToJsonHelper(
+          &data_array, allocator, shape, 1, uint16_t_base, &counter);
     } else if (strcmp(dtype, "UINT32")) {
-      uint32_t* uint32_t_tensor = reinterpret_cast<uint32_t*>(base);
-      for (size_t i = 0; i < (byte_size / 4); i++) {
-        rapidjson::Value data_val((uint32_t)(uint32_t_tensor[i]));
-        data_array.PushBack(data_val, allocator);
-      }
+      uint32_t* uint32_t_base = reinterpret_cast<uint32_t*>(base);
+      WriteDataToJsonHelper(
+          &data_array, allocator, shape, 1, uint32_t_base, &counter);
     } else if (strcmp(dtype, "UINT64")) {
-      uint64_t* uint64_t_tensor = reinterpret_cast<uint64_t*>(base);
-      for (size_t i = 0; i < (byte_size / 8); i++) {
-        rapidjson::Value data_val((uint64_t)(uint64_t_tensor[i]));
-        data_array.PushBack(data_val, allocator);
-      }
+      uint64_t* uint64_t_base = reinterpret_cast<uint64_t*>(base);
+      WriteDataToJsonHelper(
+          &data_array, allocator, shape, 1, uint64_t_base, &counter);
     } else if (strcmp(dtype, "INT8")) {
-      int8_t* int8_t_tensor = reinterpret_cast<int8_t*>(base);
-      for (size_t i = 0; i < byte_size; i++) {
-        rapidjson::Value data_val((int8_t)(int8_t_tensor[i]));
-        data_array.PushBack(data_val, allocator);
-      }
+      int8_t* int8_t_base = reinterpret_cast<int8_t*>(base);
+      WriteDataToJsonHelper(
+          &data_array, allocator, shape, 1, int8_t_base, &counter);
     } else if (strcmp(dtype, "INT16")) {
-      int16_t* int16_t_tensor = reinterpret_cast<int16_t*>(base);
-      for (size_t i = 0; i < (byte_size / 2); i++) {
-        rapidjson::Value data_val((int16_t)(int16_t_tensor[i]));
-        data_array.PushBack(data_val, allocator);
-      }
+      int16_t* int16_t_base = reinterpret_cast<int16_t*>(base);
+      WriteDataToJsonHelper(
+          &data_array, allocator, shape, 1, int16_t_base, &counter);
     } else if (strcmp(dtype, "INT32")) {
-      int32_t* int32_t_tensor = reinterpret_cast<int32_t*>(base);
-      for (size_t i = 0; i < (byte_size / 4); i++) {
-        rapidjson::Value data_val((int32_t)(int32_t_tensor[i]));
-        data_array.PushBack(data_val, allocator);
-      }
+      int32_t* int32_t_base = reinterpret_cast<int32_t*>(base);
+      WriteDataToJsonHelper(
+          &data_array, allocator, shape, 1, int32_t_base, &counter);
     } else if (strcmp(dtype, "INT64")) {
-      int64_t* int64_t_tensor = reinterpret_cast<int64_t*>(base);
-      for (size_t i = 0; i < (byte_size / 8); i++) {
-        rapidjson::Value data_val((int64_t)(int64_t_tensor[i]));
-        data_array.PushBack(data_val, allocator);
-      }
+      int64_t* int64_t_base = reinterpret_cast<int64_t*>(base);
+      WriteDataToJsonHelper(
+          &data_array, allocator, shape, 1, int64_t_base, &counter);
     }
     // FP16 needs a work around
     else if (strcmp(dtype, "FP16")) {
-      // fp16* fp16_tensor = reinterpret_cast<fp16*>(base);
-      // for (size_t i = 0; i < (byte_size / 2); i++) {
-      //   rapidjson::Value data_val((fp16)(fp16_tensor[i]));
-      //   data_array.PushBack(data_val, allocator);
-      // }
+      // float16* float16_base = reinterpret_cast<float16*>(base);
+      // WriteDataToJsonHelper(
+      //     &data_array, allocator, shape, 1, float16_base, &counter);
     } else if (strcmp(dtype, "FP32")) {
-      float* float_tensor = reinterpret_cast<float*>(base);
-      for (size_t i = 0; i < (byte_size / 4); i++) {
-        rapidjson::Value data_val((float)(float_tensor[i]));
-        data_array.PushBack(data_val, allocator);
-      }
+      float* float_base = reinterpret_cast<float*>(base);
+      WriteDataToJsonHelper(
+          &data_array, allocator, shape, 1, float_base, &counter);
     } else if (strcmp(dtype, "FP64")) {
-      double* double_tensor = reinterpret_cast<double*>(base);
-      for (size_t i = 0; i < (byte_size / 8); i++) {
-        rapidjson::Value data_val((double)(double_tensor[i]));
-        data_array.PushBack(data_val, allocator);
-      }
+      double* double_base = reinterpret_cast<double*>(base);
+      WriteDataToJsonHelper(
+          &data_array, allocator, shape, 1, double_base, &counter);
     }
     // BYTES (String) needs a work around
     else if (strcmp(dtype, "BYTES")) {
