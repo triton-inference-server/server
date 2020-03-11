@@ -410,6 +410,47 @@ HTTPAPIServerV2::ResponseRelease(
   return nullptr;  // Success
 }
 
+template <typename T>
+void
+ReadDataFromJsonHelper(
+    std::vector<T>* data_vec, const char* dtype,
+    const rapidjson::Value& payload_data, int* counter)
+{
+  for (size_t i = 0; i < payload_data.Size(); i++) {
+    // If last dimension
+    if (!payload_data[i].IsArray()) {
+      if (strcmp(dtype, "BOOL")) {
+        data_vec->push_back((uint8_t)payload_data[i].GetBool());
+      } else if (strcmp(dtype, "UINT8")) {
+        data_vec->push_back((uint8_t)payload_data[i].GetInt());
+      } else if (strcmp(dtype, "UINT16")) {
+        data_vec->push_back((uint16_t)payload_data[i].GetInt());
+      } else if (strcmp(dtype, "UINT32")) {
+        data_vec->push_back((uint32_t)payload_data[i].GetInt());
+      } else if (strcmp(dtype, "UINT64")) {
+        data_vec->push_back((uint64_t)payload_data[i].GetInt());
+      } else if (strcmp(dtype, "INT8")) {
+        data_vec->push_back((int8_t)payload_data[i].GetInt());
+      } else if (strcmp(dtype, "INT16")) {
+        data_vec->push_back((int16_t)payload_data[i].GetInt());
+      } else if (strcmp(dtype, "INT32")) {
+        data_vec->push_back((int32_t)payload_data[i].GetInt());
+      } else if (strcmp(dtype, "INT64")) {
+        data_vec->push_back((int64_t)payload_data[i].GetInt());
+      } else if (strcmp(dtype, "FP32")) {
+        data_vec->push_back((float)payload_data[i].GetFloat());
+      } else if (strcmp(dtype, "FP64")) {
+        data_vec->push_back((double)payload_data[i].GetDouble());
+      }
+      *counter += 1;
+    }
+    // If not dimension
+    else {
+      ReadDataFromJsonHelper(data_vec, dtype, payload_data[i], counter);
+    }
+  }
+}
+
 TRTSERVER_Error*
 ReadDataArrayFromJson(
     const rapidjson::Value& request_input, char** base, size_t* byte_size)
@@ -417,6 +458,7 @@ ReadDataArrayFromJson(
   const rapidjson::Value& tensor_data = request_input["data"];
   const rapidjson::Value& shape = request_input["shape"];
   const char* dtype = request_input["datatype"].GetString();
+  int counter = 0;
 
   // Must be an array
   if (!tensor_data.IsArray()) {
@@ -425,6 +467,70 @@ ReadDataArrayFromJson(
         "failed to parse request buffer, tensor data must be an array");
   }
 
+  // BOOL vector is broken
+  if (strcmp(dtype, "BOOL")) {
+    std::vector<uint8_t> bool_tensor;
+    ReadDataFromJsonHelper(&bool_tensor, dtype, tensor_data, &counter);
+    *base = reinterpret_cast<char*>(&bool_tensor[0]);
+  } else if (strcmp(dtype, "UINT8")) {
+    std::vector<uint8_t> uint8_t_tensor;
+    ReadDataFromJsonHelper(&uint8_t_tensor, dtype, tensor_data, &counter);
+    *base = reinterpret_cast<char*>(&uint8_t_tensor[0]);
+  } else if (strcmp(dtype, "UINT16")) {
+    std::vector<uint16_t> uint16_t_tensor;
+    ReadDataFromJsonHelper(&uint16_t_tensor, dtype, tensor_data, &counter);
+    *base = reinterpret_cast<char*>(&uint16_t_tensor[0]);
+  } else if (strcmp(dtype, "UINT32")) {
+    std::vector<uint32_t> uint32_t_tensor;
+    ReadDataFromJsonHelper(&uint32_t_tensor, dtype, tensor_data, &counter);
+    *base = reinterpret_cast<char*>(&uint32_t_tensor[0]);
+  } else if (strcmp(dtype, "UINT64")) {
+    std::vector<uint64_t> uint64_t_tensor;
+    ReadDataFromJsonHelper(&uint64_t_tensor, dtype, tensor_data, &counter);
+    *base = reinterpret_cast<char*>(&uint64_t_tensor[0]);
+  } else if (strcmp(dtype, "INT8")) {
+    std::vector<int8_t> int8_t_tensor;
+    ReadDataFromJsonHelper(&int8_t_tensor, dtype, tensor_data, &counter);
+    *base = reinterpret_cast<char*>(&int8_t_tensor[0]);
+  } else if (strcmp(dtype, "INT16")) {
+    std::vector<int8_t> int16_t_tensor;
+    ReadDataFromJsonHelper(&int16_t_tensor, dtype, tensor_data, &counter);
+    *base = reinterpret_cast<char*>(&int16_t_tensor[0]);
+  } else if (strcmp(dtype, "INT32")) {
+    std::vector<int32_t> int32_t_tensor;
+    ReadDataFromJsonHelper(&int32_t_tensor, dtype, tensor_data, &counter);
+    *base = reinterpret_cast<char*>(&int32_t_tensor[0]);
+  } else if (strcmp(dtype, "INT64")) {
+    std::vector<int64_t> int64_t_tensor;
+    ReadDataFromJsonHelper(&int64_t_tensor, dtype, tensor_data, &counter);
+    *base = reinterpret_cast<char*>(&int64_t_tensor[0]);
+  }
+  // FP16 needs a work around
+  else if (strcmp(dtype, "FP16")) {
+    // std::vector<float> float16_tensor;
+    // ReadDataFromJsonHelper(&float16_t_tensor, dtype, tensor_data, &counter);
+    // *base = reinterpret_cast<char*>(&float16_tensor[0]);
+  } else if (strcmp(dtype, "FP32")) {
+    std::vector<float> float_tensor;
+    ReadDataFromJsonHelper(&float_tensor, dtype, tensor_data, &counter);
+    *base = reinterpret_cast<char*>(&float_tensor[0]);
+  } else if (strcmp(dtype, "FP64")) {
+    std::vector<double> double_tensor;
+    ReadDataFromJsonHelper(&double_tensor, dtype, tensor_data, &counter);
+    *base = reinterpret_cast<char*>(&double_tensor[0]);
+  }
+  // BYTES (String) needs a work around
+  else if (strcmp(dtype, "BYTES")) {
+  } else {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "invalid datatype " + std::string(dtype) + " of input " +
+            request_input["name"].GetString())
+            .c_str());
+  }
+
+  // Need shape to verify size is correct
   std::vector<int> shape_vec;
   int element_cnt = 0;
   for (rapidjson::SizeType i = 0; i < shape.Size(); i++) {
@@ -436,107 +542,7 @@ ReadDataArrayFromJson(
     }
   }
 
-  // If flat
-  if (!tensor_data[0].IsArray()) {
-    if (strcmp(dtype, "BOOL")) {
-      std::vector<uint8_t> bool_tensor;
-      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
-           itr != tensor_data.End(); ++itr) {
-        bool_tensor.push_back((uint8_t)itr->GetBool());
-      }
-      *base = reinterpret_cast<char*>(&bool_tensor[0]);
-    } else if (strcmp(dtype, "UINT8")) {
-      std::vector<uint8_t> uint8_t_tensor;
-      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
-           itr != tensor_data.End(); ++itr) {
-        uint8_t_tensor.push_back((uint8_t)itr->GetInt());
-      }
-      *base = reinterpret_cast<char*>(&uint8_t_tensor[0]);
-    } else if (strcmp(dtype, "UINT16")) {
-      std::vector<uint16_t> uint16_t_tensor;
-      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
-           itr != tensor_data.End(); ++itr) {
-        uint16_t_tensor.push_back((uint16_t)itr->GetInt());
-      }
-      *base = reinterpret_cast<char*>(&uint16_t_tensor[0]);
-    } else if (strcmp(dtype, "UINT32")) {
-      std::vector<uint32_t> uint32_t_tensor;
-      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
-           itr != tensor_data.End(); ++itr) {
-        uint32_t_tensor.push_back((uint32_t)itr->GetInt());
-      }
-      *base = reinterpret_cast<char*>(&uint32_t_tensor[0]);
-    } else if (strcmp(dtype, "UINT64")) {
-      std::vector<uint64_t> uint64_t_tensor;
-      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
-           itr != tensor_data.End(); ++itr) {
-        uint64_t_tensor.push_back((uint64_t)itr->GetInt());
-      }
-      *base = reinterpret_cast<char*>(&uint64_t_tensor[0]);
-    } else if (strcmp(dtype, "INT8")) {
-      std::vector<int8_t> int8_t_tensor;
-      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
-           itr != tensor_data.End(); ++itr) {
-        int8_t_tensor.push_back((int8_t)itr->GetInt());
-      }
-      *base = reinterpret_cast<char*>(&int8_t_tensor[0]);
-    } else if (strcmp(dtype, "INT16")) {
-      std::vector<int8_t> int16_t_tensor;
-      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
-           itr != tensor_data.End(); ++itr) {
-        int16_t_tensor.push_back((int16_t)itr->GetInt());
-      }
-      *base = reinterpret_cast<char*>(&int16_t_tensor[0]);
-    } else if (strcmp(dtype, "INT32")) {
-      std::vector<int32_t> int32_t_tensor;
-      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
-           itr != tensor_data.End(); ++itr) {
-        int32_t_tensor.push_back((int32_t)itr->GetInt());
-      }
-      *base = reinterpret_cast<char*>(&int32_t_tensor[0]);
-    } else if (strcmp(dtype, "INT64")) {
-      std::vector<int64_t> int64_t_tensor;
-      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
-           itr != tensor_data.End(); ++itr) {
-        int64_t_tensor.push_back((int64_t)itr->GetInt());
-      }
-      *base = reinterpret_cast<char*>(&int64_t_tensor[0]);
-    }
-    // FP16 needs a work around
-    else if (strcmp(dtype, "FP16")) {
-      // std::vector<float> float_tensor;
-      // for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
-      //      itr != tensor_data.End(); ++itr) {
-      //   float_tensor.push_back((float)itr->GetFloat());
-      // }
-      // *base = reinterpret_cast<char*>(&float_tensor[0]);
-    } else if (strcmp(dtype, "FP32")) {
-      std::vector<float> float_tensor;
-      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
-           itr != tensor_data.End(); ++itr) {
-        float_tensor.push_back((float)itr->GetFloat());
-      }
-      *base = reinterpret_cast<char*>(&float_tensor[0]);
-    } else if (strcmp(dtype, "FP64")) {
-      std::vector<double> double_tensor;
-      for (rapidjson::Value::ConstValueIterator itr = tensor_data.Begin();
-           itr != tensor_data.End(); ++itr) {
-        double_tensor.push_back((double)itr->GetDouble());
-      }
-      *base = reinterpret_cast<char*>(&double_tensor[0]);
-    }
-    // BYTES (String) needs a work around
-    else if (strcmp(dtype, "BYTES")) {
-    } else {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
-          std::string(
-              "invalid datatype " + std::string(dtype) + " of input " +
-              request_input["name"].GetString())
-              .c_str());
-    }
-    *byte_size = element_cnt * GetDataTypeByteSize(dtype);
-  }
+  *byte_size = element_cnt * GetDataTypeByteSize(dtype);
 
   return nullptr;
 }
@@ -554,7 +560,7 @@ WriteDataArrayToJson(
 
   rapidjson::Value data_array(rapidjson::kArrayType);
 
-  // If flat
+  // If not empty
   if (byte_size > 0) {
     if (strcmp(dtype, "BOOL")) {
       uint8_t* bool_tensor = reinterpret_cast<uint8_t*>(base);
