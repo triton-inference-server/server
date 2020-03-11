@@ -645,7 +645,7 @@ S3FileSystem::S3FileSystem(
 
   std::string host_name, host_port, bucket, object;
   if (RE2::FullMatch(
-          path, s3_regex_, &host_name, &host_port, &bucket, &object)) {
+          s3_path, s3_regex_, &host_name, &host_port, &bucket, &object)) {
     config.endpointOverride = Aws::String(host_name + ":" + host_port);
     config.scheme = Aws::Http::Scheme::HTTP;
   }
@@ -901,10 +901,18 @@ S3FileSystem::DownloadFileFolder(
         RequestStatusCode::INTERNAL, "File/folder does not exist at " + path);
   }
 
+  std::string effective_path, host_name, host_port, bucket, object;
+  if (RE2::FullMatch(
+          path, s3_regex_, &host_name, &host_port, &bucket, &object)) {
+    effective_path = "s3://" + bucket + '/' + object;
+  } else {
+    effective_path = path;
+  }
+
   bool is_dir = false;
   std::set<std::string> contents, files;
   std::string file_template = "/tmp/fileXXXXXX";
-  RETURN_IF_ERROR(IsDirectory(path, &is_dir));
+  RETURN_IF_ERROR(IsDirectory(effective_path, &is_dir));
   if (is_dir) {
     char* tmp_folder = mkdtemp(const_cast<char*>(file_template.c_str()));
     if (tmp_folder == nullptr) {
@@ -914,11 +922,11 @@ S3FileSystem::DownloadFileFolder(
     }
 
     *local_path = std::string(tmp_folder);
-    RETURN_IF_ERROR(GetDirectoryContents(path, &contents));
+    RETURN_IF_ERROR(GetDirectoryContents(effective_path, &contents));
 
     for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
       bool is_subdir;
-      std::string s3_fpath = JoinPath({path, *iter});
+      std::string s3_fpath = JoinPath({effective_path, *iter});
       std::string local_fpath = JoinPath({*local_path, *iter});
       RETURN_IF_ERROR(IsDirectory(s3_fpath, &is_subdir));
       if (is_subdir) {
@@ -958,14 +966,15 @@ S3FileSystem::DownloadFileFolder(
       if (get_object_outcome.IsSuccess()) {
         auto& retrieved_file =
             get_object_outcome.GetResultWithOwnership().GetBody();
-        std::string s3_removed_path = (*iter).substr(path.size());
+        std::string s3_removed_path = (*iter).substr(effective_path.size());
         std::string local_file_path = JoinPath({*local_path, s3_removed_path});
         std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
         output_file << retrieved_file.rdbuf();
         output_file.close();
       } else {
         return Status(
-            RequestStatusCode::INTERNAL, "Failed to get object at " + path);
+            RequestStatusCode::INTERNAL,
+            "Failed to get object at " + effective_path);
       }
     }
   } else {
@@ -978,7 +987,7 @@ S3FileSystem::DownloadFileFolder(
 
     *local_path = file_template;
     std::string bucket, object;
-    RETURN_IF_ERROR(ParsePath(path, &bucket, &object));
+    RETURN_IF_ERROR(ParsePath(effective_path, &bucket, &object));
 
     // Send a request for the objects metadata
     s3::Model::GetObjectRequest object_request;
@@ -994,7 +1003,8 @@ S3FileSystem::DownloadFileFolder(
       output_file.close();
     } else {
       return Status(
-          RequestStatusCode::INTERNAL, "Failed to get object at " + path);
+          RequestStatusCode::INTERNAL,
+          "Failed to get object at " + effective_path);
     }
   }
   return Status::Success;
@@ -1076,36 +1086,7 @@ JoinPath(std::initializer_list<std::string> segments)
 
   for (const auto& seg : segments) {
     if (joined.empty()) {
-#ifdef TRTIS_ENABLE_S3
-      // Check if S3 path (s3://<bucket> or s3://<host>:<port>/<bucket>)
-      if (!seg.empty() && !seg.rfind("s3://", 0)) {
-        re2::RE2 s3_regex(
-            "s3://([0-9a-zA-Z-.]+):([0-9]+)/([0-9a-z.-]+)(((/"
-            "[0-9a-zA-Z.-_]+)*)?)");
-        std::string host_name, host_port, bucket, object;
-        if (!RE2::FullMatch(
-                seg, s3_regex, &host_name, &host_port, &bucket, &object)) {
-          int bucket_start = seg.find("s3://") + 5;
-          int bucket_end = seg.find("/", bucket_start);
-
-          // If there isn't a second slash, the address has only the bucket
-          if (bucket_end > bucket_start) {
-            bucket = seg.substr(bucket_start, bucket_end - bucket_start);
-            object = seg.substr(bucket_end + 1);
-          } else {
-            bucket = seg.substr(bucket_start);
-            object = "";
-          }
-          joined = seg;
-        } else {
-          joined = "s3://" + bucket + '/' + object;
-        }
-      } else {
-        joined = seg;
-      }
-#else
       joined = seg;
-#endif  // TRTIS_ENABLE_S3
     } else if (IsAbsolutePath(seg)) {
       if (joined[joined.size() - 1] == '/') {
         joined.append(seg.substr(1));
