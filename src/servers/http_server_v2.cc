@@ -314,26 +314,6 @@ HTTPAPIServerV2::InferResponseAlloc(
   *actual_memory_type = preferred_memory_type;
   *actual_memory_type_id = preferred_memory_type_id;
 
-  // rapidjson::Document::AllocatorType& allocator =
-  //     payload->response_json_.GetAllocator();
-  // rapidjson::Value response_output;
-  // response_output.SetObject();
-  // std::string tensor_name_str = std::string(tensor_name);
-  // rapidjson::Value name_val(tensor_name_str.c_str(), tensor_name_str.size());
-  // response_output.AddMember("name", name_val, allocator);
-
-  // std::string datatype_str = GetDataTypeProtocolString(io.data_type());
-  // rapidjson::Value datatype_val(datatype_str.c_str(), datatype_str.size());
-  // response_output.AddMember("datatype", datatype_val, allocator);
-
-  // rapidjson::Value shape_array(rapidjson::kArrayType);
-  // for (const auto d : io.dims()) {
-  //   shape_array.PushBack(d, allocator);
-  // }
-  // response_output.AddMember("shape", shape_array, allocator);
-
-  // outputs_array.PushBack(response_output, allocator);
-
   // Don't need to do anything if no memory was requested.
   if (byte_size > 0) {
     bool use_shm = false;
@@ -1411,29 +1391,28 @@ HTTPAPIServerV2::InferRequestClass::InferComplete(
   HTTPAPIServerV2::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServerV2::InferRequestClass*>(userp);
 
-  // write outputs into json array
-  int i = 0;
-  for (auto ev_buffer : infer_request->response_meta_data_.response_buffer_) {
-    size_t buffer_len = evbuffer_get_length(ev_buffer);
-    char json_buffer[buffer_len];
-    evbuffer_copyout(ev_buffer, &json_buffer, buffer_len);
-    WriteDataArrayToJson(
-        &infer_request->response_meta_data_.response_json_, i++, json_buffer,
-        buffer_len);
-  }
-
-  // write json string into buffer
-  rapidjson::StringBuffer buffer;
-  buffer.Clear();
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  infer_request->response_meta_data_.response_json_.Accept(writer);
-  std::string infer_metadata(buffer.GetString());
-
-  evbuffer_add(
-      infer_request->req_->buffer_out, infer_metadata.c_str(),
-      infer_metadata.size());
-
   if (infer_request->FinalizeResponse(response) == EVHTP_RES_OK) {
+    // write outputs into json array
+    int i = 0;
+    for (auto ev_buffer : infer_request->response_meta_data_.response_buffer_) {
+      size_t buffer_len = evbuffer_get_length(ev_buffer);
+      char json_buffer[buffer_len];
+      evbuffer_copyout(ev_buffer, &json_buffer, buffer_len);
+      WriteDataArrayToJson(
+          &infer_request->response_meta_data_.response_json_, i++, json_buffer,
+          buffer_len);
+    }
+
+    // write json string into evbuffer
+    rapidjson::StringBuffer buffer;
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    infer_request->response_meta_data_.response_json_.Accept(writer);
+    std::string infer_metadata(buffer.GetString());
+    evbuffer_add(
+        infer_request->req_->buffer_out, infer_metadata.c_str(),
+        infer_metadata.size());
+
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
     evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
@@ -1477,6 +1456,36 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     evbuffer_drain(req_->buffer_out, -1);
     response_header.Clear();
     response_header.set_id(request_id_);
+  } else {
+    rapidjson::Document::AllocatorType& allocator =
+        response_meta_data_.response_json_.GetAllocator();
+    std::string request_id_str = std::to_string(request_id_);
+    rapidjson::Value id_val(request_id_str.c_str(), request_id_str.size());
+    response_meta_data_.response_json_.AddMember("id", id_val, allocator);
+    rapidjson::Value& response_outputs =
+        response_meta_data_.response_json_["outputs"];
+    for (const auto& io : response_header.output()) {
+      for (size_t i = 0; i < response_outputs.Size(); i++) {
+        rapidjson::Value& response_output = response_outputs[i];
+        if (response_output["name"].GetString() == io.name()) {
+          if (io.batch_classes().size() == 0) {
+            response_output.SetObject();
+            rapidjson::Value shape_array(rapidjson::kArrayType);
+            for (const auto d : io.raw().dims()) {
+              shape_array.PushBack(d, allocator);
+            }
+            response_output.AddMember("shape", shape_array, allocator);
+
+            std::string datatype_str =
+                GetDataTypeProtocolString(io.data_type());
+            rapidjson::Value datatype_val(
+                datatype_str.c_str(), datatype_str.size());
+            response_output.AddMember("datatype", datatype_val, allocator);
+          }
+          // TODO Add case for classification
+        }
+      }
+    }
   }
 
   RequestStatus request_status;
