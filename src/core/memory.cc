@@ -121,17 +121,17 @@ AllocatedMemory::AllocatedMemory(
 #ifdef TRTIS_ENABLE_GPU
         auto status = CudaMemoryManager::Alloc(
             (void**)&buffer_, total_byte_size_, memory_type_id_);
-        // [TODO] fallback to pinned memory if can't allocate on GPU
+        // Fall back to allocate pinned memory if can't allocate CUDA memory
         if (!status.IsOk()) {
           LOG_ERROR << status.Message();
-          buffer_ = nullptr;
+          goto pinned_memory_allocation;
         }
 #else
         buffer_ = nullptr;
 #endif  // TRTIS_ENABLE_GPU
         break;
       }
-
+      pinned_memory_allocation:
       default: {
         auto status = PinnedMemoryManager::Alloc(
             (void**)&buffer_, total_byte_size_, &memory_type_, true);
