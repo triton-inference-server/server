@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -47,19 +47,20 @@ class PinnedMemoryManager {
   ~PinnedMemoryManager();
 
   // Create the pinned memory manager based on 'options' specified.
-  // Return true on success, false otherwise.
+  // Return Status object indicating success or failure.
   static Status Create(const Options& options);
 
   // Allocate pinned memory with the requested 'size' and return the pointer
   // in 'ptr'. If 'allow_nonpinned_fallback' is true, regular system memory
   // will be allocated as fallback in the case where pinned memory fails to
   // be allocated.
-  // Return true on success, false otherwise.
+  // Return Status object indicating success or failure.
   static Status Alloc(
       void** ptr, uint64_t size, TRTSERVER_Memory_Type* allocated_type,
       bool allow_nonpinned_fallback = false);
 
   // Free the memory allocated by the pinned memory manager.
+  // Return Status object indicating success or failure.
   static Status Free(void* ptr);
 
  protected:
