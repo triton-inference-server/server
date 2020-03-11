@@ -49,7 +49,8 @@
 #include "src/servers/tracer.h"
 #endif  // TRTIS_ENABLE_TRACING
 
-namespace nvidia { namespace inferenceserver {
+namespace nvidia {
+namespace inferenceserver {
 
 namespace {
 
@@ -852,7 +853,7 @@ SharedMemoryControlHandler::SetUpAllRequests()
             TRTSERVER_ERROR_INVALID_ARG,
             std::string(
                 "failed to register CUDA shared memory region: '" +
-                request.register_().name() + "', GPUs not supported")
+                request.name() + "', GPUs not supported")
                 .c_str());
 #endif  // TRTIS_ENABLE_GPU
 
@@ -2893,147 +2894,6 @@ ModelControlHandler::Process(Handler::State* state, bool rpc_ok)
     } else {
       err = TRTSERVER_ServerUnloadModel(
           trtserver_.get(), request.model_name().c_str());
-    }
-
-    RequestStatusUtil::Create(
-        response.mutable_request_status(), err, state->unique_id_, server_id_);
-
-    TRTSERVER_ErrorDelete(err);
-
-    state->step_ = Steps::COMPLETE;
-    state->context_->responder_->Finish(response, grpc::Status::OK, state);
-  } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-  }
-
-  // Only handle one status request at a time (to avoid having status
-  // request cause too much load on server), so register for next
-  // request only after this one finished.
-  if (!shutdown && (state->step_ == Steps::FINISH)) {
-    StartNewRequest();
-  }
-
-  return state->step_ != Steps::FINISH;
-}
-
-//
-// SharedMemoryControlHandler
-//
-class SharedMemoryControlHandler
-    : public Handler<
-          GRPCInferenceService::AsyncService,
-          grpc::ServerAsyncResponseWriter<SharedMemoryControlResponse>,
-          SharedMemoryControlRequest, SharedMemoryControlResponse> {
- public:
-  SharedMemoryControlHandler(
-      const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
-      const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      GRPCInferenceService::AsyncService* service,
-      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(
-            name, trtserver, server_id, service, cq, max_state_bucket_count),
-        shm_manager_(shm_manager)
-  {
-  }
-
- protected:
-  void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
-
- private:
-  std::shared_ptr<SharedMemoryManager> shm_manager_;
-};
-
-void
-SharedMemoryControlHandler::StartNewRequest()
-{
-  auto context = std::make_shared<State::Context>(server_id_);
-  State* state = StateNew(context);
-  service_->RequestSharedMemoryControl(
-      state->context_->ctx_.get(), &state->request_,
-      state->context_->responder_.get(), cq_, cq_, state);
-
-  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
-                 << state->unique_id_;
-}
-
-bool
-SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
-{
-  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
-                 << state->unique_id_ << " step " << state->step_;
-
-  // If RPC failed on a new request then the server is shutting down
-  // and so we should do nothing (including not registering for a new
-  // request). If RPC failed on a non-START step then there is nothing
-  // we can do since we one execute one step.
-  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
-  if (shutdown) {
-    state->step_ = Steps::FINISH;
-  }
-
-  const SharedMemoryControlRequest& request = state->request_;
-  SharedMemoryControlResponse& response = state->response_;
-
-  if (state->step_ == START) {
-    TRTSERVER_Error* err = nullptr;
-    if (request.has_register_()) {
-      if (request.register_().has_system_shared_memory()) {
-        // system shared memory
-        err = shm_manager_->RegisterSystemSharedMemory(
-            request.register_().name(),
-            request.register_().system_shared_memory().shared_memory_key(),
-            request.register_().system_shared_memory().offset(),
-            request.register_().byte_size());
-      } else if (request.register_().has_cuda_shared_memory()) {
-        // cuda shared memory
-#ifdef TRTIS_ENABLE_GPU
-        const std::string& raw_handle =
-            request.register_().cuda_shared_memory().raw_handle();
-        char* handle_base = const_cast<char*>(raw_handle.c_str());
-        cudaIpcMemHandle_t* cuda_shm_handle =
-            reinterpret_cast<cudaIpcMemHandle_t*>(handle_base);
-        err = shm_manager_->RegisterCUDASharedMemory(
-            request.register_().name(), cuda_shm_handle,
-            request.register_().byte_size(),
-            request.register_().cuda_shared_memory().device_id());
-#else
-        err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            std::string(
-                "failed to register CUDA shared memory region: '" +
-                request.register_().name() + "', GPUs not supported")
-                .c_str());
-#endif  // TRTIS_ENABLE_GPU
-      } else {
-        err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            std::string(
-                "failed to register shared memory region: '" +
-                request.register_().name() + "', improperly formed request.")
-                .c_str());
-      }
-    } else if (request.has_unregister()) {
-      err = shm_manager_->Unregister(request.unregister().name());
-    } else if (request.has_unregister_all()) {
-      err = shm_manager_->UnregisterAll();
-    } else if (request.has_status()) {
-      SharedMemoryStatus shm_status;
-      err = shm_manager_->GetStatus(&shm_status);
-      if (err == nullptr) {
-        std::string serialized;
-        shm_status.SerializeToString(&serialized);
-        auto shm_status_response = response.mutable_shared_memory_status();
-        if (!shm_status_response->ParseFromArray(
-                serialized.c_str(), serialized.size())) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INTERNAL, "failed to parse shared memory status");
-        }
-      }
-    } else {
-      err = TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_UNKNOWN, "unknown sharedmemorycontrol request type");
     }
 
     RequestStatusUtil::Create(
