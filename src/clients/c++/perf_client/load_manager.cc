@@ -349,7 +349,7 @@ LoadManager::InitSharedMemory()
         return nic::Error(
             ni::RequestStatusCode::INTERNAL,
             "unable to allocate memory of " + std::to_string(alloc_size) +
-                "bytes on gpu for output " + output->Name() + " : " +
+                " bytes on gpu for output " + output->Name() + " : " +
                 std::string(cudaGetErrorString(cuda_err)));
       }
       shared_memory_regions_[region_name] =
@@ -612,8 +612,14 @@ LoadManager::PrepareSharedMemoryInfer(
     RETURN_IF_ERROR(nic::InferContext::Options::Create(options));
     (*options)->SetBatchSize(batch_size_);
     for (const auto& output : (*ctx)->Outputs()) {
+      int64_t batch1_bytesize =
+          (*ctx)->ByteSize(output->Dims(), output->DType());
+      if (batch1_bytesize < 0) {
+        batch1_bytesize = output_shm_size_;
+      }
       (*options)->AddSharedMemoryResult(
-          output, TensorToRegionName(output->Name()), 0, output_shm_size_);
+          output, TensorToRegionName(output->Name()), 0,
+          batch1_bytesize * batch_size_);
     }
   }
 
