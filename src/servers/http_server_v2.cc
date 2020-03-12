@@ -467,7 +467,6 @@ ReadDataArrayFromJson(
         "failed to parse request buffer, tensor data must be an array");
   }
 
-  // BOOL vector is broken
   if (strcmp(dtype, "BOOL")) {
     std::vector<uint8_t> bool_tensor;
     ReadDataFromJsonHelper(&bool_tensor, dtype, tensor_data, &counter);
@@ -571,9 +570,7 @@ WriteDataToJsonHelper(
 
 
 void
-WriteDataArrayToJson(
-    rapidjson::Document* response_json, int index, char* base,
-    const size_t byte_size)
+WriteDataArrayToJson(rapidjson::Document* response_json, int index, char* base)
 {
   rapidjson::Document::AllocatorType& allocator = response_json->GetAllocator();
   rapidjson::Value& response_outputs = (*response_json)["outputs"];
@@ -1381,8 +1378,7 @@ HTTPAPIServerV2::InferRequestClass::InferComplete(
       char json_buffer[buffer_len];
       evbuffer_copyout(ev_buffer, &json_buffer, buffer_len);
       WriteDataArrayToJson(
-          &infer_request->response_meta_data_.response_json_, i++, json_buffer,
-          buffer_len);
+          &infer_request->response_meta_data_.response_json_, i++, json_buffer);
     }
 
     // write json string into evbuffer
