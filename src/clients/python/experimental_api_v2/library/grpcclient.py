@@ -267,7 +267,33 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    # FIXMEPV2: Add model control support
+    def get_model_repository_index(self, as_json=False):
+        """Get the index of model repository contents
+
+        Parameters
+        ----------
+        as_json : bool
+            If True then returns model repository index
+            as a json dict, otherwise as a protobuf message.
+            Default value is False.
+
+        Returns
+        -------
+        dict or protobuf message 
+            The JSON dict or RepositoryIndexResponse message holding
+            the model repository index.
+
+        """
+        try:
+            request = grpc_service_v2_pb2.RepositoryIndexRequest()
+            response = self._client_stub.RepositoryIndex(request)
+            if as_json:
+                return json.loads(MessageToJson(response))
+            else:
+                return response
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
+
     def load_model(self, model_name):
         """Request the inference server to load or reload specified model.
 
@@ -282,9 +308,14 @@ class InferenceServerClient:
             If unable to load the model.
 
         """
-        raise_error("Not implemented yet")
+        try:
+            request = grpc_service_v2_pb2.RepositoryModelLoadRequest(
+                model_name=model_name)
+            self._client_stub.RepositoryModelLoad(request)
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
 
-    # FIXMEPV2: Add model control support
+    
     def unload_model(self, model_name):
         """Request the inference server to unload specified model.
 
@@ -299,7 +330,12 @@ class InferenceServerClient:
             If unable to unload the model.
 
         """
-        raise_error("Not implemented yet")
+        try:
+            request = grpc_service_v2_pb2.RepositoryModelUnloadRequest(
+                model_name=model_name)
+            self._client_stub.RepositoryModelUnload(request)
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
 
     def get_system_shared_memory_status(self, region_name="", as_json=False):
         """Request system shared memory status from the server.

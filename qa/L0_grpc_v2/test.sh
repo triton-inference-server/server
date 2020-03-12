@@ -45,6 +45,7 @@ SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_grpc_v2_async_infer_client.py
 SIMPLE_STRING_INFER_CLIENT=../clients/simple_grpc_v2_string_infer_client.py
 SIMPLE_CLASS_CLIENT=../clients/simple_grpc_v2_class_client.py
 SIMPLE_SHM_CLIENT=../clients/simple_grpc_v2_shm_client.py
+SIMPLE_MODEL_CONTROL=../clients/simple_grpc_v2_model_control.py
 EXPLICIT_BYTE_CONTENT_CLIENT=../clients/grpc_v2_explicit_byte_content_client.py
 EXPLICIT_INT_CONTENT_CLIENT=../clients/grpc_v2_explicit_int_content_client.py
 EXPLICIT_INT8_CONTENT_CLIENT=../clients/grpc_v2_explicit_int8_content_client.py
@@ -127,7 +128,35 @@ done
 kill $SERVER_PID
 wait $SERVER_PID
 
+SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit --api-version 2"
+# FIXMEPV2
+# Cannot use run_server since it repeatedly curls the (old) HTTP health endpoint to know
+# when the server is ready. This endpoint would not exist in future.
+run_server_nowait
+sleep 10
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Test Model Control API
+python $SIMPLE_MODEL_CONTROL -v >> ${CLIENT_LOG}.model_control 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.model_control
+    RET=1
+fi
+
+if [ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]; then
+    cat ${CLIENT_LOG}.model_control
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 set -e
+
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

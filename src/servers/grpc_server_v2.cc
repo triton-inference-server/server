@@ -555,8 +555,7 @@ class CommonCallData : public GRPCServerV2::ICallData {
 
 template <typename ResponderType, typename RequestType, typename ResponseType>
 bool
-CommonCallData<ResponderType, RequestType, ResponseType>::Process(
-    bool rpc_ok)
+CommonCallData<ResponderType, RequestType, ResponseType>::Process(bool rpc_ok)
 {
   LOG_VERBOSE(1) << "Process for " << name_ << ", rpc_ok=" << rpc_ok << ", "
                  << id_ << " step " << step_;
@@ -907,46 +906,45 @@ CommonHandler::SetUpAllRequests()
   auto OnRegisterRepositoryIndex =
       [this](
           grpc::ServerContext* ctx, RepositoryIndexRequest* request,
-          grpc::ServerAsyncResponseWriter<RepositoryIndexResponse>*
-              responder,
+          grpc::ServerAsyncResponseWriter<RepositoryIndexResponse>* responder,
           void* tag) {
         this->service_->RequestRepositoryIndex(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
-  auto OnExecuteRepositoryIndex =
-      [this](
-          RepositoryIndexRequest& request,
-          RepositoryIndexResponse* response, grpc::Status* status) {
-        TRTSERVER_Error* err = nullptr;
-        if (request.repository_name().empty()) {
-          TRTSERVER_Protobuf* repository_index_protobuf = nullptr;
-        err = TRTSERVER_ServerModelRepositoryIndex(
-            trtserver_.get(), &repository_index_protobuf);
+  auto OnExecuteRepositoryIndex = [this](
+                                      RepositoryIndexRequest& request,
+                                      RepositoryIndexResponse* response,
+                                      grpc::Status* status) {
+    TRTSERVER_Error* err = nullptr;
+    if (request.repository_name().empty()) {
+      TRTSERVER_Protobuf* repository_index_protobuf = nullptr;
+      err = TRTSERVER_ServerModelRepositoryIndex(
+          trtserver_.get(), &repository_index_protobuf);
+      if (err == nullptr) {
+        const char* serialized_buffer;
+        size_t serialized_byte_size;
+        err = TRTSERVER_ProtobufSerialize(
+            repository_index_protobuf, &serialized_buffer,
+            &serialized_byte_size);
         if (err == nullptr) {
-          const char* serialized_buffer;
-          size_t serialized_byte_size;
-          err = TRTSERVER_ProtobufSerialize(
-              repository_index_protobuf, &serialized_buffer,
-              &serialized_byte_size);
-          if (err == nullptr) {
-            if (!response->ParseFromArray(
-                    serialized_buffer, serialized_byte_size)) {
-              err = TRTSERVER_ErrorNew(
-                  TRTSERVER_ERROR_UNKNOWN, "failed to parse repository index");
-            }
+          if (!response->ParseFromArray(
+                  serialized_buffer, serialized_byte_size)) {
+            err = TRTSERVER_ErrorNew(
+                TRTSERVER_ERROR_UNKNOWN, "failed to parse repository index");
           }
         }
-        TRTSERVER_ProtobufDelete(repository_index_protobuf);
+      }
+      TRTSERVER_ProtobufDelete(repository_index_protobuf);
+    } else {
+      err = TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_UNSUPPORTED,
+          "'repository_name' specification is not supported");
+    }
 
-        } else {
-          err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_UNSUPPORTED,"repository_name is currently not supported");
-        }
-
-        GrpcStatusUtil::Create(status, err);
-        TRTSERVER_ErrorDelete(err);
-      };
+    GrpcStatusUtil::Create(status, err);
+    TRTSERVER_ErrorDelete(err);
+  };
 
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<RepositoryIndexResponse>,
@@ -967,21 +965,23 @@ CommonHandler::SetUpAllRequests()
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
-  auto OnExecuteRepositoryModelLoad =
-      [this](
-          RepositoryModelLoadRequest& request,
-          RepositoryModelLoadResponse* response, grpc::Status* status) {
-        TRTSERVER_Error* err = nullptr;
-        if (request.repository_name().empty()) {
-          err = TRTSERVER_ServerLoadModel(trtserver_.get(), request.model_name().c_str());
-        } else {
-          err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_UNSUPPORTED,"repository_name is currently not supported");
-        }
+  auto OnExecuteRepositoryModelLoad = [this](
+                                          RepositoryModelLoadRequest& request,
+                                          RepositoryModelLoadResponse* response,
+                                          grpc::Status* status) {
+    TRTSERVER_Error* err = nullptr;
+    if (request.repository_name().empty()) {
+      err = TRTSERVER_ServerLoadModel(
+          trtserver_.get(), request.model_name().c_str());
+    } else {
+      err = TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_UNSUPPORTED,
+          "'repository_name' specification is not supported");
+    }
 
-        GrpcStatusUtil::Create(status, err);
-        TRTSERVER_ErrorDelete(err);
-      };
+    GrpcStatusUtil::Create(status, err);
+    TRTSERVER_ErrorDelete(err);
+  };
 
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<RepositoryModelLoadResponse>,
@@ -1008,10 +1008,12 @@ CommonHandler::SetUpAllRequests()
           RepositoryModelUnloadResponse* response, grpc::Status* status) {
         TRTSERVER_Error* err = nullptr;
         if (request.repository_name().empty()) {
-          err = TRTSERVER_ServerUnloadModel(trtserver_.get(), request.model_name().c_str());
+          err = TRTSERVER_ServerUnloadModel(
+              trtserver_.get(), request.model_name().c_str());
         } else {
           err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_UNSUPPORTED,"repository_name is currently not supported");
+              TRTSERVER_ERROR_UNSUPPORTED,
+              "'repository_name' specification is not supported");
         }
 
         GrpcStatusUtil::Create(status, err);
@@ -2970,8 +2972,8 @@ GRPCServerV2::Start()
 
   // A common Handler for other non-critical requests
   CommonHandler* hcommon = new CommonHandler(
-      "CommonHandler", server_, server_id_, shm_manager_,
-      &service_, common_cq_.get());
+      "CommonHandler", server_, server_id_, shm_manager_, &service_,
+      common_cq_.get());
   hcommon->Start();
   common_handler_.reset(hcommon);
 

@@ -93,22 +93,31 @@ service GRPCInferenceService
   //@@
   //@@     Get the index of model repository contents.
   //@@
-  rpc RepositoryIndex(RepositoryIndexRequest) returns (RepositoryIndexResponse) {}
+  rpc RepositoryIndex(RepositoryIndexRequest) returns (RepositoryIndexResponse)
+  {
+  }
 
   //@@  .. cpp:var:: rpc RepositoryModelLoad(RepositoryModelLoadRequest) returns
   //@@       (RepositoryModelLoadResponse)
   //@@
   //@@     Load or reload a model from a repository.
   //@@
-  rpc RepositoryModelLoad(RepositoryModelLoadRequest) returns (RepositoryModelLoadResponse) {}
+  rpc RepositoryModelLoad(RepositoryModelLoadRequest)
+      returns (RepositoryModelLoadResponse)
+  {
+  }
 
 
-  //@@  .. cpp:var:: rpc RepositoryModelUnload(RepositoryModelUnloadRequest) returns
+  //@@  .. cpp:var:: rpc RepositoryModelUnload(RepositoryModelUnloadRequest)
+  // returns
   //@@       (RepositoryModelUnloadResponse)
   //@@
   //@@     Unload a model.
   //@@
-  rpc RepositoryModelUnload(RepositoryModelUnloadRequest) returns (RepositoryModelUnloadResponse) {}
+  rpc RepositoryModelUnload(RepositoryModelUnloadRequest)
+      returns (RepositoryModelUnloadResponse)
+  {
+  }
 
   //@@  .. cpp:var:: rpc SystemSharedMemoryStatus(
   //@@                     SystemSharedMemoryStatusRequest)
@@ -833,7 +842,8 @@ message RepositoryIndexResponse
   //@@
   //@@     Index entry for a model.
   //@@
-  message ModelIndex {
+  message ModelIndex
+  {
     //@@
     //@@    .. cpp:var:: string name
     //@@
@@ -876,7 +886,7 @@ message RepositoryModelLoadRequest
 //@@
 //@@   Response message for RepositoryModelLoad.
 //@@
-message RepositoryModelLoadResponse{}
+message RepositoryModelLoadResponse {}
 
 //@@
 //@@.. cpp:var:: message RepositoryModelUnloadRequest
@@ -904,7 +914,7 @@ message RepositoryModelUnloadRequest
 //@@
 //@@   Response message for RepositoryModelUnload.
 //@@
-message RepositoryModelUnloadResponse{}
+message RepositoryModelUnloadResponse {}
 
 //@@
 //@@.. cpp:var:: message SystemSharedMemoryStatusRequest
