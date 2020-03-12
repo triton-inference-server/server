@@ -184,8 +184,8 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
     explicit AllocPayload() : shm_map_(nullptr) {}
     ~AllocPayload()
     {
-      // Don't delete 'response_buffer_' or 'response_json_' here. Destoryed as a part of the
-      // InferRequestClass
+      // Don't delete 'response_buffer_' or 'response_json_' here. Destoryed as
+      // a part of the InferRequestClass
       delete shm_map_;
     }
 
@@ -318,15 +318,17 @@ HTTPAPIServerV2::InferResponseAlloc(
     if (shm_map != nullptr) {
       const auto& pr = shm_map->find(tensor_name);
       if (pr != shm_map->end()) {
-        // If the output is in shared memory then check that the expected
-        // requested buffer size is at least the byte size of the output.
+        // If the output is in shared memory then check whether the shared
+        // memory size is at least the byte size of the output.
         if (byte_size > pr->second.byte_size_) {
           return TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_INTERNAL,
               std::string(
-                  "expected buffer size to be at least " +
-                  std::to_string(pr->second.byte_size_) + " bytes but got " +
-                  std::to_string(byte_size) + " bytes in output tensor")
+                  "shared memory size specified with the request for output '" +
+                  std::string(tensor_name) + "' (" +
+                  std::to_string(pr->second.byte_size_) +
+                  " bytes) should be at least " + std::to_string(byte_size) +
+                  " bytes to hold the results")
                   .c_str());
         }
 
