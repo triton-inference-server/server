@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        TRTISClient = grpcclient.InferenceServerClient(FLAGS.url)
+        triton_client = grpcclient.InferenceServerClient(FLAGS.url)
     except Exception as e:
         print("channel creation failed: " + str(e))
         sys.exit()
@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
     outputs.append(grpcclient.InferOutput('OUTPUT0'))
     outputs.append(grpcclient.InferOutput('OUTPUT1'))
-    results = TRTISClient.infer(inputs, outputs, model_name)
+    results = triton_client.infer(inputs, outputs, model_name)
 
     # Get the output arrays from the
     output0_data = results.as_numpy('OUTPUT0')
@@ -90,5 +90,3 @@ if __name__ == '__main__':
             print("sync infer error: incorrect difference")
             sys.exit(1)
     print('PASS: infer')
-
-    TRTISClient.close()

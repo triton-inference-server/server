@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        TRTISClient = grpcclient.InferenceServerClient(FLAGS.url)
+        triton_client = grpcclient.InferenceServerClient(FLAGS.url)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()
@@ -55,34 +55,32 @@ if __name__ == '__main__':
     model_name = 'simple'
 
     # Health
-    if TRTISClient.is_server_live():
+    if triton_client.is_server_live():
         print("PASS: is_server_live")
 
-    if TRTISClient.is_server_ready():
+    if triton_client.is_server_ready():
         print("PASS: is_server_ready")
 
-    if TRTISClient.is_model_ready(model_name):
+    if triton_client.is_model_ready(model_name):
         print("PASS: is_model_ready")
 
     # Metadata
-    metadata = TRTISClient.get_server_metadata()
+    metadata = triton_client.get_server_metadata()
     if (metadata.name == 'inference:0'):
         print("PASS: get_server_metadata")
 
-    metadata = TRTISClient.get_model_metadata(model_name)
+    metadata = triton_client.get_model_metadata(model_name)
     if (metadata.name == model_name):
         print("PASS: get_model_metadata")
 
     # Passing incorrect model name
     try:
-        metadata = TRTISClient.get_model_metadata("wrong_model_name")
+        metadata = triton_client.get_model_metadata("wrong_model_name")
     except InferenceServerException as ex:
         if "no status available for unknown model" in ex.message():
             print("PASS: detected wrong model")
 
     # Configuration
-    config = TRTISClient.get_model_config(model_name)
+    config = triton_client.get_model_config(model_name)
     if (config.config.name == model_name):
         print("PASS: get_model_config")
-
-    TRTISClient.close()

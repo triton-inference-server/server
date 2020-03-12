@@ -863,7 +863,7 @@ InferAllocatorPayload(
     if (io.has_shared_memory()) {
       void* base;
       TRTSERVER_Memory_Type memory_type;
-      int memory_type_id;
+      int64_t memory_type_id;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
           io.shared_memory().name(), io.shared_memory().offset(), &base,
           &memory_type, &memory_type_id));
@@ -896,7 +896,7 @@ InferGRPCToInput(
     const void* base;
     size_t byte_size;
     TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
-    int memory_type_id = 0;
+    int64_t memory_type_id = 0;
     if (io.has_shared_memory()) {
       void* tmp;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(

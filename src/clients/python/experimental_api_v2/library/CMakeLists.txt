@@ -27,8 +27,35 @@
 cmake_minimum_required (VERSION 3.5)
 
 if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_GRPC_V2})
+  if(NOT WIN32)
+    #
+    # libcshmv2.so
+    #
+    add_library(cshmv2 SHARED shared_memory/shared_memory.cc)
+    if(${TRTIS_ENABLE_GPU})
+      target_include_directories(cshmv2 PRIVATE ${CUDA_INCLUDE_DIRS})
+    endif() # TRTIS_ENABLE_GPU
+    target_link_libraries(cshmv2 rt)
+
+    #
+    # libccudashm.so
+    #
+    if(${TRTIS_ENABLE_GPU})
+      add_library(ccudashmv2 SHARED cuda_shared_memory/cuda_shared_memory.cc)
+      target_include_directories(ccudashmv2 PUBLIC ${CUDA_INCLUDE_DIRS})
+      target_link_libraries(ccudashmv2 PRIVATE ${CUDA_LIBRARIES})
+    endif() # TRTIS_ENABLE_GPU
+  endif() # NOT WIN32
+
   configure_file(../../../../../VERSION VERSION COPYONLY)
   configure_file(utils.py utils.py COPYONLY)
+
+  if(NOT WIN32)
+    configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
+    if(${TRTIS_ENABLE_GPU})
+      configure_file(cuda_shared_memory/__init__.py cuda_shared_memory/__init__.py COPYONLY)
+    endif() # TRTIS_ENABLE_GPU
+  endif() # NOT WIN32
 endif() # TRTIS_ENABLE_HTTP_V2 || TRTIS_ENABLE_GRPC_V2
 
 

@@ -232,7 +232,7 @@ if __name__ == '__main__':
 
     # Create gRPC client for communicating with the server
     try:
-        TRTISClient = grpcclient.InferenceServerClient(FLAGS.url)
+        triton_client = grpcclient.InferenceServerClient(FLAGS.url)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()
@@ -240,13 +240,13 @@ if __name__ == '__main__':
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
     try:
-        model_meta = TRTISClient.get_model_metadata(model_name=FLAGS.model_name)
+        model_meta = triton_client.get_model_metadata(model_name=FLAGS.model_name)
     except InferenceServerException as e:
         print("failed to retrieve the metadata: " + str(e))
         sys.exit()
 
     try:
-        model_config = TRTISClient.get_model_config(model_name=FLAGS.model_name)
+        model_config = triton_client.get_model_config(model_name=FLAGS.model_name)
     except InferenceServerException as e:
         print("failed to retrieve the config: " + str(e))
         sys.exit()
@@ -265,7 +265,7 @@ if __name__ == '__main__':
             input_name, output_name, c, h, w, format, dtype, FLAGS):
         try:
             results.append(
-                TRTISClient.infer(inputs,
+                triton_client.infer(inputs,
                                   outputs,
                                   model_name=FLAGS.model_name,
                                   model_version=FLAGS.model_version))

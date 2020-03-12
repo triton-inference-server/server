@@ -301,6 +301,191 @@ class InferenceServerClient:
         """
         raise_error("Not implemented yet")
 
+    def get_system_shared_memory_status(self, region_name="", as_json=False):
+        """Request system shared memory status from the server.
+
+        Parameters
+        ----------
+        region_name : str
+            The name of the region to query status. The default
+            value is an empty string, which means that the status
+            of all active system shared memory will be returned.
+        as_json : bool
+            If True then returns system shared memory status as a 
+            json dict, otherwise as a protobuf message. Default
+            value is False.
+
+        Returns
+        -------
+        dict or protobuf message 
+            The JSON dict or SystemSharedMemoryStatusResponse message holding
+            the metadata.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to get the status of specified shared memory.
+
+        """
+
+        try:
+            request = grpc_service_v2_pb2.SystemSharedMemoryStatusRequest(name=region_name)
+            response = self._client_stub.SystemSharedMemoryStatus(request)
+            if as_json:
+                return json.loads(MessageToJson(response))
+            else:
+                return response
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
+
+    def register_system_shared_memory(self, name, key, byte_size, offset=0):
+        """Request the server to register a system shared memory with the
+        following specification.
+
+        Parameters
+        ----------
+        name : str
+            The name of the region to register.
+        key : str 
+            The key of the underlying memory object that contains the
+            system shared memory region.
+        byte_size : int
+            The size of the system shared memory region, in bytes.
+        offset : int
+            Offset, in bytes, within the underlying memory object to
+            the start of the system shared memory region. The default
+            value is zero.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to register the specified system shared memory.     
+
+        """
+        try:
+            request = grpc_service_v2_pb2.SystemSharedMemoryRegisterRequest(
+                    name=name,
+                    key=key,
+                    offset=offset,
+                    byte_size=byte_size)
+            self._client_stub.SystemSharedMemoryRegister(request)
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
+
+    def unregister_system_shared_memory(self, name=""):
+        """Request the server to unregister a system shared memory with the
+        specified name.
+
+        Parameters
+        ----------
+        name : str
+            The name of the region to unregister. The default value is empty
+            string which means all the system shared memory regions will be
+            unregistered.
+        
+        Raises
+        ------
+        InferenceServerException
+            If unable to unregister the specified system shared memory region.
+
+        """
+        try:
+            request = grpc_service_v2_pb2.SystemSharedMemoryUnregisterRequest(name=name)
+            self._client_stub.SystemSharedMemoryUnregister(request)
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
+
+    def get_cuda_shared_memory_status(self, region_name="", as_json=False):
+        """Request cuda shared memory status from the server.
+
+        Parameters
+        ----------
+        region_name : str
+            The name of the region to query status. The default
+            value is an empty string, which means that the status
+            of all active cuda shared memory will be returned.
+        as_json : bool
+            If True then returns cuda shared memory status as a 
+            json dict, otherwise as a protobuf message. Default
+            value is False.
+
+        Returns
+        -------
+        dict or protobuf message 
+            The JSON dict or CudaSharedMemoryStatusResponse message holding
+            the metadata.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to get the status of specified shared memory.
+
+        """
+
+        try:
+            request = grpc_service_v2_pb2.CudaSharedMemoryStatusRequest(name=region_name)
+            response = self._client_stub.CudaSharedMemoryStatus(request)
+            if as_json:
+                return json.loads(MessageToJson(response))
+            else:
+                return response
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
+
+    def register_cuda_shared_memory(self, name, raw_handle, device_id, byte_size):
+        """Request the server to register a system shared memory with the
+        following specification.
+
+        Parameters
+        ----------
+        name : str
+            The name of the region to register.
+        raw_handle : bytes 
+            The raw serialized cudaIPC handle.
+        device_id : int
+            The GPU device ID on which the cudaIPC handle was created.
+        byte_size : int
+            The size of the cuda shared memory region, in bytes.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to register the specified cuda shared memory.     
+
+        """
+        try:
+            request = grpc_service_v2_pb2.CudaSharedMemoryRegisterRequest(
+                    name=name,
+                    raw_handle=raw_handle,
+                    device_id=device_id,
+                    byte_size=byte_size)
+            self._client_stub.CudaSharedMemoryRegister(request)
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
+
+    def unregister_cuda_shared_memory(self, name=""):
+        """Request the server to unregister a cuda shared memory with the
+        specified name.
+
+        Parameters
+        ----------
+        name : str
+            The name of the region to unregister. The default value is empty
+            string which means all the cuda shared memory regions will be
+            unregistered.
+        
+        Raises
+        ------
+        InferenceServerException
+            If unable to unregister the specified cuda shared memory region.
+
+        """
+        try:
+            request = grpc_service_v2_pb2.CudaSharedMemoryUnregisterRequest(name=name)
+            self._client_stub.CudaSharedMemoryUnregister(request)
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
+    
     # FIXMEPV2: Add parameter support
     def parameters(self):
         raise_error("Not implemented yet")
@@ -484,6 +669,7 @@ class InferInput:
         """
         return self._input.name
 
+    @property
     def datatype(self):
         """Get the datatype of input associated with this object.
 
@@ -494,6 +680,19 @@ class InferInput:
         """
         return self._input.datatype
 
+    @datatype.setter
+    def datatype(self, value):
+        """Sets the datatype for the input associated with this
+        object
+
+        Parameters
+        ----------
+        value : str
+            The datatype of input
+        """
+        self._input.datatype = value
+
+    @property
     def shape(self):
         """Get the shape of input associated with this object.
 
@@ -503,6 +702,18 @@ class InferInput:
             The shape of input
         """
         return self._input.shape
+
+    @shape.setter
+    def shape(self, value):
+        """Sets the shape of input associated with this object.
+
+        Parameters
+        ----------
+        value : list
+            The shape of input
+        """
+        self._input.ClearField('shape')
+        self._input.shape.extend(value)
 
     def set_data_from_numpy(self, input_tensor):
         """Set the tensor data (datatype, shape, contents) from the
@@ -524,9 +735,30 @@ class InferInput:
         else:
             self._input.contents.raw_contents = input_tensor.tobytes()
 
-    # FIXMEPV2: Add parameter support
-    def parameters(self):
-        raise_error("Not implemented yet")
+    def set_parameter(self, key, value):
+        """Adds the specified key-value pair in the requested input parameters
+
+        Parameters
+        ----------
+        key : str
+            The name of the parameter to be included in the request. 
+        value : str/int/bool
+            The value of the parameter
+        
+        """
+        if not type(key) is str:
+            raise_error(
+                "only string data type for key is supported in parameters")
+
+        param = self._input.parameters[key]
+        if type(value) is int:
+            param.int64_param = value
+        elif type(value) is bool:
+            param.bool_param = value
+        elif type(value) is str:
+            param.string_param = value
+        else:
+            raise_error("unsupported value type for the parameter")
 
     def _get_tensor(self):
         """Retrieve the underlying InferInputTensor message.

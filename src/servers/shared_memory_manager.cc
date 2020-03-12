@@ -130,7 +130,12 @@ OpenCudaIPCRegion(
 
 SharedMemoryManager::~SharedMemoryManager()
 {
+  // FIXME: Replace UnregisterAll() call with below commented lines
   UnregisterAll();
+#ifdef TRTIS_ENABLE_GRPC_V2
+  // UnregisterAllV2(TRTSERVER_MEMORY_CPU);
+  // UnregisterAllV2(TRTSERVER_MEMORY_GPU);
+#endif
 }
 
 TRTSERVER_Error*
@@ -239,7 +244,7 @@ SharedMemoryManager::RegisterCUDASharedMemory(
 TRTSERVER_Error*
 SharedMemoryManager::GetMemoryInfo(
     const std::string& name, size_t offset, void** shm_mapped_addr,
-    TRTSERVER_Memory_Type* memory_type, int* device_id)
+    TRTSERVER_Memory_Type* memory_type, int64_t* device_id)
 {
   auto it = shared_memory_map_.find(name);
   if (it == shared_memory_map_.end()) {
@@ -358,5 +363,199 @@ SharedMemoryManager::UnregisterHelper(const std::string& name)
 
   return nullptr;
 }
+
+#ifdef TRTIS_ENABLE_GRPC_V2
+TRTSERVER_Error*
+SharedMemoryManager::GetStatusV2(
+    const std::string& name, SystemSharedMemoryStatusResponse*& shm_status)
+{
+  std::lock_guard<std::mutex> lock(mu_);
+
+  if (name.empty()) {
+    for (const auto& shm_info : shared_memory_map_) {
+      if (shm_info.second->kind_ == TRTSERVER_MEMORY_CPU) {
+        SystemSharedMemoryStatusResponse::RegionStatus region_status;
+
+        region_status.set_name(shm_info.second->name_);
+        region_status.set_key(shm_info.second->shm_key_);
+        region_status.set_offset(shm_info.second->offset_);
+        region_status.set_byte_size(shm_info.second->byte_size_);
+
+        (*shm_status->mutable_regions())[shm_info.second->name_] =
+            region_status;
+      }
+    }
+  } else {
+    auto it = shared_memory_map_.find(name);
+    if (it == shared_memory_map_.end()) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_NOT_FOUND,
+          std::string(
+              "Unable to find system shared memory region: '" + name + "'")
+              .c_str());
+    }
+
+    if (it->second->kind_ == TRTSERVER_MEMORY_GPU) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_NOT_FOUND,
+          std::string(
+              "The region named '" + name +
+              "' is registered as CUDA shared memory, not system shared memory")
+              .c_str());
+    }
+
+    SystemSharedMemoryStatusResponse::RegionStatus region_status;
+
+    region_status.set_name(it->second->name_);
+    region_status.set_key(it->second->shm_key_);
+    region_status.set_offset(it->second->offset_);
+    region_status.set_byte_size(it->second->byte_size_);
+
+    (*shm_status->mutable_regions())[name] = region_status;
+  }
+
+  return nullptr;
+}
+
+TRTSERVER_Error*
+SharedMemoryManager::GetStatusV2(
+    const std::string& name, CudaSharedMemoryStatusResponse*& shm_status)
+{
+  std::lock_guard<std::mutex> lock(mu_);
+
+  if (name.empty()) {
+    for (const auto& shm_info : shared_memory_map_) {
+      if (shm_info.second->kind_ == TRTSERVER_MEMORY_GPU) {
+        CudaSharedMemoryStatusResponse::RegionStatus region_status;
+
+        region_status.set_name(shm_info.second->name_);
+        region_status.set_device_id(shm_info.second->device_id_);
+        region_status.set_byte_size(shm_info.second->byte_size_);
+
+        (*shm_status->mutable_regions())[shm_info.second->name_] =
+            region_status;
+      }
+    }
+  } else {
+    auto it = shared_memory_map_.find(name);
+    if (it == shared_memory_map_.end()) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_NOT_FOUND,
+          std::string(
+              "Unable to find cuda shared memory region: '" + name + "'")
+              .c_str());
+    }
+
+    if (it->second->kind_ == TRTSERVER_MEMORY_CPU) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_NOT_FOUND,
+          std::string(
+              "The region named '" + name +
+              "' is registered as system shared memory, not CUDA shared memory")
+              .c_str());
+    }
+
+    CudaSharedMemoryStatusResponse::RegionStatus region_status;
+
+    region_status.set_name(it->second->name_);
+    region_status.set_device_id(it->second->device_id_);
+    region_status.set_byte_size(it->second->byte_size_);
+
+    (*shm_status->mutable_regions())[name] = region_status;
+  }
+
+
+  return nullptr;
+}
+
+TRTSERVER_Error*
+SharedMemoryManager::UnregisterV2(
+    const std::string& name, TRTSERVER_Memory_Type memory_type)
+{
+  // Serialize all operations that write/read current shared memory regions
+  std::lock_guard<std::mutex> lock(mu_);
+
+  return UnregisterHelperV2(name, memory_type);
+}
+
+TRTSERVER_Error*
+SharedMemoryManager::UnregisterAllV2(TRTSERVER_Memory_Type memory_type)
+{
+  std::lock_guard<std::mutex> lock(mu_);
+  std::string error_message = "Failed to unregister the following ";
+  std::vector<std::string> unregister_fails;
+  if (memory_type == TRTSERVER_MEMORY_CPU) {
+    // Serialize all operations that write/read current shared memory regions
+    error_message += "system shared memory regions: ";
+    for (const auto& shm_info : shared_memory_map_) {
+      if (shm_info.second->kind_ == TRTSERVER_MEMORY_CPU) {
+        TRTSERVER_Error* err = UnregisterHelperV2(shm_info.first, memory_type);
+        if (err != nullptr) {
+          unregister_fails.push_back(shm_info.first);
+        }
+      }
+    }
+  } else if (memory_type == TRTSERVER_MEMORY_GPU) {
+    error_message += "cuda shared memory regions: ";
+    for (const auto& shm_info : shared_memory_map_) {
+      if (shm_info.second->kind_ == TRTSERVER_MEMORY_GPU) {
+        TRTSERVER_Error* err = UnregisterHelperV2(shm_info.first, memory_type);
+        if (err != nullptr) {
+          unregister_fails.push_back(shm_info.first);
+        }
+      }
+    }
+  }
+
+  if (!unregister_fails.empty()) {
+    for (auto unreg_fail : unregister_fails) {
+      error_message += unreg_fail + " ,";
+    }
+    LOG_ERROR << error_message;
+    return TRTSERVER_ErrorNew(TRTSERVER_ERROR_INTERNAL, error_message.c_str());
+  }
+
+  return nullptr;
+}
+
+
+TRTSERVER_Error*
+SharedMemoryManager::UnregisterHelperV2(
+    const std::string& name, TRTSERVER_Memory_Type memory_type)
+{
+  // Must hold the lock on register_mu_ while calling this function.
+  auto it = shared_memory_map_.find(name);
+  if (it != shared_memory_map_.end() && it->second->kind_ == memory_type) {
+    if (it->second->kind_ == TRTSERVER_MEMORY_CPU) {
+      RETURN_IF_ERR(
+          UnmapSharedMemory(it->second->mapped_addr_, it->second->byte_size_));
+    } else {
+#ifdef TRTIS_ENABLE_GPU
+      cudaError_t err = cudaIpcCloseMemHandle(it->second->mapped_addr_);
+      if (err != cudaSuccess) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INTERNAL, std::string(
+                                          "failed to close CUDA IPC handle: " +
+                                          std::string(cudaGetErrorString(err)))
+                                          .c_str());
+      }
+#else
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "failed to unregister CUDA shared memory region: '" + name +
+              "', GPUs not supported")
+              .c_str());
+#endif  // TRTIS_ENABLE_GPU
+    }
+
+    // Remove region information from shared_memory_map_
+    shared_memory_map_.erase(it);
+  }
+
+  return nullptr;
+}
+
+#endif  // TRTIS_ENABLE_GRPC_V2
 
 }}  // namespace nvidia::inferenceserver
