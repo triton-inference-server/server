@@ -515,14 +515,14 @@ Handler<ServiceType, ServerResponderType, RequestType, ResponseType>::Stop()
 }
 
 template <typename ResponderType, typename RequestType, typename ResponseType>
-class SharedMemoryControlCallData : public GRPCServerV2::ICallData {
+class CommonCallData : public GRPCServerV2::ICallData {
  public:
   using StandardRegisterFunc = std::function<void(
       grpc::ServerContext*, RequestType*, ResponderType*, void*)>;
   using StandardCallbackFunc =
       std::function<void(RequestType&, ResponseType*, grpc::Status*)>;
 
-  SharedMemoryControlCallData(
+  CommonCallData(
       const std::string& name, const uint64_t id,
       const StandardRegisterFunc OnRegister,
       const StandardCallbackFunc OnCallback)
@@ -555,7 +555,7 @@ class SharedMemoryControlCallData : public GRPCServerV2::ICallData {
 
 template <typename ResponderType, typename RequestType, typename ResponseType>
 bool
-SharedMemoryControlCallData<ResponderType, RequestType, ResponseType>::Process(
+CommonCallData<ResponderType, RequestType, ResponseType>::Process(
     bool rpc_ok)
 {
   LOG_VERBOSE(1) << "Process for " << name_ << ", rpc_ok=" << rpc_ok << ", "
@@ -584,7 +584,7 @@ SharedMemoryControlCallData<ResponderType, RequestType, ResponseType>::Process(
   }
 
   if (!shutdown && (step_ == Steps::FINISH)) {
-    new SharedMemoryControlCallData<ResponderType, RequestType, ResponseType>(
+    new CommonCallData<ResponderType, RequestType, ResponseType>(
         name_, id_ + 1, OnRegister_, OnCallback_);
   }
 
@@ -592,11 +592,11 @@ SharedMemoryControlCallData<ResponderType, RequestType, ResponseType>::Process(
 }
 
 //
-// SharedMemoryControlHandler
+// CommonHandler
 //
-class SharedMemoryControlHandler : public GRPCServerV2::HandlerBase {
+class CommonHandler : public GRPCServerV2::HandlerBase {
  public:
-  SharedMemoryControlHandler(
+  CommonHandler(
       const std::string& name,
       const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
@@ -626,7 +626,7 @@ class SharedMemoryControlHandler : public GRPCServerV2::HandlerBase {
   std::unique_ptr<std::thread> thread_;
 };
 
-SharedMemoryControlHandler::SharedMemoryControlHandler(
+CommonHandler::CommonHandler(
     const std::string& name, const std::shared_ptr<TRTSERVER_Server>& trtserver,
     const char* server_id,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
@@ -638,7 +638,7 @@ SharedMemoryControlHandler::SharedMemoryControlHandler(
 }
 
 void
-SharedMemoryControlHandler::Start()
+CommonHandler::Start()
 {
   // Use a barrier to make sure we don't return until thread has
   // started.
@@ -667,7 +667,7 @@ SharedMemoryControlHandler::Start()
 }
 
 void
-SharedMemoryControlHandler::Stop()
+CommonHandler::Stop()
 {
   if (thread_->joinable()) {
     thread_->join();
@@ -677,7 +677,7 @@ SharedMemoryControlHandler::Stop()
 }
 
 void
-SharedMemoryControlHandler::SetUpAllRequests()
+CommonHandler::SetUpAllRequests()
 {
   // Define all the RPCs to be handled by this handler below
   //
@@ -686,7 +686,7 @@ SharedMemoryControlHandler::SetUpAllRequests()
   //    server is ready to receive the requests for this RPC.
   // 2. A OnExecute function: This will be called when the
   //    to process the request.
-  // 3. Create a CallData object with the above callback
+  // 3. Create a CommonCallData object with the above callback
   //    functions
 
 
@@ -714,7 +714,7 @@ SharedMemoryControlHandler::SetUpAllRequests()
         TRTSERVER_ErrorDelete(err);
       };
 
-  new SharedMemoryControlCallData<
+  new CommonCallData<
       grpc::ServerAsyncResponseWriter<SystemSharedMemoryStatusResponse>,
       SystemSharedMemoryStatusRequest, SystemSharedMemoryStatusResponse>(
       "SystemSharedMemoryStatus", 0, OnRegisterSystemSharedMemoryStatus,
@@ -746,7 +746,7 @@ SharedMemoryControlHandler::SetUpAllRequests()
         TRTSERVER_ErrorDelete(err);
       };
 
-  new SharedMemoryControlCallData<
+  new CommonCallData<
       grpc::ServerAsyncResponseWriter<SystemSharedMemoryRegisterResponse>,
       SystemSharedMemoryRegisterRequest, SystemSharedMemoryRegisterResponse>(
       "SystemSharedMemoryRegister", 0, OnRegisterSystemSharedMemoryRegister,
@@ -784,7 +784,7 @@ SharedMemoryControlHandler::SetUpAllRequests()
         TRTSERVER_ErrorDelete(err);
       };
 
-  new SharedMemoryControlCallData<
+  new CommonCallData<
       grpc::ServerAsyncResponseWriter<SystemSharedMemoryUnregisterResponse>,
       SystemSharedMemoryUnregisterRequest,
       SystemSharedMemoryUnregisterResponse>(
@@ -814,7 +814,7 @@ SharedMemoryControlHandler::SetUpAllRequests()
         GrpcStatusUtil::Create(status, err);
         TRTSERVER_ErrorDelete(err);
       };
-  new SharedMemoryControlCallData<
+  new CommonCallData<
       grpc::ServerAsyncResponseWriter<CudaSharedMemoryStatusResponse>,
       CudaSharedMemoryStatusRequest, CudaSharedMemoryStatusResponse>(
       "CudaSharedMemoryStatus", 0, OnRegisterCudaSharedMemoryStatus,
@@ -860,7 +860,7 @@ SharedMemoryControlHandler::SetUpAllRequests()
         TRTSERVER_ErrorDelete(err);
       };
 
-  new SharedMemoryControlCallData<
+  new CommonCallData<
       grpc::ServerAsyncResponseWriter<CudaSharedMemoryRegisterResponse>,
       CudaSharedMemoryRegisterRequest, CudaSharedMemoryRegisterResponse>(
       "CudaSharedMemoryRegister", 0, OnRegisterCudaSharedMemoryRegister,
@@ -895,7 +895,7 @@ SharedMemoryControlHandler::SetUpAllRequests()
         TRTSERVER_ErrorDelete(err);
       };
 
-  new SharedMemoryControlCallData<
+  new CommonCallData<
       grpc::ServerAsyncResponseWriter<CudaSharedMemoryUnregisterResponse>,
       CudaSharedMemoryUnregisterRequest, CudaSharedMemoryUnregisterResponse>(
       "CudaSharedMemoryUnregister", 0, OnRegisterCudaSharedMemoryUnregister,
@@ -2724,197 +2724,6 @@ StreamInferHandler::StreamInferComplete(
   state->step_ = Steps::WRITEREADY;
   state->context_->WriteResponseIfReady(state);
 }
-
-//
-// RepositoryHandler
-//
-class RepositoryHandler
-    : public Handler<
-          GRPCInferenceService::AsyncService,
-          grpc::ServerAsyncResponseWriter<RepositoryResponse>,
-          RepositoryRequest, RepositoryResponse> {
- public:
-  RepositoryHandler(
-      const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
-      GRPCInferenceService::AsyncService* service,
-      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, trtserver, server_id, service, cq, max_state_bucket_count)
-  {
-  }
-
- protected:
-  void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
-};
-
-void
-RepositoryHandler::StartNewRequest()
-{
-  auto context = std::make_shared<State::Context>(server_id_);
-  State* state = StateNew(context);
-  service_->RequestRepository(
-      state->context_->ctx_.get(), &state->request_,
-      state->context_->responder_.get(), cq_, cq_, state);
-
-  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
-                 << state->unique_id_;
-}
-
-bool
-RepositoryHandler::Process(Handler::State* state, bool rpc_ok)
-{
-  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
-                 << state->unique_id_ << " step " << state->step_;
-
-  // If RPC failed on a new request then the server is shutting down
-  // and so we should do nothing (including not registering for a new
-  // request). If RPC failed on a non-START step then there is nothing
-  // we can do since we one execute one step.
-  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
-  if (shutdown) {
-    state->step_ = Steps::FINISH;
-  }
-
-  const RepositoryRequest& request = state->request_;
-  RepositoryResponse& response = state->response_;
-
-  if (state->step_ == Steps::START) {
-    TRTSERVER_Error* err = nullptr;
-    switch (request.request_type_case()) {
-      case RepositoryRequest::RequestTypeCase::kIndex: {
-        TRTSERVER_Protobuf* repository_index_protobuf = nullptr;
-        err = TRTSERVER_ServerModelRepositoryIndex(
-            trtserver_.get(), &repository_index_protobuf);
-        if (err == nullptr) {
-          const char* serialized_buffer;
-          size_t serialized_byte_size;
-          err = TRTSERVER_ProtobufSerialize(
-              repository_index_protobuf, &serialized_buffer,
-              &serialized_byte_size);
-          if (err == nullptr) {
-            if (!response.mutable_index()->ParseFromArray(
-                    serialized_buffer, serialized_byte_size)) {
-              err = TRTSERVER_ErrorNew(
-                  TRTSERVER_ERROR_UNKNOWN, "failed to parse repository index");
-            }
-          }
-        }
-
-        TRTSERVER_ProtobufDelete(repository_index_protobuf);
-        break;
-      }
-      default:
-        err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_UNKNOWN, "request type is not specified");
-        break;
-    }
-
-    RequestStatusUtil::Create(
-        response.mutable_request_status(), err, state->unique_id_, server_id_);
-
-    TRTSERVER_ErrorDelete(err);
-
-    state->step_ = Steps::COMPLETE;
-    state->context_->responder_->Finish(response, grpc::Status::OK, state);
-  } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-  }
-
-  // Only handle one model repository request at a time (to avoid having
-  // model repository request cause too much load on server),
-  // so register for next request only after this one finished.
-  if (!shutdown && (state->step_ == Steps::FINISH)) {
-    StartNewRequest();
-  }
-
-  return state->step_ != Steps::FINISH;
-}
-
-//
-// ModelControlHandler
-//
-class ModelControlHandler
-    : public Handler<
-          GRPCInferenceService::AsyncService,
-          grpc::ServerAsyncResponseWriter<ModelControlResponse>,
-          ModelControlRequest, ModelControlResponse> {
- public:
-  ModelControlHandler(
-      const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
-      GRPCInferenceService::AsyncService* service,
-      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, trtserver, server_id, service, cq, max_state_bucket_count)
-  {
-  }
-
- protected:
-  void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
-};
-
-void
-ModelControlHandler::StartNewRequest()
-{
-  auto context = std::make_shared<State::Context>(server_id_);
-  State* state = StateNew(context);
-  service_->RequestModelControl(
-      state->context_->ctx_.get(), &state->request_,
-      state->context_->responder_.get(), cq_, cq_, state);
-
-  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
-                 << state->unique_id_;
-}
-
-bool
-ModelControlHandler::Process(Handler::State* state, bool rpc_ok)
-{
-  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
-                 << state->unique_id_ << " step " << state->step_;
-
-  // If RPC failed on a new request then the server is shutting down
-  // and so we should do nothing (including not registering for a new
-  // request). If RPC failed on a non-START step then there is nothing
-  // we can do since we one execute one step.
-  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
-  if (shutdown) {
-    state->step_ = Steps::FINISH;
-  }
-
-  const ModelControlRequest& request = state->request_;
-  ModelControlResponse& response = state->response_;
-
-  if (state->step_ == START) {
-    TRTSERVER_Error* err = nullptr;
-    if (request.type() == ModelControlRequest::LOAD) {
-      err = TRTSERVER_ServerLoadModel(
-          trtserver_.get(), request.model_name().c_str());
-    } else {
-      err = TRTSERVER_ServerUnloadModel(
-          trtserver_.get(), request.model_name().c_str());
-    }
-
-    RequestStatusUtil::Create(
-        response.mutable_request_status(), err, state->unique_id_, server_id_);
-
-    TRTSERVER_ErrorDelete(err);
-
-    state->step_ = Steps::COMPLETE;
-    state->context_->responder_->Finish(response, grpc::Status::OK, state);
-  } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-  }
-
-  // Only handle one status request at a time (to avoid having status
-  // request cause too much load on server), so register for next
-  // request only after this one finished.
-  if (!shutdown && (state->step_ == Steps::FINISH)) {
-    StartNewRequest();
-  }
-
-  return state->step_ != Steps::FINISH;
-}
 #endif
 
 }  // namespace
@@ -2980,12 +2789,9 @@ GRPCServerV2::Start()
   model_metadata_cq_ = grpc_builder_.AddCompletionQueue();
   model_config_cq_ = grpc_builder_.AddCompletionQueue();
   model_infer_cq_ = grpc_builder_.AddCompletionQueue();
-  shmcontrol_cq_ = grpc_builder_.AddCompletionQueue();
+  common_cq_ = grpc_builder_.AddCompletionQueue();
 #if 0
   stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
-  repository_cq_ = grpc_builder_.AddCompletionQueue();
-  modelcontrol_cq_ = grpc_builder_.AddCompletionQueue();
-  shmcontrol_cq_ = grpc_builder_.AddCompletionQueue();
 #endif
   grpc_server_ = grpc_builder_.BuildAndStart();
 
@@ -3039,12 +2845,12 @@ GRPCServerV2::Start()
   hmodelinfer->Start();
   model_infer_handler_.reset(hmodelinfer);
 
-  // Handler for other requests
-  SharedMemoryControlHandler* hshmcontrol = new SharedMemoryControlHandler(
-      "SharedMemoryControlHandler", server_, server_id_, shm_manager_,
-      &service_, shmcontrol_cq_.get());
-  hshmcontrol->Start();
-  shmcontrol_handler_.reset(hshmcontrol);
+  // A common Handler for other non-critical requests
+  CommonHandler* hcommon = new CommonHandler(
+      "CommonHandler", server_, server_id_, shm_manager_,
+      &service_, common_cq_.get());
+  hcommon->Start();
+  common_handler_.reset(hcommon);
 
 #if 0
   // Handler for streaming inference requests.
@@ -3054,27 +2860,6 @@ GRPCServerV2::Start()
       infer_allocation_pool_size_ /* max_state_bucket_count */);
   hstreaminfer->Start();
   stream_infer_handler_.reset(hstreaminfer);
-
-  // Handler for status requests.
-  RepositoryHandler* hrepository = new RepositoryHandler(
-      "RepositoryHandler", server_, server_id_, &service_, repository_cq_.get(),
-      2 /* max_state_bucket_count */);
-  hrepository->Start();
-  repository_handler_.reset(hrepository);
-
-  // Handler for model-control requests.
-  ModelControlHandler* hmodelcontrol = new ModelControlHandler(
-      "ModelControlHandler", server_, server_id_, &service_,
-      modelcontrol_cq_.get(), 2 /* max_state_bucket_count */);
-  hmodelcontrol->Start();
-  modelcontrol_handler_.reset(hmodelcontrol);
-
-  // Handler for shared-memory-control requests.
-  SharedMemoryControlHandler* hshmcontrol = new SharedMemoryControlHandler(
-      "SharedMemoryControlHandler", server_, server_id_, shm_manager_,
-      &service_, shmcontrol_cq_.get(), 2 /* max_state_bucket_count */);
-  hshmcontrol->Start();
-  shmcontrol_handler_.reset(hshmcontrol);
 #endif
 
   running_ = true;
@@ -3100,11 +2885,9 @@ GRPCServerV2::Stop()
   model_metadata_cq_->Shutdown();
   model_config_cq_->Shutdown();
   model_infer_cq_->Shutdown();
-  shmcontrol_cq_->Shutdown();
+  common_cq_->Shutdown();
 #if 0
-  repository_cq_->Shutdown();
   stream_infer_cq_->Shutdown();
-  modelcontrol_cq_->Shutdown();
 #endif
 
   // Must stop all handlers explicitly to wait for all the handler
@@ -3116,12 +2899,9 @@ GRPCServerV2::Stop()
   dynamic_cast<ModelMetadataHandler*>(model_metadata_handler_.get())->Stop();
   dynamic_cast<ModelConfigHandler*>(model_config_handler_.get())->Stop();
   dynamic_cast<ModelInferHandler*>(model_infer_handler_.get())->Stop();
-  dynamic_cast<SharedMemoryControlHandler*>(shmcontrol_handler_.get())->Stop();
+  dynamic_cast<CommonHandler*>(common_handler_.get())->Stop();
 #if 0
   dynamic_cast<StreamInferHandler*>(stream_infer_handler_.get())->Stop();
-  dynamic_cast<RepositoryHandler*>(repository_handler_.get())->Stop();
-  dynamic_cast<ModelControlHandler*>(modelcontrol_handler_.get())->Stop();
-  dynamic_cast<SharedMemoryControlHandler*>(shmcontrol_handler_.get())->Stop();
 #endif
 
   running_ = false;
