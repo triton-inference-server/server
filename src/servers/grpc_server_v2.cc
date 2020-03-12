@@ -900,6 +900,129 @@ CommonHandler::SetUpAllRequests()
       CudaSharedMemoryUnregisterRequest, CudaSharedMemoryUnregisterResponse>(
       "CudaSharedMemoryUnregister", 0, OnRegisterCudaSharedMemoryUnregister,
       OnExecuteCudaSharedMemoryUnregister);
+
+  //
+  // RepositoryIndex
+  //
+  auto OnRegisterRepositoryIndex =
+      [this](
+          grpc::ServerContext* ctx, RepositoryIndexRequest* request,
+          grpc::ServerAsyncResponseWriter<RepositoryIndexResponse>*
+              responder,
+          void* tag) {
+        this->service_->RequestRepositoryIndex(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteRepositoryIndex =
+      [this](
+          RepositoryIndexRequest& request,
+          RepositoryIndexResponse* response, grpc::Status* status) {
+        TRTSERVER_Error* err = nullptr;
+        if (request.repository_name().empty()) {
+          TRTSERVER_Protobuf* repository_index_protobuf = nullptr;
+        err = TRTSERVER_ServerModelRepositoryIndex(
+            trtserver_.get(), &repository_index_protobuf);
+        if (err == nullptr) {
+          const char* serialized_buffer;
+          size_t serialized_byte_size;
+          err = TRTSERVER_ProtobufSerialize(
+              repository_index_protobuf, &serialized_buffer,
+              &serialized_byte_size);
+          if (err == nullptr) {
+            if (!response->ParseFromArray(
+                    serialized_buffer, serialized_byte_size)) {
+              err = TRTSERVER_ErrorNew(
+                  TRTSERVER_ERROR_UNKNOWN, "failed to parse repository index");
+            }
+          }
+        }
+        TRTSERVER_ProtobufDelete(repository_index_protobuf);
+
+        } else {
+          err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_UNSUPPORTED,"repository_name is currently not supported");
+        }
+
+        GrpcStatusUtil::Create(status, err);
+        TRTSERVER_ErrorDelete(err);
+      };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<RepositoryIndexResponse>,
+      RepositoryIndexRequest, RepositoryIndexResponse>(
+      "RepositoryIndex", 0, OnRegisterRepositoryIndex,
+      OnExecuteRepositoryIndex);
+
+  //
+  // RepositoryModelLoad
+  //
+  auto OnRegisterRepositoryModelLoad =
+      [this](
+          grpc::ServerContext* ctx, RepositoryModelLoadRequest* request,
+          grpc::ServerAsyncResponseWriter<RepositoryModelLoadResponse>*
+              responder,
+          void* tag) {
+        this->service_->RequestRepositoryModelLoad(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteRepositoryModelLoad =
+      [this](
+          RepositoryModelLoadRequest& request,
+          RepositoryModelLoadResponse* response, grpc::Status* status) {
+        TRTSERVER_Error* err = nullptr;
+        if (request.repository_name().empty()) {
+          err = TRTSERVER_ServerLoadModel(trtserver_.get(), request.model_name().c_str());
+        } else {
+          err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_UNSUPPORTED,"repository_name is currently not supported");
+        }
+
+        GrpcStatusUtil::Create(status, err);
+        TRTSERVER_ErrorDelete(err);
+      };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<RepositoryModelLoadResponse>,
+      RepositoryModelLoadRequest, RepositoryModelLoadResponse>(
+      "RepositoryModelLoad", 0, OnRegisterRepositoryModelLoad,
+      OnExecuteRepositoryModelLoad);
+
+  //
+  // RepositoryModelUnload
+  //
+  auto OnRegisterRepositoryModelUnload =
+      [this](
+          grpc::ServerContext* ctx, RepositoryModelUnloadRequest* request,
+          grpc::ServerAsyncResponseWriter<RepositoryModelUnloadResponse>*
+              responder,
+          void* tag) {
+        this->service_->RequestRepositoryModelUnload(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteRepositoryModelUnload =
+      [this](
+          RepositoryModelUnloadRequest& request,
+          RepositoryModelUnloadResponse* response, grpc::Status* status) {
+        TRTSERVER_Error* err = nullptr;
+        if (request.repository_name().empty()) {
+          err = TRTSERVER_ServerUnloadModel(trtserver_.get(), request.model_name().c_str());
+        } else {
+          err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_UNSUPPORTED,"repository_name is currently not supported");
+        }
+
+        GrpcStatusUtil::Create(status, err);
+        TRTSERVER_ErrorDelete(err);
+      };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<RepositoryModelUnloadResponse>,
+      RepositoryModelUnloadRequest, RepositoryModelUnloadResponse>(
+      "RepositoryModelUnload", 0, OnRegisterRepositoryModelUnload,
+      OnExecuteRepositoryModelUnload);
 }
 
 //
