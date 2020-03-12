@@ -354,7 +354,6 @@ HTTPAPIServerV2::InferResponseAlloc(
         *actual_memory_type_id = 0;
       }
 
-#if 0
       // Reserve requested space in evbuffer...
       struct evbuffer_iovec output_iovec;
       if (evbuffer_reserve_space(evhttp_buffer, byte_size, &output_iovec, 1) !=
@@ -390,7 +389,6 @@ HTTPAPIServerV2::InferResponseAlloc(
             TRTSERVER_ERROR_INTERNAL,
             "failed to commit output tensors to output buffer");
       }
-#endif
 
       LOG_VERBOSE(1) << "HTTP using buffer for: '" << tensor_name
                      << "', size: " << byte_size << ", addr: " << *buffer;
