@@ -38,16 +38,17 @@ class CudaMemoryManager {
  public:
   // Options to configure CUDA memeory manager.
   struct Options {
-    Options(double cc = 6.0, uint64_t b = 0)
-        : min_supported_compute_capability_(cc), memory_pool_byte_size_(b)
+    Options(double cc = 6.0, const std::map<int, uint64_t>& s = {})
+        : min_supported_compute_capability_(cc), memory_pool_byte_size_(s)
     {
     }
 
     // The minimum compute capability of the supported devices.
     double min_supported_compute_capability_;
 
-    // The size of CUDA memory reserved for every supported device.
-    uint64_t memory_pool_byte_size_;
+    // The size of CUDA memory reserved for the specified devices.
+    // No memory will be reserved for devices that is not listed.
+    std::map<int, uint64_t> memory_pool_byte_size_;
   };
 
   ~CudaMemoryManager();

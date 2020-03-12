@@ -237,6 +237,16 @@ class TrtServerOptions {
   uint64_t PinnedMemoryPoolByteSize() const { return pinned_memory_pool_size_; }
   void SetPinnedMemoryPoolByteSize(uint64_t s) { pinned_memory_pool_size_ = s; }
 
+
+  const std::map<int, uint64_t>& CudaMemoryPoolByteSize() const
+  {
+    return cuda_memory_pool_size_;
+  }
+  void SetCudaMemoryPoolByteSize(int id, uint64_t s)
+  {
+    cuda_memory_pool_size_[id] = s;
+  }
+
   double MinSupportedComputeCapability() const
   {
     return min_compute_capability_;
@@ -289,6 +299,7 @@ class TrtServerOptions {
   bool gpu_metrics_;
   unsigned int exit_timeout_;
   uint64_t pinned_memory_pool_size_;
+  std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_compute_capability_;
 
   bool tf_soft_placement_;
@@ -1232,6 +1243,15 @@ TRTSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(
 }
 
 TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetCudaMemoryPoolByteSize(
+    TRTSERVER_ServerOptions* options, int gpu_device, uint64_t size)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetCudaMemoryPoolByteSize(gpu_device, size);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetMinSupportedComputeCapability(
     TRTSERVER_ServerOptions* options, double cc)
 {
@@ -1395,6 +1415,7 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
   lserver->SetStartupModels(loptions->StartupModels());
   lserver->SetStrictModelConfigEnabled(loptions->StrictModelConfig());
   lserver->SetPinnedMemoryPoolByteSize(loptions->PinnedMemoryPoolByteSize());
+  lserver->SetCudaMemoryPoolByteSize(loptions->CudaMemoryPoolByteSize());
   lserver->SetMinSupportedComputeCapability(
       loptions->MinSupportedComputeCapability());
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());

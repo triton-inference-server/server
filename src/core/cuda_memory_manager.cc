@@ -84,11 +84,14 @@ CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
   if (status.IsOk()) {
     std::vector<cnmemDevice_t> devices;
     for (auto gpu : supported_gpus) {
-      devices.emplace_back();
-      auto& device = devices.back();
-      memset(&device, 0, sizeof(device));
-      device.device = gpu;
-      device.size = options.memory_pool_byte_size_;
+      const auto it = options.memory_pool_byte_size_.find(gpu);
+      if ((it != options.memory_pool_byte_size_.end()) && (it->second != 0)) {
+        devices.emplace_back();
+        auto& device = devices.back();
+        memset(&device, 0, sizeof(device));
+        device.device = gpu;
+        device.size = it->second;
+      }
     }
 
     auto status =

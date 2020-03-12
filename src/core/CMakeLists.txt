@@ -247,7 +247,7 @@ if(${TRTIS_ENABLE_GPU})
   target_include_directories(
     server-library
     PRIVATE ${CUDA_INCLUDE_DIRS}
-    PRIVATE ${cnmem_DIR}/include
+    PRIVATE ${CNMEM_PATH}/include
   )
 endif() # TRTIS_ENABLE_GPU
 

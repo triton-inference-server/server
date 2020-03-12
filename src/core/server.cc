@@ -99,7 +99,6 @@ InferenceServer::InferenceServer()
   strict_readiness_ = true;
   exit_timeout_secs_ = 30;
   pinned_memory_pool_size_ = 1 << 28;
-  cuda_memory_pool_size_ = 1 << 28;
 #ifdef TRTIS_ENABLE_GPU
   min_supported_compute_capability_ = TRTIS_MIN_COMPUTE_CAPABILITY;
 #else
@@ -138,6 +137,17 @@ InferenceServer::Init()
   }
 
 #ifdef TRTIS_ENABLE_GPU
+  // Defer the setting of default CUDA memory pool value here as
+  // 'min_supported_compute_capability_' is finalized
+  std::set<int> supported_gpus;
+  if (GetSupportedGPUs(&supported_gpus, min_supported_compute_capability_)
+          .IsOk()) {
+    for (const auto gpu : supported_gpus) {
+      if (cuda_memory_pool_size_.find(gpu) == cuda_memory_pool_size_.end()) {
+        cuda_memory_pool_size_[gpu] = 1 << 26;
+      }
+    }
+  }
   CudaMemoryManager::Options cuda_options(
       min_supported_compute_capability_, cuda_memory_pool_size_);
   status = CudaMemoryManager::Create(cuda_options);
