@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,60 +26,51 @@
 //
 #pragma once
 
-#include <boost/interprocess/managed_external_buffer.hpp>
 #include <memory>
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
-// This is a singleton class responsible for maintaining pinned memory pool
-// used by the inference server. Pinned memory allocations and deallocations
+// This is a singleton class responsible for maintaining CUDA memory pool
+// used by the inference server. CUDA memory allocations and deallocations
 // must be requested via functions provided by this class.
-class PinnedMemoryManager {
+class CudaMemoryManager {
  public:
-  // Options to configure pinned memeory manager.
+  // Options to configure CUDA memeory manager.
   struct Options {
-    Options(uint64_t b = 0) : pinned_memory_pool_byte_size_(b) {}
+    Options(double cc = 6.0, const std::map<int, uint64_t>& s = {})
+        : min_supported_compute_capability_(cc), memory_pool_byte_size_(s)
+    {
+    }
 
-    uint64_t pinned_memory_pool_byte_size_;
+    // The minimum compute capability of the supported devices.
+    double min_supported_compute_capability_;
+
+    // The size of CUDA memory reserved for the specified devices.
+    // No memory will be reserved for devices that is not listed.
+    std::map<int, uint64_t> memory_pool_byte_size_;
   };
 
-  ~PinnedMemoryManager();
+  ~CudaMemoryManager();
 
-  // Create the pinned memory manager based on 'options' specified.
+  // Create the memory manager based on 'options' specified.
   // Return Status object indicating success or failure.
   static Status Create(const Options& options);
 
-  // Allocate pinned memory with the requested 'size' and return the pointer
-  // in 'ptr'. If 'allow_nonpinned_fallback' is true, regular system memory
-  // will be allocated as fallback in the case where pinned memory fails to
-  // be allocated.
+  // Allocate CUDA memory on GPU 'device_id' with
+  // the requested 'size' and return the pointer in 'ptr'.
   // Return Status object indicating success or failure.
-  static Status Alloc(
-      void** ptr, uint64_t size, TRTSERVER_Memory_Type* allocated_type,
-      bool allow_nonpinned_fallback = false);
+  static Status Alloc(void** ptr, uint64_t size, int64_t device_id);
 
-  // Free the memory allocated by the pinned memory manager.
+  // Free the memory allocated by the memory manager on 'device_id'.
   // Return Status object indicating success or failure.
-  static Status Free(void* ptr);
+  static Status Free(void* ptr, int64_t device_id);
 
  protected:
-  PinnedMemoryManager(void* pinned_memory_buffer, uint64_t size);
-
-  Status AllocInternal(
-      void** ptr, uint64_t size, TRTSERVER_Memory_Type* allocated_type,
-      bool allow_nonpinned_fallback = false);
-  Status FreeInternal(void* ptr);
+  CudaMemoryManager() = default;
 
  private:
-  static std::unique_ptr<PinnedMemoryManager> instance_;
-
-  std::mutex info_mtx_;
-  std::map<void*, bool> memory_info_;
-
-  void* pinned_memory_buffer_;
-  std::mutex buffer_mtx_;
-  boost::interprocess::managed_external_buffer managed_pinned_memory_;
+  static std::unique_ptr<CudaMemoryManager> instance_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -778,6 +778,17 @@ TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(
     TRTSERVER_ServerOptions* options, uint64_t size);
 
+/// Set the total CUDA memory byte size that the server can allocate on given
+/// GPU device in a server options. This option will not affect the allocation
+/// conducted by the backend frameworks.
+/// \param options The server options object.
+/// \param gpu_device The GPU device to allocate the memory pool.
+/// \param size The CUDA memory pool byte size.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetCudaMemoryPoolByteSize(
+    TRTSERVER_ServerOptions* options, int gpu_device, uint64_t size);
+
 /// Set the minimum support CUDA compute capability in a server
 /// options.
 /// \param options The server options object.

@@ -184,6 +184,7 @@ enum OptionId {
   OPTION_ALLOW_MODEL_CONTROL,
   OPTION_STARTUP_MODEL,
   OPTION_PINNED_MEMORY_POOL_BYTE_SIZE,
+  OPTION_CUDA_MEMORY_POOL_BYTE_SIZE,
   OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
   OPTION_EXIT_TIMEOUT_SECS,
   OPTION_TF_ALLOW_SOFT_PLACEMENT,
@@ -330,6 +331,16 @@ std::vector<Option> options_
        "memory to accelerate data transfer between host and devices until it "
        "exceeds the specified byte size. This option will not affect the "
        "allocation conducted by the backend frameworks. Default is 256 MB."},
+      {OPTION_CUDA_MEMORY_POOL_BYTE_SIZE, "cuda-memory-pool-byte-size",
+       "The total byte size that can be allocated as CUDA memory for the GPU "
+       "device. If GPU support is enabled, the server will allocate CUDA "
+       "memory to minimize data transfer between host and devices until it "
+       "exceeds the specified byte size. This option will not affect the "
+       "allocation conducted by the backend frameworks. The argument should be "
+       "2 integers separated by colons in the format "
+       "<GPU device ID>:<pool byte size>. This option can be used multiple "
+       "times, but only once per GPU device. Subsequent uses will overwrite "
+       "previous uses for the same GPU device. Default is 64 MB."},
       {OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
        "min-supported-compute-capability",
        "The minimum supported CUDA compute capability. GPUs that don't support "
@@ -848,6 +859,31 @@ ParseVGPUOption(const std::string arg)
   return {gpu_device, num_vgpus_on_device, mem_limit};
 }
 
+std::pair<int, uint64_t>
+ParsePairOption(const std::string arg)
+{
+  int delim = arg.find(":");
+
+  if ((delim < 0)) {
+    std::cerr << "Cannot parse pair option due to incorrect number of inputs."
+                 "--<pair option> argument requires format <key>:<value>. "
+              << "Found: " << arg << std::endl;
+    std::cerr << Usage() << std::endl;
+    exit(1);
+  }
+
+  std::string key_string = arg.substr(0, delim);
+  std::string value_string = arg.substr(delim + 1);
+
+  // Specific conversion from key-value string to actual key-value type,
+  // should be extracted out of this function if we need to parse
+  // more pair option of different types.
+  int key = ParseIntOption(key_string);
+  uint64_t value = ParseLongLongOption(value_string);
+
+  return {key, value};
+}
+
 bool
 Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 {
@@ -1054,6 +1090,14 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       case OPTION_PINNED_MEMORY_POOL_BYTE_SIZE:
         pinned_memory_pool_byte_size = ParseLongLongOption(optarg);
         break;
+      case OPTION_CUDA_MEMORY_POOL_BYTE_SIZE: {
+        auto cuda_pool = ParsePairOption(optarg);
+        FAIL_IF_ERR(
+            TRTSERVER_ServerOptionsSetCudaMemoryPoolByteSize(
+                server_options, cuda_pool.first, cuda_pool.second),
+            "setting total CUDA memory byte size");
+        break;
+      }
       case OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY:
         min_supported_compute_capability = ParseDoubleOption(optarg);
         break;

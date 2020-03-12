@@ -138,6 +138,17 @@ class InferenceServer {
     pinned_memory_pool_size_ = std::max((int64_t)0, s);
   }
 
+  // Get / set CUDA memory pool size
+  const std::map<int, uint64_t>& CudaMemoryPoolByteSize() const
+  {
+    return cuda_memory_pool_size_;
+  }
+
+  void SetCudaMemoryPoolByteSize(const std::map<int, uint64_t>& s)
+  {
+    cuda_memory_pool_size_ = s;
+  }
+
   // Get / set the minimum support CUDA compute capability.
   double MinSupportedComputeCapability() const
   {
@@ -216,6 +227,7 @@ class InferenceServer {
   bool strict_readiness_;
   uint32_t exit_timeout_secs_;
   uint64_t pinned_memory_pool_size_;
+  std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_supported_compute_capability_;
 
   // Tensorflow options

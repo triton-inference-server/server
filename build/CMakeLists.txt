@@ -319,6 +319,20 @@ ExternalProject_Add(google-cloud-cpp
 )
 
 #
+# Build CNMeM (CUDA memeory management library)
+#
+ExternalProject_Add(cnmem
+  PREFIX cnmem
+  GIT_REPOSITORY "https://github.com/NVIDIA/cnmem.git"
+  GIT_TAG "37896cc9bfc6536a8c878a1e675835c22d827821"
+  PATCH_COMMAND sed -i "s/SHARED/STATIC/g" ${CMAKE_CURRENT_BINARY_DIR}/cnmem/src/cnmem/CMakeLists.txt
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/cnmem/src/cnmem"
+  CMAKE_CACHE_ARGS
+    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/cnmem
+)
+
+#
 # Build AWS sdk for S3 support
 #
 ExternalProject_Add(aws-sdk-cpp
@@ -446,6 +460,9 @@ endif() # TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 if(${TRTIS_ENABLE_METRICS})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} prometheus-cpp)
 endif() # TRTIS_ENABLE_METRICS
+if(${TRTIS_ENABLE_GPU})
+  set(TRTIS_DEPENDS ${TRTIS_DEPENDS} cnmem)
+endif() # TRTIS_ENABLE_GPU
 
 ExternalProject_Add(trtis
   PREFIX trtis
@@ -469,6 +486,7 @@ ExternalProject_Add(trtis
     -Daws-c-event-stream_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/aws-c-event-stream/cmake
     -Daws-c-common_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/aws-c-common/cmake
     -Daws-checksums_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/aws-checksums/cmake
+    -DCNMEM_PATH:PATH=${CMAKE_CURRENT_BINARY_DIR}/cnmem
     -DTRTIS_ONNXRUNTIME_INCLUDE_PATHS:PATH=${TRTIS_ONNXRUNTIME_INCLUDE_PATHS}
     -DTRTIS_PYTORCH_INCLUDE_PATHS:PATH=${TRTIS_PYTORCH_INCLUDE_PATHS}
     -DTRTIS_EXTRA_LIB_PATHS:PATH=${TRTIS_EXTRA_LIB_PATHS}

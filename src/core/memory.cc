@@ -31,6 +31,7 @@
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
+#include "src/core/cuda_memory_manager.h"
 #endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
@@ -113,38 +114,21 @@ AllocatedMemory::AllocatedMemory(
     : MutableMemory(nullptr, byte_size, memory_type, memory_type_id)
 {
   if (total_byte_size_ != 0) {
-    // If the requested memory type is not GPU, we always attempt to allocated
-    // on pinned memory first
+    // Allocate memory with the following fallback policy:
+    // CUDA memory -> pinned system memory -> non-pinned system memory
     switch (memory_type_) {
-      case TRTSERVER_MEMORY_GPU: {
 #ifdef TRTIS_ENABLE_GPU
-        int current_device;
-        auto err = cudaGetDevice(&current_device);
-        bool overridden = false;
-        if (err == cudaSuccess) {
-          overridden = (current_device != memory_type_id_);
-          if (overridden) {
-            err = cudaSetDevice(memory_type_id_);
-          }
+      case TRTSERVER_MEMORY_GPU: {
+        auto status = CudaMemoryManager::Alloc(
+            (void**)&buffer_, total_byte_size_, memory_type_id_);
+        if (!status.IsOk()) {
+          LOG_ERROR << status.Message();
+          goto pinned_memory_allocation;
         }
-        if (err == cudaSuccess) {
-          err = cudaMalloc((void**)&buffer_, total_byte_size_);
-        }
-        if (err != cudaSuccess) {
-          LOG_ERROR << "failed to allocate GPU memory with byte size"
-                    << total_byte_size_ << ": "
-                    << std::string(cudaGetErrorString(err));
-          buffer_ = nullptr;
-        }
-        if (overridden) {
-          cudaSetDevice(current_device);
-        }
-#else
-        buffer_ = nullptr;
-#endif  // TRTIS_ENABLE_GPU
         break;
       }
-
+      pinned_memory_allocation:
+#endif  // TRTIS_ENABLE_GPU
       default: {
         auto status = PinnedMemoryManager::Alloc(
             (void**)&buffer_, total_byte_size_, &memory_type_, true);
@@ -165,24 +149,9 @@ AllocatedMemory::~AllocatedMemory()
     switch (memory_type_) {
       case TRTSERVER_MEMORY_GPU: {
 #ifdef TRTIS_ENABLE_GPU
-        int current_device;
-        auto err = cudaGetDevice(&current_device);
-        bool overridden = false;
-        if (err == cudaSuccess) {
-          overridden = (current_device != memory_type_id_);
-          if (overridden) {
-            err = cudaSetDevice(memory_type_id_);
-          }
-        }
-        if (err == cudaSuccess) {
-          err = cudaFree(buffer_);
-        }
-        if (err != cudaSuccess) {
-          LOG_ERROR << "failed to free GPU memory at address " << buffer_
-                    << ": " << std::string(cudaGetErrorString(err));
-        }
-        if (overridden) {
-          cudaSetDevice(current_device);
+        auto status = CudaMemoryManager::Free(buffer_, memory_type_id_);
+        if (!status.IsOk()) {
+          LOG_ERROR << status.Message();
         }
 #endif  // TRTIS_ENABLE_GPU
         break;
