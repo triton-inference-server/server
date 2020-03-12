@@ -514,6 +514,394 @@ Handler<ServiceType, ServerResponderType, RequestType, ResponseType>::Stop()
   LOG_VERBOSE(1) << "Thread exited for " << Name();
 }
 
+template <typename ResponderType, typename RequestType, typename ResponseType>
+class SharedMemoryControlCallData : public GRPCServerV2::ICallData {
+ public:
+  using StandardRegisterFunc = std::function<void(
+      grpc::ServerContext*, RequestType*, ResponderType*, void*)>;
+  using StandardCallbackFunc =
+      std::function<void(RequestType&, ResponseType*, grpc::Status*)>;
+
+  SharedMemoryControlCallData(
+      const std::string& name, const uint64_t id,
+      const StandardRegisterFunc OnRegister,
+      const StandardCallbackFunc OnCallback)
+      : name_(name), id_(id), OnRegister_(OnRegister), OnCallback_(OnCallback),
+        responder_(&ctx_), step_(Steps::START)
+  {
+    OnRegister_(&ctx_, &request_, &responder_, this);
+    LOG_VERBOSE(1) << "Ready for RPC '" << name_ << "', " << id_;
+  }
+
+  bool Process(bool ok) override;
+
+  std::string Name() override { return name_; }
+
+  uint64_t Id() override { return id_; }
+
+ private:
+  const std::string name_;
+  const uint64_t id_;
+  const StandardRegisterFunc OnRegister_;
+  const StandardCallbackFunc OnCallback_;
+
+  grpc::ServerContext ctx_;
+
+  ResponderType responder_;
+  RequestType request_;
+
+  Steps step_;
+};
+
+template <typename ResponderType, typename RequestType, typename ResponseType>
+bool
+SharedMemoryControlCallData<ResponderType, RequestType, ResponseType>::Process(
+    bool rpc_ok)
+{
+  LOG_VERBOSE(1) << "Process for " << name_ << ", rpc_ok=" << rpc_ok << ", "
+                 << id_ << " step " << step_;
+
+  // If RPC failed on a new request then the server is shutting down
+  // and so we should do nothing (including not registering for a new
+  // request). If RPC failed on a non-START step then there is nothing
+  // we can do since we one execute one step.
+  const bool shutdown = (!rpc_ok && (step_ == Steps::START));
+  if (shutdown) {
+    step_ = Steps::FINISH;
+  }
+
+  if (step_ == Steps::START) {
+    ResponseType response;
+    grpc::Status status;
+
+    OnCallback_(request_, &response, &status);
+
+    step_ = Steps::COMPLETE;
+
+    responder_.Finish(response, status, this);
+  } else if (step_ == Steps::COMPLETE) {
+    step_ = Steps::FINISH;
+  }
+
+  if (!shutdown && (step_ == Steps::FINISH)) {
+    new SharedMemoryControlCallData<ResponderType, RequestType, ResponseType>(
+        name_, id_ + 1, OnRegister_, OnCallback_);
+  }
+
+  return step_ != Steps::FINISH;
+}
+
+//
+// SharedMemoryControlHandler
+//
+class SharedMemoryControlHandler : public GRPCServerV2::HandlerBase {
+ public:
+  SharedMemoryControlHandler(
+      const std::string& name,
+      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      const std::shared_ptr<SharedMemoryManager>& shm_manager,
+      GRPCInferenceService::AsyncService* service,
+      grpc::ServerCompletionQueue* cq);
+
+  // Descriptive name of of the handler.
+  const std::string& Name() const { return name_; }
+
+  // Start handling requests.
+  void Start();
+
+  // Stop handling requests.
+  void Stop();
+
+ private:
+  void SetUpAllRequests();
+
+  const std::string name_;
+  std::shared_ptr<TRTSERVER_Server> trtserver_;
+  const char* const server_id_;
+
+  std::shared_ptr<SharedMemoryManager> shm_manager_;
+
+  GRPCInferenceService::AsyncService* service_;
+  grpc::ServerCompletionQueue* cq_;
+  std::unique_ptr<std::thread> thread_;
+};
+
+SharedMemoryControlHandler::SharedMemoryControlHandler(
+    const std::string& name, const std::shared_ptr<TRTSERVER_Server>& trtserver,
+    const char* server_id,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager,
+    GRPCInferenceService::AsyncService* service,
+    grpc::ServerCompletionQueue* cq)
+    : name_(name), trtserver_(trtserver), server_id_(server_id),
+      shm_manager_(shm_manager), service_(service), cq_(cq)
+{
+}
+
+void
+SharedMemoryControlHandler::Start()
+{
+  // Use a barrier to make sure we don't return until thread has
+  // started.
+  auto barrier = std::make_shared<Barrier>(2);
+
+  thread_.reset(new std::thread([this, barrier] {
+    SetUpAllRequests();
+    barrier->Wait();
+
+    void* tag;
+    bool ok;
+
+    while (cq_->Next(&tag, &ok)) {
+      GRPCServerV2::ICallData* call_data =
+          static_cast<GRPCServerV2::ICallData*>(tag);
+      if (!call_data->Process(ok)) {
+        LOG_VERBOSE(1) << "Done for " << call_data->Name() << ", "
+                       << call_data->Id();
+        delete call_data;
+      }
+    }
+  }));
+
+  barrier->Wait();
+  LOG_VERBOSE(1) << "Thread started for " << Name();
+}
+
+void
+SharedMemoryControlHandler::Stop()
+{
+  if (thread_->joinable()) {
+    thread_->join();
+  }
+
+  LOG_VERBOSE(1) << "Thread exited for " << Name();
+}
+
+void
+SharedMemoryControlHandler::SetUpAllRequests()
+{
+  // Define all the RPCs to be handled by this handler below
+  //
+  // The format of each RPC specification is :
+  // 1. A OnRegister function: This will be called when the
+  //    server is ready to receive the requests for this RPC.
+  // 2. A OnExecute function: This will be called when the
+  //    to process the request.
+  // 3. Create a CallData object with the above callback
+  //    functions
+
+
+  //
+  // SystemSharedMemoryStatus
+  //
+  auto OnRegisterSystemSharedMemoryStatus =
+      [this](
+          grpc::ServerContext* ctx, SystemSharedMemoryStatusRequest* request,
+          grpc::ServerAsyncResponseWriter<SystemSharedMemoryStatusResponse>*
+              responder,
+          void* tag) {
+        this->service_->RequestSystemSharedMemoryStatus(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteSystemSharedMemoryStatus =
+      [this](
+          SystemSharedMemoryStatusRequest& request,
+          SystemSharedMemoryStatusResponse* response, grpc::Status* status) {
+        TRTSERVER_Error* err =
+            shm_manager_->GetStatusV2(request.name(), response);
+
+        GrpcStatusUtil::Create(status, err);
+        TRTSERVER_ErrorDelete(err);
+      };
+
+  new SharedMemoryControlCallData<
+      grpc::ServerAsyncResponseWriter<SystemSharedMemoryStatusResponse>,
+      SystemSharedMemoryStatusRequest, SystemSharedMemoryStatusResponse>(
+      "SystemSharedMemoryStatus", 0, OnRegisterSystemSharedMemoryStatus,
+      OnExecuteSystemSharedMemoryStatus);
+
+
+  //
+  // SystemSharedMemoryRegister
+  //
+  auto OnRegisterSystemSharedMemoryRegister =
+      [this](
+          grpc::ServerContext* ctx, SystemSharedMemoryRegisterRequest* request,
+          grpc::ServerAsyncResponseWriter<SystemSharedMemoryRegisterResponse>*
+              responder,
+          void* tag) {
+        this->service_->RequestSystemSharedMemoryRegister(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteSystemSharedMemoryRegister =
+      [this](
+          SystemSharedMemoryRegisterRequest& request,
+          SystemSharedMemoryRegisterResponse* response, grpc::Status* status) {
+        TRTSERVER_Error* err = shm_manager_->RegisterSystemSharedMemory(
+            request.name(), request.key(), request.offset(),
+            request.byte_size());
+
+        GrpcStatusUtil::Create(status, err);
+        TRTSERVER_ErrorDelete(err);
+      };
+
+  new SharedMemoryControlCallData<
+      grpc::ServerAsyncResponseWriter<SystemSharedMemoryRegisterResponse>,
+      SystemSharedMemoryRegisterRequest, SystemSharedMemoryRegisterResponse>(
+      "SystemSharedMemoryRegister", 0, OnRegisterSystemSharedMemoryRegister,
+      OnExecuteSystemSharedMemoryRegister);
+
+
+  //
+  // SystemSharedMemoryUnregister
+  //
+  auto OnRegisterSystemSharedMemoryUnregister =
+      [this](
+          grpc::ServerContext* ctx,
+          SystemSharedMemoryUnregisterRequest* request,
+          grpc::ServerAsyncResponseWriter<SystemSharedMemoryUnregisterResponse>*
+              responder,
+          void* tag) {
+        this->service_->RequestSystemSharedMemoryUnregister(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteSystemSharedMemoryUnregister =
+      [this](
+          SystemSharedMemoryUnregisterRequest& request,
+          SystemSharedMemoryUnregisterResponse* response,
+          grpc::Status* status) {
+        TRTSERVER_Error* err = nullptr;
+        if (request.name().empty()) {
+          err = shm_manager_->UnregisterAllV2(TRTSERVER_MEMORY_CPU);
+        } else {
+          err =
+              shm_manager_->UnregisterV2(request.name(), TRTSERVER_MEMORY_CPU);
+        }
+
+        GrpcStatusUtil::Create(status, err);
+        TRTSERVER_ErrorDelete(err);
+      };
+
+  new SharedMemoryControlCallData<
+      grpc::ServerAsyncResponseWriter<SystemSharedMemoryUnregisterResponse>,
+      SystemSharedMemoryUnregisterRequest,
+      SystemSharedMemoryUnregisterResponse>(
+      "SystemSharedMemoryUnregister", 0, OnRegisterSystemSharedMemoryUnregister,
+      OnExecuteSystemSharedMemoryUnregister);
+
+
+  //
+  // CudaSharedMemoryStatus
+  //
+  auto OnRegisterCudaSharedMemoryStatus =
+      [this](
+          grpc::ServerContext* ctx, CudaSharedMemoryStatusRequest* request,
+          grpc::ServerAsyncResponseWriter<CudaSharedMemoryStatusResponse>*
+              responder,
+          void* tag) {
+        this->service_->RequestCudaSharedMemoryStatus(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+  auto OnExecuteCudaSharedMemoryStatus =
+      [this](
+          CudaSharedMemoryStatusRequest& request,
+          CudaSharedMemoryStatusResponse* response, grpc::Status* status) {
+        TRTSERVER_Error* err =
+            shm_manager_->GetStatusV2(request.name(), response);
+
+        GrpcStatusUtil::Create(status, err);
+        TRTSERVER_ErrorDelete(err);
+      };
+  new SharedMemoryControlCallData<
+      grpc::ServerAsyncResponseWriter<CudaSharedMemoryStatusResponse>,
+      CudaSharedMemoryStatusRequest, CudaSharedMemoryStatusResponse>(
+      "CudaSharedMemoryStatus", 0, OnRegisterCudaSharedMemoryStatus,
+      OnExecuteCudaSharedMemoryStatus);
+
+
+  //
+  // CudaSharedMemoryRegister
+  //
+  auto OnRegisterCudaSharedMemoryRegister =
+      [this](
+          grpc::ServerContext* ctx, CudaSharedMemoryRegisterRequest* request,
+          grpc::ServerAsyncResponseWriter<CudaSharedMemoryRegisterResponse>*
+              responder,
+          void* tag) {
+        this->service_->RequestCudaSharedMemoryRegister(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteCudaSharedMemoryRegister =
+      [this](
+          CudaSharedMemoryRegisterRequest& request,
+          CudaSharedMemoryRegisterResponse* response, grpc::Status* status) {
+        TRTSERVER_Error* err = nullptr;
+#ifdef TRTIS_ENABLE_GPU
+        const std::string& raw_handle = request.raw_handle();
+        char* handle_base = const_cast<char*>(raw_handle.c_str());
+        cudaIpcMemHandle_t* cuda_shm_handle =
+            reinterpret_cast<cudaIpcMemHandle_t*>(handle_base);
+        err = shm_manager_->RegisterCUDASharedMemory(
+            request.name(), cuda_shm_handle, request.byte_size(),
+            request.device_id());
+#else
+        err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "failed to register CUDA shared memory region: '" +
+                request.name() + "', GPUs not supported")
+                .c_str());
+#endif  // TRTIS_ENABLE_GPU
+
+        GrpcStatusUtil::Create(status, err);
+        TRTSERVER_ErrorDelete(err);
+      };
+
+  new SharedMemoryControlCallData<
+      grpc::ServerAsyncResponseWriter<CudaSharedMemoryRegisterResponse>,
+      CudaSharedMemoryRegisterRequest, CudaSharedMemoryRegisterResponse>(
+      "CudaSharedMemoryRegister", 0, OnRegisterCudaSharedMemoryRegister,
+      OnExecuteCudaSharedMemoryRegister);
+
+  //
+  // CudaSharedMemoryUnregister
+  //
+  auto OnRegisterCudaSharedMemoryUnregister =
+      [this](
+          grpc::ServerContext* ctx, CudaSharedMemoryUnregisterRequest* request,
+          grpc::ServerAsyncResponseWriter<CudaSharedMemoryUnregisterResponse>*
+              responder,
+          void* tag) {
+        this->service_->RequestCudaSharedMemoryUnregister(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteCudaSharedMemoryUnregister =
+      [this](
+          CudaSharedMemoryUnregisterRequest& request,
+          CudaSharedMemoryUnregisterResponse* response, grpc::Status* status) {
+        TRTSERVER_Error* err = nullptr;
+        if (request.name().empty()) {
+          err = shm_manager_->UnregisterAllV2(TRTSERVER_MEMORY_GPU);
+        } else {
+          err =
+              shm_manager_->UnregisterV2(request.name(), TRTSERVER_MEMORY_GPU);
+        }
+
+        GrpcStatusUtil::Create(status, err);
+        TRTSERVER_ErrorDelete(err);
+      };
+
+  new SharedMemoryControlCallData<
+      grpc::ServerAsyncResponseWriter<CudaSharedMemoryUnregisterResponse>,
+      CudaSharedMemoryUnregisterRequest, CudaSharedMemoryUnregisterResponse>(
+      "CudaSharedMemoryUnregister", 0, OnRegisterCudaSharedMemoryUnregister,
+      OnExecuteCudaSharedMemoryUnregister);
+}
+
 //
 // ServerLiveHandler
 //
@@ -1246,6 +1634,94 @@ InferResponseRelease(
   return nullptr;  // Success
 }
 
+template <typename TensorType>
+TRTSERVER_Error*
+ParseSharedMemoryParams(
+    const TensorType& tensor, bool* has_shared_memory, std::string* region_name,
+    int64_t* offset, size_t* byte_size)
+{
+  *has_shared_memory = false;
+  *offset = 0 /* default value */;
+  const auto& region_it = tensor.parameters().find("shared_memory_region");
+  if (region_it != tensor.parameters().end()) {
+    *has_shared_memory = true;
+    const auto& infer_param = region_it->second;
+    if (infer_param.parameter_choice_case() !=
+        InferParameter::ParameterChoiceCase::kStringParam) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "invalid value type for 'shared_memory_region' parameter for "
+              "tensor '" +
+              tensor.name() + "', expected string_param.")
+              .c_str());
+    }
+    *region_name = infer_param.string_param();
+  }
+
+  const auto& offset_it = tensor.parameters().find("shared_memory_offset");
+  if (offset_it != tensor.parameters().end()) {
+    if (!*has_shared_memory) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "'shared_memory_offset' can not be specified without "
+              "'shared_memory_region' parameter for tensor '" +
+              tensor.name() + "'")
+              .c_str());
+    }
+    const auto& infer_param = offset_it->second;
+    if (infer_param.parameter_choice_case() !=
+        InferParameter::ParameterChoiceCase::kInt64Param) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "invalid value type for 'shared_memory_offset' parameter for "
+              "tensor '" +
+              tensor.name() + "', expected int64_param.")
+              .c_str());
+    }
+    *offset = infer_param.int64_param();
+  }
+
+  const auto& bs_it = tensor.parameters().find("shared_memory_byte_size");
+  if (bs_it != tensor.parameters().end()) {
+    if (!*has_shared_memory) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "'shared_memory_byte_size' can not be specified without "
+              "'shared_memory_region' parameter for tensor '" +
+              tensor.name() + "'")
+              .c_str());
+    }
+    const auto& infer_param = bs_it->second;
+    if (infer_param.parameter_choice_case() !=
+        InferParameter::ParameterChoiceCase::kInt64Param) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "invalid value type for 'shared_memory_byte_size' parameter for "
+              "tensor '" +
+              tensor.name() + "', expected int64_param.")
+              .c_str());
+    }
+    *byte_size = infer_param.int64_param();
+  } else {
+    if (*has_shared_memory) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "'shared_memory_byte_size' must be specified along with "
+              "'shared_memory_region' parameter for tensor '" +
+              tensor.name() + "'")
+              .c_str());
+    }
+  }
+
+  return nullptr;
+}
+
 TRTSERVER_Error*
 InferAllocatorPayload(
     const std::shared_ptr<TRTSERVER_Server>& trtserver,
@@ -1269,16 +1745,22 @@ InferAllocatorPayload(
   // the memory address for that output and store it in the allocator
   // payload so that it is available when the allocation callback is
   // invoked.
-
-#if 0
   for (const auto& io : request.outputs()) {
-    if (io.has_shared_memory()) {
+    std::string region_name;
+    int64_t offset;
+    size_t byte_size;
+    bool has_shared_memory;
+
+    RETURN_IF_ERR(
+        ParseSharedMemoryParams<ModelInferRequest::InferRequestedOutputTensor>(
+            io, &has_shared_memory, &region_name, &offset, &byte_size));
+
+    if (has_shared_memory) {
       void* base;
       TRTSERVER_Memory_Type memory_type;
       int64_t memory_type_id;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
-          io.shared_memory().name(), io.shared_memory().offset(), &base,
-          &memory_type, &memory_type_id));
+          region_name, offset, &base, &memory_type, &memory_type_id));
 
       // if shm_map_ does not exist, then create an empty shm_map
       if (alloc_payload->shm_map_ == nullptr) {
@@ -1286,11 +1768,10 @@ InferAllocatorPayload(
       }
 
       alloc_payload->shm_map_->emplace(
-          io.name(), AllocPayload::ShmInfo{base, io.shared_memory().byte_size(),
-                                           memory_type, memory_type_id});
+          io.name(),
+          AllocPayload::ShmInfo{base, byte_size, memory_type, memory_type_id});
     }
   }
-#endif
 
   return nullptr;  // Success
 }
@@ -1339,17 +1820,18 @@ InferGRPCToInput(
     int64_t memory_type_id = 0;
     bool has_byte_contents = false;
 
-#if 0
-    if (io.has_shared_memory()) {
+    std::string region_name;
+    int64_t offset;
+    bool has_shared_memory;
+    RETURN_IF_ERR(ParseSharedMemoryParams<ModelInferRequest::InferInputTensor>(
+        io, &has_shared_memory, &region_name, &offset, &byte_size));
+
+    if (has_shared_memory) {
       void* tmp;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
-          io.shared_memory().name(), io.shared_memory().offset(), &tmp,
-          &memory_type, &memory_type_id));
+          region_name, offset, &tmp, &memory_type, &memory_type_id));
       base = tmp;
-      byte_size = io.shared_memory().byte_size();
-    } else
-#endif
-    {
+    } else {
       if (!io.has_contents()) {
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INVALID_ARG,
@@ -2433,147 +2915,6 @@ ModelControlHandler::Process(Handler::State* state, bool rpc_ok)
 
   return state->step_ != Steps::FINISH;
 }
-
-//
-// SharedMemoryControlHandler
-//
-class SharedMemoryControlHandler
-    : public Handler<
-          GRPCInferenceService::AsyncService,
-          grpc::ServerAsyncResponseWriter<SharedMemoryControlResponse>,
-          SharedMemoryControlRequest, SharedMemoryControlResponse> {
- public:
-  SharedMemoryControlHandler(
-      const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
-      const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      GRPCInferenceService::AsyncService* service,
-      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(
-            name, trtserver, server_id, service, cq, max_state_bucket_count),
-        shm_manager_(shm_manager)
-  {
-  }
-
- protected:
-  void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
-
- private:
-  std::shared_ptr<SharedMemoryManager> shm_manager_;
-};
-
-void
-SharedMemoryControlHandler::StartNewRequest()
-{
-  auto context = std::make_shared<State::Context>(server_id_);
-  State* state = StateNew(context);
-  service_->RequestSharedMemoryControl(
-      state->context_->ctx_.get(), &state->request_,
-      state->context_->responder_.get(), cq_, cq_, state);
-
-  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
-                 << state->unique_id_;
-}
-
-bool
-SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
-{
-  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
-                 << state->unique_id_ << " step " << state->step_;
-
-  // If RPC failed on a new request then the server is shutting down
-  // and so we should do nothing (including not registering for a new
-  // request). If RPC failed on a non-START step then there is nothing
-  // we can do since we one execute one step.
-  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
-  if (shutdown) {
-    state->step_ = Steps::FINISH;
-  }
-
-  const SharedMemoryControlRequest& request = state->request_;
-  SharedMemoryControlResponse& response = state->response_;
-
-  if (state->step_ == START) {
-    TRTSERVER_Error* err = nullptr;
-    if (request.has_register_()) {
-      if (request.register_().has_system_shared_memory()) {
-        // system shared memory
-        err = shm_manager_->RegisterSystemSharedMemory(
-            request.register_().name(),
-            request.register_().system_shared_memory().shared_memory_key(),
-            request.register_().system_shared_memory().offset(),
-            request.register_().byte_size());
-      } else if (request.register_().has_cuda_shared_memory()) {
-        // cuda shared memory
-#ifdef TRTIS_ENABLE_GPU
-        const std::string& raw_handle =
-            request.register_().cuda_shared_memory().raw_handle();
-        char* handle_base = const_cast<char*>(raw_handle.c_str());
-        cudaIpcMemHandle_t* cuda_shm_handle =
-            reinterpret_cast<cudaIpcMemHandle_t*>(handle_base);
-        err = shm_manager_->RegisterCUDASharedMemory(
-            request.register_().name(), cuda_shm_handle,
-            request.register_().byte_size(),
-            request.register_().cuda_shared_memory().device_id());
-#else
-        err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            std::string(
-                "failed to register CUDA shared memory region: '" +
-                request.register_().name() + "', GPUs not supported")
-                .c_str());
-#endif  // TRTIS_ENABLE_GPU
-      } else {
-        err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            std::string(
-                "failed to register shared memory region: '" +
-                request.register_().name() + "', improperly formed request.")
-                .c_str());
-      }
-    } else if (request.has_unregister()) {
-      err = shm_manager_->Unregister(request.unregister().name());
-    } else if (request.has_unregister_all()) {
-      err = shm_manager_->UnregisterAll();
-    } else if (request.has_status()) {
-      SharedMemoryStatus shm_status;
-      err = shm_manager_->GetStatus(&shm_status);
-      if (err == nullptr) {
-        std::string serialized;
-        shm_status.SerializeToString(&serialized);
-        auto shm_status_response = response.mutable_shared_memory_status();
-        if (!shm_status_response->ParseFromArray(
-                serialized.c_str(), serialized.size())) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INTERNAL, "failed to parse shared memory status");
-        }
-      }
-    } else {
-      err = TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_UNKNOWN, "unknown sharedmemorycontrol request type");
-    }
-
-    RequestStatusUtil::Create(
-        response.mutable_request_status(), err, state->unique_id_, server_id_);
-
-    TRTSERVER_ErrorDelete(err);
-
-    state->step_ = Steps::COMPLETE;
-    state->context_->responder_->Finish(response, grpc::Status::OK, state);
-  } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-  }
-
-  // Only handle one status request at a time (to avoid having status
-  // request cause too much load on server), so register for next
-  // request only after this one finished.
-  if (!shutdown && (state->step_ == Steps::FINISH)) {
-    StartNewRequest();
-  }
-
-  return state->step_ != Steps::FINISH;
-}
 #endif
 
 }  // namespace
@@ -2639,6 +2980,7 @@ GRPCServerV2::Start()
   model_metadata_cq_ = grpc_builder_.AddCompletionQueue();
   model_config_cq_ = grpc_builder_.AddCompletionQueue();
   model_infer_cq_ = grpc_builder_.AddCompletionQueue();
+  shmcontrol_cq_ = grpc_builder_.AddCompletionQueue();
 #if 0
   stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
   repository_cq_ = grpc_builder_.AddCompletionQueue();
@@ -2697,6 +3039,13 @@ GRPCServerV2::Start()
   hmodelinfer->Start();
   model_infer_handler_.reset(hmodelinfer);
 
+  // Handler for other requests
+  SharedMemoryControlHandler* hshmcontrol = new SharedMemoryControlHandler(
+      "SharedMemoryControlHandler", server_, server_id_, shm_manager_,
+      &service_, shmcontrol_cq_.get());
+  hshmcontrol->Start();
+  shmcontrol_handler_.reset(hshmcontrol);
+
 #if 0
   // Handler for streaming inference requests.
   StreamInferHandler* hstreaminfer = new StreamInferHandler(
@@ -2751,11 +3100,11 @@ GRPCServerV2::Stop()
   model_metadata_cq_->Shutdown();
   model_config_cq_->Shutdown();
   model_infer_cq_->Shutdown();
+  shmcontrol_cq_->Shutdown();
 #if 0
   repository_cq_->Shutdown();
   stream_infer_cq_->Shutdown();
   modelcontrol_cq_->Shutdown();
-  shmcontrol_cq_->Shutdown();
 #endif
 
   // Must stop all handlers explicitly to wait for all the handler
@@ -2767,6 +3116,7 @@ GRPCServerV2::Stop()
   dynamic_cast<ModelMetadataHandler*>(model_metadata_handler_.get())->Stop();
   dynamic_cast<ModelConfigHandler*>(model_config_handler_.get())->Stop();
   dynamic_cast<ModelInferHandler*>(model_infer_handler_.get())->Stop();
+  dynamic_cast<SharedMemoryControlHandler*>(shmcontrol_handler_.get())->Stop();
 #if 0
   dynamic_cast<StreamInferHandler*>(stream_infer_handler_.get())->Stop();
   dynamic_cast<RepositoryHandler*>(repository_handler_.get())->Stop();

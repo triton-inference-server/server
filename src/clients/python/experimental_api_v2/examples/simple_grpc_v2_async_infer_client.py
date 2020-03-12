@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        TRTISClient = grpcclient.InferenceServerClient(FLAGS.url)
+        triton_client = grpcclient.InferenceServerClient(FLAGS.url)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()
@@ -86,7 +86,7 @@ if __name__ == '__main__':
     user_data = []
 
     # Inference call
-    TRTISClient.async_infer(partial(callback, user_data), inputs, outputs,
+    triton_client.async_infer(partial(callback, user_data), inputs, outputs,
                             model_name)
 
     # Wait until the results are available in user_data
@@ -113,5 +113,3 @@ if __name__ == '__main__':
                 print("sync infer error: incorrect difference")
                 sys.exit(1)
         print("PASS: Async infer")
-
-    TRTISClient.close()

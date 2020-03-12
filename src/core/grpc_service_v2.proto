@@ -87,6 +87,72 @@ service GRPCInferenceService
   //@@     Get model configuration.
   //@@
   rpc ModelConfig(ModelConfigRequest) returns (ModelConfigResponse) {}
+
+  //@@  .. cpp:var:: rpc SystemSharedMemoryStatus(
+  //@@                     SystemSharedMemoryStatusRequest)
+  //@@                   returns (SystemSharedMemoryStatusRespose)
+  //@@
+  //@@     Get the status of all registered system-shared-memory regions.
+  //@@
+  rpc SystemSharedMemoryStatus(SystemSharedMemoryStatusRequest)
+      returns (SystemSharedMemoryStatusResponse)
+  {
+  }
+
+  //@@  .. cpp:var:: rpc SystemSharedMemoryRegister(
+  //@@                     SystemSharedMemoryRegisterRequest)
+  //@@                   returns (SystemSharedMemoryRegisterResponse)
+  //@@
+  //@@     Register a system-shared-memory region.
+  //@@
+  rpc SystemSharedMemoryRegister(SystemSharedMemoryRegisterRequest)
+      returns (SystemSharedMemoryRegisterResponse)
+  {
+  }
+
+  //@@  .. cpp:var:: rpc SystemSharedMemoryUnregister(
+  //@@                     SystemSharedMemoryUnregisterRequest)
+  //@@                   returns (SystemSharedMemoryUnregisterResponse)
+  //@@
+  //@@     Unregister a system-shared-memory region.
+  //@@
+  rpc SystemSharedMemoryUnregister(SystemSharedMemoryUnregisterRequest)
+      returns (SystemSharedMemoryUnregisterResponse)
+  {
+  }
+
+  //@@  .. cpp:var:: rpc CudaSharedMemoryStatus(
+  //@@                     CudaSharedMemoryStatusRequest)
+  //@@                   returns (CudaSharedMemoryStatusRespose)
+  //@@
+  //@@     Get the status of all registered CUDA-shared-memory regions.
+  //@@
+  rpc CudaSharedMemoryStatus(CudaSharedMemoryStatusRequest)
+      returns (CudaSharedMemoryStatusResponse)
+  {
+  }
+
+  //@@  .. cpp:var:: rpc CudaSharedMemoryRegister(
+  //@@                     CudaSharedMemoryRegisterRequest)
+  //@@                   returns (CudaSharedMemoryRegisterResponse)
+  //@@
+  //@@     Register a CUDA-shared-memory region.
+  //@@
+  rpc CudaSharedMemoryRegister(CudaSharedMemoryRegisterRequest)
+      returns (CudaSharedMemoryRegisterResponse)
+  {
+  }
+
+  //@@  .. cpp:var:: rpc CudaSharedMemoryUnregister(
+  //@@                     CudaSharedMemoryUnregisterRequest)
+  //@@                   returns (CudaSharedMemoryUnregisterResponse)
+  //@@
+  //@@     Unregister a CUDA-shared-memory region.
+  //@@
+  rpc CudaSharedMemoryUnregister(CudaSharedMemoryUnregisterRequest)
+      returns (CudaSharedMemoryUnregisterResponse)
+  {
+  }
 }
 
 //@@
@@ -717,3 +783,257 @@ message ModelConfigResponse
   //@@
   ModelConfig config = 1;
 }
+
+//@@
+//@@.. cpp:var:: message SystemSharedMemoryStatusRequest
+//@@
+//@@   Request message for SystemSharedMemoryStatus.
+//@@
+message SystemSharedMemoryStatusRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the region to get status for. If empty the
+  //@@     status is returned for all registered regions.
+  //@@
+  string name = 1;
+}
+
+//@@
+//@@.. cpp:var:: message SystemSharedMemoryStatusResponse
+//@@
+//@@   Response message for SystemSharedMemoryStatus.
+//@@
+message SystemSharedMemoryStatusResponse
+{
+  //@@
+  //@@  .. cpp:var:: message RegionStatus
+  //@@
+  //@@     Status for a shared memory region.
+  //@@
+  message RegionStatus
+  {
+    //@@
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The name for the shared memory region.
+    //@@
+    string name = 1;
+
+    //@@    .. cpp:var:: string shared_memory_key
+    //@@
+    //@@       The key of the underlying memory object that contains the
+    //@@       shared memory region.
+    //@@
+    string key = 2;
+
+    //@@    .. cpp:var:: uint64 offset
+    //@@
+    //@@       Offset, in bytes, within the underlying memory object to
+    //@@       the start of the shared memory region.
+    //@@
+    uint64 offset = 3;
+
+    //@@    .. cpp:var:: uint64 byte_size
+    //@@
+    //@@       Size of the shared memory region, in bytes.
+    //@@
+    uint64 byte_size = 4;
+  }
+
+  //@@
+  //@@  .. cpp:var:: map<string,RegionStatus> regions
+  //@@
+  //@@     Status for each of the registered regions, indexed by
+  //@@     region name.
+  //@@
+  map<string, RegionStatus> regions = 1;
+}
+
+//@@
+//@@.. cpp:var:: message SystemSharedMemoryRegisterRequest
+//@@
+//@@   Request message for SystemSharedMemoryRegister.
+//@@
+message SystemSharedMemoryRegisterRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the region to register.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: string shared_memory_key
+  //@@
+  //@@     The key of the underlying memory object that contains the
+  //@@     shared memory region.
+  //@@
+  string key = 2;
+
+  //@@  .. cpp:var:: uint64 offset
+  //@@
+  //@@     Offset, in bytes, within the underlying memory object to
+  //@@     the start of the shared memory region.
+  //@@
+  uint64 offset = 3;
+
+  //@@  .. cpp:var:: uint64 byte_size
+  //@@
+  //@@     Size of the shared memory region, in bytes.
+  //@@
+  uint64 byte_size = 4;
+}
+
+//@@
+//@@.. cpp:var:: message SystemSharedMemoryRegisterResponse
+//@@
+//@@   Response message for SystemSharedMemoryRegister.
+//@@
+message SystemSharedMemoryRegisterResponse {}
+
+//@@
+//@@.. cpp:var:: message SystemSharedMemoryUnregisterRequest
+//@@
+//@@   Request message for SystemSharedMemoryUnregister.
+//@@
+message SystemSharedMemoryUnregisterRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the system region to unregister. If empty
+  //@@     all system shared-memory regions are unregistered.
+  //@@
+  string name = 1;
+}
+
+//@@
+//@@.. cpp:var:: message SystemSharedMemoryUnregisterResponse
+//@@
+//@@   Response message for SystemSharedMemoryUnregister.
+//@@
+message SystemSharedMemoryUnregisterResponse {}
+
+//@@
+//@@.. cpp:var:: message CudaSharedMemoryStatusRequest
+//@@
+//@@   Request message for CudaSharedMemoryStatus.
+//@@
+message CudaSharedMemoryStatusRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the region to get status for. If empty the
+  //@@     status is returned for all registered regions.
+  //@@
+  string name = 1;
+}
+
+//@@
+//@@.. cpp:var:: message CudaSharedMemoryStatusResponse
+//@@
+//@@   Response message for CudaSharedMemoryStatus.
+//@@
+message CudaSharedMemoryStatusResponse
+{
+  //@@
+  //@@  .. cpp:var:: message RegionStatus
+  //@@
+  //@@     Status for a shared memory region.
+  //@@
+  message RegionStatus
+  {
+    //@@
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The name for the shared memory region.
+    //@@
+    string name = 1;
+
+    //@@    .. cpp:var:: uin64 device_id
+    //@@
+    //@@       The GPU device ID where the cudaIPC handle was created.
+    //@@
+    uint64 device_id = 2;
+
+    //@@    .. cpp:var:: uint64 byte_size
+    //@@
+    //@@       Size of the shared memory region, in bytes.
+    //@@
+    uint64 byte_size = 3;
+  }
+
+  //@@
+  //@@  .. cpp:var:: map<string,RegionStatus> regions
+  //@@
+  //@@     Status for each of the registered regions, indexed by
+  //@@     region name.
+  //@@
+  map<string, RegionStatus> regions = 1;
+}
+
+//@@
+//@@.. cpp:var:: message CudaSharedMemoryRegisterRequest
+//@@
+//@@   Request message for CudaSharedMemoryRegister.
+//@@
+message CudaSharedMemoryRegisterRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the region to register.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: bytes raw_handle
+  //@@
+  //@@     The raw serialized cudaIPC handle.
+  //@@
+  bytes raw_handle = 2;
+
+  //@@  .. cpp:var:: int64 device_id
+  //@@
+  //@@     The GPU device ID on which the cudaIPC handle was created.
+  //@@
+  int64 device_id = 3;
+
+  //@@  .. cpp:var:: uint64 byte_size
+  //@@
+  //@@     Size of the shared memory block, in bytes.
+  //@@
+  uint64 byte_size = 4;
+}
+
+//@@
+//@@.. cpp:var:: message CudaSharedMemoryRegisterResponse
+//@@
+//@@   Response message for CudaSharedMemoryRegister.
+//@@
+message CudaSharedMemoryRegisterResponse {}
+
+//@@
+//@@.. cpp:var:: message CudaSharedMemoryUnregisterRequest
+//@@
+//@@   Request message for CudaSharedMemoryUnregister.
+//@@
+message CudaSharedMemoryUnregisterRequest
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the cuda region to unregister. If empty
+  //@@     all cuda shared-memory regions are unregistered.
+  //@@
+  string name = 1;
+}
+
+//@@
+//@@.. cpp:var:: message CudaSharedMemoryUnregisterResponse
+//@@
+//@@   Response message for CudaSharedMemoryUnregister.
+//@@
+message CudaSharedMemoryUnregisterResponse {}

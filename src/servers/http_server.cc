@@ -1030,7 +1030,7 @@ HTTPAPIServer::EVBufferToInput(
 
         void* base;
         TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
-        int memory_type_id;
+        int64_t memory_type_id;
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
             io.shared_memory().name(), io.shared_memory().offset(), &base,
             &memory_type, &memory_type_id));
@@ -1083,7 +1083,7 @@ HTTPAPIServer::EVBufferToInput(
     if (io.has_shared_memory()) {
       void* base;
       TRTSERVER_Memory_Type memory_type;
-      int memory_type_id;
+      int64_t memory_type_id;
       RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
           io.shared_memory().name(), io.shared_memory().offset(), &base,
           &memory_type, &memory_type_id));

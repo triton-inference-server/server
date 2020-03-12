@@ -31,6 +31,10 @@
 #include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
 
+#ifdef TRTIS_ENABLE_GRPC_V2
+#include "src/core/grpc_service_v2.grpc.pb.h"
+#endif
+
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRTIS_ENABLE_GPU
@@ -84,7 +88,7 @@ class SharedMemoryManager {
   /// \return a TRTSERVER_Error indicating success or failure.
   TRTSERVER_Error* GetMemoryInfo(
       const std::string& name, size_t offset, void** shm_mapped_addr,
-      TRTSERVER_Memory_Type* memory_type, int* device_id);
+      TRTSERVER_Memory_Type* memory_type, int64_t* device_id);
 
   /// Removes the named shared memory block from the manager. Any future
   /// attempt to get the details of this block will result in an array
@@ -103,9 +107,48 @@ class SharedMemoryManager {
   /// \return a TRTSERVER_Error indicating success or failure.
   TRTSERVER_Error* GetStatus(SharedMemoryStatus* status);
 
+#ifdef TRTIS_ENABLE_GRPC_V2
+  /// Removes the named shared memory block of the specified type from
+  /// the manager. Any future attempt to get the details of this block
+  /// will result in an array till another block with the same name is
+  /// added to the manager.
+  /// \param name The name of the shared memory block to remove.
+  /// \param memory_type The type of memory to unregister
+  /// \return a TRTSERVER_Error indicating success or failure.
+  TRTSERVER_Error* UnregisterV2(
+      const std::string& name, TRTSERVER_Memory_Type memory_type);
+
+  /// Unregister all shared memory blocks of specified type from the manager.
+  /// \param memory_type The type of memory to unregister
+  /// \return a TRTSERVER_Error indicating success or failure.
+  TRTSERVER_Error* UnregisterAllV2(TRTSERVER_Memory_Type memory_type);
+
+  /// Populates the status of active system shared memory regions
+  /// in the response protobuf
+  /// \param shm_status Returns status of active shared meeory blocks
+  /// \return a TRTSERVER_Error indicating success or failure.
+  TRTSERVER_Error* GetStatusV2(
+      const std::string& name, SystemSharedMemoryStatusResponse*& shm_status);
+
+  /// Populates the status of active cuda shared memory regions
+  /// in the response protobuf
+  /// \param shm_status Returns status of active shared meeory blocks
+  /// \return a TRTSERVER_Error indicating success or failure.
+  TRTSERVER_Error* GetStatusV2(
+      const std::string& name, CudaSharedMemoryStatusResponse*& shm_status);
+
+#endif
+
  private:
   /// A helper function to remove the named shared memory blocks.
   TRTSERVER_Error* UnregisterHelper(const std::string& name);
+
+#ifdef TRTIS_ENABLE_GRPC_V2
+  /// A helper function to remove the named shared memory blocks of
+  /// specified type
+  TRTSERVER_Error* UnregisterHelperV2(
+      const std::string& name, TRTSERVER_Memory_Type memory_type);
+#endif  // TRTIS_ENABLE_GRPC_V2
 
   /// A struct that records the shared memory regions registered by the shared
   /// memory manager.
@@ -114,7 +157,7 @@ class SharedMemoryManager {
         const std::string& name, const std::string& shm_key,
         const size_t offset, const size_t byte_size, int shm_fd,
         void* mapped_addr, const TRTSERVER_Memory_Type kind,
-        const int device_id)
+        const int64_t device_id)
         : name_(name), shm_key_(shm_key), offset_(offset),
           byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr),
           kind_(kind), device_id_(device_id)
@@ -128,7 +171,7 @@ class SharedMemoryManager {
     int shm_fd_;
     void* mapped_addr_;
     TRTSERVER_Memory_Type kind_;
-    int device_id_;
+    int64_t device_id_;
   };
 
   using SharedMemoryStateMap =
