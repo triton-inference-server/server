@@ -35,6 +35,8 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+export CUDA_VISIBLE_DEVICES=0
+
 CLIENT_LOG="./client.log"
 PERF_CLIENT=../clients/perf_client
 TRT_OP_TEST=trt_dynamic_shape_test.py
