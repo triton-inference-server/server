@@ -114,24 +114,21 @@ AllocatedMemory::AllocatedMemory(
     : MutableMemory(nullptr, byte_size, memory_type, memory_type_id)
 {
   if (total_byte_size_ != 0) {
-    // If the requested memory type is not GPU, we always attempt to allocated
-    // on pinned memory first
+    // Allocate memory with the following fallback policy:
+    // CUDA memory -> pinned system memory -> non-pinned system memory
     switch (memory_type_) {
-      case TRTSERVER_MEMORY_GPU: {
 #ifdef TRTIS_ENABLE_GPU
+      case TRTSERVER_MEMORY_GPU: {
         auto status = CudaMemoryManager::Alloc(
             (void**)&buffer_, total_byte_size_, memory_type_id_);
-        // Fall back to allocate pinned memory if can't allocate CUDA memory
         if (!status.IsOk()) {
           LOG_ERROR << status.Message();
           goto pinned_memory_allocation;
         }
-#else
-        buffer_ = nullptr;
-#endif  // TRTIS_ENABLE_GPU
         break;
       }
       pinned_memory_allocation:
+#endif  // TRTIS_ENABLE_GPU
       default: {
         auto status = PinnedMemoryManager::Alloc(
             (void**)&buffer_, total_byte_size_, &memory_type_, true);
