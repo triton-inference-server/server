@@ -170,11 +170,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
   // AllocPayload
   //
   // Simple structure that carries the userp payload needed for
-  // allocation. These are just pointers into a HandlerState
-  // object. HandlerState lifetime is always longer than what is
-  // required for allocation callback so HandlerState manages the
-  // lifetime of the actual objects referenced by those pointers.
-  //
+  // allocation.
   struct ShmInfo {
     void* base_;
     size_t byte_size_;
@@ -188,7 +184,8 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
     explicit AllocPayload() : shm_map_(nullptr) {}
     ~AllocPayload()
     {
-      // Don't delete 'response_'.. it is owned by the HandlerState
+      // Don't delete 'response_buffer_' or 'response_json_' here. Destoryed as a part of the
+      // InferRequestClass
       delete shm_map_;
     }
 
