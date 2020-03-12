@@ -224,6 +224,19 @@ set(
   trtserver.h
 )
 
+if(${TRTIS_ENABLE_GPU})
+  set(
+    SERVER_SRCS
+    ${SERVER_SRCS}
+    cuda_memory_manager.cc
+  )
+  set(
+    SERVER_HDRS
+    ${SERVER_HDRS}
+    cuda_memory_manager.h
+  )
+endif() # TRTIS_ENABLE_GPU
+
 add_library(
   server-library EXCLUDE_FROM_ALL OBJECT
   ${SERVER_SRCS} ${SERVER_HDRS}
@@ -234,6 +247,7 @@ if(${TRTIS_ENABLE_GPU})
   target_include_directories(
     server-library
     PRIVATE ${CUDA_INCLUDE_DIRS}
+    PRIVATE ${CNMEM_PATH}/include
   )
 endif() # TRTIS_ENABLE_GPU
 

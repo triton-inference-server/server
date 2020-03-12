@@ -33,6 +33,18 @@
 
 namespace nvidia { namespace inferenceserver {
 
+#ifdef TRTIS_ENABLE_GPU
+#define RETURN_IF_CUDA_ERR(X, MSG)                   \
+  do {                                               \
+    cudaError_t err__ = (X);                         \
+    if (err__ != cudaSuccess) {                      \
+      return Status(                                 \
+          RequestStatusCode::INTERNAL,               \
+          (MSG) + ": " + cudaGetErrorString(err__)); \
+    }                                                \
+  } while (false)
+#endif  // TRTIS_ENABLE_GPU
+
 #ifndef TRTIS_ENABLE_GPU
 using cudaStream_t = void*;
 #endif  // TRTIS_ENABLE_GPU

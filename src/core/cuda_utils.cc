@@ -99,24 +99,20 @@ CopyBuffer(
       copy_kind = cudaMemcpyDeviceToHost;
     }
 
-    cudaError_t err;
     if ((src_memory_type_id != dst_memory_type_id) &&
         (copy_kind == cudaMemcpyDeviceToDevice)) {
-      err = cudaMemcpyPeerAsync(
-          dst, dst_memory_type_id, src, src_memory_type_id, byte_size,
-          cuda_stream);
+      RETURN_IF_CUDA_ERR(
+          cudaMemcpyPeerAsync(
+              dst, dst_memory_type_id, src, src_memory_type_id, byte_size,
+              cuda_stream),
+          msg + ": failed to perform CUDA copy");
     } else {
-      err = cudaMemcpyAsync(dst, src, byte_size, copy_kind, cuda_stream);
+      RETURN_IF_CUDA_ERR(
+          cudaMemcpyAsync(dst, src, byte_size, copy_kind, cuda_stream),
+          msg + ": failed to perform CUDA copy");
     }
 
-    if (err != cudaSuccess) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          msg + ": failed to use CUDA copy : " +
-              std::string(cudaGetErrorString(err)));
-    } else {
-      *cuda_used = true;
-    }
+    *cuda_used = true;
 #else
     return Status(
         RequestStatusCode::INTERNAL,
