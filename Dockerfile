@@ -151,6 +151,7 @@ RUN apt-get update && \
             libssl-dev \
             libtool \
             libboost-dev \
+            rapidjson-dev \
             patchelf \
             software-properties-common && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
@@ -286,6 +287,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRTIS_ENABLE_ONNXRUNTIME_OPENVINO=ON \
                   -DTRTIS_ENABLE_PYTORCH=ON \
                   -DTRTIS_ENABLE_GRPC_V2=ON \
+                  -DTRTIS_ENABLE_HTTP_V2=ON \
                   -DTRTIS_ONNXRUNTIME_INCLUDE_PATHS="/opt/tensorrtserver/include/onnxruntime" \
                   -DTRTIS_PYTORCH_INCLUDE_PATHS="/opt/tensorrtserver/include/torch" \
                   -DTRTIS_EXTRA_LIB_PATHS="/opt/tensorrtserver/lib;/opt/tensorrtserver/lib/tensorflow;/opt/tensorrtserver/lib/pytorch;/opt/tensorrtserver/lib/onnx" \
