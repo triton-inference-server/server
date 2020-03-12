@@ -1518,7 +1518,7 @@ ModelMetadataHandler::Process(Handler::State* state, bool rpc_ok)
         for (const auto& io : model_config.input()) {
           ModelMetadataResponse::TensorMetadata* input = response.add_inputs();
           input->set_name(io.name());
-          input->set_datatype(GetDataTypeProtocolString(io.data_type()));
+          input->set_datatype(DataTypeToProtocolString(io.data_type()));
           for (const auto d : io.dims()) {
             input->add_shape(d);
           }
@@ -1528,7 +1528,7 @@ ModelMetadataHandler::Process(Handler::State* state, bool rpc_ok)
           ModelMetadataResponse::TensorMetadata* output =
               response.add_outputs();
           output->set_name(io.name());
-          output->set_datatype(GetDataTypeProtocolString(io.data_type()));
+          output->set_datatype(DataTypeToProtocolString(io.data_type()));
           for (const auto d : io.dims()) {
             output->add_shape(d);
           }
@@ -2406,7 +2406,7 @@ ModelInferHandler::InferComplete(
             for (const auto d : io.raw().dims()) {
               output.add_shape(d);
             }
-            output.set_datatype(GetDataTypeProtocolString(io.data_type()));
+            output.set_datatype(DataTypeToProtocolString(io.data_type()));
           } else {
             int cls_count = 0;
             for (const auto& classes : io.batch_classes()) {

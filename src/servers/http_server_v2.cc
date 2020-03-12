@@ -413,34 +413,48 @@ HTTPAPIServerV2::ResponseRelease(
 template <typename T>
 void
 ReadDataFromJsonHelper(
-    std::vector<T>* data_vec, const char* dtype,
+    std::vector<T>* data_vec, const DataType dtype,
     const rapidjson::Value& payload_data, int* counter)
 {
   for (size_t i = 0; i < payload_data.Size(); i++) {
     // If last dimension
     if (!payload_data[i].IsArray()) {
-      if (strcmp(dtype, "BOOL")) {
-        data_vec->push_back((uint8_t)payload_data[i].GetBool());
-      } else if (strcmp(dtype, "UINT8")) {
-        data_vec->push_back((uint8_t)payload_data[i].GetInt());
-      } else if (strcmp(dtype, "UINT16")) {
-        data_vec->push_back((uint16_t)payload_data[i].GetInt());
-      } else if (strcmp(dtype, "UINT32")) {
-        data_vec->push_back((uint32_t)payload_data[i].GetInt());
-      } else if (strcmp(dtype, "UINT64")) {
-        data_vec->push_back((uint64_t)payload_data[i].GetInt());
-      } else if (strcmp(dtype, "INT8")) {
-        data_vec->push_back((int8_t)payload_data[i].GetInt());
-      } else if (strcmp(dtype, "INT16")) {
-        data_vec->push_back((int16_t)payload_data[i].GetInt());
-      } else if (strcmp(dtype, "INT32")) {
-        data_vec->push_back((int32_t)payload_data[i].GetInt());
-      } else if (strcmp(dtype, "INT64")) {
-        data_vec->push_back((int64_t)payload_data[i].GetInt());
-      } else if (strcmp(dtype, "FP32")) {
-        data_vec->push_back((float)payload_data[i].GetFloat());
-      } else if (strcmp(dtype, "FP64")) {
-        data_vec->push_back((double)payload_data[i].GetDouble());
+      switch (dtype) {
+        case TYPE_BOOL:
+          data_vec->push_back((uint8_t)payload_data[i].GetBool());
+          break;
+        case TYPE_UINT8:
+          data_vec->push_back((uint8_t)payload_data[i].GetInt());
+          break;
+        case TYPE_UINT16:
+          data_vec->push_back((uint16_t)payload_data[i].GetInt());
+          break;
+        case TYPE_UINT32:
+          data_vec->push_back((uint32_t)payload_data[i].GetInt());
+          break;
+        case TYPE_UINT64:
+          data_vec->push_back((uint64_t)payload_data[i].GetInt());
+          break;
+        case TYPE_INT8:
+          data_vec->push_back((int8_t)payload_data[i].GetInt());
+          break;
+        case TYPE_INT16:
+          data_vec->push_back((int16_t)payload_data[i].GetInt());
+          break;
+        case TYPE_INT32:
+          data_vec->push_back((int32_t)payload_data[i].GetInt());
+          break;
+        case TYPE_INT64:
+          data_vec->push_back((int64_t)payload_data[i].GetInt());
+          break;
+        case TYPE_FP32:
+          data_vec->push_back((float)payload_data[i].GetFloat());
+          break;
+        case TYPE_FP64:
+          data_vec->push_back((double)payload_data[i].GetDouble());
+          break;
+        default:
+          break;
       }
       *counter += 1;
     }
@@ -457,7 +471,8 @@ ReadDataArrayFromJson(
 {
   const rapidjson::Value& tensor_data = request_input["data"];
   const rapidjson::Value& shape = request_input["shape"];
-  const char* dtype = request_input["datatype"].GetString();
+  const DataType dtype =
+      ProtocolStringToDataType(request_input["datatype"].GetString());
   int counter = 0;
 
   // Must be an array
@@ -467,66 +482,91 @@ ReadDataArrayFromJson(
         "failed to parse request buffer, tensor data must be an array");
   }
 
-  if (strcmp(dtype, "BOOL")) {
-    std::vector<uint8_t> bool_tensor;
-    ReadDataFromJsonHelper(&bool_tensor, dtype, tensor_data, &counter);
-    *base = reinterpret_cast<char*>(&bool_tensor[0]);
-  } else if (strcmp(dtype, "UINT8")) {
-    std::vector<uint8_t> uint8_t_tensor;
-    ReadDataFromJsonHelper(&uint8_t_tensor, dtype, tensor_data, &counter);
-    *base = reinterpret_cast<char*>(&uint8_t_tensor[0]);
-  } else if (strcmp(dtype, "UINT16")) {
-    std::vector<uint16_t> uint16_t_tensor;
-    ReadDataFromJsonHelper(&uint16_t_tensor, dtype, tensor_data, &counter);
-    *base = reinterpret_cast<char*>(&uint16_t_tensor[0]);
-  } else if (strcmp(dtype, "UINT32")) {
-    std::vector<uint32_t> uint32_t_tensor;
-    ReadDataFromJsonHelper(&uint32_t_tensor, dtype, tensor_data, &counter);
-    *base = reinterpret_cast<char*>(&uint32_t_tensor[0]);
-  } else if (strcmp(dtype, "UINT64")) {
-    std::vector<uint64_t> uint64_t_tensor;
-    ReadDataFromJsonHelper(&uint64_t_tensor, dtype, tensor_data, &counter);
-    *base = reinterpret_cast<char*>(&uint64_t_tensor[0]);
-  } else if (strcmp(dtype, "INT8")) {
-    std::vector<int8_t> int8_t_tensor;
-    ReadDataFromJsonHelper(&int8_t_tensor, dtype, tensor_data, &counter);
-    *base = reinterpret_cast<char*>(&int8_t_tensor[0]);
-  } else if (strcmp(dtype, "INT16")) {
-    std::vector<int8_t> int16_t_tensor;
-    ReadDataFromJsonHelper(&int16_t_tensor, dtype, tensor_data, &counter);
-    *base = reinterpret_cast<char*>(&int16_t_tensor[0]);
-  } else if (strcmp(dtype, "INT32")) {
-    std::vector<int32_t> int32_t_tensor;
-    ReadDataFromJsonHelper(&int32_t_tensor, dtype, tensor_data, &counter);
-    *base = reinterpret_cast<char*>(&int32_t_tensor[0]);
-  } else if (strcmp(dtype, "INT64")) {
-    std::vector<int64_t> int64_t_tensor;
-    ReadDataFromJsonHelper(&int64_t_tensor, dtype, tensor_data, &counter);
-    *base = reinterpret_cast<char*>(&int64_t_tensor[0]);
-  }
-  // FP16 needs a work around
-  else if (strcmp(dtype, "FP16")) {
-    // std::vector<float> float16_tensor;
-    // ReadDataFromJsonHelper(&float16_t_tensor, dtype, tensor_data, &counter);
-    // *base = reinterpret_cast<char*>(&float16_tensor[0]);
-  } else if (strcmp(dtype, "FP32")) {
-    std::vector<float> float_tensor;
-    ReadDataFromJsonHelper(&float_tensor, dtype, tensor_data, &counter);
-    *base = reinterpret_cast<char*>(&float_tensor[0]);
-  } else if (strcmp(dtype, "FP64")) {
-    std::vector<double> double_tensor;
-    ReadDataFromJsonHelper(&double_tensor, dtype, tensor_data, &counter);
-    *base = reinterpret_cast<char*>(&double_tensor[0]);
-  }
-  // BYTES (String) needs a work around
-  else if (strcmp(dtype, "BYTES")) {
-  } else {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "invalid datatype " + std::string(dtype) + " of input " +
-            request_input["name"].GetString())
-            .c_str());
+  switch (dtype) {
+    case TYPE_BOOL: {
+      std::vector<uint8_t> bool_tensor;
+      ReadDataFromJsonHelper(&bool_tensor, dtype, tensor_data, &counter);
+      *base = reinterpret_cast<char*>(&bool_tensor[0]);
+      break;
+    }
+    case TYPE_UINT8: {
+      std::vector<uint8_t> uint8_t_tensor;
+      ReadDataFromJsonHelper(&uint8_t_tensor, dtype, tensor_data, &counter);
+      *base = reinterpret_cast<char*>(&uint8_t_tensor[0]);
+      break;
+    }
+    case TYPE_UINT16: {
+      std::vector<uint16_t> uint16_t_tensor;
+      ReadDataFromJsonHelper(&uint16_t_tensor, dtype, tensor_data, &counter);
+      *base = reinterpret_cast<char*>(&uint16_t_tensor[0]);
+      break;
+    }
+    case TYPE_UINT32: {
+      std::vector<uint32_t> uint32_t_tensor;
+      ReadDataFromJsonHelper(&uint32_t_tensor, dtype, tensor_data, &counter);
+      *base = reinterpret_cast<char*>(&uint32_t_tensor[0]);
+      break;
+    }
+    case TYPE_UINT64: {
+      std::vector<uint64_t> uint64_t_tensor;
+      ReadDataFromJsonHelper(&uint64_t_tensor, dtype, tensor_data, &counter);
+      *base = reinterpret_cast<char*>(&uint64_t_tensor[0]);
+      break;
+    }
+    case TYPE_INT8: {
+      std::vector<int8_t> int8_t_tensor;
+      ReadDataFromJsonHelper(&int8_t_tensor, dtype, tensor_data, &counter);
+      *base = reinterpret_cast<char*>(&int8_t_tensor[0]);
+    } break;
+    case TYPE_INT16: {
+      std::vector<int8_t> int16_t_tensor;
+      ReadDataFromJsonHelper(&int16_t_tensor, dtype, tensor_data, &counter);
+      *base = reinterpret_cast<char*>(&int16_t_tensor[0]);
+    } break;
+    case TYPE_INT32: {
+      std::vector<int32_t> int32_t_tensor;
+      ReadDataFromJsonHelper(&int32_t_tensor, dtype, tensor_data, &counter);
+      *base = reinterpret_cast<char*>(&int32_t_tensor[0]);
+      break;
+    }
+    case TYPE_INT64: {
+      std::vector<int64_t> int64_t_tensor;
+      ReadDataFromJsonHelper(&int64_t_tensor, dtype, tensor_data, &counter);
+      *base = reinterpret_cast<char*>(&int64_t_tensor[0]);
+      break;
+    }
+    // FP16 needs a work around
+    case TYPE_FP16: {  // std::vector<float> float16_tensor;
+      // ReadDataFromJsonHelper(&float16_t_tensor, dtype, tensor_data,
+      // &counter); *base = reinterpret_cast<char*>(&float16_tensor[0]);
+      break;
+    }
+    case TYPE_FP32: {
+      std::vector<float> float_tensor;
+      ReadDataFromJsonHelper(&float_tensor, dtype, tensor_data, &counter);
+      *base = reinterpret_cast<char*>(&float_tensor[0]);
+      break;
+    }
+    case TYPE_FP64: {
+      std::vector<double> double_tensor;
+      ReadDataFromJsonHelper(&double_tensor, dtype, tensor_data, &counter);
+      *base = reinterpret_cast<char*>(&double_tensor[0]);
+      break;
+    }
+    // BYTES (String) needs a work around
+    case TYPE_STRING:
+      break;
+    case TYPE_INVALID: {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "invalid datatype " +
+              std::string(DataTypeToProtocolString(dtype)) + " of input " +
+              request_input["name"].GetString())
+              .c_str());
+    }
+    default:
+      break;
   }
 
   // Need shape to verify size is correct
@@ -541,7 +581,8 @@ ReadDataArrayFromJson(
     }
   }
 
-  *byte_size = element_cnt * GetDataTypeByteSize(dtype);
+  *byte_size =
+      element_cnt * GetDataTypeByteSize(DataTypeToProtocolString(dtype));
 
   return nullptr;
 }
@@ -881,7 +922,7 @@ HTTPAPIServerV2::HandleModelMetadata(
         rapidjson::Value name_val(io.name().c_str(), io.name().size());
         input_metadata[i].AddMember("name", name_val, allocator);
 
-        std::string datatype_str = GetDataTypeProtocolString(io.data_type());
+        std::string datatype_str = DataTypeToProtocolString(io.data_type());
         rapidjson::Value datatype_val(
             datatype_str.c_str(), datatype_str.size());
         input_metadata[i].AddMember("datatype", datatype_val, allocator);
@@ -905,7 +946,7 @@ HTTPAPIServerV2::HandleModelMetadata(
         rapidjson::Value name_val(io.name().c_str(), io.name().size());
         output_metadata[i].AddMember("name", name_val, allocator);
 
-        std::string datatype_str = GetDataTypeProtocolString(io.data_type());
+        std::string datatype_str = DataTypeToProtocolString(io.data_type());
         rapidjson::Value datatype_val(
             datatype_str.c_str(), datatype_str.size());
         output_metadata[i].AddMember("datatype", datatype_val, allocator);
@@ -1454,8 +1495,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
             }
             response_output.AddMember("shape", shape_array, allocator);
 
-            std::string datatype_str =
-                GetDataTypeProtocolString(io.data_type());
+            std::string datatype_str = DataTypeToProtocolString(io.data_type());
             rapidjson::Value datatype_val(
                 datatype_str.c_str(), datatype_str.size());
             response_output.AddMember("datatype", datatype_val, allocator);
