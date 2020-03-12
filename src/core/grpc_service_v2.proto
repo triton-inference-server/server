@@ -88,6 +88,37 @@ service GRPCInferenceService
   //@@
   rpc ModelConfig(ModelConfigRequest) returns (ModelConfigResponse) {}
 
+  //@@  .. cpp:var:: rpc RepositoryIndex(RepositoryIndexRequest) returns
+  //@@       (RepositoryIndexResponse)
+  //@@
+  //@@     Get the index of model repository contents.
+  //@@
+  rpc RepositoryIndex(RepositoryIndexRequest) returns (RepositoryIndexResponse)
+  {
+  }
+
+  //@@  .. cpp:var:: rpc RepositoryModelLoad(RepositoryModelLoadRequest) returns
+  //@@       (RepositoryModelLoadResponse)
+  //@@
+  //@@     Load or reload a model from a repository.
+  //@@
+  rpc RepositoryModelLoad(RepositoryModelLoadRequest)
+      returns (RepositoryModelLoadResponse)
+  {
+  }
+
+
+  //@@  .. cpp:var:: rpc RepositoryModelUnload(RepositoryModelUnloadRequest)
+  // returns
+  //@@       (RepositoryModelUnloadResponse)
+  //@@
+  //@@     Unload a model.
+  //@@
+  rpc RepositoryModelUnload(RepositoryModelUnloadRequest)
+      returns (RepositoryModelUnloadResponse)
+  {
+  }
+
   //@@  .. cpp:var:: rpc SystemSharedMemoryStatus(
   //@@                     SystemSharedMemoryStatusRequest)
   //@@                   returns (SystemSharedMemoryStatusRespose)
@@ -783,6 +814,107 @@ message ModelConfigResponse
   //@@
   ModelConfig config = 1;
 }
+
+//@@
+//@@.. cpp:var:: message RepositoryIndexRequest
+//@@
+//@@   Request message for RepositoryIndex.
+//@@
+message RepositoryIndexRequest
+{
+  //@@  .. cpp:var:: string repository_name
+  //@@
+  //@@     The name of the repository. If empty the index is returned
+  //@@     for all repositories.
+  //@@
+  string repository_name = 1;
+}
+
+//@@
+//@@.. cpp:var:: message RepositoryIndexResponse
+//@@
+//@@   Response message for RepositoryIndex.
+//@@
+message RepositoryIndexResponse
+{
+  //@@
+  //@@  .. cpp:var:: message ModelIndex
+  //@@
+  //@@     Index entry for a model.
+  //@@
+  message ModelIndex
+  {
+    //@@
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The name of the model.
+    //@@
+    string name = 1;
+  }
+
+  //@@
+  //@@  .. cpp:var:: ModelIndex models (repeated)
+  //@@
+  //@@     An index entry for each model.
+  //@@
+  repeated ModelIndex models = 1;
+}
+
+//@@
+//@@.. cpp:var:: message RepositoryModelLoadRequest
+//@@
+//@@   Request message for RepositoryModelLoad.
+//@@
+message RepositoryModelLoadRequest
+{
+  //@@  .. cpp:var:: string repository_name
+  //@@
+  //@@     The name of the repository to load from. If empty the model
+  //@@     is loaded from any repository.
+  //@@
+  string repository_name = 1;
+
+  //@@  .. cpp:var:: string repository_name
+  //@@
+  //@@     The name of the model to load, or reload.
+  //@@
+  string model_name = 2;
+}
+
+//@@
+//@@.. cpp:var:: message RepositoryModelLoadResponse
+//@@
+//@@   Response message for RepositoryModelLoad.
+//@@
+message RepositoryModelLoadResponse {}
+
+//@@
+//@@.. cpp:var:: message RepositoryModelUnloadRequest
+//@@
+//@@   Request message for RepositoryModelUnload.
+//@@
+message RepositoryModelUnloadRequest
+{
+  //@@  .. cpp:var:: string repository_name
+  //@@
+  //@@     The name of the repository from which the model was originally
+  //@@     loaded. If empty the repository is not considered.
+  //@@
+  string repository_name = 1;
+
+  //@@  .. cpp:var:: string repository_name
+  //@@
+  //@@     The name of the model to unload.
+  //@@
+  string model_name = 2;
+}
+
+//@@
+//@@.. cpp:var:: message RepositoryModelUnloadResponse
+//@@
+//@@   Response message for RepositoryModelUnload.
+//@@
+message RepositoryModelUnloadResponse {}
 
 //@@
 //@@.. cpp:var:: message SystemSharedMemoryStatusRequest

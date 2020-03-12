@@ -85,11 +85,9 @@ class GRPCServerV2 {
   std::unique_ptr<grpc::ServerCompletionQueue> server_metadata_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> model_metadata_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> model_config_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> repository_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> model_infer_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> stream_infer_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> modelcontrol_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> shmcontrol_cq_;
+  std::unique_ptr<grpc::ServerCompletionQueue> common_cq_;
 
   grpc::ServerBuilder grpc_builder_;
   std::unique_ptr<grpc::Server> grpc_server_;
@@ -100,11 +98,9 @@ class GRPCServerV2 {
   std::unique_ptr<HandlerBase> server_metadata_handler_;
   std::unique_ptr<HandlerBase> model_metadata_handler_;
   std::unique_ptr<HandlerBase> model_config_handler_;
-  std::unique_ptr<HandlerBase> repository_handler_;
   std::unique_ptr<HandlerBase> model_infer_handler_;
   std::unique_ptr<HandlerBase> stream_infer_handler_;
-  std::unique_ptr<HandlerBase> modelcontrol_handler_;
-  std::unique_ptr<HandlerBase> shmcontrol_handler_;
+  std::unique_ptr<HandlerBase> common_handler_;
 
   GRPCInferenceService::AsyncService service_;
   bool running_;

@@ -39,5 +39,6 @@ install(
     simple_grpc_v2_infer_client.py
     simple_grpc_v2_string_infer_client.py
     simple_grpc_v2_shm_client.py
+    simple_grpc_v2_model_control.py
   DESTINATION python
 )
