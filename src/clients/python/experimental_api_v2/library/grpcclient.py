@@ -310,8 +310,7 @@ class InferenceServerClient:
               outputs,
               model_name,
               model_version="",
-              request_id=None,
-              sequence_id=0):
+              request_id=None):
         """Run synchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
 
@@ -334,11 +333,6 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
-        sequence_id : int
-            The sequence ID of the inference request. Default is 0, which
-            indicates that the request is not part of a sequence. The
-            sequence ID is used to indicate that two or more inference
-            requests are in the same sequence.
 
         Returns
         -------
@@ -352,11 +346,11 @@ class InferenceServerClient:
             If server fails to perform inference.
         """
 
-        self._get_inference_request(inputs, outputs, model_name, model_version,
-                                    request_id, sequence_id)
+        request = self._get_inference_request(inputs, outputs, model_name, model_version,
+                                    request_id)
 
         try:
-            response = self._client_stub.ModelInfer(self._request)
+            response = self._client_stub.ModelInfer(request)
             result = InferResult(response)
             return result
         except grpc.RpcError as rpc_error:
@@ -368,8 +362,7 @@ class InferenceServerClient:
                     outputs,
                     model_name,
                     model_version="",
-                    request_id=None,
-                    sequence_id=None):
+                    request_id=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
 
@@ -399,11 +392,6 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
-        sequence_id : int
-            The sequence ID of the inference request. Default is 0, which
-            indicates that the request is not part of a sequence. The
-            sequence ID is used to indicate that two or more inference
-            requests are in the same sequence.
     
         Raises
         ------
@@ -418,18 +406,17 @@ class InferenceServerClient:
                 raise_error_grpc(rpc_error)
             callback(result=result)
 
-        self._get_inference_request(inputs, outputs, model_name, model_version,
-                                    request_id, sequence_id)
+        request = self._get_inference_request(inputs, outputs, model_name, model_version,
+                                    request_id)
 
         try:
-            self._call_future = self._client_stub.ModelInfer.future(
-                self._request)
+            self._call_future = self._client_stub.ModelInfer.future(request)
             self._call_future.add_done_callback(wrapped_callback)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
     def _get_inference_request(self, inputs, outputs, model_name, model_version,
-                               request_id, sequence_id):
+                               request_id):
         """Creates and initializes an inference request.
 
         Parameters
@@ -451,24 +438,25 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
-        sequence_id : int
-            The sequence ID of the inference request. Default is 0, which
-            indicates that the request is not part of a sequence. The
-            sequence ID is used to indicate that two or more inference
-            requests are in the same sequence.
+
+        Returns
+        -------
+        ModelInferRequest
+            The protobuf message holding the inference request.
+
         """
 
-        self._request = grpc_service_v2_pb2.ModelInferRequest()
-        self._request.model_name = model_name
-        self._request.model_version = model_version
+        request = grpc_service_v2_pb2.ModelInferRequest()
+        request.model_name = model_name
+        request.model_version = model_version
         if request_id != None:
-            self._request.id = request_id
-        if sequence_id != None:
-            self._request.sequence_id = sequence_id
+            request.id = request_id
         for infer_input in inputs:
-            self._request.inputs.extend([infer_input._get_tensor()])
+            request.inputs.extend([infer_input._get_tensor()])
         for infer_output in outputs:
-            self._request.outputs.extend([infer_output._get_tensor()])
+            request.outputs.extend([infer_output._get_tensor()])
+
+        return request
 
 
 class InferInput:
@@ -663,27 +651,6 @@ class InferResult:
                 np_array = np.resize(np_array, shape)
                 return np_array
         return None
-
-    def get_request(self, as_json=False):
-        """Retrieves the ModelInferRequest for the request associated
-        with this response as a json dict object or protobuf message
-
-        Parameters
-        ----------
-        as_json : bool
-            If True then returns request as a json dict, otherwise
-            as a protobuf message. Default value is False.
-
-        Returns
-        -------
-        protobuf message or dict
-            The ModelInferRequest protobuf message or dict for the request
-            associated  with this response.
-        """
-        if as_json:
-            return json.loads(MessageToJson(self._result.request))
-        else:
-            return self._result.request
 
     def get_statistics(self, as_json=False):
         """Retrieves the InferStatistics for this response as

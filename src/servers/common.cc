@@ -154,8 +154,8 @@ SetInferenceRequestOptions(
   //   request_options, request_header.priority()));
   // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetTimeoutMicroseconds(
   //   request_options, request_header.timeout_microseconds()));
-  RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetCorrelationId(
-      request_options, request.sequence_id()));
+  // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetCorrelationId(
+  //    request_options, request.sequence_id()));
 
   // FIXMEV2 raw contents size?? Do we need it?
   for (const auto& input : request.inputs()) {

@@ -149,9 +149,8 @@ message ModelReadyRequest
 
   //@@  .. cpp:var:: string version
   //@@
-  //@@     The version of the model to check for readiness. If not given
-  //@@     the model version is selected automatically based on the version
-  //@@     policy.
+  //@@     The version of the model to check for readiness. If not given the
+  //@@     server will choose a version based on the model and internal policy.
   //@@
   string version = 2;
 }
@@ -223,8 +222,9 @@ message ModelMetadataRequest
 
   //@@  .. cpp:var:: string version
   //@@
-  //@@     The version of the model. If not given the model version
-  //@@     is selected automatically based on the version policy.
+  //@@     The version of the model to check for readiness. If not
+  //@@     given the server will choose a version based on the
+  //@@     model and internal policy.
   //@@
   string version = 2;
 }
@@ -311,8 +311,8 @@ message InferParameter
 {
   //@@  .. cpp:var:: oneof parameter_choice
   //@@
-  //@@     The parameter value can be a string, an int64, a boolean
-  //@@     or a message specific to a predefined parameter.
+  //@@     The parameter value can be a string, an int64 or
+  //@@     a boolean
   //@@
   oneof parameter_choice
   {
@@ -328,11 +328,11 @@ message InferParameter
     //@@
     int64 int64_param = 2;
 
-    //@@    .. cpp:var:: bytes string_param
+    //@@    .. cpp:var:: string string_param
     //@@
     //@@       A string parameter value.
     //@@
-    bytes string_param = 3;
+    string string_param = 3;
   }
 }
 
@@ -570,18 +570,6 @@ message ModelInferRequest
     //@@       Optional requested output tensor parameters.
     //@@
     map<string, InferParameter> parameters = 2;
-
-    //@@
-    //@@    .. cpp:var:: string data_format
-    //@@
-    //@@       Format to use to return the output tensor data. Options
-    //@@       are "explicit", "binary" and "shared_memory".
-    //@@       Default is "binary". If "shared_memory" is specified then
-    //@@       the "shared_memory_data" field must also be specified.
-    //@@       Server support for “binary” and “shared_memory”
-    //@@       is optional.
-    //@@
-    string data_format = 3;
   }
 
   //@@  .. cpp:var:: string model_name
@@ -623,16 +611,6 @@ message ModelInferRequest
   //@@     The requested output tensors for the inference.
   //@@
   repeated InferRequestedOutputTensor outputs = 6;
-
-  //@@
-  //@@  .. cpp:var:: uin64 sequence_id
-  //@@
-  //@@     The sequence ID of the inference request. Default is 0, which
-  //@@     indicates that the request is not part of a sequence. The
-  //@@     sequence ID is used to indicate that two or more inference
-  //@@     requests are in the same sequence.
-  //@@
-  uint64 sequence_id = 7;
 }
 
 //@@
@@ -677,49 +655,30 @@ message ModelInferResponse
     InferTensorContents contents = 4;
   }
 
-  //@@  .. cpp:var:: string model_name
-  //@@
-  //@@     The name of the model used for inferencing.
-  //@@
-  string model_name = 1;
-
   //@@  .. cpp:var:: string model_version
   //@@
   //@@     The version of the model used for inference.
   //@@
-  string model_version = 2;
+  string model_version = 1;
 
   //@@  .. cpp:var:: string id
   //@@
   //@@     The id of the inference request if one was specified.
   //@@
-  string id = 3;
+  string id = 2;
 
   //@@  .. cpp:var:: map<string,InferParameter> parameters
   //@@
   //@@     Optional inference response parameters.
   //@@
-  map<string, InferParameter> parameters = 4;
-
-  //@@  .. cpp:var:: ModelInferRequest request
-  //@@
-  //@@     Optionally returns the inference request that produced
-  //@@     this response.
-  //@@
-  ModelInferRequest request = 5;
-
-  //@@  .. cpp:var:: InferStatistics statistics
-  //@@
-  //@@     Optionally returns the inference statistics.
-  //@@
-  InferStatistics statistics = 6;
+  map<string, InferParameter> parameters = 3;
 
   //@@
   //@@  .. cpp:var:: InferOutputTensor outputs (repeated)
   //@@
   //@@     The output tensors holding inference results.
   //@@
-  repeated InferOutputTensor outputs = 7;
+  repeated InferOutputTensor outputs = 4;
 }
 
 //@@
