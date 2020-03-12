@@ -471,8 +471,8 @@ ReadDataArrayFromJson(
 {
   const rapidjson::Value& tensor_data = request_input["data"];
   const rapidjson::Value& shape = request_input["shape"];
-  const DataType dtype =
-      ProtocolStringToDataType(request_input["datatype"].GetString());
+  std::string dtype_str = std::string(request_input["datatype"].GetString());
+  const DataType dtype = ProtocolStringToDataType(dtype_str.c_str(), dtype_str.size());
   int counter = 0;
 
   // Must be an array

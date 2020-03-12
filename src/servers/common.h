@@ -119,7 +119,7 @@ std::string MemoryTypeString(TRTSERVER_Memory_Type memory_type);
 
 const char* DataTypeToProtocolString(const DataType dtype);
 
-DataType ProtocolStringToDataType(const char* dtype);
+DataType ProtocolStringToDataType(const char* dtype, size_t len);
 
 size_t GetDataTypeByteSize(const std::string& protocol_dtype);
 
