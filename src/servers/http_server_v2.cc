@@ -1210,7 +1210,44 @@ HTTPAPIServerV2::EVBufferToInput(
       // FIXMEV2 handle non-raw content types
       char* base;
       size_t byte_size;
-      RETURN_IF_ERR(ReadDataFromJson(request_input, &base, &byte_size));
+      rapidjson::Value::ConstMemberIterator itr =
+          request_input.FindMember("parameters");
+      if (itr != request_input.MemberEnd()) {
+        const rapidjson::Value& params = itr->value;
+        // int64_t binary_offset = params["binary_data_offset"].GetInt();
+        // Set binary_data_start. Use Inference-Header-Content-Length to get
+        // offset of byte data start.
+        // base = binary_data_start + binary_offset;
+        rapidjson::Value::ConstMemberIterator iter =
+            params.FindMember("binary_data_size");
+        if (iter != params.MemberEnd()) {
+          byte_size = iter->value.GetInt();
+        } else {
+          const char* dtype = request_input["datatype"].GetString();
+          int element_size = GetDataTypeByteSize(dtype);
+          if (element_size == 0) {
+            return TRTSERVER_ErrorNew(
+                TRTSERVER_ERROR_INVALID_ARG,
+                std::string(
+                    "must specify 'binary_data_size' for input '" +
+                    std::string(request_input["name"].GetString()) +
+                    "' of datatype BYTES")
+                    .c_str());
+          }
+          const rapidjson::Value& shape = request_input["shape"];
+          int element_cnt = 0;
+          for (rapidjson::SizeType i = 0; i < shape.Size(); i++) {
+            if (element_cnt == 0) {
+              element_cnt = shape[i].GetInt();
+            } else {
+              element_cnt *= shape[i].GetInt();
+            }
+          }
+          byte_size = element_cnt * element_size;
+        }
+      } else {
+        RETURN_IF_ERR(ReadDataFromJson(request_input, &base, &byte_size));
+      }
 
       RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
           irequest, input_name, base, byte_size, TRTSERVER_MEMORY_CPU,
