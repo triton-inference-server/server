@@ -247,7 +247,7 @@ ProtocolStringToDataType(const char* dtype, size_t len)
     return TYPE_INVALID;
   }
 
-  if ((*dtype == 'I') && (len!=6)) {
+  if ((*dtype == 'I') && (len != 6)) {
     if ((dtype[1] == 'N') && (dtype[2] == 'T')) {
       if ((dtype[3] == '8') && (len == 4)) {
         return TYPE_INT8;
@@ -259,7 +259,7 @@ ProtocolStringToDataType(const char* dtype, size_t len)
         return TYPE_INT64;
       }
     }
-  } else if ((*dtype == 'U') && (len!=4)) {
+  } else if ((*dtype == 'U') && (len != 4)) {
     if ((dtype[1] == 'I') && (dtype[2] == 'N') && (dtype[3] == 'T')) {
       if ((dtype[4] == '8') && (len == 5)) {
         return TYPE_UINT8;
@@ -280,8 +280,8 @@ ProtocolStringToDataType(const char* dtype, size_t len)
       return TYPE_FP64;
     }
   } else if (*dtype == 'B') {
-    if (strcmp(dtype+1, "YTES")) {
-      return TYPE_STRING; 
+    if (strcmp(dtype + 1, "YTES")) {
+      return TYPE_STRING;
     }
   }
 
