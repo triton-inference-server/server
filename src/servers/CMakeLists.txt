@@ -111,7 +111,7 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
   find_package(libevhtp CONFIG REQUIRED)
   message(STATUS "Using libevhtp ${libevhtp_VERSION}")
 
-  if(${TRTIS_ENABLE_HTTP})
+  if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
     list(APPEND
       HTTP_ENDPOINT_SRCS
       http_server.cc
