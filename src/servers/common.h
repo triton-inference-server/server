@@ -123,6 +123,8 @@ DataType ProtocolStringToDataType(const char* dtype, size_t len);
 
 size_t GetDataTypeByteSize(const std::string& protocol_dtype);
 
+size_t GetDataTypeByteSize(const DataType dtype);
+
 TRTSERVER_Error* GetModelVersionFromString(
     const std::string& version_string, int64_t* version_int);
 

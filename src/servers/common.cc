@@ -316,6 +316,35 @@ GetDataTypeByteSize(const std::string& protocol_dtype)
   }
 }
 
+size_t
+GetDataTypeByteSize(const DataType dtype)
+{
+  switch (dtype) {
+    case TYPE_BOOL:
+    case TYPE_INT8:
+    case TYPE_UINT8:
+      return 1;
+    case TYPE_INT16:
+    case TYPE_UINT16:
+    case TYPE_FP16:
+      return 2;
+    case TYPE_INT32:
+    case TYPE_UINT32:
+    case TYPE_FP32:
+      return 4;
+    case TYPE_INT64:
+    case TYPE_UINT64:
+    case TYPE_FP64:
+      return 8;
+    case TYPE_STRING:
+      return 0;
+    default:
+      break;
+  }
+
+  return 0;
+}
+
 TRTSERVER_Error*
 GetModelVersionFromString(
     const std::string& version_string, int64_t* version_int)
