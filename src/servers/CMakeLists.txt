@@ -237,6 +237,7 @@ target_link_libraries(
   main
   ${HTTP_ENDPOINT_LIBRARIES}
   ${GRPC_ENDPOINT_LIBRARIES}
+  PRIVATE rt
   ${TRACING_LIBRARIES}
   PRIVATE protobuf::libprotobuf
   PRIVATE trtserver
@@ -390,7 +391,6 @@ set_target_properties(
 target_link_libraries(
   trtserver
   PRIVATE -ldl
-  PRIVATE -lrt
   PRIVATE ${TRTIS_EXTRA_LDFLAGS}
   PRIVATE protobuf::libprotobuf
 )
