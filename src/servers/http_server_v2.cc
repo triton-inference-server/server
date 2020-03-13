@@ -570,11 +570,8 @@ ReadDataArrayFromJson(
       break;
   }
 
-  // Need shape to verify size is correct
-  std::vector<int> shape_vec;
   int element_cnt = 0;
   for (rapidjson::SizeType i = 0; i < shape.Size(); i++) {
-    shape_vec.push_back(shape[i].GetInt());
     if (element_cnt == 0) {
       element_cnt = shape[i].GetInt();
     } else {
@@ -610,73 +607,101 @@ WriteDataToJsonHelper(
   }
 }
 
-
 void
 WriteDataArrayToJson(rapidjson::Document* response_json, int index, char* base)
 {
   rapidjson::Document::AllocatorType& allocator = response_json->GetAllocator();
   rapidjson::Value& response_outputs = (*response_json)["outputs"];
   rapidjson::Value& response_output = response_outputs[index];
-  const char* dtype = response_output["datatype"].GetString();
   const rapidjson::Value& shape = response_output["shape"];
+  std::string dtype_str = std::string(response_output["datatype"].GetString());
+  const DataType dtype =
+      ProtocolStringToDataType(dtype_str.c_str(), dtype_str.size());
 
   rapidjson::Value data_array(rapidjson::kArrayType);
   int counter = 0;
 
   for (int i = 0; i < shape[0].GetInt(); i++) {
-    if (strcmp(dtype, "BOOL")) {
-      uint8_t* bool_base = reinterpret_cast<uint8_t*>(base);
-      WriteDataToJsonHelper(
-          &data_array, allocator, shape, 1, bool_base, &counter);
-    } else if (strcmp(dtype, "UINT8")) {
-      uint8_t* uint8_t_base = reinterpret_cast<uint8_t*>(base);
-      WriteDataToJsonHelper(
-          &data_array, allocator, shape, 1, uint8_t_base, &counter);
-    } else if (strcmp(dtype, "UINT16")) {
-      uint16_t* uint16_t_base = reinterpret_cast<uint16_t*>(base);
-      WriteDataToJsonHelper(
-          &data_array, allocator, shape, 1, uint16_t_base, &counter);
-    } else if (strcmp(dtype, "UINT32")) {
-      uint32_t* uint32_t_base = reinterpret_cast<uint32_t*>(base);
-      WriteDataToJsonHelper(
-          &data_array, allocator, shape, 1, uint32_t_base, &counter);
-    } else if (strcmp(dtype, "UINT64")) {
-      uint64_t* uint64_t_base = reinterpret_cast<uint64_t*>(base);
-      WriteDataToJsonHelper(
-          &data_array, allocator, shape, 1, uint64_t_base, &counter);
-    } else if (strcmp(dtype, "INT8")) {
-      int8_t* int8_t_base = reinterpret_cast<int8_t*>(base);
-      WriteDataToJsonHelper(
-          &data_array, allocator, shape, 1, int8_t_base, &counter);
-    } else if (strcmp(dtype, "INT16")) {
-      int16_t* int16_t_base = reinterpret_cast<int16_t*>(base);
-      WriteDataToJsonHelper(
-          &data_array, allocator, shape, 1, int16_t_base, &counter);
-    } else if (strcmp(dtype, "INT32")) {
-      int32_t* int32_t_base = reinterpret_cast<int32_t*>(base);
-      WriteDataToJsonHelper(
-          &data_array, allocator, shape, 1, int32_t_base, &counter);
-    } else if (strcmp(dtype, "INT64")) {
-      int64_t* int64_t_base = reinterpret_cast<int64_t*>(base);
-      WriteDataToJsonHelper(
-          &data_array, allocator, shape, 1, int64_t_base, &counter);
-    }
-    // FP16 needs a work around
-    else if (strcmp(dtype, "FP16")) {
-      // float16* float16_base = reinterpret_cast<float16*>(base);
-      // WriteDataToJsonHelper(
-      //     &data_array, allocator, shape, 1, float16_base, &counter);
-    } else if (strcmp(dtype, "FP32")) {
-      float* float_base = reinterpret_cast<float*>(base);
-      WriteDataToJsonHelper(
-          &data_array, allocator, shape, 1, float_base, &counter);
-    } else if (strcmp(dtype, "FP64")) {
-      double* double_base = reinterpret_cast<double*>(base);
-      WriteDataToJsonHelper(
-          &data_array, allocator, shape, 1, double_base, &counter);
-    }
-    // BYTES (String) needs a work around
-    else if (strcmp(dtype, "BYTES")) {
+    switch (dtype) {
+      case TYPE_BOOL: {
+        uint8_t* bool_base = reinterpret_cast<uint8_t*>(base);
+        WriteDataToJsonHelper(
+            &data_array, allocator, shape, 1, bool_base, &counter);
+        break;
+      }
+      case TYPE_UINT8: {
+        uint8_t* uint8_t_base = reinterpret_cast<uint8_t*>(base);
+        WriteDataToJsonHelper(
+            &data_array, allocator, shape, 1, uint8_t_base, &counter);
+        break;
+      }
+      case TYPE_UINT16: {
+        uint16_t* uint16_t_base = reinterpret_cast<uint16_t*>(base);
+        WriteDataToJsonHelper(
+            &data_array, allocator, shape, 1, uint16_t_base, &counter);
+        break;
+      }
+      case TYPE_UINT32: {
+        uint32_t* uint32_t_base = reinterpret_cast<uint32_t*>(base);
+        WriteDataToJsonHelper(
+            &data_array, allocator, shape, 1, uint32_t_base, &counter);
+        break;
+      }
+      case TYPE_UINT64: {
+        uint64_t* uint64_t_base = reinterpret_cast<uint64_t*>(base);
+        WriteDataToJsonHelper(
+            &data_array, allocator, shape, 1, uint64_t_base, &counter);
+        break;
+      }
+      case TYPE_INT8: {
+        int8_t* int8_t_base = reinterpret_cast<int8_t*>(base);
+        WriteDataToJsonHelper(
+            &data_array, allocator, shape, 1, int8_t_base, &counter);
+      } break;
+      case TYPE_INT16: {
+        int16_t* int16_t_base = reinterpret_cast<int16_t*>(base);
+        WriteDataToJsonHelper(
+            &data_array, allocator, shape, 1, int16_t_base, &counter);
+      } break;
+      case TYPE_INT32: {
+        int32_t* int32_t_base = reinterpret_cast<int32_t*>(base);
+        WriteDataToJsonHelper(
+            &data_array, allocator, shape, 1, int32_t_base, &counter);
+        break;
+      }
+      case TYPE_INT64: {
+        int64_t* int64_t_base = reinterpret_cast<int64_t*>(base);
+        WriteDataToJsonHelper(
+            &data_array, allocator, shape, 1, int64_t_base, &counter);
+        break;
+      }
+      // FP16 needs a work around
+      case TYPE_FP16: {
+        // float16* float16_base = reinterpret_cast<float16*>(base);
+        // WriteDataToJsonHelper(
+        //     &data_array, allocator, shape, 1, float16_base, &counter);
+        break;
+      }
+      case TYPE_FP32: {
+        float* float_base = reinterpret_cast<float*>(base);
+        WriteDataToJsonHelper(
+            &data_array, allocator, shape, 1, float_base, &counter);
+        break;
+      }
+      case TYPE_FP64: {
+        double* double_base = reinterpret_cast<double*>(base);
+        WriteDataToJsonHelper(
+            &data_array, allocator, shape, 1, double_base, &counter);
+        break;
+      }
+      // BYTES (String) needs a work around
+      case TYPE_STRING:
+        break;
+      case TYPE_INVALID: {
+        break;
+      }
+      default:
+        break;
     }
   }
 

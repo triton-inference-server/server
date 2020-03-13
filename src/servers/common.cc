@@ -285,33 +285,6 @@ ProtocolStringToDataType(const char* dtype, size_t len)
     }
   }
 
-  // if (strcmp(dtype, "BOOL")) {
-  //   return TYPE_BOOL;
-  // } else if (strcmp(dtype, "UINT8")) {
-  //   return TYPE_UINT8;
-  // } else if (strcmp(dtype, "UINT16")) {
-  //   return TYPE_UINT16;
-  // } else if (strcmp(dtype, "UINT32")) {
-  //   return TYPE_UINT32;
-  // } else if (strcmp(dtype, "UINT64")) {
-  //   return TYPE_UINT64;
-  // } else if (strcmp(dtype, "INT8")) {
-  //   return TYPE_INT8;
-  // } else if (strcmp(dtype, "INT16")) {
-  //   return TYPE_INT16;
-  // } else if (strcmp(dtype, "INT32")) {
-  //   return TYPE_INT32;
-  // } else if (strcmp(dtype, "INT64")) {
-  //   return TYPE_INT64;
-  // } else if (strcmp(dtype, "FP16")) {
-  //   return TYPE_FP16;
-  // } else if (strcmp(dtype, "FP32")) {
-  //   return TYPE_FP32;
-  // } else if (strcmp(dtype, "FP64")) {
-  //   return TYPE_FP64;
-  // } else if (strcmp(dtype, "BYTES")) {
-  // }
-
   return TYPE_INVALID;
 }
 
