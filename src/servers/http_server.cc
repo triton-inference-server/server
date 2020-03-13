@@ -1307,10 +1307,12 @@ HTTPAPIServer::InferRequest::InferComplete(
     evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
   }
 
-  // Don't need to explicitly delete 'trace_manager'. It will be deleted by
-  // the TraceMetaData object in 'infer_request'.
+  // Don't need to explicitly delete 'trace_manager'. It is owned by
+  // 'infer_request' which will be deleted after the response is sent
+  // in ReplayCallback.
   LOG_TRTSERVER_ERROR(
-      TRTSERVER_InferenceResponseDelete(response), "deleting HTTP response");
+      TRTSERVER_InferenceResponseDelete(response),
+      "deleting inference response");
 }
 
 evhtp_res
