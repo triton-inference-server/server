@@ -324,7 +324,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       const std::string& model_name, TRTSERVER2_InferenceRequest* irequest,
       evbuffer* input_buffer, InferRequestClass* infer_req, , int header_length);
       const std::string& model_name, const InferRequestHeader& request_header,
-      int header_length);
+      size_t header_length);
 
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
@@ -1123,7 +1123,7 @@ HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
 TRTSERVER_Error*
 HTTPAPIServerV2::EVBufferToInput(
     const std::string& model_name, TRTSERVER2_InferenceRequest* irequest,
-    evbuffer* input_buffer, InferRequestClass* infer_req, int header_length)
+    evbuffer* input_buffer, InferRequestClass* infer_req, size_t header_length)
 {
   // Extract individual input data from HTTP body and register in
   // 'request_provider'. The input data from HTTP body is not
@@ -1144,7 +1144,7 @@ HTTPAPIServerV2::EVBufferToInput(
 
   // Extract just the header from the complete buffer
   std::vector<char> json_buffer;
-  if (header_length == -1) {
+  if (header_length == 0) {
     json_buffer = complete_buffer;
   } else {
     std::vector<char>::iterator it = complete_buffer.begin();
@@ -1224,7 +1224,7 @@ HTTPAPIServerV2::EVBufferToInput(
       rapidjson::Value::ConstMemberIterator itr =
           request_input.FindMember("parameters");
       if (itr != request_input.MemberEnd()) {
-        if (header_length == -1) {
+        if (header_length == 0) {
           return TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_INVALID_ARG,
               "must specify valid 'Infer-Header-Content-Length' in request "
@@ -1377,8 +1377,8 @@ HTTPAPIServerV2::HandleInfer(
     std::unique_ptr<InferRequestClass> infer_request(
         new InferRequestClass(req, server_id_, unique_id));
 
-    // Find Inference-Header-Content-Length in header. If missing set to -1
-    int header_length = -1;
+    // Find Inference-Header-Content-Length in header. If missing set to 0
+    size_t header_length = 0;
     const char* header_length_c_str =
         evhtp_kv_find(req->headers_in, "Inference-Header-Content-Length");
     if (header_length_c_str != NULL) {
