@@ -105,7 +105,8 @@ def create_shared_memory_region(triton_shm_name, byte_size, device_id):
     return cuda_shm_handle
 
 def get_raw_handle(cuda_shm_handle):
-    """Returns the underlying raw serialized cudaIPC handle.
+    """Returns the underlying raw serialized cudaIPC handle
+    in base64 encoding.
 
     Parameters
     ----------
@@ -114,8 +115,9 @@ def get_raw_handle(cuda_shm_handle):
     
     Returns
     -------
-    bytes
-        The underlying raw serialized cudaIPC handle
+    bytes 
+        The raw serialized cudaIPC handle of underlying cuda shared memory
+        in base64 encoding
 
     """
     craw_handle = c_char_p()

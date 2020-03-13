@@ -26,6 +26,7 @@
 
 #include "src/servers/grpc_server_v2.h"
 
+#include <b64/decode.h>
 #include <condition_variable>
 #include <cstdint>
 #include <map>
@@ -840,12 +841,16 @@ CommonHandler::SetUpAllRequests()
         TRTSERVER_Error* err = nullptr;
 #ifdef TRTIS_ENABLE_GPU
         const std::string& raw_handle = request.raw_handle();
-        char* handle_base = const_cast<char*>(raw_handle.c_str());
-        cudaIpcMemHandle_t* cuda_shm_handle =
-            reinterpret_cast<cudaIpcMemHandle_t*>(handle_base);
+        // Decode the handle from base64
+        void* cuda_shm_handle = malloc(raw_handle.size());
+        base64::decoder D;
+        D.decode(
+            raw_handle.c_str(), raw_handle.size(),
+            static_cast<char*>(cuda_shm_handle));
         err = shm_manager_->RegisterCUDASharedMemory(
-            request.name(), cuda_shm_handle, request.byte_size(),
-            request.device_id());
+            request.name(),
+            reinterpret_cast<cudaIpcMemHandle_t*>(cuda_shm_handle),
+            request.byte_size(), request.device_id());
 #else
         err = TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INVALID_ARG,

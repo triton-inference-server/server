@@ -98,6 +98,7 @@ if(${TRTIS_ENABLE_GRPC} OR ${TRTIS_ENABLE_GRPC_V2})
     PRIVATE gRPC::grpc++
     PRIVATE gRPC::grpc
     PRIVATE protobuf::libprotobuf
+    -lb64
     )
 endif() # TRTIS_ENABLE_GRPC || TRTIS_ENABLE_GRPC_V2
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -83,8 +83,8 @@ if __name__ == '__main__':
     shm_op1_handle = cudashm.create_shared_memory_region("output1_data", output_byte_size, 0)
 
     # Register Output0 and Output1 shared memory with Triton Server
-    triton_client.register_cuda_shared_memory("output0_data", "/output0_simple", 0, output_byte_size)
-    triton_client.register_cuda_shared_memory("output1_data", "/output1_simple", 0, output_byte_size)
+    triton_client.register_cuda_shared_memory("output0_data", cudashm.get_raw_handle(shm_op0_handle), 0, output_byte_size)
+    triton_client.register_cuda_shared_memory("output1_data", cudashm.get_raw_handle(shm_op1_handle), 0, output_byte_size)
 
     # Create Input0 and Input1 in Shared Memory and store shared memory handles
     shm_ip0_handle = cudashm.create_shared_memory_region("input0_data", input_byte_size, 0)
@@ -95,8 +95,8 @@ if __name__ == '__main__':
     cudashm.set_shared_memory_region(shm_ip1_handle, [input1_data])
 
     # Register Input0 and Input1 shared memory with Triton Server
-    triton_client.register_cuda_shared_memory("input0_data", "/input0_simple", 0, input_byte_size)
-    triton_client.register_cuda_shared_memory("input1_data", "/input1_simple", 0, input_byte_size)
+    triton_client.register_cuda_shared_memory("input0_data", cudashm.get_raw_handle(shm_ip0_handle), 0, input_byte_size)
+    triton_client.register_cuda_shared_memory("input1_data", cudashm.get_raw_handle(shm_ip1_handle), 0, input_byte_size)
 
     # Set the parameters to use data from shared memory
     inputs = []
@@ -125,7 +125,7 @@ if __name__ == '__main__':
 
     # TODO : Currently, this example doesn't use shared memory for output.
     # This is done to effectively validate the results.
-    # tritongrpcclient.shared_memory module will be enhanced to read
+    # tritongrpcclient.cuda_shared_memory module will be enhanced to read
     # data from a specified shared memory handle, data_type and shape;
     # and later return the numpy array.
     output0_data = results.as_numpy('OUTPUT0')

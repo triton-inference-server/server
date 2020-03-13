@@ -146,6 +146,7 @@ RUN apt-get update && \
             build-essential \
             cmake \
             git \
+            libb64-dev \
             libgoogle-glog0v5 \
             libre2-dev \
             libssl-dev \

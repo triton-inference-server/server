@@ -1123,7 +1123,7 @@ message CudaSharedMemoryRegisterRequest
 
   //@@  .. cpp:var:: bytes raw_handle
   //@@
-  //@@     The raw serialized cudaIPC handle.
+  //@@     The raw serialized cudaIPC handle in base64 encoding.
   //@@
   bytes raw_handle = 2;
 

@@ -477,7 +477,7 @@ class InferenceServerClient:
         name : str
             The name of the region to register.
         raw_handle : bytes 
-            The raw serialized cudaIPC handle.
+            The raw serialized cudaIPC handle in base64 encoding.
         device_id : int
             The GPU device ID on which the cudaIPC handle was created.
         byte_size : int
