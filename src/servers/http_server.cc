@@ -367,15 +367,17 @@ HTTPAPIServer::ResponseAlloc(
   if (byte_size > 0) {
     auto pr = output_shm_map.find(tensor_name);
     if (pr != output_shm_map.end()) {
-      // If the output is in shared memory then check that the expected buffer
-      // size is at least the byte size of the output.
+      // If the output is in shared memory then check whether the shared
+      // memory size is at least the byte size of the output.
       if (byte_size > std::get<1>(pr->second)) {
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INTERNAL,
             std::string(
-                "expected buffer size to be at least " +
-                std::to_string(std::get<1>(pr->second)) + " bytes but gets " +
-                std::to_string(byte_size) + " bytes in output tensor")
+                "shared memory size specified with the request for output '" +
+                std::string(tensor_name) + "' (" +
+                std::to_string(std::get<1>(pr->second)) +
+                " bytes) should be at least " + std::to_string(byte_size) +
+                " bytes to hold the results")
                 .c_str());
       }
 

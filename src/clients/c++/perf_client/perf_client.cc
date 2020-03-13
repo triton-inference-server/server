@@ -476,8 +476,8 @@ Usage(char** argv, const std::string& msg = std::string())
              "shape. The value should be larger than the size of the largest "
              "output tensor the model is expected to return. The client will "
              "use the following formula to calculate the total shared memory "
-             "to allocate: output_shm_size * number_of_outputs * batch_size. "
-             "Defaults to 100KB.",
+             "to allocate: output_shared_memory_size * number_of_outputs * "
+             "batch_size. Defaults to 100KB.",
              18)
       << std::endl;
 
