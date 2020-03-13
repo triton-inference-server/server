@@ -143,8 +143,8 @@ if __name__ == '__main__':
             print("cudashm infer error: incorrect difference")
             sys.exit(1)
 
-    print(triton_client.get_system_shared_memory_status())
-    triton_client.unregister_system_shared_memory()
+    print(triton_client.get_cuda_shared_memory_status())
+    triton_client.unregister_cuda_shared_memory()
     cudashm.destroy_shared_memory_region(shm_ip0_handle)
     cudashm.destroy_shared_memory_region(shm_ip1_handle)
     cudashm.destroy_shared_memory_region(shm_op0_handle)
