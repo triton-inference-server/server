@@ -466,7 +466,7 @@ ReadDataFromJsonHelper(
 }
 
 TRTSERVER_Error*
-ReadDataArrayFromJson(
+ReadDataFromJson(
     const rapidjson::Value& request_input, char** base, size_t* byte_size)
 {
   const rapidjson::Value& tensor_data = request_input["data"];
@@ -608,11 +608,10 @@ WriteDataToJsonHelper(
 }
 
 void
-WriteDataArrayToJson(rapidjson::Document* response_json, int index, char* base)
+WriteDataToJson(
+    rapidjson::Value& response_output,
+    rapidjson::Document::AllocatorType& allocator, char* base)
 {
-  rapidjson::Document::AllocatorType& allocator = response_json->GetAllocator();
-  rapidjson::Value& response_outputs = (*response_json)["outputs"];
-  rapidjson::Value& response_output = response_outputs[index];
   const rapidjson::Value& shape = response_output["shape"];
   std::string dtype_str = std::string(response_output["datatype"].GetString());
   const DataType dtype =
@@ -1178,7 +1177,7 @@ HTTPAPIServerV2::EVBufferToInput(
       // FIXMEV2 handle non-raw content types
       char* base;
       size_t byte_size;
-      RETURN_IF_ERR(ReadDataArrayFromJson(request_input, &base, &byte_size));
+      RETURN_IF_ERR(ReadDataFromJson(request_input, &base, &byte_size));
 
       RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
           request_provider, request_input["name"].GetString(), base, byte_size,
@@ -1437,15 +1436,19 @@ HTTPAPIServerV2::InferRequestClass::InferComplete(
   HTTPAPIServerV2::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServerV2::InferRequestClass*>(userp);
 
+  rapidjson::Document::AllocatorType& allocator =
+      infer_request->response_meta_data_.response_json_.GetAllocator();
   if (infer_request->FinalizeResponse(response) == EVHTP_RES_OK) {
     // write outputs into json array
     int i = 0;
+    rapidjson::Value& response_outputs =
+        infer_request->response_meta_data_.response_json_["outputs"];
     for (auto ev_buffer : infer_request->response_meta_data_.response_buffer_) {
+      rapidjson::Value& response_output = response_outputs[i++];
       size_t buffer_len = evbuffer_get_length(ev_buffer);
       char json_buffer[buffer_len];
       evbuffer_copyout(ev_buffer, &json_buffer, buffer_len);
-      WriteDataArrayToJson(
-          &infer_request->response_meta_data_.response_json_, i++, json_buffer);
+      WriteDataToJson(response_output, allocator, json_buffer);
     }
 
     // write json string into evbuffer
