@@ -1230,9 +1230,9 @@ HTTPAPIServerV2::EVBufferToInput(
               "must specify valid 'Infer-Header-Content-Length' in request "
               "header");
         }
+        // Handle binary data case
         const rapidjson::Value& params = itr->value;
         int64_t binary_offset = params["binary_data_offset"].GetInt();
-        // Use Inference-Header-Content-Length to get offset to binary data.
         base = complete_buffer.data() + header_length + binary_offset;
         rapidjson::Value::ConstMemberIterator iter =
             params.FindMember("binary_data_size");
@@ -1513,10 +1513,19 @@ HTTPAPIServerV2::InferRequestClass::InferComplete(
         infer_request->response_meta_data_.response_json_["outputs"];
     for (auto ev_buffer : infer_request->response_meta_data_.response_buffer_) {
       rapidjson::Value& response_output = response_outputs[i++];
-      size_t buffer_len = evbuffer_get_length(ev_buffer);
-      char json_buffer[buffer_len];
-      evbuffer_copyout(ev_buffer, &json_buffer, buffer_len);
-      WriteDataToJson(response_output, allocator, json_buffer);
+      rapidjson::Value::ConstMemberIterator itr =
+          response_output.FindMember("parameters");
+      if (itr == response_output.MemberEnd()) {
+        size_t buffer_len = evbuffer_get_length(ev_buffer);
+        char json_buffer[buffer_len];
+        evbuffer_copyout(ev_buffer, &json_buffer, buffer_len);
+        WriteDataToJson(response_output, allocator, json_buffer);
+      } else {
+        const rapidjson::Value& params = itr->value;
+        if (params["binary_data"].GetBool()) {
+          evbuffer_add_buffer(infer_request->req_->buffer_out, ev_buffer);
+        }
+      }
     }
 
     // write json string into evbuffer
