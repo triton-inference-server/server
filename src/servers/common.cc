@@ -204,7 +204,7 @@ MemoryTypeString(TRTSERVER_Memory_Type memory_type)
 }
 
 const char*
-GetDataTypeProtocolString(const DataType dtype)
+DataTypeToProtocolString(const DataType dtype)
 {
   switch (dtype) {
     case TYPE_BOOL:
@@ -238,6 +238,54 @@ GetDataTypeProtocolString(const DataType dtype)
   }
 
   return "";
+}
+
+DataType
+ProtocolStringToDataType(const char* dtype, size_t len)
+{
+  if (len < 4 || len > 6) {
+    return TYPE_INVALID;
+  }
+
+  if ((*dtype == 'I') && (len != 6)) {
+    if ((dtype[1] == 'N') && (dtype[2] == 'T')) {
+      if ((dtype[3] == '8') && (len == 4)) {
+        return TYPE_INT8;
+      } else if ((dtype[3] == '1') && (dtype[4] == '6')) {
+        return TYPE_INT16;
+      } else if ((dtype[3] == '3') && (dtype[4] == '2')) {
+        return TYPE_INT32;
+      } else if ((dtype[3] == '6') && (dtype[4] == '4')) {
+        return TYPE_INT64;
+      }
+    }
+  } else if ((*dtype == 'U') && (len != 4)) {
+    if ((dtype[1] == 'I') && (dtype[2] == 'N') && (dtype[3] == 'T')) {
+      if ((dtype[4] == '8') && (len == 5)) {
+        return TYPE_UINT8;
+      } else if ((dtype[4] == '1') && (dtype[5] == '6')) {
+        return TYPE_UINT16;
+      } else if ((dtype[4] == '3') && (dtype[5] == '2')) {
+        return TYPE_UINT32;
+      } else if ((dtype[4] == '6') && (dtype[5] == '4')) {
+        return TYPE_UINT64;
+      }
+    }
+  } else if ((*dtype == 'F') && (dtype[1] == 'P') && (len == 4)) {
+    if ((dtype[2] == '1') && (dtype[3] == '6')) {
+      return TYPE_FP16;
+    } else if ((dtype[2] == '3') && (dtype[3] == '2')) {
+      return TYPE_FP32;
+    } else if ((dtype[2] == '6') && (dtype[3] == '4')) {
+      return TYPE_FP64;
+    }
+  } else if (*dtype == 'B') {
+    if (strcmp(dtype + 1, "YTES")) {
+      return TYPE_STRING;
+    }
+  }
+
+  return TYPE_INVALID;
 }
 
 size_t
