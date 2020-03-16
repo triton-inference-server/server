@@ -110,9 +110,10 @@ CudaSharedMemoryGetRawHandle(
   base64_init_encodestate(&es);
   size_t handle_size = sizeof(cudaIpcMemHandle_t);
   *serialized_raw_handle = (char*)malloc(handle_size * 2); /* ~4/3 x input */
-  base64_encode_block(
+  int offset = base64_encode_block(
       (char*)((void*)&handle->cuda_shm_handle_), handle_size,
       *serialized_raw_handle, &es);
+  base64_encode_blockend(*serialized_raw_handle + offset, &es);
 
   return 0;
 }

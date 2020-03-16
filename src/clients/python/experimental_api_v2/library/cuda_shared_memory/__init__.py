@@ -28,6 +28,7 @@ from builtins import range
 from enum import IntEnum
 from functools import partial
 from future.utils import iteritems
+import base64
 from ctypes import *
 import numpy as np
 from numpy.ctypeslib import ndpointer
@@ -123,7 +124,7 @@ def get_raw_handle(cuda_shm_handle):
     craw_handle = c_char_p()
     _raise_if_error(c_int(_ccudashm_get_raw_handle(cuda_shm_handle, byref(craw_handle))))
 
-    return craw_handle.value
+    return base64.b64decode(craw_handle.value.decode())
 
 
 def set_shared_memory_region(cuda_shm_handle, input_values):
