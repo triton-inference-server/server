@@ -682,6 +682,41 @@ main(int argc, char** argv)
         input0_size, datatype, is_int);
   }
 
+  // Remove input data and then add back different data.
+  {
+    FAIL_IF_ERR(
+        TRTSERVER2_InferenceRequestRemoveAllInputData(irequest, input0),
+        "removing INPUT0 data");
+    FAIL_IF_ERR(
+        TRTSERVER2_InferenceRequestAppendInputData(
+            irequest, input0, input1_base, input1_size, memory_type,
+            0 /* memory_type_id */),
+        "assigning INPUT1 data to INPUT0");
+
+    auto p = new std::promise<TRTSERVER2_InferenceRequest*>();
+    std::future<TRTSERVER2_InferenceRequest*> completed = p->get_future();
+
+    FAIL_IF_ERR(
+        TRTSERVER2_ServerInferAsync(
+            server.get(), nullptr /* trace_manager */, irequest, allocator,
+            nullptr /* response_allocator_userp */, InferComplete,
+            reinterpret_cast<void*>(p)),
+        "running inference");
+
+    // Wait for the inference to complete.
+    TRTSERVER2_InferenceRequest* completed_request = completed.get();
+    if (completed_request != irequest) {
+      FAIL("completed request differs from inference request");
+    }
+    FAIL_IF_ERR(
+        TRTSERVER2_InferenceRequestError(completed_request), "request status");
+
+    // Both inputs are using input1_data...
+    Check(
+        completed_request, input1_data, input1_data, output0, output1,
+        input0_size, datatype, is_int);
+  }
+
   FAIL_IF_ERR(
       TRTSERVER2_InferenceRequestDelete(irequest),
       "deleting inference request");
