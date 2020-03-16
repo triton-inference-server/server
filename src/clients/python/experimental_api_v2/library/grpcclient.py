@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import base64
 import numpy as np
 import grpc
 import rapidjson as json
@@ -475,7 +476,7 @@ class InferenceServerClient:
         name : str
             The name of the region to register.
         raw_handle : bytes 
-            The raw serialized cudaIPC handle.
+            The raw serialized cudaIPC handle in base64 encoding.
         device_id : int
             The GPU device ID on which the cudaIPC handle was created.
         byte_size : int
@@ -490,7 +491,7 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.CudaSharedMemoryRegisterRequest(
                 name=name,
-                raw_handle=raw_handle,
+                raw_handle=base64.b64decode(raw_handle),
                 device_id=device_id,
                 byte_size=byte_size)
             self._client_stub.CudaSharedMemoryRegister(request)
