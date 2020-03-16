@@ -151,6 +151,7 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
     HTTP_ENDPOINT_OBJECTS
     $<TARGET_OBJECTS:http-endpoint-library>
     $<TARGET_OBJECTS:proto-library>
+    $<TARGET_OBJECTS:model-config-library>
   )
 
   set(
