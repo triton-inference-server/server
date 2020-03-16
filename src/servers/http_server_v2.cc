@@ -1127,32 +1127,58 @@ HTTPAPIServerV2::EVBufferToInput(
 {
   // Extract individual input data from HTTP body and register in
   // 'request_provider'. The input data from HTTP body is not
-  // necessarily contiguous so need to copy into a contiguous
-  // buffer to be able to parse it into a json.
+  // necessarily contiguous so may need to register multiple input
+  // "blocks" for a given input.
   //
-  // Get the addr and size of from the evbuffer.
-  int buffer_len = evbuffer_get_length(input_buffer);
+  // Get the addr and size of each chunk of input data from the
+  // evbuffer.
+  struct evbuffer_iovec* v = nullptr;
+  int v_idx = 0;
 
-  std::vector<char> complete_buffer(buffer_len);
-  ev_ssize_t extracted_size =
-      evbuffer_copyout(input_buffer, complete_buffer.data(), buffer_len);
-  if (extracted_size != buffer_len) {
+  int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
+  if (n > 0) {
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
+    if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INTERNAL, "unexpected error getting input buffers");
+    }
+  }
+
+  // Extract just the json header from the complete buffer
+  char json_buffer[header_length];
+  size_t offset = 0;
+  size_t header_length_tmp = header_length;
+  while ((header_length_tmp > 0) && (v_idx < n)) {
+    char* base = static_cast<char*>(v[v_idx].iov_base);
+    size_t base_size;
+    if (v[v_idx].iov_len > header_length_tmp) {
+      base_size = header_length_tmp;
+      v[v_idx].iov_base = static_cast<void*>(base + header_length_tmp);
+      v[v_idx].iov_len -= header_length_tmp;
+      header_length_tmp = 0;
+    } else {
+      base_size = v[v_idx].iov_len;
+      header_length_tmp -= v[v_idx].iov_len;
+      v_idx++;
+    }
+
+    memcpy(&json_buffer[offset], base, base_size);
+    offset += base_size;
+  }
+
+  if (header_length_tmp != 0) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INVALID_ARG,
-        "failed to parse request header buffer into json");
+        std::string(
+            "unexpected size for request header, expecting " +
+            std::to_string(header_length_tmp) +
+            " more bytes").c_str());
   }
 
-  // Extract just the header from the complete buffer
-  std::vector<char> json_buffer;
-  if (header_length == 0) {
-    json_buffer = complete_buffer;
-  } else {
-    std::vector<char>::iterator it = complete_buffer.begin();
-    json_buffer.assign(it, it + header_length);
-  }
   rapidjson::Document document;
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-  document.Parse(json_buffer.data());
+  document.Parse(&json_buffer[0]);
   if (document.HasParseError()) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INVALID_ARG,
@@ -1219,7 +1245,6 @@ HTTPAPIServerV2::EVBufferToInput(
       else {
 #endif
       // FIXMEV2 handle non-raw content types
-      char* base;
       size_t byte_size;
       rapidjson::Value::ConstMemberIterator itr =
           request_input.FindMember("parameters");
@@ -1232,8 +1257,7 @@ HTTPAPIServerV2::EVBufferToInput(
         }
         // Handle binary data case
         const rapidjson::Value& params = itr->value;
-        int64_t binary_offset = params["binary_data_offset"].GetInt();
-        base = complete_buffer.data() + header_length + binary_offset;
+        size_t binary_offset = params["binary_data_offset"].GetInt();
         rapidjson::Value::ConstMemberIterator iter =
             params.FindMember("binary_data_size");
         if (iter != params.MemberEnd()) {
@@ -1261,28 +1285,56 @@ HTTPAPIServerV2::EVBufferToInput(
           }
           byte_size = element_cnt * element_size;
         }
+
+        // Copy one block at a time
+        while ((byte_size > 0) && (v_idx_tmp < n)) {
+          char* base = static_cast<char*>(v[v_idx_tmp].iov_base) + next_offset;
+          size_t base_size;
+          if ((v[v_idx_tmp].iov_len - next_offset) > byte_size) {
+            base_size = byte_size;
+            next_offset = byte_size;
+            byte_size = 0;
+          } else {
+            base_size = v[v_idx_tmp].iov_len - next_offset;
+            byte_size -= v[v_idx_tmp].iov_len - next_offset;
+            next_offset = 0;
+            v_idx_tmp++;
+          }
+
+          RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
+              irequest, input_name, base, byte_size, TRTSERVER_MEMORY_CPU,
+              0 /* memory_type_id */));
+        }
+
+        if (byte_size != 0) {
+          return TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INVALID_ARG,
+              std::string(
+                  "unexpected size for input '" +
+                  std::string(request_input["name"].GetString()) +
+                  "', expecting " + std::to_string(byte_size) +
+                  " bytes for model '" + model_name + "'")
+                  .c_str());
+        }
       } else {
+        char* base;
         RETURN_IF_ERR(ReadDataFromJson(request_input, &base, &byte_size));
-      }
-
-      RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
-          irequest, input_name, base, byte_size, TRTSERVER_MEMORY_CPU,
-          0 /* memory_type_id */));
-
-      if (byte_size != 0) {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            std::string(
-                "unexpected size for input '" +
-                std::string(request_input["name"].GetString()) +
-                "', expecting " + std::to_string(byte_size) +
-                " bytes for model '" + model_name + "'")
-                .c_str());
+        RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
+            irequest, input_name, base, byte_size, TRTSERVER_MEMORY_CPU,
+            0 /* memory_type_id */));
       }
 #if 0
       }
 #endif
     }
+  }
+
+  if (v_idx != n) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "unexpected additional input data for model '" + model_name + "'")
+            .c_str());
   }
 
   rapidjson::Document& response_json =
