@@ -159,27 +159,6 @@ Status ParseBoolParameter(
 Status ParseLongLongParameter(
     const std::string& key, const std::string& value, int64_t* parsed_value);
 
-#ifdef TRTIS_ENABLE_GPU
-/// Validates the compute capability of the GPU indexed
-/// \param gpu_id The index of the target GPU.
-/// \param min_compute_capability The minimum support CUDA compute
-/// capability.
-/// \return The error status. A non-OK status means the target GPU is
-///  not supported
-Status CheckGPUCompatibility(
-    const int gpu_id, const double min_compute_capability);
-
-/// Obtains a set of gpu ids that is supported by TRTIS.
-/// \param supported_gpus Returns the set of integers which is
-///  populated by ids of supported GPUS
-/// \param min_compute_capability The minimum support CUDA compute
-/// capability.
-/// \return The error status. A non-ok status means there were
-/// errors encountered while querying GPU devices.
-Status GetSupportedGPUs(
-    std::set<int>* supported_gpus, const double min_compute_capability);
-#endif
-
 /// Obtain the 'profile_index' of the 'profile_name'.
 /// \param profile_name The name of the profile.
 /// \param profile_index Return the index of the profile.

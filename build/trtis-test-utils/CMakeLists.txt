@@ -53,4 +53,13 @@ if(${TRTIS_ENABLE_GPU})
   set(CUDA_NVCC_FLAGS -std=c++11)
 endif() # TRTIS_ENABLE_GPU
 
+#
+# Protobuf
+#
+set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
+find_package(Protobuf CONFIG REQUIRED)
+message(STATUS "Using protobuf ${Protobuf_VERSION}")
+include_directories(${Protobuf_INCLUDE_DIRS})
+
+add_subdirectory(../../src/core src/core)
 add_subdirectory(../../src/test src/test)

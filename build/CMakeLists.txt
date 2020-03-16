@@ -145,6 +145,19 @@ ExternalProject_Add(protobuf
   DEPENDS grpc-repo
 )
 
+#
+# Build googletest project from grpc-repo
+#
+ExternalProject_Add(googletest
+  PREFIX protobuf
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc-repo/src/grpc/third_party/googletest"
+  DOWNLOAD_COMMAND ""
+  CMAKE_CACHE_ARGS
+    -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/googletest
+  DEPENDS grpc-repo
+)
+
 # Location where protobuf-config.cmake will be installed varies by
 # platform
 if (WIN32)
@@ -361,6 +374,10 @@ ExternalProject_Add(trtis-test-utils
     -DTRTIS_ENABLE_TENSORRT:BOOL=${TRTIS_ENABLE_TENSORRT}
     -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_TEST_UTILS_INSTALL_PREFIX}
+    -DGTEST_ROOT:PATH=${CMAKE_CURRENT_BINARY_DIR}/googletest
+    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
+    -DCNMEM_PATH:PATH=${CMAKE_CURRENT_BINARY_DIR}/cnmem
+  DEPENDS protobuf googletest
 )
 
 #
