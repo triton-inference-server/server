@@ -304,6 +304,7 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
           }
         }
 
+        new_shape->clear();
         for (const auto& dim : input_config->reshape().shape()) {
           if (dim == -1) {
             new_shape->push_back(variable_size_values.front());

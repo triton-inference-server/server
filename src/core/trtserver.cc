@@ -1733,7 +1733,7 @@ TRTSERVER_ServerInferAsync(
         lrequest, lbackend->GetLabelProvider(), response_allocator,
         lresponsealloc->AllocFn(), response_allocator_userp,
         lresponsealloc->ReleaseFn(), &del_response_provider));
-    infer_response_provider = del_response_provider;
+    infer_response_provider = std::move(del_response_provider);
   }
 
 #ifdef TRTIS_ENABLE_GRPC_V2
@@ -2147,7 +2147,7 @@ TRTSERVER2_ServerInferAsync(
         lrequest, lbackend->GetLabelProvider(), response_allocator,
         lresponsealloc->AllocFn(), response_allocator_userp,
         lresponsealloc->ReleaseFn(), &del_response_provider));
-    infer_response_provider = del_response_provider;
+    infer_response_provider = std::move(del_response_provider);
   }
 
   lserver->InferAsync(
