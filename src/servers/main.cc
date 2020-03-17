@@ -53,9 +53,9 @@ static_assert(
 #if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
 #include "src/servers/http_server.h"
 #endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
-#if defined(TRTIS_ENABLE_HTTP_V2)
+#if defined(TRTIS_ENABLE_HTTP_V2) || defined(TRTIS_ENABLE_METRICS)
 #include "src/servers/http_server_v2.h"
-#endif  // TRTIS_ENABLE_HTTP_V2
+#endif  // TRTIS_ENABLE_HTTP_V2|| TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_GRPC
 #include "src/servers/grpc_server.h"
