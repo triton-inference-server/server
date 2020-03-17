@@ -876,25 +876,11 @@ HTTPAPIServerV2::HandleRepositoryIndex(
   }
 
   TRTSERVER_Error* err = nullptr;
-  RepositoryIndexResponse response;
+  const char** models;
+  size_t models_count;
   if (repository_name.empty()) {
-    TRTSERVER_Protobuf* repository_index_protobuf = nullptr;
-    err = TRTSERVER_ServerModelRepositoryIndex(
-        server_.get(), &repository_index_protobuf);
-    if (err == nullptr) {
-      const char* serialized_buffer;
-      size_t serialized_byte_size;
-      err = TRTSERVER_ProtobufSerialize(
-          repository_index_protobuf, &serialized_buffer, &serialized_byte_size);
-      if (err == nullptr) {
-        if (!response.ParseFromArray(
-                serialized_buffer, serialized_byte_size)) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_UNKNOWN, "failed to parse repository index");
-        }
-      }
-    }
-    TRTSERVER_ProtobufDelete(repository_index_protobuf);
+    err = TRTSERVER_ServerModelRepositoryIndexHTTP(
+        server_.get(), &models, &models_count);
   } else {
     err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_UNSUPPORTED,
@@ -907,9 +893,10 @@ HTTPAPIServerV2::HandleRepositoryIndex(
     rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
 
     rapidjson::Value models_array(rapidjson::kArrayType);
-    for (const auto& model : response.models()) {
+    for (uint64_t i = 0; i < models_count; ++i) {
       rapidjson::Value model_index;
-      rapidjson::Value name_val(model.name().c_str(), model.name().size());
+      std::string model_str(models[i]);
+      rapidjson::Value name_val(model_str.c_str(), model_str.size(), allocator);
       model_index.AddMember("name", name_val, allocator);
       models_array.PushBack(model_index, allocator);
     }

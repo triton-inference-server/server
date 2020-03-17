@@ -1646,6 +1646,38 @@ TRTSERVER_ServerModelRepositoryIndex(
   return nullptr;  // success
 }
 
+// Overload to remove GRPC V2 dependency
+TRTSERVER_Error*
+TRTSERVER_ServerModelRepositoryIndexHTTP(
+    TRTSERVER_Server* server, const char*** models, uint64_t* models_count)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+#ifdef TRTIS_ENABLE_STATS
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::REPOSITORY);
+#endif  // TRTIS_ENABLE_STATS
+
+  ni::ModelRepositoryIndex model_repository_index;
+  RETURN_IF_STATUS_ERROR(
+      lserver->GetModelRepositoryIndex(&model_repository_index));
+
+  std::vector<const char*> indices;
+  for (const auto& model : model_repository_index.models()) {
+    indices.push_back(model.name().c_str());
+  }
+
+  if (indices.empty()) {
+    *models_count = 0;
+    *models = nullptr;
+  } else {
+    *models_count = indices.size();
+    *models = &(indices[0]);
+  }
+
+  return nullptr;  // success
+}
+
 TRTSERVER_Error*
 TRTSERVER_ServerLoadModel(TRTSERVER_Server* server, const char* model_name)
 {
