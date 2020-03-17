@@ -918,7 +918,6 @@ HTTPAPIServerV2::HandleModelReady(
   }
 
   TRTSERVER_ProtobufDelete(model_status_protobuf);
-
   evhtp_send_reply(
       req, (ready && (err == nullptr)) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
 
