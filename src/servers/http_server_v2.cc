@@ -826,18 +826,22 @@ HTTPAPIServerV2::HandleServerReady(
     err = TRTSERVER_ServerIsReady(server_.get(), &ready);
   }
 
-  RequestStatus request_status;
-  RequestStatusUtil::Create(
-      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
-      server_id_);
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (ready && (err == nullptr)) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
+  if (err == nullptr) {
+    evhtp_send_reply(req, ready ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
+  } else {
+    rapidjson::Document document;
+    rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+    std::string message = std::string(TRTSERVER_ErrorMessage(err));
+    rapidjson::Value message_val(message.c_str(), message.size());
+    document.AddMember("error", message_val, allocator);
+    rapidjson::StringBuffer buffer;
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
+    std::string status_buffer(buffer.GetString());
+    evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+  }
 
   TRTSERVER_ErrorDelete(err);
 }
@@ -914,18 +918,22 @@ HTTPAPIServerV2::HandleModelHealth(
   }
 
   TRTSERVER_ProtobufDelete(model_status_protobuf);
-  RequestStatus request_status;
-  RequestStatusUtil::Create(
-      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
-      server_id_);
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (ready && (err == nullptr)) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
+  if (err == nullptr) {
+    evhtp_send_reply(req, ready ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
+  } else {
+    rapidjson::Document document;
+    rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+    std::string message = std::string(TRTSERVER_ErrorMessage(err));
+    rapidjson::Value message_val(message.c_str(), message.size());
+    document.AddMember("error", message_val, allocator);
+    rapidjson::StringBuffer buffer;
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
+    std::string status_buffer(buffer.GetString());
+    evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+  }
 
   TRTSERVER_ErrorDelete(err);
 }
@@ -1047,6 +1055,10 @@ HTTPAPIServerV2::HandleModelMetadata(
     }
   }
 
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new("Content-Type", "application/json", 1, 1));
+
   if (err == nullptr) {
     rapidjson::StringBuffer buffer;
     buffer.Clear();
@@ -1056,26 +1068,20 @@ HTTPAPIServerV2::HandleModelMetadata(
 
     evbuffer_add(
         req->buffer_out, model_metadata.c_str(), model_metadata.size());
+    evhtp_send_reply(req, EVHTP_RES_OK);
+  } else {
+    document.Clear();
+    std::string message = std::string(TRTSERVER_ErrorMessage(err));
+    rapidjson::Value message_val(message.c_str(), message.size());
+    document.AddMember("error", message_val, allocator);
+    rapidjson::StringBuffer buffer;
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
+    std::string status_buffer(buffer.GetString());
+    evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
   }
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new("Content-Type", "application/json", 1, 1));
-
-  RequestStatus request_status;
-  RequestStatusUtil::Create(
-      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
-      server_id_);
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (request_status.code() == RequestStatusCode::SUCCESS)
-               ? EVHTP_RES_OK
-               : EVHTP_RES_BADREQ);
 
   TRTSERVER_ErrorDelete(err);
 }
@@ -1122,6 +1128,10 @@ HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
     }
   }
 
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new("Content-Type", "application/json", 1, 1));
+
   if (err == nullptr) {
     rapidjson::StringBuffer buffer;
     buffer.Clear();
@@ -1130,26 +1140,20 @@ HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
     std::string status_buffer(buffer.GetString());
 
     evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
+    evhtp_send_reply(req, EVHTP_RES_OK);
+  } else {
+    document.Clear();
+    std::string message = std::string(TRTSERVER_ErrorMessage(err));
+    rapidjson::Value message_val(message.c_str(), message.size());
+    document.AddMember("error", message_val, allocator);
+    rapidjson::StringBuffer buffer;
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
+    std::string status_buffer(buffer.GetString());
+    evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
   }
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new("Content-Type", "application/json", 1, 1));
-
-  RequestStatus request_status;
-  RequestStatusUtil::Create(
-      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
-      server_id_);
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (request_status.code() == RequestStatusCode::SUCCESS)
-               ? EVHTP_RES_OK
-               : EVHTP_RES_BADREQ);
 
   TRTSERVER_ErrorDelete(err);
 }
@@ -1398,30 +1402,24 @@ HTTPAPIServerV2::HandleInfer(
   TRTSERVER_InferenceRequestOptionsDelete(request_options);
 
   if (err != nullptr) {
-    RequestStatus request_status;
-    RequestStatusUtil::Create(&request_status, err, unique_id, server_id_);
+    rapidjson::Document document;
+    rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+    std::string message = std::string(TRTSERVER_ErrorMessage(err));
+    rapidjson::Value message_val(message.c_str(), message.size());
+    document.AddMember("error", message_val, allocator);
+    rapidjson::StringBuffer buffer;
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
+    std::string status_buffer(buffer.GetString());
+    evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
+    LOG_VERBOSE(1) << "Infer failed: " << message;
 
-    InferResponseHeader response_header;
-    response_header.set_id(request_header_protobuf.id());
     evhtp_headers_add_header(
         req->headers_out,
-        evhtp_header_new(
-            kInferResponseHTTPHeader,
-            response_header.ShortDebugString().c_str(), 1, 1));
-    LOG_VERBOSE(1) << "Infer failed: " << request_status.msg();
+        evhtp_header_new("Content-Type", "application/json", 1, 1));
 
-    evhtp_headers_add_header(
-        req->headers_out, evhtp_header_new(
-                              kStatusHTTPHeader,
-                              request_status.ShortDebugString().c_str(), 1, 1));
-    evhtp_headers_add_header(
-        req->headers_out,
-        evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
-
-    evhtp_send_reply(
-        req, (request_status.code() == RequestStatusCode::SUCCESS)
-                 ? EVHTP_RES_OK
-                 : EVHTP_RES_BADREQ);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
   }
 
   TRTSERVER_ErrorDelete(err);
