@@ -325,6 +325,9 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       evbuffer* input_buffer, InferRequestClass* infer_req, , int header_length);
       const std::string& model_name, const InferRequestHeader& request_header,
       size_t header_length);
+  TRTSERVER_Error* EVBufferToJson(
+      rapidjson::Document* document, evbuffer_iovec* v, int* v_idx,
+      char* json_buffer, const size_t length, int n);
 
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
@@ -1121,6 +1124,54 @@ HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
 }
 
 TRTSERVER_Error*
+HTTPAPIServerV2::EVBufferToJson(
+    rapidjson::Document* document, evbuffer_iovec* v, int* v_idx,
+    char* json_buffer, const size_t length, int n)
+{
+  size_t offset = 0;
+  size_t length_tmp = length;
+  while ((length_tmp > 0) && (*v_idx < n)) {
+    char* base = static_cast<char*>(v[*v_idx].iov_base);
+    size_t base_size;
+    if (v[*v_idx].iov_len > length_tmp) {
+      base_size = length_tmp;
+      v[*v_idx].iov_base = static_cast<void*>(base + length_tmp);
+      v[*v_idx].iov_len -= length_tmp;
+      length_tmp = 0;
+    } else {
+      base_size = v[*v_idx].iov_len;
+      length_tmp -= v[*v_idx].iov_len;
+      *v_idx += 1;
+    }
+
+    memcpy(json_buffer + offset, base, base_size);
+    offset += base_size;
+  }
+
+  if (length_tmp != 0) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "unexpected size for request JSON, expecting " +
+            std::to_string(length_tmp) + " more bytes")
+            .c_str());
+  }
+
+  document->Parse(json_buffer);
+  if (document->HasParseError()) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "failed to parse the request JSON buffer: " +
+            std::string(GetParseError_En(document->GetParseError())) + " at " +
+            std::to_string(document->GetErrorOffset()))
+            .c_str());
+  }
+
+  return nullptr;
+}
+
+TRTSERVER_Error*
 HTTPAPIServerV2::EVBufferToInput(
     const std::string& model_name, TRTSERVER2_InferenceRequest* irequest,
     evbuffer* input_buffer, InferRequestClass* infer_req, size_t header_length)
@@ -1146,48 +1197,17 @@ HTTPAPIServerV2::EVBufferToInput(
   }
 
   // Extract just the json header from the complete buffer
-  char json_buffer[header_length];
-  size_t offset = 0;
-  size_t header_length_tmp = header_length;
-  while ((header_length_tmp > 0) && (v_idx < n)) {
-    char* base = static_cast<char*>(v[v_idx].iov_base);
-    size_t base_size;
-    if (v[v_idx].iov_len > header_length_tmp) {
-      base_size = header_length_tmp;
-      v[v_idx].iov_base = static_cast<void*>(base + header_length_tmp);
-      v[v_idx].iov_len -= header_length_tmp;
-      header_length_tmp = 0;
-    } else {
-      base_size = v[v_idx].iov_len;
-      header_length_tmp -= v[v_idx].iov_len;
-      v_idx++;
-    }
-
-    memcpy(&json_buffer[offset], base, base_size);
-    offset += base_size;
-  }
-
-  if (header_length_tmp != 0) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "unexpected size for request header, expecting " +
-            std::to_string(header_length_tmp) +
-            " more bytes").c_str());
-  }
-
   rapidjson::Document document;
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-  document.Parse(&json_buffer[0]);
-  if (document.HasParseError()) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "failed to parse the request header buffer: " +
-            std::string(GetParseError_En(document.GetParseError())) + " at " +
-            std::to_string(document.GetErrorOffset()))
-            .c_str());
+  int buffer_len = 0;
+  std::vector<char> json_buffer(header_length);
+  if (header_length == 0) {
+    buffer_len = header_length;
+  } else {
+    buffer_len = evbuffer_get_length(input_buffer);
   }
+  json_buffer.resize(buffer_len);
+  EVBufferToJson(&document, v, &v_idx, json_buffer.data(), buffer_len, n);
 
   // Set InferenceRequest request_id
   const char* id = document["id"].GetString();
@@ -1253,7 +1273,7 @@ HTTPAPIServerV2::EVBufferToInput(
           return TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_INVALID_ARG,
               "must specify valid 'Infer-Header-Content-Length' in request "
-              "header");
+              "header when passing inputs in binary data format");
         }
         // Handle binary data case
         const rapidjson::Value& params = itr->value;
@@ -1432,7 +1452,7 @@ HTTPAPIServerV2::HandleInfer(
     // Find Inference-Header-Content-Length in header. If missing set to 0
     size_t header_length = 0;
     const char* header_length_c_str =
-        evhtp_kv_find(req->headers_in, "Inference-Header-Content-Length");
+        evhtp_kv_find(req->headers_in, kInferHeaderContentLengthHTTPHeader);
     if (header_length_c_str != NULL) {
       header_length = std::atoi(header_length_c_str);
     }
