@@ -1707,6 +1707,8 @@ TRTSERVER_ServerInferAsync(
   const auto& lrequest = ltrtrequest->Request();
   const auto& lbackend = ltrtrequest->Backend();
 
+  RETURN_IF_STATUS_ERROR(lrequest->PrepareForInference(*lbackend));
+
 #ifdef TRTIS_ENABLE_STATS
   auto infer_stats = std::make_shared<ni::ModelInferStats>(
       lserver->StatusManager(), lrequest->ModelName());

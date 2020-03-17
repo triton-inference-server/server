@@ -520,6 +520,12 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
       }
     }
 
+    // If no data was given for an input just add an empty memory
+    // reference.
+    if (input.Data() == nullptr) {
+      input.SetData(std::make_shared<MemoryReference>());
+    }
+
     // Get the full size of the data from the input's data. We should
     // ultimately be able to remove this "batch_byte_size" parameter
     // since the same information is in the Memory object.
@@ -559,8 +565,7 @@ InferenceRequest::Input::AppendData(
     int64_t memory_type_id)
 {
   if (data_ == nullptr) {
-    data_.reset(new MemoryReference());
-    data_idx_ = 0;
+    data_ = std::make_shared<MemoryReference>();
   }
 
   if (byte_size > 0) {
@@ -581,7 +586,6 @@ InferenceRequest::Input::SetData(const std::shared_ptr<Memory>& data)
   }
 
   data_ = data;
-  data_idx_ = 0;
 
   return Status::Success;
 }
@@ -590,7 +594,6 @@ Status
 InferenceRequest::Input::RemoveAllData()
 {
   data_.reset();
-  data_idx_ = 0;
   return Status::Success;
 }
 
