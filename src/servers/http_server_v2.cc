@@ -305,9 +305,8 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       int64_t memory_type_id);
 
   void Handle(evhtp_request_t* req) override;
-  void HandleServerReady(evhtp_request_t* req, const std::string& kind);
-  void HandleModelHealth(
-      evhtp_request_t* req, const std::string& model_name,
+  void HandleServerHealth(evhtp_request_t* req, const std::string& kind);
+  void HandleModelReady(evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
   void HandleServerMetadata(evhtp_request_t* req);
   void HandleModelMetadata(
@@ -776,8 +775,8 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
           std::string(req->uri->path->full), model_regex_, &model_name,
           &version, &kind)) {
     if (kind == "ready") {
-      // model health
-      HandleModelHealth(req, model_name, version);
+      // model ready
+      HandleModelReady(req, model_name, version);
       return;
     } else if (kind == "infer") {
       // model infer
@@ -798,7 +797,7 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
   } else if (RE2::FullMatch(
                  std::string(req->uri->path->full), server_regex_, &rest)) {
     // server health
-    HandleServerReady(req, rest);
+    HandleServerHealth(req, rest);
     return;
   }
 
@@ -809,7 +808,7 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
 }
 
 void
-HTTPAPIServerV2::HandleServerReady(
+HTTPAPIServerV2::HandleServerHealth(
     evhtp_request_t* req, const std::string& kind)
 {
   if (req->method != htp_method_GET) {
@@ -847,7 +846,7 @@ HTTPAPIServerV2::HandleServerReady(
 }
 
 void
-HTTPAPIServerV2::HandleModelHealth(
+HTTPAPIServerV2::HandleModelReady(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
