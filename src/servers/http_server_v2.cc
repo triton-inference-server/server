@@ -134,17 +134,17 @@ HTTPServerV2Impl::Dispatch(evhtp_request_t* req, void* arg)
 #ifdef TRTIS_ENABLE_METRICS
 
 // Handle HTTP requests to obtain prometheus metrics
-class HTTPMetricsServer : public HTTPServerImpl {
+class HTTPMetricsServerV2 : public HTTPServerV2Impl {
  public:
-  explicit HTTPMetricsServer(
+  explicit HTTPMetricsServerV2(
       const std::shared_ptr<TRTSERVER_Server>& server, const int32_t port,
       const int thread_cnt)
-      : HTTPServerImpl(port, thread_cnt), server_(server),
+      : HTTPServerV2Impl(port, thread_cnt), server_(server),
         api_regex_(R"(/metrics/?)")
   {
   }
 
-  ~HTTPMetricsServer() = default;
+  ~HTTPMetricsServerV2() = default;
 
  private:
   void Handle(evhtp_request_t* req) override;
@@ -154,7 +154,7 @@ class HTTPMetricsServer : public HTTPServerImpl {
 };
 
 void
-HTTPMetricsServer::Handle(evhtp_request_t* req)
+HTTPMetricsServerV2::Handle(evhtp_request_t* req)
 {
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
@@ -1643,4 +1643,24 @@ HTTPServerV2::CreateAPIServer(
 
   return nullptr;
 }
+
+TRTSERVER_Error*
+HTTPServerV2::CreateMetricsServer(
+    const std::shared_ptr<TRTSERVER_Server>& server, const int32_t port,
+    const int thread_cnt, std::unique_ptr<HTTPServerV2>* metrics_server)
+{
+  std::string addr = "0.0.0.0:" + std::to_string(port);
+  LOG_INFO << "Starting Metrics Service at " << addr;
+
+#ifndef TRTIS_ENABLE_METRICS
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNAVAILABLE, "Metrics support is disabled");
+#endif  // !TRTIS_ENABLE_METRICS
+
+#ifdef TRTIS_ENABLE_METRICS
+  metrics_server->reset(new HTTPMetricsServerV2(server, port, thread_cnt));
+  return nullptr;
+#endif  // TRTIS_ENABLE_METRICS
+}
+
 }}  // namespace nvidia::inferenceserver
