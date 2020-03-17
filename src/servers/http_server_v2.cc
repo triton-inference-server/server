@@ -910,16 +910,7 @@ HTTPAPIServerV2::HandleRepositoryIndex(
         req->buffer_out, model_metadata.c_str(), model_metadata.size());
     evhtp_send_reply(req, EVHTP_RES_OK);
   } else {
-    document.Clear();
-    std::string message = std::string(TRTSERVER_ErrorMessage(err));
-    rapidjson::Value message_val(message.c_str(), message.size());
-    document.AddMember("error", message_val, allocator);
-    rapidjson::StringBuffer buffer;
-    buffer.Clear();
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-    document.Accept(writer);
-    std::string status_buffer(buffer.GetString());
-    evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
+    EVBufferAddErrorJson(req->buffer_out, err);
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
   }
 
@@ -952,17 +943,7 @@ HTTPAPIServerV2::HandleRepositoryControl(
   if (err == nullptr) {
     evhtp_send_reply(req, EVHTP_RES_OK);
   } else {
-    rapidjson::Document document;
-    rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-    std::string message = std::string(TRTSERVER_ErrorMessage(err));
-    rapidjson::Value message_val(message.c_str(), message.size());
-    document.AddMember("error", message_val, allocator);
-    rapidjson::StringBuffer buffer;
-    buffer.Clear();
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-    document.Accept(writer);
-    std::string status_buffer(buffer.GetString());
-    evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
+    EVBufferAddErrorJson(req->buffer_out, err);
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
   }
 
