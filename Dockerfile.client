@@ -41,6 +41,7 @@ RUN apt-get update && \
             cmake \
             curl \
             git \
+            libb64-dev \
             libopencv-dev \
             libopencv-core-dev \
             libssl-dev \

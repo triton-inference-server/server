@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import base64
 import numpy as np
 import grpc
 import rapidjson as json
@@ -32,6 +33,7 @@ from google.protobuf.json_format import MessageToJson
 from tritongrpcclient import grpc_service_v2_pb2
 from tritongrpcclient import grpc_service_v2_pb2_grpc
 from tritongrpcclient.utils import *
+
 
 def raise_error_grpc(rpc_error):
     raise InferenceServerException(
@@ -151,8 +153,7 @@ class InferenceServerClient:
         """
         try:
             request = grpc_service_v2_pb2.ModelReadyRequest(
-                name=model_name,
-                version=model_version)
+                name=model_name, version=model_version)
             response = self._client_stub.ModelReady(request)
             return response.ready
         except grpc.RpcError as rpc_error:
@@ -218,8 +219,7 @@ class InferenceServerClient:
         """
         try:
             request = grpc_service_v2_pb2.ModelMetadataRequest(
-                name=model_name,
-                version=model_version)
+                name=model_name, version=model_version)
             response = self._client_stub.ModelMetadata(request)
             if as_json:
                 return json.loads(MessageToJson(response))
@@ -257,8 +257,7 @@ class InferenceServerClient:
         """
         try:
             request = grpc_service_v2_pb2.ModelConfigRequest(
-                name=model_name,
-                version=model_version)
+                name=model_name, version=model_version)
             response = self._client_stub.ModelConfig(request)
             if as_json:
                 return json.loads(MessageToJson(response))
@@ -315,7 +314,6 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    
     def unload_model(self, model_name):
         """Request the inference server to unload specified model.
 
@@ -365,7 +363,8 @@ class InferenceServerClient:
         """
 
         try:
-            request = grpc_service_v2_pb2.SystemSharedMemoryStatusRequest(name=region_name)
+            request = grpc_service_v2_pb2.SystemSharedMemoryStatusRequest(
+                name=region_name)
             response = self._client_stub.SystemSharedMemoryStatus(request)
             if as_json:
                 return json.loads(MessageToJson(response))
@@ -400,10 +399,7 @@ class InferenceServerClient:
         """
         try:
             request = grpc_service_v2_pb2.SystemSharedMemoryRegisterRequest(
-                    name=name,
-                    key=key,
-                    offset=offset,
-                    byte_size=byte_size)
+                name=name, key=key, offset=offset, byte_size=byte_size)
             self._client_stub.SystemSharedMemoryRegister(request)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
@@ -426,7 +422,8 @@ class InferenceServerClient:
 
         """
         try:
-            request = grpc_service_v2_pb2.SystemSharedMemoryUnregisterRequest(name=name)
+            request = grpc_service_v2_pb2.SystemSharedMemoryUnregisterRequest(
+                name=name)
             self._client_stub.SystemSharedMemoryUnregister(request)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
@@ -459,7 +456,8 @@ class InferenceServerClient:
         """
 
         try:
-            request = grpc_service_v2_pb2.CudaSharedMemoryStatusRequest(name=region_name)
+            request = grpc_service_v2_pb2.CudaSharedMemoryStatusRequest(
+                name=region_name)
             response = self._client_stub.CudaSharedMemoryStatus(request)
             if as_json:
                 return json.loads(MessageToJson(response))
@@ -468,7 +466,8 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def register_cuda_shared_memory(self, name, raw_handle, device_id, byte_size):
+    def register_cuda_shared_memory(self, name, raw_handle, device_id,
+                                    byte_size):
         """Request the server to register a system shared memory with the
         following specification.
 
@@ -477,7 +476,7 @@ class InferenceServerClient:
         name : str
             The name of the region to register.
         raw_handle : bytes 
-            The raw serialized cudaIPC handle.
+            The raw serialized cudaIPC handle in base64 encoding.
         device_id : int
             The GPU device ID on which the cudaIPC handle was created.
         byte_size : int
@@ -491,10 +490,10 @@ class InferenceServerClient:
         """
         try:
             request = grpc_service_v2_pb2.CudaSharedMemoryRegisterRequest(
-                    name=name,
-                    raw_handle=raw_handle,
-                    device_id=device_id,
-                    byte_size=byte_size)
+                name=name,
+                raw_handle=base64.b64decode(raw_handle),
+                device_id=device_id,
+                byte_size=byte_size)
             self._client_stub.CudaSharedMemoryRegister(request)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
@@ -517,11 +516,12 @@ class InferenceServerClient:
 
         """
         try:
-            request = grpc_service_v2_pb2.CudaSharedMemoryUnregisterRequest(name=name)
+            request = grpc_service_v2_pb2.CudaSharedMemoryUnregisterRequest(
+                name=name)
             self._client_stub.CudaSharedMemoryUnregister(request)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
-    
+
     # FIXMEPV2: Add parameter support
     def parameters(self):
         raise_error("Not implemented yet")
@@ -567,8 +567,8 @@ class InferenceServerClient:
             If server fails to perform inference.
         """
 
-        request = self._get_inference_request(inputs, outputs, model_name, model_version,
-                                    request_id)
+        request = self._get_inference_request(inputs, outputs, model_name,
+                                              model_version, request_id)
 
         try:
             response = self._client_stub.ModelInfer(request)
@@ -627,8 +627,8 @@ class InferenceServerClient:
                 raise_error_grpc(rpc_error)
             callback(result=result)
 
-        request = self._get_inference_request(inputs, outputs, model_name, model_version,
-                                    request_id)
+        request = self._get_inference_request(inputs, outputs, model_name,
+                                              model_version, request_id)
 
         try:
             self._call_future = self._client_stub.ModelInfer.future(request)

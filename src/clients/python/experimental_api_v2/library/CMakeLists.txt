@@ -38,12 +38,14 @@ if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_GRPC_V2})
     target_link_libraries(cshmv2 rt)
 
     #
-    # libccudashm.so
+    # libccudashmv2.so
     #
     if(${TRTIS_ENABLE_GPU})
       add_library(ccudashmv2 SHARED cuda_shared_memory/cuda_shared_memory.cc)
       target_include_directories(ccudashmv2 PUBLIC ${CUDA_INCLUDE_DIRS})
-      target_link_libraries(ccudashmv2 PRIVATE ${CUDA_LIBRARIES})
+      target_link_libraries(ccudashmv2
+        PRIVATE ${CUDA_LIBRARIES}
+        PRIVATE -lb64)
     endif() # TRTIS_ENABLE_GPU
   endif() # NOT WIN32
 

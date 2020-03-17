@@ -34,6 +34,7 @@ install(
     grpc_v2_explicit_int8_content_client.py
     grpc_v2_image_client.py
     simple_grpc_v2_class_client.py
+    simple_grpc_v2_cudashm_client.py
     simple_grpc_v2_health_metadata.py
     simple_grpc_v2_async_infer_client.py
     simple_grpc_v2_infer_client.py

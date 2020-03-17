@@ -45,6 +45,7 @@ SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_grpc_v2_async_infer_client.py
 SIMPLE_STRING_INFER_CLIENT=../clients/simple_grpc_v2_string_infer_client.py
 SIMPLE_CLASS_CLIENT=../clients/simple_grpc_v2_class_client.py
 SIMPLE_SHM_CLIENT=../clients/simple_grpc_v2_shm_client.py
+SIMPLE_CUDASHM_CLIENT=../clients/simple_grpc_v2_cudashm_client.py
 SIMPLE_MODEL_CONTROL=../clients/simple_grpc_v2_model_control.py
 EXPLICIT_BYTE_CONTENT_CLIENT=../clients/grpc_v2_explicit_byte_content_client.py
 EXPLICIT_INT_CONTENT_CLIENT=../clients/grpc_v2_explicit_int_content_client.py
@@ -100,6 +101,7 @@ for i in \
         $SIMPLE_STRING_INFER_CLIENT \
         $SIMPLE_CLASS_CLIENT \
         $SIMPLE_SHM_CLIENT \
+        $SIMPLE_CUDASHM_CLIENT \
         $EXPLICIT_BYTE_CONTENT_CLIENT \
         $EXPLICIT_INT_CONTENT_CLIENT \
         $EXPLICIT_INT8_CONTENT_CLIENT \
