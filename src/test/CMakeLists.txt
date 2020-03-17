@@ -62,18 +62,18 @@ set(
 )
 
 find_package(GTest REQUIRED)
-add_executable(sample_test test_main.cc ${CUDA_MEMORY_MANAGER_SRCS} ${CUDA_MEMORY_MANAGER_HDRS} $<TARGET_OBJECTS:proto-library>)
+add_executable(memory_test memory_test.cc ${CUDA_MEMORY_MANAGER_SRCS} ${CUDA_MEMORY_MANAGER_HDRS} $<TARGET_OBJECTS:proto-library>)
 set_target_properties(
-  sample_test
+  memory_test
   PROPERTIES
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
     INSTALL_RPATH ""
 )
-target_include_directories(sample_test PRIVATE ${GTEST_INCLUDE_DIR} PRIVATE ${CUDA_INCLUDE_DIRS} PRIVATE ${CNMEM_PATH}/include)
+target_include_directories(memory_test PRIVATE ${GTEST_INCLUDE_DIR} PRIVATE ${CUDA_INCLUDE_DIRS} PRIVATE ${CNMEM_PATH}/include)
 target_link_libraries(
-  sample_test
+  memory_test
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
@@ -83,6 +83,6 @@ target_link_libraries(
   PRIVATE -lcnmem
 )
 install(
-  TARGETS sample_test
+  TARGETS memory_test
   RUNTIME DESTINATION bin
 )

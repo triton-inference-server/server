@@ -66,6 +66,12 @@ CudaMemoryManager::~CudaMemoryManager()
   }
 }
 
+void
+CudaMemoryManager::Reset()
+{
+  instance_.reset();
+}
+
 Status
 CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
 {
@@ -97,8 +103,9 @@ CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
     // Use to finalize CNMeM properly when out of scope
     instance_.reset(new CudaMemoryManager());
   } else {
-    return Status(RequestStatusCode::INTERNAL,
-                  "Failed to initialize CUDA memory manager: " + status.Message());
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "Failed to initialize CUDA memory manager: " + status.Message());
   }
 
   return Status::Success;
