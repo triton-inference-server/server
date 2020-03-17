@@ -327,7 +327,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       size_t header_length);
   TRTSERVER_Error* EVBufferToJson(
       rapidjson::Document* document, evbuffer_iovec* v, int* v_idx,
-      char* json_buffer, const size_t length, int n);
+      const size_t length, int n);
 
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
@@ -1126,26 +1126,44 @@ HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
 TRTSERVER_Error*
 HTTPAPIServerV2::EVBufferToJson(
     rapidjson::Document* document, evbuffer_iovec* v, int* v_idx,
-    char* json_buffer, const size_t length, int n)
+    const size_t length, int n)
 {
-  size_t offset = 0;
-  size_t length_tmp = length;
-  while ((length_tmp > 0) && (*v_idx < n)) {
-    char* base = static_cast<char*>(v[*v_idx].iov_base);
-    size_t base_size;
-    if (v[*v_idx].iov_len > length_tmp) {
-      base_size = length_tmp;
-      v[*v_idx].iov_base = static_cast<void*>(base + length_tmp);
-      v[*v_idx].iov_len -= length_tmp;
-      length_tmp = 0;
-    } else {
-      base_size = v[*v_idx].iov_len;
-      length_tmp -= v[*v_idx].iov_len;
-      *v_idx += 1;
-    }
+  size_t offset = 0, length_tmp = length;
+  char *json_base;
+  std::vector<char> json_buffer;
 
-    memcpy(json_buffer + offset, base, base_size);
-    offset += base_size;
+  // No need to memcpy when number of iovecs is 1
+  if (n == 1) {
+    json_base = static_cast<char*>(v[0].iov_base);
+    if (v[0].iov_len > length_tmp) {
+      v[0].iov_base = static_cast<void*>(json_base + length_tmp);
+      v[0].iov_len -= length_tmp;
+      length_tmp = 0;
+    } else if (v[0].iov_len == length_tmp)
+      {
+        length_tmp = 0;
+        *v_idx += 1;
+      }
+  } else {
+    json_buffer.resize(length);
+    json_base = json_buffer.data();
+    while ((length_tmp > 0) && (*v_idx < n)) {
+      char* base = static_cast<char*>(v[*v_idx].iov_base);
+      size_t base_size;
+      if (v[*v_idx].iov_len > length_tmp) {
+        base_size = length_tmp;
+        v[*v_idx].iov_base = static_cast<void*>(base + length_tmp);
+        v[*v_idx].iov_len -= length_tmp;
+        length_tmp = 0;
+      } else {
+        base_size = v[*v_idx].iov_len;
+        length_tmp -= v[*v_idx].iov_len;
+        *v_idx += 1;
+      }
+
+      memcpy(json_base + offset, base, base_size);
+      offset += base_size;
+    }
   }
 
   if (length_tmp != 0) {
@@ -1157,7 +1175,7 @@ HTTPAPIServerV2::EVBufferToJson(
             .c_str());
   }
 
-  document->Parse(json_buffer);
+  document->Parse(json_base, length);
   if (document->HasParseError()) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INVALID_ARG,
@@ -1200,14 +1218,12 @@ HTTPAPIServerV2::EVBufferToInput(
   rapidjson::Document document;
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
   int buffer_len = 0;
-  std::vector<char> json_buffer(header_length);
   if (header_length == 0) {
     buffer_len = header_length;
   } else {
     buffer_len = evbuffer_get_length(input_buffer);
   }
-  json_buffer.resize(buffer_len);
-  EVBufferToJson(&document, v, &v_idx, json_buffer.data(), buffer_len, n);
+  EVBufferToJson(&document, v, &v_idx, buffer_len, n);
 
   // Set InferenceRequest request_id
   const char* id = document["id"].GetString();
