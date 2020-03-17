@@ -300,6 +300,51 @@ install(
 )
 
 #
+# simplev2
+#
+set(
+  SIMPLEV2_SRCS
+  simplev2.cc common.cc
+)
+
+set(
+  SIMPLEV2_HDRS
+)
+
+add_executable(
+  simplev2
+  ${SIMPLEV2_SRCS}
+  ${SIMPLEV2_HDRS}
+  $<TARGET_OBJECTS:proto-library>
+)
+set_target_properties(
+  simplev2
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH ""
+)
+target_link_libraries(
+  simplev2
+  PRIVATE trtserver
+  PRIVATE protobuf::libprotobuf
+)
+if(${TRTIS_ENABLE_GPU})
+target_include_directories(simplev2 PRIVATE ${CUDA_INCLUDE_DIRS})
+target_link_libraries(
+  simplev2
+  PUBLIC -L/usr/local/cuda/lib64/stubs
+  PUBLIC -lnvidia-ml
+  PRIVATE ${CUDA_LIBRARIES}
+)
+endif() # TRTIS_ENABLE_GPU
+install(
+  TARGETS simplev2
+  RUNTIME DESTINATION bin
+)
+
+#
 # memory_alloc (only build when TRTIS_ENABLE_GPU given the purpose)
 #
 if(${TRTIS_ENABLE_GPU})

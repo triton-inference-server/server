@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,121 +35,123 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-SIMPLE_CLIENT=./simple
-CLIENT_LOG="./client.log"
 MODELSDIR=`pwd`/models
-
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 
 export CUDA_VISIBLE_DEVICES=0
 
-# Must explicitly set LD_LIBRARY_PATH so that SIMPLE_CLIENT can find
+# Must explicitly set LD_LIBRARY_PATH so that clients can find
 # libtrtserver.so.
 LD_LIBRARY_PATH=/opt/tensorrtserver/lib:$LD_LIBRARY_PATH
 
-rm -f $CLIENT_LOG.*
+rm -f *.log
 
 RET=0
 
-for trial in graphdef savedmodel netdef onnx libtorch plan ; do
-    full=${trial}_float32_float32_float32
-    rm -rf $MODELSDIR/simple
-    mkdir -p $MODELSDIR/simple/1 && \
-        cp -r $DATADIR/${full}/1/* $MODELSDIR/simple/1/. && \
-        cp $DATADIR/${full}/config.pbtxt $MODELSDIR/simple/. && \
-        (cd $MODELSDIR/simple && \
-                sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
-                sed -i "s/label_filename:.*//" config.pbtxt)
+for SIMPLE_CLIENT in simple simplev2 ; do
+    CLIENT_LOG=$SIMPLE_CLIENT
+    SIMPLE_CLIENT=./$SIMPLE_CLIENT
+
+    for trial in graphdef savedmodel netdef onnx libtorch plan ; do
+        full=${trial}_float32_float32_float32
+        rm -rf $MODELSDIR
+        mkdir -p $MODELSDIR/simple/1 && \
+            cp -r $DATADIR/${full}/1/* $MODELSDIR/simple/1/. && \
+            cp $DATADIR/${full}/config.pbtxt $MODELSDIR/simple/. && \
+            (cd $MODELSDIR/simple && \
+                    sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
+                    sed -i "s/label_filename:.*//" config.pbtxt)
+
+        set +e
+
+        $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.$full.cpu.log 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG.$full.cpu.log
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+
+        $SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG.$full.gpu.log 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG.$full.gpu.log
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+
+        set -e
+    done
+
+    # custom model needs to be obtained elsewhere
+    rm -rf $MODELSDIR
+    mkdir -p $MODELSDIR/simple/1
+    cp -r ../custom_models/custom_float32_float32_float32/1/* $MODELSDIR/simple/1/.
+    cp ../custom_models/custom_float32_float32_float32/config.pbtxt $MODELSDIR/simple/.
+    (cd $MODELSDIR/simple && \
+            sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
+            sed -i "s/label_filename:.*//" config.pbtxt)
 
     set +e
 
-    $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.$full.cpu 2>&1
+    $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.custom.cpu.log 2>&1
     if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.$full.cpu
+        cat $CLIENT_LOG.custom.cpu.log
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
 
-    $SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG.$full.gpu 2>&1
+    $SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG.custom.gpu.log 2>&1
     if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.$full.gpu
+        cat $CLIENT_LOG.custom.gpu.log
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
 
     set -e
-done
 
-# custom model needs to be obtained elsewhere
-rm -rf $MODELSDIR/simple/1/*
-cp -r ../custom_models/custom_float32_float32_float32/1/* $MODELSDIR/simple/1/.
-cp ../custom_models/custom_float32_float32_float32/config.pbtxt $MODELSDIR/simple/.
-(cd $MODELSDIR/simple && \
-            sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
-            sed -i "s/label_filename:.*//" config.pbtxt)
-
-set +e
-
-$SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.custom.cpu 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG.custom.cpu
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-$SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG.custom.gpu 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG.custom.gpu
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-set -e
-
-# set up "addsub" ensemble
-ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
-rm -rf $MODELSDIR/simple/1/*
-mkdir -p $MODELSDIR/simple/1 && \
-    cp $ENSEMBLEDIR/fan_plan_float32_float32_float32/config.pbtxt $MODELSDIR/simple/. && \
+    # set up "addsub" ensemble
+    ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
+    rm -rf $MODELSDIR
+    mkdir -p $MODELSDIR/simple/1 && \
+        cp $ENSEMBLEDIR/fan_plan_float32_float32_float32/config.pbtxt $MODELSDIR/simple/. && \
         (cd $MODELSDIR/simple && \
                 sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
                 sed -i "s/label_filename:.*//" config.pbtxt)
 
-cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
-    mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1 && \
-    cp libidentity.so $MODELSDIR/nop_TYPE_FP32_-1/1/.
+    cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
+        mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1 && \
+        cp libidentity.so $MODELSDIR/nop_TYPE_FP32_-1/1/.
 
-cp -r $DATADIR/plan_float32_float32_float32 $MODELSDIR/. && \
-    # make sure version 1 is used (no swap)
-    rm -r $MODELSDIR/plan_float32_float32_float32/2 && \
-    rm -r $MODELSDIR/plan_float32_float32_float32/3
+    cp -r $DATADIR/plan_float32_float32_float32 $MODELSDIR/. && \
+        # make sure version 1 is used (no swap)
+        rm -r $MODELSDIR/plan_float32_float32_float32/2 && \
+        rm -r $MODELSDIR/plan_float32_float32_float32/3
 
-set +e
+    set +e
 
-$SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.ensemble.cpu 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG.ensemble.cpu
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-$SIMPLE_CLIENT -r $MODELSDIR -g -v >>$CLIENT_LOG.ensemble.gpu 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG.ensemble.gpu
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    # For GPU input / output case, all ensemble allocation should be on GPU
-    if grep ^I[0-9][0-9][0-9][0-9].*"Internal response".*"memory type 0" $CLIENT_LOG.ensemble.gpu; then
-        echo -e "\n*** FAILED: unexpected CPU allocation for ensemble" >> $CLIENT_LOG.ensemble.gpu
-        cat $CLIENT_LOG.ensemble.gpu
+    $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.ensemble.cpu.log 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG.ensemble.cpu.log
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
-fi
 
-set -e
+    $SIMPLE_CLIENT -r $MODELSDIR -g -v >>$CLIENT_LOG.ensemble.gpu.log 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG.ensemble.gpu.log
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+        # For GPU input / output case, all ensemble allocation should be on GPU
+        if grep ^I[0-9][0-9][0-9][0-9].*"Internal response".*"memory type 0" $CLIENT_LOG.ensemble.gpu.log; then
+            echo -e "\n*** FAILED: unexpected CPU allocation for ensemble" >> $CLIENT_LOG.ensemble.gpu.log
+            cat $CLIENT_LOG.ensemble.gpu.log
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+    fi
 
+    set -e
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -31,13 +31,14 @@
 
 namespace nvidia { namespace inferenceserver {
 
-struct EnsembleTensor {
-  EnsembleTensor(bool isOutput) : ready(false), isOutput(isOutput) {}
-  bool ready;
-  bool isOutput;
-  std::vector<EnsembleTensor*> prev_nodes;
-  std::vector<EnsembleTensor*> next_nodes;
-};
+/// Get the integral version from a string, or fail if string does not
+/// represent a valid version.
+/// \param version_string The string version.
+/// \param version Returns the integral version.
+/// \return The error status. Failure if 'version_string' doesn't
+/// convert to valid version.
+Status GetModelVersionFromString(
+    const std::string& version_string, int64_t* version);
 
 /// Get version of a model from the path containing the model
 /// definition file.
@@ -103,18 +104,6 @@ Status ValidateModelConfig(
 /// \return The error status. A non-OK status indicates the configuration
 /// is not valid.
 Status ValidateEnsembleSchedulingConfig(const ModelConfig& ensemble_config);
-
-/// Build a graph that represents the data flow in the ensemble specifieed in
-/// given model config. the node (ensemble tensor) in the graph can be looked
-/// up using its name as key.
-/// \param ensemble_config The model configuration that specifies
-/// ensemble_scheduling field.
-/// \param keyed_ensemble_graph Returned the ensemble graph.
-/// \return The error status. A non-OK status indicates the build fails because
-/// the ensemble configuration is not valid.
-Status BuildEnsembleGraph(
-    const ModelConfig& ensemble_config,
-    std::unordered_map<std::string, EnsembleTensor>& keyed_ensemble_graph);
 
 /// Validate that input is specified correctly in a model
 /// configuration.

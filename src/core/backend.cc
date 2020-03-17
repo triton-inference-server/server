@@ -353,19 +353,17 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
       random_buffer[offset] = rand();
     }
 
-    // Use batch-1 for every request, batch size is simulated by populating
-    // requests for single run.
-    warmup_data.irequest_ = std::make_shared<InferenceRequest>();
-    warmup_data.irequest_->SetModelName(Name());
-    warmup_data.irequest_->SetRequestedModelVersion(Version());
+    // Use batch-1 for every request, batch size is simulated by
+    // populating requests for single run. FIXMEV2 once
+    // protocol_version 2 is the only one remove SetBatchSize and
+    // adjust the input/output tensors to have appropriate shape
+    warmup_data.irequest_ =
+        std::make_shared<InferenceRequest>(Name(), Version(), Version(), 1);
     warmup_data.irequest_->SetBatchSize(1);
-    warmup_data.irequest_->SetPriority(0);
-    warmup_data.irequest_->SetTimeoutMicroseconds(0);
 
     // Request all outputs
     for (const auto& io : Config().output()) {
-      RETURN_IF_ERROR(warmup_data.irequest_->RequestOutput(
-          io.name(), 0 /* classification_cnt */));
+      RETURN_IF_ERROR(warmup_data.irequest_->AddRequestedOutput(io.name()));
     }
 
     // Second pass to prepare input buffer and request header
@@ -499,7 +497,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
           TRTSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */));
     }
 
-    RETURN_IF_ERROR(warmup_data.irequest_->Normalize(*this));
+    RETURN_IF_ERROR(warmup_data.irequest_->PrepareForInference(*this));
   }
 
   return Status::Success;
