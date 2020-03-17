@@ -839,13 +839,11 @@ CommonHandler::SetUpAllRequests()
           CudaSharedMemoryRegisterResponse* response, grpc::Status* status) {
         TRTSERVER_Error* err = nullptr;
 #ifdef TRTIS_ENABLE_GPU
-        const std::string& raw_handle = request.raw_handle();
-        char* handle_base = const_cast<char*>(raw_handle.c_str());
-        cudaIpcMemHandle_t* cuda_shm_handle =
-            reinterpret_cast<cudaIpcMemHandle_t*>(handle_base);
         err = shm_manager_->RegisterCUDASharedMemory(
-            request.name(), cuda_shm_handle, request.byte_size(),
-            request.device_id());
+            request.name(),
+            reinterpret_cast<const cudaIpcMemHandle_t*>(
+                request.raw_handle().c_str()),
+            request.byte_size(), request.device_id());
 #else
         err = TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INVALID_ARG,

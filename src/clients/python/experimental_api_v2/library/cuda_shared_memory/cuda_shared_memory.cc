@@ -26,7 +26,11 @@
 
 #include "src/clients/python/experimental_api_v2/library/cuda_shared_memory/cuda_shared_memory.h"
 
+extern "C" {
+#include <b64/cencode.h>
+}
 #include <cuda_runtime_api.h>
+#include <cstring>
 #include <iostream>
 #include "src/clients/python/experimental_api_v2/library/shared_memory/shared_memory_handle.h"
 
@@ -92,12 +96,25 @@ CudaSharedMemoryRegionCreate(
 
 int
 CudaSharedMemoryGetRawHandle(
-    void* cuda_shm_handle, const char** serialized_raw_handle)
+    void* cuda_shm_handle, char** serialized_raw_handle)
 {
   if (cuda_shm_handle == nullptr) {
     return -1;
   }
-  // TODO: Serialize cuda_shm_handle into serialized_raw_handle
+
+  SharedMemoryHandle* handle =
+      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle);
+
+  // Encode the handle object to base64
+  base64_encodestate es;
+  base64_init_encodestate(&es);
+  size_t handle_size = sizeof(cudaIpcMemHandle_t);
+  *serialized_raw_handle = (char*)malloc(handle_size * 2); /* ~4/3 x input */
+  int offset = base64_encode_block(
+      (char*)((void*)&handle->cuda_shm_handle_), handle_size,
+      *serialized_raw_handle, &es);
+  base64_encode_blockend(*serialized_raw_handle + offset, &es);
+
   return 0;
 }
 

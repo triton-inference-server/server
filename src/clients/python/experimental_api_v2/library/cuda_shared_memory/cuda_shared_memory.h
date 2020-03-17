@@ -36,6 +36,8 @@ extern "C" {
 int CudaSharedMemoryRegionCreate(
     const char* triton_shm_name, size_t byte_size, int device_id,
     void** cuda_shm_handle);
+int CudaSharedMemoryGetRawHandle(
+    void* cuda_shm_handle, char** serialized_raw_handle);
 int CudaSharedMemoryRegionSet(
     void* cuda_shm_handle, size_t offset, size_t byte_size, const void* data);
 int CudaSharedMemoryRegionDestroy(void* cuda_shm_handle);
