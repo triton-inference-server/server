@@ -31,6 +31,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#else
+typedef void cudaIpcMemHandle_t;
+#endif  // TRTIS_ENABLE_GPU
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -42,12 +48,6 @@ extern "C" {
 #else
 #define TRTSERVER_EXPORT
 #endif
-
-#ifdef TRTIS_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#else
-typedef void cudaIpcMemHandle_t;
-#endif  // TRTIS_ENABLE_GPU
 
 struct TRTSERVER_Error;
 struct TRTSERVER_InferenceRequestOptions;

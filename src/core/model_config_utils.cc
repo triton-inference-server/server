@@ -40,6 +40,35 @@
 namespace nvidia { namespace inferenceserver {
 
 Status
+GetModelVersionFromString(const std::string& version_string, int64_t* version)
+{
+  if (version_string.empty()) {
+    *version = -1;
+    return Status::Success;
+  }
+
+  try {
+    *version = std::stol(version_string);
+  }
+  catch (std::exception& e) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "failed to get model version from specified version string '" +
+            version_string + "' (details: " + e.what() +
+            "), version should be an integral value > 0");
+  }
+
+  if (*version < 0) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "invalid model version specified '" + version_string +
+            "' , version should be an integral value > 0");
+  }
+
+  return Status::Success;
+}
+
+Status
 GetModelVersionFromPath(const std::string& path, int64_t* version)
 {
   auto version_dir = BaseName(path);
@@ -774,6 +803,107 @@ ValidateModelConfig(
   return Status::Success;
 }
 
+namespace {
+
+struct EnsembleTensor {
+  EnsembleTensor(bool isOutput) : ready(false), isOutput(isOutput) {}
+  bool ready;
+  bool isOutput;
+  std::vector<EnsembleTensor*> prev_nodes;
+  std::vector<EnsembleTensor*> next_nodes;
+};
+
+/// Build a graph that represents the data flow in the ensemble specified in
+/// given model config. the node (ensemble tensor) in the graph can be looked
+/// up using its name as key.
+/// \param ensemble_config The model configuration that specifies
+/// ensemble_scheduling field.
+/// \param keyed_ensemble_graph Returned the ensemble graph.
+/// \return The error status. A non-OK status indicates the build fails because
+/// the ensemble configuration is not valid.
+Status
+BuildEnsembleGraph(
+    const ModelConfig& config,
+    std::unordered_map<std::string, EnsembleTensor>& keyed_ensemble_graph)
+{
+  keyed_ensemble_graph.clear();
+  size_t step_idx = 0;
+  for (const auto& element : config.ensemble_scheduling().step()) {
+    if (element.model_name().empty()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "must specify 'model_name' in step " + std::to_string(step_idx) +
+              " of ensemble '" + config.name() + "'");
+    }
+    if (element.input_map().size() == 0) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "must specify 'input_map' in step " + std::to_string(step_idx) +
+              " of ensemble '" + config.name() + "'");
+    }
+    if (element.output_map().size() == 0) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "must specify 'output_map' in step " + std::to_string(step_idx) +
+              " of ensemble '" + config.name() + "'");
+    }
+
+    // Link ensemble tensors
+    std::vector<EnsembleTensor*> tensor_as_output;
+    for (const auto& output_map : element.output_map()) {
+      auto it = keyed_ensemble_graph.find(output_map.second);
+      if (it != keyed_ensemble_graph.end()) {
+        if (it->second.isOutput) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "ensemble tensor '" + it->first +
+                  "' can appear in an output map only once for ensemble '" +
+                  config.name() + "' step " + std::to_string(step_idx));
+        } else {
+          it->second.isOutput = true;
+        }
+      } else {
+        it = keyed_ensemble_graph
+                 .emplace(
+                     std::make_pair(output_map.second, EnsembleTensor(true)))
+                 .first;
+      }
+      tensor_as_output.push_back(&(it->second));
+    }
+
+    std::set<std::string> model_inputs;
+    for (const auto& input_map : element.input_map()) {
+      if (model_inputs.find(input_map.first) != model_inputs.end()) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "input '" + input_map.first + "' in model '" +
+                element.model_name() +
+                "' is mapped to multiple ensemble tensors for ensemble '" +
+                config.name() + "' step " + std::to_string(step_idx));
+      } else {
+        model_inputs.emplace(input_map.first);
+      }
+      auto it = keyed_ensemble_graph.find(input_map.second);
+      if (it == keyed_ensemble_graph.end()) {
+        it = keyed_ensemble_graph
+                 .emplace(
+                     std::make_pair(input_map.second, EnsembleTensor(false)))
+                 .first;
+      }
+      for (auto output : tensor_as_output) {
+        output->prev_nodes.push_back(&(it->second));
+        it->second.next_nodes.push_back(output);
+      }
+    }
+
+    step_idx++;
+  }
+
+  return Status::Success;
+}
+
+}  // namespace
+
 Status
 ValidateEnsembleSchedulingConfig(const ModelConfig& config)
 {
@@ -878,87 +1008,6 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
                                               config.name() + "'");
     }
   }
-  return Status::Success;
-}
-
-Status
-BuildEnsembleGraph(
-    const ModelConfig& config,
-    std::unordered_map<std::string, EnsembleTensor>& keyed_ensemble_graph)
-{
-  keyed_ensemble_graph.clear();
-  size_t step_idx = 0;
-  for (const auto& element : config.ensemble_scheduling().step()) {
-    if (element.model_name().empty()) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "must specify 'model_name' in step " + std::to_string(step_idx) +
-              " of ensemble '" + config.name() + "'");
-    }
-    if (element.input_map().size() == 0) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "must specify 'input_map' in step " + std::to_string(step_idx) +
-              " of ensemble '" + config.name() + "'");
-    }
-    if (element.output_map().size() == 0) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "must specify 'output_map' in step " + std::to_string(step_idx) +
-              " of ensemble '" + config.name() + "'");
-    }
-
-    // Link ensemble tensors
-    std::vector<EnsembleTensor*> tensor_as_output;
-    for (const auto& output_map : element.output_map()) {
-      auto it = keyed_ensemble_graph.find(output_map.second);
-      if (it != keyed_ensemble_graph.end()) {
-        if (it->second.isOutput) {
-          return Status(
-              RequestStatusCode::INVALID_ARG,
-              "ensemble tensor '" + it->first +
-                  "' can appear in an output map only once for ensemble '" +
-                  config.name() + "' step " + std::to_string(step_idx));
-        } else {
-          it->second.isOutput = true;
-        }
-      } else {
-        it = keyed_ensemble_graph
-                 .emplace(
-                     std::make_pair(output_map.second, EnsembleTensor(true)))
-                 .first;
-      }
-      tensor_as_output.push_back(&(it->second));
-    }
-
-    std::set<std::string> model_inputs;
-    for (const auto& input_map : element.input_map()) {
-      if (model_inputs.find(input_map.first) != model_inputs.end()) {
-        return Status(
-            RequestStatusCode::INVALID_ARG,
-            "input '" + input_map.first + "' in model '" +
-                element.model_name() +
-                "' is mapped to multiple ensemble tensors for ensemble '" +
-                config.name() + "' step " + std::to_string(step_idx));
-      } else {
-        model_inputs.emplace(input_map.first);
-      }
-      auto it = keyed_ensemble_graph.find(input_map.second);
-      if (it == keyed_ensemble_graph.end()) {
-        it = keyed_ensemble_graph
-                 .emplace(
-                     std::make_pair(input_map.second, EnsembleTensor(false)))
-                 .first;
-      }
-      for (auto output : tensor_as_output) {
-        output->prev_nodes.push_back(&(it->second));
-        it->second.next_nodes.push_back(output);
-      }
-    }
-
-    step_idx++;
-  }
-
   return Status::Success;
 }
 

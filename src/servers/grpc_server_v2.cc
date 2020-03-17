@@ -1942,7 +1942,6 @@ InferGRPCToInput(
     size_t byte_size;
     TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
     int64_t memory_type_id = 0;
-    bool has_byte_contents = false;
 
     std::string region_name;
     int64_t offset;
@@ -2098,7 +2097,6 @@ InferGRPCToInput(
       }
 
       if (io.contents().byte_contents_size() != 0) {
-        has_byte_contents = true;
         RETURN_IF_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "BYTES", io.datatype(),
             byte_size));
@@ -2118,23 +2116,6 @@ InferGRPCToInput(
         }
         base = serialized->c_str();
         byte_size = serialized->size();
-      }
-    }
-
-    if (!has_byte_contents) {
-      uint64_t expected_byte_size = 0;
-      RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
-          request_provider, io.name().c_str(), &expected_byte_size));
-
-      if (byte_size != expected_byte_size) {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            std::string(
-                "unexpected size " + std::to_string(byte_size) +
-                " for input '" + io.name() + "', expecting " +
-                std::to_string(expected_byte_size) + " for model '" +
-                request.model_name() + "'")
-                .c_str());
       }
     }
 
