@@ -61,8 +61,59 @@ set(
   ../core/cuda_utils.h
 )
 
+#
+# PinnedMemoryManger
+#
+set(
+  PINNED_MEMORY_MANAGER_SRCS
+  ../core/pinned_memory_manager.cc
+  ../core/status.cc
+  ../core/cuda_utils.cc
+)
+
+set(
+  PINNED_MEMORY_MANAGER_HDRS
+  ../core/pinned_memory_manager.h
+  ../core/status.h
+  ../core/cuda_utils.h
+)
+
+#
+# Memory
+#
+set(
+  MEMORY_SRCS
+  ../core/memory.cc
+)
+
+set(
+  MEMORY_HDRS
+  ../core/memory.h
+  ../core/constants.h
+)
+
+set(
+  MEMORY_TEST_SRCS
+  memory_test.cc
+  ${MEMORY_SRCS}
+  ${CUDA_MEMORY_MANAGER_SRCS}
+  ${PINNED_MEMORY_MANAGER_SRCS}
+)
+
+set(
+  MEMORY_TEST_HDRS
+  ${MEMORY_HDRS}
+  ${CUDA_MEMORY_MANAGER_HDRS}
+  ${PINNED_MEMORY_MANAGER_HDRS}
+)
+
 find_package(GTest REQUIRED)
-add_executable(memory_test memory_test.cc ${CUDA_MEMORY_MANAGER_SRCS} ${CUDA_MEMORY_MANAGER_HDRS} $<TARGET_OBJECTS:proto-library>)
+add_executable(
+  memory_test
+  ${MEMORY_TEST_SRCS}
+  ${MEMORY_TEST_HDRS}
+  $<TARGET_OBJECTS:proto-library>
+)
 set_target_properties(
   memory_test
   PROPERTIES

@@ -1,8 +1,35 @@
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gtest/gtest.h"
 
 #include <cuda_runtime_api.h>
 #include "src/core/cuda_memory_manager.h"
 #include "src/core/cuda_utils.h"
+#include "src/core/memory.h"
+#include "src/core/pinned_memory_manager.h"
 
 namespace ni = nvidia::inferenceserver;
 
@@ -155,4 +182,175 @@ TEST_F(CudaMemoryManagerTest, MultipleDevice)
   EXPECT_TRUE(status.IsOk()) << status.Message();
 }
 
+class AllocatedMemoryTest : public ::testing::Test {
+ protected:
+  // Per-test-suite set-up.
+  static void SetUpTestSuite()
+  {
+    // CUDA memory manager
+    {
+      ni::CudaMemoryManager::Options options{6.0, {{0, 1 << 10}}};
+      auto status = ni::CudaMemoryManager::Create(options);
+      ASSERT_TRUE(status.IsOk()) << status.Message();
+    }
+    // Pinned memory manager
+    {
+      ni::PinnedMemoryManager::Options options{1024};
+      auto status = ni::PinnedMemoryManager::Create(options);
+      ASSERT_TRUE(status.IsOk()) << status.Message();
+    }
+  }
+};
+
+TEST_F(AllocatedMemoryTest, AllocGPU)
+{
+  size_t expect_size = 512, actual_size;
+  TRTSERVER_Memory_Type expect_type = TRTSERVER_MEMORY_GPU, actual_type;
+  int64_t expect_id = 0, actual_id;
+  ni::AllocatedMemory memory(expect_size, expect_type, expect_id);
+
+  auto ptr = memory.BufferAt(0, &actual_size, &actual_type, &actual_id);
+  EXPECT_EQ(expect_size, actual_size)
+      << "Expect size: " << expect_size << ", got: " << actual_size;
+  EXPECT_EQ(expect_type, actual_type)
+      << "Expect type: " << expect_type << ", got: " << actual_type;
+  EXPECT_EQ(expect_id, actual_id)
+      << "Expect id: " << expect_id << ", got: " << actual_id;
+
+  // Sanity check on the pointer property
+  CHECK_POINTER_ATTRIBUTES(ptr, cudaMemoryTypeDevice, expect_id);
+}
+
+TEST_F(AllocatedMemoryTest, AllocPinned)
+{
+  size_t expect_size = 512, actual_size;
+  TRTSERVER_Memory_Type expect_type = TRTSERVER_MEMORY_CPU_PINNED, actual_type;
+  int64_t expect_id = 0, actual_id;
+  ni::AllocatedMemory memory(expect_size, expect_type, expect_id);
+
+  auto ptr = memory.BufferAt(0, &actual_size, &actual_type, &actual_id);
+  EXPECT_EQ(expect_size, actual_size)
+      << "Expect size: " << expect_size << ", got: " << actual_size;
+  EXPECT_EQ(expect_type, actual_type)
+      << "Expect type: " << expect_type << ", got: " << actual_type;
+  EXPECT_EQ(expect_id, actual_id)
+      << "Expect id: " << expect_id << ", got: " << actual_id;
+
+  // Sanity check on the pointer property
+  CHECK_POINTER_ATTRIBUTES(ptr, cudaMemoryTypeHost, expect_id);
+}
+
+TEST_F(AllocatedMemoryTest, AllocFallback)
+{
+  // Each allocation uses half of the target reserved memory
+  size_t expect_size = 600, actual_size;
+  TRTSERVER_Memory_Type expect_type = TRTSERVER_MEMORY_GPU, actual_type;
+  int64_t expect_id = 0, actual_id;
+
+  // First allocation
+  ni::AllocatedMemory cuda_memory(expect_size, expect_type, expect_id);
+
+  auto ptr = cuda_memory.BufferAt(0, &actual_size, &actual_type, &actual_id);
+  EXPECT_EQ(expect_size, actual_size)
+      << "Expect size: " << expect_size << ", got: " << actual_size;
+  EXPECT_EQ(expect_type, actual_type)
+      << "Expect type: " << expect_type << ", got: " << actual_type;
+  EXPECT_EQ(expect_id, actual_id)
+      << "Expect id: " << expect_id << ", got: " << actual_id;
+
+  // Sanity check on the pointer property
+  CHECK_POINTER_ATTRIBUTES(ptr, cudaMemoryTypeDevice, expect_id);
+
+  // Second allocation, should trigger fallback from CUDA -> pinned memory
+  ni::AllocatedMemory pinned_memory(expect_size, expect_type, expect_id);
+
+  ptr = pinned_memory.BufferAt(0, &actual_size, &actual_type, &actual_id);
+  EXPECT_EQ(expect_size, actual_size)
+      << "Expect size: " << expect_size << ", got: " << actual_size;
+  EXPECT_EQ(TRTSERVER_MEMORY_CPU_PINNED, actual_type)
+      << "Expect type: " << TRTSERVER_MEMORY_CPU_PINNED
+      << ", got: " << actual_type;
+
+  // Sanity check on the pointer property
+  CHECK_POINTER_ATTRIBUTES(ptr, cudaMemoryTypeHost, expect_id);
+
+  // Third allocation, CUDA -> pinned -> non-pinned
+  ni::AllocatedMemory system_memory(expect_size, expect_type, expect_id);
+
+  ptr = system_memory.BufferAt(0, &actual_size, &actual_type, &actual_id);
+  EXPECT_EQ(expect_size, actual_size)
+      << "Expect size: " << expect_size << ", got: " << actual_size;
+  EXPECT_EQ(TRTSERVER_MEMORY_CPU, actual_type)
+      << "Expect type: " << TRTSERVER_MEMORY_CPU_PINNED
+      << ", got: " << actual_type;
+
+  // Sanity check on the pointer property
+  cudaPointerAttributes attr;
+  EXPECT_EQ(cudaPointerGetAttributes(&attr, ptr), cudaErrorInvalidValue)
+      << "Expect cudaErrorInvalidValue is returned for non-pinned memory";
+
+  // Note: After CUDA 11.0, we can verify non-pinned memory with the macro,
+  // but before that, only check cudaErrorInvalidValue is returned.
+  //
+  // CHECK_POINTER_ATTRIBUTES(ptr, cudaMemoryTypeUnregistered, expect_id);
+}
+
+TEST_F(AllocatedMemoryTest, Release)
+{
+  // Similar to above, but verify that the memory will be released once
+  // out of scope
+  // Each allocation uses half of the target reserved memory
+  size_t expect_size = 600, actual_size;
+  TRTSERVER_Memory_Type expect_type = TRTSERVER_MEMORY_GPU, actual_type;
+  int64_t expect_id = 0, actual_id;
+
+  {
+    // First allocation
+    ni::AllocatedMemory cuda_memory(expect_size, expect_type, expect_id);
+
+    auto ptr = cuda_memory.BufferAt(0, &actual_size, &actual_type, &actual_id);
+    EXPECT_EQ(expect_size, actual_size)
+        << "Expect size: " << expect_size << ", got: " << actual_size;
+    EXPECT_EQ(expect_type, actual_type)
+        << "Expect type: " << expect_type << ", got: " << actual_type;
+    EXPECT_EQ(expect_id, actual_id)
+        << "Expect id: " << expect_id << ", got: " << actual_id;
+
+    // Sanity check on the pointer property
+    CHECK_POINTER_ATTRIBUTES(ptr, cudaMemoryTypeDevice, expect_id);
+
+    // Second allocation, should trigger fallback from CUDA -> pinned memory
+    ni::AllocatedMemory pinned_memory(expect_size, expect_type, expect_id);
+
+    ptr = pinned_memory.BufferAt(0, &actual_size, &actual_type, &actual_id);
+    EXPECT_EQ(expect_size, actual_size)
+        << "Expect size: " << expect_size << ", got: " << actual_size;
+    EXPECT_EQ(TRTSERVER_MEMORY_CPU_PINNED, actual_type)
+        << "Expect type: " << TRTSERVER_MEMORY_CPU_PINNED
+        << ", got: " << actual_type;
+
+    // Sanity check on the pointer property
+    CHECK_POINTER_ATTRIBUTES(ptr, cudaMemoryTypeHost, expect_id);
+  }
+
+  // Third allocation, should not trigger fallback
+  ni::AllocatedMemory memory(expect_size, expect_type, expect_id);
+
+  auto ptr = memory.BufferAt(0, &actual_size, &actual_type, &actual_id);
+  EXPECT_EQ(expect_size, actual_size)
+      << "Expect size: " << expect_size << ", got: " << actual_size;
+  EXPECT_EQ(expect_type, actual_type)
+      << "Expect type: " << expect_type << ", got: " << actual_type;
+
+  // Sanity check on the pointer property
+  CHECK_POINTER_ATTRIBUTES(ptr, cudaMemoryTypeDevice, expect_id);
+}
+
 }  // namespace
+
+int
+main(int argc, char** argv)
+{
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
