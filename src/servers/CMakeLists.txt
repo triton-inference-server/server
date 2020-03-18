@@ -120,8 +120,8 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
       HTTP_ENDPOINT_HDRS
       http_server.h
       )
-  endif() # TRTIS_ENABLE_HTTP
-  if(${TRTIS_ENABLE_HTTP_V2})
+  endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
+  if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_METRICS})
     list(APPEND
       HTTP_ENDPOINT_SRCS
       http_server_v2.cc
@@ -130,7 +130,7 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS} OR ${TRTIS_ENABLE_HTTP_V2})
       HTTP_ENDPOINT_HDRS
       http_server_v2.h
       )
-  endif() # TRTIS_ENABLE_HTTP_V2
+  endif() # TRTIS_ENABLE_HTTP_V2 || TRTIS_ENABLE_METRICS
 
   add_library(
     http-endpoint-library EXCLUDE_FROM_ALL OBJECT
