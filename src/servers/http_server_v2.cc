@@ -271,7 +271,6 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       }
     }
 
-    void SetRequestId(uint64_t request_id) { request_id_ = request_id; }
     evhtp_request_t* EvHtpRequest() const { return req_; }
 
     static void InferComplete(
@@ -288,7 +287,6 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
    private:
     evhtp_request_t* req_;
     evthr_t* thread_;
-    uint64_t request_id_;
     const char* const server_id_;
     const uint64_t unique_id_;
   };
@@ -1154,7 +1152,7 @@ HTTPAPIServerV2::EVBufferToInput(
             .c_str());
   }
 
-  // Set InferRequest request_id
+  // Set InferenceRequest request_id
   const char* id = document["id"].GetString();
   RETURN_IF_ERR(TRTSERVER2_InferenceRequestSetId(irequest, id));
 
@@ -1486,7 +1484,9 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
 {
   rapidjson::Document::AllocatorType& allocator =
       response_meta_data_.response_json_.GetAllocator();
-  std::string request_id_str = std::to_string(request_id_);
+  const char* request_id;
+  TRTSERVER2_InferenceRequestId(request, &request_id);
+  std::string request_id_str = std::string(request_id);
   rapidjson::Value id_val(request_id_str.c_str(), request_id_str.size());
   response_meta_data_.response_json_.AddMember("id", id_val, allocator);
   TRTSERVER_Error* err;
