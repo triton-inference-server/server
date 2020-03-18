@@ -187,12 +187,6 @@ class AllocatedMemoryTest : public ::testing::Test {
   // Per-test-suite set-up.
   static void SetUpTestSuite()
   {
-    // CUDA memory manager
-    {
-      ni::CudaMemoryManager::Options options{6.0, {{0, 1 << 10}}};
-      auto status = ni::CudaMemoryManager::Create(options);
-      ASSERT_TRUE(status.IsOk()) << status.Message();
-    }
     // Pinned memory manager
     {
       ni::PinnedMemoryManager::Options options{1024};
@@ -200,6 +194,16 @@ class AllocatedMemoryTest : public ::testing::Test {
       ASSERT_TRUE(status.IsOk()) << status.Message();
     }
   }
+
+  // Set up CUDA memory manager per test for special fallback case
+  void SetUp() override
+  {
+    ni::CudaMemoryManager::Options options{6.0, {{0, 1 << 10}}};
+    auto status = ni::CudaMemoryManager::Create(options);
+    ASSERT_TRUE(status.IsOk()) << status.Message();
+  }
+
+  void TearDown() override { TestingCudaMemoryManager::Reset(); }
 };
 
 TEST_F(AllocatedMemoryTest, AllocGPU)
@@ -293,6 +297,29 @@ TEST_F(AllocatedMemoryTest, AllocFallback)
   // but before that, only check cudaErrorInvalidValue is returned.
   //
   // CHECK_POINTER_ATTRIBUTES(ptr, cudaMemoryTypeUnregistered, expect_id);
+}
+
+TEST_F(AllocatedMemoryTest, AllocFallbackNoCuda)
+{
+  // Test fallback in the case where CUDA memory manager is not properly created
+  TestingCudaMemoryManager::Reset();
+
+  size_t expect_size = 600, actual_size;
+  TRTSERVER_Memory_Type expect_type = TRTSERVER_MEMORY_GPU, actual_type;
+  int64_t expect_id = 0, actual_id;
+
+  // CUDA memory allocation should trigger fallback to allocate pinned memory
+  ni::AllocatedMemory pinned_memory(expect_size, expect_type, expect_id);
+
+  auto ptr = pinned_memory.BufferAt(0, &actual_size, &actual_type, &actual_id);
+  EXPECT_EQ(expect_size, actual_size)
+      << "Expect size: " << expect_size << ", got: " << actual_size;
+  EXPECT_EQ(TRTSERVER_MEMORY_CPU_PINNED, actual_type)
+      << "Expect type: " << TRTSERVER_MEMORY_CPU_PINNED
+      << ", got: " << actual_type;
+
+  // Sanity check on the pointer property
+  CHECK_POINTER_ATTRIBUTES(ptr, cudaMemoryTypeHost, expect_id);
 }
 
 TEST_F(AllocatedMemoryTest, Release)

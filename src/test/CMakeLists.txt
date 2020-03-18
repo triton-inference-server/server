@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -122,7 +122,12 @@ set_target_properties(
     INSTALL_RPATH_USE_LINK_PATH FALSE
     INSTALL_RPATH ""
 )
-target_include_directories(memory_test PRIVATE ${GTEST_INCLUDE_DIR} PRIVATE ${CUDA_INCLUDE_DIRS} PRIVATE ${CNMEM_PATH}/include)
+target_include_directories(
+  memory_test
+  PRIVATE ${GTEST_INCLUDE_DIR}
+  PRIVATE ${CUDA_INCLUDE_DIRS}
+  PRIVATE ${CNMEM_PATH}/include
+)
 target_link_libraries(
   memory_test
   PRIVATE ${GTEST_LIBRARY}
