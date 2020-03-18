@@ -679,7 +679,9 @@ class InferenceServerClient:
               model_name,
               model_version="",
               request_id=None,
-              parameters=None,
+              sequence_id=0,
+              sequence_start=False,
+              sequence_end=False,
               headers=None):
         """Run synchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
@@ -703,11 +705,20 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
-        parameters: dict
-            Optional inference parameters described as key-value pairs.
+        sequence_id: int
+            Indicates which sequence does the request belongs to. All inference
+            requests that belong to the same sequence must use the same sequence
+            ID. A sequence ID of 0 indicates the inference request is not part of
+            a sequence. Default value is 0.
+        sequence_start: bool
+            Indicates whether the request is first in the sequence. Default value
+            is False.
+        sequence_end: bool
+            Indicates whether the request is last in the sequence. Default value
+            is False.
         headers: dict
             Optional dictionary specifying additional HTTP
-            headers to include in the request.
+            headers to include in the request
 
         Returns
         -------
@@ -745,7 +756,6 @@ class InferenceServerClient:
                     model_name,
                     model_version="",
                     request_id=None,
-                    parameters=None,
                     headers=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
@@ -776,8 +786,17 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
-        parameters: dict
-            Optional inference parameters described as key-value pairs.
+        sequence_id: int
+            Indicates which sequence does the request belongs to. All inference
+            requests that belong to the same sequence must use the same sequence
+            ID. A sequence ID of 0 indicates the inference request is not part of
+            a sequence. Default value is 0.
+        sequence_start: bool
+            Indicates whether the request is first in the sequence. Default value
+            is False.
+        sequence_end: bool
+            Indicates whether the request is last in the sequence. Default value
+            is False.
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
