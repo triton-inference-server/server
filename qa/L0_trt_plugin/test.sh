@@ -35,6 +35,8 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+export CUDA_VISIBLE_DEVICES=0
+
 CLIENT_LOG="./client.log"
 PLUGIN_TEST=trt_plugin_test.py
 

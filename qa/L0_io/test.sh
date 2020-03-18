@@ -35,6 +35,8 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+
 IO_TEST_UTIL=./memory_alloc
 CLIENT_LOG="./client.log"
 MODELSDIR=`pwd`/models
