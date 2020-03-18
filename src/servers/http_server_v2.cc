@@ -1128,36 +1128,35 @@ HTTPAPIServerV2::EVBufferToJson(
     rapidjson::Document* document, evbuffer_iovec* v, int* v_idx,
     const size_t length, int n)
 {
-  size_t offset = 0, length_tmp = length;
-  char *json_base;
+  size_t offset = 0, remaining_length = length;
+  char* json_base;
   std::vector<char> json_buffer;
 
   // No need to memcpy when number of iovecs is 1
-  if (n == 1) {
+  if ((n > 0) and (v[0].iov_len >= remaining_length)) {
     json_base = static_cast<char*>(v[0].iov_base);
-    if (v[0].iov_len > length_tmp) {
-      v[0].iov_base = static_cast<void*>(json_base + length_tmp);
-      v[0].iov_len -= length_tmp;
-      length_tmp = 0;
-    } else if (v[0].iov_len == length_tmp)
-      {
-        length_tmp = 0;
-        *v_idx += 1;
-      }
+    if (v[0].iov_len > remaining_length) {
+      v[0].iov_base = static_cast<void*>(json_base + remaining_length);
+      v[0].iov_len -= remaining_length;
+      remaining_length = 0;
+    } else if (v[0].iov_len == remaining_length) {
+      remaining_length = 0;
+      *v_idx += 1;
+    }
   } else {
     json_buffer.resize(length);
     json_base = json_buffer.data();
-    while ((length_tmp > 0) && (*v_idx < n)) {
+    while ((remaining_length > 0) && (*v_idx < n)) {
       char* base = static_cast<char*>(v[*v_idx].iov_base);
       size_t base_size;
-      if (v[*v_idx].iov_len > length_tmp) {
-        base_size = length_tmp;
-        v[*v_idx].iov_base = static_cast<void*>(base + length_tmp);
-        v[*v_idx].iov_len -= length_tmp;
-        length_tmp = 0;
+      if (v[*v_idx].iov_len > remaining_length) {
+        base_size = remaining_length;
+        v[*v_idx].iov_base = static_cast<void*>(base + remaining_length);
+        v[*v_idx].iov_len -= remaining_length;
+        remaining_length = 0;
       } else {
         base_size = v[*v_idx].iov_len;
-        length_tmp -= v[*v_idx].iov_len;
+        remaining_length -= v[*v_idx].iov_len;
         *v_idx += 1;
       }
 
@@ -1166,12 +1165,12 @@ HTTPAPIServerV2::EVBufferToJson(
     }
   }
 
-  if (length_tmp != 0) {
+  if (remaining_length != 0) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INVALID_ARG,
         std::string(
             "unexpected size for request JSON, expecting " +
-            std::to_string(length_tmp) + " more bytes")
+            std::to_string(remaining_length) + " more bytes")
             .c_str());
   }
 
@@ -1219,9 +1218,9 @@ HTTPAPIServerV2::EVBufferToInput(
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
   int buffer_len = 0;
   if (header_length == 0) {
-    buffer_len = header_length;
-  } else {
     buffer_len = evbuffer_get_length(input_buffer);
+  } else {
+    buffer_len = header_length;
   }
   EVBufferToJson(&document, v, &v_idx, buffer_len, n);
 
@@ -1280,7 +1279,7 @@ HTTPAPIServerV2::EVBufferToInput(
       }
       else {
 #endif
-      // FIXMEV2 handle non-raw content types
+      // FIXMEV2 handle shared memory content types
       size_t byte_size;
       rapidjson::Value::ConstMemberIterator itr =
           request_input.FindMember("parameters");
@@ -1293,7 +1292,6 @@ HTTPAPIServerV2::EVBufferToInput(
         }
         // Handle binary data case
         const rapidjson::Value& params = itr->value;
-        size_t binary_offset = params["binary_data_offset"].GetInt();
         rapidjson::Value::ConstMemberIterator iter =
             params.FindMember("binary_data_size");
         if (iter != params.MemberEnd()) {
@@ -1322,19 +1320,19 @@ HTTPAPIServerV2::EVBufferToInput(
           byte_size = element_cnt * element_size;
         }
 
-        // Copy one block at a time
-        while ((byte_size > 0) && (v_idx_tmp < n)) {
-          char* base = static_cast<char*>(v[v_idx_tmp].iov_base) + next_offset;
+        // Process one block at a time
+        while ((byte_size > 0) && (v_idx < n)) {
+          char* base = static_cast<char*>(v[v_idx].iov_base);
           size_t base_size;
-          if ((v[v_idx_tmp].iov_len - next_offset) > byte_size) {
+          if (v[v_idx].iov_len > byte_size) {
             base_size = byte_size;
-            next_offset = byte_size;
+            v[v_idx].iov_base = static_cast<void*>(base + byte_size);
+            v[v_idx].iov_len -= byte_size;
             byte_size = 0;
           } else {
-            base_size = v[v_idx_tmp].iov_len - next_offset;
-            byte_size -= v[v_idx_tmp].iov_len - next_offset;
-            next_offset = 0;
-            v_idx_tmp++;
+            base_size = v[v_idx].iov_len;
+            byte_size -= v[v_idx].iov_len;
+            v_idx++;
           }
 
           RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
