@@ -53,9 +53,9 @@ static_assert(
 #if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
 #include "src/servers/http_server.h"
 #endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
-#if defined(TRTIS_ENABLE_HTTP_V2)
+#if defined(TRTIS_ENABLE_HTTP_V2) || defined(TRTIS_ENABLE_METRICS)
 #include "src/servers/http_server_v2.h"
-#endif  // TRTIS_ENABLE_HTTP_V2
+#endif  // TRTIS_ENABLE_HTTP_V2|| TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_GRPC
 #include "src/servers/grpc_server.h"
@@ -117,6 +117,7 @@ int32_t grpc_port_ = 8001;
 
 #ifdef TRTIS_ENABLE_METRICS
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
+std::unique_ptr<nvidia::inferenceserver::HTTPServerV2> metrics_service_v2_;
 bool allow_metrics_ = true;
 int32_t metrics_port_ = 8002;
 #endif  // TRTIS_ENABLE_METRICS
@@ -567,6 +568,24 @@ StartMetricsService(
 
   return err;
 }
+
+TRTSERVER_Error*
+StartMetricsV2Service(
+    std::unique_ptr<nvidia::inferenceserver::HTTPServerV2>* service,
+    const std::shared_ptr<TRTSERVER_Server>& server)
+{
+  TRTSERVER_Error* err =
+      nvidia::inferenceserver::HTTPServerV2::CreateMetricsServer(
+          server, metrics_port_, 1 /* HTTP thread count */, service);
+  if (err == nullptr) {
+    err = (*service)->Start();
+  }
+  if (err != nullptr) {
+    service->reset();
+  }
+
+  return err;
+}
 #endif  // TRTIS_ENABLE_METRICS
 
 bool
@@ -640,7 +659,7 @@ StartEndpoints(
     TRTSERVER_Error* err = StartHttpV2Service(
         &http_services_v2_, server, trace_manager, shm_manager, port_map);
     if (err != nullptr) {
-      LOG_TRTSERVER_ERROR(err, "failed to start HTTP service");
+      LOG_TRTSERVER_ERROR(err, "failed to start HTTP V2 service");
       return false;
     }
   }
@@ -649,10 +668,19 @@ StartEndpoints(
 #ifdef TRTIS_ENABLE_METRICS
   // Enable metrics endpoint if requested...
   if (metrics_port_ != -1) {
-    TRTSERVER_Error* err = StartMetricsService(&metrics_service_, server);
-    if (err != nullptr) {
-      LOG_TRTSERVER_ERROR(err, "failed to start Metrics service");
-      return false;
+    if (api_version_ == 1) {
+      TRTSERVER_Error* err = StartMetricsService(&metrics_service_, server);
+      if (err != nullptr) {
+        LOG_TRTSERVER_ERROR(err, "failed to start Metrics service");
+        return false;
+      }
+    } else if (api_version_ == 2) {
+      TRTSERVER_Error* err =
+          StartMetricsV2Service(&metrics_service_v2_, server);
+      if (err != nullptr) {
+        LOG_TRTSERVER_ERROR(err, "failed to start Metrics V2 service");
+        return false;
+      }
     }
   }
 #endif  // TRTIS_ENABLE_METRICS
@@ -684,7 +712,7 @@ StopEndpoints()
     if (http_eps != nullptr) {
       TRTSERVER_Error* err = http_eps->Stop();
       if (err != nullptr) {
-        LOG_TRTSERVER_ERROR(err, "failed to stop HTTP service");
+        LOG_TRTSERVER_ERROR(err, "failed to stop HTTP V2 service");
         ret = false;
       }
     }
@@ -726,6 +754,16 @@ StopEndpoints()
     }
 
     metrics_service_.reset();
+  }
+
+  if (metrics_service_v2_) {
+    TRTSERVER_Error* err = metrics_service_v2_->Stop();
+    if (err != nullptr) {
+      LOG_TRTSERVER_ERROR(err, "failed to stop Metrics V2 service");
+      ret = false;
+    }
+
+    metrics_service_v2_.reset();
   }
 #endif  // TRTIS_ENABLE_METRICS
 
