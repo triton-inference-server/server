@@ -204,7 +204,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
         model_regex_(
-            R"(/v2/models/([^/]+)(?:/version/([0-9]+))?(/infer|/ready)?)")
+            R"(/v2/models/([^/]+)(?:/version/([0-9]+))?(?:/(infer|ready))?)")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
