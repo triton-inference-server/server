@@ -1,4 +1,5 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+#!/bin/bash
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,42 +25,29 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.5)
-project (trtis-test-utils)
+TEST_LOG="./memory_test.log"
+MEMORY_TEST=./memory_test
 
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
+RET=0
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Werror -Wno-deprecated-declarations")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-set(CMAKE_CXX_STANDARD 11)
+# Must run on multiple devices
+export CUDA_VISIBLE_DEVICES=0,1
 
-if(${TRTIS_ENABLE_GPU})
-  add_definitions(-DTRTIS_ENABLE_GPU=1)
-  add_definitions(-DTRTIS_MIN_COMPUTE_CAPABILITY=${TRTIS_MIN_COMPUTE_CAPABILITY})
-endif() # TRTIS_ENABLE_GPU
+rm -f TEST_LOG
 
-include_directories("${PROJECT_SOURCE_DIR}/../..")
-include_directories("${PROJECT_BINARY_DIR}")
+set +e
+$MEMORY_TEST >>$TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
 
-#
-# CUDA
-#
-if(${TRTIS_ENABLE_GPU})
-  find_package(CUDA REQUIRED)
-  message(STATUS "Using CUDA ${CUDA_VERSION}")
-  set(CUDA_NVCC_FLAGS -std=c++11)
-endif() # TRTIS_ENABLE_GPU
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    cat $TEST_LOG
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
 
-#
-# Protobuf
-#
-set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
-find_package(Protobuf CONFIG REQUIRED)
-message(STATUS "Using protobuf ${Protobuf_VERSION}")
-include_directories(${Protobuf_INCLUDE_DIRS})
-
-add_subdirectory(../../src/core src/core)
-add_subdirectory(../../src/test src/test)
+exit $RET

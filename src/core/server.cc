@@ -149,9 +149,10 @@ InferenceServer::Init()
   CudaMemoryManager::Options cuda_options(
       min_supported_compute_capability_, cuda_memory_pool_size_);
   status = CudaMemoryManager::Create(cuda_options);
+  // If CUDA memory manager can't be created, just log error as the
+  // server can still function properly
   if (!status.IsOk()) {
-    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
-    return status;
+    LOG_ERROR << status.Message();
   }
 #endif  // TRTIS_ENABLE_GPU
 

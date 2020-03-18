@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,3 +43,102 @@ install(
   RUNTIME DESTINATION bin
 )
 endif() # TRTIS_ENABLE_TENSORRT
+
+#
+# CudaMemoryManger
+#
+set(
+  CUDA_MEMORY_MANAGER_SRCS
+  ../core/cuda_memory_manager.cc
+  ../core/status.cc
+  ../core/cuda_utils.cc
+)
+
+set(
+  CUDA_MEMORY_MANAGER_HDRS
+  ../core/cuda_memory_manager.h
+  ../core/status.h
+  ../core/cuda_utils.h
+)
+
+#
+# PinnedMemoryManger
+#
+set(
+  PINNED_MEMORY_MANAGER_SRCS
+  ../core/pinned_memory_manager.cc
+  ../core/status.cc
+  ../core/cuda_utils.cc
+)
+
+set(
+  PINNED_MEMORY_MANAGER_HDRS
+  ../core/pinned_memory_manager.h
+  ../core/status.h
+  ../core/cuda_utils.h
+)
+
+#
+# Memory
+#
+set(
+  MEMORY_SRCS
+  ../core/memory.cc
+)
+
+set(
+  MEMORY_HDRS
+  ../core/memory.h
+  ../core/constants.h
+)
+
+set(
+  MEMORY_TEST_SRCS
+  memory_test.cc
+  ${MEMORY_SRCS}
+  ${CUDA_MEMORY_MANAGER_SRCS}
+  ${PINNED_MEMORY_MANAGER_SRCS}
+)
+
+set(
+  MEMORY_TEST_HDRS
+  ${MEMORY_HDRS}
+  ${CUDA_MEMORY_MANAGER_HDRS}
+  ${PINNED_MEMORY_MANAGER_HDRS}
+)
+
+find_package(GTest REQUIRED)
+add_executable(
+  memory_test
+  ${MEMORY_TEST_SRCS}
+  ${MEMORY_TEST_HDRS}
+  $<TARGET_OBJECTS:proto-library>
+)
+set_target_properties(
+  memory_test
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH ""
+)
+target_include_directories(
+  memory_test
+  PRIVATE ${GTEST_INCLUDE_DIR}
+  PRIVATE ${CUDA_INCLUDE_DIRS}
+  PRIVATE ${CNMEM_PATH}/include
+)
+target_link_libraries(
+  memory_test
+  PRIVATE ${GTEST_LIBRARY}
+  PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE ${CUDA_LIBRARIES}
+  PRIVATE -lpthread
+  PRIVATE protobuf::libprotobuf
+  PRIVATE -L${CNMEM_PATH}/lib
+  PRIVATE -lcnmem
+)
+install(
+  TARGETS memory_test
+  RUNTIME DESTINATION bin
+)
