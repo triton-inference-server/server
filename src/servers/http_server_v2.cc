@@ -1123,6 +1123,26 @@ HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
   TRTSERVER_ErrorDelete(err);
 }
 
+bool
+CheckBinaryInputData(
+    const rapidjson::Value& request_input, size_t* byte_size)
+{
+  bool binary_input = false;
+  rapidjson::Value::ConstMemberIterator itr =
+      request_input.FindMember("parameters");
+  if (itr != request_input.MemberEnd()) {
+    const rapidjson::Value& params = itr->value;
+    rapidjson::Value::ConstMemberIterator iter =
+        params.FindMember("binary_data_size");
+    if (iter != params.MemberEnd()) {
+      *byte_size = iter->value.GetInt();
+      binary_input = true;
+    }
+  }
+
+  return binary_input;
+}
+
 TRTSERVER_Error*
 HTTPAPIServerV2::EVBufferToJson(
     rapidjson::Document* document, evbuffer_iovec* v, int* v_idx,
@@ -1255,6 +1275,7 @@ HTTPAPIServerV2::EVBufferToInput(
       // If input is in shared memory then verify that the size is
       // correct and set input from the shared memory.
 #if 0
+      // FIXMEV2 handle shared memory inputs
       if (io.has_shared_memory()) {
         if (byte_size != io.shared_memory().byte_size()) {
           return TRTSERVER_ErrorNew(
@@ -1276,50 +1297,19 @@ HTTPAPIServerV2::EVBufferToInput(
         RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
             request_provider, io.name().c_str(), base, byte_size, memory_type,
             memory_type_id));
-      }
-      else {
+      } else {
 #endif
-      // FIXMEV2 handle shared memory content types
       size_t byte_size;
-      rapidjson::Value::ConstMemberIterator itr =
-          request_input.FindMember("parameters");
-      if (itr != request_input.MemberEnd()) {
-        if (header_length == 0) {
-          return TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INVALID_ARG,
-              "must specify valid 'Infer-Header-Content-Length' in request "
-              "header when passing inputs in binary data format");
-        }
-        // Handle binary data case
-        const rapidjson::Value& params = itr->value;
-        rapidjson::Value::ConstMemberIterator iter =
-            params.FindMember("binary_data_size");
-        if (iter != params.MemberEnd()) {
-          byte_size = iter->value.GetInt();
-        } else {
-          const char* dtype = request_input["datatype"].GetString();
-          int element_size = GetDataTypeByteSize(dtype);
-          if (element_size == 0) {
-            return TRTSERVER_ErrorNew(
-                TRTSERVER_ERROR_INVALID_ARG,
-                std::string(
-                    "must specify 'binary_data_size' for input '" +
-                    std::string(request_input["name"].GetString()) +
-                    "' of datatype BYTES")
-                    .c_str());
-          }
-          const rapidjson::Value& shape = request_input["shape"];
-          int element_cnt = 0;
-          for (rapidjson::SizeType i = 0; i < shape.Size(); i++) {
-            if (element_cnt == 0) {
-              element_cnt = shape[i].GetInt();
-            } else {
-              element_cnt *= shape[i].GetInt();
-            }
-          }
-          byte_size = element_cnt * element_size;
-        }
+      bool binary_input = CheckBinaryInputData(request_input, &byte_size);
+      if (binary_input && (header_length == 0)) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            "must specify valid 'Infer-Header-Content-Length' in request "
+            "header and 'binary_data_size' when passing inputs in binary data "
+            "format");
+      }
 
+      if (binary_input) {
         // Process one block at a time
         while ((byte_size > 0) && (v_idx < n)) {
           char* base = static_cast<char*>(v[v_idx].iov_base);
@@ -1358,7 +1348,7 @@ HTTPAPIServerV2::EVBufferToInput(
             0 /* memory_type_id */));
       }
 #if 0
-      }
+    }
 #endif
     }
   }
@@ -1380,6 +1370,7 @@ HTTPAPIServerV2::EVBufferToInput(
   response_json.CopyFrom(outputs_array, allocator);
 
 #if 0
+  // FIXMEV2 handle shared memory outputs
   // Initialize System Memory for Output if it uses shared memory
   for (const auto& io : request_header.output()) {
     if (io.has_shared_memory()) {
