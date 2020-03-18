@@ -30,7 +30,6 @@
 #include <set>
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
-#include "src/core/model_config_utils.h"
 
 namespace {
 
@@ -67,6 +66,12 @@ CudaMemoryManager::~CudaMemoryManager()
   }
 }
 
+void
+CudaMemoryManager::Reset()
+{
+  instance_.reset();
+}
+
 Status
 CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
 {
@@ -76,8 +81,6 @@ CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
         "CudaMemoryManager has been created");
   }
 
-  // Log error instead of returning failure at initialization so that
-  // server can start up.
   std::set<int> supported_gpus;
   auto status = GetSupportedGPUs(
       &supported_gpus, options.min_supported_compute_capability_);
@@ -94,18 +97,15 @@ CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
       }
     }
 
-    auto status =
-        cnmemInit(devices.size(), devices.data(), CNMEM_FLAGS_CANNOT_GROW);
-    if (status == CNMEM_STATUS_SUCCESS) {
-      // Use to finalize CNMeM properly when out of scope
-      instance_.reset(new CudaMemoryManager());
-    } else {
-      LOG_ERROR << "Failed to finalize CUDA memory manager: "
-                << cnmemGetErrorString(status);
-    }
+    RETURN_IF_CNMEM_ERROR(
+        cnmemInit(devices.size(), devices.data(), CNMEM_FLAGS_CANNOT_GROW),
+        std::string("Failed to finalize CUDA memory manager"));
+    // Use to finalize CNMeM properly when out of scope
+    instance_.reset(new CudaMemoryManager());
   } else {
-    LOG_ERROR << "Failed to initialize CUDA memory manager: "
-              << status.Message();
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "Failed to initialize CUDA memory manager: " + status.Message());
   }
 
   return Status::Success;

@@ -36,7 +36,7 @@ namespace nvidia { namespace inferenceserver {
 // must be requested via functions provided by this class.
 class CudaMemoryManager {
  public:
-  // Options to configure CUDA memeory manager.
+  // Options to configure CUDA memory manager.
   struct Options {
     Options(double cc = 6.0, const std::map<int, uint64_t>& s = {})
         : min_supported_compute_capability_(cc), memory_pool_byte_size_(s)
@@ -47,6 +47,8 @@ class CudaMemoryManager {
     double min_supported_compute_capability_;
 
     // The size of CUDA memory reserved for the specified devices.
+    // The memory size will be rounded up to align with
+    // the default granularity (512 bytes).
     // No memory will be reserved for devices that is not listed.
     std::map<int, uint64_t> memory_pool_byte_size_;
   };
@@ -68,6 +70,10 @@ class CudaMemoryManager {
 
  protected:
   CudaMemoryManager() = default;
+
+  // Provide explicit control on the lifecycle of the CUDA memory manager,
+  // for testing only.
+  static void Reset();
 
  private:
   static std::unique_ptr<CudaMemoryManager> instance_;
