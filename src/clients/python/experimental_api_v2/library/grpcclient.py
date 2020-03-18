@@ -689,7 +689,9 @@ class InferenceServerClient:
             request.outputs.extend([infer_output._get_tensor()])
         if parameters:
             for param_key in parameters:
-                _set_parameter(request, key=param_key, value=parameters[param_key])
+                _set_parameter(request,
+                               key=param_key,
+                               value=parameters[param_key])
 
         return request
 
@@ -725,6 +727,7 @@ class InferenceServerClient:
         else:
             raise_error("unsupported value type for the parameter")
 
+
 class InferInput:
     """An object of InferInput class is used to describe
     input tensor for an inference request.
@@ -733,12 +736,21 @@ class InferInput:
     ----------
     name : str
         The name of input whose data will be described by this object
+    shape : list
+        The shape of the associated input. Default value is None.
+    datatype : str
+        The datatype of the associated input. Default is None.
 
     """
 
-    def __init__(self, name):
+    def __init__(self, name, shape=None, datatype=None):
         self._input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
         self._input.name = name
+        if shape:
+            self._input.ClearField('shape')
+            self._input.shape.extend(shape)
+        if datatype:
+            self._input.datatype = datatype
 
     def name(self):
         """Get the name of input associated with this object.
@@ -750,7 +762,6 @@ class InferInput:
         """
         return self._input.name
 
-    @property
     def datatype(self):
         """Get the datatype of input associated with this object.
 
@@ -761,19 +772,6 @@ class InferInput:
         """
         return self._input.datatype
 
-    @datatype.setter
-    def datatype(self, value):
-        """Sets the datatype for the input associated with this
-        object
-
-        Parameters
-        ----------
-        value : str
-            The datatype of input
-        """
-        self._input.datatype = value
-
-    @property
     def shape(self):
         """Get the shape of input associated with this object.
 
@@ -783,18 +781,6 @@ class InferInput:
             The shape of input
         """
         return self._input.shape
-
-    @shape.setter
-    def shape(self, value):
-        """Sets the shape of input associated with this object.
-
-        Parameters
-        ----------
-        value : list
-            The shape of input
-        """
-        self._input.ClearField('shape')
-        self._input.shape.extend(value)
 
     def set_data_from_numpy(self, input_tensor):
         """Set the tensor data (datatype, shape, contents) from the
@@ -840,7 +826,7 @@ class InferInput:
             param.string_param = value
         else:
             raise_error("unsupported value type for the parameter")
-    
+
     def clear_parameters(self):
         """Clears all the parameters that have been added to the input request.
         
@@ -906,7 +892,7 @@ class InferOutput:
             param.string_param = value
         else:
             raise_error("unsupported value type for the parameter")
-    
+
     def clear_parameters(self):
         """Clears all the parameters that have been added to the output request.
         

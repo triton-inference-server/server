@@ -26,6 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+import sys
 
 import tritonhttpclient.core as httpclient
 from tritonhttpclient.utils import InferenceServerException
@@ -55,29 +56,35 @@ if __name__ == '__main__':
     model_name = 'simple'
 
     # Health
-    if triton_client.is_server_live():
-        print("PASS: is_server_live")
+    if not triton_client.is_server_live():
+        print("FAILED : is_server_live")
+        sys.exit(1)
     
-    if triton_client.is_server_ready():
-        print("PASS: is_server_ready")
+    if not triton_client.is_server_ready():
+        print("FAILED : is_server_ready")
+        sys.exit(1)
 
-    if triton_client.is_model_ready(model_name):
-       print("PASS: is_model_ready")
+    if not triton_client.is_model_ready(model_name):
+        print("FAILED : is_model_ready")
+        sys.exit(1)
 
     # Metadata
     metadata = triton_client.get_server_metadata()
-    if (metadata['name'] == 'inference:0'):
-        print("PASS: get_server_metadata")
-    print(metadata)
+    if not (metadata['name'] == 'inference:0'):
+        print("FAILED : get_server_metadata")
+        sys.exit(1)
 
     metadata = triton_client.get_model_metadata(model_name)
-    if (metadata['name'] == model_name):
-        print("PASS: get_model_metadata")
-    print(metadata)
+    if not (metadata['name'] == model_name):
+        print("FAILED : get_model_metadata")
+        sys.exit(1)
 
     # Passing incorrect model name
     try:
         metadata = triton_client.get_model_metadata("wrong_model_name")
     except InferenceServerException as ex:
         if "no status available for unknown model" in ex.message():
-            print("PASS: detected wrong model")
+            sys.exit(0)
+
+    print("FAILED : get_model_metadata wrong_model_name")
+    sys.exit(1)

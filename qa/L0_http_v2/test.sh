@@ -68,11 +68,6 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-if [ $(cat ${CLIENT_LOG}.health | grep "PASS" | wc -l) -ne 7 ]; then
-    cat ${CLIENT_LOG}.health
-    RET=1
-fi
-
 kill $SERVER_PID
 wait $SERVER_PID
 
