@@ -1648,8 +1648,9 @@ TRTSERVER_ServerModelRepositoryIndex(
 
 // Overload to remove GRPC V2 dependency
 TRTSERVER_Error*
-TRTSERVER_ServerModelRepositoryIndexHTTP(
-    TRTSERVER_Server* server, const char*** models, uint64_t* models_count)
+TRTSERVER2_ServerModelRepositoryIndex(
+    TRTSERVER_Server* server, const char* const** models,
+    uint64_t* models_count)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 

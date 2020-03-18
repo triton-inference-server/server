@@ -304,6 +304,19 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestOutputData(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestRemoveAllOutputs(
     TRTSERVER2_InferenceRequest* inference_request);
 
+/// Get the indices of all unique models in the model repository.
+/// The caller does not own the returned strings and must not modify or
+/// delete them. The lifetime of the returned strings extends only as
+/// long as 'server' and must not be accessed once 'server' is deleted.
+/// \param server The inference server object.
+/// \param models Returns the model repository indices as an array of
+/// pointers to the name of each model.
+/// \param models_count Returns the number of models indices.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ServerModelRepositoryIndex(
+    TRTSERVER_Server* server, const char* const** models,
+    uint64_t* models_count);
+
 /// Type for inference completion callback function. If non-nullptr,
 /// the 'trace_manager' object is the trace manager associated with
 /// the request that is completing. The callback function takes
