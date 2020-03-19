@@ -33,7 +33,7 @@ CLIENT_LOG="./client.log"
 SERVER_LOG="./inference_server.log"
 
 DATADIR=`pwd`/models
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 source ../common/util.sh
 
 HP_ARR=(8000 8005 -1)

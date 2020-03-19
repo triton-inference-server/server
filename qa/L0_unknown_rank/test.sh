@@ -42,7 +42,7 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}
 CLIENT_LOG="./client.log"
 UNKNOWN_RANK_TEST=unknown_rank_test.py
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

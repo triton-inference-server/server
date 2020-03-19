@@ -30,7 +30,7 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG="./client.log"
 SHM_TEST=cuda_shared_memory_test.py
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 source ../common/util.sh
 
 RET=0

@@ -32,7 +32,7 @@ SIMPLE_CUDA_SHM_CLIENT_PY=../clients/simple_cuda_shm_client.py
 SIMPLE_CUDA_SHM_STRING_CLIENT=../clients/simple_cuda_shm_string_client
 SIMPLE_CUDA_SHM_STRING_CLIENT_PY=../clients/simple_cuda_shm_string_client.py
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS=--model-repository=`pwd`/models
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

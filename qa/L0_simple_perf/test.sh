@@ -54,7 +54,7 @@ CONCURRENCIES="1 8"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 source ../common/util.sh
 
 # Select the single GPU that will be available to the inference server
