@@ -522,16 +522,13 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    # FIXMEPV2: Add parameter support
-    def parameters(self):
-        raise_error("Not implemented yet")
-
     def infer(self,
               inputs,
               outputs,
               model_name,
               model_version="",
-              request_id=None):
+              request_id=None,
+              parameters=None):
         """Run synchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
 
@@ -554,6 +551,8 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
+        parameters: dict
+            Optional inference parameters described as key-value pairs.
 
         Returns
         -------
@@ -568,7 +567,8 @@ class InferenceServerClient:
         """
 
         request = self._get_inference_request(inputs, outputs, model_name,
-                                              model_version, request_id)
+                                              model_version, request_id,
+                                              parameters)
 
         try:
             response = self._client_stub.ModelInfer(request)
@@ -583,7 +583,8 @@ class InferenceServerClient:
                     outputs,
                     model_name,
                     model_version="",
-                    request_id=None):
+                    request_id=None,
+                    parameters=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
 
@@ -613,6 +614,8 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
+        parameters: dict
+            Optional inference parameters described as key-value pairs.
     
         Raises
         ------
@@ -628,7 +631,8 @@ class InferenceServerClient:
             callback(result=result)
 
         request = self._get_inference_request(inputs, outputs, model_name,
-                                              model_version, request_id)
+                                              model_version, request_id,
+                                              parameters)
 
         try:
             self._call_future = self._client_stub.ModelInfer.future(request)
@@ -637,7 +641,7 @@ class InferenceServerClient:
             raise_error_grpc(rpc_error)
 
     def _get_inference_request(self, inputs, outputs, model_name, model_version,
-                               request_id):
+                               request_id, parameters):
         """Creates and initializes an inference request.
 
         Parameters
@@ -659,11 +663,18 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
+        parameters: dict
+            Optional inference parameters described as key-value pairs.
 
         Returns
         -------
         ModelInferRequest
             The protobuf message holding the inference request.
+        
+        Raises
+        ------
+        InferenceServerException
+            If server fails to issue inference.
 
         """
 
@@ -676,8 +687,45 @@ class InferenceServerClient:
             request.inputs.extend([infer_input._get_tensor()])
         for infer_output in outputs:
             request.outputs.extend([infer_output._get_tensor()])
+        if parameters:
+            for param_key in parameters:
+                _set_parameter(request,
+                               key=param_key,
+                               value=parameters[param_key])
 
         return request
+
+    def _set_parameter(self, request, key, value):
+        """Adds the specified key-value pair to the request
+
+        Parameters
+        ----------
+        request : protobuf message
+            The ModelInferRequest object to add the parameter to.
+        key : str
+            The name of the parameter to be included in the request. 
+        value : str/int/bool
+            The value of the parameter
+
+        Raises
+        ------
+        InferenceServerException
+            If server fails to add the parameter to request.
+
+        """
+        if not type(key) is str:
+            raise_error(
+                "only string data type for key is supported in parameters")
+
+        param = request.parameters[key]
+        if type(value) is int:
+            param.int64_param = value
+        elif type(value) is bool:
+            param.bool_param = value
+        elif type(value) is str:
+            param.string_param = value
+        else:
+            raise_error("unsupported value type for the parameter")
 
 
 class InferInput:
@@ -688,12 +736,21 @@ class InferInput:
     ----------
     name : str
         The name of input whose data will be described by this object
+    shape : list
+        The shape of the associated input. Default value is None.
+    datatype : str
+        The datatype of the associated input. Default is None.
 
     """
 
-    def __init__(self, name):
+    def __init__(self, name, shape=None, datatype=None):
         self._input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
         self._input.name = name
+        if shape:
+            self._input.ClearField('shape')
+            self._input.shape.extend(shape)
+        if datatype:
+            self._input.datatype = datatype
 
     def name(self):
         """Get the name of input associated with this object.
@@ -705,7 +762,6 @@ class InferInput:
         """
         return self._input.name
 
-    @property
     def datatype(self):
         """Get the datatype of input associated with this object.
 
@@ -716,19 +772,6 @@ class InferInput:
         """
         return self._input.datatype
 
-    @datatype.setter
-    def datatype(self, value):
-        """Sets the datatype for the input associated with this
-        object
-
-        Parameters
-        ----------
-        value : str
-            The datatype of input
-        """
-        self._input.datatype = value
-
-    @property
     def shape(self):
         """Get the shape of input associated with this object.
 
@@ -738,18 +781,6 @@ class InferInput:
             The shape of input
         """
         return self._input.shape
-
-    @shape.setter
-    def shape(self, value):
-        """Sets the shape of input associated with this object.
-
-        Parameters
-        ----------
-        value : list
-            The shape of input
-        """
-        self._input.ClearField('shape')
-        self._input.shape.extend(value)
 
     def set_data_from_numpy(self, input_tensor):
         """Set the tensor data (datatype, shape, contents) from the
@@ -795,6 +826,12 @@ class InferInput:
             param.string_param = value
         else:
             raise_error("unsupported value type for the parameter")
+
+    def clear_parameters(self):
+        """Clears all the parameters that have been added to the input request.
+        
+        """
+        self._input.parameters.clear()
 
     def _get_tensor(self):
         """Retrieve the underlying InferInputTensor message.
@@ -855,6 +892,12 @@ class InferOutput:
             param.string_param = value
         else:
             raise_error("unsupported value type for the parameter")
+
+    def clear_parameters(self):
+        """Clears all the parameters that have been added to the output request.
+        
+        """
+        self._output.parameters.clear()
 
     def _get_tensor(self):
         """Retrieve the underlying InferRequestedOutputTensor message.

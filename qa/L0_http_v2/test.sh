@@ -1,4 +1,5 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+#!/bin/bash
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,33 +25,59 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.5)
+REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
 
-if(${TRTIS_ENABLE_HTTP_V2})
-  install(
-    PROGRAMS
-      simple_http_v2_health_metadata.py
-      simple_http_v2_infer_client.py
-    DESTINATION python
-  )
-endif() # TRTIS_ENABLE_HTTP_V2
+set +e
 
-if(${TRTIS_ENABLE_GRPC_V2})
-  install(
-    PROGRAMS
-      grpc_v2_client.py
-      grpc_v2_explicit_byte_content_client.py
-      grpc_v2_explicit_int_content_client.py
-      grpc_v2_explicit_int8_content_client.py
-      grpc_v2_image_client.py
-      simple_grpc_v2_class_client.py
-      simple_grpc_v2_cudashm_client.py
-      simple_grpc_v2_health_metadata.py
-      simple_grpc_v2_async_infer_client.py
-      simple_grpc_v2_infer_client.py
-      simple_grpc_v2_string_infer_client.py
-      simple_grpc_v2_shm_client.py
-      simple_grpc_v2_model_control.py
-    DESTINATION python
-  )
-endif() # TRTIS_ENABLE_GRPC_V2
+RET=0
+
+SIMPLE_HEALTH_CLIENT=../clients/simple_http_v2_health_metadata.py
+
+rm -f *.log
+rm -f *.log.*
+
+CLIENT_LOG=`pwd`/client.log
+DATADIR=`pwd`/models
+SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER_ARGS="--model-repository=$DATADIR --api-version 2"
+source ../common/util.sh
+
+# FIXMEPV2
+# Cannot use run_server since it repeatedly curls the (old) HTTP health endpoint to know
+# when the server is ready. This endpoint would not exist in future.
+run_server_nowait
+sleep 10
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Test health
+python $SIMPLE_HEALTH_CLIENT -v >> ${CLIENT_LOG}.health 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.health
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set -e
+
+
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+exit $RET

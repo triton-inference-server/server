@@ -100,17 +100,13 @@ if __name__ == '__main__':
 
     # Set the parameters to use data from shared memory
     inputs = []
-    inputs.append(grpcclient.InferInput('INPUT0'))
+    inputs.append(grpcclient.InferInput('INPUT0', [1,16], "INT32"))
     inputs[-1].set_parameter("shared_memory_region", "input0_data")
     inputs[-1].set_parameter("shared_memory_byte_size", input_byte_size)
-    inputs[-1].datatype = "INT32"
-    inputs[-1].shape = [1, 16]
 
-    inputs.append(grpcclient.InferInput('INPUT1'))
+    inputs.append(grpcclient.InferInput('INPUT1', [1,16], "INT32"))
     inputs[-1].set_parameter("shared_memory_region", "input1_data")
     inputs[-1].set_parameter("shared_memory_byte_size", input_byte_size)
-    inputs[-1].datatype = "INT32"
-    inputs[-1].shape = [1, 16]
 
     outputs = []
     outputs.append(grpcclient.InferOutput('OUTPUT0'))
