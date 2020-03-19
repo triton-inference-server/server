@@ -35,6 +35,8 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+export CUDA_VISIBLE_DEVICES=0
+
 LIBTORCH_OP_VAL_CLIENT=lt_op_val_client.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/libtorch_model_store2

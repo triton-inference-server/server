@@ -35,6 +35,8 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+
 CLIENT_LOG_BASE="./client"
 
 DATADIR=`pwd`/models

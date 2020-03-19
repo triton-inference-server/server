@@ -35,6 +35,8 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+export CUDA_VISIBLE_DEVICES=0
+
 CLIENT=../clients/simple_perf_client
 BACKENDS=${BACKENDS:="graphdef savedmodel"}
 WARMUP_ITERS=20

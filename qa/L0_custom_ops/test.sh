@@ -35,6 +35,8 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+export CUDA_VISIBLE_DEVICES=0
+
 CLIENT_LOG="./client.log"
 ZERO_OUT_TEST=zero_out_test.py
 CUDA_OP_TEST=cuda_op_test.py

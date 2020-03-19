@@ -35,6 +35,8 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+export CUDA_VISIBLE_DEVICES=0
+
 CLIENT_LOG="./client.log"
 LC_TEST=lifecycle_test.py
 
@@ -57,7 +59,7 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-sleep 5
+sleep 10
 
 rm -f $CLIENT_LOG
 set +e
@@ -82,7 +84,7 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-sleep 5
+sleep 10
 
 rm -f $CLIENT_LOG
 set +e
@@ -109,7 +111,7 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-sleep 5
+sleep 10
 
 rm -f $CLIENT_LOG
 set +e
@@ -136,7 +138,7 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-sleep 5
+sleep 10
 
 rm -f $CLIENT_LOG
 set +e
@@ -597,7 +599,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_multiple_model_repository_control
 rm -fr models models_0 savedmodel_float32_float32_float32

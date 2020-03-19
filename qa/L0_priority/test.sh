@@ -35,6 +35,8 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+export CUDA_VISIBLE_DEVICES=0
+
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 SERVER=/opt/tensorrtserver/bin/trtserver

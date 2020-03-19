@@ -35,6 +35,8 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+export CUDA_VISIBLE_DEVICES=0
+
 CLIENT_LOG_BASE="./client_saved_model_shape"
 INFER_TEST=saved_model_shape_test.py
 
