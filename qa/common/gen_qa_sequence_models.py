@@ -1032,7 +1032,9 @@ def create_onnx_modelfile(
     onnx_outputs = [onnx_output]
 
     graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs, onnx_outputs)
-    model_def = onnx.helper.make_model(graph_proto, producer_name="TRTIS")
+    model_opset = onnx.helper.make_operatorsetid("", FLAGS.onnx_opset)
+    model_def = onnx.helper.make_model(graph_proto, producer_name="TRTIS",
+                                       opset_imports=[model_opset])
 
     try:
         os.makedirs(model_version_dir)
@@ -1301,6 +1303,8 @@ if __name__ == '__main__':
                         help='Generate TensorRT PLAN models w/ shape tensor i/o')
     parser.add_argument('--onnx', required=False, action='store_true',
                         help='Generate Onnx models')
+    parser.add_argument('--onnx_opset', type=int, required=False, default=11,
+                        help='Opset used for Onnx models. Default is 11')
     parser.add_argument('--libtorch', required=False, action='store_true',
                         help='Generate Pytorch LibTorch models')
     parser.add_argument('--variable', required=False, action='store_true',

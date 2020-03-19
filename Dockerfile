@@ -62,7 +62,7 @@ FROM ${BASE_IMAGE} AS trtserver_onnx
 # needs to be built from source
 
 # Onnx Runtime release version
-ARG ONNX_RUNTIME_VERSION=1.1.1
+ARG ONNX_RUNTIME_VERSION=1.2.0
 
 # Get release version of Onnx Runtime
 WORKDIR /workspace
@@ -220,7 +220,7 @@ RUN cd /opt/tensorrtserver/lib/pytorch && \
 # Onnx Runtime headers and library
 # Put include files to same directory as ONNX Runtime changed the include path
 # https://github.com/microsoft/onnxruntime/pull/1461
-ARG ONNX_RUNTIME_VERSION=1.1.1
+ARG ONNX_RUNTIME_VERSION=1.2.0
 COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/session/onnxruntime_c_api.h \
      /opt/tensorrtserver/include/onnxruntime/
 COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cpu/cpu_provider_factory.h \
