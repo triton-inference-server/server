@@ -76,6 +76,7 @@ if __name__ == '__main__':
 
     print(results.get_response())
 
+    # FIXME: Uncomment when DLIS 1162 is fixed.
     # Get the output arrays from the
     # output0_data = results.as_numpy('OUTPUT0')
     # output1_data = results.as_numpy('OUTPUT1')
