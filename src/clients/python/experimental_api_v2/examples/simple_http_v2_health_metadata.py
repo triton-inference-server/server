@@ -73,11 +73,13 @@ if __name__ == '__main__':
     if not (metadata['name'] == 'inference:0'):
         print("FAILED : get_server_metadata")
         sys.exit(1)
+    print(metadata)
 
     metadata = triton_client.get_model_metadata(model_name)
     if not (metadata['name'] == model_name):
         print("FAILED : get_model_metadata")
         sys.exit(1)
+    print(metadata)
 
     # Passing incorrect model name
     try:

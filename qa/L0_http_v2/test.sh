@@ -40,6 +40,7 @@ set +e
 RET=0
 
 SIMPLE_HEALTH_CLIENT=../clients/simple_http_v2_health_metadata.py
+SIMPLE_INFER_CLIENT=../clients/simple_http_v2_infer_client.py
 
 rm -f *.log
 rm -f *.log.*
@@ -67,6 +68,23 @@ if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.health
     RET=1
 fi
+
+for i in \
+        $SIMPLE_INFER_CLIENT \
+        ; do
+    BASE=$(basename -- $i)
+    SUFFIX="${BASE%.*}"
+    python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+    if [ $? -ne 0 ]; then
+        cat "${CLIENT_LOG}.${SUFFIX}"
+        RET=1
+    fi
+
+    if [ $(cat "${CLIENT_LOG}.${SUFFIX}" | grep "PASS" | wc -l) -ne 1 ]; then
+        cat "${CLIENT_LOG}.${SUFFIX}"
+        RET=1
+    fi
+done
 
 kill $SERVER_PID
 wait $SERVER_PID
