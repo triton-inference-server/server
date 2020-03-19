@@ -26,23 +26,22 @@
 
 from geventhttpclient import HTTPClient
 from geventhttpclient.url import URL
+
+from urllib.parse import quote
 import rapidjson as json
-from google.protobuf import text_format
+import numpy as np
 
-import tensorrtserver.api.request_status_pb2 as request_status
-from tensorrtserverV2.common import *
+from tritonhttpclient.utils import *
 
 
-def raise_if_error(nv_status):
+def raise_if_error(response):
     """
-    Raise InferenceServerException if 'nv_status' is non-success.
-    Otherwise return the request ID.
+    Raise InferenceServerException if received non-Success
+    response from the server
     """
-    rstatus = text_format.Parse(nv_status, request_status.RequestStatus())
-    if not rstatus.code == request_status.RequestStatusCode.SUCCESS:
-        raise InferenceServerException(msg=rstatus.msg)
-    else:
-        return rstatus.request_id
+    if response.status_code != 200:
+        error_response = json.loads(response.read())
+        raise_error(error_response["error"])
 
 
 class InferenceServerClient:
@@ -107,20 +106,14 @@ class InferenceServerClient:
         """
         self._client_stub.close()
 
-    def get_last_request_id(self):
-        """Get the request ID of the most recent request.
-
-        Returns
-        -------
-        int
-            The request ID, or None if a request has not yet been made
-            or if the last request was not successful.
-
-        """
-        return self._last_request_id
-
-    def is_server_live(self):
+    def is_server_live(self, headers=None):
         """Contact the inference server and get liveness.
+
+        Parameters
+        ----------
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
 
         Returns
         -------
@@ -129,16 +122,25 @@ class InferenceServerClient:
 
         Raises
         ------
-        InferenceServerException
+        Exception
             If unable to get liveness.
 
         """
-        response = self._client_stub.get("/v2/health/live")
-        self._last_request_id = raise_if_error(response['NV-Status'])
+        if not headers:
+            response = self._client_stub.get("v2/health/live")
+        else:
+            response = self._client_stub.get("v2/health/live", headers=headers)
+
         return response.status_code == 200
 
-    def is_server_ready(self):
+    def is_server_ready(self, headers=None):
         """Contact the inference server and get readiness.
+
+        Parameters
+        ----------
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
 
         Returns
         -------
@@ -147,158 +149,417 @@ class InferenceServerClient:
 
         Raises
         ------
-        InferenceServerException
+        Exception
             If unable to get readiness.
 
         """
-        response = self._client_stub.get("/v2/health/ready")
-        self._last_request_id = raise_if_error(response['NV-Status'])
+        if not headers:
+            response = self._client_stub.get("v2/health/ready")
+        else:
+            response = self._client_stub.get("v2/health/ready", headers=headers)
+
         return response.status_code == 200
 
-    def is_model_ready(self, model_name, model_version=-1):
+    def is_model_ready(self, model_name, model_version="", headers=None):
         """Contact the inference server and get the readiness of specified model.
 
-         Parameters
+        Parameters
         ----------
         model_name: str
-            The name of the model
-
-        model_version: int
-            The version of the model. The default value is -1 which means by default
-            the server will choose the model version based on its version policy
-            for the model.
+            The name of the model to check for readiness.
+        model_version: str
+            The version of the model to check for readiness. The default value
+            is an empty string which means then the server will choose a version
+            based on the model and internal policy.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
 
         Returns
         -------
         bool
-            True if the model is ready to be served, False if otherwise.
+            True if the model is ready, False if not ready.
 
         Raises
         ------
-        InferenceServerException
+        Exception
             If unable to get model readiness.
 
         """
-        raise_error('Not implemented')
+        if not model_version:
+            request_uri = "v2/models/{}/ready".format(quote(model_name))
+        else:
+            request_uri = "v2/models/{}/versions/{}/ready".format(
+                quote(model_name), model_version)
 
-    def get_server_metadata(self):
+        if not headers:
+            response = self._client_stub.get(request_uri)
+        else:
+            response = self._client_stub.get(request_uri, headers=headers)
+
+        return response.status_code == 200
+
+    def get_server_metadata(self, headers=None):
         """Contact the inference server and get its metadata.
+
+        Parameters
+        ----------
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
 
         Returns
         -------
-        object
-            The JSON object holding the metadata
+        dict
+            The JSON dict holding the metadata.
 
         Raises
         ------
-        InferenceServerException
+        Exception
             If unable to get server metadata.
 
         """
+        if not headers:
+            response = self._client_stub.get("v2")
+        else:
+            response = self._client_stub.get("v2", headers=headers)
 
-        response = self._client_stub.get("/v2")
-        self._last_request_id = raise_if_error(response['NV-Status'])
+        raise_if_error(response)
+        metadata = json.loads(response.read())
+        return metadata
 
-        status = json.loads(self.response.read())
-        return status
-
-    def get_model_metadata(self, model_name, model_version=-1):
+    def get_model_metadata(self, model_name, model_version="", headers=None):
         """Contact the inference server and get the metadata for specified model.
 
         Parameters
         ----------
         model_name: str
             The name of the model
+        model_version: str
+            The version of the model to get metadata. The default value
+            is an empty string which means then the server will choose
+            a version based on the model and internal policy.
+        headers: dict
+            Optional dictionary specifying additional
+            HTTP headers to include in the request
 
         Returns
         -------
-        object
-            The JSON object holding the model metadata
+        dict
+            The JSON dict holding the metadata.
 
         Raises
         ------
-        InferenceServerException
+        Exception
             If unable to get model metadata.
 
         """
-        #response = self._client_stub.get("/api/status/" + model_name +
-        #                                      "?format=json")
-        #self._last_request_id = raise_if_error(response['NV-Status'])
+        if not model_version:
+            request_uri = "v2/models/{}".format(quote(model_name))
+        else:
+            request_uri = "v2/models/{}/versions/{}".format(
+                quote(model_name), model_version)
 
-        #status = json.loads(response.read())
-        #return status
-        raise_error('Not implemented')
-        return None
+        if not headers:
+            response = self._client_stub.get(request_uri)
+        else:
+            response = self._client_stub.get(request_uri, headers=headers)
 
-    def load_model(self, model_name):
-        """Request the inference server to load or reload specified model.
+        raise_if_error(response)
+        metadata = json.loads(response.read())
+        return metadata
+
+    def infer(self,
+              inputs,
+              model_name,
+              model_version="",
+              outputs=None,
+              request_id=None,
+              parameters=None,
+              headers=None):
+        """Run synchronous inference using the supplied 'inputs' requesting
+        the outputs specified by 'outputs'.
 
         Parameters
         ----------
-        model_name : str
-            The name of the model to be loaded.
+        inputs : list
+            A list of InferInput objects, each describing data for a input
+            tensor required by the model.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. If not specified all outputs produced
+            by the model will be returned using default settings.
+        model_name: str
+            The name of the model to run inference.
+        model_version: str
+            The version of the model to run inference. The default value
+            is an empty string which means then the server will choose
+            a version based on the model and internal policy.
+        request_id: str
+            Optional identifier for the request. If specified will be returned
+            in the response. Default value is 'None' which means no request_id
+            will be used.
+        parameters: dict
+            Optional inference parameters described as key-value pairs.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request
+
+        Returns
+        -------
+        InferResult
+            The object holding the result of the inference, including the
+            statistics.
 
         Raises
         ------
         InferenceServerException
-            If unable to load the model.
-
+            If server fails to perform inference.
         """
-        #response = self._client_stub.post("/api/modelcontrol/load/" +
-        #                                       model_name)
-        #self._last_request_id = raise_if_error(response['NV-Status'])
-        raise_error('Not implemented')
-        return None
+        infer_request = {}
+        if request_id:
+            infer_request['id'] = request_id
+        if parameters:
+            infer_request['parameters'] = parameters
+        infer_request['inputs'] = [
+            this_input._get_tensor() for this_input in inputs
+        ]
+        if outputs:
+            infer_request['outputs'] = [
+                this_output._get_tensor() for this_output in outputs
+            ]
 
-    def unload_model(self, model_name):
-        """Request the inference server to unload specified model.
+        request_body = json.dumps(infer_request)
+        if not model_version:
+            request_uri = "v2/models/{}/infer".format(quote(model_name))
+        else:
+            request_uri = "v2/models/{}/versions/{}/infer".format(
+                quote(model_name), model_version)
+
+        if not headers:
+            response = self._client_stub.post(request_uri=request_uri,
+                                              body=request_body)
+        else:
+            response = self._client_stub.post(request_uri=request_uri,
+                                              body=request_body,
+                                              headers=headers)
+
+        result = InferResult(response.read())
+
+        return result
+
+
+class InferInput:
+    """An object of InferInput class is used to describe
+    input tensor for an inference request.
+
+    Parameters
+    ----------
+    name : str
+        The name of input whose data will be described by this object
+    shape : list
+        The shape of the associated input. Default value is None.
+    datatype : str
+        The datatype of the associated input. Default is None.
+
+    """
+
+    def __init__(self, name, shape=None, datatype=None):
+        self._name = name
+        self._shape = shape
+        self._datatype = datatype
+        self._parameters = {}
+        self._data = None
+
+    def name(self):
+        """Get the name of input associated with this object.
+
+        Returns
+        -------
+        str
+            The name of input
+        """
+        return self._name
+
+    def shape(self):
+        """Get the shape of input associated with this object.
+
+        Returns
+        -------
+        list
+            The shape of input
+        """
+        return self._shape
+
+    def datatype(self):
+        """Get the datatype of input associated with this object.
+
+        Returns
+        -------
+        str
+            The datatype of input
+        """
+        return self._datatype
+
+    def set_data_from_numpy(self, input_tensor):
+        """Set the tensor data (datatype, shape and data) from the
+        specified numpy array for input associated with this object.
 
         Parameters
         ----------
-        model_name : str
-            The name of the model to be unloaded.
-
-        Raises
-        ------
-        InferenceServerException
-            If unable to unload the model.
-
+        input_tensor : numpy array
+            The tensor data in numpy array format
         """
-        #response = self._client_stub.post("/api/modelcontrol/unload/" +
-        #                                       model_name)
-        #self._last_request_id = raise_if_error(response['NV-Status'])
-        raise_error('Not implemented')
+        if not isinstance(input_tensor, (np.ndarray,)):
+            raise_error("input_tensor must be a numpy array")
+        self._datatype = np_to_triton_dtype(input_tensor.dtype)
+        self._shape = input_tensor.shape
+        # FIXMEV2 Use Binary data when support available on the server.
+        self._data = [val.item() for val in input_tensor.flatten()]
+
+    def set_parameter(self, key, value):
+        """Adds the specified key-value pair in the requested input parameters
+
+        Parameters
+        ----------
+        key : str
+            The name of the parameter to be included in the request. 
+        value : str/int/bool
+            The value of the parameter
+        
+        """
+        if not type(key) is str:
+            raise_error(
+                "only string data type for key is supported in parameters")
+
+        self._parameters[key] = value
+
+    def clear_parameters(self):
+        """Clears all the parameters that have been added to the request.
+        
+        """
+        self._parameters.clear()
+
+    def _get_tensor(self):
+        """Retrieve the underlying input as json dict.
+
+        Returns
+        -------
+        dict
+            The underlying tensor specification as dict
+        """
+        return {
+            'name': self._name,
+            'shape': self._shape,
+            'datatype': self._datatype,
+            'parameters': self._parameters,
+            'data': self._data
+        }
+
+
+class InferOutput:
+    """An object of InferOutput class is used to describe a
+    requested output tensor for an inference request.
+
+    Parameters
+    ----------
+    name : str
+        The name of output tensor to associate with this object
+    """
+
+    def __init__(self, name):
+        self._name = name
+        self._parameters = {}
+
+    def name(self):
+        """Get the name of output associated with this object.
+
+        Returns
+        -------
+        str
+            The name of output
+        """
+        return self._name
+
+    def set_parameter(self, key, value):
+        """Adds the specified key-value pair in the requested output parameters
+
+        Parameters
+        ----------
+        key : str
+            The name of the parameter to be included in the request. 
+        value : str/int/bool
+            The value of the parameter
+        
+        """
+        if not type(key) is str:
+            raise_error(
+                "only string data type for key is supported in parameters")
+
+        self._parameters[key] = value
+
+    def clear_parameters(self):
+        """Clears all the parameters that have been added to the request.
+        
+        """
+        self._parameters.clear()
+
+    def _get_tensor(self):
+        """Retrieve the underlying input as json dict.
+
+        Returns
+        -------
+        dict
+            The underlying tensor as a dict
+        """
+        return {'name': self._name, 'parameters': self._parameters}
+
+
+class InferResult:
+    """An object of InferResult class holds the response of
+    an inference request and provide methods to retrieve
+    inference results.
+
+    Parameters
+    ----------
+    result : dict
+        The inference response from the server
+    """
+
+    def __init__(self, result):
+        self._result = json.loads(result)
+
+    def as_numpy(self, name):
+        """Get the tensor data for output associated with this object
+        in numpy format
+
+        Parameters
+        ----------
+        name : str
+            The name of the output tensor whose result is to be retrieved.
+    
+        Returns
+        -------
+        numpy array
+            The numpy array containing the response data for the tensor or
+            None if the data for specified tensor name is not found.
+        """
+        for output in self._result['outputs']:
+            if output['name'] == name:
+                datatype = output['datatype']
+                # FIXME: Add the support for binary data when available with server
+                np_array = np.array(output['data'],
+                                    dtype=triton_to_np_dtype(datatype))
+                resize(np_array, output['shape'])
+                return np_array
         return None
 
+    def get_response(self):
+        """Retrieves the complete response
 
-#def infer(self, inputs, outputs, model_name, model_version=-1, batch_size=1, flags=0, correlation_id=0):
-#    """Run inference using the supplied 'inputs' to calculate the outputs
-#    specified by 'outputs'.
-#       Parameters
-#    ----------
-#    inputs : list
-#        A list of InferInput objects, each describing data for a input
-#        tensor required by the model.
-#       outputs : list
-#        A list of InferOutput objects, each describing how the output
-#        data must be returned. Only the output tensors present in the
-#        list will be requested from the server.
-#       batch_size : int
-#        The batch size of the inference. Each input must provide
-#        an appropriately sized batch of inputs.
-#       flags : int
-#        The flags to use for the inference. The bitwise-or of
-#        InferRequestHeader.Flag values.
-#       corr_id : int
-#        The correlation id of the inference. Used to differentiate
-#        sequences.
-#       Returns
-#    -------
-#    InferResult
-#        The object holding the result of the inference, including the
-#        statistics.
-#       Raises
-#    ------
-#    InferenceServerException
-#        If server fails to perform inference.
-#       """
+        Returns
+        -------
+        dict
+            The underlying response dict.
+        """
+        return self._result
