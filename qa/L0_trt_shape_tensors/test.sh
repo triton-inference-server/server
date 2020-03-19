@@ -35,6 +35,8 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+export CUDA_VISIBLE_DEVICES=0
+
 CLIENT_LOG="./client.log"
 SHAPE_TENSOR_TEST=trt_shape_tensor_test.py
 
