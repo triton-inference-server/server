@@ -81,6 +81,16 @@ service GRPCInferenceService
   //@@
   rpc ModelInfer(ModelInferRequest) returns (ModelInferResponse) {}
 
+  //@@  .. cpp:var:: rpc ModelInfer(stream ModelInferRequest) returns
+  //@@       (stream ModelInferResponse)
+  //@@
+  //@@     Perform inference using a specific model.
+  //@@
+  rpc ModelStreamInfer(stream ModelInferRequest)
+      returns (stream ModelInferResponse)
+  {
+  }
+
   //@@  .. cpp:var:: rpc ModelConfig(ModelConfigRequest) returns
   //@@       (ModelConfigResponse)
   //@@
