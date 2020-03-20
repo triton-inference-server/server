@@ -634,23 +634,22 @@ TrtServerResponse::OutputData(
 class TrtServerModelIndex {
  public:
   TrtServerModelIndex() = default;
-  TRTSERVER_Error* PushBackModel(const char* model);
-  TRTSERVER_Error* GetModels(const char*** models, uint64_t* models_count);
+  TRTSERVER_Error* GetModels(
+      const char* const** models, uint64_t* models_count);
+  ni::ModelRepositoryIndex model_repository_index_;
 
  private:
   std::vector<const char*> indices_;
 };
 
 TRTSERVER_Error*
-TrtServerModelIndex::PushBackModel(const char* model)
+TrtServerModelIndex::GetModels(
+    const char* const** models, uint64_t* models_count)
 {
-  indices_.push_back(model);
-  return nullptr;
-}
+  for (const auto& model : model_repository_index_.models()) {
+    indices_.push_back(model.name().c_str());
+  }
 
-TRTSERVER_Error*
-TrtServerModelIndex::GetModels(const char*** models, uint64_t* models_count)
-{
   if (indices_.empty()) {
     *models_count = 0;
     *models = nullptr;
@@ -1693,24 +1692,17 @@ TRTSERVER2_ServerModelRepositoryIndexNew(
       lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::REPOSITORY);
 #endif  // TRTIS_ENABLE_STATS
 
-  ni::ModelRepositoryIndex model_repository_index;
-  RETURN_IF_STATUS_ERROR(
-      lserver->GetModelRepositoryIndex(&model_repository_index));
-
-  // *inference_request =
-  //     reinterpret_cast<TRTSERVER2_ModelIndex*>();
   TrtServerModelIndex* indices = new TrtServerModelIndex();
   *model_indices = reinterpret_cast<TRTSERVER2_ModelIndex*>(indices);
-  for (const auto& model : model_repository_index.models()) {
-    indices->PushBackModel(model.name().c_str());
-  }
+  RETURN_IF_STATUS_ERROR(
+      lserver->GetModelRepositoryIndex(&indices->model_repository_index_));
 
   return nullptr;  // success
 }
 
 TRTSERVER_Error*
 TRTSERVER2_ServerGetModelRepositoryIndex(
-    TRTSERVER2_ModelIndex* model_indices, const char*** models,
+    TRTSERVER2_ModelIndex* model_indices, const char* const** models,
     uint64_t* models_count)
 {
   TrtServerModelIndex* indices =

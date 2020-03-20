@@ -878,7 +878,7 @@ HTTPAPIServerV2::HandleRepositoryIndex(
   }
 
   TRTSERVER_Error* err = nullptr;
-  const char** models;
+  const char* const* models;
   uint64_t models_count;
   TRTSERVER2_ModelIndex* model_indices = nullptr;
   if (repository_name.empty()) {

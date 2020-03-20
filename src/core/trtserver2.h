@@ -318,7 +318,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ServerModelRepositoryIndexNew(
     TRTSERVER_Server* server, TRTSERVER2_ModelIndex** model_indices);
 
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ServerGetModelRepositoryIndex(
-    TRTSERVER2_ModelIndex* model_indices, const char*** models,
+    TRTSERVER2_ModelIndex* model_indices, const char* const** models,
     uint64_t* models_count);
 
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ServerModelRepositoryIndexDelete(
