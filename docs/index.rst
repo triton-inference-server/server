@@ -34,7 +34,7 @@ NVIDIA Triton Inference Server
      You are currently viewing unstable developer preview
      of the documentation. To see the documentation for the latest
      stable release click `here
-     <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/index.html>`_.
+     <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/index.html>`_.
 
 .. include:: ../README.rst
    :start-after: overview-begin-marker-do-not-remove

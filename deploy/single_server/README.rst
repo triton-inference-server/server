@@ -87,7 +87,7 @@ in a Google Cloud Storage bucket::
   $ gsutil mb gs://triton-inference-server-repository
 
 Following the `instructions
-<https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/run.html#example-model-repository>`_
+<https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/run.html#example-model-repository>`_
 download the example model repository to your system and copy it into
 the GCS bucket::
 
@@ -220,7 +220,7 @@ from the HTTP endpoint::
   $ curl 34.83.9.133:8000/api/status
 
 Follow the `instructions
-<https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/client.html#getting-the-client-examples>`_
+<https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/client.html#getting-the-client-examples>`_
 to get the example image classification client that can be used to
 perform inferencing using image classification models being served by
 the inference server. For example::
