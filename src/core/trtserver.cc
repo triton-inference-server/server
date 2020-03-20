@@ -2105,6 +2105,16 @@ TRTSERVER2_InferenceRequestOutputShape(
 }
 
 TRTSERVER_Error*
+TRTSERVER2_InferenceRequestClearAllOutputs(
+    TRTSERVER2_InferenceRequest* inference_request)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  lrequest->SetResponse(nullptr);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
 TRTSERVER2_ServerInferAsync(
     TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER2_InferenceRequest* inference_request,
