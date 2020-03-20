@@ -32,10 +32,6 @@
 #include <google/protobuf/text_format.h>
 #include "src/clients/c++/library/request_common.h"
 
-#ifdef TRTIS_ENABLE_HTTP_V2
-#include "src/core/grpc_service.grpc.pb.h"
-#endif
-
 // MSVC equivalent of POSIX call
 #ifdef _MSC_VER
 #define strncasecmp _strnicmp
@@ -109,24 +105,15 @@ class ServerHealthHttpContextImpl : public ServerHealthContext {
 
 ServerHealthHttpContextImpl::ServerHealthHttpContextImpl(
     const std::string& url, bool verbose)
-#ifdef TRTIS_ENABLE_HTTP_V2
-    : url_(url + "/" + kHttpV2RESTEndpoint), verbose_(verbose)
-#else
     : url_(url + "/" + kHealthRESTEndpoint), verbose_(verbose)
-#endif
 {
 }
 
 ServerHealthHttpContextImpl::ServerHealthHttpContextImpl(
     const std::string& url, const std::map<std::string, std::string>& headers,
     bool verbose)
-#ifdef TRTIS_ENABLE_HTTP_V2
-    : url_(url + "/" + kHttpV2RESTEndpoint), headers_(headers),
-      verbose_(verbose)
-#else
     : url_(url + "/" + kHealthRESTEndpoint), headers_(headers),
       verbose_(verbose)
-#endif
 {
 }
 
@@ -217,12 +204,10 @@ ServerHealthHttpContext::Create(
 
 class ServerStatusHttpContextImpl : public ServerStatusContext {
  public:
-#ifndef TRTIS_ENABLE_HTTP_V2
   ServerStatusHttpContextImpl(const std::string& url, bool verbose);
   ServerStatusHttpContextImpl(
       const std::string& url, const std::map<std::string, std::string>& headers,
       bool verbose);
-#endif
   ServerStatusHttpContextImpl(
       const std::string& url, const std::string& model_name, bool verbose);
   ServerStatusHttpContextImpl(
@@ -251,7 +236,7 @@ class ServerStatusHttpContextImpl : public ServerStatusContext {
   std::string response_;
 };
 
-#ifndef TRTIS_ENABLE_HTTP_V2
+
 ServerStatusHttpContextImpl::ServerStatusHttpContextImpl(
     const std::string& url, bool verbose)
     : url_(url + "/" + kStatusRESTEndpoint), verbose_(verbose)
@@ -265,30 +250,19 @@ ServerStatusHttpContextImpl::ServerStatusHttpContextImpl(
       verbose_(verbose)
 {
 }
-#endif
 
 ServerStatusHttpContextImpl::ServerStatusHttpContextImpl(
     const std::string& url, const std::string& model_name, bool verbose)
-#ifdef TRTIS_ENABLE_HTTP_V2
-    : url_(url + "/" + kHttpV2RESTEndpoint + "/" + model_name + "/metadata"),
-      verbose_(verbose)
-#else
     : url_(url + "/" + kStatusRESTEndpoint + "/" + model_name),
       verbose_(verbose)
-#endif
 {
 }
 
 ServerStatusHttpContextImpl::ServerStatusHttpContextImpl(
     const std::string& url, const std::map<std::string, std::string>& headers,
     const std::string& model_name, bool verbose)
-#ifdef TRTIS_ENABLE_HTTP_V2
-    : url_(url + "/" + kHttpV2RESTEndpoint + "/" + model_name + "/metadata"),
-      headers_(headers), verbose_(verbose)
-#else
     : url_(url + "/" + kStatusRESTEndpoint + "/" + model_name),
       headers_(headers), verbose_(verbose)
-#endif
 {
 }
 
@@ -424,13 +398,9 @@ ServerStatusHttpContext::Create(
     std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
     bool verbose)
 {
-#ifdef TRTIS_ENABLE_HTTP_V2
-  return Error(RequestStatusCode::INVALID_ARG, "Not valid for HTTP V2");
-#else
   ctx->reset(static_cast<ServerStatusContext*>(
       new ServerStatusHttpContextImpl(server_url, verbose)));
   return Error::Success;
-#endif
 }
 
 Error
@@ -438,13 +408,9 @@ ServerStatusHttpContext::Create(
     std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
     const std::map<std::string, std::string>& headers, bool verbose)
 {
-#ifdef TRTIS_ENABLE_HTTP_V2
-  return Error(RequestStatusCode::INVALID_ARG, "Not valid for HTTP V2");
-#else
   ctx->reset(static_cast<ServerStatusContext*>(
       new ServerStatusHttpContextImpl(server_url, headers, verbose)));
   return Error::Success;
-#endif
 }
 
 Error
@@ -1246,11 +1212,6 @@ class InferHttpContextImpl : public InferContextImpl {
 
   // Serialized InferRequestHeader
   std::string infer_request_str_;
-
-#ifdef TRTIS_ENABLE_HTTP_V2
-  // Serialized InferRequest
-  std::string request_body_str_;
-#endif
 };
 
 //==============================================================================
@@ -1476,11 +1437,7 @@ InferHttpContextImpl::InferHttpContextImpl(
 {
   // Process url for HTTP request
   // URL doesn't contain the version portion if using the latest version.
-#ifdef TRTIS_ENABLE_HTTP_V2
-  url_ = server_url + "/" + kHttpV2RESTEndpoint + "/" + model_name + ":predict";
-#else
   url_ = server_url + "/" + kInferRESTEndpoint + "/" + model_name;
-#endif
   if (model_version >= 0) {
     url_ += "/" + std::to_string(model_version);
   }
@@ -1557,13 +1514,9 @@ InferHttpContextImpl::Run(ResultMap* results)
   // Set SEND_END when content length is 0 (because CURLOPT_READFUNCTION will
   // not be called) or if using HTTP V2. In that case, we can't measure SEND_END
   // properly (send ends after sending request header).
-#ifdef TRTIS_ENABLE_HTTP_V2
-  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
-#else
   if (sync_request->total_input_byte_size_ == 0) {
     sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
   }
-#endif
 
   // During this call SEND_END (except in above case), RECV_START, and
   // RECV_END will be set.
@@ -1770,11 +1723,7 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
         RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
   }
 
-#ifdef TRTIS_ENABLE_HTTP_V2
-  std::string full_url = url_;
-#else
   std::string full_url = url_ + "?format=binary";
-#endif
   curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
   curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -1788,10 +1737,8 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
   curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, buffer_byte_size);
 
   // request data provided by RequestProvider()
-#ifndef TRTIS_ENABLE_HTTP_V2
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, RequestProvider);
   curl_easy_setopt(curl, CURLOPT_READDATA, http_request.get());
-#endif
 
   // response headers handled by ResponseHeaderHandler()
   http_request->response_handler_userp_ =
@@ -1836,33 +1783,6 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
     }
   }
 
-#ifdef TRTIS_ENABLE_HTTP_V2
-  InferRequest infer_request;
-  size_t input_pos_idx = 0;
-  while (input_pos_idx < inputs_.size()) {
-    InputImpl* io = reinterpret_cast<InputImpl*>(inputs_[input_pos_idx].get());
-
-    // Append all batches of one input together (skip if using shared memory)
-    if (!io->IsSharedMemory()) {
-      std::string* new_input = infer_request.add_raw_input();
-      for (size_t batch_idx = 0; batch_idx < batch_size_; batch_idx++) {
-        const uint8_t* data_ptr;
-        size_t data_byte_size;
-        io->GetRaw(batch_idx, &data_ptr, &data_byte_size);
-        new_input->append(
-            reinterpret_cast<const char*>(data_ptr), data_byte_size);
-      }
-    }
-    input_pos_idx++;
-  }
-
-  request_body_str_.clear();
-  ::google::protobuf::util::MessageToJsonString(
-      infer_request, &request_body_str_);
-  http_request->total_input_byte_size_ = request_body_str_.length();
-  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request_body_str_.c_str());
-#endif
-
   const curl_off_t post_byte_size = http_request->total_input_byte_size_;
   curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, post_byte_size);
 
@@ -1872,9 +1792,7 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
                        infer_request_.ShortDebugString();
   struct curl_slist* list = nullptr;
   list = curl_slist_append(list, "Expect:");
-#ifndef TRTIS_ENABLE_HTTP_V2
   list = curl_slist_append(list, "Content-Type: application/octet-stream");
-#endif
   list = curl_slist_append(list, infer_request_str_.c_str());
   for (const auto& pr : headers_) {
     std::string hdr = pr.first + ": " + pr.second;
