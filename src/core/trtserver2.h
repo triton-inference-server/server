@@ -297,11 +297,11 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestOutputData(
     const void** base, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
     int64_t* memory_type_id);
 
-/// Clear all the output tensors. The meta data of the output tensors will
+/// Remove all the output tensors. The meta data of the output tensors will
 /// become unaccesible and the result data will be released.
 /// \param inference_request The request object.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestClearAllOutputs(
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestRemoveAllOutputs(
     TRTSERVER2_InferenceRequest* inference_request);
 
 /// Type for inference completion callback function. If non-nullptr,
