@@ -1257,11 +1257,11 @@ HTTPAPIServerV2::HandleSystemSharedMemory(
     return;
   }
 
-  TRTSERVER_Error* err;
+  TRTSERVER_Error* err = nullptr;
   rapidjson::Document document;
-  document.SetObject();
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
   if (action == "status") {
+    document.SetObject();
     SharedMemoryStatus shm_status;
     err = shm_manager_->GetStatus(&shm_status);
     if (err == nullptr) {
@@ -1289,23 +1289,55 @@ HTTPAPIServerV2::HandleSystemSharedMemory(
       }
       document.AddMember(
           "system shared memory status", response_regions, allocator);
-    }
-    rapidjson::StringBuffer buffer;
-    buffer.Clear();
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-    document.Accept(writer);
-    std::string status_buffer(buffer.GetString());
 
-    evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
-    evhtp_send_reply(req, EVHTP_RES_OK);
-    TRTSERVER_ErrorDelete(err);
+      rapidjson::StringBuffer buffer;
+      buffer.Clear();
+      rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+      document.Accept(writer);
+      std::string status_buffer(buffer.GetString());
+      evbuffer_add(
+          req->buffer_out, status_buffer.c_str(), status_buffer.size());
+    }
   } else {
     if (action == "register") {
-      // err = shm_manager_->RegisterSystemSharedMemory(
-      //     name.c_str(), shm_key.c_str(), offset, byte_size);
-    } else {
+      struct evbuffer_iovec* v = nullptr;
+      int v_idx = 0;
+      int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+      if (n > 0) {
+        v = static_cast<struct evbuffer_iovec*>(
+            alloca(sizeof(struct evbuffer_iovec) * n));
+        if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INTERNAL,
+              "unexpected error getting register request buffers");
+        }
+      }
+      if (err == nullptr) {
+        size_t buffer_len = evbuffer_get_length(req->buffer_in);
+        err = EVBufferToJson(&document, v, &v_idx, buffer_len, n);
+        if (err == nullptr) {
+          const char* name = document["name"].GetString();
+          const char* shm_key = document["key"].GetString();
+          uint64_t offset = document["offset"].GetInt();
+          uint64_t byte_size = document["byte_size"].GetInt();
+          err = shm_manager_->RegisterSystemSharedMemory(
+              name, shm_key, offset, byte_size);
+        }
+      }
+    } else if ((action == "unregister") && (region_name.empty())) {
+      err = shm_manager_->UnregisterAll();
+    } else if (action == "unregister") {
+      err = shm_manager_->Unregister(region_name);
     }
   }
+
+  if (err == nullptr) {
+    evhtp_send_reply(req, EVHTP_RES_OK);
+  } else {
+    EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+  }
+  TRTSERVER_ErrorDelete(err);
 }
 
 bool
