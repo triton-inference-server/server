@@ -1310,7 +1310,7 @@ HTTPAPIServerV2::HandleSystemSharedMemory(
   } else {
     if ((action == "register") && (region_name.empty())) {
       err = TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INTERNAL,
+          TRTSERVER_ERROR_INVALID_ARG,
           "'region name' is necessary to register system shared memory region");
     } else if (action == "register") {
       struct evbuffer_iovec* v = nullptr;
@@ -1325,6 +1325,7 @@ HTTPAPIServerV2::HandleSystemSharedMemory(
               "unexpected error getting register request buffers");
         }
       }
+
       if (err == nullptr) {
         size_t buffer_len = evbuffer_get_length(req->buffer_in);
         err = EVBufferToJson(&document, v, &v_idx, buffer_len, n);
@@ -1403,9 +1404,10 @@ HTTPAPIServerV2::HandleCudaSharedMemory(
   } else {
     if ((action == "register") && (region_name.empty())) {
       err = TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INTERNAL,
+          TRTSERVER_ERROR_INVALID_ARG,
           "'region name' is necessary to register cuda shared memory region");
     } else if (action == "register") {
+#ifdef TRTIS_ENABLE_GPU
       struct evbuffer_iovec* v = nullptr;
       int v_idx = 0;
       int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
@@ -1425,12 +1427,21 @@ HTTPAPIServerV2::HandleCudaSharedMemory(
           const char* raw_handle = document["raw_handle"].GetString();
           uint64_t byte_size = document["byte_size"].GetInt();
           uint64_t device_id = document["device_id"].GetInt();
+          // TODO Add Base64 decoding for raw_handle
           err = shm_manager_->RegisterCUDASharedMemory(
               region_name.c_str(),
               reinterpret_cast<const cudaIpcMemHandle_t*>(raw_handle),
               byte_size, device_id);
         }
       }
+#else
+      err = TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "failed to register CUDA shared memory region: '" + region_name +
+              "', GPUs not supported")
+              .c_str());
+#endif  // TRTIS_ENABLE_GPU
     } else if ((action == "unregister") && (region_name.empty())) {
       err = shm_manager_->UnregisterAllV2(TRTSERVER_MEMORY_GPU);
     } else if (action == "unregister") {
