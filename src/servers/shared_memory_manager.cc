@@ -132,10 +132,10 @@ SharedMemoryManager::~SharedMemoryManager()
 {
   // FIXME: Replace UnregisterAll() call with below commented lines
   UnregisterAll();
-#ifdef TRTIS_ENABLE_GRPC_V2
+#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
   // UnregisterAllV2(TRTSERVER_MEMORY_CPU);
   // UnregisterAllV2(TRTSERVER_MEMORY_GPU);
-#endif
+#endif  // TRTIS_ENABLE_GRPC_V2 || TRTIS_ENABLE_HTTP_V2
 }
 
 TRTSERVER_Error*
@@ -467,7 +467,78 @@ SharedMemoryManager::GetStatusV2(
 
   return nullptr;
 }
+#endif  // TRTIS_ENABLE_GRPC_V2
 
+#ifdef TRTIS_ENABLE_HTTP_V2
+TRTSERVER_Error*
+SharedMemoryManager::GetStatusV2(
+    const std::string& name, SharedMemoryStatus* shm_status,
+    TRTSERVER_Memory_Type memory_type)
+{
+  std::lock_guard<std::mutex> lock(mu_);
+
+  if (name.empty()) {
+    for (const auto& shm_info : shared_memory_map_) {
+      if (shm_info.second->kind_ == memory_type) {
+        auto region_status = shm_status->add_shared_memory_region();
+        region_status->set_name(shm_info.second->name_);
+        if (memory_type == TRTSERVER_MEMORY_CPU) {
+          auto system_shm_info = region_status->mutable_system_shared_memory();
+          system_shm_info->set_shared_memory_key(shm_info.second->shm_key_);
+          system_shm_info->set_offset(shm_info.second->offset_);
+        } else {
+          auto system_shm_info = region_status->mutable_cuda_shared_memory();
+          system_shm_info->set_device_id(shm_info.second->device_id_);
+        }
+        region_status->set_byte_size(shm_info.second->byte_size_);
+      }
+    }
+  } else {
+    auto it = shared_memory_map_.find(name);
+    if (it == shared_memory_map_.end()) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_NOT_FOUND,
+          std::string(
+              "Unable to find system shared memory region: '" + name + "'")
+              .c_str());
+    }
+
+    if (it->second->kind_ == memory_type) {
+      if (memory_type == TRTSERVER_MEMORY_GPU) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_NOT_FOUND, std::string(
+                                           "The region named '" + name +
+                                           "' is registered as CUDA shared "
+                                           "memory, not system shared memory")
+                                           .c_str());
+      } else {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_NOT_FOUND, std::string(
+                                           "The region named '" + name +
+                                           "' is registered as system shared "
+                                           "memory, not CUDA shared memory")
+                                           .c_str());
+      }
+    }
+
+    auto region_status = shm_status->add_shared_memory_region();
+    region_status->set_name(it->second->name_);
+    if (memory_type == TRTSERVER_MEMORY_CPU) {
+      auto system_shm_info = region_status->mutable_system_shared_memory();
+      system_shm_info->set_shared_memory_key(it->second->shm_key_);
+      system_shm_info->set_offset(it->second->offset_);
+    } else {
+      auto system_shm_info = region_status->mutable_cuda_shared_memory();
+      system_shm_info->set_device_id(it->second->device_id_);
+    }
+    region_status->set_byte_size(it->second->byte_size_);
+  }
+
+  return nullptr;
+}
+#endif  // TRTIS_ENABLE_HTTP_V2
+
+#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
 TRTSERVER_Error*
 SharedMemoryManager::UnregisterV2(
     const std::string& name, TRTSERVER_Memory_Type memory_type)
@@ -556,6 +627,7 @@ SharedMemoryManager::UnregisterHelperV2(
   return nullptr;
 }
 
-#endif  // TRTIS_ENABLE_GRPC_V2
+#endif  // TRTIS_ENABLE_GRPC_V2 || TRTIS_ENABLE_HTTP_V2
+
 
 }}  // namespace nvidia::inferenceserver
