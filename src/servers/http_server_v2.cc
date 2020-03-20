@@ -209,7 +209,9 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
         modelcontrol_regex_(
             R"(/v2/repository(?:/([^/]+))?/(index|model/([^/]+)/(load|unload)))"),
         systemsharedmemory_regex_(
-            R"(/v2/systemsharedmemory(?:/region/([^/]+))?/(status|register|unregister))")
+            R"(/v2/systemsharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
+        cudasharedmemory_regex_(
+            R"(/v2/cudasharedmemory(?:/region/([^/]+))?/(status|register|unregister))")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -328,6 +330,9 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
   void HandleSystemSharedMemory(
       evhtp_request_t* req, const std::string& region_name,
       const std::string& action);
+  void HandleCudaSharedMemory(
+      evhtp_request_t* req, const std::string& region_name,
+      const std::string& action);
 
 #ifdef TRTIS_ENABLE_GPU
   TRTSERVER_Error* EVBufferToCudaHandle(
@@ -358,6 +363,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
   re2::RE2 model_regex_;
   re2::RE2 modelcontrol_regex_;
   re2::RE2 systemsharedmemory_regex_;
+  re2::RE2 cudasharedmemory_regex_;
 };
 
 TRTSERVER_Error*
@@ -835,6 +841,12 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
     HandleSystemSharedMemory(req, region, action);
     return;
   } else if (RE2::FullMatch(
+                 std::string(req->uri->path->full), cudasharedmemory_regex_,
+                 &region, &action)) {
+    // cuda shared memory
+    HandleCudaSharedMemory(req, region, action);
+    return;
+  } else if (RE2::FullMatch(
                  std::string(req->uri->path->full), modelcontrol_regex_,
                  &repo_name, &kind, &model_name, &action)) {
     // model repository
@@ -845,12 +857,11 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
       HandleRepositoryControl(req, repo_name, model_name, action);
       return;
     }
-  }  
+  }
 
   LOG_VERBOSE(1) << "HTTP V2 error: " << req->method << " "
                  << req->uri->path->full << " - "
                  << static_cast<int>(EVHTP_RES_BADREQ);
-  evhtp_send_reply(req, EVHTP_RES_BADREQ);
 }
 
 void
@@ -1263,7 +1274,8 @@ HTTPAPIServerV2::HandleSystemSharedMemory(
   if (action == "status") {
     document.SetObject();
     SharedMemoryStatus shm_status;
-    err = shm_manager_->GetStatus(&shm_status);
+    err = shm_manager_->GetStatusV2(
+        region_name, &shm_status, TRTSERVER_MEMORY_CPU);
     if (err == nullptr) {
       rapidjson::Value response_regions(rapidjson::kArrayType);
       for (int i = 0; i < shm_status.shared_memory_region_size(); i++) {
@@ -1299,7 +1311,11 @@ HTTPAPIServerV2::HandleSystemSharedMemory(
           req->buffer_out, status_buffer.c_str(), status_buffer.size());
     }
   } else {
-    if (action == "register") {
+    if ((action == "register") && (region_name.empty())) {
+      err = TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INTERNAL,
+          "'region name' is necessary to register system shared memory region");
+    } else if (action == "register") {
       struct evbuffer_iovec* v = nullptr;
       int v_idx = 0;
       int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
@@ -1316,18 +1332,115 @@ HTTPAPIServerV2::HandleSystemSharedMemory(
         size_t buffer_len = evbuffer_get_length(req->buffer_in);
         err = EVBufferToJson(&document, v, &v_idx, buffer_len, n);
         if (err == nullptr) {
-          const char* name = document["name"].GetString();
           const char* shm_key = document["key"].GetString();
           uint64_t offset = document["offset"].GetInt();
           uint64_t byte_size = document["byte_size"].GetInt();
           err = shm_manager_->RegisterSystemSharedMemory(
-              name, shm_key, offset, byte_size);
+              region_name.c_str(), shm_key, offset, byte_size);
         }
       }
     } else if ((action == "unregister") && (region_name.empty())) {
-      err = shm_manager_->UnregisterAll();
+      err = shm_manager_->UnregisterAllV2(TRTSERVER_MEMORY_CPU);
     } else if (action == "unregister") {
-      err = shm_manager_->Unregister(region_name);
+      err = shm_manager_->UnregisterV2(region_name, TRTSERVER_MEMORY_CPU);
+    }
+  }
+
+  if (err == nullptr) {
+    evhtp_send_reply(req, EVHTP_RES_OK);
+  } else {
+    EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+  }
+  TRTSERVER_ErrorDelete(err);
+}
+
+void
+HTTPAPIServerV2::HandleCudaSharedMemory(
+    evhtp_request_t* req, const std::string& region_name,
+    const std::string& action)
+{
+  if ((action == "status") && (req->method != htp_method_GET)) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  } else if ((action != "status") && (req->method != htp_method_POST)) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  TRTSERVER_Error* err = nullptr;
+  rapidjson::Document document;
+  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+  if (action == "status") {
+    document.SetObject();
+    SharedMemoryStatus shm_status;
+    err = shm_manager_->GetStatusV2(
+        region_name, &shm_status, TRTSERVER_MEMORY_GPU);
+    if (err == nullptr) {
+      rapidjson::Value response_regions(rapidjson::kArrayType);
+      for (int i = 0; i < shm_status.shared_memory_region_size(); i++) {
+        const auto& rshm_region = shm_status.shared_memory_region(i);
+        if (rshm_region.has_cuda_shared_memory()) {
+          rapidjson::Value shm_region;
+          shm_region.SetObject();
+          std::string name = rshm_region.name();
+          rapidjson::Value name_val(name.c_str(), name.size());
+          shm_region.AddMember("name", name_val, allocator);
+          uint64_t device_id = rshm_region.cuda_shared_memory().device_id();
+          rapidjson::Value device_id_val(device_id);
+          shm_region.AddMember("device_id", device_id_val, allocator);
+          uint64_t byte_size = rshm_region.byte_size();
+          rapidjson::Value byte_size_val(byte_size);
+          shm_region.AddMember("byte_size", byte_size_val, allocator);
+          response_regions.PushBack(shm_region, allocator);
+        }
+      }
+      document.AddMember(
+          "cuda shared memory status", response_regions, allocator);
+
+      rapidjson::StringBuffer buffer;
+      buffer.Clear();
+      rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+      document.Accept(writer);
+      std::string status_buffer(buffer.GetString());
+      evbuffer_add(
+          req->buffer_out, status_buffer.c_str(), status_buffer.size());
+    }
+  } else {
+    if ((action == "register") && (region_name.empty())) {
+      err = TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INTERNAL,
+          "'region name' is necessary to register cuda shared memory region");
+    } else if (action == "register") {
+      struct evbuffer_iovec* v = nullptr;
+      int v_idx = 0;
+      int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+      if (n > 0) {
+        v = static_cast<struct evbuffer_iovec*>(
+            alloca(sizeof(struct evbuffer_iovec) * n));
+        if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INTERNAL,
+              "unexpected error getting register request buffers");
+        }
+      }
+      if (err == nullptr) {
+        size_t buffer_len = evbuffer_get_length(req->buffer_in);
+        err = EVBufferToJson(&document, v, &v_idx, buffer_len, n);
+        if (err == nullptr) {
+          const char* raw_handle = document["raw_handle"].GetString();
+          uint64_t byte_size = document["byte_size"].GetInt();
+          uint64_t device_id = document["device_id"].GetInt();
+          err = shm_manager_->RegisterCUDASharedMemory(
+              region_name.c_str(),
+              reinterpret_cast<const cudaIpcMemHandle_t*>(raw_handle),
+              byte_size, device_id);
+        }
+      }
+    } else if ((action == "unregister") && (region_name.empty())) {
+      err = shm_manager_->UnregisterAllV2(TRTSERVER_MEMORY_GPU);
+    } else if (action == "unregister") {
+      err = shm_manager_->UnregisterV2(region_name, TRTSERVER_MEMORY_GPU);
     }
   }
 
