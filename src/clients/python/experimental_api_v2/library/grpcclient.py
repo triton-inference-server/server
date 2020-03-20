@@ -599,9 +599,8 @@ class InferenceServerClient:
             The function must reserve the last two arguments (result, error)
             to hold InferResult and InferenceServerException objects
             respectively which will be provided to the function when executing
-            the callback. he ownership of these objects will be given to the
-            user and the its lifetime is limited to the scope of this function.
-            The 'error' would be None for a successful inference. 
+            the callback. The ownership of these objects will be given to the
+            user. The 'error' would be None for a successful inference.
         inputs : list
             A list of InferInput objects, each describing data for a input
             tensor required by the model.
