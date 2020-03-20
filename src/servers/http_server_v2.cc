@@ -831,8 +831,10 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
           &kind, &model_name, &action)) {
     if (kind == "index") {
       HandleRepositoryIndex(req, repo_name);
+      return;
     } else if (kind.find("model", 0) == 0) {
       HandleRepositoryControl(req, repo_name, model_name, action);
+      return;
     }
   }
 
@@ -877,10 +879,15 @@ HTTPAPIServerV2::HandleRepositoryIndex(
 
   TRTSERVER_Error* err = nullptr;
   const char** models;
-  size_t models_count;
+  uint64_t models_count;
+  TRTSERVER2_ModelIndex* model_indices = nullptr;
   if (repository_name.empty()) {
-    err = TRTSERVER_ServerModelRepositoryIndexHTTP(
-        server_.get(), &models, &models_count);
+    err =
+        TRTSERVER2_ServerModelRepositoryIndexNew(server_.get(), &model_indices);
+    if (err == nullptr) {
+      err = TRTSERVER2_ServerGetModelRepositoryIndex(
+          model_indices, &models, &models_count);
+    }
   } else {
     err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_UNSUPPORTED,
@@ -892,11 +899,14 @@ HTTPAPIServerV2::HandleRepositoryIndex(
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
   if (err == nullptr) {
     rapidjson::Value models_array(rapidjson::kArrayType);
-    for (uint64_t i = 0; i < models_count; ++i) {
+    LOG_VERBOSE(1) << "models size: " << models_count;
+    for (uint64_t i = 0; i < models_count; i++) {
       rapidjson::Value model_index;
+      model_index.SetObject();
       std::string model_str(models[i]);
       rapidjson::Value name_val(model_str.c_str(), model_str.size(), allocator);
       model_index.AddMember("name", name_val, allocator);
+      LOG_VERBOSE(1) << "added name: " << model_str;
       models_array.PushBack(model_index, allocator);
     }
     document.AddMember("index", models_array, allocator);
@@ -909,6 +919,7 @@ HTTPAPIServerV2::HandleRepositoryIndex(
     evbuffer_add(
         req->buffer_out, model_metadata.c_str(), model_metadata.size());
     evhtp_send_reply(req, EVHTP_RES_OK);
+    err = TRTSERVER2_ServerModelRepositoryIndexDelete(model_indices);
   } else {
     EVBufferAddErrorJson(req->buffer_out, err);
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
@@ -1156,7 +1167,6 @@ HTTPAPIServerV2::HandleModelMetadata(
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
     document.Accept(writer);
     std::string model_metadata(buffer.GetString());
-
     evbuffer_add(
         req->buffer_out, model_metadata.c_str(), model_metadata.size());
     evhtp_send_reply(req, EVHTP_RES_OK);
@@ -1220,7 +1230,6 @@ HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
     document.Accept(writer);
     std::string status_buffer(buffer.GetString());
-
     evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
     evhtp_send_reply(req, EVHTP_RES_OK);
   } else {
@@ -1785,8 +1794,8 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       TRTSERVER_Memory_Type memory_type;
       int64_t memory_type_id;
       err = TRTSERVER2_InferenceRequestOutputData(
-              request, output_name.c_str(), &base, &byte_size, &memory_type,
-              &memory_type_id);
+          request, output_name.c_str(), &base, &byte_size, &memory_type,
+          &memory_type_id);
       if (err != nullptr) {
         return EVHTP_RES_BADREQ;
       }
@@ -1820,8 +1829,8 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
   response_meta_data_.response_json_.Accept(writer);
   std::string response_metadata(buffer.GetString());
-  evbuffer_add(req_->buffer_out, response_metadata.c_str(),
-      response_metadata.size());
+  evbuffer_add(
+      req_->buffer_out, response_metadata.c_str(), response_metadata.size());
 
   evhtp_headers_add_header(
       req_->headers_out,

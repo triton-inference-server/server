@@ -37,6 +37,7 @@ extern "C" {
 #endif
 
 struct TRTSERVER2_InferenceRequest;
+struct TRTSERVER2_ModelIndex;
 
 /// TRTSERVER2_InferenceRequest
 ///
@@ -309,13 +310,19 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestRemoveAllOutputs(
 /// delete them. The lifetime of the returned strings extends only as
 /// long as 'server' and must not be accessed once 'server' is deleted.
 /// \param server The inference server object.
-/// \param models Returns the model repository indices as an array of
-/// pointers to the name of each model.
-/// \param models_count Returns the number of models indices.
+/// \param model_indices Returns the TRTSERVER2_ModelIndex object that
+/// can then be used to get the indices of all unique models in the model
+/// repository.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ServerModelRepositoryIndex(
-    TRTSERVER_Server* server, const char* const** models,
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ServerModelRepositoryIndexNew(
+    TRTSERVER_Server* server, TRTSERVER2_ModelIndex** model_indices);
+
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ServerGetModelRepositoryIndex(
+    TRTSERVER2_ModelIndex* model_indices, const char*** models,
     uint64_t* models_count);
+
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ServerModelRepositoryIndexDelete(
+    TRTSERVER2_ModelIndex* model_indices);
 
 /// Type for inference completion callback function. If non-nullptr,
 /// the 'trace_manager' object is the trace manager associated with

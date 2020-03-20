@@ -626,6 +626,42 @@ TrtServerResponse::OutputData(
   return nullptr;  // Success
 }
 
+//
+// TrtServerModelIndex
+//
+// Implementation for TRTSERVER2_ModelIndex.
+//
+class TrtServerModelIndex {
+ public:
+  TrtServerModelIndex() = default;
+  TRTSERVER_Error* PushBackModel(const char* model);
+  TRTSERVER_Error* GetModels(const char*** models, uint64_t* models_count);
+
+ private:
+  std::vector<const char*> indices_;
+};
+
+TRTSERVER_Error*
+TrtServerModelIndex::PushBackModel(const char* model)
+{
+  indices_.push_back(model);
+  return nullptr;
+}
+
+TRTSERVER_Error*
+TrtServerModelIndex::GetModels(const char*** models, uint64_t* models_count)
+{
+  if (indices_.empty()) {
+    *models_count = 0;
+    *models = nullptr;
+  } else {
+    *models_count = indices_.size();
+    *models = &(indices_[0]);
+  }
+
+  return nullptr;
+}
+
 }  // namespace
 
 #ifdef __cplusplus
@@ -1646,11 +1682,9 @@ TRTSERVER_ServerModelRepositoryIndex(
   return nullptr;  // success
 }
 
-// Overload to remove GRPC V2 dependency
 TRTSERVER_Error*
-TRTSERVER2_ServerModelRepositoryIndex(
-    TRTSERVER_Server* server, const char* const** models,
-    uint64_t* models_count)
+TRTSERVER2_ServerModelRepositoryIndexNew(
+    TRTSERVER_Server* server, TRTSERVER2_ModelIndex** model_indices)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
@@ -1663,20 +1697,36 @@ TRTSERVER2_ServerModelRepositoryIndex(
   RETURN_IF_STATUS_ERROR(
       lserver->GetModelRepositoryIndex(&model_repository_index));
 
-  std::vector<const char*> indices;
+  // *inference_request =
+  //     reinterpret_cast<TRTSERVER2_ModelIndex*>();
+  TrtServerModelIndex* indices = new TrtServerModelIndex();
+  *model_indices = reinterpret_cast<TRTSERVER2_ModelIndex*>(indices);
   for (const auto& model : model_repository_index.models()) {
-    indices.push_back(model.name().c_str());
-  }
-
-  if (indices.empty()) {
-    *models_count = 0;
-    *models = nullptr;
-  } else {
-    *models_count = indices.size();
-    *models = &(indices[0]);
+    indices->PushBackModel(model.name().c_str());
   }
 
   return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER2_ServerGetModelRepositoryIndex(
+    TRTSERVER2_ModelIndex* model_indices, const char*** models,
+    uint64_t* models_count)
+{
+  TrtServerModelIndex* indices =
+      reinterpret_cast<TrtServerModelIndex*>(model_indices);
+  indices->GetModels(models, models_count);
+  return nullptr;
+}
+
+TRTSERVER_Error*
+TRTSERVER2_ServerModelRepositoryIndexDelete(
+    TRTSERVER2_ModelIndex* model_indices)
+{
+  TrtServerModelIndex* lrequest =
+      reinterpret_cast<TrtServerModelIndex*>(model_indices);
+  delete lrequest;
+  return nullptr;  // Success
 }
 
 TRTSERVER_Error*
