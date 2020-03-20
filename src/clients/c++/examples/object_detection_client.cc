@@ -178,8 +178,8 @@ Postprocess(
         results,
     const std::vector<std::string>& filenames, const size_t batch_size, const size_t output_size)
 {
-  if (results.size() != 1) {
-    std::cerr << "expected 1 result, got " << results.size() << std::endl;
+  if (results.size() != output_size) {
+    std::cerr << "expected "<<output_size<<" results, got " << results.size() << std::endl;
     exit(1);
   }
 
@@ -193,28 +193,38 @@ Postprocess(
   }
 
   for (size_t b = 0; b < batch_size; ++b) {
-    size_t cnt = 0;
-    nic::Error err = result->GetClassCount(b, &cnt);
-    if (!err.IsOk()) {
-      std::cerr << "failed reading class count for batch " << b << ": " << err
-                << std::endl;
-      exit(1);
-    }
 
     std::cout << "Image '" << filenames[b] << "':" << std::endl;
 
-    for (size_t c = 0; c < cnt; ++c) {
-      nic::InferContext::Result::ClassResult cls;
-      nic::Error err = result->GetClassAtCursor(b, &cls);
-      if (!err.IsOk()) {
-        std::cerr << "failed reading class for batch " << b << ": " << err
-                  << std::endl;
-        exit(1);
-      }
+      std::vector<int64_t> output_tensor_shape;
+      for (size_t c = 0; c < output_size; ++c) {
+        nic::Error err1 = result->GetRawShape(&output_tensor_shape);
+        if (!err1.IsOk()) {
+            std::cerr << "failed reading output_tensor shape for batch " << b << ": " << err1
+                    << std::endl;
+            exit(1);
+        }
+        std::cout<<"Output tensor"<< c <<" shape: "<<std::endl;
+        if(output_tensor_shape.empty()){
+            std::cerr << "Output tensor shape is empty!" << std::endl;
+            exit(1);
+        }
+        for(size_t i=0; i<output_tensor_shape.size(); i++)
+        {
+            std::cout << output_tensor_shape[i] << " ";
+        }
+        float output_array[output_tensor_shape[0]][output_tensor_shape[1]][output_tensor_shape[2]];
+        std::cout << "\n" << std::endl;
+        nic::Error err2 = result->GetRawAtCursor(b, &output_array[0][0][0]);
+        if (!err2.IsOk()) {
+            std::cerr << "failed reading output_tensor for batch " << b << ": " << err2
+                    << std::endl;
+            exit(1);
+        }
+    
+        std::cout<<"first element in the output tensor: "<<output_array[0][0][0]<<std::endl;
 
-      std::cout << "    " << cls.idx << " (" << cls.label << ") = " << cls.value
-                << std::endl;
-    }
+      }
   }
 }
 
@@ -233,6 +243,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-a" << std::endl;
   std::cerr << "\t--streaming" << std::endl;
   std::cerr << "\t-b <batch size>" << std::endl;
+  std::cerr << "\t-o <output size>" << std::endl;
   std::cerr << "\t-c <topk>" << std::endl;
   std::cerr << "\t-s <NONE|INCEPTION|VGG>" << std::endl;
   std::cerr << "\t-p <proprocessed output filename>" << std::endl;
@@ -381,22 +392,22 @@ ParseModel(
   // dimensions as long as all but 1 is size 1 (e.g. { 10 }, { 1, 10
   // }, { 10, 1, 1 } are all ok). Variable-size dimensions are not
   // currently supported.
-  size_t non_one_cnt = 0;
-  for (const auto dim : output->Dims()) {
-    if (dim == -1) {
-      std::cerr << "variable-size dimension in model output not supported"
-                << std::endl;
-      exit(1);
-    }
+//   size_t non_one_cnt = 0;
+//   for (const auto dim : output->Dims()) {
+//     if (dim == -1) {
+//       std::cerr << "variable-size dimension in model output not supported"
+//                 << std::endl;
+//       exit(1);
+//     }
 
-    if (dim > 1) {
-      non_one_cnt++;
-      if (non_one_cnt > 1) {
-        std::cerr << "expecting model output to be a vector" << std::endl;
-        exit(1);
-      }
-    }
-  }
+//     if (dim > 1) {
+//       non_one_cnt++;
+//       if (non_one_cnt > 1) {
+//         std::cerr << "expecting model output to be a vector" << std::endl;
+//         exit(1);
+//       }
+//     }
+//   }
 
   *format = input->Format();
 
@@ -519,7 +530,7 @@ main(int argc, char** argv)
   // Parse commandline...
   int opt;
   while ((opt = getopt_long(
-              argc, argv, "vau:m:x:b:c:s:p:i:H:", long_options, NULL)) != -1) {
+              argc, argv, "vau:m:x:b:o:c:s:p:i:H:", long_options, NULL)) != -1) {
     switch (opt) {
       case 0:
         streaming = true;
