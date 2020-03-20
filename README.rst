@@ -216,7 +216,7 @@ protocols (version 2) will take place over several releases.
   * Beta release of Python client library that uses community standard
     GRPC inference protocol.
   * See `client documentation
-    <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/client_experimental.html>`_
+    <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/client_experimental.html>`_
     for description and examples showing how to enable and use the new
     GRPC inference protocol and Python client library.
   * Existing HTTP/REST and GRPC protocols, and existing client APIs

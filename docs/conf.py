@@ -78,8 +78,8 @@ release = str(version_long)
 # link here as well:
 version = version + """<br/>
 Version select: <select onChange="window.location.href = this.value" onFocus="this.selectedIndex = -1">
-    <option value="https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/index.html">Current release</option>
-    <option value="https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/index.html">master (unstable)</option>
+    <option value="https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/index.html">Current release</option>
+    <option value="https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/index.html">master (unstable)</option>
     <option value="https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/index.html">Older releases</option>
 </select>"""
 
@@ -174,7 +174,7 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 # documentation.
 #
 html_theme_options = {
-    'canonical_url': 'https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/index.html',
+    'canonical_url': 'https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-guide/docs/index.html',
     'collapse_navigation': False,
     'display_version': True,
     'logo_only': False,
