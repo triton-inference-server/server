@@ -89,6 +89,23 @@ install(
 )
 
 #
+# object_detection_client
+#
+find_package(OpenCV REQUIRED)
+add_executable(object_detection_client object_detection_client.cc)
+target_include_directories(object_detection_client PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(
+  object_detection_client
+  PRIVATE TRTIS::request_static
+  PRIVATE ${OpenCV_LIBS}
+)
+install(
+  TARGETS object_detection_client
+  RUNTIME DESTINATION bin
+)
+
+
+#
 # simple_callback_client
 #
 add_executable(simple_callback_client simple_callback_client.cc)
