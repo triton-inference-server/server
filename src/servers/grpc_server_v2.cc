@@ -1857,9 +1857,9 @@ InferAllocatorPayload(
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const ModelInferRequest& request,
     AllocPayload::TensorSerializedDataMap* serialized_data_map,
-    ModelInferResponse& response, AllocPayload* alloc_payload)
+    ModelInferResponse* response, AllocPayload* alloc_payload)
 {
-  alloc_payload->response_ = &response;
+  alloc_payload->response_ = response;
   if (alloc_payload->shm_map_ != nullptr) {
     alloc_payload->shm_map_->clear();
   }
@@ -2276,7 +2276,7 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
     }
     if (err == nullptr) {
       err = InferAllocatorPayload(
-          trtserver_, shm_manager_, request, serialized_data_map, response,
+          trtserver_, shm_manager_, request, serialized_data_map, &response,
           &state->alloc_payload_);
     }
     if (err == nullptr) {
@@ -2461,8 +2461,9 @@ ModelInferHandler::InferComplete(
 class ModelStreamInferHandler
     : public Handler<
           GRPCInferenceService::AsyncService,
-          grpc::ServerAsyncReaderWriter<ModelInferResponse, ModelInferRequest>,
-          ModelInferRequest, ModelInferResponse> {
+          grpc::ServerAsyncReaderWriter<
+              ModelStreamInferResponse, ModelInferRequest>,
+          ModelInferRequest, ModelStreamInferResponse> {
  public:
   ModelStreamInferHandler(
       const std::string& name,
@@ -2604,7 +2605,7 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     std::shared_ptr<StateContext> context = state->context_;
 
     // Issue the inference request into server...
-    ModelInferResponse& response = state->response_;
+    ModelStreamInferResponse& response = state->response_;
 
     // Create the inference request provider which provides all the
     // input information needed for an inference.
@@ -2636,8 +2637,8 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     }
     if (err == nullptr) {
       err = InferAllocatorPayload(
-          trtserver_, shm_manager_, request, serialized_data_map, response,
-          &state->alloc_payload_);
+          trtserver_, shm_manager_, request, serialized_data_map,
+          response.mutable_infer_response(), &state->alloc_payload_);
     }
     if (err == nullptr) {
       // Provide the trace manager object to use for this request, if
@@ -2674,12 +2675,10 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
       GrpcStatusUtil::Create(&status, err);
       TRTSERVER_ErrorDelete(err);
 
-      // Only record the first inference failure per stream
-      if (state->context_->request_status_.ok()) {
-        state->context_->request_status_ = status;
-      }
+      response.mutable_status()->set_code(status.error_code());
+      response.mutable_status()->set_message(status.error_message());
 
-      response.Clear();
+      response.mutable_infer_response()->Clear();
 
       state->step_ = Steps::WRITEREADY;
       state->context_->WriteResponseIfReady(state);
@@ -2745,7 +2744,7 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
       state->context_->step_ = Steps::COMPLETE;
       state->step_ = Steps::COMPLETE;
       state->context_->responder_->Finish(
-          state->context_->finish_ok_ ? state->context_->request_status_
+          state->context_->finish_ok_ ? grpc::Status::OK
                                       : grpc::Status::CANCELLED,
           state);
     } else {
@@ -2772,7 +2771,7 @@ ModelStreamInferHandler::StreamInferComplete(
                  << state->context_->unique_id_ << ", " << state->unique_id_
                  << " step " << state->step_;
 
-  ModelInferResponse& response = state->response_;
+  ModelStreamInferResponse& response = state->response_;
   InferResponseHeader response_header;
 
   TRTSERVER_Error* err = TRTSERVER_InferenceResponseStatus(trtserver_response);
@@ -2803,11 +2802,12 @@ ModelStreamInferHandler::StreamInferComplete(
 
   // Convert the InferResponseHeader to the V2 response
   if (err == nullptr) {
-    response.set_model_version(std::to_string(response_header.model_version()));
-    response.set_id(id);
+    response.mutable_infer_response()->set_model_version(
+        std::to_string(response_header.model_version()));
+    response.mutable_infer_response()->set_id(id);
     for (const auto& io : response_header.output()) {
       // Find the tensor in the response and set its shape.
-      for (auto& output : *(response.mutable_outputs())) {
+      for (auto& output : *(response.mutable_infer_response()->mutable_outputs())) {
         if (output.name() == io.name()) {
           if (io.batch_classes().size() == 0) {
             for (const auto d : io.raw().dims()) {
@@ -2854,11 +2854,13 @@ ModelStreamInferHandler::StreamInferComplete(
 
 
   if (err != nullptr) {
-    response.Clear();
+    response.mutable_infer_response()->Clear();
   }
 
   grpc::Status status;
   GrpcStatusUtil::Create(&status, err);
+  response.mutable_status()->set_code(status.error_code());
+  response.mutable_status()->set_message(status.error_message());
 
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'state'.
@@ -2866,11 +2868,6 @@ ModelStreamInferHandler::StreamInferComplete(
       TRTSERVER_InferenceResponseDelete(trtserver_response),
       "deleting GRPC response");
   TRTSERVER_ErrorDelete(err);
-
-  // Only record the first inference failure per stream
-  if (state->context_->request_status_.ok()) {
-    state->context_->request_status_ = status;
-  }
 
   state->step_ = Steps::WRITEREADY;
   state->context_->WriteResponseIfReady(state);
