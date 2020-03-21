@@ -283,7 +283,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestOutputShape(
 /// returned as the base pointer to the data and the size, in bytes,
 /// of the data. The caller does not own the returned data and must
 /// not modify or delete it. The lifetime of the returned data extends
-/// until 'inference_request' is or until 'inference_request' is
+/// until 'inference_request' is deleted or until 'inference_request' is
 /// reused in a call to TRTSERVER2_ServerInferAsync.
 /// \param inference_request The request object.
 /// \param name The name of the output.
@@ -296,6 +296,13 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestOutputData(
     TRTSERVER2_InferenceRequest* inference_request, const char* name,
     const void** base, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
     int64_t* memory_type_id);
+
+/// Remove all the output tensors. The meta data of the output tensors will
+/// become unaccesible and the result data will be released.
+/// \param inference_request The request object.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestRemoveAllOutputs(
+    TRTSERVER2_InferenceRequest* inference_request);
 
 /// Type for inference completion callback function. If non-nullptr,
 /// the 'trace_manager' object is the trace manager associated with

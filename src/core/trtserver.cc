@@ -1707,6 +1707,7 @@ TRTSERVER_ServerInferAsync(
   const auto& lrequest = ltrtrequest->Request();
   const auto& lbackend = ltrtrequest->Backend();
 
+  ltrtrequest->SetResponse(nullptr);
   RETURN_IF_STATUS_ERROR(lrequest->PrepareForInference(*lbackend));
 
 #ifdef TRTIS_ENABLE_STATS
@@ -2105,6 +2106,16 @@ TRTSERVER2_InferenceRequestOutputShape(
 }
 
 TRTSERVER_Error*
+TRTSERVER2_InferenceRequestRemoveAllOutputs(
+    TRTSERVER2_InferenceRequest* inference_request)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  lrequest->SetResponse(nullptr);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
 TRTSERVER2_ServerInferAsync(
     TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER2_InferenceRequest* inference_request,
@@ -2121,6 +2132,7 @@ TRTSERVER2_ServerInferAsync(
   const auto& lrequest = ltrtrequest->Request();
   const auto& lbackend = ltrtrequest->Backend();
 
+  ltrtrequest->SetResponse(nullptr);
   RETURN_IF_STATUS_ERROR(lrequest->PrepareForInference(*lbackend));
 
 #ifdef TRTIS_ENABLE_STATS
