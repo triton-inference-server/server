@@ -41,6 +41,12 @@
 #include "src/core/trtserver2.h"
 #include "src/servers/common.h"
 
+#ifdef TRTIS_ENABLE_GPU
+extern "C" {
+#include <b64/cdecode.h>
+}
+#endif  // TRTIS_ENABLE_GPU
+
 #ifdef TRTIS_ENABLE_TRACING
 #include "src/servers/tracer.h"
 #endif  // TRTIS_ENABLE_TRACING
@@ -1424,14 +1430,26 @@ HTTPAPIServerV2::HandleCudaSharedMemory(
         size_t buffer_len = evbuffer_get_length(req->buffer_in);
         err = EVBufferToJson(&document, v, &v_idx, buffer_len, n);
         if (err == nullptr) {
-          const char* raw_handle = document["raw_handle"].GetString();
+          rapidjson::Value& handle = document["raw_handle"];
+          std::string b64_handle = std::string(handle["b64"].GetString());
           uint64_t byte_size = document["byte_size"].GetInt();
           uint64_t device_id = document["device_id"].GetInt();
-          // TODO Add Base64 decoding for raw_handle
-          err = shm_manager_->RegisterCUDASharedMemory(
-              region_name.c_str(),
-              reinterpret_cast<const cudaIpcMemHandle_t*>(raw_handle),
-              byte_size, device_id);
+          base64_decodestate s;
+          base64_init_decodestate(&s);
+          std::vector<char> raw_handle(sizeof(cudaIpcMemHandle_t));
+          size_t decoed_size = base64_decode_block(
+              b64_handle.c_str(), b64_handle.size(), raw_handle.data(), &s);
+          if (decoed_size != sizeof(cudaIpcMemHandle_t)) {
+            err = TRTSERVER_ErrorNew(
+                TRTSERVER_ERROR_INVALID_ARG,
+                "'raw_handle' must be a valid base64 encode "
+                "cudaIpcMemHandle_t");
+          } else {
+            err = shm_manager_->RegisterCUDASharedMemory(
+                region_name.c_str(),
+                reinterpret_cast<const cudaIpcMemHandle_t*>(raw_handle.data()),
+                byte_size, device_id);
+          }
         }
       }
 #else
