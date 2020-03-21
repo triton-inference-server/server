@@ -32,6 +32,7 @@ import time
 import sys
 
 import tritongrpcclient.core as grpcclient
+from tritongrpcclient.utils import InferenceServerException
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -76,11 +77,16 @@ if __name__ == '__main__':
     outputs.append(grpcclient.InferOutput('OUTPUT0'))
     outputs.append(grpcclient.InferOutput('OUTPUT1'))
 
-    # Define the callback function. Note the last parameter should be
-    # result InferenceServerClient would povide the results of an
-    # inference in the same parameter.
-    def callback(user_data, result):
-        user_data.append(result)
+    # Define the callback function. Note the last two parameters should be
+    # result and error. InferenceServerClient would povide the results of an
+    # inference as tritongrpcclient.core.InferResult in result. For successful
+    # inference, error will be None, otherwise it will be an object of
+    # tritongrpcclient.utils.InferenceServerException holding the error details.
+    def callback(user_data, result, error):
+        if not error:
+            user_data.append(result)
+        else:
+            user_data.append(error)
 
     # list to hold the results of inference.
     user_data = []
@@ -97,6 +103,11 @@ if __name__ == '__main__':
 
     # Display and validate the available results
     if ((len(user_data) == 1)):
+        # Check for the errors
+        if type(user_data[0]) == InferenceServerException:
+            print(user_data[0])
+            sys.exit(1)
+        
         # Validate the values by matching with already computed expected
         # values.
         output0_data = user_data[0].as_numpy('OUTPUT0')

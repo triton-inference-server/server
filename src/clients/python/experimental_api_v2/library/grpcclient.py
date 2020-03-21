@@ -35,11 +35,15 @@ from tritongrpcclient import grpc_service_v2_pb2_grpc
 from tritongrpcclient.utils import *
 
 
-def raise_error_grpc(rpc_error):
-    raise InferenceServerException(
+def get_error_grpc(rpc_error):
+    return InferenceServerException(
         msg=rpc_error.details(),
         status=str(rpc_error.code()),
-        debug_details=rpc_error.debug_error_string()) from None
+        debug_details=rpc_error.debug_error_string())
+
+
+def raise_error_grpc(rpc_error):
+    raise get_error_grpc(rpc_error) from None
 
 
 class InferenceServerClient:
@@ -592,11 +596,11 @@ class InferenceServerClient:
         ----------
         callback : function
             Python function that is invoked once the request is completed.
-            The function must reserve the last argument to hold InferResult
-            object which will be provided to the function when executing
-            the callback. The ownership of this InferResult object will be
-            given to the user and the its lifetime is limited to the scope
-            of this function.
+            The function must reserve the last two arguments (result, error)
+            to hold InferResult and InferenceServerException objects
+            respectively which will be provided to the function when executing
+            the callback. The ownership of these objects will be given to the
+            user. The 'error' would be None for a successful inference.
         inputs : list
             A list of InferInput objects, each describing data for a input
             tensor required by the model.
@@ -624,11 +628,12 @@ class InferenceServerClient:
         """
 
         def wrapped_callback(call_future):
+            error = result = None
             try:
                 result = InferResult(call_future.result())
             except grpc.RpcError as rpc_error:
-                raise_error_grpc(rpc_error)
-            callback(result=result)
+                error = get_error_grpc(rpc_error)
+            callback(result=result, error=error)
 
         request = self._get_inference_request(inputs, outputs, model_name,
                                               model_version, request_id,
