@@ -633,19 +633,20 @@ TrtServerResponse::OutputData(
 //
 class TrtServerModelIndex {
  public:
-  TrtServerModelIndex() = default;
-  TRTSERVER_Error* GetModels(
+  TrtServerModelIndex(ni::ModelRepositoryIndex model_repository_index);
+  TRTSERVER_Error* GetModelNames(
       const char* const** models, uint64_t* models_count);
-  ni::ModelRepositoryIndex model_repository_index_;
 
  private:
+  ni::ModelRepositoryIndex model_repository_index_;
   std::vector<const char*> indices_;
 };
 
 TRTSERVER_Error*
-TrtServerModelIndex::GetModels(
+TrtServerModelIndex::GetModelNames(
     const char* const** models, uint64_t* models_count)
 {
+  indices_.clear();
   for (const auto& model : model_repository_index_.models()) {
     indices_.push_back(model.name().c_str());
   }
@@ -660,6 +661,13 @@ TrtServerModelIndex::GetModels(
 
   return nullptr;
 }
+
+TrtServerModelIndex::TrtServerModelIndex(
+    ni::ModelRepositoryIndex model_repository_index)
+    : model_repository_index_(model_repository_index)
+{
+}
+
 
 }  // namespace
 
@@ -1682,7 +1690,7 @@ TRTSERVER_ServerModelRepositoryIndex(
 }
 
 TRTSERVER_Error*
-TRTSERVER2_ServerModelRepositoryIndexNew(
+TRTSERVER2_ServerModelIndex(
     TRTSERVER_Server* server, TRTSERVER2_ModelIndex** model_indices)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
@@ -1692,32 +1700,34 @@ TRTSERVER2_ServerModelRepositoryIndexNew(
       lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::REPOSITORY);
 #endif  // TRTIS_ENABLE_STATS
 
-  TrtServerModelIndex* indices = new TrtServerModelIndex();
-  *model_indices = reinterpret_cast<TRTSERVER2_ModelIndex*>(indices);
+  ni::ModelRepositoryIndex model_repository_index;
   RETURN_IF_STATUS_ERROR(
-      lserver->GetModelRepositoryIndex(&indices->model_repository_index_));
+      lserver->GetModelRepositoryIndex(&model_repository_index));
+
+  TrtServerModelIndex* indices =
+      new TrtServerModelIndex(model_repository_index);
+  *model_indices = reinterpret_cast<TRTSERVER2_ModelIndex*>(indices);
 
   return nullptr;  // success
 }
 
 TRTSERVER_Error*
-TRTSERVER2_ServerGetModelRepositoryIndex(
+TRTSERVER2_ModelIndexNames(
     TRTSERVER2_ModelIndex* model_indices, const char* const** models,
     uint64_t* models_count)
 {
   TrtServerModelIndex* indices =
       reinterpret_cast<TrtServerModelIndex*>(model_indices);
-  indices->GetModels(models, models_count);
+  indices->GetModelNames(models, models_count);
   return nullptr;
 }
 
 TRTSERVER_Error*
-TRTSERVER2_ServerModelRepositoryIndexDelete(
-    TRTSERVER2_ModelIndex* model_indices)
+TRTSERVER2_ModelIndexDelete(TRTSERVER2_ModelIndex* model_indices)
 {
-  TrtServerModelIndex* lrequest =
+  TrtServerModelIndex* indices =
       reinterpret_cast<TrtServerModelIndex*>(model_indices);
-  delete lrequest;
+  delete indices;
   return nullptr;  // Success
 }
 
