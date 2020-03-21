@@ -127,7 +127,6 @@ class SharedMemoryManager {
       const std::string& name, CudaSharedMemoryStatusResponse*& shm_status);
 #endif  // TRTIS_ENABLE_GRPC_V2
 
-#ifdef TRTIS_ENABLE_HTTP_V2
   /// Populates the status of active system/CUDA shared memory regions
   /// in the status protobuf. If 'name' is missing then return status of all
   /// active system/CUDA shared memory regions as specified by 'memory_type'.
@@ -138,9 +137,7 @@ class SharedMemoryManager {
   TRTSERVER_Error* GetStatusV2(
       const std::string& name, SharedMemoryStatus* shm_status,
       TRTSERVER_Memory_Type memory_type);
-#endif  // TRTIS_ENABLE_HTTP_V2
 
-#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
   /// Removes the named shared memory block of the specified type from
   /// the manager. Any future attempt to get the details of this block
   /// will result in an array till another block with the same name is
@@ -155,18 +152,15 @@ class SharedMemoryManager {
   /// \param memory_type The type of memory to unregister.
   /// \return a TRTSERVER_Error indicating success or failure.
   TRTSERVER_Error* UnregisterAllV2(TRTSERVER_Memory_Type memory_type);
-#endif  // TRTIS_ENABLE_GRPC_V2 || TRTIS_ENABLE_HTTP_V2
 
  private:
   /// A helper function to remove the named shared memory blocks.
   TRTSERVER_Error* UnregisterHelper(const std::string& name);
 
-#ifdef TRTIS_ENABLE_GRPC_V2
   /// A helper function to remove the named shared memory blocks of
   /// specified type
   TRTSERVER_Error* UnregisterHelperV2(
       const std::string& name, TRTSERVER_Memory_Type memory_type);
-#endif  // TRTIS_ENABLE_GRPC_V2
 
   /// A struct that records the shared memory regions registered by the shared
   /// memory manager.

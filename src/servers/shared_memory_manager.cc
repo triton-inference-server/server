@@ -469,7 +469,6 @@ SharedMemoryManager::GetStatusV2(
 }
 #endif  // TRTIS_ENABLE_GRPC_V2
 
-#ifdef TRTIS_ENABLE_HTTP_V2
 TRTSERVER_Error*
 SharedMemoryManager::GetStatusV2(
     const std::string& name, SharedMemoryStatus* shm_status,
@@ -536,9 +535,7 @@ SharedMemoryManager::GetStatusV2(
 
   return nullptr;
 }
-#endif  // TRTIS_ENABLE_HTTP_V2
 
-#if defined(TRTIS_ENABLE_GRPC) || defined(TRTIS_ENABLE_GRPC_V2)
 TRTSERVER_Error*
 SharedMemoryManager::UnregisterV2(
     const std::string& name, TRTSERVER_Memory_Type memory_type)
@@ -626,8 +623,5 @@ SharedMemoryManager::UnregisterHelperV2(
 
   return nullptr;
 }
-
-#endif  // TRTIS_ENABLE_GRPC_V2 || TRTIS_ENABLE_HTTP_V2
-
 
 }}  // namespace nvidia::inferenceserver
