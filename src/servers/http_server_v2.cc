@@ -878,8 +878,8 @@ HTTPAPIServerV2::HandleRepositoryIndex(
   }
 
   TRTSERVER_Error* err = nullptr;
-  const char* const* models;
-  uint64_t models_count;
+  const char** models;
+  uint64_t models_count = 0;
   TRTSERVER2_ModelIndex* model_index = nullptr;
   if (repository_name.empty()) {
     err = TRTSERVER2_ServerModelIndex(server_.get(), &model_index);
@@ -897,14 +897,12 @@ HTTPAPIServerV2::HandleRepositoryIndex(
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
   if (err == nullptr) {
     rapidjson::Value models_array(rapidjson::kArrayType);
-    LOG_VERBOSE(1) << "models size: " << models_count;
     for (uint64_t i = 0; i < models_count; i++) {
       rapidjson::Value model_index;
       model_index.SetObject();
-      std::string model_str(models[i]);
-      rapidjson::Value name_val(model_str.c_str(), model_str.size(), allocator);
+      const char* model_name = models[i];
+      rapidjson::Value name_val(model_name, strlen(model_name), allocator);
       model_index.AddMember("name", name_val, allocator);
-      LOG_VERBOSE(1) << "added name: " << model_str;
       models_array.PushBack(model_index, allocator);
     }
     document.AddMember("index", models_array, allocator);
@@ -913,9 +911,9 @@ HTTPAPIServerV2::HandleRepositoryIndex(
     buffer.Clear();
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
     document.Accept(writer);
-    std::string model_metadata(buffer.GetString());
+    const char* model_metadata = buffer.GetString();
     evbuffer_add(
-        req->buffer_out, model_metadata.c_str(), model_metadata.size());
+        req->buffer_out, model_metadata, strlen(model_metadata));
     err = TRTSERVER2_ModelIndexDelete(model_index);
     evhtp_send_reply(req, EVHTP_RES_OK);
   } else {
