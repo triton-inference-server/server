@@ -45,6 +45,7 @@ SIMPLE_HEALTH_CLIENT=../clients/simple_grpc_v2_health_metadata.py
 SIMPLE_INFER_CLIENT=../clients/simple_grpc_v2_infer_client.py
 SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_grpc_v2_async_infer_client.py
 SIMPLE_STRING_INFER_CLIENT=../clients/simple_grpc_v2_string_infer_client.py
+SIMPLE_SEQUENCE_INFER_CLIENT=../clients/simple_grpc_v2_sequence_infer_client.py
 SIMPLE_CLASS_CLIENT=../clients/simple_grpc_v2_class_client.py
 SIMPLE_SHM_CLIENT=../clients/simple_grpc_v2_shm_client.py
 SIMPLE_CUDASHM_CLIENT=../clients/simple_grpc_v2_cudashm_client.py
@@ -93,6 +94,7 @@ for i in \
         $SIMPLE_ASYNC_INFER_CLIENT \
         $SIMPLE_STRING_INFER_CLIENT \
         $SIMPLE_CLASS_CLIENT \
+        $SIMPLE_SEQUENCE_INFER_CLIENT \
         $SIMPLE_SHM_CLIENT \
         $SIMPLE_CUDASHM_CLIENT \
         $EXPLICIT_BYTE_CONTENT_CLIENT \

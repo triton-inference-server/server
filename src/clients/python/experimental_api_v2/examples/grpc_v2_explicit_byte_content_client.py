@@ -101,7 +101,8 @@ if __name__ == '__main__':
         shape = []
         for value in output.shape:
             shape.append(value)
-        output_results.append(utils.deserialize_bytes_tensor(output.contents.raw_contents))
+        output_results.append(
+            utils.deserialize_bytes_tensor(output.contents.raw_contents))
         output_results[-1] = np.resize(output_results[-1], shape)
 
     if len(output_results) != 2:
@@ -111,7 +112,7 @@ if __name__ == '__main__':
     for i in range(16):
         print("{} + 1 = {}".format(i, output_results[0][0][i]))
         print("{} - 1 = {}".format(i, output_results[1][0][i]))
-        
+
         if (i + 1) != int(output_results[0][0][i]):
             print("explicit string infer error: incorrect sum")
             sys.exit(1)

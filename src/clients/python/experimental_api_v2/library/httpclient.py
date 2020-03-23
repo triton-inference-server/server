@@ -795,16 +795,16 @@ class InferenceServerClient:
         inputs : list
             A list of InferInput objects, each describing data for a input
             tensor required by the model.
-        outputs : list
-            A list of InferOutput objects, each describing how the output
-            data must be returned. If not specified all outputs produced
-            by the model will be returned using default settings.
         model_name: str
             The name of the model to run inference.
         model_version: str
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. If not specified all outputs produced
+            by the model will be returned using default settings.
         request_id: str
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id

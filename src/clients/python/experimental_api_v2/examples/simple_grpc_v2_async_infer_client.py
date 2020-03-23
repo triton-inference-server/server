@@ -92,8 +92,10 @@ if __name__ == '__main__':
     user_data = []
 
     # Inference call
-    triton_client.async_infer(partial(callback, user_data), inputs, outputs,
-                            model_name)
+    triton_client.async_infer(callback=partial(callback, user_data),
+                              inputs=inputs,
+                              model_name=model_name,
+                              outputs=outputs)
 
     # Wait until the results are available in user_data
     time_out = 10
@@ -107,7 +109,7 @@ if __name__ == '__main__':
         if type(user_data[0]) == InferenceServerException:
             print(user_data[0])
             sys.exit(1)
-        
+
         # Validate the values by matching with already computed expected
         # values.
         output0_data = user_data[0].as_numpy('OUTPUT0')

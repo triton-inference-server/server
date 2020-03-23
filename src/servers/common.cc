@@ -175,7 +175,7 @@ SetInferenceRequestOptions(
     }
     const auto& sequence_end_it = request.parameters().find("sequence_end");
     if (sequence_end_it != request.parameters().end()) {
-      const auto& infer_param = sequence_start_it->second;
+      const auto& infer_param = sequence_end_it->second;
       if (infer_param.parameter_choice_case() !=
           InferParameter::ParameterChoiceCase::kBoolParam) {
         return TRTSERVER_ErrorNew(

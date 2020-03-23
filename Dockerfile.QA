@@ -75,7 +75,6 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_cuda_shared_memory/models/. && \
     mkdir qa/L0_cmdline_trace/models && \
     cp -r docs/examples/model_repository/simple qa/L0_cmdline_trace/models/. && \
-    mkdir qa/L0_grpc_v2/models && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_grpc_v2/models && \
     cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_grpc_v2/models && \
     cp -r /workspace/docs/examples/model_repository/inception_graphdef qa/L0_grpc_v2/models && \
@@ -130,6 +129,9 @@ RUN mkdir -p qa/L0_simple_sequence_example/models/simple_sequence/1 && \
     mkdir -p qa/L0_backend_release/simple_seq_models/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/L0_backend_release/simple_seq_models/simple_sequence/1/. && \
+    mkdir -p qa/L0_grpc_v2/models/simple_sequence/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libsequence.so \
+        qa/L0_grpc_v2/models/simple_sequence/1/. && \
     mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/custom_models/custom_sequence_int32/1/. && \

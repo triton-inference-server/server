@@ -2807,7 +2807,8 @@ ModelStreamInferHandler::StreamInferComplete(
     response.mutable_infer_response()->set_id(id);
     for (const auto& io : response_header.output()) {
       // Find the tensor in the response and set its shape.
-      for (auto& output : *(response.mutable_infer_response()->mutable_outputs())) {
+      for (auto& output :
+           *(response.mutable_infer_response()->mutable_outputs())) {
         if (output.name() == io.name()) {
           if (io.batch_classes().size() == 0) {
             for (const auto d : io.raw().dims()) {

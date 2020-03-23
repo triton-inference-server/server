@@ -27,7 +27,10 @@
 import base64
 import numpy as np
 import grpc
+import threading
+import concurrent.futures
 import rapidjson as json
+import queue
 from google.protobuf.json_format import MessageToJson
 
 from tritongrpcclient import grpc_service_v2_pb2
@@ -44,6 +47,36 @@ def get_error_grpc(rpc_error):
 
 def raise_error_grpc(rpc_error):
     raise get_error_grpc(rpc_error) from None
+
+
+def _get_inference_request(inputs,
+                           model_name,
+                           model_version,
+                           outputs,
+                           request_id,
+                           sequence_id=None,
+                           sequence_start=None,
+                           sequence_end=None):
+    request = grpc_service_v2_pb2.ModelInferRequest()
+    request.model_name = model_name
+    request.model_version = model_version
+    if request_id != None:
+        request.id = request_id
+    for infer_input in inputs:
+        request.inputs.extend([infer_input._get_tensor()])
+    for infer_output in outputs:
+        request.outputs.extend([infer_output._get_tensor()])
+    if sequence_id:
+        param = request.parameters['sequence_id']
+        param.int64_param = sequence_id
+    if sequence_start:
+        param = request.parameters['sequence_start']
+        param.bool_param = sequence_start
+    if sequence_end:
+        param = request.parameters['sequence_end']
+        param.bool_param = sequence_end
+
+    return request
 
 
 class InferenceServerClient:
@@ -675,7 +708,6 @@ class InferenceServerClient:
 
     def infer(self,
               inputs,
-              outputs,
               model_name,
               model_version="",
               request_id=None,
@@ -691,16 +723,16 @@ class InferenceServerClient:
         inputs : list
             A list of InferInput objects, each describing data for a input
             tensor required by the model.
-        outputs : list
-            A list of InferOutput objects, each describing how the output
-            data must be returned. Only the output tensors present in the
-            list will be requested from the server.
         model_name: str
             The name of the model to run inference.
         model_version: str
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. If not specified all outputs produced
+            by the model will be returned using default settings.
         request_id: str
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
@@ -752,7 +784,6 @@ class InferenceServerClient:
     def async_infer(self,
                     callback,
                     inputs,
-                    outputs,
                     model_name,
                     model_version="",
                     request_id=None,
@@ -772,16 +803,16 @@ class InferenceServerClient:
         inputs : list
             A list of InferInput objects, each describing data for a input
             tensor required by the model.
-        outputs : list
-            A list of InferOutput objects, each describing how the output
-            data must be returned. Only the output tensors present in the
-            list will be requested from the server.
         model_name: str
             The name of the model to run inference.
         model_version: str
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. If not specified all outputs produced
+            by the model will be returned using default settings.
         request_id: str
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
@@ -820,9 +851,8 @@ class InferenceServerClient:
         else:
             metadata = ()
 
-        request = self._get_inference_request(inputs, outputs, model_name,
-                                              model_version, request_id,
-                                              parameters)
+        request = _get_inference_request(inputs, model_name, model_version,
+                                         outputs, request_id)
 
         try:
             self._call_future = self._client_stub.ModelInfer.future(
@@ -831,92 +861,45 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def _get_inference_request(self, inputs, outputs, model_name, model_version,
-                               request_id, parameters):
-        """Creates and initializes an inference request.
+    def async_sequence_infer(self,
+                             response_pool,
+                             sequence_metadata,
+                             model_name,
+                             model_version=""):
+        """Run asynchronous sequence inference. The inference requests
+        will be communicated with the server in a bi-directional stream.
 
         Parameters
         ----------
-        inputs : list
-            A list of InferInput objects, each describing data for a input
-            tensor required by the model.
-        outputs : list
-            A list of InferOutput objects, each describing how the output
-            data must be returned. Only the output tensors present in the
-            list will be requested from the server.
+        response_pool: concurrent.futures.ThreadPoolExecutor
+            The thread pool to execute callbacks for the
+            response.
+        sequence_metadata : InferSequenceMetadata
+            This object describes the sequence information, composing
+            requests and essential means of processing the response.
         model_name: str
             The name of the model to run inference.
         model_version: str
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
-        request_id: str
-            Optional identifier for the request. If specified will be returned
-            in the response. Default value is 'None' which means no request_id
-            will be used.
-        parameters: dict
-            Optional inference parameters described as key-value pairs.
-
-        Returns
-        -------
-        ModelInferRequest
-            The protobuf message holding the inference request.
-        
+    
         Raises
         ------
         InferenceServerException
             If server fails to issue inference.
-
         """
-
-        request = grpc_service_v2_pb2.ModelInferRequest()
-        request.model_name = model_name
-        request.model_version = model_version
-        if request_id != None:
-            request.id = request_id
-        for infer_input in inputs:
-            request.inputs.extend([infer_input._get_tensor()])
-        for infer_output in outputs:
-            request.outputs.extend([infer_output._get_tensor()])
-        if parameters:
-            for param_key in parameters:
-                _set_parameter(request,
-                               key=param_key,
-                               value=parameters[param_key])
-
-        return request
-
-    def _set_parameter(self, request, key, value):
-        """Adds the specified key-value pair to the request
-
-        Parameters
-        ----------
-        request : protobuf message
-            The ModelInferRequest object to add the parameter to.
-        key : str
-            The name of the parameter to be included in the request. 
-        value : str/int/bool
-            The value of the parameter
-
-        Raises
-        ------
-        InferenceServerException
-            If server fails to add the parameter to request.
-
-        """
-        if not type(key) is str:
+        if type(response_pool) != concurrent.futures.ThreadPoolExecutor:
             raise_error(
-                "only string data type for key is supported in parameters")
+                "'response_pool' should be of type concurrent.futures.ThreadPoolExecutor"
+            )
 
-        param = request.parameters[key]
-        if type(value) is int:
-            param.int64_param = value
-        elif type(value) is bool:
-            param.bool_param = value
-        elif type(value) is str:
-            param.string_param = value
-        else:
-            raise_error("unsupported value type for the parameter")
+        response_iterator = self._client_stub.ModelStreamInfer(
+            _RequestIterator(sequence_metadata, model_name, model_version))
+
+        # Delegate the reponsibility of collecting response to the thread pool
+        response_pool.submit(sequence_metadata._process_response,
+                             response_iterator)
 
 
 class InferInput:
@@ -1193,3 +1176,224 @@ class InferResult:
             return json.loads(MessageToJson(self._result))
         else:
             return self._result
+
+
+class InferSequenceMetadata:
+    """Holds the metadata for sequence inference requests
+
+    Parameters
+    ----------
+    sequence_id : int
+        The unique identifier for the sequence being represented by the
+        metadata.
+    sequence_length : int
+        The number of requests that will compose the sequence associated
+        with this metadata object.
+    callback : function
+        Python function that will be invoked for responses received for
+        the sequence. The function must reserve the last three arguments
+        (result, error, sequence_id) to hold InferResult,
+        InferenceServerException and sequence ID respectively which
+        will be provided to the function when executing the callback.
+        The ownership of these objects will be given to the user. The
+        'error' would be None for a successful inference.
+
+    """
+
+    def __init__(self, sequence_id, sequence_length, callback):
+        self._id = sequence_id
+        self._sequence_length = sequence_length
+        self._callback = callback
+        self._request_queue = queue.Queue()
+        self._requests_delivered = self._requests_added = 0
+
+    def reset(self,
+              new_sequence_id,
+              new_sequence_length=None,
+              new_callback=None):
+        """Resets the object to handle new sequence. This
+        function allows these objects to be reused for 
+        multiple sequence. 
+
+        Parameters
+        ----------
+        sequence_id : int
+            The unique identifier for the new sequence being
+            represented by the metadata.
+        new_sequence_length : int
+            The length of the new sequence to be handled by the
+            object. By default, the value is None, which means
+            the length of the current sequence will be used for
+            the new sequence.
+        new_callback : function
+            The callback function to be used with the new sequence
+            to be handled by the object. By default, the value is
+            None, which means the callback of the current sequence
+            will be used for the new sequence. See 'callback'
+            parameter description for 'InferSequenceMetadata'.
+        
+        Raises
+        ------
+        InferenceServerException
+            If the requests for the current sequence have not been
+            delivered. See 'InferSequenceMetadata.sequence_delivered'
+        """
+        if not self.sequence_delivered():
+            raise_error('The sequence metadata object can be reset only \
+                    once the current sequence is complete')
+
+        self._requests_delivered = self._requests_added = 0
+        self._id = new_sequence_id
+        if not new_sequence_length:
+            self._sequence_length = new_sequence_length
+        if not new_callback:
+            self._callback = new_callback
+
+    def sequence_delivered(self):
+        """Indicates whether or not the requests corresponding to the
+        current sequence have been delivered.
+
+        Returns
+        -------
+        bool
+            The truth value of whether the requests for the current
+            sequence have been delivered or not.
+        """
+        return (self._requests_delivered == self._sequence_length)
+
+    def add_request(self, inputs, outputs=None, request_id=None):
+        """Adds an inference request to the underlying sequence.
+        Note the added requests can be used only once.
+
+        Parameters
+        ----------
+        inputs : list
+            A list of InferInput objects, each describing data for a input
+            tensor required by the model.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. If not specified all outputs produced
+            by the model will be returned using default settings.
+        request_id: str
+            Optional identifier for the request. If specified will be returned
+            in the response. Default value is 'None' which means no request_id
+            will be used.
+        
+        Raises
+        ------
+        InferenceServerException
+            If the user tries to add more requests in the sequence than
+            described by the sequence length.
+        """
+        if self._requests_added == self._sequence_length:
+            raise_error('Can not add extra requests to the sequence metadata, \
+                    expected {} many requests'.format(self._sequence_length))
+        self._request_queue.put((inputs, outputs, request_id))
+        self._requests_added = self._requests_added + 1
+
+    def sequence_id(self):
+        """Returns the ID of the current sequence being handled
+        by the object.
+
+        Returns
+        -------
+        int
+            The ID of the current sequence
+        """
+        return self._id
+
+    def get_length(self):
+        """Returns the length of the current sequence being handled
+        by the object.
+
+        Returns
+        -------
+        int
+            The length of the current sequence
+        """
+        return self._sequence_length
+
+    def _get_request(self):
+        """Returns the request details in the order they were added.
+        The call to this function will block until the requests
+        are available in the queue. InferSequenceMetadata.add_request
+        adds the request to the queue.
+
+        Returns
+        -------
+        (list, list, str), int, bool, bool
+            The list of InferInputs, list of InferOutput, optional request ID,
+            sequence_id, truth value for the start of the sequence and the truth
+            value for end of the sequence for the next request.
+
+        Raises
+        ------
+        InferenceServerException
+            If the user tries get more requests than described by sequence
+            length.
+
+        """
+        if self._requests_delivered == self._sequence_length:
+            raise_error('[INTERNAL] Can not retrieve extra requests from \
+                    the sequence metadata, expected {} many requests'.format(
+                self._sequence_length))
+        self._requests_delivered = self._requests_delivered + 1
+        return (self._request_queue.get(), self._id,
+                (self._requests_delivered == 1),
+                (self._requests_delivered == self._sequence_length))
+
+    def _process_response(self, responses):
+        """Iterates through the response stream and executes the
+        provided callbacks. 
+
+        Parameters
+        ----------
+        responses : iterator
+            The iterator to the response from the server for the
+            requests in the sequence.
+        
+        """
+        for response in responses:
+            error = result = None
+            if not response.status.code:
+                result = InferResult(response.infer_response)
+            else:
+                error = InferenceServerException(msg=response.status.message)
+            self._callback(result=result, error=error, sequence_id=self._id)
+
+
+class _RequestIterator:
+    """An iterator class to generate and iterate through ModelInferRequest.
+
+    Parameters
+    ----------
+    sequence_metadata : InferSequenceMetadata
+        The InferSequenceMetadata that will provide all the information
+        for building requests.
+    model_name: str
+        The name of the model to run inference.
+    model_version: str
+        The version of the model to run inference. The default value
+        is an empty string which means then the server will choose
+        a version based on the model and internal policy.
+
+    """
+
+    def __init__(self, sequence_metadata, model_name, model_version=""):
+        self._sequence_metadata = sequence_metadata
+        self._model_name = model_name
+        self._model_version = model_version
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self._sequence_metadata.sequence_delivered():
+            raise StopIteration
+
+        ((inputs, outputs, request_id), sequence_id, sequence_start,
+         sequence_end) = self._sequence_metadata._get_request()
+
+        return _get_inference_request(inputs, self._model_name,
+                                      self._model_version, outputs, request_id,
+                                      sequence_id, sequence_start, sequence_end)
