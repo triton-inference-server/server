@@ -56,9 +56,10 @@ def async_send(triton_client, response_pool, values, batch_size, sequence_id,
                user_data, model_name, model_version):
     # Prepare the sequence metadata object
     sequence_metadata = grpcclient.InferSequenceMetadata(
-        sequence_id, len(values), partial(completion_callback, user_data))
+        sequence_id, partial(completion_callback, user_data))
 
     # Add requests in the sequence for each value
+    count = 1
     for value in values:
         # Create the tensor for INPUT
         value_data = np.full(shape=[batch_size, 1],
@@ -70,7 +71,10 @@ def async_send(triton_client, response_pool, values, batch_size, sequence_id,
         inputs[0].set_data_from_numpy(value_data)
         outputs = []
         outputs.append(grpcclient.InferOutput('OUTPUT'))
-        sequence_metadata.add_request(inputs, outputs)
+        sequence_metadata.add_request(inputs,
+                                      outputs,
+                                      is_sequence_end=(count == len(values)))
+        count = count + 1
 
     # Issue the asynchronous sequence inference.
     triton_client.async_sequence_infer(response_pool=response_pool,
