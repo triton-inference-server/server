@@ -878,7 +878,7 @@ HTTPAPIServerV2::HandleRepositoryIndex(
   }
 
   TRTSERVER_Error* err = nullptr;
-  const char** models;
+  const char* const* models;
   uint64_t models_count = 0;
   TRTSERVER2_ModelIndex* model_index = nullptr;
   if (repository_name.empty()) {
@@ -912,8 +912,7 @@ HTTPAPIServerV2::HandleRepositoryIndex(
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
     document.Accept(writer);
     const char* model_metadata = buffer.GetString();
-    evbuffer_add(
-        req->buffer_out, model_metadata, strlen(model_metadata));
+    evbuffer_add(req->buffer_out, model_metadata, strlen(model_metadata));
     err = TRTSERVER2_ModelIndexDelete(model_index);
     evhtp_send_reply(req, EVHTP_RES_OK);
   } else {

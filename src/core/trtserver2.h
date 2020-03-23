@@ -332,7 +332,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ServerModelIndex(
 /// \param models_count Returns the number of unique models.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ModelIndexNames(
-    TRTSERVER2_ModelIndex* model_index, const char*** models,
+    TRTSERVER2_ModelIndex* model_index, const char* const** models,
     uint64_t* models_count);
 
 /// Delete a model index object.

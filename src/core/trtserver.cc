@@ -635,35 +635,22 @@ class TrtServerModelIndex {
  public:
   TrtServerModelIndex(ni::ModelRepositoryIndex model_repository_index);
   TRTSERVER_Error* GetModelNames(
-      const char*** models, uint64_t* models_count);
+      const char* const** models, uint64_t* models_count);
 
  private:
-  ni::ModelRepositoryIndex model_repository_index_;
-  const char** models_;
+  std::vector<const char*> index_;
 };
 
 TRTSERVER_Error*
 TrtServerModelIndex::GetModelNames(
-    const char*** models, uint64_t* models_count)
+    const char* const** models, uint64_t* models_count)
 {
-  // index_.clear();
-  if (model_repository_index_.models_size() > 0) {
-    models_ = (const char**)malloc(model_repository_index_.models_size());
-  }
-  *models_count = 0;
-  for (const auto& model : model_repository_index_.models()) {
-    // index_.push_back(model.name().c_str());
-    models_[*models_count] = model.name().c_str();
-    *models_count+=1;
-  }
-
-  if (*models_count == 0) {
-    // if (index_.empty()) {
-    // *models_count = 0;
+  if (index_.empty()) {
+    *models_count = 0;
     *models = nullptr;
   } else {
-    // *models_count = index_.size();
-    *models = &(models_[0]);
+    *models_count = index_.size();
+    *models = &(index_[0]);
   }
 
   return nullptr;
@@ -671,8 +658,10 @@ TrtServerModelIndex::GetModelNames(
 
 TrtServerModelIndex::TrtServerModelIndex(
     ni::ModelRepositoryIndex model_repository_index)
-    : model_repository_index_(model_repository_index)
 {
+  for (const auto& model : model_repository_index.models()) {
+    index_.push_back(model.name().c_str());
+  }
 }
 
 
@@ -1719,7 +1708,7 @@ TRTSERVER2_ServerModelIndex(
 
 TRTSERVER_Error*
 TRTSERVER2_ModelIndexNames(
-    TRTSERVER2_ModelIndex* model_index, const char*** models,
+    TRTSERVER2_ModelIndex* model_index, const char* const** models,
     uint64_t* models_count)
 {
   TrtServerModelIndex* index =
