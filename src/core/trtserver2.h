@@ -325,8 +325,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ServerModelIndex(
 /// delete them. The lifetime of the returned strings extends only as
 /// long as 'model_index' and must not be accessed once 'model_index'
 /// is deleted.
-/// \param model_index The TRTSERVER2_ModelIndex object that
-/// is used to manage the lifecycle of the returned strings.
+/// \param model_index The index of models.
 /// \param models Returns the names of all unique models as an array of
 /// pointers to the name of each model.
 /// \param models_count Returns the number of unique models.

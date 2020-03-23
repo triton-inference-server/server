@@ -633,13 +633,23 @@ TrtServerResponse::OutputData(
 //
 class TrtServerModelIndex {
  public:
-  TrtServerModelIndex(ni::ModelRepositoryIndex model_repository_index);
+  TrtServerModelIndex(const ni::ModelRepositoryIndex& model_repository_index);
   TRTSERVER_Error* GetModelNames(
       const char* const** models, uint64_t* models_count);
 
  private:
+  ni::ModelRepositoryIndex model_repository_index_;
   std::vector<const char*> index_;
 };
+
+TrtServerModelIndex::TrtServerModelIndex(
+    const ni::ModelRepositoryIndex& model_repository_index)
+    : model_repository_index_(model_repository_index) {
+{
+  for (const auto& model : model_repository_index.models())
+  index_.push_back(model.name().c_str());
+  }
+}
 
 TRTSERVER_Error*
 TrtServerModelIndex::GetModelNames(
@@ -654,14 +664,6 @@ TrtServerModelIndex::GetModelNames(
   }
 
   return nullptr;
-}
-
-TrtServerModelIndex::TrtServerModelIndex(
-    ni::ModelRepositoryIndex model_repository_index)
-{
-  for (const auto& model : model_repository_index.models()) {
-    index_.push_back(model.name().c_str());
-  }
 }
 
 
