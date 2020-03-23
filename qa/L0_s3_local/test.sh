@@ -90,7 +90,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-sleep 5 
+sleep 20
 
 set +e
 for MODEL_NAME in resnet_v1_50_graphdef resnet_v1_50_savedmodel; do
@@ -120,7 +120,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-sleep 5 
+sleep 20 
 
 set +e
 for MODEL_NAME in resnet_v1_50_graphdef resnet_v1_50_savedmodel; do
