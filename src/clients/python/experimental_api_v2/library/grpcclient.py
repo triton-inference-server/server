@@ -867,8 +867,7 @@ class InferenceServerClient:
                              model_version="",
                              use_streaming=True,
                              response_pool=None):
-        """Run asynchronous sequence inference. The inference requests
-        will be communicated with the server in a bi-directional stream.
+        """Run asynchronous sequence inference.
 
         Parameters
         ----------
