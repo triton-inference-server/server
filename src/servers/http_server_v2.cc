@@ -1111,7 +1111,6 @@ HTTPAPIServerV2::HandleModelMetadata(
       // model_version.
       const ModelStatus& model_status = nitr->second;
       const ModelConfig& model_config = model_status.config();
-      // std::string name_str(name);
       rapidjson::Value name_val(
           model_config.name().c_str(), model_config.name().size());
       document.AddMember("name", name_val, allocator);
@@ -1187,9 +1186,8 @@ HTTPAPIServerV2::HandleModelMetadata(
     buffer.Clear();
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
     document.Accept(writer);
-    std::string model_metadata(buffer.GetString());
-    evbuffer_add(
-        req->buffer_out, model_metadata.c_str(), model_metadata.size());
+    const char* model_metadata = buffer.GetString();
+    evbuffer_add(req->buffer_out, model_metadata, strlen(model_metadata));
     evhtp_send_reply(req, EVHTP_RES_OK);
   } else {
     EVBufferAddErrorJson(req->buffer_out, err);
@@ -1213,15 +1211,13 @@ HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
   const char* name = nullptr;
   TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &name);
   if (err == nullptr) {
-    std::string name_str(name);
-    rapidjson::Value name_val(name_str.c_str(), name_str.size());
+    rapidjson::Value name_val(name, strlen(name));
     document.AddMember("name", name_val, allocator);
 
     const char* version = nullptr;
     err = TRTSERVER_ServerVersion(server_.get(), &version);
     if (err == nullptr) {
-      std::string version_str(version);
-      rapidjson::Value version_val(version_str.c_str(), version_str.size());
+      rapidjson::Value version_val(version, strlen(version));
       document.AddMember("version", version_val, allocator);
 
       uint64_t extensions_count;
@@ -1231,9 +1227,8 @@ HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
       rapidjson::Value extensions_array(rapidjson::kArrayType);
       if (err == nullptr) {
         for (uint64_t i = 0; i < extensions_count; ++i) {
-          std::string extension_str(extensions[i]);
           rapidjson::Value extension_val(
-              extension_str.c_str(), extension_str.size(), allocator);
+              extensions[i], strlen(extensions[i]), allocator);
           extensions_array.PushBack(extension_val, allocator);
         }
         document.AddMember("extensions", extensions_array, allocator);
@@ -1250,8 +1245,8 @@ HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
     buffer.Clear();
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
     document.Accept(writer);
-    std::string status_buffer(buffer.GetString());
-    evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
+    const char* status_buffer = buffer.GetString();
+    evbuffer_add(req->buffer_out, status_buffer, strlen(status_buffer));
     evhtp_send_reply(req, EVHTP_RES_OK);
   } else {
     EVBufferAddErrorJson(req->buffer_out, err);
@@ -1288,8 +1283,8 @@ HTTPAPIServerV2::HandleSystemSharedMemory(
         if (rshm_region.has_system_shared_memory()) {
           rapidjson::Value shm_region;
           shm_region.SetObject();
-          std::string name = rshm_region.name();
-          rapidjson::Value name_val(name.c_str(), name.size());
+          rapidjson::Value name_val(
+              rshm_region.name().c_str(), rshm_region.name().size());
           shm_region.AddMember("name", name_val, allocator);
           std::string key =
               rshm_region.system_shared_memory().shared_memory_key();
@@ -1309,9 +1304,8 @@ HTTPAPIServerV2::HandleSystemSharedMemory(
       buffer.Clear();
       rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
       document.Accept(writer);
-      std::string status_buffer(buffer.GetString());
-      evbuffer_add(
-          req->buffer_out, status_buffer.c_str(), status_buffer.size());
+      const char* status_buffer = buffer.GetString();
+      evbuffer_add(req->buffer_out, status_buffer, strlen(status_buffer));
     }
   } else {
     if ((action == "register") && (region_name.empty())) {
@@ -1386,8 +1380,8 @@ HTTPAPIServerV2::HandleCudaSharedMemory(
         if (rshm_region.has_cuda_shared_memory()) {
           rapidjson::Value shm_region;
           shm_region.SetObject();
-          std::string name = rshm_region.name();
-          rapidjson::Value name_val(name.c_str(), name.size());
+          rapidjson::Value name_val(
+              rshm_region.name().c_str(), rshm_region.name().size());
           shm_region.AddMember("name", name_val, allocator);
           uint64_t device_id = rshm_region.cuda_shared_memory().device_id();
           rapidjson::Value device_id_val(device_id);
@@ -1403,9 +1397,8 @@ HTTPAPIServerV2::HandleCudaSharedMemory(
       buffer.Clear();
       rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
       document.Accept(writer);
-      std::string status_buffer(buffer.GetString());
-      evbuffer_add(
-          req->buffer_out, status_buffer.c_str(), status_buffer.size());
+      const char* status_buffer = buffer.GetString();
+      evbuffer_add(req->buffer_out, status_buffer, strlen(status_buffer));
     }
   } else {
     if ((action == "register") && (region_name.empty())) {
@@ -2064,10 +2057,8 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
   buffer.Clear();
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
   response_meta_data_.response_json_.Accept(writer);
-  std::string response_metadata(buffer.GetString());
-  evbuffer_add(
-      req_->buffer_out, response_metadata.c_str(), response_metadata.size());
-
+  const char* response_metadata = buffer.GetString();
+  evbuffer_add(req_->buffer_out, response_metadata, strlen(response_metadata));
   evhtp_headers_add_header(
       req_->headers_out,
       evhtp_header_new("Content-Type", "application/json", 1, 1));
