@@ -182,7 +182,7 @@ already understood. The primary reasons for the name change are to :
   frameworks and formats.
 
 * Highlight that the server is aligning HTTP/REST and GRPC protocols
-  with a set of `community standard inference protocols
+  with a set of `KFServing community standard inference protocols
   <https://github.com/kubeflow/kfserving/tree/master/docs/predict-api/v2>`_
   that have been proposed by the `KFServing project
   <https://github.com/kubeflow/kfserving>`_.
@@ -193,10 +193,10 @@ protocols (version 2) will take place over several releases.
 * 20.03
 
   * Change name to Triton Inference Server.
-  * Beta release of server support for community standard GRPC
-    inference protocol.
-  * Beta release of Python client library that uses community standard
+  * Beta release of server support for KFServing community standard
     GRPC inference protocol.
+  * Beta release of Python client library that uses KFServing
+    community standard GRPC inference protocol.
   * See `client documentation
     <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/client_experimental.html>`_
     for description and examples showing how to enable and use the new
@@ -206,25 +206,32 @@ protocols (version 2) will take place over several releases.
 
 * 20.05
 
-  * Full release of community standard HTTP/REST and GRPC inference
-    protocol support in server, Python client, and C++ client.
+  * Full release of KFServing community standard HTTP/REST and GRPC
+    inference protocol support in server, Python client, and C++
+    client.
   * Existing HTTP/REST and GRPC protocols are deprecated but remain
     the default.
-  * Shared library inferface defined in trtserver.h is deprecated.
+  * Existing shared library inferface defined in trtserver.h continues
+    to be supported but is deprecated.
   * New shared library interface is defined in tritonserver.h.
 
 * 20.06
 
   * Triton Server version 2.0.0.
-  * Community standard HTTP/REST and GRPC inference protocols become
-    the default and only supported protocols for the server.
-  * Original Python and C++ client libraries and examples are removed.
-  * Shared library interface defined in trtserver.h is removed.
+  * KFserving community standard HTTP/REST and GRPC inference
+    protocols become the default and only supported protocols for the
+    server.
+  * C++ and Python client libraries based on the KFServing standard
+    inference protocols become the default and only supported client
+    libraries, replacing the original C++ and Python client libraries.
+  * The new shared library interface defined in tritonserver.h becomes
+    the default and only supported shared library interface, replacing
+    the original trtserver.h inferface.
 
-Throughout transition the model configuration schema, model repository
-struture, and custom backend APIs will remain unchanged so that any
-existing models, model repository, and custom backends will continue
-to work with Triton Server.
+Throughout the transition the model configuration schema, model
+repository struture, and custom backend APIs will remain unchanged so
+that any existing models, model repository, and custom backends will
+continue to work with Triton Server.
 
 Documentation
 -------------
