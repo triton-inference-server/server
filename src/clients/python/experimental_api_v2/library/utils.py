@@ -44,8 +44,7 @@ def raise_error(msg):
 
 def get_stream_response_processor_pool(max_workers):
     """
-    Creates a thread pool of specified size to process
-    the stream responses and execute specific callbacks.
+    Creates a thread pool of specified size.
 
     Parameters
     ----------

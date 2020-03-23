@@ -27,7 +27,6 @@
 import base64
 import numpy as np
 import grpc
-import threading
 import concurrent.futures
 import rapidjson as json
 import queue
