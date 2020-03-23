@@ -880,11 +880,11 @@ HTTPAPIServerV2::HandleRepositoryIndex(
   TRTSERVER_Error* err = nullptr;
   const char* const* models;
   uint64_t models_count;
-  TRTSERVER2_ModelIndex* model_indices = nullptr;
+  TRTSERVER2_ModelIndex* model_index = nullptr;
   if (repository_name.empty()) {
-    err = TRTSERVER2_ServerModelIndex(server_.get(), &model_indices);
+    err = TRTSERVER2_ServerModelIndex(server_.get(), &model_index);
     if (err == nullptr) {
-      err = TRTSERVER2_ModelIndexNames(model_indices, &models, &models_count);
+      err = TRTSERVER2_ModelIndexNames(model_index, &models, &models_count);
     }
   } else {
     err = TRTSERVER_ErrorNew(
@@ -916,7 +916,7 @@ HTTPAPIServerV2::HandleRepositoryIndex(
     std::string model_metadata(buffer.GetString());
     evbuffer_add(
         req->buffer_out, model_metadata.c_str(), model_metadata.size());
-    err = TRTSERVER2_ModelIndexDelete(model_indices);
+    err = TRTSERVER2_ModelIndexDelete(model_index);
     evhtp_send_reply(req, EVHTP_RES_OK);
   } else {
     EVBufferAddErrorJson(req->buffer_out, err);

@@ -308,38 +308,38 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestRemoveAllOutputs(
 ///
 /// TRTSERVER2_ModelIndex
 ///
-/// Object representing model indices.
+/// Object representing model index.
 ///
 
-/// Get the object representing the indices of all unique models in the
-/// model repository.
+/// Get the object representing the index of all unique models in the
+/// model repositories.
 /// \param server The inference server object.
-/// \param model_indices Returns the TRTSERVER2_ModelIndex object that
-/// is used to manage the lifecycle of the returned strings.
+/// \param model_index Return the TRTSERVER2_ModelIndex object that holds the
+/// index of all models contained in the server's model repository(s).
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ServerModelIndex(
-    TRTSERVER_Server* server, TRTSERVER2_ModelIndex** model_indices);
+    TRTSERVER_Server* server, TRTSERVER2_ModelIndex** model_index);
 
 /// Get the names of all unique models in the model repository.
 /// The caller does not own the returned strings and must not modify or
 /// delete them. The lifetime of the returned strings extends only as
-/// long as 'model_indices' and must not be accessed once 'model_indices'
+/// long as 'model_index' and must not be accessed once 'model_index'
 /// is deleted.
-/// \param model_indices The TRTSERVER2_ModelIndex object that
+/// \param model_index The TRTSERVER2_ModelIndex object that
 /// is used to manage the lifecycle of the returned strings.
 /// \param models Returns the names of all unique models as an array of
-/// pointers to the name of each extension.
+/// pointers to the name of each model.
 /// \param models_count Returns the number of unique models.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ModelIndexNames(
-    TRTSERVER2_ModelIndex* model_indices, const char* const** models,
+    TRTSERVER2_ModelIndex* model_index, const char* const** models,
     uint64_t* models_count);
 
 /// Delete a model indices object.
-/// \param model_indices The model indices object.
+/// \param model_index The index of models.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_ModelIndexDelete(
-    TRTSERVER2_ModelIndex* model_indices);
+    TRTSERVER2_ModelIndex* model_index);
 
 /// Type for inference completion callback function. If non-nullptr,
 /// the 'trace_manager' object is the trace manager associated with

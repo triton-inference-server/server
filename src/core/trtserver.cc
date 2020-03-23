@@ -639,24 +639,24 @@ class TrtServerModelIndex {
 
  private:
   ni::ModelRepositoryIndex model_repository_index_;
-  std::vector<const char*> indices_;
+  std::vector<const char*> index_;
 };
 
 TRTSERVER_Error*
 TrtServerModelIndex::GetModelNames(
     const char* const** models, uint64_t* models_count)
 {
-  indices_.clear();
+  index_.clear();
   for (const auto& model : model_repository_index_.models()) {
-    indices_.push_back(model.name().c_str());
+    index_.push_back(model.name().c_str());
   }
 
-  if (indices_.empty()) {
+  if (index_.empty()) {
     *models_count = 0;
     *models = nullptr;
   } else {
-    *models_count = indices_.size();
-    *models = &(indices_[0]);
+    *models_count = index_.size();
+    *models = &(index_[0]);
   }
 
   return nullptr;
@@ -1691,7 +1691,7 @@ TRTSERVER_ServerModelRepositoryIndex(
 
 TRTSERVER_Error*
 TRTSERVER2_ServerModelIndex(
-    TRTSERVER_Server* server, TRTSERVER2_ModelIndex** model_indices)
+    TRTSERVER_Server* server, TRTSERVER2_ModelIndex** model_index)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
@@ -1704,29 +1704,28 @@ TRTSERVER2_ServerModelIndex(
   RETURN_IF_STATUS_ERROR(
       lserver->GetModelRepositoryIndex(&model_repository_index));
 
-  TrtServerModelIndex* indices =
-      new TrtServerModelIndex(model_repository_index);
-  *model_indices = reinterpret_cast<TRTSERVER2_ModelIndex*>(indices);
+  TrtServerModelIndex* index = new TrtServerModelIndex(model_repository_index);
+  *model_index = reinterpret_cast<TRTSERVER2_ModelIndex*>(index);
 
   return nullptr;  // success
 }
 
 TRTSERVER_Error*
 TRTSERVER2_ModelIndexNames(
-    TRTSERVER2_ModelIndex* model_indices, const char* const** models,
+    TRTSERVER2_ModelIndex* model_index, const char* const** models,
     uint64_t* models_count)
 {
-  TrtServerModelIndex* indices =
-      reinterpret_cast<TrtServerModelIndex*>(model_indices);
-  indices->GetModelNames(models, models_count);
+  TrtServerModelIndex* index =
+      reinterpret_cast<TrtServerModelIndex*>(model_index);
+  index->GetModelNames(models, models_count);
   return nullptr;
 }
 
 TRTSERVER_Error*
-TRTSERVER2_ModelIndexDelete(TRTSERVER2_ModelIndex* model_indices)
+TRTSERVER2_ModelIndexDelete(TRTSERVER2_ModelIndex* model_index)
 {
-  TrtServerModelIndex* indices =
-      reinterpret_cast<TrtServerModelIndex*>(model_indices);
+  TrtServerModelIndex* index =
+      reinterpret_cast<TrtServerModelIndex*>(model_index);
   delete indices;
   return nullptr;  // Success
 }
