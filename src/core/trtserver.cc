@@ -635,28 +635,35 @@ class TrtServerModelIndex {
  public:
   TrtServerModelIndex(ni::ModelRepositoryIndex model_repository_index);
   TRTSERVER_Error* GetModelNames(
-      const char* const** models, uint64_t* models_count);
+      const char*** models, uint64_t* models_count);
 
  private:
   ni::ModelRepositoryIndex model_repository_index_;
-  std::vector<const char*> index_;
+  const char** models_;
 };
 
 TRTSERVER_Error*
 TrtServerModelIndex::GetModelNames(
-    const char* const** models, uint64_t* models_count)
+    const char*** models, uint64_t* models_count)
 {
-  index_.clear();
+  // index_.clear();
+  if (model_repository_index_.models_size() > 0) {
+    models_ = (const char**)malloc(model_repository_index_.models_size());
+  }
+  *models_count = 0;
   for (const auto& model : model_repository_index_.models()) {
-    index_.push_back(model.name().c_str());
+    // index_.push_back(model.name().c_str());
+    models_[*models_count] = model.name().c_str();
+    *models_count+=1;
   }
 
-  if (index_.empty()) {
-    *models_count = 0;
+  if (*models_count == 0) {
+    // if (index_.empty()) {
+    // *models_count = 0;
     *models = nullptr;
   } else {
-    *models_count = index_.size();
-    *models = &(index_[0]);
+    // *models_count = index_.size();
+    *models = &(models_[0]);
   }
 
   return nullptr;
@@ -1712,7 +1719,7 @@ TRTSERVER2_ServerModelIndex(
 
 TRTSERVER_Error*
 TRTSERVER2_ModelIndexNames(
-    TRTSERVER2_ModelIndex* model_index, const char* const** models,
+    TRTSERVER2_ModelIndex* model_index, const char*** models,
     uint64_t* models_count)
 {
   TrtServerModelIndex* index =
@@ -1726,7 +1733,7 @@ TRTSERVER2_ModelIndexDelete(TRTSERVER2_ModelIndex* model_index)
 {
   TrtServerModelIndex* index =
       reinterpret_cast<TrtServerModelIndex*>(model_index);
-  delete indices;
+  delete index;
   return nullptr;  // Success
 }
 
