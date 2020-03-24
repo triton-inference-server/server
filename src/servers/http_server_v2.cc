@@ -262,6 +262,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
     }
 
     std::vector<evbuffer*> response_buffer_;
+    std::vector<std::vector<char>> request_buffer_;
     rapidjson::Document request_json_;
     rapidjson::Document response_json_;
     TensorShmMap* shm_map_;
@@ -500,52 +501,52 @@ HTTPAPIServerV2::ResponseRelease(
 template <typename T>
 void
 ReadDataFromJsonHelper(
-    std::vector<T>* data_vec, const DataType dtype,
-    const rapidjson::Value& payload_data, int* counter)
+    T* data_vec, const DataType dtype, const rapidjson::Value& payload_data,
+    int* counter)
 {
   for (size_t i = 0; i < payload_data.Size(); i++) {
     // If last dimension
     if (!payload_data[i].IsArray()) {
       switch (dtype) {
         case TYPE_BOOL:
-          data_vec->push_back((uint8_t)payload_data[i].GetBool());
+          data_vec[*counter] = (uint8_t)payload_data[i].GetBool();
           break;
         case TYPE_UINT8:
-          data_vec->push_back((uint8_t)payload_data[i].GetInt());
+          data_vec[*counter] = (uint8_t)payload_data[i].GetInt();
           break;
         case TYPE_UINT16:
-          data_vec->push_back((uint16_t)payload_data[i].GetInt());
+          data_vec[*counter] = (uint16_t)payload_data[i].GetInt();
           break;
         case TYPE_UINT32:
-          data_vec->push_back((uint32_t)payload_data[i].GetInt());
+          data_vec[*counter] = (uint32_t)payload_data[i].GetInt();
           break;
         case TYPE_UINT64:
-          data_vec->push_back((uint64_t)payload_data[i].GetInt());
+          data_vec[*counter] = (uint64_t)payload_data[i].GetInt();
           break;
         case TYPE_INT8:
-          data_vec->push_back((int8_t)payload_data[i].GetInt());
+          data_vec[*counter] = (int8_t)payload_data[i].GetInt();
           break;
         case TYPE_INT16:
-          data_vec->push_back((int16_t)payload_data[i].GetInt());
+          data_vec[*counter] = (int16_t)payload_data[i].GetInt();
           break;
         case TYPE_INT32:
-          data_vec->push_back((int32_t)payload_data[i].GetInt());
+          data_vec[*counter] = (int32_t)payload_data[i].GetInt();
           break;
         case TYPE_INT64:
-          data_vec->push_back((int64_t)payload_data[i].GetInt());
+          data_vec[*counter] = (int64_t)payload_data[i].GetInt();
           break;
         case TYPE_FP32:
-          data_vec->push_back((float)payload_data[i].GetFloat());
+          data_vec[*counter] = (float)payload_data[i].GetFloat();
           break;
         case TYPE_FP64:
-          data_vec->push_back((double)payload_data[i].GetDouble());
+          data_vec[*counter] = (double)payload_data[i].GetDouble();
           break;
         default:
           break;
       }
       *counter += 1;
     }
-    // If not dimension
+    // If not last dimension
     else {
       ReadDataFromJsonHelper(data_vec, dtype, payload_data[i], counter);
     }
@@ -554,14 +555,10 @@ ReadDataFromJsonHelper(
 
 TRTSERVER_Error*
 ReadDataFromJson(
-    const rapidjson::Value& request_input, char** base, size_t* byte_size)
+    const rapidjson::Value& request_input, std::vector<char>* base,
+    const DataType dtype)
 {
   const rapidjson::Value& tensor_data = request_input["data"];
-  const rapidjson::Value& shape = request_input["shape"];
-  std::string dtype_str = std::string(request_input["datatype"].GetString());
-  const DataType dtype =
-      ProtocolStringToDataType(dtype_str.c_str(), dtype_str.size());
-  int counter = 0;
 
   // Must be an array
   if (!tensor_data.IsArray()) {
@@ -570,88 +567,66 @@ ReadDataFromJson(
         "failed to parse request buffer, tensor data must be an array");
   }
 
-  int element_cnt = 0;
-  for (rapidjson::SizeType i = 0; i < shape.Size(); i++) {
-    if (element_cnt == 0) {
-      element_cnt = shape[i].GetInt();
-    } else {
-      element_cnt *= shape[i].GetInt();
-    }
-  }
-
-  if (element_cnt == 0) {
-    return nullptr;
-  }
-
+  int counter = 0;
   switch (dtype) {
     case TYPE_BOOL: {
-      std::vector<uint8_t> bool_tensor;
-      ReadDataFromJsonHelper(&bool_tensor, dtype, tensor_data, &counter);
-      *base = reinterpret_cast<char*>(&bool_tensor[0]);
+      uint8_t* bool_tensor = reinterpret_cast<uint8_t*>(base->data());
+      ReadDataFromJsonHelper(bool_tensor, dtype, tensor_data, &counter);
       break;
     }
     case TYPE_UINT8: {
-      std::vector<uint8_t> uint8_t_tensor;
-      ReadDataFromJsonHelper(&uint8_t_tensor, dtype, tensor_data, &counter);
-      *base = reinterpret_cast<char*>(&uint8_t_tensor[0]);
+      uint8_t* uint8_t_tensor = reinterpret_cast<uint8_t*>(base->data());
+      ReadDataFromJsonHelper(uint8_t_tensor, dtype, tensor_data, &counter);
       break;
     }
     case TYPE_UINT16: {
-      std::vector<uint16_t> uint16_t_tensor;
-      ReadDataFromJsonHelper(&uint16_t_tensor, dtype, tensor_data, &counter);
-      *base = reinterpret_cast<char*>(&uint16_t_tensor[0]);
+      uint16_t* uint16_t_tensor = reinterpret_cast<uint16_t*>(base->data());
+      ReadDataFromJsonHelper(uint16_t_tensor, dtype, tensor_data, &counter);
       break;
     }
     case TYPE_UINT32: {
-      std::vector<uint32_t> uint32_t_tensor;
-      ReadDataFromJsonHelper(&uint32_t_tensor, dtype, tensor_data, &counter);
-      *base = reinterpret_cast<char*>(&uint32_t_tensor[0]);
+      uint32_t* uint32_t_tensor = reinterpret_cast<uint32_t*>(base->data());
+      ReadDataFromJsonHelper(uint32_t_tensor, dtype, tensor_data, &counter);
       break;
     }
     case TYPE_UINT64: {
-      std::vector<uint64_t> uint64_t_tensor;
-      ReadDataFromJsonHelper(&uint64_t_tensor, dtype, tensor_data, &counter);
-      *base = reinterpret_cast<char*>(&uint64_t_tensor[0]);
+      uint64_t* uint64_t_tensor = reinterpret_cast<uint64_t*>(base->data());
+      ReadDataFromJsonHelper(uint64_t_tensor, dtype, tensor_data, &counter);
       break;
     }
     case TYPE_INT8: {
-      std::vector<int8_t> int8_t_tensor;
-      ReadDataFromJsonHelper(&int8_t_tensor, dtype, tensor_data, &counter);
-      *base = reinterpret_cast<char*>(&int8_t_tensor[0]);
+      int8_t* int8_t_tensor = reinterpret_cast<int8_t*>(base->data());
+      ReadDataFromJsonHelper(int8_t_tensor, dtype, tensor_data, &counter);
     } break;
     case TYPE_INT16: {
-      std::vector<int8_t> int16_t_tensor;
-      ReadDataFromJsonHelper(&int16_t_tensor, dtype, tensor_data, &counter);
-      *base = reinterpret_cast<char*>(&int16_t_tensor[0]);
+      int16_t* int16_t_tensor = reinterpret_cast<int16_t*>(base->data());
+      ReadDataFromJsonHelper(int16_t_tensor, dtype, tensor_data, &counter);
     } break;
     case TYPE_INT32: {
-      std::vector<int32_t> int32_t_tensor;
-      ReadDataFromJsonHelper(&int32_t_tensor, dtype, tensor_data, &counter);
-      *base = reinterpret_cast<char*>(&int32_t_tensor[0]);
+      int32_t* int32_t_tensor = reinterpret_cast<int32_t*>(base->data());
+      ReadDataFromJsonHelper(int32_t_tensor, dtype, tensor_data, &counter);
       break;
     }
     case TYPE_INT64: {
-      std::vector<int64_t> int64_t_tensor;
-      ReadDataFromJsonHelper(&int64_t_tensor, dtype, tensor_data, &counter);
-      *base = reinterpret_cast<char*>(&int64_t_tensor[0]);
+      int64_t* int64_t_tensor = reinterpret_cast<int64_t*>(base->data());
+      ReadDataFromJsonHelper(int64_t_tensor, dtype, tensor_data, &counter);
       break;
     }
     // FP16 needs a work around
-    case TYPE_FP16: {  // std::vector<float> float16_tensor;
-      // ReadDataFromJsonHelper(&float16_t_tensor, dtype, tensor_data,
-      // &counter); *base = reinterpret_cast<char*>(&float16_tensor[0]);
+    case TYPE_FP16: {
+      // float* float16_tensor = reinterpret_cast<float*>(base->data());
+      // ReadDataFromJsonHelper(float16_t_tensor, dtype, tensor_data,
+      // &counter);
       break;
     }
     case TYPE_FP32: {
-      std::vector<float> float_tensor;
-      ReadDataFromJsonHelper(&float_tensor, dtype, tensor_data, &counter);
-      *base = reinterpret_cast<char*>(&float_tensor[0]);
+      float* float_tensor = reinterpret_cast<float*>(base->data());
+      ReadDataFromJsonHelper(float_tensor, dtype, tensor_data, &counter);
       break;
     }
     case TYPE_FP64: {
-      std::vector<double> double_tensor;
-      ReadDataFromJsonHelper(&double_tensor, dtype, tensor_data, &counter);
-      *base = reinterpret_cast<char*>(&double_tensor[0]);
+      double* double_tensor = reinterpret_cast<double*>(base->data());
+      ReadDataFromJsonHelper(double_tensor, dtype, tensor_data, &counter);
       break;
     }
     // BYTES (String) needs a work around
@@ -669,8 +644,6 @@ ReadDataFromJson(
     default:
       break;
   }
-
-  *byte_size = element_cnt * GetDataTypeByteSize(dtype);
 
   return nullptr;
 }
@@ -1647,6 +1620,7 @@ HTTPAPIServerV2::EVBufferToInput(
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
   const rapidjson::Value& inputs = request_json["inputs"];
+  infer_req->response_meta_data_.request_buffer_.resize(inputs.Size());
   for (size_t i = 0; i < inputs.Size(); i++) {
     const rapidjson::Value& request_input = inputs[i];
     const char* input_name = request_input["name"].GetString();
@@ -1728,11 +1702,34 @@ HTTPAPIServerV2::EVBufferToInput(
             irequest, input_name, base, byte_size, memory_type,
             memory_type_id));
       } else {
-        char* base = nullptr;
-        RETURN_IF_ERR(ReadDataFromJson(request_input, &base, &byte_size));
-        RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
-            irequest, input_name, base, byte_size, TRTSERVER_MEMORY_CPU,
-            0 /* memory_type_id */));
+        const rapidjson::Value& shape = request_input["shape"];
+        const char* dtype_str = request_input["datatype"].GetString();
+        const DataType dtype =
+            ProtocolStringToDataType(dtype_str, strlen(dtype_str));
+        int element_cnt = 0;
+        for (rapidjson::SizeType i = 0; i < shape.Size(); i++) {
+          if (element_cnt == 0) {
+            element_cnt = shape[i].GetInt();
+          } else {
+            element_cnt *= shape[i].GetInt();
+          }
+        }
+
+        byte_size = element_cnt * GetDataTypeByteSize(dtype);
+        if (byte_size == 0) {
+          RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
+              irequest, input_name, nullptr, 0 /* byte_size */,
+              TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+        } else {
+          infer_req->response_meta_data_.request_buffer_[i].resize(byte_size);
+          RETURN_IF_ERR(ReadDataFromJson(
+              request_input, &infer_req->response_meta_data_.request_buffer_[i],
+              dtype));
+          RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
+              irequest, input_name,
+              infer_req->response_meta_data_.request_buffer_[i].data(),
+              byte_size, TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+        }
       }
     }
   }
