@@ -64,19 +64,23 @@ for SIMPLE_CLIENT in simple simplev2 ; do
 
         set +e
 
-        $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.$full.cpu.log 2>&1
+        # No memory type enforcement
+        $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.$full.log 2>&1
         if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG.$full.cpu.log
+            cat $CLIENT_LOG.$full.log
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         fi
 
-        $SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG.$full.gpu.log 2>&1
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG.$full.gpu.log
-            echo -e "\n***\n*** Test Failed\n***"
-            RET=1
-        fi
+        # Enforce I/O to be in specific memory type
+        for MEM_TYPE in system pinned gpu ; do
+            $SIMPLE_CLIENT -r $MODELSDIR -m $MEM_TYPE >>$CLIENT_LOG.$full.$MEM_TYPE.log 2>&1
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG.$full.$MEM_TYPE.log
+                echo -e "\n***\n*** Test Failed\n***"
+                RET=1
+            fi
+        done
 
         set -e
     done
@@ -89,22 +93,27 @@ for SIMPLE_CLIENT in simple simplev2 ; do
     (cd $MODELSDIR/simple && \
             sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
             sed -i "s/label_filename:.*//" config.pbtxt)
+    full=custom_float32_float32_float32
 
     set +e
 
-    $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.custom.cpu.log 2>&1
+    # No memory type enforcement
+    $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.$full.log 2>&1
     if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.custom.cpu.log
+        cat $CLIENT_LOG.$full.log
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
 
-    $SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG.custom.gpu.log 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.custom.gpu.log
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
+    # Enforce I/O to be in specific memory type
+    for MEM_TYPE in system pinned gpu ; do
+        $SIMPLE_CLIENT -r $MODELSDIR -m $MEM_TYPE >>$CLIENT_LOG.$full.$MEM_TYPE.log 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG.$full.$MEM_TYPE.log
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+    done
 
     set -e
 
@@ -125,29 +134,34 @@ for SIMPLE_CLIENT in simple simplev2 ; do
         # make sure version 1 is used (no swap)
         rm -r $MODELSDIR/plan_float32_float32_float32/2 && \
         rm -r $MODELSDIR/plan_float32_float32_float32/3
+    full=ensemble
 
     set +e
 
-    $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.ensemble.cpu.log 2>&1
+    # No memory type enforcement
+    $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.$full.log 2>&1
     if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.ensemble.cpu.log
+        cat $CLIENT_LOG.$full.log
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
 
-    $SIMPLE_CLIENT -r $MODELSDIR -g -v >>$CLIENT_LOG.ensemble.gpu.log 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.ensemble.gpu.log
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    else
-        # For GPU input / output case, all ensemble allocation should be on GPU
-        if grep ^I[0-9][0-9][0-9][0-9].*"Internal response".*"memory type 0" $CLIENT_LOG.ensemble.gpu.log; then
-            echo -e "\n*** FAILED: unexpected CPU allocation for ensemble" >> $CLIENT_LOG.ensemble.gpu.log
-            cat $CLIENT_LOG.ensemble.gpu.log
+    # Enforce I/O to be in specific memory type
+    for MEM_TYPE in system pinned gpu ; do
+        $SIMPLE_CLIENT -r $MODELSDIR -m $MEM_TYPE >>$CLIENT_LOG.$full.$MEM_TYPE.log 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG.$full.$MEM_TYPE.log
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         fi
+    done
+
+    # For GPU input / output case, all ensemble allocation should be on GPU
+    if grep ^I[0-9][0-9][0-9][0-9].*"Internal response".*"memory type 0" $CLIENT_LOG.$full.gpu.log; then
+        echo -e "\n*** FAILED: unexpected CPU allocation for ensemble" >> $CLIENT_LOG.$full.gpu.log
+        cat $CLIENT_LOG.$full.gpu.log
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
     fi
 
     set -e
