@@ -644,10 +644,11 @@ class TrtServerModelIndex {
 
 TrtServerModelIndex::TrtServerModelIndex(
     const ni::ModelRepositoryIndex& model_repository_index)
-    : model_repository_index_(model_repository_index) {
+    : model_repository_index_(model_repository_index)
 {
-  for (const auto& model : model_repository_index.models())
-  index_.push_back(model.name().c_str());
+  {
+    for (const auto& model : model_repository_index_.models())
+      index_.push_back(model.name().c_str());
   }
 }
 
