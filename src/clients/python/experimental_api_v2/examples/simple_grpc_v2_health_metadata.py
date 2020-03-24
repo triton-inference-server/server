@@ -55,36 +55,49 @@ if __name__ == '__main__':
     model_name = 'simple'
 
     # Health
-    if triton_client.is_server_live(headers={'test': '1', 'dummy': '2'}):
-        print("PASS: is_server_live")
+    if not triton_client.is_server_live(headers={'test': '1', 'dummy': '2'}):
+        print("FAILED : is_server_live")
+        sys.exit(1)
+    
+    if not triton_client.is_server_ready():
+        print("FAILED : is_server_ready")
+        sys.exit(1)
 
-    if triton_client.is_server_ready():
-        print("PASS: is_server_ready")
-
-    if triton_client.is_model_ready(model_name):
-        print("PASS: is_model_ready")
+    if not triton_client.is_model_ready(model_name):
+        print("FAILED : is_model_ready")
+        sys.exit(1)
 
     # Metadata
     metadata = triton_client.get_server_metadata()
-    if (metadata.name == 'inference:0'):
-        print("PASS: get_server_metadata")
+    if not (metadata['name'] == 'inference:0'):
+        print("FAILED : get_server_metadata")
+        sys.exit(1)
+    print(metadata)
 
     metadata = triton_client.get_model_metadata(model_name,
                                                 headers={
                                                     'test': '1',
                                                     'dummy': '2'
                                                 })
-    if (metadata.name == model_name):
-        print("PASS: get_model_metadata")
+    if not (metadata['name'] == model_name):
+        print("FAILED : get_model_metadata")
+        sys.exit(1)
+    print(metadata)
 
     # Passing incorrect model name
     try:
         metadata = triton_client.get_model_metadata("wrong_model_name")
     except InferenceServerException as ex:
-        if "no status available for unknown model" in ex.message():
-            print("PASS: detected wrong model")
+        if "no status available for unknown model" not in ex.message():
+            print("FAILED : get_model_metadata wrong_model_name")
+            sys.exit(1)
+    else:
+        print("FAILED : get_model_metadata wrong_model_name")
+        sys.exit(1)
 
     # Configuration
     config = triton_client.get_model_config(model_name)
-    if (config.config.name == model_name):
-        print("PASS: get_model_config")
+    if not (config.config.name == model_name):
+        print("FAILED: get_model_config")
+        sys.exit(1)
+
