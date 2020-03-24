@@ -2068,8 +2068,14 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
           output_metadata[i].AddMember("parameters", params, allocator);
         }
       } else {
-        // Write outputs into json array
-        WriteDataToJson(output_metadata[i], allocator, const_cast<void*>(base));
+        uint64_t offset = 0, byte_size = 0;
+        const char* shm_region = nullptr;
+        if (!CheckSharedMemoryData(
+                request_output, &shm_region, &offset, &byte_size)) {
+          // Write outputs into json array (if not shared memory)
+          WriteDataToJson(
+              output_metadata[i], allocator, const_cast<void*>(base));
+        }
       }
     }
     // TODO Add case for classification
