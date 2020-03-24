@@ -319,12 +319,7 @@ class HandlerState {
     // The step of the entire context.
     Steps step_;
 
-    // The status of the requests in the stream. If OK then all the requests
-    // in the stream were successfull, otherwise stores the status of the
-    // first failing request in the stream.
-    grpc::Status request_status_;
-
-    // True if this context should finish with request_status_, false if
+    // True if this context should finish with OK, false if
     // should finish with CANCELLED status.
     bool finish_ok_;
   };

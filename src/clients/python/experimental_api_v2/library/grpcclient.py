@@ -862,63 +862,62 @@ class InferenceServerClient:
             raise_error_grpc(rpc_error)
 
     def async_sequence_infer(self,
-                             sequence_metadata,
+                             sequence,
+                             inputs,
                              model_name,
                              model_version="",
-                             use_streaming=True,
-                             response_pool=None):
+                             outputs=None,
+                             request_id=None,
+                             end_of_sequence=False):
         """Run asynchronous sequence inference.
 
         Parameters
         ----------
-        sequence_metadata : InferSequenceMetadata
-            This object describes the sequence information, composing
-            requests and essential means of processing the response.
+        sequence : InferSequence
+            The sequence to be used for the inference request.
+        inputs : list
+            A list of InferInput objects, each describing data for a input
+            tensor required by the model.
         model_name: str
             The name of the model to run inference.
         model_version: str
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
-        use_streaming: bool
-            Indicates whether or not to use grpc bidirectional streaming
-            API.
-        response_pool: concurrent.futures.ThreadPoolExecutor
-            The thread pool to execute callbacks for the
-            response when using Streaming API. Will be ignored
-            when 'use_streaming' is set False. This pool is meant to be
-            shared among concurrent 'async_sequence_infer' calls. If not
-            provided the client will create a new thread for handling the
-            responses for each 'async_sequence_infer' calls.
-        
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. If not specified all outputs produced
+            by the model will be returned using default settings.
+        request_id: str
+            Optional identifier for the request. If specified will be returned
+            in the response. Default value is 'None' which means no request_id
+            will be used.
+        end_of_sequence: bool
+            Indicates whether the request being added marks the end of the 
+            sequence. After sending a request with sequence_end flag over a sequence
+            object, any further attempts to issue additional request with the object
+            will throw an error. See InferSequence.reset() for reusing the sequence 
+            object.The default value for this flag is False.
     
         Raises
         ------
         InferenceServerException
             If server fails to issue inference.
         """
-        if use_streaming:
-            try:
-                response_iterator = self._client_stub.ModelStreamInfer(
-                    _RequestIterator(sequence_metadata, model_name,
-                                     model_version))
-            except grpc.RpcError as rpc_error:
-                raise_error_grpc(rpc_error)
+        if sequence._use_streaming:
+            if sequence._is_sequence_start:
+                # Inititate the response handler if it is the first
+                # request of the sequence.
+                try:
+                    sequence._init_handler(
+                        self._client_stub.ModelStreamInfer(
+                            _RequestIterator(sequence)))
+                except grpc.RpcError as rpc_error:
+                    raise_error_grpc(rpc_error)
 
-            if not response_pool:
-                worker_thread = threading.Thread(
-                    target=sequence_metadata._process_response,
-                    args=(response_iterator))
-                worker_thread.start()
-            else:
-                if type(response_pool) != concurrent.futures.ThreadPoolExecutor:
-                    raise_error(
-                        "'response_pool' should be of type concurrent.futures.ThreadPoolExecutor"
-                    )
-                # Delegate the reponsibility of collecting response to the thread pool
-                response_pool.submit(sequence_metadata._process_response,
-                                     response_iterator)
-
+            # Adds the request to the stream
+            sequence._add_request(inputs, model_name, model_version, outputs,
+                                  request_id, end_of_sequence)
         else:
 
             def wrapped_callback(call_future):
@@ -927,18 +926,20 @@ class InferenceServerClient:
                     result = InferResult(call_future.result())
                 except grpc.RpcError as rpc_error:
                     error = get_error_grpc(rpc_error)
-                sequence_metadata._callback(result=result,
-                                            error=error,
-                                            sequence_id=sequence_metadata._id)
+                sequence._callback(result=result,
+                                   error=error,
+                                   sequence_id=sequence._id)
 
-            for request in _RequestIterator(sequence_metadata, model_name,
-                                            model_version):
-                try:
-                    self._call_future = self._client_stub.ModelInfer.future(
-                        request)
-                    self._call_future.add_done_callback(wrapped_callback)
-                except grpc.RpcError as rpc_error:
-                    raise_error_grpc(rpc_error)
+            request = _get_inference_request(inputs, model_name, model_version,
+                                             outputs, request_id, sequence._id,
+                                             sequence._is_sequence_start,
+                                             end_of_sequence)
+            sequence._is_sequence_start = False
+            try:
+                self._call_future = self._client_stub.ModelInfer.future(request)
+                self._call_future.add_done_callback(wrapped_callback)
+            except grpc.RpcError as rpc_error:
+                raise_error_grpc(rpc_error)
 
 
 class InferInput:
@@ -1217,14 +1218,15 @@ class InferResult:
             return self._result
 
 
-class InferSequenceMetadata:
-    """Holds the metadata for sequence inference requests
+class InferSequence:
+    """The objects of InferSequence provides context to a sequence
+    of inference requests.
 
     Parameters
     ----------
     sequence_id : int
         The unique identifier for the sequence being represented by the
-        metadata.
+        object.
     callback : function
         Python function that will be invoked for responses received for
         the sequence. The function must reserve the last three arguments
@@ -1233,15 +1235,43 @@ class InferSequenceMetadata:
         will be provided to the function when executing the callback.
         The ownership of these objects will be given to the user. The
         'error' would be None for a successful inference.
-
+    use_streaming: bool
+        Indicates whether or not to use grpc bidirectional streaming
+        API while issuing the sequence.
+    response_pool: concurrent.futures.ThreadPoolExecutor
+        The thread pool to execute callbacks for the
+        response when using Streaming API. Will be ignored
+        when 'use_streaming' is set False. This pool is meant to be
+        shared among concurrent InferSequence objects. If not
+        provided the client will create a new thread for handling the
+        response stream for each InferSequence.
     """
 
-    def __init__(self, sequence_id, callback):
+    def __init__(self,
+                 sequence_id,
+                 callback,
+                 use_streaming=True,
+                 response_pool=None):
         self._id = sequence_id
         self._callback = callback
         self._request_queue = queue.Queue()
         self._sequence_added = self._sequence_delivered = False
         self._is_sequence_start = True
+        self._use_streaming = use_streaming
+        if response_pool:
+            if type(response_pool
+                   ) != concurrent.futures.ThreadPoolExecutor:
+                raise_error(
+                    "'response_pool' should be of type concurrent.futures.ThreadPoolExecutor"
+                )
+        self._response_pool = response_pool
+
+    def close(self):
+        """Gracefully close the request iterators. Use this to
+        end the request stream prematurely.
+
+        """
+        self._request_queue.put(None)
 
     def reset(self, new_sequence_id, new_callback=None):
         """Resets the object to handle new sequence. This
@@ -1250,24 +1280,24 @@ class InferSequenceMetadata:
 
         Parameters
         ----------
-        sequence_id : int
+        new_sequence_id : int
             The unique identifier for the new sequence being
-            represented by the metadata.
+            represented by the object.
         new_callback : function
             The callback function to be used with the new sequence
             to be handled by the object. By default, the value is
             None, which means the callback of the current sequence
             will be used for the new sequence. See 'callback'
-            parameter description for 'InferSequenceMetadata'.
+            parameter description for 'InferSequence'.
         
         Raises
         ------
         InferenceServerException
             If the requests for the current sequence have not been
-            delivered. See 'InferSequenceMetadata.sequence_delivered'
+            delivered. See 'InferSequence.sequence_delivered'
         """
         if not self._sequence_delivered:
-            raise_error('The sequence metadata object can be reset only \
+            raise_error('The InferSequence object can be reset only \
                     once the current sequence is delivered')
 
         self._sequence_added = self._sequence_delivered = False
@@ -1276,6 +1306,17 @@ class InferSequenceMetadata:
 
         if not new_callback:
             self._callback = new_callback
+    
+    def sequence_id(self):
+        """Returns the ID of the current sequence being handled
+        by the object.
+
+        Returns
+        -------
+        int
+            The ID of the current sequence
+        """
+        return self._id
 
     def sequence_delivered(self):
         """Indicates whether or not the requests corresponding to the
@@ -1289,11 +1330,28 @@ class InferSequenceMetadata:
         """
         return self._sequence_delivered
 
-    def add_request(self,
-                    inputs,
-                    outputs=None,
-                    request_id=None,
-                    is_sequence_end=False):
+    def _init_handler(self, response_iterator):
+        """Initializes the response handlers to process and execute
+        the callbacks
+
+        Parameters
+        ----------
+        response_iterator : iterator
+            The iterator over the response stream
+
+        """
+        if not self._response_pool:
+            # Create a new thread to handle the response stream for this sequence
+            worker_thread = threading.Thread(target=self._process_response,
+                                             args=(response_iterator,))
+            worker_thread.start()
+        else:
+            # Delegate the reponsibility of collecting response to the thread pool
+            self._response_pool.submit(self._process_response,
+                                       response_iterator)
+
+    def _add_request(self, inputs, model_name, model_version, outputs,
+                     request_id, is_sequence_end):
         """Adds an inference request to the underlying sequence.
         Note the added requests can be used only once.
 
@@ -1323,37 +1381,34 @@ class InferSequenceMetadata:
             request with 'is_sequence_end' marker.
         """
         if self._sequence_added:
-            raise_error(('Can not add extra requests to the sequence metadata, '
-                         'after receiving sequence end request'))
+            raise_error(
+                ('Can not add extra requests to the InferSequence object, '
+                 'after receiving sequence end of sequence request'))
         if is_sequence_end:
             self._sequence_added = True
-        self._request_queue.put((inputs, outputs, request_id, self._id,
-                                 self._is_sequence_start, is_sequence_end))
+
+        # Defer the request to be provided to stream
+        self._request_queue.put(
+            _get_inference_request(inputs=inputs,
+                                   model_name=model_name,
+                                   model_version=model_version,
+                                   outputs=outputs,
+                                   request_id=request_id,
+                                   sequence_id=self._id,
+                                   sequence_start=self._is_sequence_start,
+                                   sequence_end=is_sequence_end))
         self._is_sequence_start = False
-
-    def sequence_id(self):
-        """Returns the ID of the current sequence being handled
-        by the object.
-
-        Returns
-        -------
-        int
-            The ID of the current sequence
-        """
-        return self._id
 
     def _get_request(self):
         """Returns the request details in the order they were added.
         The call to this function will block until the requests
-        are available in the queue. InferSequenceMetadata.add_request
+        are available in the queue. InferSequence.add_request
         adds the request to the queue.
 
         Returns
         -------
-        list, list, str, int, bool, bool
-            The list of InferInputs, list of InferOutput, optional request ID,
-            sequence_id, truth value for the start of the sequence and the truth
-            value for end of the sequence for the next request.
+        protobuf message
+            The ModelInferRequest protobuf message.
 
         Raises
         ------
@@ -1363,17 +1418,20 @@ class InferSequenceMetadata:
 
         """
         if self._sequence_delivered:
-            raise_error(('[INTERNAL] Can not retrieve extra requests from '
-                         'the sequence metadata after the sequence end request '
-                         'is delivered.'))
+            raise_error(
+                ('[INTERNAL] Can not retrieve extra requests from '
+                 'the InferSequence object after the end of sequence request '
+                 'is delivered.'))
         request = self._request_queue.get()
-        if request[-1]:
-            self._sequence_delivered = True
+        if 'sequence_end' in request.parameters:
+            self._sequence_delivered = request.parameters[
+                'sequence_end'].bool_param
+
         return request
 
     def _process_response(self, responses):
-        """Iterates through the response stream and executes the
-        provided callbacks. 
+        """Worker thread function to iterate through the response stream and
+        executes the provided callbacks. 
 
         Parameters
         ----------
@@ -1396,33 +1454,23 @@ class _RequestIterator:
 
     Parameters
     ----------
-    sequence_metadata : InferSequenceMetadata
-        The InferSequenceMetadata that will provide all the information
-        for building requests.
-    model_name: str
-        The name of the model to run inference.
-    model_version: str
-        The version of the model to run inference. The default value
-        is an empty string which means then the server will choose
-        a version based on the model and internal policy.
+    sequence : InferSequence
+        The InferSequence that holds the context to a sequence.
 
     """
 
-    def __init__(self, sequence_metadata, model_name, model_version=""):
-        self._sequence_metadata = sequence_metadata
-        self._model_name = model_name
-        self._model_version = model_version
+    def __init__(self, sequence):
+        self._sequence = sequence
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        if self._sequence_metadata.sequence_delivered():
+        if self._sequence.sequence_delivered():
             raise StopIteration
 
-        (inputs, outputs, request_id, sequence_id, sequence_start,
-         sequence_end) = self._sequence_metadata._get_request()
+        request = self._sequence._get_request()
+        if not request:
+            raise StopIteration
 
-        return _get_inference_request(inputs, self._model_name,
-                                      self._model_version, outputs, request_id,
-                                      sequence_id, sequence_start, sequence_end)
+        return request

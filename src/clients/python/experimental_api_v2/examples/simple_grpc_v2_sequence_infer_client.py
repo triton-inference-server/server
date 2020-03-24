@@ -28,12 +28,10 @@
 from functools import partial
 import argparse
 import numpy as np
-import time
 import sys
 import queue
 
 import tritongrpcclient.core as grpcclient
-from tritongrpcclient.utils import InferenceServerException
 from tritongrpcclient.utils import get_stream_response_processor_pool
 
 FLAGS = None
@@ -45,7 +43,7 @@ class UserData:
         self._completed_requests = queue.Queue()
 
 
-# Callback function used for InferSequenceMetadata. Note the last
+# Callback function used for InferSequence. Note the last
 # three parameters are reserved for InferResult, InferenceServerException
 # and the sequence ID for the response.
 def completion_callback(user_data, result, error, sequence_id):
@@ -54,11 +52,11 @@ def completion_callback(user_data, result, error, sequence_id):
 
 def async_send(triton_client, response_pool, values, batch_size, sequence_id,
                user_data, model_name, model_version):
-    # Prepare the sequence metadata object
-    sequence_metadata = grpcclient.InferSequenceMetadata(
-        sequence_id, partial(completion_callback, user_data))
+    # Prepare the sequence object
+    sequence = grpcclient.InferSequence(sequence_id,
+                                        partial(completion_callback, user_data),
+                                        response_pool=response_pool)
 
-    # Add requests in the sequence for each value
     count = 1
     for value in values:
         # Create the tensor for INPUT
@@ -71,16 +69,13 @@ def async_send(triton_client, response_pool, values, batch_size, sequence_id,
         inputs[0].set_data_from_numpy(value_data)
         outputs = []
         outputs.append(grpcclient.InferOutput('OUTPUT'))
-        sequence_metadata.add_request(inputs,
-                                      outputs,
-                                      is_sequence_end=(count == len(values)))
+        # Issue the asynchronous sequence inference.
+        triton_client.async_sequence_infer(sequence=sequence,
+                                           inputs=inputs,
+                                           model_name=model_name,
+                                           outputs=outputs,
+                                           end_of_sequence=(count == len(values)))
         count = count + 1
-
-    # Issue the asynchronous sequence inference.
-    triton_client.async_sequence_infer(response_pool=response_pool,
-                                       sequence_metadata=sequence_metadata,
-                                       model_name=model_name,
-                                       model_version=model_version)
 
 
 if __name__ == '__main__':
@@ -141,8 +136,9 @@ if __name__ == '__main__':
     user_data_0 = UserData()
     user_data_1 = UserData()
 
-    # Create the thread pool with the size as expected
-    # number of concurrent sequences.
+    # Create the thread pool to handle the response stream from the
+    # server. It is usually advisable to keep the size of the thread
+    # pool to be equal to the expected number of concurrent sequences.
     response_pool = get_stream_response_processor_pool(2)
 
     # Now send the inference sequences...
