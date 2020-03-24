@@ -80,20 +80,19 @@ if __name__ == '__main__':
 
     print(results.get_response())
 
-    # FIXME: Uncomment when DLIS 1162 is fixed.
-    # Get the output arrays from the
-    # output0_data = results.as_numpy('OUTPUT0')
-    # output1_data = results.as_numpy('OUTPUT1')
+    # Get the output arrays from the results
+    output0_data = results.as_numpy('OUTPUT0')
+    output1_data = results.as_numpy('OUTPUT1')
 
-    # for i in range(16):
-    #    print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
-    #          str(output0_data[0][i]))
-    #    print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
-    #          str(output1_data[0][i]))
-    #    if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
-    #        print("sync infer error: incorrect sum")
-    #        sys.exit(1)
-    #    if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
-    #        print("sync infer error: incorrect difference")
-    #        sys.exit(1)
+    for i in range(16):
+       print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
+             str(output0_data[0][i]))
+       print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
+             str(output1_data[0][i]))
+       if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
+           print("sync infer error: incorrect sum")
+           sys.exit(1)
+       if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
+           print("sync infer error: incorrect difference")
+           sys.exit(1)
     print('PASS: infer')
