@@ -106,6 +106,62 @@ class InferenceServerClient:
         """
         self._client_stub.close()
 
+    def _get(self, request_uri, headers):
+        """Issues the GET request to the server
+
+         Parameters
+        ----------
+        request_uri: str
+            The request URI to be used in GET request.
+        headers: dict
+            Additional HTTP headers to include in the request.
+
+        Returns
+        -------
+        geventhttpclient.response.HTTPSocketPoolResponse
+            The response from server.
+        """
+        query = self._parsed_url.query_string
+        if query:
+            request_uri = request_uri + "?" + query
+        if not headers:
+            response = self._client_stub.get(request_uri)
+        else:
+            response = self._client_stub.get(request_uri, headers=headers)
+
+        return response
+
+    def _post(self, request_uri, request_body, headers):
+        """Issues the POST request to the server
+
+        Parameters
+        ----------
+        request_uri: str
+            The request URI to be used in POST request.
+        request_body: str
+            The body of the request
+        headers: dict
+            Additional HTTP headers to include in the request.
+
+        Returns
+        -------
+        geventhttpclient.response.HTTPSocketPoolResponse
+            The response from server.
+        """
+        query = self._parsed_url.query_string
+        if query:
+            request_uri = request_uri + "?" + query
+
+        if not headers:
+            response = self._client_stub.post(request_uri=request_uri,
+                                              body=request_body)
+        else:
+            response = self._client_stub.post(request_uri=request_uri,
+                                              body=request_body,
+                                              headers=headers)
+
+        return response
+
     def is_server_live(self, headers=None):
         """Contact the inference server and get liveness.
 
@@ -126,10 +182,9 @@ class InferenceServerClient:
             If unable to get liveness.
 
         """
-        if not headers:
-            response = self._client_stub.get("v2/health/live")
-        else:
-            response = self._client_stub.get("v2/health/live", headers=headers)
+
+        request_uri = "v2/health/live"
+        response = self._get(request_uri, headers)
 
         return response.status_code == 200
 
@@ -153,10 +208,8 @@ class InferenceServerClient:
             If unable to get readiness.
 
         """
-        if not headers:
-            response = self._client_stub.get("v2/health/ready")
-        else:
-            response = self._client_stub.get("v2/health/ready", headers=headers)
+        request_uri = "v2/health/ready"
+        response = self._get(request_uri, headers)
 
         return response.status_code == 200
 
@@ -192,11 +245,7 @@ class InferenceServerClient:
             request_uri = "v2/models/{}/versions/{}/ready".format(
                 quote(model_name), model_version)
 
-        if not headers:
-            response = self._client_stub.get(request_uri)
-        else:
-            response = self._client_stub.get(request_uri, headers=headers)
-
+        response = self._get(request_uri, headers)
         return response.status_code == 200
 
     def get_server_metadata(self, headers=None):
@@ -219,13 +268,11 @@ class InferenceServerClient:
             If unable to get server metadata.
 
         """
-        if not headers:
-            response = self._client_stub.get("v2")
-        else:
-            response = self._client_stub.get("v2", headers=headers)
-
+        request_uri = "v2"
+        response = self._get(request_uri, headers)
         raise_if_error(response)
         metadata = json.loads(response.read())
+
         return metadata
 
     def get_model_metadata(self, model_name, model_version="", headers=None):
@@ -260,13 +307,10 @@ class InferenceServerClient:
             request_uri = "v2/models/{}/versions/{}".format(
                 quote(model_name), model_version)
 
-        if not headers:
-            response = self._client_stub.get(request_uri)
-        else:
-            response = self._client_stub.get(request_uri, headers=headers)
-
+        response = self._get(request_uri, headers)
         raise_if_error(response)
         metadata = json.loads(response.read())
+
         return metadata
 
     def infer(self,
@@ -336,14 +380,7 @@ class InferenceServerClient:
             request_uri = "v2/models/{}/versions/{}/infer".format(
                 quote(model_name), model_version)
 
-        if not headers:
-            response = self._client_stub.post(request_uri=request_uri,
-                                              body=request_body)
-        else:
-            response = self._client_stub.post(request_uri=request_uri,
-                                              body=request_body,
-                                              headers=headers)
-
+        response = self._post(request_uri, request_body, headers)
         result = InferResult(response.read())
 
         return result

@@ -42,7 +42,7 @@ if __name__ == '__main__':
                         '--url',
                         type=str,
                         required=False,
-                        default='localhost:8000',
+                        default='localhost:8000?dummy=1',
                         help='Inference server URL. Default is localhost:8000.')
 
     FLAGS = parser.parse_args()
