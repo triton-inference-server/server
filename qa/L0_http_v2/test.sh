@@ -54,11 +54,7 @@ SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS="--model-repository=$DATADIR --api-version 2"
 source ../common/util.sh
 
-# FIXMEPV2
-# Cannot use run_server since it repeatedly curls the (old) HTTP health endpoint to know
-# when the server is ready. This endpoint would not exist in future.
-run_server_nowait
-sleep 10
+run_server_v2
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
