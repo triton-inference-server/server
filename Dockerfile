@@ -152,6 +152,7 @@ RUN apt-get update && \
             libtool \
             libboost-dev \
             rapidjson-dev \
+            libb64-dev \
             patchelf \
             software-properties-common && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \

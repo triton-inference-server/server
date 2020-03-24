@@ -108,47 +108,59 @@ class SharedMemoryManager {
   TRTSERVER_Error* GetStatus(SharedMemoryStatus* status);
 
 #ifdef TRTIS_ENABLE_GRPC_V2
-  /// Removes the named shared memory block of the specified type from
-  /// the manager. Any future attempt to get the details of this block
-  /// will result in an array till another block with the same name is
-  /// added to the manager.
-  /// \param name The name of the shared memory block to remove.
-  /// \param memory_type The type of memory to unregister
-  /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* UnregisterV2(
-      const std::string& name, TRTSERVER_Memory_Type memory_type);
-
-  /// Unregister all shared memory blocks of specified type from the manager.
-  /// \param memory_type The type of memory to unregister
-  /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* UnregisterAllV2(TRTSERVER_Memory_Type memory_type);
-
   /// Populates the status of active system shared memory regions
-  /// in the response protobuf
+  /// in the response protobuf. If 'name' is missing then return status of
+  /// all active system shared memory regions.
+  /// \param name The name of the shared memory block to get the status of.
   /// \param shm_status Returns status of active shared meeory blocks
   /// \return a TRTSERVER_Error indicating success or failure.
   TRTSERVER_Error* GetStatusV2(
       const std::string& name, SystemSharedMemoryStatusResponse*& shm_status);
 
-  /// Populates the status of active cuda shared memory regions
-  /// in the response protobuf
-  /// \param shm_status Returns status of active shared meeory blocks
+  /// Populates the status of active CUDA shared memory regions
+  /// in the response protobuf. If 'name' is missing then return status of
+  /// all active CUDA shared memory regions.
+  /// \param name The name of the shared memory block to get the status of.
+  /// \param shm_status Returns status of active shared meeory blocks.
   /// \return a TRTSERVER_Error indicating success or failure.
   TRTSERVER_Error* GetStatusV2(
       const std::string& name, CudaSharedMemoryStatusResponse*& shm_status);
+#endif  // TRTIS_ENABLE_GRPC_V2
 
-#endif
+  /// Populates the status of active system/CUDA shared memory regions
+  /// in the status protobuf. If 'name' is missing then return status of all
+  /// active system/CUDA shared memory regions as specified by 'memory_type'.
+  /// \param name The name of the shared memory block to get the status of.
+  /// \param shm_status Returns status of active shared meeory blocks.
+  /// \param memory_type The type of memory to get the status of.
+  /// \return a TRTSERVER_Error indicating success or failure.
+  TRTSERVER_Error* GetStatusV2(
+      const std::string& name, SharedMemoryStatus* shm_status,
+      TRTSERVER_Memory_Type memory_type);
+
+  /// Removes the named shared memory block of the specified type from
+  /// the manager. Any future attempt to get the details of this block
+  /// will result in an array till another block with the same name is
+  /// added to the manager.
+  /// \param name The name of the shared memory block to remove.
+  /// \param memory_type The type of memory to unregister.
+  /// \return a TRTSERVER_Error indicating success or failure.
+  TRTSERVER_Error* UnregisterV2(
+      const std::string& name, TRTSERVER_Memory_Type memory_type);
+
+  /// Unregister all shared memory blocks of specified type from the manager.
+  /// \param memory_type The type of memory to unregister.
+  /// \return a TRTSERVER_Error indicating success or failure.
+  TRTSERVER_Error* UnregisterAllV2(TRTSERVER_Memory_Type memory_type);
 
  private:
   /// A helper function to remove the named shared memory blocks.
   TRTSERVER_Error* UnregisterHelper(const std::string& name);
 
-#ifdef TRTIS_ENABLE_GRPC_V2
   /// A helper function to remove the named shared memory blocks of
   /// specified type
   TRTSERVER_Error* UnregisterHelperV2(
       const std::string& name, TRTSERVER_Memory_Type memory_type);
-#endif  // TRTIS_ENABLE_GRPC_V2
 
   /// A struct that records the shared memory regions registered by the shared
   /// memory manager.
