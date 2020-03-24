@@ -502,8 +502,7 @@ class InferenceServerClient:
         """
 
         def wrapped_post(request_uri, request_body, headers, query_params):
-            temp = self._post(request_uri, request_body, headers, query_params)
-            return temp
+            return self._post(request_uri, request_body, headers, query_params)
 
         def wrapped_callback(response):
             callback(result=InferResult(response.read()),
