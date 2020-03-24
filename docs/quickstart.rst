@@ -73,10 +73,6 @@ following prerequisite steps:
 If you are starting with a pre-built NGC container perform these
 additional steps:
 
-* Ensure you have access and are logged into NGC.  For step-by-step
-  instructions, see the `NGC Getting Started Guide
-  <http://docs.nvidia.com/ngc/ngc-getting-started-guide/index.html>`_.
-
 * Install Docker and nvidia-docker.  For DGX users, see `Preparing to
   use NVIDIA Containers
   <http://docs.nvidia.com/deeplearning/dgx/preparing-containers/index.html>`_.
