@@ -245,7 +245,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
   // allocation.
   struct ShmInfo {
     void* base_;
-    size_t byte_size_;
+    uint64_t byte_size_;
     TRTSERVER_Memory_Type memory_type_;
     int64_t device_id_;
   };
@@ -1505,6 +1505,37 @@ CheckBinaryOutputData(const rapidjson::Value& request_output)
   return false;
 }
 
+bool
+CheckSharedMemoryData(
+    const rapidjson::Value& request_input, const char** shm_region,
+    uint64_t* offset, uint64_t* byte_size)
+{
+  bool has_shared_memory = false;
+  rapidjson::Value::ConstMemberIterator itr =
+      request_input.FindMember("parameters");
+  if (itr != request_input.MemberEnd()) {
+    const rapidjson::Value& params = itr->value;
+    rapidjson::Value::ConstMemberIterator region_itr =
+        params.FindMember("shared_memory_region");
+    if (region_itr != params.MemberEnd()) {
+      *shm_region = region_itr->value.GetString();
+      rapidjson::Value::ConstMemberIterator offset_itr =
+          params.FindMember("shared_memory_offset");
+      if (offset_itr != params.MemberEnd()) {
+        *offset = offset_itr->value.GetInt();
+      }
+      rapidjson::Value::ConstMemberIterator size_itr =
+          params.FindMember("shared_memory_byte_size");
+      if (size_itr != params.MemberEnd()) {
+        *byte_size = size_itr->value.GetInt();
+        has_shared_memory = true;
+      }
+    }
+  }
+
+  return has_shared_memory;
+}
+
 TRTSERVER_Error*
 HTTPAPIServerV2::EVBufferToJson(
     rapidjson::Document* document, evbuffer_iovec* v, int* v_idx,
@@ -1636,74 +1667,60 @@ HTTPAPIServerV2::EVBufferToInput(
       RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
           irequest, input_name, nullptr, 0 /* byte_size */,
           TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
-    } else {
-      // If input is in shared memory then verify that the size is
-      // correct and set input from the shared memory.
-#if 0
-      // FIXMEV2 handle shared memory inputs
-      if (io.has_shared_memory()) {
-        if (byte_size != io.shared_memory().byte_size()) {
-          return TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INVALID_ARG,
-              std::string(
-                  "unexpected shared-memory size " +
-                  std::to_string(io.shared_memory().byte_size()) +
-                  " for input '" + io.name() + "', expecting " +
-                  std::to_string(byte_size) + " for model '" + model_name + "'")
-                  .c_str());
+    } else if (binary_input) {
+      if (header_length == 0) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            "must specify valid 'Infer-Header-Content-Length' in request "
+            "header and 'binary_data_size' when passing inputs in binary "
+            "data "
+            "format");
+      }
+
+      // Process one block at a time
+      while ((byte_size > 0) && (v_idx < n)) {
+        char* base = static_cast<char*>(v[v_idx].iov_base);
+        size_t base_size;
+        if (v[v_idx].iov_len > byte_size) {
+          base_size = byte_size;
+          v[v_idx].iov_base = static_cast<void*>(base + byte_size);
+          v[v_idx].iov_len -= byte_size;
+          byte_size = 0;
+        } else {
+          base_size = v[v_idx].iov_len;
+          byte_size -= v[v_idx].iov_len;
+          v_idx++;
         }
 
+        RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
+            irequest, input_name, base, base_size, TRTSERVER_MEMORY_CPU,
+            0 /* memory_type_id */));
+      }
+
+      if (byte_size != 0) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "unexpected size for input '" +
+                std::string(request_input["name"].GetString()) +
+                "', expecting " + std::to_string(byte_size) +
+                " bytes for model '" + model_name + "'")
+                .c_str());
+      }
+    } else {
+      // Process input if in shared memory.
+      uint64_t offset = 0;
+      const char* shm_region = nullptr;
+      if (CheckSharedMemoryData(
+              request_input, &shm_region, &offset, &byte_size)) {
         void* base;
-        TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
+        TRTSERVER_Memory_Type memory_type;
         int64_t memory_type_id;
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
-            io.shared_memory().name(), io.shared_memory().offset(), &base,
-            &memory_type, &memory_type_id));
-        RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-            request_provider, io.name().c_str(), base, byte_size, memory_type,
+            shm_region, offset, &base, &memory_type, &memory_type_id));
+        RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
+            irequest, input_name, base, byte_size, memory_type,
             memory_type_id));
-      } else {
-#endif
-      if (binary_input) {
-        if (header_length == 0) {
-          return TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INVALID_ARG,
-              "must specify valid 'Infer-Header-Content-Length' in request "
-              "header and 'binary_data_size' when passing inputs in binary "
-              "data "
-              "format");
-        }
-
-        // Process one block at a time
-        while ((byte_size > 0) && (v_idx < n)) {
-          char* base = static_cast<char*>(v[v_idx].iov_base);
-          size_t base_size;
-          if (v[v_idx].iov_len > byte_size) {
-            base_size = byte_size;
-            v[v_idx].iov_base = static_cast<void*>(base + byte_size);
-            v[v_idx].iov_len -= byte_size;
-            byte_size = 0;
-          } else {
-            base_size = v[v_idx].iov_len;
-            byte_size -= v[v_idx].iov_len;
-            v_idx++;
-          }
-
-          RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
-              irequest, input_name, base, base_size, TRTSERVER_MEMORY_CPU,
-              0 /* memory_type_id */));
-        }
-
-        if (byte_size != 0) {
-          return TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INVALID_ARG,
-              std::string(
-                  "unexpected size for input '" +
-                  std::string(request_input["name"].GetString()) +
-                  "', expecting " + std::to_string(byte_size) +
-                  " bytes for model '" + model_name + "'")
-                  .c_str());
-        }
       } else {
         char* base = nullptr;
         RETURN_IF_ERR(ReadDataFromJson(request_input, &base, &byte_size));
@@ -1711,9 +1728,6 @@ HTTPAPIServerV2::EVBufferToInput(
             irequest, input_name, base, byte_size, TRTSERVER_MEMORY_CPU,
             0 /* memory_type_id */));
       }
-#if 0
-    }
-#endif
     }
   }
 
@@ -1728,31 +1742,29 @@ HTTPAPIServerV2::EVBufferToInput(
   rapidjson::Value& outputs_array = request_json["outputs"];
   for (size_t i = 0; i < outputs_array.Size(); i++) {
     rapidjson::Value& output = outputs_array[i];
-    std::string output_name = std::string(output["name"].GetString());
-    TRTSERVER2_InferenceRequestAddRequestedOutput(
-        irequest, output_name.c_str());
-  }
+    const char* output_name = output["name"].GetString();
+    TRTSERVER2_InferenceRequestAddRequestedOutput(irequest, output_name);
 
-#if 0
-  // FIXMEV2 handle shared memory outputs
-  // Initialize System Memory for Output if it uses shared memory
-  for (const auto& io : request_header.output()) {
-    if (io.has_shared_memory()) {
+    // Initialize System Memory for Output if it uses shared memory
+    uint64_t offset = 0, byte_size = 0;
+    const char* shm_region = nullptr;
+    if (CheckSharedMemoryData(output, &shm_region, &offset, &byte_size)) {
       void* base;
       TRTSERVER_Memory_Type memory_type;
       int64_t memory_type_id;
       RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
-          io.shared_memory().name(), io.shared_memory().offset(), &base,
-          &memory_type, &memory_type_id));
+          shm_region, offset, &base, &memory_type, &memory_type_id));
 
-      output_shm_map.emplace(
-          io.name(),
-          std::make_tuple(
-              static_cast<const void*>(base), io.shared_memory().byte_size(),
-              memory_type, memory_type_id));
+      // if shm_map_ does not exist, then create an empty shm_map
+      if (infer_req->response_meta_data_.shm_map_ == nullptr) {
+        infer_req->response_meta_data_.shm_map_ = new TensorShmMap;
+      }
+
+      infer_req->response_meta_data_.shm_map_->emplace(
+          std::string(output_name), ShmInfo{static_cast<void*>(base), byte_size,
+                                            memory_type, memory_type_id});
     }
   }
-#endif
 
   return nullptr;  // success
 }
