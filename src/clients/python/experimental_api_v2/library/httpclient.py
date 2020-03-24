@@ -27,7 +27,7 @@
 from geventhttpclient import HTTPClient
 from geventhttpclient.url import URL
 
-from urllib.parse import quote
+from urllib.parse import quote, quote_plus
 import rapidjson as json
 import numpy as np
 
@@ -42,6 +42,20 @@ def raise_if_error(response):
     if response.status_code != 200:
         error_response = json.loads(response.read())
         raise_error(error_response["error"])
+
+
+def _get_query_string(query_params):
+    params = []
+    for key, value in query_params.items():
+        if isinstance(value, list):
+            for item in value:
+                params.append("%s=%s" %
+                              (quote_plus(key), quote_plus(str(item))))
+        else:
+            params.append("%s=%s" % (quote_plus(key), quote_plus(str(value))))
+    if params:
+        return "&".join(params)
+    return ''
 
 
 class InferenceServerClient:
@@ -106,7 +120,67 @@ class InferenceServerClient:
         """
         self._client_stub.close()
 
-    def is_server_live(self, headers=None):
+    def _get(self, request_uri, headers, query_params):
+        """Issues the GET request to the server
+
+         Parameters
+        ----------
+        request_uri: str
+            The request URI to be used in GET request.
+        headers: dict
+            Additional HTTP headers to include in the request.
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction.
+
+        Returns
+        -------
+        geventhttpclient.response.HTTPSocketPoolResponse
+            The response from server.
+        """
+        if query_params:
+            request_uri = request_uri + "?" + _get_query_string(query_params)
+        if not headers:
+            response = self._client_stub.get(request_uri)
+        else:
+            response = self._client_stub.get(request_uri, headers=headers)
+
+        return response
+
+    def _post(self, request_uri, request_body, headers, query_params):
+        """Issues the POST request to the server
+
+        Parameters
+        ----------
+        request_uri: str
+            The request URI to be used in POST request.
+        request_body: str
+            The body of the request
+        headers: dict
+            Additional HTTP headers to include in the request.
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction.
+
+        Returns
+        -------
+        geventhttpclient.response.HTTPSocketPoolResponse
+            The response from server.
+        """
+        if query_params:
+            request_uri = request_uri + "?" + _get_query_string(query_params)
+
+        if not headers:
+            response = self._client_stub.post(request_uri=request_uri,
+                                              body=request_body)
+        else:
+            response = self._client_stub.post(request_uri=request_uri,
+                                              body=request_body,
+                                              headers=headers)
+
+        return response
+
+    def is_server_live(self, headers=None, query_params=None):
         """Contact the inference server and get liveness.
 
         Parameters
@@ -114,6 +188,9 @@ class InferenceServerClient:
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction.
 
         Returns
         -------
@@ -126,14 +203,13 @@ class InferenceServerClient:
             If unable to get liveness.
 
         """
-        if not headers:
-            response = self._client_stub.get("v2/health/live")
-        else:
-            response = self._client_stub.get("v2/health/live", headers=headers)
+
+        request_uri = "v2/health/live"
+        response = self._get(request_uri, headers, query_params)
 
         return response.status_code == 200
 
-    def is_server_ready(self, headers=None):
+    def is_server_ready(self, headers=None, query_params=None):
         """Contact the inference server and get readiness.
 
         Parameters
@@ -141,6 +217,9 @@ class InferenceServerClient:
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction.
 
         Returns
         -------
@@ -153,14 +232,16 @@ class InferenceServerClient:
             If unable to get readiness.
 
         """
-        if not headers:
-            response = self._client_stub.get("v2/health/ready")
-        else:
-            response = self._client_stub.get("v2/health/ready", headers=headers)
+        request_uri = "v2/health/ready"
+        response = self._get(request_uri, headers, query_params)
 
         return response.status_code == 200
 
-    def is_model_ready(self, model_name, model_version="", headers=None):
+    def is_model_ready(self,
+                       model_name,
+                       model_version="",
+                       headers=None,
+                       query_params=None):
         """Contact the inference server and get the readiness of specified model.
 
         Parameters
@@ -174,6 +255,9 @@ class InferenceServerClient:
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction.
 
         Returns
         -------
@@ -192,14 +276,10 @@ class InferenceServerClient:
             request_uri = "v2/models/{}/versions/{}/ready".format(
                 quote(model_name), model_version)
 
-        if not headers:
-            response = self._client_stub.get(request_uri)
-        else:
-            response = self._client_stub.get(request_uri, headers=headers)
-
+        response = self._get(request_uri, headers, query_params)
         return response.status_code == 200
 
-    def get_server_metadata(self, headers=None):
+    def get_server_metadata(self, headers=None, query_params=None):
         """Contact the inference server and get its metadata.
 
         Parameters
@@ -207,6 +287,9 @@ class InferenceServerClient:
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction.
 
         Returns
         -------
@@ -219,16 +302,18 @@ class InferenceServerClient:
             If unable to get server metadata.
 
         """
-        if not headers:
-            response = self._client_stub.get("v2")
-        else:
-            response = self._client_stub.get("v2", headers=headers)
-
+        request_uri = "v2"
+        response = self._get(request_uri, headers, query_params)
         raise_if_error(response)
         metadata = json.loads(response.read())
+
         return metadata
 
-    def get_model_metadata(self, model_name, model_version="", headers=None):
+    def get_model_metadata(self,
+                           model_name,
+                           model_version="",
+                           headers=None,
+                           query_params=None):
         """Contact the inference server and get the metadata for specified model.
 
         Parameters
@@ -242,6 +327,9 @@ class InferenceServerClient:
         headers: dict
             Optional dictionary specifying additional
             HTTP headers to include in the request
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction 
 
         Returns
         -------
@@ -260,13 +348,10 @@ class InferenceServerClient:
             request_uri = "v2/models/{}/versions/{}".format(
                 quote(model_name), model_version)
 
-        if not headers:
-            response = self._client_stub.get(request_uri)
-        else:
-            response = self._client_stub.get(request_uri, headers=headers)
-
+        response = self._get(request_uri, headers, query_params)
         raise_if_error(response)
         metadata = json.loads(response.read())
+
         return metadata
 
     def infer(self,
@@ -276,7 +361,8 @@ class InferenceServerClient:
               outputs=None,
               request_id=None,
               parameters=None,
-              headers=None):
+              headers=None,
+              query_params=None):
         """Run synchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
 
@@ -303,7 +389,10 @@ class InferenceServerClient:
             Optional inference parameters described as key-value pairs.
         headers: dict
             Optional dictionary specifying additional HTTP
-            headers to include in the request
+            headers to include in the request.
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction.
 
         Returns
         -------
@@ -336,14 +425,7 @@ class InferenceServerClient:
             request_uri = "v2/models/{}/versions/{}/infer".format(
                 quote(model_name), model_version)
 
-        if not headers:
-            response = self._client_stub.post(request_uri=request_uri,
-                                              body=request_body)
-        else:
-            response = self._client_stub.post(request_uri=request_uri,
-                                              body=request_body,
-                                              headers=headers)
-
+        response = self._post(request_uri, request_body, headers, query_params)
         result = InferResult(response.read())
 
         return result
