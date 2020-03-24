@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,7 +42,80 @@ def add_span(span_map, timestamps, span_name, ts_start, ts_end):
         span_map[span_name] = 0
     span_map[span_name] += timestamps[ts_end] - timestamps[ts_start]
 
-def summarize(protocol, traces):
+class AbstractFrontend():
+    @property
+    def filter_timestamp(self):
+        return None
+
+    def add_frontend_span(self, span_map, timestamps):
+        pass
+
+    def summarize_frontend_span(self, span_map, cnt):
+        return None
+
+class HttpFrontend(AbstractFrontend):
+    @property
+    def filter_timestamp(self):
+        return "http recv start"
+
+    def add_frontend_span(self, span_map, timestamps):
+        if ("http recv start" in timestamps) and ("http send end" in timestamps):
+            add_span(span_map, timestamps,
+                     "http infer", "http recv start", "http send end")
+            add_span(span_map, timestamps,
+                     "http recv", "http recv start", "http recv end")
+            add_span(span_map, timestamps,
+                     "http send", "http send start", "http send end")
+
+    def summarize_frontend_span(self, span_map, cnt):
+        if "http infer" in span_map:
+            res = "HTTP infer request (avg): {}us\n".format(
+                    span_map["http infer"] / (cnt * 1000))
+            res += "\tReceive (avg): {}us\n".format(
+                    span_map["http recv"] / (cnt * 1000))
+            res += "\tSend (avg): {}us\n".format(
+                    span_map["http send"] / (cnt * 1000))
+            res += "\tOverhead (avg): {}us\n".format(
+                    (span_map["http infer"] -
+                     span_map["request handler"] -
+                     span_map["http recv"] -
+                     span_map["http send"]) / (cnt * 1000))
+            return res
+        else:
+            return None
+
+class GrpcFrontend(AbstractFrontend):
+    @property
+    def filter_timestamp(self):
+        return "grpc wait/read start"
+
+    def add_frontend_span(self, span_map, timestamps):
+        if ("grpc wait/read start" in timestamps) and ("grpc send end" in timestamps):
+            add_span(span_map, timestamps,
+                     "grpc infer", "grpc wait/read start", "grpc send end")
+            add_span(span_map, timestamps,
+                     "grpc wait/read", "grpc wait/read start", "grpc wait/read end")
+            add_span(span_map, timestamps,
+                     "grpc send", "grpc send start", "grpc send end")
+
+    def summarize_frontend_span(self, span_map, cnt):
+        if "grpc infer" in span_map:
+            res = "GRPC infer request (avg): {}us\n".format(
+                    span_map["grpc infer"] / (cnt * 1000))
+            res += "\tWait/Read (avg): {}us\n".format(
+                    span_map["grpc wait/read"] / (cnt * 1000))
+            res += "\tSend (avg): {}us\n".format(
+                    span_map["grpc send"] / (cnt * 1000))
+            res += "\tOverhead (avg): {}us\n".format(
+                    (span_map["grpc infer"] -
+                     span_map["request handler"] -
+                     span_map["grpc wait/read"] -
+                     span_map["grpc send"]) / (cnt * 1000))
+            return res
+        else:
+            return None
+
+def summarize(frontend, traces):
     # map from (model_name, model_version) to # of traces
     model_count_map = dict()
     # map from (model_name, model_version) to map of span->total time
@@ -51,27 +124,23 @@ def summarize(protocol, traces):
     # Order traces by id to be more intuitive if 'show_trace'
     traces = sorted(traces, key=lambda t: t.get('id', -1))
 
-    # Filter the trace that is not for the requested protocol
-    match_protocol_id_set = set()
+    # Filter the trace that is not for the requested frontend
+    match_frontend_id_set = set()
     filtered_traces = []
     for trace in traces:
         if "id" not in trace:
             continue
-        # Trace without a parent must contain protocol timestamps
+        # Trace without a parent must contain frontend timestamps
         if "parent_id" not in trace:
-            if protocol == "http":
-                str_to_match = "http recv start"
-            elif protocol == "grpc":
-                str_to_match = "grpc wait/read start"
-            else:
+            if frontend.filter_timestamp is None:
                 continue
             for ts in trace["timestamps"]:
-                if str_to_match in ts["name"]:
-                    match_protocol_id_set.add(trace["id"])
+                if frontend.filter_timestamp in ts["name"]:
+                    match_frontend_id_set.add(trace["id"])
                     filtered_traces.append(trace)
         # Otherwise need to check whether parent is filtered
-        elif trace["parent_id"] in match_protocol_id_set:
-            match_protocol_id_set.add(trace["id"])
+        elif trace["parent_id"] in match_frontend_id_set:
+            match_frontend_id_set.add(trace["id"])
             filtered_traces.append(trace)
 
     for trace in filtered_traces:
@@ -86,20 +155,8 @@ def summarize(protocol, traces):
                 model_span_map[key] = dict()
 
             model_count_map[key] += 1
-            if ("http recv start" in timestamps) and ("http send end" in timestamps):
-                add_span(model_span_map[key], timestamps,
-                         "http infer", "http recv start", "http send end")
-                add_span(model_span_map[key], timestamps,
-                         "http recv", "http recv start", "http recv end")
-                add_span(model_span_map[key], timestamps,
-                         "http send", "http send start", "http send end")
-            elif ("grpc wait/read start" in timestamps) and ("grpc send end" in timestamps):
-                add_span(model_span_map[key], timestamps,
-                         "grpc infer", "grpc wait/read start", "grpc send end")
-                add_span(model_span_map[key], timestamps,
-                         "grpc wait/read", "grpc wait/read start", "grpc wait/read end")
-                add_span(model_span_map[key], timestamps,
-                         "grpc send", "grpc send start", "grpc send end")
+
+            frontend.add_frontend_span(model_span_map[key], timestamps)
 
             add_span(model_span_map[key], timestamps,
                      "request handler", "request handler start", "request handler end")
@@ -140,30 +197,9 @@ def summarize(protocol, traces):
         model_name, model_value = key
         print("Summary for {} ({}): trace count = {}".format(model_name, model_value, cnt))
 
-        if "http infer" in model_span_map[key]:
-            print("HTTP infer request (avg): {}us".format(
-                model_span_map[key]["http infer"] / (cnt * 1000)))
-            print("\tReceive (avg): {}us".format(
-                model_span_map[key]["http recv"] / (cnt * 1000)))
-            print("\tSend (avg): {}us".format(
-                model_span_map[key]["http send"] / (cnt * 1000)))
-            print("\tOverhead (avg): {}us".format(
-                (model_span_map[key]["http infer"] -
-                 model_span_map[key]["request handler"] -
-                 model_span_map[key]["http recv"] -
-                 model_span_map[key]["http send"]) / (cnt * 1000)))
-        elif "grpc infer" in model_span_map[key]:
-            print("GRPC infer request (avg): {}us".format(
-                model_span_map[key]["grpc infer"] / (cnt * 1000)))
-            print("\tWait/Read (avg): {}us".format(
-                model_span_map[key]["grpc wait/read"] / (cnt * 1000)))
-            print("\tSend (avg): {}us".format(
-                model_span_map[key]["grpc send"] / (cnt * 1000)))
-            print("\tOverhead (avg): {}us".format(
-                (model_span_map[key]["grpc infer"] -
-                 model_span_map[key]["request handler"] -
-                 model_span_map[key]["grpc wait/read"] -
-                 model_span_map[key]["grpc send"]) / (cnt * 1000)))
+        frontend_summary = frontend.summarize_frontend_span(model_span_map[key], cnt)
+        if frontend_summary is not None:
+            print(frontend_summary)
 
         print("\tHandler (avg): {}us".format(
             model_span_map[key]["request handler"] / (cnt * 1000)))
@@ -202,5 +238,5 @@ if __name__ == '__main__':
         # Must summarize HTTP and GRPC separately since they have
         # different ways of accumulating time.
         print("File: {}".format(f.name))
-        summarize("http", trace_data)
-        summarize("grpc", trace_data)
+        summarize(HttpFrontend(), trace_data)
+        summarize(GrpcFrontend(), trace_data)
