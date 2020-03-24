@@ -42,7 +42,7 @@ if __name__ == '__main__':
                         '--url',
                         type=str,
                         required=False,
-                        default='localhost:8000?dummy=1',
+                        default='localhost:8000',
                         help='Inference server URL. Default is localhost:8000.')
 
     FLAGS = parser.parse_args()
@@ -72,7 +72,11 @@ if __name__ == '__main__':
 
     outputs.append(httpclient.InferOutput('OUTPUT0'))
     outputs.append(httpclient.InferOutput('OUTPUT1'))
-    results = triton_client.infer(inputs, model_name, outputs=outputs)
+    query_params = {'test_1': 1, 'test_2': 2}
+    results = triton_client.infer(inputs,
+                                  model_name,
+                                  outputs=outputs,
+                                  query_params=query_params)
 
     print(results.get_response())
 

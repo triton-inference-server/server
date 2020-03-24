@@ -43,7 +43,7 @@ if __name__ == '__main__':
                         '--url',
                         type=str,
                         required=False,
-                        default='localhost:8000?dummy=1',
+                        default='localhost:8000',
                         help='Inference server URL. Default is localhost:8000.')
 
     FLAGS = parser.parse_args()
@@ -56,10 +56,13 @@ if __name__ == '__main__':
     model_name = 'simple'
 
     # Health
-    if not triton_client.is_server_live():
+    if not triton_client.is_server_live(query_params={
+            'test_1': 1,
+            'test_2': 2
+    }):
         print("FAILED : is_server_live")
         sys.exit(1)
-    
+
     if not triton_client.is_server_ready():
         print("FAILED : is_server_ready")
         sys.exit(1)
@@ -75,7 +78,11 @@ if __name__ == '__main__':
         sys.exit(1)
     print(metadata)
 
-    metadata = triton_client.get_model_metadata(model_name)
+    metadata = triton_client.get_model_metadata(model_name,
+                                                query_params={
+                                                    'test_1': 1,
+                                                    'test_2': 2
+                                                })
     if not (metadata['name'] == model_name):
         print("FAILED : get_model_metadata")
         sys.exit(1)
