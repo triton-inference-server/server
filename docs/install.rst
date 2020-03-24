@@ -38,10 +38,7 @@ Installing Prebuilt Containers
 ------------------------------
 
 The inference server is provided as a pre-built container on the
-`NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_.  Before pulling the
-container you must have access and be logged into the NGC container
-registry as explained in the `NGC Getting Started Guide
-<http://docs.nvidia.com/ngc/ngc-getting-started-guide/index.html>`_.
+`NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_.
 
 Before you can pull a container from the NGC container registry, you
 must have Docker and nvidia-docker installed. For DGX users, this is
