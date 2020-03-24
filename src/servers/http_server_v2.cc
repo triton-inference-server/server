@@ -1510,7 +1510,7 @@ CheckSharedMemoryData(
     const rapidjson::Value& request_input, const char** shm_region,
     uint64_t* offset, uint64_t* byte_size)
 {
-  bool has_shared_memory = false;
+  bool use_shared_memory = false;
   rapidjson::Value::ConstMemberIterator itr =
       request_input.FindMember("parameters");
   if (itr != request_input.MemberEnd()) {
@@ -1528,12 +1528,12 @@ CheckSharedMemoryData(
           params.FindMember("shared_memory_byte_size");
       if (size_itr != params.MemberEnd()) {
         *byte_size = size_itr->value.GetInt();
-        has_shared_memory = true;
+        use_shared_memory = true;
       }
     }
   }
 
-  return has_shared_memory;
+  return use_shared_memory;
 }
 
 TRTSERVER_Error*
@@ -1673,8 +1673,7 @@ HTTPAPIServerV2::EVBufferToInput(
             TRTSERVER_ERROR_INVALID_ARG,
             "must specify valid 'Infer-Header-Content-Length' in request "
             "header and 'binary_data_size' when passing inputs in binary "
-            "data "
-            "format");
+            "data format");
       }
 
       // Process one block at a time
@@ -1713,6 +1712,13 @@ HTTPAPIServerV2::EVBufferToInput(
       const char* shm_region = nullptr;
       if (CheckSharedMemoryData(
               request_input, &shm_region, &offset, &byte_size)) {
+        if (request_input.FindMember("data") == request_input.MemberEnd()) {
+          return TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INVALID_ARG,
+              "must not specify 'data' field in request input when using "
+              "shared memory");
+        }
+
         void* base;
         TRTSERVER_Memory_Type memory_type;
         int64_t memory_type_id;
@@ -1749,6 +1755,13 @@ HTTPAPIServerV2::EVBufferToInput(
     uint64_t offset = 0, byte_size = 0;
     const char* shm_region = nullptr;
     if (CheckSharedMemoryData(output, &shm_region, &offset, &byte_size)) {
+      if (output.FindMember("data") == output.MemberEnd()) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            "must not specify 'data' field in request output when using shared "
+            "memory");
+      }
+
       void* base;
       TRTSERVER_Memory_Type memory_type;
       int64_t memory_type_id;
