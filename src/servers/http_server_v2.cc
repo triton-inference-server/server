@@ -387,7 +387,7 @@ HTTPAPIServerV2::InferResponseAlloc(
   if (evhttp_buffer == nullptr) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INTERNAL,
-        std::string("failed to create evbuffer for output tensor").c_str());
+        "failed to create evbuffer for output tensor");
   } else {
     payload->response_buffer_.push_back(evhttp_buffer);
   }
@@ -676,9 +676,8 @@ WriteDataToJson(
     rapidjson::Document::AllocatorType& allocator, void* base)
 {
   const rapidjson::Value& shape = response_output["shape"];
-  std::string dtype_str = std::string(response_output["datatype"].GetString());
-  const DataType dtype =
-      ProtocolStringToDataType(dtype_str.c_str(), dtype_str.size());
+  const char* dtype_str = response_output["datatype"].GetString();
+  const DataType dtype = ProtocolStringToDataType(dtype_str, strlen(dtype_str));
 
   rapidjson::Value data_array(rapidjson::kArrayType);
   int counter = 0;
@@ -1397,14 +1396,14 @@ HTTPAPIServerV2::HandleCudaSharedMemory(
         err = EVBufferToJson(&document, v, &v_idx, buffer_len, n);
         if (err == nullptr) {
           rapidjson::Value& handle = document["raw_handle"];
-          std::string b64_handle = std::string(handle["b64"].GetString());
+          const char* b64_handle = handle["b64"].GetString();
           uint64_t byte_size = document["byte_size"].GetInt();
           uint64_t device_id = document["device_id"].GetInt();
           base64_decodestate s;
           base64_init_decodestate(&s);
           std::vector<char> raw_handle(sizeof(cudaIpcMemHandle_t));
           size_t decoed_size = base64_decode_block(
-              b64_handle.c_str(), b64_handle.size(), raw_handle.data(), &s);
+              b64_handle, strlen(b64_handle), raw_handle.data(), &s);
           if (decoed_size != sizeof(cudaIpcMemHandle_t)) {
             err = TRTSERVER_ErrorNew(
                 TRTSERVER_ERROR_INVALID_ARG,
@@ -1674,8 +1673,7 @@ HTTPAPIServerV2::EVBufferToInput(
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INVALID_ARG,
             std::string(
-                "unexpected size for input '" +
-                std::string(request_input["name"].GetString()) +
+                "unexpected size for input '" + std::string(input_name) +
                 "', expecting " + std::to_string(byte_size) +
                 " bytes for model '" + model_name + "'")
                 .c_str());
@@ -1981,11 +1979,10 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
   rapidjson::Document& response_json = response_meta_data_.response_json_;
   rapidjson::Document::AllocatorType& allocator = response_json.GetAllocator();
 
-  const char* request_id;
+  const char* request_id = nullptr;
   TRTSERVER2_InferenceRequestId(request, &request_id);
-  std::string request_id_str = std::string(request_id);
-  if (!request_id_str.empty()) {
-    rapidjson::Value id_val(request_id_str.c_str(), request_id_str.size());
+  if (request_id != nullptr) {
+    rapidjson::Value id_val(request_id, strlen(request_id));
     response_json.AddMember("id", id_val, allocator);
   }
 
@@ -1997,8 +1994,8 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
   for (size_t i = 0; i < request_outputs.Size(); i++) {
     output_metadata[i].SetObject();
     rapidjson::Value& request_output = request_outputs[i];
-    std::string output_name = std::string(request_output["name"].GetString());
-    rapidjson::Value name_val(output_name.c_str(), output_name.size());
+    const char* output_name = request_output["name"].GetString();
+    rapidjson::Value name_val(output_name, strlen(output_name));
     output_metadata[i].AddMember("name", name_val, allocator);
 
     int class_size = 0;
@@ -2018,7 +2015,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       uint64_t dim_count = 6;
       std::vector<int64_t> shape_vec(dim_count);
       err = TRTSERVER2_InferenceRequestOutputShape(
-          request, output_name.c_str(), &shape_vec[0], &dim_count);
+          request, output_name, &shape_vec[0], &dim_count);
       if (err != nullptr) {
         return EVHTP_RES_BADREQ;
       }
@@ -2031,13 +2028,12 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
 
       const char* datatype;
       err = TRTSERVER2_InferenceRequestOutputDataType(
-          request, output_name.c_str(), &datatype);
+          request, output_name, &datatype);
       if (err != nullptr) {
         return EVHTP_RES_BADREQ;
       }
 
-      std::string datatype_str = std::string(datatype);
-      rapidjson::Value datatype_val(datatype_str.c_str(), datatype_str.size());
+      rapidjson::Value datatype_val(datatype, strlen(datatype));
       output_metadata[i].AddMember("datatype", datatype_val, allocator);
 
       const void* base;
@@ -2045,7 +2041,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       TRTSERVER_Memory_Type memory_type;
       int64_t memory_type_id;
       err = TRTSERVER2_InferenceRequestOutputData(
-          request, output_name.c_str(), &base, &byte_size, &memory_type,
+          request, output_name, &base, &byte_size, &memory_type,
           &memory_type_id);
       if (err != nullptr) {
         return EVHTP_RES_BADREQ;
