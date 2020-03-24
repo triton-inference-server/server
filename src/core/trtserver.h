@@ -1001,7 +1001,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerModelStatus(
     TRTSERVER_Server* server, const char* model_name,
     TRTSERVER_Protobuf** status);
 
-/// Get the index for all unique models in the model repository  as a
+/// Get the index for all unique models in the model repository as a
 /// TRTSERVER_Protobuf object. The caller takes ownership of the object
 /// and must call TRTSERVER_ProtobufDelete to release the object.
 /// \param server The inference server object.

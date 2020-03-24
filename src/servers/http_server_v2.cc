@@ -205,7 +205,9 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
         model_regex_(
-            R"(/v2/models/([^/]+)(?:/version/([0-9]+))?(?:/(infer|ready))?)")
+            R"(/v2/models/([^/]+)(?:/version/([0-9]+))?(?:/(infer|ready))?)"),
+        modelcontrol_regex_(
+            R"(/v2/repository(?:/([^/]+))?/(index|model/([^/]+)/(load|unload)))")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -316,6 +318,11 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
   void HandleInfer(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
+  void HandleRepositoryIndex(
+      evhtp_request_t* req, const std::string& repository_name);
+  void HandleRepositoryControl(
+      evhtp_request_t* req, const std::string& repository_name,
+      const std::string& model_name, const std::string& action);
 
 #ifdef TRTIS_ENABLE_GPU
   TRTSERVER_Error* EVBufferToCudaHandle(
@@ -344,6 +351,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
 
   re2::RE2 server_regex_;
   re2::RE2 model_regex_;
+  re2::RE2 modelcontrol_regex_;
 };
 
 TRTSERVER_Error*
@@ -816,6 +824,20 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
     return;
   }
 
+  // model repository
+  std::string repo_name, action;
+  if (RE2::FullMatch(
+          std::string(req->uri->path->full), modelcontrol_regex_, &repo_name,
+          &kind, &model_name, &action)) {
+    if (kind == "index") {
+      HandleRepositoryIndex(req, repo_name);
+      return;
+    } else if (kind.find("model", 0) == 0) {
+      HandleRepositoryControl(req, repo_name, model_name, action);
+      return;
+    }
+  }
+
   LOG_VERBOSE(1) << "HTTP V2 error: " << req->method << " "
                  << req->uri->path->full << " - "
                  << static_cast<int>(EVHTP_RES_BADREQ);
@@ -842,6 +864,94 @@ HTTPAPIServerV2::HandleServerHealth(
 
   evhtp_send_reply(
       req, (ready && (err == nullptr)) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
+
+  TRTSERVER_ErrorDelete(err);
+}
+
+void
+HTTPAPIServerV2::HandleRepositoryIndex(
+    evhtp_request_t* req, const std::string& repository_name)
+{
+  if (req->method != htp_method_GET) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  TRTSERVER_Error* err = nullptr;
+  const char* const* models;
+  uint64_t models_count = 0;
+  TRTSERVER2_ModelIndex* model_index = nullptr;
+  if (repository_name.empty()) {
+    err = TRTSERVER2_ServerModelIndex(server_.get(), &model_index);
+    if (err == nullptr) {
+      err = TRTSERVER2_ModelIndexNames(model_index, &models, &models_count);
+    }
+  } else {
+    err = TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_UNSUPPORTED,
+        "'repository_name' specification is not yet supported");
+  }
+
+  rapidjson::Document document;
+  document.SetObject();
+  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+  if (err == nullptr) {
+    rapidjson::Value models_array(rapidjson::kArrayType);
+    for (uint64_t i = 0; i < models_count; i++) {
+      rapidjson::Value model_index;
+      model_index.SetObject();
+      const char* model_name = models[i];
+      rapidjson::Value name_val(model_name, strlen(model_name), allocator);
+      model_index.AddMember("name", name_val, allocator);
+      models_array.PushBack(model_index, allocator);
+    }
+    document.AddMember("index", models_array, allocator);
+
+    rapidjson::StringBuffer buffer;
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
+    const char* model_metadata = buffer.GetString();
+    evbuffer_add(req->buffer_out, model_metadata, strlen(model_metadata));
+    err = TRTSERVER2_ModelIndexDelete(model_index);
+    evhtp_send_reply(req, EVHTP_RES_OK);
+  } else {
+    EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+  }
+
+  TRTSERVER_ErrorDelete(err);
+}
+
+void
+HTTPAPIServerV2::HandleRepositoryControl(
+    evhtp_request_t* req, const std::string& repository_name,
+    const std::string& model_name, const std::string& action)
+{
+  if (req->method != htp_method_POST) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  TRTSERVER_Error* err = nullptr;
+  if (!repository_name.empty()) {
+    err = TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_UNSUPPORTED,
+        "'repository_name' specification is not supported");
+  }
+
+  if (action == "load") {
+    err = TRTSERVER_ServerLoadModel(server_.get(), model_name.c_str());
+  } else if (action == "unload") {
+    err = TRTSERVER_ServerUnloadModel(server_.get(), model_name.c_str());
+  }
+
+  if (err == nullptr) {
+    evhtp_send_reply(req, EVHTP_RES_OK);
+  } else {
+    EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+  }
 
   TRTSERVER_ErrorDelete(err);
 }
@@ -1052,7 +1162,6 @@ HTTPAPIServerV2::HandleModelMetadata(
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
     document.Accept(writer);
     std::string model_metadata(buffer.GetString());
-
     evbuffer_add(
         req->buffer_out, model_metadata.c_str(), model_metadata.size());
     evhtp_send_reply(req, EVHTP_RES_OK);
@@ -1116,7 +1225,6 @@ HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
     document.Accept(writer);
     std::string status_buffer(buffer.GetString());
-
     evbuffer_add(req->buffer_out, status_buffer.c_str(), status_buffer.size());
     evhtp_send_reply(req, EVHTP_RES_OK);
   } else {
@@ -1681,8 +1789,8 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       TRTSERVER_Memory_Type memory_type;
       int64_t memory_type_id;
       err = TRTSERVER2_InferenceRequestOutputData(
-              request, output_name.c_str(), &base, &byte_size, &memory_type,
-              &memory_type_id);
+          request, output_name.c_str(), &base, &byte_size, &memory_type,
+          &memory_type_id);
       if (err != nullptr) {
         return EVHTP_RES_BADREQ;
       }
@@ -1716,8 +1824,8 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
   response_meta_data_.response_json_.Accept(writer);
   std::string response_metadata(buffer.GetString());
-  evbuffer_add(req_->buffer_out, response_metadata.c_str(),
-      response_metadata.size());
+  evbuffer_add(
+      req_->buffer_out, response_metadata.c_str(), response_metadata.size());
 
   evhtp_headers_add_header(
       req_->headers_out,
