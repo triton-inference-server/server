@@ -306,7 +306,7 @@ AutoFillSavedModel::Create(
   }
 
   if (err != nullptr) {
-    std::string msg(err->msg_);
+    std::string msg((err->msg_ == nullptr) ? "<unknown>" : err->msg_);
     TRTISTF_ErrorDelete(err);
     return Status(
         RequestStatusCode::INTERNAL,
