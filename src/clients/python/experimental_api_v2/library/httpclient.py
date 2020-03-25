@@ -30,18 +30,31 @@ from geventhttpclient.url import URL
 from urllib.parse import quote, quote_plus
 import rapidjson as json
 import numpy as np
+import gevent.pool
 
 from tritonhttpclient.utils import *
 
 
-def raise_if_error(response):
+def _get_error(response):
+    """
+    Returns the InferenceServerException object if response
+    indicates the error. If no error then return None
+    """
+    if response.status_code != 200:
+        error_response = json.loads(response.read())
+        return InferenceServerException(msg=error_response["error"])
+    else:
+        return None
+
+
+def _raise_if_error(response):
     """
     Raise InferenceServerException if received non-Success
     response from the server
     """
-    if response.status_code != 200:
-        error_response = json.loads(response.read())
-        raise_error(error_response["error"])
+    error = _get_error(response)
+    if error:
+        raise error
 
 
 def _get_query_string(query_params):
@@ -66,21 +79,22 @@ class InferenceServerClient:
     ----------
     url : str
         The inference server URL, e.g. 'localhost:8000'.
-
     connection_count : int
         The number of connections to create for this client.
         Default value is 1.
-
     connection_timeout : float
         The timeout value for the connection. Default value
         is 60.0 sec.
-    
     network_timeout : float
         The timeout value for the network. Default value is
         60.0 sec
-
     verbose : bool
         If True generate verbose output. Default value is False.
+    max_greenlets : int
+        Determines the maximum allowed number of worker greenlets
+        for handling asynchronous inference requests. Default value
+        is None, which means there will be no restriction on the
+        number of greenlets created.
 
     Raises
         ------
@@ -94,7 +108,8 @@ class InferenceServerClient:
                  connection_count=1,
                  connection_timeout=60.0,
                  network_timeout=60.0,
-                 verbose=False):
+                 verbose=False,
+                 max_greenlets=None):
         self._last_request_id = None
         self._parsed_url = URL("http://" + url)
         self._client_stub = HTTPClient.from_url(
@@ -102,7 +117,8 @@ class InferenceServerClient:
             concurrency=connection_count,
             connection_timeout=connection_timeout,
             network_timeout=network_timeout)
-        self.verbose = verbose
+        self._pool = gevent.pool.Pool(max_greenlets)
+        self._verbose = verbose
 
     def __enter__(self):
         return self
@@ -118,6 +134,7 @@ class InferenceServerClient:
         will result in an Error.
 
         """
+        self._pool.join()
         self._client_stub.close()
 
     def _get(self, request_uri, headers, query_params):
@@ -304,7 +321,7 @@ class InferenceServerClient:
         """
         request_uri = "v2"
         response = self._get(request_uri, headers, query_params)
-        raise_if_error(response)
+        _raise_if_error(response)
         metadata = json.loads(response.read())
 
         return metadata
@@ -349,7 +366,7 @@ class InferenceServerClient:
                 quote(model_name), model_version)
 
         response = self._get(request_uri, headers, query_params)
-        raise_if_error(response)
+        _raise_if_error(response)
         metadata = json.loads(response.read())
 
         return metadata
@@ -429,6 +446,93 @@ class InferenceServerClient:
         result = InferResult(response.read())
 
         return result
+
+    def async_infer(self,
+                    callback,
+                    inputs,
+                    outputs,
+                    model_name,
+                    model_version="",
+                    request_id=None,
+                    parameters=None,
+                    headers=None,
+                    query_params=None):
+        """Run asynchronous inference using the supplied 'inputs' requesting
+        the outputs specified by 'outputs'.
+
+        Parameters
+        ----------
+        callback : function
+            Python function that is invoked once the request is completed.
+            The function must reserve the last two arguments (result, error)
+            to hold InferResult and InferenceServerException objects
+            respectively which will be provided to the function when executing
+            the callback. The ownership of these objects will be given to the
+            user. The 'error' would be None for a successful inference.
+        inputs : list
+            A list of InferInput objects, each describing data for a input
+            tensor required by the model.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. If not specified all outputs produced
+            by the model will be returned using default settings.
+        model_name: str
+            The name of the model to run inference.
+        model_version: str
+            The version of the model to run inference. The default value
+            is an empty string which means then the server will choose
+            a version based on the model and internal policy.
+        request_id: str
+            Optional identifier for the request. If specified will be returned
+            in the response. Default value is 'None' which means no request_id
+            will be used.
+        parameters: dict
+            Optional inference parameters described as key-value pairs.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction.
+
+        Raises
+        ------
+        InferenceServerException
+            If server fails to issue inference.
+        """
+
+        def wrapped_post(request_uri, request_body, headers, query_params):
+            return self._post(request_uri, request_body, headers, query_params)
+
+        def wrapped_callback(response):
+            callback(result=InferResult(response.read()),
+                     error=_get_error(response))
+
+        infer_request = {}
+        if request_id:
+            infer_request['id'] = request_id
+        if parameters:
+            infer_request['parameters'] = parameters
+        infer_request['inputs'] = [
+            this_input._get_tensor() for this_input in inputs
+        ]
+        if outputs:
+            infer_request['outputs'] = [
+                this_output._get_tensor() for this_output in outputs
+            ]
+
+        request_body = json.dumps(infer_request)
+        if not model_version:
+            request_uri = "v2/models/{}/infer".format(quote(model_name))
+        else:
+            request_uri = "v2/models/{}/versions/{}/infer".format(
+                quote(model_name), model_version)
+
+        g = self._pool.apply_async(
+            wrapped_post, (request_uri, request_body, headers, query_params),
+            callback=wrapped_callback)
+
+        g.start()
 
 
 class InferInput:
@@ -619,7 +723,7 @@ class InferResult:
         ----------
         name : str
             The name of the output tensor whose result is to be retrieved.
-    
+
         Returns
         -------
         numpy array
@@ -632,7 +736,7 @@ class InferResult:
                 # FIXME: Add the support for binary data when available with server
                 np_array = np.array(output['data'],
                                     dtype=triton_to_np_dtype(datatype))
-                resize(np_array, output['shape'])
+                np.resize(np_array, output['shape'])
                 return np_array
         return None
 
