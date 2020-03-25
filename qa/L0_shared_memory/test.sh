@@ -28,7 +28,7 @@
 CLIENT_LOG="./client.log"
 SHM_TEST=shared_memory_test.py
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 source ../common/util.sh
 
 RET=0

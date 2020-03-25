@@ -42,7 +42,7 @@ PERF_CLIENT=../clients/perf_client
 
 DATADIR="/data/inferenceserver/${REPO_VERSION}/tf_model_store"
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 source ../common/util.sh
 
 rm -f *.log*

@@ -51,7 +51,7 @@ STRING_WITHSHAPE_JSONDATAFILE=`pwd`/json_input_data_files/string_data_with_shape
 SEQ_JSONDATAFILE=`pwd`/json_input_data_files/seq_data.json
 SHAPETENSORADTAFILE=`pwd`/json_input_data_files/shape_tensor_data.json
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS=--model-repository=$DATADIR
 SERVER_LOG="./inference_server.log"
 

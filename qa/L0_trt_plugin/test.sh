@@ -42,7 +42,7 @@ PLUGIN_TEST=trt_plugin_test.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

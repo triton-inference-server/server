@@ -30,7 +30,7 @@ export CUDA_VISIBLE_DEVICES=0
 SIMPLE_CLIENT=../clients/simple_client
 SIMPLE_CLIENT_PY=../clients/simple_client.py
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS=--model-repository=`pwd`/models
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

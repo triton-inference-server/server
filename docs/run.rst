@@ -150,11 +150,11 @@ After :ref:`building the inference server outside of Docker
 will be in builddir/trtis/install/bin and the required shared
 libraries will be in builddir/trtis/install/lib. The *trtserver*
 executable and libraries are configured to be installed and executed
-from the /opt/tensorrtserver directory, so copy
-builddir/trtis/install/* to /opt/tensorrtserver/. . Then execute
+from the /opt/tritonserver directory, so copy
+builddir/trtis/install/* to /opt/tritonserver/. . Then execute
 *trtserver* with the desired arguments::
 
-  $ /opt/tensorrtserver/bin/trtserver --model-repository=/models
+  $ /opt/tritonserver/bin/trtserver --model-repository=/models
 
 .. _section-checking-inference-server-status:
 

@@ -42,7 +42,7 @@ SERVER_STATUS_TEST=server_status_test.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS="--repository-poll-secs=1 --model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

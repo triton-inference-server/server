@@ -39,7 +39,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS=--model-repository=`pwd`/models
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

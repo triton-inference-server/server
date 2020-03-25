@@ -40,7 +40,7 @@ BATCHER_TEST=dyna_sequence_batcher_test.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 source ../common/util.sh
 
 export CUDA_VISIBLE_DEVICES=0

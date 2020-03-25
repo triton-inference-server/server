@@ -69,7 +69,7 @@ cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/resnet_v1_50_graphdef
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS="--model-repository=$DATADIR --api-version 2"
 source ../common/util.sh
 

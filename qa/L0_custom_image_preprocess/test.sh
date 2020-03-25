@@ -30,7 +30,7 @@ export CUDA_VISIBLE_DEVICES=0
 TEST_PY=./preprocess_test.py
 CLIENT_LOG="./client.log"
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS=--model-repository=`pwd`/models
 SERVER_LOG="./inference_server.log"
 

@@ -40,7 +40,7 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG="./client.log"
 INFER_TEST=infer_reshape_test.py
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS=--model-repository=`pwd`/models
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
