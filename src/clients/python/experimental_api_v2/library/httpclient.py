@@ -736,7 +736,7 @@ class InferResult:
                 # FIXME: Add the support for binary data when available with server
                 np_array = np.array(output['data'],
                                     dtype=triton_to_np_dtype(datatype))
-                resize(np_array, output['shape'])
+                np.resize(np_array, output['shape'])
                 return np_array
         return None
 
