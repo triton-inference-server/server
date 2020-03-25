@@ -474,8 +474,8 @@ main(int argc, char** argv)
     Usage(argv, "-r must be used to specify model repository path");
   }
 #ifndef TRTIS_ENABLE_GPU
-  if (use_gpu_memory) {
-    Usage(argv, "-g can not be used without enabling GPU");
+  if (enforce_memory_type && requested_memory_type != TRTSERVER_MEMORY_CPU) {
+    Usage(argv, "-m can only be set to \"system\" without enabling GPU");
   }
 #endif  // TRTIS_ENABLE_GPU
 
@@ -751,8 +751,8 @@ main(int argc, char** argv)
 
   // Modify some input data in place and then reuse the request
   // object. For simplicity we only do this when the input tensors are
-  // in CPU memory.
-  if (!enforce_memory_type || (requested_memory_type != TRTSERVER_MEMORY_GPU)) {
+  // in non-pinned system memory.
+  if (!enforce_memory_type || (requested_memory_type == TRTSERVER_MEMORY_CPU)) {
     if (is_int) {
       int32_t* input0_base = reinterpret_cast<int32_t*>(&input0_data[0]);
       input0_base[0] = 27;
