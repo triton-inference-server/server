@@ -44,15 +44,26 @@ namespace ni = nvidia::inferenceserver;
 
 namespace {
 
-bool use_gpu_memory = false;
+bool enforce_memory_type = false;
+TRTSERVER_Memory_Type requested_memory_type;
 
 #ifdef TRTIS_ENABLE_GPU
-static auto gpu_data_deleter = [](void* data) {
+static auto cuda_data_deleter = [](void* data) {
   if (data != nullptr) {
-    auto err = cudaFree(data);
-    if (err != cudaSuccess) {
-      std::cerr << "error: failed to cudaFree " << data << ": "
-                << cudaGetErrorString(err) << std::endl;
+    cudaPointerAttributes attr;
+    auto cuerr = cudaPointerGetAttributes(&attr, data);
+    if (cuerr != cudaSuccess) {
+      std::cerr << "error: failed to get CUDA pointer attribute of " << data
+                << ": " << cudaGetErrorString(cuerr) << std::endl;
+    }
+    if (attr.type == cudaMemoryTypeDevice) {
+      cuerr = cudaFree(data);
+    } else if (attr.type == cudaMemoryTypeHost) {
+      cuerr = cudaFreeHost(data);
+    }
+    if (cuerr != cudaSuccess) {
+      std::cerr << "error: failed to release CUDA pointer " << data << ": "
+                << cudaGetErrorString(cuerr) << std::endl;
     }
   }
 };
@@ -66,7 +77,10 @@ Usage(char** argv, const std::string& msg = std::string())
   }
 
   std::cerr << "Usage: " << argv[0] << " [options]" << std::endl;
-  std::cerr << "\t-g Use GPU memory for input and output tensors" << std::endl;
+  std::cerr << "\t-m <\"system\"|\"pinned\"|gpu>"
+            << " Enforce the memory type for input and output tensors."
+            << " If not specified, inputs will be in system memory and outputs"
+            << " will be based on the model's preferred type." << std::endl;
   std::cerr << "\t-v Enable verbose logging" << std::endl;
   std::cerr << "\t-r [model repository absolute path]" << std::endl;
 
@@ -85,9 +99,9 @@ ResponseAlloc(
   // releasing the buffer.
 
   // Unless necessary, the actual memory type and id is the same as preferred
-  // memory type and id
+  // memory type
   *actual_memory_type = preferred_memory_type;
-  *actual_memory_type_id = preferred_memory_type_id;
+  *actual_memory_type_id = 0;
 
   // If 'byte_size' is zero just return 'buffer'==nullptr, we don't
   // need to do any other book-keeping.
@@ -98,32 +112,64 @@ ResponseAlloc(
               << tensor_name << std::endl;
   } else {
     void* allocated_ptr = nullptr;
-    if (!use_gpu_memory || (preferred_memory_type == TRTSERVER_MEMORY_CPU)) {
-      allocated_ptr = malloc(byte_size);
-      *actual_memory_type = TRTSERVER_MEMORY_CPU;
-      *actual_memory_type_id = 0;
-    } else {
+    if (enforce_memory_type) {
+      *actual_memory_type = requested_memory_type;
+    }
+    switch (*actual_memory_type) {
 #ifdef TRTIS_ENABLE_GPU
-      auto err = cudaSetDevice(preferred_memory_type_id);
-      if ((err != cudaSuccess) && (err != cudaErrorNoDevice) &&
-          (err != cudaErrorInsufficientDriver)) {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INTERNAL,
-            std::string(
-                "unable to recover current CUDA device: " +
-                std::string(cudaGetErrorString(err)))
-                .c_str());
-      }
+      case TRTSERVER_MEMORY_CPU_PINNED: {
+        auto err = cudaSetDevice(*actual_memory_type_id);
+        if ((err != cudaSuccess) && (err != cudaErrorNoDevice) &&
+            (err != cudaErrorInsufficientDriver)) {
+          return TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INTERNAL,
+              std::string(
+                  "unable to recover current CUDA device: " +
+                  std::string(cudaGetErrorString(err)))
+                  .c_str());
+        }
 
-      err = cudaMalloc(&allocated_ptr, byte_size);
-      if (err != cudaSuccess) {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INTERNAL,
-            std::string(
-                "cudaMalloc failed: " + std::string(cudaGetErrorString(err)))
-                .c_str());
+        err = cudaHostAlloc(&allocated_ptr, byte_size, cudaHostAllocPortable);
+        if (err != cudaSuccess) {
+          return TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INTERNAL,
+              std::string(
+                  "cudaHostAlloc failed: " +
+                  std::string(cudaGetErrorString(err)))
+                  .c_str());
+        }
+        break;
+      }
+      case TRTSERVER_MEMORY_GPU: {
+        auto err = cudaSetDevice(*actual_memory_type_id);
+        if ((err != cudaSuccess) && (err != cudaErrorNoDevice) &&
+            (err != cudaErrorInsufficientDriver)) {
+          return TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INTERNAL,
+              std::string(
+                  "unable to recover current CUDA device: " +
+                  std::string(cudaGetErrorString(err)))
+                  .c_str());
+        }
+
+        err = cudaMalloc(&allocated_ptr, byte_size);
+        if (err != cudaSuccess) {
+          return TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INTERNAL,
+              std::string(
+                  "cudaMalloc failed: " + std::string(cudaGetErrorString(err)))
+                  .c_str());
+        }
+        break;
       }
 #endif  // TRTIS_ENABLE_GPU
+      // Fallback if unknown type.
+      case TRTSERVER_MEMORY_CPU:
+      default: {
+        *actual_memory_type = TRTSERVER_MEMORY_CPU;
+        allocated_ptr = malloc(byte_size);
+        break;
+      }
     }
 
     if (allocated_ptr != nullptr) {
@@ -131,8 +177,7 @@ ResponseAlloc(
       *buffer_userp = new std::string(tensor_name);
       std::cout << "allocated " << byte_size << " bytes in "
                 << ni::MemoryTypeString(*actual_memory_type)
-                << " for result tensor " << tensor_name << " at " << *buffer
-                << std::endl;
+                << " for result tensor " << tensor_name << std::endl;
     }
   }
 
@@ -154,22 +199,38 @@ ResponseRelease(
   std::cout << "Releasing buffer " << buffer << " of size " << byte_size
             << " in " << ni::MemoryTypeString(memory_type) << " for result '"
             << *name << "'" << std::endl;
-  if (memory_type == TRTSERVER_MEMORY_CPU) {
-    free(buffer);
+  switch (memory_type) {
+    case TRTSERVER_MEMORY_CPU:
+      free(buffer);
+      break;
 #ifdef TRTIS_ENABLE_GPU
-  } else if (use_gpu_memory) {
-    auto err = cudaSetDevice(memory_type_id);
-    if (err == cudaSuccess) {
-      err = cudaFree(buffer);
+    case TRTSERVER_MEMORY_CPU_PINNED: {
+      auto err = cudaSetDevice(memory_type_id);
+      if (err == cudaSuccess) {
+        err = cudaFreeHost(buffer);
+      }
+      if (err != cudaSuccess) {
+        std::cerr << "error: failed to cudaFree " << buffer << ": "
+                  << cudaGetErrorString(err) << std::endl;
+      }
+      break;
     }
-    if (err != cudaSuccess) {
-      std::cerr << "error: failed to cudaFree " << buffer << ": "
-                << cudaGetErrorString(err) << std::endl;
+    case TRTSERVER_MEMORY_GPU: {
+      auto err = cudaSetDevice(memory_type_id);
+      if (err == cudaSuccess) {
+        err = cudaFree(buffer);
+      }
+      if (err != cudaSuccess) {
+        std::cerr << "error: failed to cudaFree " << buffer << ": "
+                  << cudaGetErrorString(err) << std::endl;
+      }
+      break;
     }
 #endif  // TRTIS_ENABLE_GPU
-  } else {
-    std::cerr << "error: unexpected buffer allocated in GPU memory"
-              << std::endl;
+    default:
+      std::cerr << "error: unexpected buffer allocated in CUDA managed memory"
+                << std::endl;
+      break;
   }
 
   delete name;
@@ -284,11 +345,11 @@ GetResult(
     FAIL(
         "unexpected byte-size, expected " + std::to_string(expected_byte_size) +
         ", got " + std::to_string(byte_size) + " for " + name);
-  } else if (!use_gpu_memory && (memory_type == TRTSERVER_MEMORY_GPU)) {
+  } else if (enforce_memory_type && (memory_type != requested_memory_type)) {
     FAIL(
         "unexpected memory type, expected to be allocated "
         "in " +
-        ni::MemoryTypeString(TRTSERVER_MEMORY_CPU) + ", got " +
+        ni::MemoryTypeString(requested_memory_type) + ", got " +
         ni::MemoryTypeString(memory_type) + ", id " +
         std::to_string(memory_type_id) + " for " + name);
   }
@@ -296,19 +357,26 @@ GetResult(
   *result = content;
 
 #ifdef TRTIS_ENABLE_GPU
-  // Different from CPU memory, outputs in GPU memory must be copied
-  // to CPU memory to be read directly.
+  // Different from CPU memory (system and pinned),
+  // outputs in GPU memory must be copied to CPU memory to be read directly.
   scratch->clear();
   scratch->reserve(byte_size);
-  if (memory_type == TRTSERVER_MEMORY_CPU) {
-    std::cout << name << " is stored in CPU memory" << std::endl;
-  } else {
-    std::cout << name << " is stored in GPU memory" << std::endl;
-    FAIL_IF_CUDA_ERR(
-        cudaMemcpy(
-            &((*scratch)[0]), content, byte_size, cudaMemcpyDeviceToHost),
-        "getting " + name + " data from GPU memory");
-    *result = &((*scratch)[0]);
+  switch (memory_type) {
+    case TRTSERVER_MEMORY_CPU:
+      std::cout << name << " is stored in system memory" << std::endl;
+      break;
+    case TRTSERVER_MEMORY_CPU_PINNED:
+      std::cout << name << " is stored in pinned memory" << std::endl;
+      break;
+    default: {
+      std::cout << name << " is stored in GPU memory" << std::endl;
+      FAIL_IF_CUDA_ERR(
+          cudaMemcpy(
+              &((*scratch)[0]), content, byte_size, cudaMemcpyDeviceToHost),
+          "getting " + name + " data from GPU memory");
+      *result = &((*scratch)[0]);
+      break;
+    }
   }
 #endif  // TRTIS_ENABLE_GPU
 }
@@ -372,11 +440,24 @@ main(int argc, char** argv)
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vgr:")) != -1) {
+  while ((opt = getopt(argc, argv, "vm:r:")) != -1) {
     switch (opt) {
-      case 'g':
-        use_gpu_memory = true;
+      case 'm': {
+        enforce_memory_type = true;
+        if (strcmp(optarg, "system")) {
+          requested_memory_type = TRTSERVER_MEMORY_CPU;
+        } else if (strcmp(optarg, "pinned")) {
+          requested_memory_type = TRTSERVER_MEMORY_CPU_PINNED;
+        } else if (strcmp(optarg, "gpu")) {
+          requested_memory_type = TRTSERVER_MEMORY_GPU;
+        } else {
+          Usage(
+              argv,
+              "-m must be used to specify one of the following types:"
+              " <\"system\"|\"pinned\"|gpu>");
+        }
         break;
+      }
       case 'r':
         model_repository_path = optarg;
         break;
@@ -393,8 +474,8 @@ main(int argc, char** argv)
     Usage(argv, "-r must be used to specify model repository path");
   }
 #ifndef TRTIS_ENABLE_GPU
-  if (use_gpu_memory) {
-    Usage(argv, "-g can not be used without enabling GPU");
+  if (enforce_memory_type && requested_memory_type != TRTSERVER_MEMORY_CPU) {
+    Usage(argv, "-m can only be set to \"system\" without enabling GPU");
   }
 #endif  // TRTIS_ENABLE_GPU
 
@@ -585,30 +666,51 @@ main(int argc, char** argv)
   const void* input1_base = &input1_data[0];
   auto memory_type = TRTSERVER_MEMORY_CPU;
 #ifdef TRTIS_ENABLE_GPU
-  std::unique_ptr<void, decltype(gpu_data_deleter)> input0_gpu(
-      nullptr, gpu_data_deleter);
-  std::unique_ptr<void, decltype(gpu_data_deleter)> input1_gpu(
-      nullptr, gpu_data_deleter);
-  if (use_gpu_memory) {
+  std::unique_ptr<void, decltype(cuda_data_deleter)> input0_gpu(
+      nullptr, cuda_data_deleter);
+  std::unique_ptr<void, decltype(cuda_data_deleter)> input1_gpu(
+      nullptr, cuda_data_deleter);
+  bool use_cuda_memory =
+      (enforce_memory_type && (requested_memory_type != TRTSERVER_MEMORY_CPU));
+  if (use_cuda_memory) {
     FAIL_IF_CUDA_ERR(cudaSetDevice(0), "setting CUDA device to device 0");
-    void* dst;
-    FAIL_IF_CUDA_ERR(
-        cudaMalloc(&dst, input0_size), "allocating GPU memory for INPUT0 data");
-    input0_gpu.reset(dst);
-    FAIL_IF_CUDA_ERR(
-        cudaMemcpy(dst, &input0_data[0], input0_size, cudaMemcpyHostToDevice),
-        "setting INPUT0 data in GPU memory");
-    FAIL_IF_CUDA_ERR(
-        cudaMalloc(&dst, input1_size), "allocating GPU memory for INPUT1 data");
-    input1_gpu.reset(dst);
-    FAIL_IF_CUDA_ERR(
-        cudaMemcpy(dst, &input1_data[0], input1_size, cudaMemcpyHostToDevice),
-        "setting INPUT1 data in GPU memory");
+    if (requested_memory_type != TRTSERVER_MEMORY_CPU_PINNED) {
+      void* dst;
+      FAIL_IF_CUDA_ERR(
+          cudaMalloc(&dst, input0_size),
+          "allocating GPU memory for INPUT0 data");
+      input0_gpu.reset(dst);
+      FAIL_IF_CUDA_ERR(
+          cudaMemcpy(dst, &input0_data[0], input0_size, cudaMemcpyHostToDevice),
+          "setting INPUT0 data in GPU memory");
+      FAIL_IF_CUDA_ERR(
+          cudaMalloc(&dst, input1_size),
+          "allocating GPU memory for INPUT1 data");
+      input1_gpu.reset(dst);
+      FAIL_IF_CUDA_ERR(
+          cudaMemcpy(dst, &input1_data[0], input1_size, cudaMemcpyHostToDevice),
+          "setting INPUT1 data in GPU memory");
+    } else {
+      void* dst;
+      FAIL_IF_CUDA_ERR(
+          cudaHostAlloc(&dst, input0_size, cudaHostAllocPortable),
+          "allocating pinned memory for INPUT0 data");
+      input0_gpu.reset(dst);
+      FAIL_IF_CUDA_ERR(
+          cudaMemcpy(dst, &input0_data[0], input0_size, cudaMemcpyHostToHost),
+          "setting INPUT0 data in pinned memory");
+      FAIL_IF_CUDA_ERR(
+          cudaHostAlloc(&dst, input1_size, cudaHostAllocPortable),
+          "allocating pinned memory for INPUT1 data");
+      input1_gpu.reset(dst);
+      FAIL_IF_CUDA_ERR(
+          cudaMemcpy(dst, &input1_data[0], input1_size, cudaMemcpyHostToHost),
+          "setting INPUT1 data in pinned memory");
+    }
   }
 
-  input0_base = use_gpu_memory ? input0_gpu.get() : &input0_data[0];
-  input1_base = use_gpu_memory ? input1_gpu.get() : &input1_data[0];
-  memory_type = use_gpu_memory ? TRTSERVER_MEMORY_GPU : TRTSERVER_MEMORY_CPU;
+  input0_base = use_cuda_memory ? input0_gpu.get() : &input0_data[0];
+  input1_base = use_cuda_memory ? input1_gpu.get() : &input1_data[0];
 #endif  // TRTIS_ENABLE_GPU
 
   FAIL_IF_ERR(
@@ -649,8 +751,8 @@ main(int argc, char** argv)
 
   // Modify some input data in place and then reuse the request
   // object. For simplicity we only do this when the input tensors are
-  // in CPU memory.
-  if (!use_gpu_memory) {
+  // in non-pinned system memory.
+  if (!enforce_memory_type || (requested_memory_type == TRTSERVER_MEMORY_CPU)) {
     if (is_int) {
       int32_t* input0_base = reinterpret_cast<int32_t*>(&input0_data[0]);
       input0_base[0] = 27;
