@@ -275,6 +275,13 @@ AutoFillSavedModel::Create(
   std::set<std::string> savedmodel_dirs;
   RETURN_IF_ERROR(GetDirectorySubdirs(version_path, &savedmodel_dirs));
 
+  if (savedmodel_dirs.empty()) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name +
+            "', unable to find savedmodel directory.");
+  }
+
   std::string savedmodel_dir;
   TRTISTF_Error* err = nullptr;
   TRTISTF_Model* trtistf_model;
