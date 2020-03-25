@@ -82,10 +82,9 @@ if __name__ == '__main__':
     results = test_infer("simple", input0_data, input1_data)
     print(results.get_response())
 
-    # Get the output arrays from the results
+    # Validate the results by comparing with precomputed values.
     output0_data = results.as_numpy('OUTPUT0')
     output1_data = results.as_numpy('OUTPUT1')
-
     for i in range(16):
         print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
                 str(output0_data[0][i]))
@@ -97,7 +96,7 @@ if __name__ == '__main__':
         if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
             print("sync infer error: incorrect difference")
             sys.exit(1)
-        print('PASS: infer')
+    print('PASS: infer')
 
     # Infer with incorrect model name
     response = test_infer("wrong model name", input0_data, input1_data).get_response()
