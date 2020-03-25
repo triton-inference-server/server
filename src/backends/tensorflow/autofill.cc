@@ -271,14 +271,19 @@ AutoFillSavedModel::Create(
   // directories.
   const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
 
-  // There must be a single savedmodel directory within the version
-  // directory...
+  // There can be multiple savedmodel directories so we try each...
   std::set<std::string> savedmodel_dirs;
   RETURN_IF_ERROR(GetDirectorySubdirs(version_path, &savedmodel_dirs));
 
-  bool found = false;
+  if (savedmodel_dirs.empty()) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name +
+            "', unable to find savedmodel directory.");
+  }
+
   std::string savedmodel_dir;
-  TRTISTF_Error* err;
+  TRTISTF_Error* err = nullptr;
   TRTISTF_Model* trtistf_model;
 
   for (auto dir : savedmodel_dirs) {
@@ -303,16 +308,16 @@ AutoFillSavedModel::Create(
     RETURN_IF_ERROR(DestroyFileFolder(local_savedmodel_path));
     if (err == nullptr) {
       savedmodel_dir = dir;
-      found = true;
       break;
     }
   }
 
-  if (!found) {
+  if (err != nullptr) {
+    std::string msg((err->msg_ == nullptr) ? "<unknown>" : err->msg_);
+    TRTISTF_ErrorDelete(err);
     return Status(
         RequestStatusCode::INTERNAL,
-        "unable to autofill for '" + model_name +
-            "', unable to find savedmodel directory.");
+        "unable to autofill for '" + model_name + "': " + msg);
   }
 
   autofill->reset(
