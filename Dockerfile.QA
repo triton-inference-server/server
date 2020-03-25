@@ -79,6 +79,7 @@ RUN mkdir -p qa/common && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_grpc_v2/models && \
     cp -r /workspace/docs/examples/model_repository/simple_string qa/L0_grpc_v2/models && \
     cp -r /workspace/docs/examples/model_repository/inception_graphdef qa/L0_grpc_v2/models && \
+    mkdir qa/L0_http_v2/models && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_http_v2/models && \
     cp /opt/tritonserver/bin/simple qa/L0_simple_lib/. && \
     cp /opt/tritonserver/bin/simplev2 qa/L0_simple_lib/. && \
