@@ -49,7 +49,7 @@ rm -f *.log.*
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS="--model-repository=$DATADIR --api-version 2"
 source ../common/util.sh
 

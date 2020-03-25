@@ -75,7 +75,7 @@ container so the tests will be able to access them::
 
   $ nvidia-docker run -it --rm -v/tmp:/data/inferenceserver tritonserver_qa
 
-Within the container the QA tests are in /opt/tensorrtserver/qa. To run a test::
+Within the container the QA tests are in /opt/tritonserver/qa. To run a test::
 
   $ cd <test directory>
   $ ./test.sh

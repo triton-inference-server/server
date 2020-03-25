@@ -81,9 +81,9 @@ RUN mkdir -p qa/common && \
     cp -r /workspace/docs/examples/model_repository/inception_graphdef qa/L0_grpc_v2/models && \
     mkdir qa/L0_http_v2/models && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_http_v2/models && \
-    cp /opt/tensorrtserver/bin/simple qa/L0_simple_lib/. && \
-    cp /opt/tensorrtserver/bin/simplev2 qa/L0_simple_lib/. && \
-    cp /opt/tensorrtserver/bin/memory_alloc qa/L0_io/. && \
+    cp /opt/tritonserver/bin/simple qa/L0_simple_lib/. && \
+    cp /opt/tritonserver/bin/simplev2 qa/L0_simple_lib/. && \
+    cp /opt/tritonserver/bin/memory_alloc qa/L0_io/. && \
     cp /workspace/builddir/trtis-test-utils/install/bin/memory_test qa/L0_memory/.
 
 RUN cp /workspace/builddir/trtis-test-utils/install/bin/caffe2plan qa/common/.
@@ -266,16 +266,16 @@ RUN rm -f /usr/bin/python && \
 
 RUN pip3 install --upgrade numpy pillow future grpcio requests gsutil awscli six
 
-# CI expects tests in /opt/tensorrtserver/qa. The tensorrt-server
-# (1000) user should own all artifacts in case CI is run using
-# tensorrt-server user.
-WORKDIR /opt/tensorrtserver
+# CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
+# user should own all artifacts in case CI is run using triton-server
+# user.
+WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 --from=cbe /workspace/qa/ qa/
 
 # Remove CI tests that are meant to run only on build image and
-# install the tensorrtserver/triton python client APIs.
+# install the tritonserver/triton python client APIs.
 RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
     pip3 install --upgrade qa/pkgs/tensorrtserver*.whl && \
     pip3 install --upgrade qa/pkgs/triton*.whl
 
-ENV LD_LIBRARY_PATH /opt/tensorrtserver/qa/clients:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}

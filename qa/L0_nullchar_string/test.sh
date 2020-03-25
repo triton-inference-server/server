@@ -41,7 +41,7 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
 NULLCHAR_CLIENT_PY=nullchar_string_client.py
 CLIENT_LOG="./client.log"
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS=--model-repository=$DATADIR
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

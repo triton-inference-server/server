@@ -45,7 +45,7 @@ DATADIR="./models"
 rm -rf ${DATADIR} 
 mkdir -p ${DATADIR}
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS="--log-verbose=1 --model-repository=$DATADIR"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

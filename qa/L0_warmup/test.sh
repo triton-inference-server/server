@@ -44,7 +44,7 @@ IMAGE="../images/vulture.jpeg"
 
 DATADIR=`pwd`/models
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1 --exit-timeout-secs=120"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

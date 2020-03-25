@@ -48,7 +48,7 @@ export CUDA_VISIBLE_DEVICES=0,1
 
 # Must explicitly set LD_LIBRARY_PATH so that IO_TEST_UTIL can find
 # libtrtserver.so.
-LD_LIBRARY_PATH=/opt/tensorrtserver/lib:$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH
 
 rm -f $CLIENT_LOG.*
 

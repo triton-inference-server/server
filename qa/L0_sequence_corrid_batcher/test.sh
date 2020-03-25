@@ -40,7 +40,7 @@ BATCHER_TEST=sequence_corrid_batcher_test.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 source ../common/util.sh
 
 RET=0

@@ -42,7 +42,7 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}
 CLIENT_LOG="./client.log"
 TFTRT_OPTIMIZATION_TEST=tftrt_optimization_test.py
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --exit-on-error=false"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

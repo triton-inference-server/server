@@ -42,7 +42,7 @@ LC_TEST=lifecycle_test.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 source ../common/util.sh
 
 RET=0

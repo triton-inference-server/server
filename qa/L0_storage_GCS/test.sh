@@ -48,7 +48,7 @@ BUCKET_URL="gs://bucket"
 BUCKET_URL=${BUCKET_URL%/}
 BUCKET_URL_SLASH="${BUCKET_URL}/"
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 SERVER_TIMEOUT=360
 
 SERVER_LOG_BASE="./inference_server"

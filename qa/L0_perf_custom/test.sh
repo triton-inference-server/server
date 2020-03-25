@@ -43,7 +43,7 @@ APIS="async sync"
 CONCURRENCIES="1 8"
 TENSOR_SIZES="16384 16777216"
 
-SERVER=/opt/tensorrtserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/trtserver
 source ../common/util.sh
 
 # Select the single GPU that will be available to the inference server
