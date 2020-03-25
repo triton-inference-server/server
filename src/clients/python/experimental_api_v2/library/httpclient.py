@@ -222,7 +222,9 @@ class InferenceServerClient:
         """
 
         request_uri = "v2/health/live"
-        response = self._get(request_uri, headers, query_params)
+        response = self._get(request_uri=request_uri,
+                             headers=headers,
+                             query_params=query_params)
 
         return response.status_code == 200
 
@@ -250,7 +252,9 @@ class InferenceServerClient:
 
         """
         request_uri = "v2/health/ready"
-        response = self._get(request_uri, headers, query_params)
+        response = self._get(request_uri=request_uri,
+                             headers=headers,
+                             query_params=query_params)
 
         return response.status_code == 200
 
@@ -293,7 +297,9 @@ class InferenceServerClient:
             request_uri = "v2/models/{}/versions/{}/ready".format(
                 quote(model_name), model_version)
 
-        response = self._get(request_uri, headers, query_params)
+        response = self._get(request_uri=request_uri,
+                             headers=headers,
+                             query_params=query_params)
         return response.status_code == 200
 
     def get_server_metadata(self, headers=None, query_params=None):
@@ -315,12 +321,14 @@ class InferenceServerClient:
 
         Raises
         ------
-        Exception
+        InferenceServerException
             If unable to get server metadata.
 
         """
         request_uri = "v2"
-        response = self._get(request_uri, headers, query_params)
+        response = self._get(request_uri=request_uri,
+                             headers=headers,
+                             query_params=query_params)
         _raise_if_error(response)
         metadata = json.loads(response.read())
 
@@ -355,7 +363,7 @@ class InferenceServerClient:
 
         Raises
         ------
-        Exception
+        InferenceServerException
             If unable to get model metadata.
 
         """
@@ -365,11 +373,410 @@ class InferenceServerClient:
             request_uri = "v2/models/{}/versions/{}".format(
                 quote(model_name), model_version)
 
-        response = self._get(request_uri, headers, query_params)
+        response = self._get(request_uri=request_uri,
+                             headers=headers,
+                             query_params=query_params)
         _raise_if_error(response)
         metadata = json.loads(response.read())
 
         return metadata
+
+    def get_model_config(self,
+                         model_name,
+                         model_version="",
+                         headers=None,
+                         query_params=None):
+        """Contact the inference server and get the configuration for specified model.
+
+        Parameters
+        ----------
+        model_name: str
+            The name of the model
+        model_version: str
+            The version of the model to get configuration. The default value
+            is an empty string which means then the server will choose
+            a version based on the model and internal policy.
+        headers: dict
+            Optional dictionary specifying additional
+            HTTP headers to include in the request
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction 
+        
+
+        Returns
+        -------
+        dict
+            The JSON dict holding the model config.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to get model configuration.
+
+        """
+        if not model_version:
+            request_uri = "v2/models/{}/config".format(quote(model_name))
+        else:
+            request_uri = "v2/models/{}/versions/{}/config".format(
+                quote(model_name), model_version)
+
+        response = self._get(request_uri=request_uri,
+                             headers=headers,
+                             query_params=query_params)
+        _raise_if_error(response)
+        config = json.loads(response.read())
+
+        return config
+
+    def get_model_repository_index(self, headers=None, query_params=None):
+        """Get the index of model repository contents
+
+        Parameters
+        ----------
+        headers: dict
+            Optional dictionary specifying additional
+            HTTP headers to include in the request
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction 
+
+        Returns
+        -------
+        dict
+            The JSON dict holding the model repository index.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to get the repository index.
+
+        """
+        request_uri = "v2/repository/index"
+        response = self._get(request_uri=request_uri,
+                             headers=headers,
+                             query_params=query_params)
+        _raise_if_error(response)
+        index = json.loads(response.read())
+
+        return index
+
+    def load_model(self, model_name, headers=None, query_params=None):
+        """Request the inference server to load or reload specified model.
+
+        Parameters
+        ----------
+        model_name : str
+            The name of the model to be loaded.
+        headers: dict
+            Optional dictionary specifying additional
+            HTTP headers to include in the request
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction 
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to load the model.
+
+        """
+        request_uri = "v2/repository/model/{}/load".format(model_name)
+        response = self._post(request_uri=request_uri,
+                              request_body="",
+                              headers=headers,
+                              query_params=query_params)
+        _raise_if_error(response)
+
+    def unload_model(self, model_name, headers=None, query_params=None):
+        """Request the inference server to unload specified model.
+
+        Parameters
+        ----------
+        model_name : str
+            The name of the model to be unloaded.
+        headers: dict
+            Optional dictionary specifying additional
+            HTTP headers to include in the request
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction 
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to unload the model.
+
+        """
+        request_uri = "v2/repository/model/{}/unload".format(model_name)
+        response = self._post(request_uri=request_uri,
+                              request_body="",
+                              headers=headers,
+                              query_params=query_params)
+        _raise_if_error(response)
+
+    def get_system_shared_memory_status(self,
+                                        region_name="",
+                                        headers=None,
+                                        query_params=None):
+        """Request system shared memory status from the server.
+
+        Parameters
+        ----------
+        region_name : str
+            The name of the region to query status. The default
+            value is an empty string, which means that the status
+            of all active system shared memory will be returned.
+        headers: dict
+            Optional dictionary specifying additional
+            HTTP headers to include in the request
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction 
+
+        Returns
+        -------
+        dict
+            The JSON dict holding system shared memory status.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to get the status of specified shared memory.
+
+        """
+        if not region_name:
+            request_uri = "v2/systemsharedmemory/status"
+        else:
+            request_uri = "v2/systemsharedmemory/region/{}/status".format(
+                region_name)
+
+        response = self._get(request_uri=request_uri,
+                             headers=headers,
+                             query_params=query_params)
+        _raise_if_error(response)
+        status = json.loads(response.read())
+
+        return status
+
+    def register_system_shared_memory(self,
+                                      name,
+                                      key,
+                                      byte_size,
+                                      offset=0,
+                                      headers=None,
+                                      query_params=None):
+        """Request the server to register a system shared memory with the
+        following specification.
+
+        Parameters
+        ----------
+        name : str
+            The name of the region to register.
+        key : str 
+            The key of the underlying memory object that contains the
+            system shared memory region.
+        byte_size : int
+            The size of the system shared memory region, in bytes.
+        offset : int
+            Offset, in bytes, within the underlying memory object to
+            the start of the system shared memory region. The default
+            value is zero.
+        headers: dict
+            Optional dictionary specifying additional
+            HTTP headers to include in the request
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction 
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to register the specified system shared memory.     
+
+        """
+        request_uri = "v2/systemsharedmemory/region/{}/register".format(name)
+
+        register_request = {
+            'key': key,
+            'offset': offset,
+            'byte_size': byte_size
+        }
+        request_body = json.dumps(register_request)
+
+        response = self._post(request_uri=request_uri,
+                              request_body=request_body,
+                              headers=headers,
+                              query_params=query_params)
+        _raise_if_error(response)
+
+    def unregister_system_shared_memory(self,
+                                        name="",
+                                        headers=None,
+                                        query_params=None):
+        """Request the server to unregister a system shared memory with the
+        specified name.
+
+        Parameters
+        ----------
+        name : str
+            The name of the region to unregister. The default value is empty
+            string which means all the system shared memory regions will be
+            unregistered.
+        headers: dict
+            Optional dictionary specifying additional
+            HTTP headers to include in the request
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction 
+        
+        Raises
+        ------
+        InferenceServerException
+            If unable to unregister the specified system shared memory region.
+
+        """
+        if not name:
+            request_uri = "v2/systemsharedmemory/unregister"
+        else:
+            request_uri = "v2/systemsharedmemory/region/{}/unregister".format(
+                name)
+
+        response = self._post(request_uri=request_uri,
+                              request_body="",
+                              headers=headers,
+                              query_params=query_params)
+        _raise_if_error(response)
+
+    def get_cuda_shared_memory_status(self,
+                                      region_name="",
+                                      headers=None,
+                                      query_params=None):
+        """Request cuda shared memory status from the server.
+
+        Parameters
+        ----------
+        region_name : str
+            The name of the region to query status. The default
+            value is an empty string, which means that the status
+            of all active cuda shared memory will be returned.
+        headers: dict
+            Optional dictionary specifying additional
+            HTTP headers to include in the request
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction 
+
+        Returns
+        -------
+        dict 
+            The JSON dict holding cuda shared memory status.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to get the status of specified shared memory.
+
+        """
+        if not region_name:
+            request_uri = "v2/cudasharedmemory/status"
+        else:
+            request_uri = "v2/cudasharedmemory/region/{}/status".format(
+                region_name)
+
+        response = self._get(request_uri=request_uri,
+                             headers=headers,
+                             query_params=query_params)
+        _raise_if_error(response)
+        status = json.loads(response.read())
+
+        return status
+
+    def register_cuda_shared_memory(self,
+                                    name,
+                                    raw_handle,
+                                    device_id,
+                                    byte_size,
+                                    headers=None,
+                                    query_params=None):
+        """Request the server to register a system shared memory with the
+        following specification.
+
+        Parameters
+        ----------
+        name : str
+            The name of the region to register.
+        raw_handle : bytes 
+            The raw serialized cudaIPC handle in base64 encoding.
+        device_id : int
+            The GPU device ID on which the cudaIPC handle was created.
+        byte_size : int
+            The size of the cuda shared memory region, in bytes.
+        headers: dict
+            Optional dictionary specifying additional
+            HTTP headers to include in the request
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction 
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to register the specified cuda shared memory.     
+
+        """
+        request_uri = "v2/cudasharedmemory/region/{}/register".format(name)
+
+        register_request = {
+            'raw_handle': raw_handle,
+            'device_id': device_id,
+            'byte_size': byte_size
+        }
+        request_body = json.dumps(register_request)
+
+        response = self._post(request_uri=request_uri,
+                              request_body=request_body,
+                              headers=headers,
+                              query_params=query_params)
+        _raise_if_error(response)
+
+    def unregister_cuda_shared_memory(self,
+                                      name="",
+                                      headers=None,
+                                      query_params=None):
+        """Request the server to unregister a cuda shared memory with the
+        specified name.
+
+        Parameters
+        ----------
+        name : str
+            The name of the region to unregister. The default value is empty
+            string which means all the cuda shared memory regions will be
+            unregistered.
+        headers: dict
+            Optional dictionary specifying additional
+            HTTP headers to include in the request
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction 
+        
+        Raises
+        ------
+        InferenceServerException
+            If unable to unregister the specified cuda shared memory region.
+
+        """
+        if not name:
+            request_uri = "v2/cudasharedmemory/unregister"
+        else:
+            request_uri = "v2/cudasharedmemory/region/{}/unregister".format(
+                name)
+
+        response = self._post(request_uri=request_uri,
+                              request_body="",
+                              headers=headers,
+                              query_params=query_params)
+        _raise_if_error(response)
 
     def infer(self,
               inputs,
@@ -442,7 +849,10 @@ class InferenceServerClient:
             request_uri = "v2/models/{}/versions/{}/infer".format(
                 quote(model_name), model_version)
 
-        response = self._post(request_uri, request_body, headers, query_params)
+        response = self._post(request_uri=request_uri,
+                              request_body=request_body,
+                              headers=headers,
+                              query_params=query_params)
         result = InferResult(response.read())
 
         return result

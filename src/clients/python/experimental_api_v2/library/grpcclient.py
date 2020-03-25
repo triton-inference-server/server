@@ -357,7 +357,7 @@ class InferenceServerClient:
         -------
         dict or protobuf message 
             The JSON dict or SystemSharedMemoryStatusResponse message holding
-            the metadata.
+            the system shared memory status.
 
         Raises
         ------
@@ -450,7 +450,7 @@ class InferenceServerClient:
         -------
         dict or protobuf message 
             The JSON dict or CudaSharedMemoryStatusResponse message holding
-            the metadata.
+            the cuda shared memory status.
 
         Raises
         ------
