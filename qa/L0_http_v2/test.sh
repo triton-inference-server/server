@@ -43,6 +43,7 @@ RET=0
 
 SIMPLE_HEALTH_CLIENT=../clients/simple_http_v2_health_metadata.py
 SIMPLE_INFER_CLIENT=../clients/simple_http_v2_infer_client.py
+SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_http_v2_async_infer_client.py
 
 rm -f *.log
 rm -f *.log.*
@@ -73,6 +74,7 @@ fi
 
 for i in \
         $SIMPLE_INFER_CLIENT \
+        $SIMPLE_ASYNC_INFER_CLIENT \
         ; do
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"

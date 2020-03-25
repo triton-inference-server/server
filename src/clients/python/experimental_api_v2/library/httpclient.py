@@ -321,7 +321,7 @@ class InferenceServerClient:
         """
         request_uri = "v2"
         response = self._get(request_uri, headers, query_params)
-        raise_if_error(response)
+        _raise_if_error(response)
         metadata = json.loads(response.read())
 
         return metadata
@@ -366,7 +366,7 @@ class InferenceServerClient:
                 quote(model_name), model_version)
 
         response = self._get(request_uri, headers, query_params)
-        raise_if_error(response)
+        _raise_if_error(response)
         metadata = json.loads(response.read())
 
         return metadata
