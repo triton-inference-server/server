@@ -50,6 +50,10 @@ class PlanBackend : public InferenceBackend {
       uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
       std::function<void(Status)> OnCompleteQueuedPayloads) override;
 
+  void WarmUp(
+      uint32_t runner_idx, const WarmupData& sample,
+      std::function<void(Status)> OnCompleteWarmup) override;
+
   // Create a context for execution for each instance for the
   // serialized plans specified in 'models'.
   Status CreateExecutionContexts(
