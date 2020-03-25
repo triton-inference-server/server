@@ -26,9 +26,9 @@
 
 #include "src/backends/tensorrt/plan_backend.h"
 
-#include <future>
 #include <NvInfer.h>
 #include <stdint.h>
+#include <future>
 #include "src/backends/tensorrt/loader.h"
 #include "src/backends/tensorrt/plan_utils.h"
 #include "src/core/constants.h"
@@ -1527,7 +1527,8 @@ PlanBackend::WarmUp(
     // Duplicate payloads to match batch size requirement.
     for (size_t idx = 0; idx < sample.batch_size_; idx++) {
       std::shared_ptr<InferRequestProvider> request_provider;
-      status = InferRequestProvider::Create(sample.irequest_, &request_provider);
+      status =
+          InferRequestProvider::Create(sample.irequest_, &request_provider);
       if (status.IsOk()) {
         status = request_provider->AddInputOverrides(sample.input_override_);
       }

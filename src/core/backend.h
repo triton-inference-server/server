@@ -111,7 +111,7 @@ class InferenceBackend {
     std::unique_ptr<AllocatedMemory> random_data_;
     std::vector<std::string> provided_data_;
   };
-  
+
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
   virtual void Run(
