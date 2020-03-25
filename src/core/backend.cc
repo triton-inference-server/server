@@ -141,27 +141,16 @@ InferenceBackend::SetConfiguredScheduler(
     RETURN_IF_ERROR(GenerateWarmupData(&samples));
   }
 
-  // [DLIS-1001] Assumption on runner tied to instance is not longer valid
   auto OnWarmup = [this, &samples](uint32_t runner_idx) -> Status {
     for (const auto& sample : samples) {
       LOG_VERBOSE(1) << "model '" << sample.irequest_->ModelName()
                      << "' instance " << std::to_string(runner_idx)
                      << " is running warmup sample '" << sample.sample_name_
                      << "'";
-      std::vector<Scheduler::Payload> payloads;
-      // Duplicate payloads to match batch size requirement.
-      for (size_t idx = 0; idx < sample.batch_size_; idx++) {
-        std::shared_ptr<InferRequestProvider> request_provider;
-        RETURN_IF_ERROR(
-            InferRequestProvider::Create(sample.irequest_, &request_provider));
-        RETURN_IF_ERROR(
-            request_provider->AddInputOverrides(sample.input_override_));
-        payloads.emplace_back(nullptr, request_provider, nullptr, nullptr);
-      }
 
       std::promise<Status> warmup_promise;
       auto warmup_future = warmup_promise.get_future();
-      Run(runner_idx, &payloads, [&warmup_promise](Status status) {
+      WarmUp(runner_idx, sample, [&warmup_promise](Status status) {
         warmup_promise.set_value(status);
       });
       RETURN_IF_ERROR(warmup_future.get());
@@ -286,6 +275,32 @@ InferenceBackend::Run(
 #endif  // TRTIS_ENABLE_STATS
 
   OnCompleteQueuedPayloads(status);
+}
+
+void
+InferenceBackend::WarmUp(
+    uint32_t runner_idx, const WarmupData& sample,
+    std::function<void(Status)> OnCompleteWarmup)
+{
+  std::vector<Scheduler::Payload> payloads;
+  // Duplicate payloads to match batch size requirement.
+  for (size_t idx = 0; idx < sample.batch_size_; idx++) {
+    std::shared_ptr<InferRequestProvider> request_provider;
+    auto status =
+        InferRequestProvider::Create(sample.irequest_, &request_provider);
+    if (status.IsOk()) {
+      status = request_provider->AddInputOverrides(sample.input_override_);
+    }
+    if (status.IsOk()) {
+      payloads.emplace_back(nullptr, request_provider, nullptr, nullptr);
+    } else {
+      OnCompleteWarmup(status);
+      return;
+    }
+  }
+
+  // Unless necessary, simply invoke Run()
+  Run(runner_idx, &payloads, OnCompleteWarmup);
 }
 
 Status

@@ -28,6 +28,7 @@
 
 #include <NvInfer.h>
 #include <stdint.h>
+#include <future>
 #include "src/backends/tensorrt/loader.h"
 #include "src/backends/tensorrt/plan_utils.h"
 #include "src/core/constants.h"
@@ -1490,6 +1491,96 @@ PlanBackend::Run(
   // Set the next context to be executed on this runner, will block
   // until there is available context for the runner
   next_context_[runner_idx] = available_context_queue_[runner_idx]->Get();
+}
+
+void
+PlanBackend::WarmUp(
+    uint32_t runner_idx, const WarmupData& sample,
+    std::function<void(Status)> OnCompleteWarmup)
+{
+  // Each runner executes using the corresponding context...
+  if (runner_idx >= available_context_queue_.size()) {
+    OnCompleteWarmup(Status(
+        RequestStatusCode::INTERNAL,
+        "unexpected runner index" + std::to_string(runner_idx) +
+            ", max allowed " +
+            std::to_string(available_context_queue_.size())));
+    return;
+  }
+
+  // Different from Run(), the contexts in available_context_queue_[runner_idx]
+  // also need to be executed
+  //
+  // Exhaust available contexts for the 'runner_idx', and also get
+  // the number of available contexts
+  std::vector<size_t> contexts;
+  while (!available_context_queue_[runner_idx]->Empty()) {
+    contexts.push_back(available_context_queue_[runner_idx]->Get());
+  }
+  contexts.push_back(next_context_[runner_idx]);
+
+  std::vector<std::promise<Status>> completion_promises(contexts.size());
+  Status status;
+  for (size_t idx = 0; idx < contexts.size(); idx++) {
+    // Prepare payloads. A set of payloads is required for each context
+    auto payloads = std::make_shared<std::vector<Scheduler::Payload>>();
+    // Duplicate payloads to match batch size requirement.
+    for (size_t idx = 0; idx < sample.batch_size_; idx++) {
+      std::shared_ptr<InferRequestProvider> request_provider;
+      status =
+          InferRequestProvider::Create(sample.irequest_, &request_provider);
+      if (status.IsOk()) {
+        status = request_provider->AddInputOverrides(sample.input_override_);
+      }
+      if (status.IsOk()) {
+        payloads->emplace_back(nullptr, request_provider, nullptr, nullptr);
+      }
+    }
+
+    // Run context
+    if (status.IsOk()) {
+      status = contexts_[contexts[idx]]->Run(this, payloads.get());
+    }
+
+    // If one of the contexts can't run properly, the whole warmup should abort
+    if (!status.IsOk()) {
+      // Clean up the rest of the contexts back to queue,
+      // the contexts before will be handled by completion function
+      for (auto rest_idx = idx; idx < contexts.size(); idx++) {
+        available_context_queue_[runner_idx]->Put(contexts[rest_idx]);
+        completion_promises[rest_idx].set_value(status);
+      }
+      break;
+    }
+
+    // Place in completion queue
+    auto context = static_cast<Context*>(contexts_[contexts[idx]].get());
+    auto event_set_idx = context->next_set_;
+    context->next_set_ = (event_set_idx + 1) % context->EVENT_SET_COUNT;
+    auto outputs = std::make_shared<std::vector<OutputInfo>>();
+    outputs->swap(context->outputs_);
+    auto& completion_promise = completion_promises[idx];
+
+    context->completion_queue_.Put(std::make_tuple(
+        [payloads, &completion_promise](Status status) {
+          completion_promise.set_value(status);
+        },
+        payloads.get(), event_set_idx, std::move(outputs)));
+  }
+
+  // Wait for all inflight executions to be finished.
+  for (auto& completion_promise : completion_promises) {
+    auto completion_status = completion_promise.get_future().get();
+    if (!completion_status.IsOk()) {
+      status = completion_status;
+    }
+  }
+
+  // Need to reset the next context to be executed on this runner
+  // as all contexts are in the queue at this point
+  next_context_[runner_idx] = available_context_queue_[runner_idx]->Get();
+
+  OnCompleteWarmup(status);
 }
 
 Status

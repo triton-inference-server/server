@@ -60,7 +60,7 @@ rm -fr models && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_float16_float16_float16 models/. && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/graphdef_sequence_float32 models/.
 
-# random / zero data
+# 2 instances per device with random / zero data
 #
 # Provide warmup instruction (batch size 1) in model config
 (cd models/graphdef_float16_float16_float16 && \
@@ -331,6 +331,55 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Test TensorRT model as its warmup function is different from other backends
+# Use the addsub models as example.
+rm -fr models && \
+    mkdir models && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/plan_float16_float16_float16 models/.
+
+# 4 instances per device with random / zero data
+(cd models/plan_float16_float16_float16 && \
+    echo "instance_group [ { count: 4 }]" >> config.pbtxt && \
+    echo 'model_warmup [{' >> config.pbtxt && \
+    echo '    name : "trt sample"' >> config.pbtxt && \
+    echo '    batch_size: 1' >> config.pbtxt && \
+    echo '    inputs {' >> config.pbtxt && \
+    echo '        key: "INPUT0"' >> config.pbtxt && \
+    echo '        value: {' >> config.pbtxt && \
+    echo '            data_type: TYPE_FP16' >> config.pbtxt && \
+    echo '            dims: 16' >> config.pbtxt && \
+    echo '            zero_data: true' >> config.pbtxt && \
+    echo '        }' >> config.pbtxt && \
+    echo '    }' >> config.pbtxt && \
+    echo '    inputs {' >> config.pbtxt && \
+    echo '        key: "INPUT1"' >> config.pbtxt && \
+    echo '        value: {' >> config.pbtxt && \
+    echo '            data_type: TYPE_FP16' >> config.pbtxt && \
+    echo '            dims: 16' >> config.pbtxt && \
+    echo '            random_data: true' >> config.pbtxt && \
+    echo '        }' >> config.pbtxt && \
+    echo '    }' >> config.pbtxt && \
+    echo '}]' >> config.pbtxt )
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+grep "is running warmup sample 'trt sample'" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected warmup for stateless model\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
