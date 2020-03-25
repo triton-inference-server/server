@@ -481,7 +481,7 @@ class InferenceServerClient:
             If unable to load the model.
 
         """
-        request_uri = "v2/repository/model/{}/load".format(model_name)
+        request_uri = "v2/repository/model/{}/load".format(quote(model_name))
         response = self._post(request_uri=request_uri,
                               request_body="",
                               headers=headers,
@@ -508,7 +508,7 @@ class InferenceServerClient:
             If unable to unload the model.
 
         """
-        request_uri = "v2/repository/model/{}/unload".format(model_name)
+        request_uri = "v2/repository/model/{}/unload".format(quote(model_name))
         response = self._post(request_uri=request_uri,
                               request_body="",
                               headers=headers,
@@ -549,7 +549,7 @@ class InferenceServerClient:
             request_uri = "v2/systemsharedmemory/status"
         else:
             request_uri = "v2/systemsharedmemory/region/{}/status".format(
-                region_name)
+                quote(region_name))
 
         response = self._get(request_uri=request_uri,
                              headers=headers,
@@ -595,7 +595,7 @@ class InferenceServerClient:
             If unable to register the specified system shared memory.     
 
         """
-        request_uri = "v2/systemsharedmemory/region/{}/register".format(name)
+        request_uri = "v2/systemsharedmemory/region/{}/register".format(quote(name))
 
         register_request = {
             'key': key,
@@ -640,7 +640,7 @@ class InferenceServerClient:
             request_uri = "v2/systemsharedmemory/unregister"
         else:
             request_uri = "v2/systemsharedmemory/region/{}/unregister".format(
-                name)
+                quote(name))
 
         response = self._post(request_uri=request_uri,
                               request_body="",
@@ -682,7 +682,7 @@ class InferenceServerClient:
             request_uri = "v2/cudasharedmemory/status"
         else:
             request_uri = "v2/cudasharedmemory/region/{}/status".format(
-                region_name)
+                quote(region_name))
 
         response = self._get(request_uri=request_uri,
                              headers=headers,
@@ -725,7 +725,7 @@ class InferenceServerClient:
             If unable to register the specified cuda shared memory.     
 
         """
-        request_uri = "v2/cudasharedmemory/region/{}/register".format(name)
+        request_uri = "v2/cudasharedmemory/region/{}/register".format(quote(name))
 
         register_request = {
             'raw_handle': raw_handle,
@@ -770,7 +770,7 @@ class InferenceServerClient:
             request_uri = "v2/cudasharedmemory/unregister"
         else:
             request_uri = "v2/cudasharedmemory/region/{}/unregister".format(
-                name)
+                quote(name))
 
         response = self._post(request_uri=request_uri,
                               request_body="",
