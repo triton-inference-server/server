@@ -55,7 +55,7 @@ if __name__ == '__main__':
     model_name = 'simple'
 
     # Health
-    if triton_client.is_server_live():
+    if triton_client.is_server_live(headers={'test': '1', 'dummy': '2'}):
         print("PASS: is_server_live")
 
     if triton_client.is_server_ready():
@@ -69,7 +69,11 @@ if __name__ == '__main__':
     if (metadata.name == 'inference:0'):
         print("PASS: get_server_metadata")
 
-    metadata = triton_client.get_model_metadata(model_name)
+    metadata = triton_client.get_model_metadata(model_name,
+                                                headers={
+                                                    'test': '1',
+                                                    'dummy': '2'
+                                                })
     if (metadata.name == model_name):
         print("PASS: get_model_metadata")
 

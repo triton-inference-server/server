@@ -89,8 +89,14 @@ class InferenceServerClient:
         """
         self._channel.close()
 
-    def is_server_live(self):
+    def is_server_live(self, headers=None):
         """Contact the inference server and get liveness.
+
+        Parameters
+        ----------
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
 
         Returns
         -------
@@ -103,15 +109,26 @@ class InferenceServerClient:
             If unable to get liveness.
 
         """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.ServerLiveRequest()
-            response = self._client_stub.ServerLive(request)
+            response = self._client_stub.ServerLive(request=request,
+                                                    metadata=metadata)
             return response.live
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def is_server_ready(self):
+    def is_server_ready(self, headers=None):
         """Contact the inference server and get readiness.
+
+        Parameters
+        ----------
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
 
         Returns
         -------
@@ -124,25 +141,32 @@ class InferenceServerClient:
             If unable to get readiness.
 
         """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.ServerReadyRequest()
-            response = self._client_stub.ServerReady(request)
+            response = self._client_stub.ServerReady(request=request,
+                                                     metadata=metadata)
             return response.ready
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def is_model_ready(self, model_name, model_version=""):
+    def is_model_ready(self, model_name, model_version="", headers=None):
         """Contact the inference server and get the readiness of specified model.
 
         Parameters
         ----------
         model_name: str
             The name of the model to check for readiness.
-
         model_version: str
             The version of the model to check for readiness. The default value
             is an empty string which means then the server will choose a version
             based on the model and internal policy.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
 
         Returns
         -------
@@ -155,19 +179,27 @@ class InferenceServerClient:
             If unable to get model readiness.
 
         """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.ModelReadyRequest(
                 name=model_name, version=model_version)
-            response = self._client_stub.ModelReady(request)
+            response = self._client_stub.ModelReady(request=request,
+                                                    metadata=metadata)
             return response.ready
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def get_server_metadata(self, as_json=False):
+    def get_server_metadata(self, headers=None, as_json=False):
         """Contact the inference server and get its metadata.
 
         Parameters
         ----------
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
         as_json : bool
             If True then returns server metadata as a json dict,
             otherwise as a protobuf message. Default value is False.
@@ -184,9 +216,14 @@ class InferenceServerClient:
             If unable to get server metadata.
 
         """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.ServerMetadataRequest()
-            response = self._client_stub.ServerMetadata(request)
+            response = self._client_stub.ServerMetadata(
+                request=request, metadata=metadata)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -194,7 +231,11 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def get_model_metadata(self, model_name, model_version="", as_json=False):
+    def get_model_metadata(self,
+                           model_name,
+                           model_version="",
+                           headers=None,
+                           as_json=False):
         """Contact the inference server and get the metadata for specified model.
 
         Parameters
@@ -205,6 +246,9 @@ class InferenceServerClient:
             The version of the model to get metadata. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
         as_json : bool
             If True then returns model metadata as a json dict, otherwise
             as a protobuf message. Default value is False.
@@ -221,10 +265,15 @@ class InferenceServerClient:
             If unable to get model metadata.
 
         """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.ModelMetadataRequest(
                 name=model_name, version=model_version)
-            response = self._client_stub.ModelMetadata(request)
+            response = self._client_stub.ModelMetadata(request=request,
+                                                       metadata=metadata)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -232,7 +281,11 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def get_model_config(self, model_name, model_version="", as_json=False):
+    def get_model_config(self,
+                         model_name,
+                         model_version="",
+                         headers=None,
+                         as_json=False):
         """Contact the inference server and get the configuration for specified model.
 
         Parameters
@@ -243,6 +296,9 @@ class InferenceServerClient:
             The version of the model to get configuration. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
         as_json : bool
             If True then returns configuration as a json dict, otherwise
             as a protobuf message. Default value is False.
@@ -259,10 +315,15 @@ class InferenceServerClient:
             If unable to get model configuration.
 
         """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.ModelConfigRequest(
                 name=model_name, version=model_version)
-            response = self._client_stub.ModelConfig(request)
+            response = self._client_stub.ModelConfig(request=request,
+                                                     metadata=metadata)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -270,11 +331,14 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def get_model_repository_index(self, as_json=False):
+    def get_model_repository_index(self, headers=None, as_json=False):
         """Get the index of model repository contents
 
         Parameters
         ----------
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
         as_json : bool
             If True then returns model repository index
             as a json dict, otherwise as a protobuf message.
@@ -287,9 +351,14 @@ class InferenceServerClient:
             the model repository index.
 
         """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.RepositoryIndexRequest()
-            response = self._client_stub.RepositoryIndex(request)
+            response = self._client_stub.RepositoryIndex(
+                request=request, metadata=metadata)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -297,13 +366,16 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def load_model(self, model_name):
+    def load_model(self, model_name, headers=None):
         """Request the inference server to load or reload specified model.
 
         Parameters
         ----------
         model_name : str
             The name of the model to be loaded.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
 
         Raises
         ------
@@ -311,20 +383,28 @@ class InferenceServerClient:
             If unable to load the model.
 
         """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.RepositoryModelLoadRequest(
                 model_name=model_name)
-            self._client_stub.RepositoryModelLoad(request)
+            self._client_stub.RepositoryModelLoad(request=request,
+                                                  metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def unload_model(self, model_name):
+    def unload_model(self, model_name, headers=None):
         """Request the inference server to unload specified model.
 
         Parameters
         ----------
         model_name : str
             The name of the model to be unloaded.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
 
         Raises
         ------
@@ -332,14 +412,22 @@ class InferenceServerClient:
             If unable to unload the model.
 
         """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.RepositoryModelUnloadRequest(
                 model_name=model_name)
-            self._client_stub.RepositoryModelUnload(request)
+            self._client_stub.RepositoryModelUnload(request=request,
+                                                    metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def get_system_shared_memory_status(self, region_name="", as_json=False):
+    def get_system_shared_memory_status(self,
+                                        region_name="",
+                                        headers=None,
+                                        as_json=False):
         """Request system shared memory status from the server.
 
         Parameters
@@ -348,6 +436,9 @@ class InferenceServerClient:
             The name of the region to query status. The default
             value is an empty string, which means that the status
             of all active system shared memory will be returned.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
         as_json : bool
             If True then returns system shared memory status as a 
             json dict, otherwise as a protobuf message. Default
@@ -365,11 +456,15 @@ class InferenceServerClient:
             If unable to get the status of specified shared memory.
 
         """
-
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.SystemSharedMemoryStatusRequest(
                 name=region_name)
-            response = self._client_stub.SystemSharedMemoryStatus(request)
+            response = self._client_stub.SystemSharedMemoryStatus(
+                request=request, metadata=metadata)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -377,7 +472,12 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def register_system_shared_memory(self, name, key, byte_size, offset=0):
+    def register_system_shared_memory(self,
+                                      name,
+                                      key,
+                                      byte_size,
+                                      offset=0,
+                                      headers=None):
         """Request the server to register a system shared memory with the
         following specification.
 
@@ -394,6 +494,9 @@ class InferenceServerClient:
             Offset, in bytes, within the underlying memory object to
             the start of the system shared memory region. The default
             value is zero.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
 
         Raises
         ------
@@ -401,14 +504,19 @@ class InferenceServerClient:
             If unable to register the specified system shared memory.     
 
         """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.SystemSharedMemoryRegisterRequest(
                 name=name, key=key, offset=offset, byte_size=byte_size)
-            self._client_stub.SystemSharedMemoryRegister(request)
+            self._client_stub.SystemSharedMemoryRegister(
+                request=request, metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def unregister_system_shared_memory(self, name=""):
+    def unregister_system_shared_memory(self, name="", headers=None):
         """Request the server to unregister a system shared memory with the
         specified name.
 
@@ -418,6 +526,9 @@ class InferenceServerClient:
             The name of the region to unregister. The default value is empty
             string which means all the system shared memory regions will be
             unregistered.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
         
         Raises
         ------
@@ -425,14 +536,22 @@ class InferenceServerClient:
             If unable to unregister the specified system shared memory region.
 
         """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.SystemSharedMemoryUnregisterRequest(
                 name=name)
-            self._client_stub.SystemSharedMemoryUnregister(request)
+            self._client_stub.SystemSharedMemoryUnregister(
+                request=request, metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def get_cuda_shared_memory_status(self, region_name="", as_json=False):
+    def get_cuda_shared_memory_status(self,
+                                      region_name="",
+                                      headers=None,
+                                      as_json=False):
         """Request cuda shared memory status from the server.
 
         Parameters
@@ -441,6 +560,9 @@ class InferenceServerClient:
             The name of the region to query status. The default
             value is an empty string, which means that the status
             of all active cuda shared memory will be returned.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
         as_json : bool
             If True then returns cuda shared memory status as a 
             json dict, otherwise as a protobuf message. Default
@@ -459,10 +581,15 @@ class InferenceServerClient:
 
         """
 
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.CudaSharedMemoryStatusRequest(
                 name=region_name)
-            response = self._client_stub.CudaSharedMemoryStatus(request)
+            response = self._client_stub.CudaSharedMemoryStatus(
+                request=request, metadata=metadata)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -470,8 +597,12 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def register_cuda_shared_memory(self, name, raw_handle, device_id,
-                                    byte_size):
+    def register_cuda_shared_memory(self,
+                                    name,
+                                    raw_handle,
+                                    device_id,
+                                    byte_size,
+                                    headers=None):
         """Request the server to register a system shared memory with the
         following specification.
 
@@ -485,6 +616,9 @@ class InferenceServerClient:
             The GPU device ID on which the cudaIPC handle was created.
         byte_size : int
             The size of the cuda shared memory region, in bytes.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
 
         Raises
         ------
@@ -492,17 +626,22 @@ class InferenceServerClient:
             If unable to register the specified cuda shared memory.     
 
         """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.CudaSharedMemoryRegisterRequest(
                 name=name,
                 raw_handle=base64.b64decode(raw_handle),
                 device_id=device_id,
                 byte_size=byte_size)
-            self._client_stub.CudaSharedMemoryRegister(request)
+            self._client_stub.CudaSharedMemoryRegister(request=request,
+                                                       metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def unregister_cuda_shared_memory(self, name=""):
+    def unregister_cuda_shared_memory(self, name="", headers=None):
         """Request the server to unregister a cuda shared memory with the
         specified name.
 
@@ -512,6 +651,9 @@ class InferenceServerClient:
             The name of the region to unregister. The default value is empty
             string which means all the cuda shared memory regions will be
             unregistered.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
         
         Raises
         ------
@@ -519,10 +661,15 @@ class InferenceServerClient:
             If unable to unregister the specified cuda shared memory region.
 
         """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
         try:
             request = grpc_service_v2_pb2.CudaSharedMemoryUnregisterRequest(
                 name=name)
-            self._client_stub.CudaSharedMemoryUnregister(request)
+            self._client_stub.CudaSharedMemoryUnregister(
+                request=request, metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -532,7 +679,8 @@ class InferenceServerClient:
               model_name,
               model_version="",
               request_id=None,
-              parameters=None):
+              parameters=None,
+              headers=None):
         """Run synchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
 
@@ -557,6 +705,9 @@ class InferenceServerClient:
             will be used.
         parameters: dict
             Optional inference parameters described as key-value pairs.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
 
         Returns
         -------
@@ -570,12 +721,18 @@ class InferenceServerClient:
             If server fails to perform inference.
         """
 
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
+
         request = self._get_inference_request(inputs, outputs, model_name,
                                               model_version, request_id,
                                               parameters)
 
         try:
-            response = self._client_stub.ModelInfer(request)
+            response = self._client_stub.ModelInfer(request=request,
+                                                    metadata=metadata)
             result = InferResult(response)
             return result
         except grpc.RpcError as rpc_error:
@@ -588,7 +745,8 @@ class InferenceServerClient:
                     model_name,
                     model_version="",
                     request_id=None,
-                    parameters=None):
+                    parameters=None,
+                    headers=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
 
@@ -620,6 +778,9 @@ class InferenceServerClient:
             will be used.
         parameters: dict
             Optional inference parameters described as key-value pairs.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
     
         Raises
         ------
@@ -635,12 +796,18 @@ class InferenceServerClient:
                 error = get_error_grpc(rpc_error)
             callback(result=result, error=error)
 
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
+
         request = self._get_inference_request(inputs, outputs, model_name,
                                               model_version, request_id,
                                               parameters)
 
         try:
-            self._call_future = self._client_stub.ModelInfer.future(request)
+            self._call_future = self._client_stub.ModelInfer.future(
+                request=request, metadata=metadata)
             self._call_future.add_done_callback(wrapped_callback)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
