@@ -15,7 +15,9 @@ What version of TRTIS are you using?
 Are you using the TRTIS container or did you build it yourself?
 
 **To Reproduce**
-Steps to reproduce the behavior:
+Steps to reproduce the behavior.
+Describe the models (framework, inputs, outputs), ideally include the model configuration file.
+If using ensemble include the model configuration file.
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.
