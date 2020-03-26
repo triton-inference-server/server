@@ -83,7 +83,7 @@ class DynamicBatchScheduler : public Scheduler {
   // \see Scheduler::Enqueue()
   void Enqueue(
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const std::shared_ptr<InferenceRequest>& request,
       const std::shared_ptr<InferResponseProvider>& response_provider,
       std::function<void(const Status&)> OnComplete) override;
 

@@ -28,6 +28,7 @@
 #include "src/backends/custom/custom.h"
 #include "src/core/backend.h"
 #include "src/core/backend_context.h"
+#include "src/core/infer_request.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
@@ -98,7 +99,14 @@ class CustomBackend : public InferenceBackend {
       }
       CustomBackend::Context* context_;
       Scheduler::Payload* payload_;
-      // Variable for being compatible with V1 interface in the case of GPU I/O
+
+      // Map from input to the buffer index for the tensor data for
+      // that input.
+      std::unordered_map<const InferenceRequest::Input*, size_t>
+          input_data_idx_;
+
+      // Variable for being compatible with V1 interface in the case
+      // of GPU I/O
       std::vector<std::unique_ptr<char[]>> input_buffers_;
       std::vector<std::tuple<void*, std::unique_ptr<char[]>, uint64_t>>
           output_buffers_;

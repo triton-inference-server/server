@@ -327,10 +327,10 @@ CustomBackend::Context::Run(
               name_ + "'");
     }
 
-    const auto& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_;
 
     total_batch_size += irequest->BatchSize();
-    total_inputs += irequest->Inputs().size();
+    total_inputs += irequest->ImmutableInputs().size();
     total_requested_outputs += irequest->RequestedOutputs().size();
   }
 
@@ -384,24 +384,24 @@ CustomBackend::Context::Run(
   // that here.
   std::vector<CustomPayload> custom_payloads;
   for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_;
 
     custom_payloads.emplace_back();
     CustomPayload& custom_payload = custom_payloads.back();
     custom_payload.batch_size = irequest->BatchSize();
 
     // Inputs
-    custom_payload.input_cnt = irequest->Inputs().size();
+    custom_payload.input_cnt = irequest->ImmutableInputs().size();
     custom_payload.input_names = nullptr;
     custom_payload.input_shape_dim_cnts = nullptr;
     custom_payload.input_shape_dims = nullptr;
-    for (const auto& pr : irequest->Inputs()) {
+    for (const auto& pr : irequest->ImmutableInputs()) {
       const auto& input = pr.second;
 
       // If the input has fixed size then use the pre-calculated
       // shape, otherwise must look at the request header to find the
       // specific shape for the input in this payload.
-      auto itr = fixed_input_shapes_.find(input.Name());
+      auto itr = fixed_input_shapes_.find(input->Name());
       if (itr != fixed_input_shapes_.end()) {
         std::unique_ptr<std::vector<int64_t>>& shape = itr->second;
         work_input_dim_cnts.push_back(shape->size());
@@ -411,14 +411,14 @@ CustomBackend::Context::Run(
         // FIXMEV2 should be able to point directly to the shape
         // vectors in InferenceRequest::Input instead of using the
         // intermediate variable_input_shapes.
-        variable_input_shapes.emplace_back(input.Shape());
+        variable_input_shapes.emplace_back(input->Shape());
         const std::vector<int64_t>& vshape = variable_input_shapes.back();
         work_input_dim_cnts.push_back(vshape.size());
         work_input_dims_ptrs.push_back(
             (vshape.size() == 0) ? nullptr : &vshape[0]);
       }
 
-      work_input_name_ptrs.push_back(input.Name().c_str());
+      work_input_name_ptrs.push_back(input->Name().c_str());
       if (custom_payload.input_names == nullptr) {
         custom_payload.input_names = &work_input_name_ptrs.back();
         custom_payload.input_shape_dim_cnts = &work_input_dim_cnts.back();
@@ -559,10 +559,28 @@ CustomBackend::Context::GetNextInput(
   const std::string name(cname);
   Scheduler::Payload* payload = input_context->payload_;
 
-  auto src_memory_type = ToTRTServerMemoryType(*memory_type);
-  Status status = payload->request_provider_->GetNextInputContent(
-      name, content, content_byte_size, &src_memory_type, memory_type_id);
-  *memory_type = ToCustomMemoryType(src_memory_type);
+  const InferenceRequest::Input* rinput;
+  Status status = payload->request_->ImmutableInput(name, &rinput);
+  if (status.IsOk()) {
+    size_t idx = 0;
+
+    const auto& pr =
+        input_context->input_data_idx_.emplace(std::make_pair(rinput, idx));
+    if (!pr.second) {
+      idx = pr.first->second + 1;
+      pr.first->second = idx;
+    }
+
+    if (idx >= rinput->ContentBufferCount()) {
+      *content = nullptr;
+      *content_byte_size = 0;
+    } else {
+      auto src_memory_type = ToTRTServerMemoryType(*memory_type);
+      status = rinput->Content(
+          idx, content, content_byte_size, &src_memory_type, memory_type_id);
+      *memory_type = ToCustomMemoryType(src_memory_type);
+    }
+  }
 
   if (!status.IsOk()) {
     LOG_VERBOSE(1) << status.AsString();

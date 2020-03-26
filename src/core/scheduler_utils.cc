@@ -41,22 +41,22 @@ InitPendingShape(
 {
   pending_batch_shapes->clear();
 
-  const auto& irequest = payload.request_provider_->Request();
-  for (const auto& pr : irequest->Inputs()) {
-    const auto& input = pr.second;
-    const auto itr = enforce_equal_shape_tensors.find(input.Name());
+  const auto& irequest = payload.request_;
+  for (const auto& pr : irequest->ImmutableInputs()) {
+    const InferenceRequest::Input* input = pr.second;
+    const auto itr = enforce_equal_shape_tensors.find(input->Name());
     if (itr != enforce_equal_shape_tensors.end()) {
       std::pair<std::vector<int64_t>, std::vector<int64_t>> shapes;
-      shapes.first = input.Shape();
+      shapes.first = input->Shape();
 
       // For shape tensors must compare the contents of the tensor in
       // addition to the tensor shape itself.
       if (itr->second) {
-        RETURN_IF_ERROR(OnPeek(runner_id, input, payload, &shapes.second));
+        RETURN_IF_ERROR(OnPeek(runner_id, *input, payload, &shapes.second));
       }
 
       pending_batch_shapes->emplace(
-          std::make_pair(input.Name(), std::move(shapes)));
+          std::make_pair(input->Name(), std::move(shapes)));
     }
   }
 
@@ -69,13 +69,13 @@ CompareWithPendingShape(
     const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
     const PendingBatchShapes& pending_batch_shapes)
 {
-  const auto& irequest = payload.request_provider_->Request();
+  const auto& irequest = payload.request_;
 
-  for (const auto& pr : irequest->Inputs()) {
-    const auto& input = pr.second;
-    const auto itr = pending_batch_shapes.find(input.Name());
+  for (const auto& pr : irequest->ImmutableInputs()) {
+    const InferenceRequest::Input* input = pr.second;
+    const auto itr = pending_batch_shapes.find(input->Name());
     if (itr != pending_batch_shapes.end()) {
-      if (!CompareDims(itr->second.first, input.Shape())) {
+      if (!CompareDims(itr->second.first, input->Shape())) {
         return false;
       }
 
@@ -86,7 +86,7 @@ CompareWithPendingShape(
 
         // If fail getting the tensor shape then conservatively return
         // false to indicate that the shapes don't match.
-        if (!OnPeek(runner_id, input, payload, &shape).IsOk()) {
+        if (!OnPeek(runner_id, *input, payload, &shape).IsOk()) {
           return false;
         }
         if (!CompareDims(itr->second.second, shape)) {
@@ -108,8 +108,7 @@ PriorityQueue::PolicyQueue::Enqueue(Scheduler::Payload&& payload)
   queue_.emplace_back(std::move(payload));
   auto timeout_us = default_timeout_us_;
   if (allow_timeout_override_) {
-    auto override_timeout_us =
-        queue_.back().request_provider_->Request()->TimeoutMicroseconds();
+    auto override_timeout_us = queue_.back().request_->TimeoutMicroseconds();
     if (override_timeout_us != 0 && override_timeout_us < timeout_us) {
       timeout_us = override_timeout_us;
     }
@@ -158,8 +157,7 @@ PriorityQueue::PolicyQueue::ApplyPolicy(
         } else {
           rejected_queue_.emplace_back(std::move(queue_[curr_idx]));
           *rejected_count += 1;
-          *rejected_batch_size +=
-              rejected_queue_.back().request_provider_->Request()->BatchSize();
+          *rejected_batch_size += rejected_queue_.back().request_->BatchSize();
         }
         curr_idx++;
       } else {

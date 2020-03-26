@@ -48,12 +48,16 @@ class Memory {
       size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
       int64_t* memory_type_id) const = 0;
 
+  // Get the number of contiguous buffers composing the memory.
+  size_t BufferCount() const { return buffer_count_; }
+
   // Return the total byte size of the data buffer
   size_t TotalByteSize() const { return total_byte_size_; }
 
  protected:
-  Memory() : total_byte_size_(0) {}
+  Memory() : total_byte_size_(0), buffer_count_(0) {}
   size_t total_byte_size_;
+  size_t buffer_count_;
 };
 
 //
@@ -109,11 +113,13 @@ class MutableMemory : public Memory {
       size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
       int64_t* memory_type_id) const override;
 
-  // 'memory_type' returns the memory type of the chunk of bytes.
-  // 'memory_type_id' returns the memory type id of the chunk of bytes.
-  // Return the mutable buffer
+  // Return a pointer to the base address of the mutable buffer. If
+  // non-null 'memory_type' returns the memory type of the chunk of
+  // bytes. If non-null 'memory_type_id' returns the memory type id of
+  // the chunk of bytes.
   char* MutableBuffer(
-      TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
+      TRTSERVER_Memory_Type* memory_type = nullptr,
+      int64_t* memory_type_id = nullptr);
 
   DISALLOW_COPY_AND_ASSIGN(MutableMemory);
 
@@ -131,7 +137,7 @@ class MutableMemory : public Memory {
 class AllocatedMemory : public MutableMemory {
  public:
   // Create a continuous data buffer with 'byte_size', 'memory_type' and
-  // 'memory_tye_id'. Note that the buffer may be created on different memeory
+  // 'memory_type_id'. Note that the buffer may be created on different memeory
   // type and memory type id if the original request type and id can not be
   // satisfied, thus the function caller should always check the actual memory
   // type and memory type id before use.

@@ -72,7 +72,7 @@ class InferenceServer {
   // is returned in the OnCompleteInfer callback.
   void InferAsync(
       const std::shared_ptr<InferenceBackend>& backend,
-      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const std::shared_ptr<InferenceRequest>& request,
       const std::shared_ptr<InferResponseProvider>& response_provider,
       const std::shared_ptr<ModelInferStats>& infer_stats,
       std::function<void(const Status&)> OnCompleteInfer);

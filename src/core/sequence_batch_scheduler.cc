@@ -77,11 +77,11 @@ SequenceBatchScheduler::Create(
   // Based on the model configuration create input tensors for control
   // signals indicating sequence start, sequence continue, and
   // sequence not ready.
-  std::shared_ptr<InferRequestProvider::InputOverrideMap> start;
-  std::shared_ptr<InferRequestProvider::InputOverrideMap> end;
-  std::shared_ptr<InferRequestProvider::InputOverrideMap> startend;
-  std::shared_ptr<InferRequestProvider::InputOverrideMap> cont;
-  std::shared_ptr<InferRequestProvider::InputOverrideMap> notready;
+  std::shared_ptr<ControlInputs> start;
+  std::shared_ptr<ControlInputs> end;
+  std::shared_ptr<ControlInputs> startend;
+  std::shared_ptr<ControlInputs> cont;
+  std::shared_ptr<ControlInputs> notready;
   RETURN_IF_ERROR(sched->CreateBooleanControlTensors(
       config, &start, &end, &startend, &cont, &notready));
 
@@ -149,32 +149,86 @@ SequenceBatchScheduler::~SequenceBatchScheduler()
   }
 }
 
+namespace {
+
+Status
+GetBooleanOverrideInputs(
+    const std::string& tensor_name, const DataType tensor_datatype,
+    const float fp32_false_value, const float fp32_true_value,
+    const int32_t int32_false_value, const int32_t int32_true_value,
+    std::shared_ptr<InferenceRequest::Input>* true_override,
+    std::shared_ptr<InferenceRequest::Input>* false_override)
+{
+  TRTSERVER_Memory_Type memory_type;
+  int64_t memory_type_id;
+
+  const std::vector<int64_t> tensor_shape{1};
+  const size_t size_p = GetDataTypeByteSize(tensor_datatype);
+
+  auto true_p =
+      std::make_shared<AllocatedMemory>(size_p, TRTSERVER_MEMORY_CPU, 0);
+  char* true_p_ptr = true_p->MutableBuffer(&memory_type, &memory_type_id);
+  if ((true_p_ptr == nullptr) ||
+      ((memory_type != TRTSERVER_MEMORY_CPU) &&
+       (memory_type != TRTSERVER_MEMORY_CPU_PINNED)) ||
+      (memory_type_id != 0)) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "failed to allocate sequence control signal in CPU memory");
+  }
+
+  auto false_p =
+      std::make_shared<AllocatedMemory>(size_p, TRTSERVER_MEMORY_CPU, 0);
+  char* false_p_ptr = false_p->MutableBuffer(&memory_type, &memory_type_id);
+  if ((false_p_ptr == nullptr) ||
+      ((memory_type != TRTSERVER_MEMORY_CPU) &&
+       (memory_type != TRTSERVER_MEMORY_CPU_PINNED)) ||
+      (memory_type_id != 0)) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "failed to allocate sequence control signal in CPU memory");
+  }
+
+  if (tensor_datatype == DataType::TYPE_INT32) {
+    *(reinterpret_cast<int32_t*>(true_p_ptr)) = int32_true_value;
+    *(reinterpret_cast<int32_t*>(false_p_ptr)) = int32_false_value;
+  } else {
+    *(reinterpret_cast<float*>(true_p_ptr)) = fp32_true_value;
+    *(reinterpret_cast<float*>(false_p_ptr)) = fp32_false_value;
+  }
+
+  auto ltrue_override = std::make_shared<InferenceRequest::Input>(
+      tensor_name, tensor_datatype, tensor_shape, size_p);
+  RETURN_IF_ERROR(ltrue_override->SetData(true_p));
+
+  auto lfalse_override = std::make_shared<InferenceRequest::Input>(
+      tensor_name, tensor_datatype, tensor_shape, size_p);
+  RETURN_IF_ERROR(lfalse_override->SetData(false_p));
+
+  *true_override = std::move(ltrue_override);
+  *false_override = std::move(lfalse_override);
+
+  return Status::Success;
+}
+
+}  // namespace
+
 Status
 SequenceBatchScheduler::CreateBooleanControlTensors(
     const ModelConfig& config,
-    std::shared_ptr<InferRequestProvider::InputOverrideMap>*
-        start_input_overrides,
-    std::shared_ptr<InferRequestProvider::InputOverrideMap>*
-        end_input_overrides,
-    std::shared_ptr<InferRequestProvider::InputOverrideMap>*
-        startend_input_overrides,
-    std::shared_ptr<InferRequestProvider::InputOverrideMap>*
-        continue_input_overrides,
-    std::shared_ptr<InferRequestProvider::InputOverrideMap>*
-        notready_input_overrides)
+    std::shared_ptr<ControlInputs>* start_input_overrides,
+    std::shared_ptr<ControlInputs>* end_input_overrides,
+    std::shared_ptr<ControlInputs>* startend_input_overrides,
+    std::shared_ptr<ControlInputs>* continue_input_overrides,
+    std::shared_ptr<ControlInputs>* notready_input_overrides)
 {
   // Currently only batch-size 1 requests are supported so only need
   // to provide control vectors of that size.
-  *start_input_overrides =
-      std::make_shared<InferRequestProvider::InputOverrideMap>();
-  *end_input_overrides =
-      std::make_shared<InferRequestProvider::InputOverrideMap>();
-  *startend_input_overrides =
-      std::make_shared<InferRequestProvider::InputOverrideMap>();
-  *continue_input_overrides =
-      std::make_shared<InferRequestProvider::InputOverrideMap>();
-  *notready_input_overrides =
-      std::make_shared<InferRequestProvider::InputOverrideMap>();
+  *start_input_overrides = std::make_shared<ControlInputs>();
+  *end_input_overrides = std::make_shared<ControlInputs>();
+  *startend_input_overrides = std::make_shared<ControlInputs>();
+  *continue_input_overrides = std::make_shared<ControlInputs>();
+  *notready_input_overrides = std::make_shared<ControlInputs>();
 
   std::string tensor_name;
   DataType tensor_datatype;
@@ -189,55 +243,19 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
         &fp32_true_value, &int32_false_value, &int32_true_value));
     if (!tensor_name.empty()) {
-      uint8_t* false_p =
-          ((tensor_datatype == DataType::TYPE_INT32)
-               ? reinterpret_cast<uint8_t*>(&int32_false_value)
-               : reinterpret_cast<uint8_t*>(&fp32_false_value));
-      uint8_t* true_p =
-          ((tensor_datatype == DataType::TYPE_INT32)
-               ? reinterpret_cast<uint8_t*>(&int32_true_value)
-               : reinterpret_cast<uint8_t*>(&fp32_true_value));
+      std::shared_ptr<InferenceRequest::Input> true_override;
+      std::shared_ptr<InferenceRequest::Input> false_override;
 
-      InferRequestProvider::InputOverride false_override;
-      false_override.content_.assign(false_p, false_p + sizeof(float));
-      false_override.dims_.push_back(1);
-      false_override.datatype_ = tensor_datatype;
+      RETURN_IF_ERROR(GetBooleanOverrideInputs(
+          tensor_name, tensor_datatype, fp32_false_value, fp32_true_value,
+          int32_false_value, int32_true_value, &true_override,
+          &false_override));
 
-      InferRequestProvider::InputOverride true_override;
-      true_override.content_.assign(true_p, true_p + sizeof(float));
-      true_override.dims_.push_back(1);
-      true_override.datatype_ = tensor_datatype;
-
-      auto oit = (*start_input_overrides)
-                     ->insert(std::make_pair(tensor_name, true_override))
-                     .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
-      oit = (*end_input_overrides)
-                ->insert(std::make_pair(tensor_name, false_override))
-                .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
-      oit = (*startend_input_overrides)
-                ->insert(std::make_pair(tensor_name, true_override))
-                .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
-      oit = (*continue_input_overrides)
-                ->insert(std::make_pair(tensor_name, false_override))
-                .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
-      oit = (*notready_input_overrides)
-                ->insert(std::make_pair(tensor_name, false_override))
-                .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
+      (*start_input_overrides)->emplace_back(true_override);
+      (*end_input_overrides)->emplace_back(false_override);
+      (*startend_input_overrides)->emplace_back(true_override);
+      (*continue_input_overrides)->emplace_back(false_override);
+      (*notready_input_overrides)->emplace_back(false_override);
     }
   }
 
@@ -249,55 +267,19 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
         &fp32_true_value, &int32_false_value, &int32_true_value));
     if (!tensor_name.empty()) {
-      uint8_t* false_p =
-          ((tensor_datatype == DataType::TYPE_INT32)
-               ? reinterpret_cast<uint8_t*>(&int32_false_value)
-               : reinterpret_cast<uint8_t*>(&fp32_false_value));
-      uint8_t* true_p =
-          ((tensor_datatype == DataType::TYPE_INT32)
-               ? reinterpret_cast<uint8_t*>(&int32_true_value)
-               : reinterpret_cast<uint8_t*>(&fp32_true_value));
+      std::shared_ptr<InferenceRequest::Input> true_override;
+      std::shared_ptr<InferenceRequest::Input> false_override;
 
-      InferRequestProvider::InputOverride false_override;
-      false_override.content_.assign(false_p, false_p + sizeof(float));
-      false_override.dims_.push_back(1);
-      false_override.datatype_ = tensor_datatype;
+      RETURN_IF_ERROR(GetBooleanOverrideInputs(
+          tensor_name, tensor_datatype, fp32_false_value, fp32_true_value,
+          int32_false_value, int32_true_value, &true_override,
+          &false_override));
 
-      InferRequestProvider::InputOverride true_override;
-      true_override.content_.assign(true_p, true_p + sizeof(float));
-      true_override.dims_.push_back(1);
-      true_override.datatype_ = tensor_datatype;
-
-      auto oit = (*start_input_overrides)
-                     ->insert(std::make_pair(tensor_name, false_override))
-                     .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
-      oit = (*end_input_overrides)
-                ->insert(std::make_pair(tensor_name, true_override))
-                .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
-      oit = (*startend_input_overrides)
-                ->insert(std::make_pair(tensor_name, true_override))
-                .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
-      oit = (*continue_input_overrides)
-                ->insert(std::make_pair(tensor_name, false_override))
-                .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
-      oit = (*notready_input_overrides)
-                ->insert(std::make_pair(tensor_name, false_override))
-                .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
+      (*start_input_overrides)->emplace_back(false_override);
+      (*end_input_overrides)->emplace_back(true_override);
+      (*startend_input_overrides)->emplace_back(true_override);
+      (*continue_input_overrides)->emplace_back(false_override);
+      (*notready_input_overrides)->emplace_back(false_override);
     }
   }
 
@@ -309,55 +291,19 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
         &fp32_true_value, &int32_false_value, &int32_true_value));
     if (!tensor_name.empty()) {
-      uint8_t* false_p =
-          ((tensor_datatype == DataType::TYPE_INT32)
-               ? reinterpret_cast<uint8_t*>(&int32_false_value)
-               : reinterpret_cast<uint8_t*>(&fp32_false_value));
-      uint8_t* true_p =
-          ((tensor_datatype == DataType::TYPE_INT32)
-               ? reinterpret_cast<uint8_t*>(&int32_true_value)
-               : reinterpret_cast<uint8_t*>(&fp32_true_value));
+      std::shared_ptr<InferenceRequest::Input> true_override;
+      std::shared_ptr<InferenceRequest::Input> false_override;
 
-      InferRequestProvider::InputOverride false_override;
-      false_override.content_.assign(false_p, false_p + sizeof(float));
-      false_override.dims_.push_back(1);
-      false_override.datatype_ = tensor_datatype;
+      RETURN_IF_ERROR(GetBooleanOverrideInputs(
+          tensor_name, tensor_datatype, fp32_false_value, fp32_true_value,
+          int32_false_value, int32_true_value, &true_override,
+          &false_override));
 
-      InferRequestProvider::InputOverride true_override;
-      true_override.content_.assign(true_p, true_p + sizeof(float));
-      true_override.dims_.push_back(1);
-      true_override.datatype_ = tensor_datatype;
-
-      auto oit = (*start_input_overrides)
-                     ->insert(std::make_pair(tensor_name, true_override))
-                     .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
-      oit = (*end_input_overrides)
-                ->insert(std::make_pair(tensor_name, true_override))
-                .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
-      oit = (*startend_input_overrides)
-                ->insert(std::make_pair(tensor_name, true_override))
-                .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
-      oit = (*continue_input_overrides)
-                ->insert(std::make_pair(tensor_name, true_override))
-                .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
-      oit = (*notready_input_overrides)
-                ->insert(std::make_pair(tensor_name, false_override))
-                .first;
-      oit->second.content_ref_.AddBuffer(
-          (const char*)oit->second.content_.data(), oit->second.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
+      (*start_input_overrides)->emplace_back(true_override);
+      (*end_input_overrides)->emplace_back(true_override);
+      (*startend_input_overrides)->emplace_back(true_override);
+      (*continue_input_overrides)->emplace_back(true_override);
+      (*notready_input_overrides)->emplace_back(false_override);
     }
   }
 
@@ -367,7 +313,7 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
 void
 SequenceBatchScheduler::Enqueue(
     const std::shared_ptr<ModelInferStats>& stats,
-    const std::shared_ptr<InferRequestProvider>& request_provider,
+    const std::shared_ptr<InferenceRequest>& irequest,
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(const Status&)> OnComplete)
 {
@@ -377,15 +323,13 @@ SequenceBatchScheduler::Enqueue(
   stats->CaptureTimestamp(ModelInferStats::TimestampKind::kQueueStart);
 #endif  // TRTIS_ENABLE_STATS
 
-  const auto& irequest = request_provider->Request();
-
   // For now the request must have batch-size 1 since the sequence
   // batcher does not yet support requests that are statically
   // batched.
   if (irequest->BatchSize() != 1) {
     OnComplete(Status(
         RequestStatusCode::INVALID_ARG,
-        "inference request to model '" + request_provider->ModelName() +
+        "inference request to model '" + irequest->ModelName() +
             "' must specify batch-size 1 due to requirements of sequence "
             "batcher"));
     return;
@@ -398,7 +342,7 @@ SequenceBatchScheduler::Enqueue(
   if (correlation_id == 0) {
     OnComplete(Status(
         RequestStatusCode::INVALID_ARG,
-        "inference request to model '" + request_provider->ModelName() +
+        "inference request to model '" + irequest->ModelName() +
             "' must specify a non-zero correlation ID"));
     return;
   }
@@ -425,7 +369,7 @@ SequenceBatchScheduler::Enqueue(
     OnComplete(Status(
         RequestStatusCode::INVALID_ARG,
         "inference request for sequence " + std::to_string(correlation_id) +
-            " to model '" + request_provider->ModelName() +
+            " to model '" + irequest->ModelName() +
             "' must specify the START flag on the first request of the "
             "sequence"));
     return;
@@ -455,7 +399,7 @@ SequenceBatchScheduler::Enqueue(
                     (bl_itr != sequence_to_backlog_map_.end()))) {
     LOG_WARNING
         << "sequence " << correlation_id << " for model '"
-        << request_provider->ModelName()
+        << irequest->ModelName()
         << "' has a conflict. The previous sequence did not end before this "
            "sequence start. Previous sequence will be terminated early.";
   }
@@ -467,11 +411,11 @@ SequenceBatchScheduler::Enqueue(
   // This request already has a queue in the backlog...
   else if (bl_itr != sequence_to_backlog_map_.end()) {
     LOG_VERBOSE(1) << "Enqueuing CORRID " << correlation_id
-                   << " into existing backlog: "
-                   << request_provider->ModelName();
+                   << " into existing backlog: " << irequest->ModelName();
 
     bl_itr->second->emplace_back(
-        stats, request_provider, response_provider, OnComplete);
+        stats, irequest, response_provider, OnComplete);
+
     // If the sequence is ending then forget correlation ID
     // connection to this backlog queue. If another sequence starts
     // with the same correlation ID it will be collected in another
@@ -492,12 +436,11 @@ SequenceBatchScheduler::Enqueue(
   // Last option is to assign this request to the backlog...
   else {
     LOG_VERBOSE(1) << "Enqueuing CORRID " << correlation_id
-                   << " into new backlog: " << request_provider->ModelName();
+                   << " into new backlog: " << irequest->ModelName();
 
     auto backlog = std::make_shared<std::deque<Scheduler::Payload>>();
     backlog_queues_.push_back(backlog);
-    backlog->emplace_back(
-        stats, request_provider, response_provider, OnComplete);
+    backlog->emplace_back(stats, irequest, response_provider, OnComplete);
     if (!seq_end) {
       sequence_to_backlog_map_[correlation_id] = std::move(backlog);
     }
@@ -522,11 +465,10 @@ SequenceBatchScheduler::Enqueue(
 
   LOG_VERBOSE(1) << "Enqueuing CORRID " << correlation_id << " into batcher "
                  << batcher_idx << ", sequence slot " << seq_slot << ": "
-                 << request_provider->ModelName();
+                 << irequest->ModelName();
 
   batchers_[batcher_idx]->Enqueue(
-      seq_slot, correlation_id, stats, request_provider, response_provider,
-      OnComplete);
+      seq_slot, correlation_id, stats, irequest, response_provider, OnComplete);
 }
 
 CorrelationID
@@ -543,8 +485,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
     *payloads = std::move(*backlog);
     backlog_queues_.pop_front();
     if (!payloads->empty()) {  // should never be empty...
-      const auto& request_provider = payloads->back().request_provider_;
-      const auto& irequest = request_provider->Request();
+      const auto& irequest = payloads->back().request_;
       const CorrelationID correlation_id = irequest->CorrelationId();
 
       // If the last queue entry is not an END request then the entire
@@ -562,7 +503,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
             sequence_to_batcherseqslot_map_.end()) {
           LOG_ERROR << "internal: backlog sequence " << correlation_id
                     << " conflicts with in-flight sequence for model '"
-                    << request_provider->ModelName() << "'";
+                    << irequest->ModelName() << "'";
         }
 
         sequence_to_backlog_map_.erase(correlation_id);
@@ -572,7 +513,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
       LOG_VERBOSE(1) << "CORRID " << correlation_id << " reusing batcher "
                      << batcher_seq_slot.batcher_idx_ << ", slot "
                      << batcher_seq_slot.seq_slot_ << ": "
-                     << request_provider->ModelName();
+                     << irequest->ModelName();
       return correlation_id;
     }
   }
@@ -698,10 +639,10 @@ SequenceBatchScheduler::ReaperThread(const int nice)
                      << " in batcher " << batcher_idx << ", slot " << seq_slot;
 
       // A slot assignment is released by enqueuing a payload with
-      // null providers and null completion callback. The scheduler
-      // thread will interpret the payload as meaning it should
-      // release the sequence slot but otherwise do nothing with the
-      // payload.
+      // null request, null providers and null completion
+      // callback. The scheduler thread will interpret the payload as
+      // meaning it should release the sequence slot but otherwise do
+      // nothing with the payload.
       batchers_[batcher_idx]->Enqueue(
           seq_slot, idle_correlation_id, nullptr, nullptr, nullptr, nullptr);
     }
@@ -722,15 +663,15 @@ SequenceBatch::SequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
     const size_t seq_slot_cnt,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         start_input_overrides,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         end_input_overrides,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         startend_input_overrides,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         continue_input_overrides,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         notready_input_overrides)
     : base_(base), batcher_idx_(batcher_idx), seq_slot_cnt_(seq_slot_cnt),
       enforce_equal_shape_tensors_(enforce_equal_shape_tensors),
@@ -748,19 +689,21 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
   // If model wants CORRID control then get the name of the input
   // tensor and initialize the override structure for each sequence
   // slot that is used to communicate the correlation ID.
+  std::string correlation_id_tensor_name;
   DataType correlation_id_datatype;
   Status corrid_status = GetTypedSequenceControlProperties(
       config.sequence_batching(), config.name(),
       ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID,
-      false /* required */, &correlation_id_tensor_, &correlation_id_datatype);
+      false /* required */, &correlation_id_tensor_name,
+      &correlation_id_datatype);
   if (!corrid_status.IsOk()) {
-    LOG_ERROR << "Failed validating CORRID control for sequence-batch "
+    LOG_ERROR << "failed validating CORRID control for sequence-batch "
                  "scheduler thread "
               << batcher_idx_ << ": " << corrid_status.Message();
     return false;
   }
 
-  if (!correlation_id_tensor_.empty()) {
+  if (!correlation_id_tensor_name.empty()) {
     if ((correlation_id_datatype != TYPE_UINT64) &&
         (correlation_id_datatype != TYPE_INT64) &&
         (correlation_id_datatype != TYPE_UINT32) &&
@@ -773,21 +716,38 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
       return false;
     }
 
-    for (size_t b = 0; b < seq_slot_cnt_; ++b) {
-      seq_slot_corrid_overrides_maps_.emplace_back(
-          new InferRequestProvider::InputOverrideMap());
-      std::shared_ptr<InferRequestProvider::InputOverrideMap>& ovr_map =
-          seq_slot_corrid_overrides_maps_.back();
-      InferRequestProvider::InputOverride& ovr =
-          (*ovr_map)[correlation_id_tensor_];
-      ovr.dims_.push_back(1);
-      ovr.datatype_ = correlation_id_datatype;
-      ovr.content_.resize(GetDataTypeByteSize(correlation_id_datatype));
-      ovr.content_ref_.AddBuffer(
-          (const char*)ovr.content_.data(), ovr.content_.size(),
-          TRTSERVER_MEMORY_CPU, 0);
+    const std::vector<int64_t> tensor_shape{1};
+    const size_t size_p = GetDataTypeByteSize(correlation_id_datatype);
 
-      seq_slot_corrid_overrides_.push_back(&ovr);
+    for (size_t b = 0; b < seq_slot_cnt_; ++b) {
+      TRTSERVER_Memory_Type memory_type;
+      int64_t memory_type_id;
+
+      auto corrid_p =
+          std::make_shared<AllocatedMemory>(size_p, TRTSERVER_MEMORY_CPU, 0);
+      char* corrid_p_ptr =
+          corrid_p->MutableBuffer(&memory_type, &memory_type_id);
+      if ((corrid_p_ptr == nullptr) ||
+          ((memory_type != TRTSERVER_MEMORY_CPU) &&
+           (memory_type != TRTSERVER_MEMORY_CPU_PINNED)) ||
+          (memory_type_id != 0)) {
+        LOG_ERROR << "failed to allocate sequence CORRID control signal in CPU "
+                     "memory";
+        return false;
+      }
+
+      auto override = std::make_shared<InferenceRequest::Input>(
+          correlation_id_tensor_name, correlation_id_datatype, tensor_shape,
+          size_p);
+      corrid_status = override->SetData(corrid_p);
+      if (!corrid_status.IsOk()) {
+        LOG_ERROR << "failed creating CORRID control for sequence-batch "
+                     "scheduler thread "
+                  << batcher_idx_ << " for " << config.name();
+        return false;
+      }
+
+      seq_slot_corrid_overrides_.push_back(std::move(override));
     }
   }
 
@@ -796,34 +756,44 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
 
 void
 SequenceBatch::SetControlTensors(
-    const std::shared_ptr<InferenceRequest>& irequest,
-    const std::shared_ptr<InferRequestProvider>& request_provider,
-    const int32_t seq_slot, const CorrelationID corr_id)
+    const std::shared_ptr<InferenceRequest>& irequest, const int32_t seq_slot,
+    const CorrelationID corrid, const bool not_ready)
 {
-  // Set the start, end, and ready control tensors
-  // appropriately...
-  if ((irequest->Flags() & (InferRequestHeader::FLAG_SEQUENCE_START |
+  const SequenceBatchScheduler::ControlInputs* controls;
+
+  // Set the start, end, and ready control tensors appropriately...
+  if (not_ready) {
+    controls = notready_input_overrides_.get();
+  } else if (
+      (irequest->Flags() & (InferRequestHeader::FLAG_SEQUENCE_START |
                             InferRequestHeader::FLAG_SEQUENCE_END)) ==
       (InferRequestHeader::FLAG_SEQUENCE_START |
        InferRequestHeader::FLAG_SEQUENCE_END)) {
-    request_provider->AddInputOverrides(startend_input_overrides_);
+    controls = startend_input_overrides_.get();
   } else if (
       (irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
-    request_provider->AddInputOverrides(start_input_overrides_);
+    controls = start_input_overrides_.get();
   } else if ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
-    request_provider->AddInputOverrides(end_input_overrides_);
+    controls = end_input_overrides_.get();
   } else {
-    request_provider->AddInputOverrides(continue_input_overrides_);
+    controls = continue_input_overrides_.get();
+  }
+
+  for (const auto& control : *controls) {
+    irequest->AddOverrideInput(control);
   }
 
   // Set correlation ID control tensor if requested by the model.
-  if (!correlation_id_tensor_.empty()) {
-    const uint8_t* corrid_p = reinterpret_cast<const uint8_t*>(&corr_id);
-    std::vector<uint8_t>& content =
-        seq_slot_corrid_overrides_[seq_slot]->content_;
-    content.assign(corrid_p, corrid_p + content.size());
-    request_provider->AddInputOverrides(
-        seq_slot_corrid_overrides_maps_[seq_slot]);
+  if (!seq_slot_corrid_overrides_.empty()) {
+    const std::shared_ptr<InferenceRequest::Input>& input =
+        seq_slot_corrid_overrides_[seq_slot];
+    AllocatedMemory* data =
+        reinterpret_cast<AllocatedMemory*>(input->Data().get());
+    const char* corrid_p = reinterpret_cast<const char*>(&corrid);
+    char* slot_corrid_ptr = data->MutableBuffer();
+    memcpy(slot_corrid_ptr, corrid_p, data->TotalByteSize());
+
+    irequest->AddOverrideInput(input);
   }
 }
 
@@ -835,15 +805,15 @@ DirectSequenceBatch::DirectSequenceBatch(
     const Scheduler::StandardRunFunc& OnSchedule,
     const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         start_input_overrides,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         end_input_overrides,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         startend_input_overrides,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         continue_input_overrides,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         notready_input_overrides,
     std::promise<bool>* is_initialized)
     : SequenceBatch(
@@ -899,7 +869,7 @@ void
 DirectSequenceBatch::Enqueue(
     const uint32_t seq_slot, const CorrelationID correlation_id,
     const std::shared_ptr<ModelInferStats>& stats,
-    const std::shared_ptr<InferRequestProvider>& request_provider,
+    const std::shared_ptr<InferenceRequest>& request,
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(const Status&)> OnComplete)
 {
@@ -909,7 +879,7 @@ DirectSequenceBatch::Enqueue(
     std::lock_guard<std::mutex> lock(mu_);
 
     queues_[seq_slot].emplace_back(
-        stats, request_provider, response_provider, OnComplete);
+        stats, request, response_provider, OnComplete);
 
     seq_slot_correlation_ids_[seq_slot] = correlation_id;
     max_active_seq_slot_ =
@@ -1024,10 +994,10 @@ DirectSequenceBatch::SchedulerThread(
              ++seq_slot) {
           std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
           if (!queue.empty()) {
-            // If the payload is nullptr then the sequence in the slot
-            // has timed-out so release the slot for another sequence
-            // from the backlog.
-            if (queue.front().request_provider_ == nullptr) {
+            // If the payload request is nullptr then the sequence in
+            // the slot has timed-out so release the slot for another
+            // sequence from the backlog.
+            if (queue.front().request_ == nullptr) {
               queue.pop_front();
 
               SequenceBatchScheduler::BatcherSequenceSlot batcher_seq_slot(
@@ -1040,10 +1010,25 @@ DirectSequenceBatch::SchedulerThread(
           // Need to check queue again for contents since if released
           // above it may now be empty...
           if (!queue.empty()) {
-            // For NULL requests need an InferenceRequest so grab the
-            // first one.
+            // For NULL requests need an InferenceRequest that can be
+            // batched but has controls get to "not ready". Any
+            // request can serve this purpose so grab a copy of the
+            // first one. This first request is also used to
+            // initialize 'pending_batch_shapes' so we are sure that
+            // this null request will have the correct shape for any
+            // created batch.
             if (null_irequest == nullptr) {
-              null_irequest = queue.front().request_provider_->Request();
+              null_irequest =
+                  std::make_shared<InferenceRequest>(*queue.front().request_);
+
+              // Note that when the not-ready control input of the
+              // request is "true" the model can't assume that any
+              // other inputs are meaningful, including CORRID. So we
+              // just use zero for that and use whatever values the
+              // other inputs have in request_.
+              SetControlTensors(
+                  null_irequest, seq_slot, 0 /* corrid */,
+                  true /* not_ready */);
             }
 
             // If this is the first non-null payload capture the
@@ -1091,27 +1076,22 @@ DirectSequenceBatch::SchedulerThread(
             }
           }
 
-          // Use null-provider if necessary otherwise use the next
-          // payload in the queue...
+          // Use null-request if necessary otherwise use the next
+          // payload in the queue... Note that we reuse the same
+          // request for all the NULL slots... this should be fine
+          // bacause the backends should not modify a request.
           if (use_null_provider) {
-            auto null_request_provider =
-                std::make_shared<NULLInferRequestProvider>(null_irequest);
-            null_request_provider->AddInputOverrides(notready_input_overrides_);
-
-            payloads->emplace_back(
-                nullptr, null_request_provider, nullptr, nullptr);
+            payloads->emplace_back(nullptr, null_irequest, nullptr, nullptr);
           } else {
             Scheduler::Payload& seq_slot_payload = queue.front();
-            const auto& request_provider = seq_slot_payload.request_provider_;
-            const auto& irequest = request_provider->Request();
+            const auto& irequest = seq_slot_payload.request_;
 
-            // Set the control tensor values in the request provider.
+            // Set the control tensor values in the request.
             SetControlTensors(
-                irequest, request_provider, seq_slot,
-                seq_slot_correlation_ids_[seq_slot]);
+                irequest, seq_slot, seq_slot_correlation_ids_[seq_slot]);
 
             payloads->emplace_back(
-                seq_slot_payload.stats_, request_provider,
+                seq_slot_payload.stats_, irequest,
                 seq_slot_payload.response_provider_,
                 seq_slot_payload.complete_function_);
 
@@ -1250,15 +1230,15 @@ OldestSequenceBatch::OldestSequenceBatch(
     const Scheduler::StandardRunFunc& OnSchedule,
     const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         start_input_overrides,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         end_input_overrides,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         startend_input_overrides,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         continue_input_overrides,
-    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+    const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         notready_input_overrides,
     std::promise<bool>* is_initialized)
     : SequenceBatch(
@@ -1335,18 +1315,17 @@ OldestSequenceBatch::CompleteAndNext(
     // it in the dynamic batcher now.
     if (!queue.empty()) {
       Scheduler::Payload& payload = queue.front();
-      const auto& request_provider = payload.request_provider_;
+      const auto& irequest = payload.request_;
 
-      // If the request provider is null then this inference request is
-      // from the reaper thread indicating a timed-out sequence. Mark
-      // that the sequence slot should be released but otherwise do
+      // If the request is null then this inference request is from
+      // the reaper thread indicating a timed-out sequence. Mark that
+      // the sequence slot should be released but otherwise do
       // nothing.
-      if (request_provider == nullptr) {
+      if (irequest == nullptr) {
         LOG_VERBOSE(1) << "force-end sequence in batcher " << batcher_idx_
                        << ", slot " << seq_slot;
         release_seq_slot = true;
       } else {
-        const auto& irequest = request_provider->Request();
         const CorrelationID correlation_id = irequest->CorrelationId();
 
         // After handling the last inference in a sequence we must
@@ -1360,7 +1339,7 @@ OldestSequenceBatch::CompleteAndNext(
         }
 
         // Add the appropriate control tensor values to the request.
-        SetControlTensors(irequest, request_provider, seq_slot, correlation_id);
+        SetControlTensors(irequest, seq_slot, correlation_id);
 
         LOG_VERBOSE(1) << "issue to dynamic batcher CORRID " << correlation_id
                        << " in batcher " << batcher_idx_ << ", slot "
@@ -1371,7 +1350,7 @@ OldestSequenceBatch::CompleteAndNext(
             &OldestSequenceBatch::CompleteAndNext, this, seq_slot,
             payload.complete_function_, std::placeholders::_1);
         dynamic_batcher_->Enqueue(
-            payload.stats_, request_provider, payload.response_provider_,
+            payload.stats_, irequest, payload.response_provider_,
             on_complete_fn);
       }
 
@@ -1415,7 +1394,7 @@ void
 OldestSequenceBatch::Enqueue(
     const uint32_t seq_slot, const CorrelationID correlation_id,
     const std::shared_ptr<ModelInferStats>& stats,
-    const std::shared_ptr<InferRequestProvider>& request_provider,
+    const std::shared_ptr<InferenceRequest>& request,
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(const Status&)> OnComplete)
 {
@@ -1426,7 +1405,7 @@ OldestSequenceBatch::Enqueue(
     std::lock_guard<std::mutex> lock(mu_);
 
     std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
-    queue.emplace_back(stats, request_provider, response_provider, OnComplete);
+    queue.emplace_back(stats, request, response_provider, OnComplete);
     in_flight = in_flight_[seq_slot];
   }
 

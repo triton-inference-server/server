@@ -180,7 +180,7 @@ DynamicBatchScheduler::~DynamicBatchScheduler()
 void
 DynamicBatchScheduler::Enqueue(
     const std::shared_ptr<ModelInferStats>& stats,
-    const std::shared_ptr<InferRequestProvider>& request_provider,
+    const std::shared_ptr<InferenceRequest>& request,
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(const Status&)> OnComplete)
 {
@@ -188,15 +188,13 @@ DynamicBatchScheduler::Enqueue(
   // scheduling process
   stats->CaptureTimestamp(ModelInferStats::TimestampKind::kQueueStart);
 
-  const auto& request = request_provider->Request();
   Status enqueue_status;
   bool wake_runner = false;
   {
     std::lock_guard<std::mutex> lock(mu_);
     enqueue_status = queue_.Enqueue(
         request->Priority(),
-        std::move(
-            Payload(stats, request_provider, response_provider, OnComplete)));
+        std::move(Payload(stats, request, response_provider, OnComplete)));
     if (enqueue_status.IsOk()) {
       queued_batch_size_ += request->BatchSize();
     }
@@ -463,8 +461,7 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
   size_t best_preferred_batch_size = 0;
   queued_batch_size_ -= queue_.ApplyPolicyAtCursor();
   while (!queue_.CursorEnd()) {
-    const auto batch_size =
-        queue_.PayloadAtCursor().request_provider_->Request()->BatchSize();
+    const auto batch_size = queue_.PayloadAtCursor().request_->BatchSize();
 
     // If there is no pending batch, then this request is starting a
     // new batch.
@@ -567,8 +564,6 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
       wait_ns = 1000;
     }
   }
-
-  LOG_ERROR << "Wait: " << wait_ns << " us";
 
   // Return non-zero wait microseconds to cause this thread to wait
   // until the queue delay or the closest timeout has expired.

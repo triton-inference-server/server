@@ -463,8 +463,9 @@ LibTorchBackend::Context::SetInputMetaData(
     InputMetaData* meta_data, bool* cuda_copy)
 {
   meta_data->name_ = name;
-  // Get the shape of the input. The provider has already checked that
-  // the request shape is valid so don't need to do it here.
+  // Get the shape of the input. The request normalizer has already
+  // checked that the request shape is valid so don't need to do it
+  // here.
   meta_data->shape_.clear();
 
   // If model supports batching then prepend the batch dimension
@@ -522,7 +523,7 @@ LibTorchBackend::Context::SetFixedSizedInputBuffer(
   // Visit the payloads in order and copy the input tensors to 'buffer'.
   std::vector<size_t> expected_byte_sizes;
   for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_;
     expected_byte_sizes.push_back(irequest->BatchSize() * batch1_byte_size);
   }
 
@@ -538,7 +539,7 @@ LibTorchBackend::Context::Run(
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
 
-  std::shared_ptr<InferRequestProvider> input_request_provider;
+  const InferenceRequest* repr_input_request = nullptr;
 
   // For each request in 'payloads' collect the total batch size for
   // this inference execution. The batch-size, number of inputs, and
@@ -553,11 +554,11 @@ LibTorchBackend::Context::Run(
               name_ + "'");
     }
 
-    total_batch_size += payload.request_provider_->Request()->BatchSize();
+    total_batch_size += payload.request_->BatchSize();
 
     // All payloads must have equally-sized input tensors so use any
     // payload as the representative for the input tensors.
-    input_request_provider = payload.request_provider_;
+    repr_input_request = payload.request_.get();
   }
 
   // If there are no valid payloads then no need to run the
@@ -576,16 +577,9 @@ LibTorchBackend::Context::Run(
             name_ + "', max allowed is " + std::to_string(max_batch_size_));
   }
 
-  // Additional inputs added to the provider...
-  const InferRequestProvider::InputOverrideMapVec& input_override_maps =
-      input_request_provider->GetInputOverrides();
+  size_t input_count = repr_input_request->ImmutableInputs().size();
 
-  size_t input_count = input_request_provider->Request()->Inputs().size();
-  for (const auto& ovr_map : input_override_maps) {
-    input_count += ovr_map->size();
-  }
-
-  // Hold reference to each buffer of input data to that it stays
+  // Hold reference to each buffer of input data so that it stays
   // until the inference has completed.
   std::vector<InputMetaData> input_meta_data(input_count);
 
@@ -596,47 +590,20 @@ LibTorchBackend::Context::Run(
 
   // Inputs from the request...
   bool cuda_copy = false;
-  for (const auto& pr : input_request_provider->Request()->Inputs()) {
-    const auto& input = pr.second;
-    const std::string& name = input.Name();
+  for (const auto& pr : repr_input_request->ImmutableInputs()) {
+    const InferenceRequest::Input* input = pr.second;
+    const std::string& name = input->Name();
     int ip_index = input_index_map_[name];
+
+    // FIXMEV2 don't need input_config once all requests have datatype
     const ModelInput* input_config;
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
     RETURN_IF_ERROR(SetInputMetaData(
-        name, input_config->data_type(), input.Shape(), total_batch_size,
+        name, input_config->data_type(), input->Shape(), total_batch_size,
         payloads, &inputs, &(input_meta_data[ip_index]), &cuda_copy));
   }
 
-  std::string deliminator = "__";
-  int ip_index;
-
-  for (const auto& ovr_map : input_override_maps) {
-    for (const auto& pr : *ovr_map) {
-      const std::string& name = pr.first;
-      LOG_VERBOSE(1) << "Processing extra input: " << name;
-      const InferRequestProvider::InputOverride& override = pr.second;
-      try {
-        int start_pos = name.find(deliminator);
-        if (start_pos == -1) {
-          throw std::invalid_argument(
-              "Input '" + name +
-              "' does not follow naming convention i.e. <name>__<index>.");
-        }
-        ip_index = std::atoi(name.substr(start_pos + 2).c_str());
-      }
-      catch (std::exception& ex) {
-        return Status(
-            RequestStatusCode::INTERNAL,
-            "Input '" + name +
-                "' does not follow naming convention i.e. <name>__<index>.");
-      }
-      input_index_map_[name] = ip_index;
-      RETURN_IF_ERROR(SetInputMetaData(
-          name, override.datatype_, override.dims_, total_batch_size, payloads,
-          &inputs, &(input_meta_data[ip_index]), &cuda_copy));
-    }
-  }
 #ifdef TRTIS_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
@@ -713,7 +680,7 @@ LibTorchBackend::Context::Run(
   // Prepare set of Outputs requested for
   std::set<std::string> required_outputs;
   for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_;
     for (const auto& pr : irequest->RequestedOutputs()) {
       required_outputs.insert(pr.first);
     }

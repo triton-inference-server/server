@@ -143,7 +143,7 @@ InferenceBackend::SetConfiguredScheduler(
 
   auto OnWarmup = [this, &samples](uint32_t runner_idx) -> Status {
     for (const auto& sample : samples) {
-      LOG_VERBOSE(1) << "model '" << sample.irequest_->ModelName()
+      LOG_VERBOSE(1) << "model '" << sample.request_->ModelName()
                      << "' instance " << std::to_string(runner_idx)
                      << " is running warmup sample '" << sample.sample_name_
                      << "'";
@@ -228,12 +228,11 @@ InferenceBackend::Init(
 void
 InferenceBackend::Run(
     const std::shared_ptr<ModelInferStats>& stats,
-    const std::shared_ptr<InferRequestProvider>& request_provider,
+    const std::shared_ptr<InferenceRequest>& request,
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(const Status&)> OnCompleteHandleInfer)
 {
-  scheduler_->Enqueue(
-      stats, request_provider, response_provider, OnCompleteHandleInfer);
+  scheduler_->Enqueue(stats, request, response_provider, OnCompleteHandleInfer);
 }
 
 void
@@ -283,20 +282,16 @@ InferenceBackend::WarmUp(
     std::function<void(Status)> OnCompleteWarmup)
 {
   std::vector<Scheduler::Payload> payloads;
-  // Duplicate payloads to match batch size requirement.
-  for (size_t idx = 0; idx < sample.batch_size_; idx++) {
-    std::shared_ptr<InferRequestProvider> request_provider;
-    auto status =
-        InferRequestProvider::Create(sample.irequest_, &request_provider);
-    if (status.IsOk()) {
-      status = request_provider->AddInputOverrides(sample.input_override_);
-    }
-    if (status.IsOk()) {
-      payloads.emplace_back(nullptr, request_provider, nullptr, nullptr);
-    } else {
-      OnCompleteWarmup(status);
-      return;
-    }
+
+  // Add the sample request directly to the payloads. For the case of
+  // batch-size 1 no other request is needed.
+  payloads.emplace_back(nullptr, sample.request_, nullptr, nullptr);
+
+  // For batch-size > 1 make copies of the request to fill out the
+  // payloads
+  for (size_t idx = 1; idx < sample.batch_size_; idx++) {
+    auto request = std::make_shared<InferenceRequest>(*sample.request_);
+    payloads.emplace_back(nullptr, request, nullptr, nullptr);
   }
 
   // Unless necessary, simply invoke Run()
@@ -372,13 +367,13 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
     // populating requests for single run. FIXMEV2 once
     // protocol_version 2 is the only one remove SetBatchSize and
     // adjust the input/output tensors to have appropriate shape
-    warmup_data.irequest_ =
+    warmup_data.request_ =
         std::make_shared<InferenceRequest>(Name(), Version(), Version(), 1);
-    warmup_data.irequest_->SetBatchSize(1);
+    warmup_data.request_->SetBatchSize(1);
 
     // Request all outputs
     for (const auto& io : Config().output()) {
-      RETURN_IF_ERROR(warmup_data.irequest_->AddRequestedOutput(io.name()));
+      RETURN_IF_ERROR(warmup_data.request_->AddRequestedOutput(io.name()));
     }
 
     // Second pass to prepare input buffer and request header
@@ -391,11 +386,6 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
       // If not found in model inputs, then treat it as control tensor
       const ModelInput* input_config;
       if (!GetInput(input_meta.first, &input_config).IsOk()) {
-        if (warmup_data.input_override_ == nullptr) {
-          warmup_data.input_override_ =
-              std::make_shared<InferRequestProvider::InputOverrideMap>();
-        }
-
         auto element_count = GetElementCount(input_meta_shape);
         auto batch_byte_size =
             element_count * GetDataTypeByteSize(input_meta.second.data_type());
@@ -403,21 +393,16 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
           batch_byte_size = element_count * sizeof(int32_t);
         }
 
-        InferRequestProvider::InputOverride value_override;
-        value_override.dims_ = input_meta_shape;
-        value_override.datatype_ = input_meta.second.data_type();
+        std::vector<uint8_t> content;
         switch (input_meta.second.input_data_type_case()) {
           case ModelWarmup_Input::InputDataTypeCase::kZeroData:
-            value_override.content_.assign(
-                zero_buffer, zero_buffer + batch_byte_size);
+            content.assign(zero_buffer, zero_buffer + batch_byte_size);
             break;
           case ModelWarmup_Input::InputDataTypeCase::kRandomData: {
             if (input_meta.second.data_type() == DataType::TYPE_STRING) {
-              value_override.content_.assign(
-                  zero_buffer, zero_buffer + batch_byte_size);
+              content.assign(zero_buffer, zero_buffer + batch_byte_size);
             } else {
-              value_override.content_.assign(
-                  random_buffer, random_buffer + batch_byte_size);
+              content.assign(random_buffer, random_buffer + batch_byte_size);
             }
             break;
           }
@@ -440,7 +425,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
                       std::to_string(input_data.size()) + " bytes");
             }
 
-            value_override.content_.assign(
+            content.assign(
                 input_data.data(), input_data.data() + input_data.size());
             break;
           }
@@ -450,7 +435,13 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
                 "warmup setting expects input '" + input_meta.first +
                     "' to have input_data_type set");
         }
-        warmup_data.input_override_->emplace(input_meta.first, value_override);
+
+        std::shared_ptr<InferenceRequest::Input> input;
+        RETURN_IF_ERROR(warmup_data.request_->AddOverrideInput(
+            input_meta.first, input_meta.second.data_type(), input_meta_shape,
+            content.size(), &input));
+        RETURN_IF_ERROR(input->AppendData(
+            &content[0], content.size(), TRTSERVER_MEMORY_CPU, 0));
         continue;
       }
 
@@ -505,14 +496,14 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
       }
 
       InferenceRequest::Input* input = nullptr;
-      RETURN_IF_ERROR(warmup_data.irequest_->AddOriginalInput(
+      RETURN_IF_ERROR(warmup_data.request_->AddOriginalInput(
           input_meta.first, input_meta_shape, batch_byte_size, &input));
       RETURN_IF_ERROR(input->AppendData(
           allocated_ptr, batch_byte_size,
           TRTSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */));
     }
 
-    RETURN_IF_ERROR(warmup_data.irequest_->PrepareForInference(*this));
+    RETURN_IF_ERROR(warmup_data.request_->PrepareForInference(*this));
   }
 
   return Status::Success;

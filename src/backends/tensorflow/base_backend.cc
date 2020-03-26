@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -370,8 +370,9 @@ BaseBackend::Context::SetInput(
     std::vector<Scheduler::Payload>* payloads, std::vector<InputInfo>* inputs,
     TRTISTF_TensorList** input_tensors, bool* cuda_copy)
 {
-  // Get the shape of the input. The provider has already checked
-  // that the request shape is valid so don't need to do it here.
+  // Get the shape of the input. The request normalizer has already
+  // checked that the request shape is valid so don't need to do it
+  // here.
   std::vector<int64_t> shape;
 
   // If model supports batching then prepend the batch dimension
@@ -443,7 +444,7 @@ BaseBackend::Context::SetFixedSizedInputTensor(
   // included in the dynamic batch.
   std::vector<size_t> expected_byte_sizes;
   for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_;
     expected_byte_sizes.push_back(irequest->BatchSize() * batch1_byte_size);
   }
 
@@ -469,7 +470,7 @@ BaseBackend::Context::SetStringInputTensor(
   // input tensor. Skip payloads that had errors since they are not
   // included in the dynamic batch.
   for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_;
     const size_t expected_element_cnt =
         irequest->BatchSize() * batch1_element_cnt;
     size_t element_idx = 0;
@@ -585,7 +586,7 @@ BaseBackend::Context::ReadStringOutputTensor(
   size_t tensor_element_idx = 0;
 
   for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_;
     const size_t expected_element_cnt =
         irequest->BatchSize() * batch1_element_cnt;
 
@@ -643,12 +644,12 @@ BaseBackend::Context::Run(
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
 
-  std::shared_ptr<InferRequestProvider> input_request_provider;
+  const InferenceRequest* repr_input_request = nullptr;
 
   // For each request in 'payloads' collect the total batch size for
   // this inference execution. The batch-size, number of inputs, and
   // size of each input has already been checked by each payloads
-  // request provider so don't need to do that here.
+  // request normalizer so don't need to do that here.
   size_t total_batch_size = 0;
   for (auto& payload : *payloads) {
     if (!payload.status_.IsOk()) {
@@ -658,11 +659,11 @@ BaseBackend::Context::Run(
               name_ + "'");
     }
 
-    total_batch_size += payload.request_provider_->Request()->BatchSize();
+    total_batch_size += payload.request_->BatchSize();
 
     // All payloads must have equally-sized input tensors so use any
     // payload as the representative for the input tensors.
-    input_request_provider = payload.request_provider_;
+    repr_input_request = payload.request_.get();
   }
 
   // If there are no valid payloads then no need to run the
@@ -699,36 +700,24 @@ BaseBackend::Context::Run(
   // Inputs from the request...
   std::vector<InputInfo> inputs;
   bool cuda_copy = false;
-  for (const auto& pr : input_request_provider->Request()->Inputs()) {
-    const auto& input = pr.second;
-    const std::string& name = input.Name();
+  for (const auto& pr : repr_input_request->ImmutableInputs()) {
+    const InferenceRequest::Input* input = pr.second;
+    const std::string& name = input->Name();
 
+    // FIXMEV2 don't need input_config once all requests have datatype
     const ModelInput* input_config;
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
     RETURN_IF_ERROR(SetInput(
-        name, input_config->data_type(), input.Shape(), total_batch_size,
+        name, input_config->data_type(), input->Shape(), total_batch_size,
         payloads, &inputs, input_tensors.get(), &cuda_copy));
-  }
-
-  // Additional inputs added to the provider...
-  const InferRequestProvider::InputOverrideMapVec& input_override_maps =
-      input_request_provider->GetInputOverrides();
-  for (const auto& ovr_map : input_override_maps) {
-    for (const auto& pr : *ovr_map) {
-      const std::string& name = pr.first;
-      const InferRequestProvider::InputOverride& override = pr.second;
-      RETURN_IF_ERROR(SetInput(
-          name, override.datatype_, override.dims_, total_batch_size, payloads,
-          &inputs, input_tensors.get(), &cuda_copy));
-    }
   }
 
   // Collect the names of outputs requested by any request
   // payload.
   std::set<std::string> required_outputs;
   for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_;
     for (const auto& pr : irequest->RequestedOutputs()) {
       required_outputs.insert(pr.first);
     }
