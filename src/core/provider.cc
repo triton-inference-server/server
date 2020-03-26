@@ -51,7 +51,7 @@ InferRequestProvider::Create(
 {
   provider->reset(new InferRequestProvider(irequest));
 
-  for (const auto& pr : irequest->Inputs()) {
+  for (const auto& pr : irequest->OriginalInputs()) {
     if ((pr.second.BatchByteSize() != 0) &&
         pr.second.BatchByteSize() != pr.second.Data()->TotalByteSize()) {
       return Status(
@@ -162,7 +162,7 @@ InferRequestProvider::GetNextInputContent(
     *memory_type = TRTSERVER_MEMORY_CPU;
     *memory_type_id = 0;
   } else {
-    auto* inputs = irequest_->MutableInputs();
+    auto* inputs = irequest_->MutableOriginalInputs();
     auto it = inputs->find(name);
     if (it == inputs->end()) {
       return Status(
@@ -180,7 +180,7 @@ Status
 InferRequestProvider::GetMemory(
     const std::string& name, std::shared_ptr<Memory>* input_buffer)
 {
-  const auto& inputs = irequest_->Inputs();
+  const auto& inputs = irequest_->OriginalInputs();
   const auto it = inputs.find(name);
   if (it == inputs.end()) {
     return Status(
@@ -197,7 +197,7 @@ Status
 InferRequestProvider::GetMemoryWithOverride(
     const std::string& name, const Memory** input_buffer)
 {
-  const auto& inputs = irequest_->Inputs();
+  const auto& inputs = irequest_->OriginalInputs();
   const auto it = inputs.find(name);
   if (it != inputs.end()) {
     *input_buffer = it->second.Data().get();

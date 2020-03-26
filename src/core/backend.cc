@@ -505,7 +505,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
       }
 
       InferenceRequest::Input* input = nullptr;
-      RETURN_IF_ERROR(warmup_data.irequest_->AddInput(
+      RETURN_IF_ERROR(warmup_data.irequest_->AddOriginalInput(
           input_meta.first, input_meta_shape, batch_byte_size, &input));
       RETURN_IF_ERROR(input->AppendData(
           allocated_ptr, batch_byte_size,
