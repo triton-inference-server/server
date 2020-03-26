@@ -96,7 +96,6 @@ if __name__ == '__main__':
         if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
             print("sync infer error: incorrect difference")
             sys.exit(1)
-    print('PASS: infer')
 
     # Infer with incorrect model name
     response = test_infer("wrong model name", input0_data, input1_data).get_response()
@@ -104,8 +103,6 @@ if __name__ == '__main__':
     if "error" not in response.keys():
         print("improper error message for wrong model name")
         sys.exit(1)
-    if response['error'].startswith("Inference request for unknown model"):
-        print('PASS: infer with wrong model name')
-    else:
+    if not response['error'].startswith("Inference request for unknown model"):
         print("improper error message for wrong model name")
         sys.exit(1)

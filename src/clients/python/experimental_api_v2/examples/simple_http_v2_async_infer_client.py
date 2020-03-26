@@ -125,4 +125,3 @@ if __name__ == '__main__':
            if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
                print("async infer error: incorrect difference")
                sys.exit(1)
-        print("PASS: Async infer")

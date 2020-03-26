@@ -79,11 +79,6 @@ for i in \
         cat "${CLIENT_LOG}.${SUFFIX}"
         RET=1
     fi
-
-    if [ $(cat "${CLIENT_LOG}.${SUFFIX}" | grep "PASS" | wc -l) -ne 1 ]; then
-        cat "${CLIENT_LOG}.${SUFFIX}"
-        RET=1
-    fi
 done
 
 kill $SERVER_PID
