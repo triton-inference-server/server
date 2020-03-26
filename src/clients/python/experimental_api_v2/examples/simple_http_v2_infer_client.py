@@ -30,6 +30,26 @@ import numpy as np
 
 import tritonhttpclient.core as httpclient
 
+def test_infer(model_name, input0_data, input1_data):
+    inputs = []
+    outputs = []
+    inputs.append(httpclient.InferInput('INPUT0'))
+    inputs.append(httpclient.InferInput('INPUT1'))
+
+    # Initialize the data
+    inputs[0].set_data_from_numpy(input0_data)
+    inputs[1].set_data_from_numpy(input1_data)
+
+    outputs.append(httpclient.InferOutput('OUTPUT0'))
+    outputs.append(httpclient.InferOutput('OUTPUT1'))
+    query_params = {'test_1': 1, 'test_2': 2}
+    results = triton_client.infer(inputs,
+                              model_name,
+                            outputs=outputs,
+                            query_params=query_params)
+
+    return results
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-v',
@@ -52,48 +72,37 @@ if __name__ == '__main__':
         print("channel creation failed: " + str(e))
         sys.exit()
 
-    model_name = 'simple'
-
-    # Infer
-    inputs = []
-    outputs = []
-    inputs.append(httpclient.InferInput('INPUT0'))
-    inputs.append(httpclient.InferInput('INPUT1'))
-
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
     input0_data = np.arange(start=0, stop=16, dtype=np.int32)
     input0_data = np.expand_dims(input0_data, axis=0)
     input1_data = np.ones(shape=(1, 16), dtype=np.int32)
 
-    # Initialize the data
-    inputs[0].set_data_from_numpy(input0_data)
-    inputs[1].set_data_from_numpy(input1_data)
-
-    outputs.append(httpclient.InferOutput('OUTPUT0'))
-    outputs.append(httpclient.InferOutput('OUTPUT1'))
-    query_params = {'test_1': 1, 'test_2': 2}
-    results = triton_client.infer(inputs,
-                                  model_name,
-                                  outputs=outputs,
-                                  query_params=query_params)
-
+    # Infer with simple
+    results = test_infer("simple", input0_data, input1_data)
     print(results.get_response())
 
-    # FIXME: Uncomment when DLIS 1162 is fixed.
-    # Get the output arrays from the
-    # output0_data = results.as_numpy('OUTPUT0')
-    # output1_data = results.as_numpy('OUTPUT1')
+    # Validate the results by comparing with precomputed values.
+    output0_data = results.as_numpy('OUTPUT0')
+    output1_data = results.as_numpy('OUTPUT1')
+    for i in range(16):
+        print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
+                str(output0_data[0][i]))
+        print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
+                str(output1_data[0][i]))
+        if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
+            print("sync infer error: incorrect sum")
+            sys.exit(1)
+        if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
+            print("sync infer error: incorrect difference")
+            sys.exit(1)
 
-    # for i in range(16):
-    #    print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
-    #          str(output0_data[0][i]))
-    #    print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
-    #          str(output1_data[0][i]))
-    #    if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
-    #        print("sync infer error: incorrect sum")
-    #        sys.exit(1)
-    #    if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
-    #        print("sync infer error: incorrect difference")
-    #        sys.exit(1)
-    print('PASS: infer')
+    # Infer with incorrect model name
+    response = test_infer("wrong model name", input0_data, input1_data).get_response()
+    print(response)
+    if "error" not in response.keys():
+        print("improper error message for wrong model name")
+        sys.exit(1)
+    if not response['error'].startswith("Inference request for unknown model"):
+        print("improper error message for wrong model name")
+        sys.exit(1)
