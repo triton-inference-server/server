@@ -28,16 +28,14 @@
 import argparse
 import numpy as np
 import os
-import sys
 from builtins import range
 from functools import partial
 from PIL import Image
 import sys
 
-import tritongrpcclient.core as grpcclient
-from tritongrpcclient.utils import InferenceServerException
-from tritongrpcclient.utils import triton_to_np_dtype
-import tritongrpcclient.model_config_pb2 as mc
+import tritonhttpclient.core as httpclient
+from tritonhttpclient.utils import InferenceServerException
+from tritonhttpclient.utils import triton_to_np_dtype
 
 FLAGS = None
 
@@ -48,63 +46,59 @@ def parse_model(model_metadata, model_config):
     requirements for an image classification network (as expected by
     this client)
     """
-    if len(model_metadata.inputs) != 1:
+    if len(model_metadata['inputs']) != 1:
         raise Exception("expecting 1 input, got {}".format(
-            len(model_metadata.inputs)))
-    if len(model_metadata.outputs) != 1:
+            len(model_metadata['inputs'])))
+    if len(model_metadata['outputs']) != 1:
         raise Exception("expecting 1 output, got {}".format(
-            len(model_metadata.outputs)))
+            len(model_metadata['outputs'])))
 
-    if len(model_config.input) != 1:
+    if len(model_config['input']) != 1:
         raise Exception(
             "expecting 1 input in model configuration, got {}".format(
-                len(model_config.inputs)))
+                len(model_config['input'])))
 
-    input_metadata = model_metadata.inputs[0]
-    input_config = model_config.input[0]
-    output_metadata = model_metadata.outputs[0]
+    input_metadata = model_metadata['inputs'][0]
+    input_config = model_config['input'][0]
+    output_metadata = model_metadata['outputs'][0]
 
-    if output_metadata.datatype != "FP32":
+    if output_metadata['datatype'] != "FP32":
         raise Exception("expecting output datatype to be FP32, model '" +
-                        model_metadata.name + "' output type is " +
-                        output_metadata.datatype)
+                        model_metadata['name'] + "' output type is " +
+                        output_metadata['datatype'])
 
     # Output is expected to be a vector. But allow any number of
     # dimensions as long as all but 1 is size 1 (e.g. { 10 }, { 1, 10
     # }, { 10, 1, 1 } are all ok).
     non_one_cnt = 0
-    for dim in output_metadata.shape:
+    for dim in output_metadata['shape']:
         if dim > 1:
             non_one_cnt += 1
             if non_one_cnt > 1:
                 raise Exception("expecting model output to be a vector")
 
     # Model input must have 3 dims, either CHW or HWC
-    if len(input_metadata.shape) != 3:
+    if len(input_metadata['shape']) != 3:
         raise Exception(
             "expecting input to have 3 dimensions, model '{}' input has {}".
-            format(model_metadata.name, len(input_metadata.shape)))
+            format(model_metadata.name, len(input_metadata['shape'])))
 
-    if ((input_config.format != mc.ModelInput.FORMAT_NCHW) and
-        (input_config.format != mc.ModelInput.FORMAT_NHWC)):
-        raise Exception("unexpected input format " +
-                        mc.ModelInput.Format.Name(input_config.format) +
-                        ", expecting " +
-                        mc.ModelInput.Format.Name(mc.ModelInput.FORMAT_NCHW) +
-                        " or " +
-                        mc.ModelInput.Format.Name(mc.ModelInput.FORMAT_NHWC))
+    if ((input_config['format'] != "FORMAT_NCHW") and
+        (input_config['format'] != "FORMAT_NHWC")):
+        raise Exception("unexpected input format " + input_config['format'] 
+                    + ", expecting FORMAT_NCHW or FORMAT_NHWC")
 
-    if input_config.format == mc.ModelInput.FORMAT_NHWC:
-        h = input_metadata.shape[0]
-        w = input_metadata.shape[1]
-        c = input_metadata.shape[2]
+    if input_config['format'] == "FORMAT_NHWC":
+        h = input_metadata['shape'][0]
+        w = input_metadata['shape'][1]
+        c = input_metadata['shape'][2]
     else:
-        c = input_metadata.shape[0]
-        h = input_metadata.shape[1]
-        w = input_metadata.shape[2]
+        c = input_metadata['shape'][0]
+        h = input_metadata['shape'][1]
+        w = input_metadata['shape'][2]
 
-    return (input_metadata.name, output_metadata.name, c, h, w,
-            mc.ModelInput.FORMAT_NHWC, input_metadata.datatype)
+    return (input_metadata['name'], output_metadata['name'], c, h, w,
+            "FORMAT_NHWC", input_metadata['datatype'])
 
 
 def preprocess(img, format, dtype, c, h, w, scaling):
@@ -138,7 +132,7 @@ def preprocess(img, format, dtype, c, h, w, scaling):
         scaled = typed
 
     # Swap to CHW if necessary
-    if format == mc.ModelInput.FORMAT_NCHW:
+    if format == "FORMAT_NCHW":
         ordered = np.transpose(scaled, (2, 0, 1))
     else:
         ordered = scaled
@@ -162,6 +156,9 @@ def postprocess(results, output_name, batch_size):
 
 
 def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
+    inputs = []
+    inputs.append(httpclient.InferInput(input_name))
+
     # Preprocess image into input data according to model requirements
     image_data = None
     with Image.open(FLAGS.image_filename) as img:
@@ -171,13 +168,11 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
     batched_image_data = np.stack(repeated_image_data, axis=0)
 
     # Set the input data
-    inputs = []
-    inputs.append(
-        grpcclient.InferInput(input_name, batched_image_data.shape, "FP32"))
     inputs[0].set_data_from_numpy(batched_image_data)
 
     outputs = []
-    outputs.append(grpcclient.InferOutput(output_name, class_count=2))
+    outputs.append(httpclient.InferOutput(output_name))
+    outputs[0].set_parameter("classification", 2)
 
     yield inputs, outputs, FLAGS.model_name, FLAGS.model_version
 
@@ -226,36 +221,36 @@ if __name__ == '__main__':
                         '--url',
                         type=str,
                         required=False,
-                        default='localhost:8001',
-                        help='Inference server URL. Default is localhost:8001.')
+                        default='localhost:8000',
+                        help='Inference server URL. Default is localhost:8000.')
     parser.add_argument('image_filename', type=str, help='Input image.')
     FLAGS = parser.parse_args()
 
     # Create gRPC client for communicating with the server
     try:
-        triton_client = grpcclient.InferenceServerClient(FLAGS.url)
+        triton_client = httpclient.InferenceServerClient(FLAGS.url)
     except Exception as e:
         print("context creation failed: " + str(e))
-        sys.exit(1)
+        sys.exit()
 
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
     try:
-        model_meta = triton_client.get_model_metadata(
-            model_name=FLAGS.model_name)
+        model_meta = triton_client.get_model_metadata(model_name=FLAGS.model_name)
     except InferenceServerException as e:
         print("failed to retrieve the metadata: " + str(e))
-        sys.exit(1)
+        sys.exit()
 
     try:
-        model_config = triton_client.get_model_config(
-            model_name=FLAGS.model_name)
+        model_config = triton_client.get_model_config(model_name=FLAGS.model_name)
     except InferenceServerException as e:
         print("failed to retrieve the config: " + str(e))
-        sys.exit(1)
+        sys.exit()
 
+    print("model_meta: ", model_meta)
+    print("model_config: ", model_config)
     input_name, output_name, c, h, w, format, dtype = parse_model(
-        model_meta, model_config.config)
+        model_meta, model_config)
 
     # Send requests of FLAGS.batch_size images. If the number of
     # images isn't an exact multiple of FLAGS.batch_size then just
@@ -268,13 +263,13 @@ if __name__ == '__main__':
             input_name, output_name, c, h, w, format, dtype, FLAGS):
         try:
             results.append(
-                triton_client.infer(model_name=FLAGS.model_name,
-                                    model_version=FLAGS.model_version,
-                                    inputs=inputs,
-                                    outputs=outputs))
+                triton_client.infer(inputs,
+                                  outputs,
+                                  model_name=FLAGS.model_name,
+                                  model_version=FLAGS.model_version))
         except InferenceServerException as e:
             print("inference failed: " + str(e))
-            sys.exit(1)
+            sys.exit()
 
     for result in results:
         postprocess(result, output_name, FLAGS.batch_size)
