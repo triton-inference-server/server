@@ -557,8 +557,8 @@ EnsembleContext::InitStep(const size_t step_idx, std::shared_ptr<Step>* step)
         std::get<1>(tensor_data_[pair.second]), other.Shape(), &shape);
 
     InferenceRequest::Input* input;
-    RETURN_IF_ERROR(
-        irequest->AddInput(pair.first, shape, other.BatchByteSize(), &input));
+    RETURN_IF_ERROR(irequest->AddOriginalInput(
+        pair.first, shape, other.BatchByteSize(), &input));
     RETURN_IF_ERROR(input->SetData(std::get<2>(tensor_data_[pair.second])));
   }
 

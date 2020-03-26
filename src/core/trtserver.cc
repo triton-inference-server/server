@@ -1095,7 +1095,7 @@ TRTSERVER_InferenceRequestProviderNewV2(
       loptions->InferRequestHeader()->timeout_microseconds());
   for (const auto& io : loptions->InferRequestHeader()->input()) {
     RETURN_IF_STATUS_ERROR(
-        request->AddInput(io.name(), io.dims(), io.batch_byte_size()));
+        request->AddOriginalInput(io.name(), io.dims(), io.batch_byte_size()));
   }
 
   for (const auto& io : loptions->InferRequestHeader()->output()) {
@@ -1130,7 +1130,7 @@ TRTSERVER_InferenceRequestProviderInputBatchByteSize(
       reinterpret_cast<TrtInferenceRequest*>(request_provider);
   const auto& lrequest = ltrtrequest->Request();
 
-  for (const auto& pr : lrequest->Inputs()) {
+  for (const auto& pr : lrequest->OriginalInputs()) {
     if (pr.first == std::string(name)) {
       *byte_size = pr.second.BatchByteSize();
       return nullptr;  // Success
@@ -1155,16 +1155,9 @@ TRTSERVER_InferenceRequestProviderSetInputData(
       reinterpret_cast<TrtInferenceRequest*>(request_provider);
   const auto& lrequest = ltrtrequest->Request();
 
-  auto* inputs = lrequest->MutableInputs();
-  auto it = inputs->find(input_name);
-  if (it == inputs->end()) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string("input '" + std::string(input_name) + "' does not exist")
-            .c_str());
-  }
-
-  it->second.AppendData(base, byte_size, memory_type, memory_type_id);
+  ni::InferenceRequest::Input* input;
+  RETURN_IF_STATUS_ERROR(lrequest->MutableOriginalInput(input_name, &input));
+  input->AppendData(base, byte_size, memory_type, memory_type_id);
 
   return nullptr;  // Success
 }
@@ -2010,7 +2003,7 @@ TRTSERVER2_InferenceRequestAddInput(
   TrtInferenceRequest* lrequest =
       reinterpret_cast<TrtInferenceRequest*>(inference_request);
   RETURN_IF_STATUS_ERROR(
-      lrequest->Request()->AddInput(name, datatype, shape, dim_count));
+      lrequest->Request()->AddOriginalInput(name, datatype, shape, dim_count));
   return nullptr;  // Success
 }
 
@@ -2020,7 +2013,7 @@ TRTSERVER2_InferenceRequestRemoveInput(
 {
   TrtInferenceRequest* lrequest =
       reinterpret_cast<TrtInferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(lrequest->Request()->RemoveInput(name));
+  RETURN_IF_STATUS_ERROR(lrequest->Request()->RemoveOriginalInput(name));
   return nullptr;  // Success
 }
 
@@ -2030,7 +2023,7 @@ TRTSERVER2_InferenceRequestRemoveAllInputs(
 {
   TrtInferenceRequest* lrequest =
       reinterpret_cast<TrtInferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(lrequest->Request()->RemoveAllInputs());
+  RETURN_IF_STATUS_ERROR(lrequest->Request()->RemoveAllOriginalInputs());
   return nullptr;  // Success
 }
 
@@ -2044,7 +2037,8 @@ TRTSERVER2_InferenceRequestAppendInputData(
       reinterpret_cast<TrtInferenceRequest*>(inference_request);
 
   ni::InferenceRequest::Input* input;
-  RETURN_IF_STATUS_ERROR(lrequest->Request()->MutableInput(name, &input));
+  RETURN_IF_STATUS_ERROR(
+      lrequest->Request()->MutableOriginalInput(name, &input));
   RETURN_IF_STATUS_ERROR(
       input->AppendData(base, byte_size, memory_type, memory_type_id));
 
@@ -2059,7 +2053,8 @@ TRTSERVER2_InferenceRequestRemoveAllInputData(
       reinterpret_cast<TrtInferenceRequest*>(inference_request);
 
   ni::InferenceRequest::Input* input;
-  RETURN_IF_STATUS_ERROR(lrequest->Request()->MutableInput(name, &input));
+  RETURN_IF_STATUS_ERROR(
+      lrequest->Request()->MutableOriginalInput(name, &input));
   RETURN_IF_STATUS_ERROR(input->RemoveAllData());
 
   return nullptr;  // Success

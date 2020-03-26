@@ -45,11 +45,11 @@ InferenceRequest::InferenceRequest(
 }
 
 Status
-InferenceRequest::MutableInput(
+InferenceRequest::MutableOriginalInput(
     const std::string& name, InferenceRequest::Input** input)
 {
-  auto itr = inputs_.find(name);
-  if (itr == inputs_.end()) {
+  auto itr = original_inputs_.find(name);
+  if (itr == original_inputs_.end()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "input '" + name + "' does not exist in request");
@@ -78,7 +78,7 @@ InferenceRequest::MutableRequestedOutput(
 
 
 Status
-InferenceRequest::AddInput(
+InferenceRequest::AddOriginalInput(
     const std::string& name, const DimsList& shape,
     const uint64_t batch_byte_size, InferenceRequest::Input** input)
 {
@@ -87,7 +87,7 @@ InferenceRequest::AddInput(
     lshape.push_back(d);
   }
 
-  const auto& pr = inputs_.emplace(std::make_pair(
+  const auto& pr = original_inputs_.emplace(std::make_pair(
       name, InferenceRequest::Input(name, lshape, batch_byte_size)));
   if (!pr.second) {
     return Status(
@@ -104,11 +104,11 @@ InferenceRequest::AddInput(
 }
 
 Status
-InferenceRequest::AddInput(
+InferenceRequest::AddOriginalInput(
     const std::string& name, const std::vector<int64_t>& shape,
     const uint64_t batch_byte_size, InferenceRequest::Input** input)
 {
-  const auto& pr = inputs_.emplace(std::make_pair(
+  const auto& pr = original_inputs_.emplace(std::make_pair(
       name, InferenceRequest::Input(name, shape, batch_byte_size)));
   if (!pr.second) {
     return Status(
@@ -125,11 +125,11 @@ InferenceRequest::AddInput(
 }
 
 Status
-InferenceRequest::AddInput(
+InferenceRequest::AddOriginalInput(
     const std::string& name, const std::string& datatype, const int64_t* shape,
     const uint64_t dim_count, InferenceRequest::Input** input)
 {
-  const auto& pr = inputs_.emplace(std::make_pair(
+  const auto& pr = original_inputs_.emplace(std::make_pair(
       name, InferenceRequest::Input(name, datatype, shape, dim_count)));
   if (!pr.second) {
     return Status(
@@ -146,9 +146,9 @@ InferenceRequest::AddInput(
 }
 
 Status
-InferenceRequest::RemoveInput(const std::string& name)
+InferenceRequest::RemoveOriginalInput(const std::string& name)
 {
-  if (inputs_.erase(name) != 1) {
+  if (original_inputs_.erase(name) != 1) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "input '" + name + "' does not exist in request");
@@ -159,9 +159,9 @@ InferenceRequest::RemoveInput(const std::string& name)
 }
 
 Status
-InferenceRequest::RemoveAllInputs()
+InferenceRequest::RemoveAllOriginalInputs()
 {
-  inputs_.clear();
+  original_inputs_.clear();
   needs_normalization_ = true;
   return Status::Success;
 }
@@ -207,7 +207,7 @@ Status
 InferenceRequest::PrepareForInference(const InferenceBackend& backend)
 {
   // Prepare all inputs...
-  for (auto& pr : inputs_) {
+  for (auto& pr : original_inputs_) {
     pr.second.PrepareForInference();
   }
 
@@ -263,16 +263,16 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
 
   // Make sure that the request is providing the same number of inputs
   // as is expected by the model.
-  if (inputs_.size() != (size_t)model_config.input_size()) {
+  if (original_inputs_.size() != (size_t)model_config.input_size()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "expected " + std::to_string(model_config.input_size()) +
-            " inputs but got " + std::to_string(inputs_.size()) +
+            " inputs but got " + std::to_string(original_inputs_.size()) +
             " inputs for model '" + model_name_ + "'");
   }
 
   // Update each input to have shape and batch-byte-size.
-  for (auto& pr : inputs_) {
+  for (auto& pr : original_inputs_) {
     const ModelInput* input_config;
     RETURN_IF_ERROR(backend.GetInput(pr.first, &input_config));
     auto& input = pr.second;
@@ -411,11 +411,11 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
 
   // Make sure that the request is providing the same number of inputs
   // as is expected by the model.
-  if (inputs_.size() != (size_t)model_config.input_size()) {
+  if (original_inputs_.size() != (size_t)model_config.input_size()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "expected " + std::to_string(model_config.input_size()) +
-            " inputs but got " + std::to_string(inputs_.size()) +
+            " inputs but got " + std::to_string(original_inputs_.size()) +
             " inputs for model '" + model_name_ + "'");
   }
 
@@ -424,7 +424,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
     // Model does not support Triton-style batching so treat as
     // batch-size 1 and leave the tensor shapes as they are.
     batch_size_ = 1;
-    for (auto& pr : inputs_) {
+    for (auto& pr : original_inputs_) {
       auto& input = pr.second;
       *input.MutableShape() = input.OriginalShape();
     }
@@ -434,7 +434,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
     // size. Adjust the shape of the input tensors to remove the batch
     // dimension.
     batch_size_ = 0;
-    for (auto& pr : inputs_) {
+    for (auto& pr : original_inputs_) {
       auto& input = pr.second;
       if (input.OriginalShape().size() == 0) {
         return Status(
@@ -481,7 +481,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
 
   // Verify that each input shape is valid for the model, make
   // adjustments for reshapes and find the total tensor size.
-  for (auto& pr : inputs_) {
+  for (auto& pr : original_inputs_) {
     const ModelInput* input_config;
     RETURN_IF_ERROR(backend.GetInput(pr.first, &input_config));
 
