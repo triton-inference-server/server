@@ -194,15 +194,30 @@ class InferenceRequest {
   uint64_t TimeoutMicroseconds() const { return timeout_us_; }
   void SetTimeoutMicroseconds(uint64_t t) { timeout_us_ = t; }
 
-  Status MutableInput(const std::string& name, Input** input);
-  std::unordered_map<std::string, Input>* MutableInputs()
+  // The original inputs are the inputs added to the request before
+  // the inference executed (that is before
+  // TRITONSERVER_ServerInferAsync or equivalent is called). Once
+  // execution has started the original inputs should not be modified
+  // until execution completes (and those modifications will apply to
+  // the next inference execution).
+  Status MutableOriginalInput(const std::string& name, Input** input);
+  std::unordered_map<std::string, Input>* MutableOriginalInputs()
   {
     needs_normalization_ = true;
-    return &inputs_;
+    return &original_inputs_;
   }
+  const std::unordered_map<std::string, Input>& OriginalInputs() const
+  {
+    return original_inputs_;
+  }
+
+  // Get an input taking into account both original inputs and
+  // overrides. If an override input is availabe use it, otherwise use
+  // the original input.
   const std::unordered_map<std::string, Input>& Inputs() const
   {
-    return inputs_;
+    // FIXME for now just return the originals...
+    return original_inputs_;
   }
 
   Status MutableRequestedOutput(
@@ -213,21 +228,21 @@ class InferenceRequest {
     return requested_outputs_;
   }
 
-  // Add an input to the request. If 'input' is non-null return a
-  // pointer to the newly added input.
-  Status AddInput(
+  // Add an original input to the request. If 'input' is non-null
+  // return a pointer to the newly added input.
+  Status AddOriginalInput(
       const std::string& name, const DimsList& shape,
       const uint64_t batch_byte_size, Input** input = nullptr);
-  Status AddInput(
+  Status AddOriginalInput(
       const std::string& name, const std::vector<int64_t>& shape,
       const uint64_t batch_byte_size, Input** input = nullptr);
-  Status AddInput(
+  Status AddOriginalInput(
       const std::string& name, const std::string& datatype,
       const int64_t* shape, const uint64_t dim_count, Input** input = nullptr);
 
-  // Remove a single input or all inputs.
-  Status RemoveInput(const std::string& name);
-  Status RemoveAllInputs();
+  // Remove a single original input or all inputs.
+  Status RemoveOriginalInput(const std::string& name);
+  Status RemoveAllOriginalInputs();
 
   // Request an output.
   Status AddRequestedOutput(
@@ -271,7 +286,7 @@ class InferenceRequest {
   uint32_t priority_;
   uint64_t timeout_us_;
 
-  std::unordered_map<std::string, Input> inputs_;
+  std::unordered_map<std::string, Input> original_inputs_;
   std::unordered_map<std::string, RequestedOutput> requested_outputs_;
 };
 
