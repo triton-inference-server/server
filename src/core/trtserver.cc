@@ -2146,6 +2146,53 @@ TRTSERVER2_InferenceRequestOutputDataType(
   return TRTSERVER_ErrorNew(TRTSERVER_ERROR_INVALID_ARG, "unknown output");
 }
 
+// TEMPORARY: will be removed as part of V1->V2 transition
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestOutputClassBatchSize(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name,
+    uint64_t* batch_size)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  const auto& response_header = lrequest->Response()->ResponseHeader();
+  for (const auto& output : response_header.output()) {
+    if (output.name() == name) {
+      *batch_size = output.batch_classes().size();
+      return nullptr;  // Success
+    }
+  }
+
+  return TRTSERVER_ErrorNew(TRTSERVER_ERROR_INVALID_ARG, "unknown output");
+}
+
+// TEMPORARY: will be removed as part of V1->V2 transition
+TRTSERVER_Error*
+TRTSERVER2_InferenceRequestOutputClasses(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name,
+    int32_t* idx, float* value, char** label)
+{
+  TrtInferenceRequest* lrequest =
+      reinterpret_cast<TrtInferenceRequest*>(inference_request);
+  const auto& response_header = lrequest->Response()->ResponseHeader();
+  for (const auto& output : response_header.output()) {
+    if (output.name() == name) {
+      uint64_t batch_size = output.batch_classes().size();
+      for (uint64_t batch_id = 0; batch_id < batch_size; batch_id++) {
+        auto& bcls = output.batch_classes(0);
+        for (int i = 0; i < bcls.cls().size(); i++) {
+          auto& cls = bcls.cls(i);
+          idx[batch_id * batch_size] = cls.idx();
+          value[batch_id * batch_size] = cls.value();
+          label[batch_id * batch_size] = const_cast<char*>(cls.label().c_str());
+        }
+      }
+      return nullptr;  // Success
+    }
+  }
+
+  return TRTSERVER_ErrorNew(TRTSERVER_ERROR_INVALID_ARG, "unknown output");
+}
+
 TRTSERVER_Error*
 TRTSERVER2_InferenceRequestOutputShape(
     TRTSERVER2_InferenceRequest* inference_request, const char* name,

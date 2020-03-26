@@ -268,6 +268,35 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestOutputDataType(
     TRTSERVER2_InferenceRequest* inference_request, const char* name,
     const char** datatype);
 
+// TEMPORARY: will be removed as part of V1->V2 transition
+/// Get the batch_size of an output tensor.
+/// \param inference_request The request object.
+/// \param name The name of the output.
+/// \param batch_size Returns the number of batches of the output.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error*
+TRTSERVER2_InferenceRequestOutputClassBatchSize(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name,
+    uint64_t* batch_size);
+
+// TEMPORARY: will be removed as part of V1->V2 transition
+/// Get the classification results of an output tensor.
+/// \param inference_request The request object.
+/// \param name The name of the output.
+/// \param idx Returns the id of each top 'n' class outputs. The returned
+/// idx is owned by 'inference_request' and must not be modified or freed
+/// by the caller.
+/// \param value Returns the value corresponding to each id. The
+/// returned value is owned by 'inference_request' and must not be modified or
+/// freed by the caller.
+/// \param label Returns the label corresponding to each id if the model
+/// specifies a labels file. The returned label is owned by 'inference_request'
+/// and must not be modified or freed by the caller.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestOutputClasses(
+    TRTSERVER2_InferenceRequest* inference_request, const char* name,
+    int32_t* idx, float* value, char** label);
+
 /// Get the shape of an output tensor.
 /// \param inference_request The request object.
 /// \param name The name of the output.
