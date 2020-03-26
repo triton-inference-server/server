@@ -268,7 +268,11 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestOutputDataType(
     TRTSERVER2_InferenceRequest* inference_request, const char* name,
     const char** datatype);
 
-
+/// Get the batch_size of an output tensor.
+/// \param inference_request The request object.
+/// \param name The name of the output.
+/// \param batch_size Returns the number of batches of the output.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER2_InferenceRequestOutputClassBatchSize(
     TRTSERVER2_InferenceRequest* inference_request, const char* name,
@@ -286,7 +290,6 @@ TRTSERVER2_InferenceRequestOutputClassBatchSize(
 /// \param label Returns the label corresponding to each id if the model
 /// specifies a labels file. The returned label is owned by 'inference_request'
 /// and must not be modified or freed by the caller.
-/// \param batch_size Returns the number of dimensions of the returned shape.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestOutputClasses(
     TRTSERVER2_InferenceRequest* inference_request, const char* name,
