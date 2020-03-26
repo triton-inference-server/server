@@ -92,8 +92,10 @@ if __name__ == '__main__':
     user_data = []
 
     # Inference call
-    triton_client.async_infer(partial(callback, user_data), inputs, outputs,
-                              model_name)
+    triton_client.async_infer(callback=partial(callback, user_data),
+                              inputs=inputs,
+                              outputs=outputs,
+                              model_name=model_name)
 
     # Wait until the results are available in user_data
     time_out = 10
@@ -115,13 +117,13 @@ if __name__ == '__main__':
         output0_data = user_data[0].as_numpy('OUTPUT0')
         output1_data = user_data[0].as_numpy('OUTPUT1')
         for i in range(16):
-           print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) +
-                 " = " + str(output0_data[0][i]))
-           print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) +
-                 " = " + str(output1_data[0][i]))
-           if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
-               print("async infer error: incorrect sum")
-               sys.exit(1)
-           if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
-               print("async infer error: incorrect difference")
-               sys.exit(1)
+            print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) +
+                  " = " + str(output0_data[0][i]))
+            print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) +
+                  " = " + str(output1_data[0][i]))
+            if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
+                print("async infer error: incorrect sum")
+                sys.exit(1)
+            if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
+                print("async infer error: incorrect difference")
+                sys.exit(1)

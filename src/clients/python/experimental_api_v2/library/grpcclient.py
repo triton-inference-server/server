@@ -255,8 +255,8 @@ class InferenceServerClient:
             metadata = ()
         try:
             request = grpc_service_v2_pb2.ServerMetadataRequest()
-            response = self._client_stub.ServerMetadata(
-                request=request, metadata=metadata)
+            response = self._client_stub.ServerMetadata(request=request,
+                                                        metadata=metadata)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -390,8 +390,8 @@ class InferenceServerClient:
             metadata = ()
         try:
             request = grpc_service_v2_pb2.RepositoryIndexRequest()
-            response = self._client_stub.RepositoryIndex(
-                request=request, metadata=metadata)
+            response = self._client_stub.RepositoryIndex(request=request,
+                                                         metadata=metadata)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -544,8 +544,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.SystemSharedMemoryRegisterRequest(
                 name=name, key=key, offset=offset, byte_size=byte_size)
-            self._client_stub.SystemSharedMemoryRegister(
-                request=request, metadata=metadata)
+            self._client_stub.SystemSharedMemoryRegister(request=request,
+                                                         metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -576,8 +576,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.SystemSharedMemoryUnregisterRequest(
                 name=name)
-            self._client_stub.SystemSharedMemoryUnregister(
-                request=request, metadata=metadata)
+            self._client_stub.SystemSharedMemoryUnregister(request=request,
+                                                           metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -701,8 +701,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.CudaSharedMemoryUnregisterRequest(
                 name=name)
-            self._client_stub.CudaSharedMemoryUnregister(
-                request=request, metadata=metadata)
+            self._client_stub.CudaSharedMemoryUnregister(request=request,
+                                                         metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -710,6 +710,7 @@ class InferenceServerClient:
               inputs,
               model_name,
               model_version="",
+              outputs=None,
               request_id=None,
               sequence_id=0,
               sequence_start=False,
@@ -737,20 +738,21 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
-        sequence_id: int
-            Indicates which sequence does the request belongs to. All inference
-            requests that belong to the same sequence must use the same sequence
-            ID. A sequence ID of 0 indicates the inference request is not part of
-            a sequence. Default value is 0.
+        sequence_id : int
+            The unique identifier for the sequence being represented by the
+            object. Default value is 0 which means that the request does not
+            belong to a sequence.
         sequence_start: bool
-            Indicates whether the request is first in the sequence. Default value
-            is False.
+            Indicates whether the request being added marks the start of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
         sequence_end: bool
-            Indicates whether the request is last in the sequence. Default value
-            is False.
+            Indicates whether the request being added marks the end of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
         headers: dict
-            Optional dictionary specifying additional HTTP
-            headers to include in the request
+            Optional dictionary specifying additional HTTP headers to include
+            in the request.
 
         Returns
         -------
@@ -769,9 +771,14 @@ class InferenceServerClient:
         else:
             metadata = ()
 
-        request = self._get_inference_request(inputs, outputs, model_name,
-                                              model_version, request_id,
-                                              parameters)
+        request = _get_inference_request(inputs=inputs,
+                                         outputs=outputs,
+                                         model_name=model_name,
+                                         model_version=model_version,
+                                         request_id=request_id,
+                                         sequence_id=sequence_id,
+                                         sequence_start=sequence_start,
+                                         sequence_end=sequence_end)
 
         try:
             response = self._client_stub.ModelInfer(request=request,
@@ -786,7 +793,11 @@ class InferenceServerClient:
                     inputs,
                     model_name,
                     model_version="",
+                    outputs=None,
                     request_id=None,
+                    sequence_id=0,
+                    sequence_start=False,
+                    sequence_end=False,
                     headers=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
@@ -794,12 +805,15 @@ class InferenceServerClient:
         Parameters
         ----------
         callback : function
-            Python function that is invoked once the request is completed.
-            The function must reserve the last two arguments (result, error)
-            to hold InferResult and InferenceServerException objects
-            respectively which will be provided to the function when executing
-            the callback. The ownership of these objects will be given to the
-            user. The 'error' would be None for a successful inference.
+            Python function that is invoked upon receiving response from
+            the underlying stream. The function must have last argument
+            as **kwargs. The client might provided upto three keyworded
+            arguments in **kwargs. For the successful inference InferResult
+            object will be provided with key 'result'. If there is an
+            error in inference, InferenceServerException object will be
+            provided with key 'error'. If this response is part of a
+            sequence then this sequence ID is provided with the key 
+            'sequence_id'.
         inputs : list
             A list of InferInput objects, each describing data for a input
             tensor required by the model.
@@ -817,17 +831,18 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
-        sequence_id: int
-            Indicates which sequence does the request belongs to. All inference
-            requests that belong to the same sequence must use the same sequence
-            ID. A sequence ID of 0 indicates the inference request is not part of
-            a sequence. Default value is 0.
+        sequence_id : int
+            The unique identifier for the sequence being represented by the
+            object. Default value is 0 which means that the request does not
+            belong to a sequence.
         sequence_start: bool
-            Indicates whether the request is first in the sequence. Default value
-            is False.
+            Indicates whether the request being added marks the start of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
         sequence_end: bool
-            Indicates whether the request is last in the sequence. Default value
-            is False.
+            Indicates whether the request being added marks the end of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
@@ -839,20 +854,32 @@ class InferenceServerClient:
         """
 
         def wrapped_callback(call_future):
-            error = result = None
             try:
                 result = InferResult(call_future.result())
+                if not sequence_id:
+                    callback(result=result)
+                else:
+                    callback(result=result, sequence_id=sequence_id)
             except grpc.RpcError as rpc_error:
                 error = get_error_grpc(rpc_error)
-            callback(result=result, error=error)
+                if not sequence_id:
+                    callback(error=error)
+                else:
+                    callback(error=error, sequence_id=sequence_id)
 
         if headers is not None:
             metadata = headers.items()
         else:
             metadata = ()
 
-        request = _get_inference_request(inputs, model_name, model_version,
-                                         outputs, request_id)
+        request = _get_inference_request(inputs=inputs,
+                                         outputs=outputs,
+                                         model_name=model_name,
+                                         model_version=model_version,
+                                         request_id=request_id,
+                                         sequence_id=sequence_id,
+                                         sequence_start=sequence_start,
+                                         sequence_end=sequence_end)
 
         try:
             self._call_future = self._client_stub.ModelInfer.future(
@@ -861,20 +888,24 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def async_sequence_infer(self,
-                             sequence,
-                             inputs,
-                             model_name,
-                             model_version="",
-                             outputs=None,
-                             request_id=None,
-                             end_of_sequence=False):
-        """Run asynchronous sequence inference.
+    def async_stream_infer(self,
+                           stream,
+                           inputs,
+                           model_name,
+                           model_version="",
+                           outputs=None,
+                           request_id=None,
+                           sequence_id=0,
+                           sequence_start=False,
+                           sequence_end=False,
+                           headers=None):
+        """Runs an asynchronous inference over gRPC bi-directional streaming
+        API.
 
         Parameters
         ----------
-        sequence : InferSequence
-            The sequence to be used for the inference request.
+        stream : InferStream
+            The stream to use for sending/receiving inference requests/response.
         inputs : list
             A list of InferInput objects, each describing data for a input
             tensor required by the model.
@@ -892,54 +923,47 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
-        end_of_sequence: bool
+        sequence_id : int
+            The unique identifier for the sequence being represented by the
+            object. Default value is 0 which means that the request does not
+            belong to a sequence.
+        sequence_start: bool
+            Indicates whether the request being added marks the start of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
+        sequence_end: bool
             Indicates whether the request being added marks the end of the 
-            sequence. After sending a request with sequence_end flag over a sequence
-            object, any further attempts to issue additional request with the object
-            will throw an error. See InferSequence.reset() for reusing the sequence 
-            object.The default value for this flag is False.
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
     
         Raises
         ------
         InferenceServerException
             If server fails to issue inference.
         """
-        if sequence._use_streaming:
-            if sequence._is_sequence_start:
-                # Inititate the response handler if it is the first
-                # request of the sequence.
-                try:
-                    sequence._init_handler(
-                        self._client_stub.ModelStreamInfer(
-                            _RequestIterator(sequence)))
-                except grpc.RpcError as rpc_error:
-                    raise_error_grpc(rpc_error)
 
-            # Adds the request to the stream
-            sequence._add_request(inputs, model_name, model_version, outputs,
-                                  request_id, end_of_sequence)
-        else:
+        if not stream._is_initialized():
+            # Inititate the response stream handler if required.
+            if stream._headers is not None:
+                metadata = headers.items()
+            else:
+                metadata = ()
 
-            def wrapped_callback(call_future):
-                error = result = None
-                try:
-                    result = InferResult(call_future.result())
-                except grpc.RpcError as rpc_error:
-                    error = get_error_grpc(rpc_error)
-                sequence._callback(result=result,
-                                   error=error,
-                                   sequence_id=sequence._id)
-
-            request = _get_inference_request(inputs, model_name, model_version,
-                                             outputs, request_id, sequence._id,
-                                             sequence._is_sequence_start,
-                                             end_of_sequence)
-            sequence._is_sequence_start = False
             try:
-                self._call_future = self._client_stub.ModelInfer.future(request)
-                self._call_future.add_done_callback(wrapped_callback)
+                stream._init_handler(
+                    self._client_stub.ModelStreamInfer(_RequestIterator(stream),
+                                                       metadata=metadata))
             except grpc.RpcError as rpc_error:
                 raise_error_grpc(rpc_error)
+
+        # Enqueues the request to the stream
+        stream._enqueue_request(
+            _get_inference_request(inputs, model_name, model_version, outputs,
+                                   request_id, sequence_id, sequence_start,
+                                   sequence_end))
 
 
 class InferInput:
@@ -1218,186 +1242,117 @@ class InferResult:
             return self._result
 
 
-class InferSequence:
-    """The objects of InferSequence provides context to a sequence
-    of inference requests.
+class InferStream:
+    """Supports sending inference requests and receiving corresponding
+    requests on a gRPC bi-directional stream.
 
     Parameters
     ----------
-    sequence_id : int
-        The unique identifier for the sequence being represented by the
-        object.
     callback : function
-        Python function that will be invoked for responses received for
-        the sequence. The function must reserve the last three arguments
-        (result, error, sequence_id) to hold InferResult,
-        InferenceServerException and sequence ID respectively which
-        will be provided to the function when executing the callback.
-        The ownership of these objects will be given to the user. The
-        'error' would be None for a successful inference.
-    use_streaming: bool
-        Indicates whether or not to use grpc bidirectional streaming
-        API while issuing the sequence.
-    response_pool: concurrent.futures.ThreadPoolExecutor
-        The thread pool to execute callbacks for the
-        response when using Streaming API. Will be ignored
-        when 'use_streaming' is set False. This pool is meant to be
-        shared among concurrent InferSequence objects. If not
-        provided the client will create a new thread for handling the
-        response stream for each InferSequence.
+        Python function that is invoked upon receiving response from
+        the underlying stream. The function must have last argument
+        as **kwargs. The client may provide upto three keyworded
+        arguments in **kwargs. For the successful inference, InferResult
+        object will be provided with key 'result'. If there is an
+        error in inference, InferenceServerException object will be
+        provided with key 'error'. If this response is part of a
+        sequence then the sequence ID is provided with the key 
+        'sequence_id'. The 'sequence_id' may not be provided if
+        it was not resolved before an error occured.
     """
 
-    def __init__(self,
-                 sequence_id,
-                 callback,
-                 use_streaming=True,
-                 response_pool=None):
-        self._id = sequence_id
+    def __init__(self, callback):
         self._callback = callback
         self._request_queue = queue.Queue()
-        self._sequence_added = self._sequence_delivered = False
-        self._is_sequence_start = True
-        self._use_streaming = use_streaming
-        if response_pool:
-            if type(response_pool
-                   ) != concurrent.futures.ThreadPoolExecutor:
-                raise_error(
-                    "'response_pool' should be of type concurrent.futures.ThreadPoolExecutor"
-                )
-        self._response_pool = response_pool
+        self._handler = None
+        self._headers = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def __del__(self):
+        self.close()
 
     def close(self):
-        """Gracefully close the request iterators. Use this to
-        end the request stream prematurely.
-
+        """Gracefully close underlying gRPC streams. Note that this call
+        blocks till response of all currently enqueued requests are not
+        received.
         """
-        self._request_queue.put(None)
+        if self._is_initialized():
+            self._request_queue.put(None)
+            if self._handler.is_alive():
+                self._handler.join()
+            self._handler = None
 
-    def reset(self, new_sequence_id, new_callback=None):
-        """Resets the object to handle new sequence. This
-        function allows these objects to be reused for 
-        multiple sequence. 
+    def set_headers(self, headers):
+        """Sets the specified headers to be used with the stream. Note
+        this call will block till response of all currently enqueued
+        requests onthe stream are not received. Also, the headers will
+        be sent only when the stream is established with first call
+        to 'async_stream_infer'.
 
         Parameters
         ----------
-        new_sequence_id : int
-            The unique identifier for the new sequence being
-            represented by the object.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include while establising gRPC stream.
+        """
+        self.close()
+        self._headers = headers
+
+    def set_callback(self, new_callback):
+        """Sets the specified callback with the stream. Note this call
+        will block till response of all currently enqueued requests
+        onthe stream are not received.
+
+        Parameters
+        ----------
         new_callback : function
-            The callback function to be used with the new sequence
-            to be handled by the object. By default, the value is
-            None, which means the callback of the current sequence
-            will be used for the new sequence. See 'callback'
-            parameter description for 'InferSequence'.
-        
-        Raises
-        ------
-        InferenceServerException
-            If the requests for the current sequence have not been
-            delivered. See 'InferSequence.sequence_delivered'
+            The new callback function to be applied to the stream.
         """
-        if not self._sequence_delivered:
-            raise_error('The InferSequence object can be reset only \
-                    once the current sequence is delivered')
+        # Needs to process all the expected responses of already issued
+        # requests before updating the callback.
+        self.close()
+        self._callback = new_callback
 
-        self._sequence_added = self._sequence_delivered = False
-        self._is_sequence_start = True
-        self._id = new_sequence_id
-
-        if not new_callback:
-            self._callback = new_callback
-    
-    def sequence_id(self):
-        """Returns the ID of the current sequence being handled
-        by the object.
-
-        Returns
-        -------
-        int
-            The ID of the current sequence
+    def _is_initialized(self):
+        """Returns whether the handler to this stream object
+        is initialized.
         """
-        return self._id
-
-    def sequence_delivered(self):
-        """Indicates whether or not the requests corresponding to the
-        current sequence have been delivered.
-
-        Returns
-        -------
-        bool
-            The truth value of whether the requests for the current
-            sequence have been delivered or not.
-        """
-        return self._sequence_delivered
+        return (self._handler is not None)
 
     def _init_handler(self, response_iterator):
-        """Initializes the response handlers to process and execute
-        the callbacks
+        """Initializes the handler to process the response from
+        stream and execute the callbacks.
 
         Parameters
         ----------
         response_iterator : iterator
-            The iterator over the response stream
+            The iterator over the gRPC response stream.
 
         """
-        if not self._response_pool:
-            # Create a new thread to handle the response stream for this sequence
-            worker_thread = threading.Thread(target=self._process_response,
-                                             args=(response_iterator,))
-            worker_thread.start()
-        else:
-            # Delegate the reponsibility of collecting response to the thread pool
-            self._response_pool.submit(self._process_response,
-                                       response_iterator)
+        if self._is_initialized():
+            raise_error(
+                'Attempted to initialize already initialized InferStream')
+        # Create a new thread to handle the gRPC response stream
+        self._handler = threading.Thread(target=self._process_response,
+                                         args=(response_iterator,))
+        self._handler.start()
 
-    def _add_request(self, inputs, model_name, model_version, outputs,
-                     request_id, is_sequence_end):
-        """Adds an inference request to the underlying sequence.
-        Note the added requests can be used only once.
+    def _enqueue_request(self, request):
+        """Enqueues the specified request object to be provided
+        in gRPC request stream.
 
         Parameters
         ----------
-        inputs : list
-            A list of InferInput objects, each describing data for a input
-            tensor required by the model.
-        outputs : list
-            A list of InferOutput objects, each describing how the output
-            data must be returned. If not specified all outputs produced
-            by the model will be returned using default settings.
-        request_id: str
-            Optional identifier for the request. If specified will be returned
-            in the response. Default value is 'None' which means no request_id
-            will be used.
-        is_sequence_end: bool
-            Indicates whether the request being added marks the end of the 
-            sequence. 'add_request' will raise an error when invoked after
-            adding a request with is_sequence_end flag set to True. The default
-            value for this flag is False.
-        
-        Raises
-        ------
-        InferenceServerException
-            If the user tries to add more requests in the sequence afer adding a
-            request with 'is_sequence_end' marker.
-        """
-        if self._sequence_added:
-            raise_error(
-                ('Can not add extra requests to the InferSequence object, '
-                 'after receiving sequence end of sequence request'))
-        if is_sequence_end:
-            self._sequence_added = True
+        request : ModelInferRequest
+            The protobuf message holding the ModelInferRequest
 
-        # Defer the request to be provided to stream
-        self._request_queue.put(
-            _get_inference_request(inputs=inputs,
-                                   model_name=model_name,
-                                   model_version=model_version,
-                                   outputs=outputs,
-                                   request_id=request_id,
-                                   sequence_id=self._id,
-                                   sequence_start=self._is_sequence_start,
-                                   sequence_end=is_sequence_end))
-        self._is_sequence_start = False
+        """
+        self._request_queue.put(request)
 
     def _get_request(self):
         """Returns the request details in the order they were added.
@@ -1417,16 +1372,7 @@ class InferSequence:
             'is_sequence_end' is delivered.
 
         """
-        if self._sequence_delivered:
-            raise_error(
-                ('[INTERNAL] Can not retrieve extra requests from '
-                 'the InferSequence object after the end of sequence request '
-                 'is delivered.'))
         request = self._request_queue.get()
-        if 'sequence_end' in request.parameters:
-            self._sequence_delivered = request.parameters[
-                'sequence_end'].bool_param
-
         return request
 
     def _process_response(self, responses):
@@ -1440,36 +1386,47 @@ class InferSequence:
             requests in the sequence.
         
         """
-        for response in responses:
-            error = result = None
-            if not response.status.code:
-                result = InferResult(response.infer_response)
-            else:
-                error = InferenceServerException(msg=response.status.message)
-            self._callback(result=result, error=error, sequence_id=self._id)
+        try:
+            for response in responses:
+                if not response.status.code:
+                    result = InferResult(response.infer_response)
+                    if not response.sequence_id:
+                        self._callback(result=result)
+                    else:
+                        self._callback(result=result,
+                                       sequence_id=response.sequence_id)
+                else:
+                    error = InferenceServerException(
+                        msg=response.status.message)
+                    if not response.sequence_id:
+                        self._callback(error=error)
+                    else:
+                        self._callback(error=error,
+                                       sequence_id=response.sequence_id)
+
+        except grpc.RpcError as rpc_error:
+            error = get_error_grpc(rpc_error)
+            self._callback(error=error)
 
 
 class _RequestIterator:
-    """An iterator class to generate and iterate through ModelInferRequest.
+    """An iterator class to provide data tp gRPC request stream.
 
     Parameters
     ----------
-    sequence : InferSequence
-        The InferSequence that holds the context to a sequence.
+    stream : InferStream
+        The InferStream that holds the context to an active stream.
 
     """
 
-    def __init__(self, sequence):
-        self._sequence = sequence
+    def __init__(self, stream):
+        self._stream = stream
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        if self._sequence.sequence_delivered():
-            raise StopIteration
-
-        request = self._sequence._get_request()
+        request = self._stream._get_request()
         if not request:
             raise StopIteration
 

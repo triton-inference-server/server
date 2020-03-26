@@ -32,7 +32,7 @@ import sys
 import queue
 
 import tritongrpcclient.core as grpcclient
-from tritongrpcclient.utils import get_stream_response_processor_pool
+from tritongrpcclient.utils import InferenceServerException
 
 FLAGS = None
 
@@ -43,19 +43,16 @@ class UserData:
         self._completed_requests = queue.Queue()
 
 
-# Callback function used for InferSequence. Note the last
-# three parameters are reserved for InferResult, InferenceServerException
-# and the sequence ID for the response.
-def completion_callback(user_data, result, error, sequence_id):
-    user_data._completed_requests.put((result, error, sequence_id))
+# Callback function to be used with the response received over
+# InferStream object. Note the last argument is **kwargs.
+def callback(user_data, **kwargs):
+    # Enqueue all the arguments on the user queue
+    # to be processed later.
+    user_data._completed_requests.put(kwargs)
 
 
-def async_send(triton_client, response_pool, values, batch_size, sequence_id,
-               user_data, model_name, model_version):
-    # Prepare the sequence object
-    sequence = grpcclient.InferSequence(sequence_id,
-                                        partial(completion_callback, user_data),
-                                        response_pool=response_pool)
+def async_send(triton_client, stream, values, batch_size, sequence_id,
+               model_name, model_version):
 
     count = 1
     for value in values:
@@ -70,11 +67,13 @@ def async_send(triton_client, response_pool, values, batch_size, sequence_id,
         outputs = []
         outputs.append(grpcclient.InferOutput('OUTPUT'))
         # Issue the asynchronous sequence inference.
-        triton_client.async_sequence_infer(sequence=sequence,
-                                           inputs=inputs,
-                                           model_name=model_name,
-                                           outputs=outputs,
-                                           end_of_sequence=(count == len(values)))
+        triton_client.async_stream_infer(stream=stream,
+                                         inputs=inputs,
+                                         model_name=model_name,
+                                         outputs=outputs,
+                                         sequence_id=sequence_id,
+                                         sequence_start=(count == 1),
+                                         sequence_end=(count == len(values)))
         count = count + 1
 
 
@@ -133,34 +132,47 @@ if __name__ == '__main__':
     result0_list = []
     result1_list = []
 
-    user_data_0 = UserData()
-    user_data_1 = UserData()
+    user_data = UserData()
 
-    # Create the thread pool to handle the response stream from the
-    # server. It is usually advisable to keep the size of the thread
-    # pool to be equal to the expected number of concurrent sequences.
-    response_pool = get_stream_response_processor_pool(2)
-
-    # Now send the inference sequences...
-    async_send(triton_client, response_pool, [0] + values, batch_size,
-               sequence_id0, user_data_0, model_name, model_version)
-    async_send(triton_client, response_pool,
-               [100] + [-1 * val for val in values], batch_size, sequence_id1,
-               user_data_1, model_name, model_version)
-
-    # Process all the requests
-    while len(result0_list) <= len(values):
-        (result, error, sequence_id) = user_data_0._completed_requests.get()
-        if error:
+    # It is advisable to use InferStream object within with..as clause
+    # when sending streaming requests. This ensures the InferStream object
+    # is closed when the block inside with exits.
+    with grpcclient.InferStream(
+            callback=partial(callback, user_data)) as stream:
+        # Now send the inference sequences...
+        try:
+            async_send(triton_client, stream, [0] + values, batch_size,
+                       sequence_id0, model_name, model_version)
+            async_send(triton_client, stream,
+                       [100] + [-1 * val for val in values], batch_size,
+                       sequence_id1, model_name, model_version)
+        except InferenceServerException as error:
             print(error)
             sys.exit(1)
-        result0_list.append(result.as_numpy('OUTPUT'))
-    while len(result1_list) <= len(values):
-        (result, error, sequence_id) = user_data_1._completed_requests.get()
-        if error:
-            print(error)
-            sys.exit(1)
-        result1_list.append(result.as_numpy('OUTPUT'))
+
+        # Retrieve results...
+        recv_count = 0
+        while recv_count < (2 * (len(values) + 1)):
+            data_item = user_data._completed_requests.get()
+            if 'error' in data_item:
+                error_string = "Encountered an inference error. Details: {}".format(
+                    data_item['error'])
+                if 'sequence_id' in data_item:
+                    error_string = error_string + ", sequence id : {}".format(
+                        data_item['sequence_id'])
+                print(error_string)
+                sys.exit(1)
+            else:
+                this_id = data_item['sequence_id']
+                if this_id == sequence_id0:
+                    result0_list.append(data_item['result'].as_numpy('OUTPUT'))
+                elif this_id == sequence_id1:
+                    result1_list.append(data_item['result'].as_numpy('OUTPUT'))
+                else:
+                    print("unexpected sequence id returned by the server {}".
+                          format(this_id))
+                    sys.exit(1)
+            recv_count = recv_count + 1
 
     seq0_expected = 0
     seq1_expected = 100
@@ -185,4 +197,4 @@ if __name__ == '__main__':
                 seq0_expected += sequence_id0
                 seq1_expected += sequence_id0
 
-    print("PASS: Sequence")
+    print("PASS: Sequence + Streaming")

@@ -29,8 +29,8 @@ import struct
 import concurrent.futures
 
 __all__ = [
-    'raise_error', 'get_stream_response_processor_pool', 'np_to_triton_dtype',
-    'triton_to_np_dtype', 'InferenceServerException', 'serialize_byte_tensor',
+    'raise_error', 'np_to_triton_dtype', 'triton_to_np_dtype',
+    'InferenceServerException', 'serialize_byte_tensor',
     'deserialize_bytes_tensor'
 ]
 
@@ -40,24 +40,6 @@ def raise_error(msg):
     Raise error with the provided message
     """
     raise InferenceServerException(msg=msg) from None
-
-
-def get_stream_response_processor_pool(max_workers):
-    """
-    Creates a thread pool of specified size.
-
-    Parameters
-    ----------
-    max_workers : int
-        The size of the thread pool.
-
-    Returns
-    -------
-    concurrent.futures.ThreadPoolExecutor
-        The executor object.
-    
-    """
-    return concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
 
 
 class InferenceServerException(Exception):

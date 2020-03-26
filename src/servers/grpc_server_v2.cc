@@ -336,11 +336,16 @@ class HandlerState {
     context_ = context;
     unique_id_ = RequestStatusUtil::NextUniqueRequestId();
     step_ = start_step;
+    sequence_id_ = 0;
     request_.Clear();
     response_.Clear();
   }
 
   void Release() { context_ = nullptr; }
+
+  void SetSequenceId(const uint64_t sequence_id) { sequence_id_ = sequence_id; }
+
+  uint64_t GetSequenceId() { return sequence_id_; }
 
   std::shared_ptr<Context> context_;
 
@@ -357,6 +362,10 @@ class HandlerState {
   // For inference requests the allocator payload, unused for other
   // requests.
   AllocPayload alloc_payload_;
+
+  // For inference requests that uses streaming + sequence id, unused
+  // for other requests.
+  uint64_t sequence_id_;
 };
 
 //
@@ -2614,6 +2623,16 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
       err = SetInferenceRequestOptions(request_options, request);
     }
 
+    if (err == nullptr) {
+      const auto& sequence_id_it = request.parameters().find("sequence_id");
+      if (sequence_id_it != request.parameters().end()) {
+        // The sequence_id datatype would already have been verified while
+        // setting the option.
+        const auto& infer_param = sequence_id_it->second;
+        state->SetSequenceId(infer_param.int64_param());
+      }
+    }
+
     TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
     if (err == nullptr) {
       err = TRTSERVER_InferenceRequestProviderNewV2(
@@ -2672,6 +2691,12 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
       response.mutable_status()->set_code(status.error_code());
       response.mutable_status()->set_message(status.error_message());
+
+      // Set the sequence ID of the response
+      uint64_t sequence_id = state->GetSequenceId();
+      if (sequence_id != 0) {
+        response.set_sequence_id(sequence_id);
+      }
 
       response.mutable_infer_response()->Clear();
 
@@ -2857,6 +2882,12 @@ ModelStreamInferHandler::StreamInferComplete(
   GrpcStatusUtil::Create(&status, err);
   response.mutable_status()->set_code(status.error_code());
   response.mutable_status()->set_message(status.error_message());
+
+  // Set the sequence ID of the response
+  uint64_t sequence_id = state->GetSequenceId();
+  if (sequence_id != 0) {
+    response.set_sequence_id(sequence_id);
+  }
 
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'state'.

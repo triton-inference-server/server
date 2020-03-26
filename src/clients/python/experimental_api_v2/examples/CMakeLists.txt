@@ -49,7 +49,8 @@ if(${TRTIS_ENABLE_GRPC_V2})
       simple_grpc_v2_health_metadata.py
       simple_grpc_v2_async_infer_client.py
       simple_grpc_v2_infer_client.py
-      simple_grpc_v2_sequence_infer_client.py
+      simple_grpc_v2_sequence_stream_infer_client.py
+      simple_grpc_v2_sequence_sync_infer_client.py
       simple_grpc_v2_string_infer_client.py
       simple_grpc_v2_shm_client.py
       simple_grpc_v2_model_control.py

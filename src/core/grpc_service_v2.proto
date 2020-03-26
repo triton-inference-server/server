@@ -830,6 +830,15 @@ message ModelStreamInferResponse
   //@@     Holds the results of the request.
   //@@
   ModelInferResponse infer_response = 2;
+
+  //@@
+  //@@  .. cpp:var:: uint64 sequence_id
+  //@@
+  //@@     The id of the sequence this response belongs to.
+  //@@     The value of zero indicates the response does not
+  //@@     belong to any stream.
+  //@@
+  uint64 sequence_id = 3;
 }
 
 //@@

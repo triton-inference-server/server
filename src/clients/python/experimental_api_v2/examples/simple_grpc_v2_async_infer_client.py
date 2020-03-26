@@ -82,11 +82,11 @@ if __name__ == '__main__':
     # inference as tritongrpcclient.core.InferResult in result. For successful
     # inference, error will be None, otherwise it will be an object of
     # tritongrpcclient.utils.InferenceServerException holding the error details.
-    def callback(user_data, result, error):
-        if not error:
-            user_data.append(result)
+    def callback(user_data, **kwargs):
+        if 'error' in kwargs:
+            user_data.append(kwargs['error'])
         else:
-            user_data.append(error)
+            user_data.append(kwargs['result'])
 
     # list to hold the results of inference.
     user_data = []
