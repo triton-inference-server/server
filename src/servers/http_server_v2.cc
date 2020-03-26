@@ -1509,6 +1509,26 @@ CheckSharedMemoryData(
   return use_shared_memory;
 }
 
+bool
+CheckClassificationOutput(
+    const rapidjson::Value& request_output, uint64_t* num_classes)
+{
+  bool use_classification = false;
+  rapidjson::Value::ConstMemberIterator itr =
+      request_output.FindMember("parameters");
+  if (itr != request_output.MemberEnd()) {
+    const rapidjson::Value& params = itr->value;
+    rapidjson::Value::ConstMemberIterator iter =
+        params.FindMember("classification");
+    if (iter != params.MemberEnd()) {
+      *num_classes = iter->value.GetInt();
+      use_classification = true;
+    }
+  }
+
+  return use_classification;
+}
+
 TRTSERVER_Error*
 HTTPAPIServerV2::EVBufferToJson(
     rapidjson::Document* document, evbuffer_iovec* v, int* v_idx,
@@ -1747,31 +1767,39 @@ HTTPAPIServerV2::EVBufferToInput(
     const char* output_name = output["name"].GetString();
     TRTSERVER2_InferenceRequestAddRequestedOutput(irequest, output_name);
 
-    // Initialize System Memory for Output if it uses shared memory
-    uint64_t offset = 0, byte_size = 0;
-    const char* shm_region = nullptr;
-    if (CheckSharedMemoryData(output, &shm_region, &offset, &byte_size)) {
-      if (output.FindMember("data") == output.MemberEnd()) {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            "must not specify 'data' field in request output when using shared "
-            "memory");
+    uint64_t class_size = 0;
+    if (!CheckClassificationOutput(output, &class_size)) {
+      // Initialize System Memory for Output if it uses shared memory
+      uint64_t offset = 0, byte_size = 0;
+      const char* shm_region = nullptr;
+      if (CheckSharedMemoryData(output, &shm_region, &offset, &byte_size)) {
+        if (output.FindMember("data") == output.MemberEnd()) {
+          return TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INVALID_ARG,
+              "must not specify 'data' field in request output when using "
+              "shared "
+              "memory");
+        }
+
+        void* base;
+        TRTSERVER_Memory_Type memory_type;
+        int64_t memory_type_id;
+        RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
+            shm_region, offset, &base, &memory_type, &memory_type_id));
+
+        // if shm_map_ does not exist, then create an empty shm_map
+        if (infer_req->response_meta_data_.shm_map_ == nullptr) {
+          infer_req->response_meta_data_.shm_map_ = new TensorShmMap;
+        }
+
+        infer_req->response_meta_data_.shm_map_->emplace(
+            std::string(output_name),
+            ShmInfo{static_cast<void*>(base), byte_size, memory_type,
+                    memory_type_id});
       }
-
-      void* base;
-      TRTSERVER_Memory_Type memory_type;
-      int64_t memory_type_id;
-      RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
-          shm_region, offset, &base, &memory_type, &memory_type_id));
-
-      // if shm_map_ does not exist, then create an empty shm_map
-      if (infer_req->response_meta_data_.shm_map_ == nullptr) {
-        infer_req->response_meta_data_.shm_map_ = new TensorShmMap;
-      }
-
-      infer_req->response_meta_data_.shm_map_->emplace(
-          std::string(output_name), ShmInfo{static_cast<void*>(base), byte_size,
-                                            memory_type, memory_type_id});
+    } else {
+      TRTSERVER2_InferenceRequestSetRequestedOutputClassificationCount(
+          irequest, output_name, class_size);
     }
   }
 
@@ -1999,55 +2027,43 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     rapidjson::Value name_val(output_name, strlen(output_name));
     output_metadata[i].AddMember("name", name_val, allocator);
 
-    int class_size = 0;
-    rapidjson::Value::ConstMemberIterator itr =
-        request_output.FindMember("parameters");
-    if (itr != request_output.MemberEnd()) {
-      const rapidjson::Value& params = itr->value;
-      auto iter = params.FindMember("classification");
-      if (iter != params.MemberEnd()) {
-        class_size = iter->value.GetInt();
-      }
+    // Get shape of Output (Assume max dimensions are 6)
+    uint64_t dim_count = 6;
+    std::vector<int64_t> shape_vec(dim_count);
+    err = TRTSERVER2_InferenceRequestOutputShape(
+        request, output_name, &shape_vec[0], &dim_count);
+    if (err != nullptr) {
+      return EVHTP_RES_BADREQ;
     }
 
-    if (class_size == 0) {
-      // Get shape of Output
-      // Assume max dimension of 6
-      uint64_t dim_count = 6;
-      std::vector<int64_t> shape_vec(dim_count);
-      err = TRTSERVER2_InferenceRequestOutputShape(
-          request, output_name, &shape_vec[0], &dim_count);
-      if (err != nullptr) {
-        return EVHTP_RES_BADREQ;
-      }
+    rapidjson::Value shape_array(rapidjson::kArrayType);
+    for (size_t i = 0; i < dim_count; i++) {
+      shape_array.PushBack(shape_vec[i], allocator);
+    }
+    output_metadata[i].AddMember("shape", shape_array, allocator);
 
-      rapidjson::Value shape_array(rapidjson::kArrayType);
-      for (size_t i = 0; i < dim_count; i++) {
-        shape_array.PushBack(shape_vec[i], allocator);
-      }
-      output_metadata[i].AddMember("shape", shape_array, allocator);
+    const char* datatype;
+    err = TRTSERVER2_InferenceRequestOutputDataType(
+        request, output_name, &datatype);
+    if (err != nullptr) {
+      return EVHTP_RES_BADREQ;
+    }
 
-      const char* datatype;
-      err = TRTSERVER2_InferenceRequestOutputDataType(
-          request, output_name, &datatype);
-      if (err != nullptr) {
-        return EVHTP_RES_BADREQ;
-      }
+    rapidjson::Value datatype_val(datatype, strlen(datatype));
+    output_metadata[i].AddMember("datatype", datatype_val, allocator);
 
-      rapidjson::Value datatype_val(datatype, strlen(datatype));
-      output_metadata[i].AddMember("datatype", datatype_val, allocator);
+    const void* base;
+    size_t byte_size;
+    TRTSERVER_Memory_Type memory_type;
+    int64_t memory_type_id;
+    err = TRTSERVER2_InferenceRequestOutputData(
+        request, output_name, &base, &byte_size, &memory_type, &memory_type_id);
+    if (err != nullptr) {
+      return EVHTP_RES_BADREQ;
+    }
 
-      const void* base;
-      size_t byte_size;
-      TRTSERVER_Memory_Type memory_type;
-      int64_t memory_type_id;
-      err = TRTSERVER2_InferenceRequestOutputData(
-          request, output_name, &base, &byte_size, &memory_type,
-          &memory_type_id);
-      if (err != nullptr) {
-        return EVHTP_RES_BADREQ;
-      }
-
+    uint64_t class_size = 0;
+    if (!CheckClassificationOutput(request_output, &class_size)) {
       if (CheckBinaryOutputData(request_output)) {
         // Write outputs into binary buffer
         evbuffer_add(req_->buffer_out, base, byte_size);
@@ -2071,8 +2087,56 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
               output_metadata[i], allocator, const_cast<void*>(base));
         }
       }
+    } else {
+      // Case when output uses classification
+      uint64_t batch_size = 0;
+      err = TRTSERVER2_InferenceRequestOutputClassBatchSize(
+          request, output_name, &batch_size);
+      if (err != nullptr) {
+        return EVHTP_RES_BADREQ;
+      }
+
+      std::vector<int32_t> idx(batch_size * class_size);
+      std::vector<float> value(batch_size * class_size);
+      std::vector<char*> label(batch_size * class_size);
+      err = TRTSERVER2_InferenceRequestOutputClasses(
+          request, output_name, idx.data(), value.data(), label.data());
+      if (err != nullptr) {
+        return EVHTP_RES_BADREQ;
+      }
+
+      rapidjson::Value params;
+      auto itr = output_metadata[i].FindMember("parameters");
+      if (itr != output_metadata[i].MemberEnd()) {
+        params = itr->value;
+      } else {
+        params.SetObject();
+        output_metadata[i].AddMember("parameters", params, allocator);
+      }
+
+      rapidjson::Value batch_class_array(rapidjson::kArrayType);
+      size_t count = 0;
+      for (size_t i = 0; i < batch_size; i++) {
+        rapidjson::Value class_array(rapidjson::kArrayType);
+        for (size_t j = 0; j < class_size; j++) {
+          std::string class_string;
+          std::string label_string = std::string(label[count]);
+          if (label_string.empty()) {
+            class_string =
+                std::to_string(idx[count]) + ":" + std::to_string(value[count]);
+          } else {
+            class_string = std::to_string(idx[count]) + ":" +
+                           std::to_string(value[count]) + ":" + label_string;
+          }
+          rapidjson::Value class_str(class_string.c_str(), class_string.size());
+          class_array.PushBack(class_str, allocator);
+          count++;
+        }
+        batch_class_array.PushBack(class_array, allocator);
+      }
+
+      params.AddMember("data", batch_class_array, allocator);
     }
-    // TODO Add case for classification
     response_outputs.PushBack(output_metadata[i], allocator);
   }
   response_json.AddMember("outputs", response_outputs, allocator);
