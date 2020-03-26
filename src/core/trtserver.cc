@@ -2151,6 +2151,7 @@ TRTSERVER2_InferenceRequestOutputDataType(
   return TRTSERVER_ErrorNew(TRTSERVER_ERROR_INVALID_ARG, "unknown output");
 }
 
+// TEMPORARY: will be removed as part of V1->V2 transition
 TRTSERVER_Error*
 TRTSERVER2_InferenceRequestOutputClassBatchSize(
     TRTSERVER2_InferenceRequest* inference_request, const char* name,
@@ -2169,6 +2170,7 @@ TRTSERVER2_InferenceRequestOutputClassBatchSize(
   return TRTSERVER_ErrorNew(TRTSERVER_ERROR_INVALID_ARG, "unknown output");
 }
 
+// TEMPORARY: will be removed as part of V1->V2 transition
 TRTSERVER_Error*
 TRTSERVER2_InferenceRequestOutputClasses(
     TRTSERVER2_InferenceRequest* inference_request, const char* name,

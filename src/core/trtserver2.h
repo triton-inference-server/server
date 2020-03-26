@@ -268,6 +268,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER2_InferenceRequestOutputDataType(
     TRTSERVER2_InferenceRequest* inference_request, const char* name,
     const char** datatype);
 
+// TEMPORARY: will be removed as part of V1->V2 transition
 /// Get the batch_size of an output tensor.
 /// \param inference_request The request object.
 /// \param name The name of the output.
@@ -278,6 +279,7 @@ TRTSERVER2_InferenceRequestOutputClassBatchSize(
     TRTSERVER2_InferenceRequest* inference_request, const char* name,
     uint64_t* batch_size);
 
+// TEMPORARY: will be removed as part of V1->V2 transition
 /// Get the classification results of an output tensor.
 /// \param inference_request The request object.
 /// \param name The name of the output.
