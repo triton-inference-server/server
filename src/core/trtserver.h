@@ -516,6 +516,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestOptionsAddOutput(
     TRTSERVER_InferenceRequestOptions* request_options,
     const char* output_name);
 
+// TEMPORARY: will be removed as part of V1->V2 transition
 /// Request the classification values of the specified output to be returned
 /// for requests associated with the request options.
 /// \param request_options The request options object.
