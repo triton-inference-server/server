@@ -211,7 +211,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
         model_regex_(
-            R"(/v2/models/([^/]+)(?:/version/([0-9]+))?(?:/(infer|ready))?)"),
+            R"(/v2/models/([^/]+)(?:/version/([0-9]+))?(?:/(infer|ready|config))?)"),
         modelcontrol_regex_(
             R"(/v2/repository(?:/([^/]+))?/(index|model/([^/]+)/(load|unload)))"),
         systemsharedmemory_regex_(
@@ -324,6 +324,9 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
   void HandleModelMetadata(
+      evhtp_request_t* req, const std::string& model_name,
+      const std::string& model_version_str);
+  void HandleModelConfig(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
   void HandleInfer(
@@ -796,6 +799,10 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
       // model infer
       HandleInfer(req, model_name, version);
       return;
+    } else if (kind == "config") {
+      // model configuration
+      HandleModelConfig(req, model_name, version);
+      return;
     } else if (kind == "") {
       // model metadata
       HandleModelMetadata(req, model_name, version);
@@ -1161,6 +1168,77 @@ HTTPAPIServerV2::HandleModelMetadata(
     document.Accept(writer);
     const char* model_metadata = buffer.GetString();
     evbuffer_add(req->buffer_out, model_metadata, strlen(model_metadata));
+    evhtp_send_reply(req, EVHTP_RES_OK);
+  } else {
+    EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+  }
+
+  TRTSERVER_ErrorDelete(err);
+}
+
+void
+HTTPAPIServerV2::HandleModelConfig(
+    evhtp_request_t* req, const std::string& model_name,
+    const std::string& model_version_str)
+{
+  if (req->method != htp_method_GET) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  if (model_name.empty()) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+
+  ServerStatus server_status;
+  TRTSERVER_Protobuf* model_status_protobuf = nullptr;
+  TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
+      server_.get(), model_name.c_str(), &model_status_protobuf);
+  if (err == nullptr) {
+    const char* status_buffer;
+    size_t status_byte_size;
+    err = TRTSERVER_ProtobufSerialize(
+        model_status_protobuf, &status_buffer, &status_byte_size);
+    if (err == nullptr) {
+      if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
+        err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
+      }
+    }
+  }
+
+  TRTSERVER_ProtobufDelete(model_status_protobuf);
+
+  if (err == nullptr) {
+    const auto& nitr = server_status.model_status().find(model_name);
+    if (nitr == server_status.model_status().end()) {
+      err = TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "no metadata available for unknown model '" + model_name + "'")
+              .c_str());
+    } else {
+      // All models share the same metadata across versions so we ignore
+      // model_version.
+      const ModelStatus& model_status = nitr->second;
+      const ModelConfig& model_config = model_status.config();
+
+      std::string model_config_json;
+      ::google::protobuf::util::MessageToJsonString(
+          model_config, &model_config_json);
+      evbuffer_add(
+          req->buffer_out, model_config_json.c_str(),
+          model_config_json.size());
+    }
+  }
+
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new("Content-Type", "application/json", 1, 1));
+
+  if (err == nullptr) {
     evhtp_send_reply(req, EVHTP_RES_OK);
   } else {
     EVBufferAddErrorJson(req->buffer_out, err);
