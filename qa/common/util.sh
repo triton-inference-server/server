@@ -87,6 +87,38 @@ function wait_for_server_ready() {
     WAIT_RET=1
 }
 
+# Wait until HTTP V2 server health endpoint show ready. Sets WAIT_RET to 0 on
+# success, 1 on failure
+function wait_for_server_ready_v2() {
+    local spid="$1"; shift
+    local wait_time_secs="${1:-30}"; shift
+
+    WAIT_RET=0
+
+    local wait_secs=$wait_time_secs
+    until test $wait_secs -eq 0 ; do
+        if ! kill -0 $spid; then
+            echo "=== Server not running."
+            WAIT_RET=1
+            return
+        fi
+
+        sleep 1;
+
+        set +e
+        code=`curl -s -w %{http_code} localhost:8000/v2/health/ready`
+        set -e
+        if [ "$code" == "200" ]; then
+            return
+        fi
+
+        ((wait_secs--));
+    done
+
+    echo "=== Timeout $wait_time_secs secs. Server not ready."
+    WAIT_RET=1
+}
+
 # Wait until server health endpoint show live. Sets WAIT_RET to 0 on
 # success, 1 on failure
 function wait_for_server_live() {
@@ -107,6 +139,38 @@ function wait_for_server_live() {
 
         set +e
         code=`curl -s -w %{http_code} localhost:8000/api/health/live`
+        set -e
+        if [ "$code" == "200" ]; then
+            return
+        fi
+
+        ((wait_secs--));
+    done
+
+    echo "=== Timeout $wait_time_secs secs. Server not live."
+    WAIT_RET=1
+}
+
+# Wait until HTTP V2 server health endpoint show live. Sets WAIT_RET to 0 on
+# success, 1 on failure
+function wait_for_server_live_v2() {
+    local spid="$1"; shift
+    local wait_time_secs="${1:-30}"; shift
+
+    WAIT_RET=0
+
+    local wait_secs=$wait_time_secs
+    until test $wait_secs -eq 0 ; do
+        if ! kill -0 $spid; then
+            echo "=== Server not running."
+            WAIT_RET=1
+            return
+        fi
+
+        sleep 1;
+
+        set +e
+        code=`curl -s -w %{http_code} localhost:8000/v2/health/live`
         set -e
         if [ "$code" == "200" ]; then
             return
@@ -177,6 +241,38 @@ function run_server () {
     fi
 }
 
+# Run inference server. Return once HTTP V2 server's health endpoint shows
+# ready or timeout expires.  Sets SERVER_PID to pid of SERVER, or 0 if
+# error (including expired timeout)
+function run_server_v2 () {
+    SERVER_PID=0
+
+    if [ -z "$SERVER" ]; then
+        echo "=== SERVER must be defined"
+        return
+    fi
+
+    if [ ! -f "$SERVER" ]; then
+        echo "=== $SERVER does not exist"
+        return
+    fi
+
+    if [ -z "$SERVER_LD_PRELOAD" ]; then
+      echo "=== Running $SERVER $SERVER_ARGS"
+    else
+      echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
+    fi
+
+    LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    SERVER_PID=$!
+
+    wait_for_server_ready_v2 $SERVER_PID $SERVER_TIMEOUT
+    if [ "$WAIT_RET" != "0" ]; then
+        kill $SERVER_PID || true
+        SERVER_PID=0
+    fi
+}
+
 # Run inference server. Return once server's health endpoint shows
 # live or timeout expires.  Sets SERVER_PID to pid of SERVER, or 0 if
 # error (including expired timeout)
@@ -203,6 +299,38 @@ function run_server_tolive () {
     SERVER_PID=$!
 
     wait_for_server_live $SERVER_PID $SERVER_TIMEOUT
+    if [ "$WAIT_RET" != "0" ]; then
+        kill $SERVER_PID || true
+        SERVER_PID=0
+    fi
+}
+
+# Run inference server. Return once HTTP V2 server's health endpoint shows
+# live or timeout expires.  Sets SERVER_PID to pid of SERVER, or 0 if
+# error (including expired timeout)
+function run_server_tolive_v2 () {
+    SERVER_PID=0
+
+    if [ -z "$SERVER" ]; then
+        echo "=== SERVER must be defined"
+        return
+    fi
+
+    if [ ! -f "$SERVER" ]; then
+        echo "=== $SERVER does not exist"
+        return
+    fi
+
+    if [ -z "$SERVER_LD_PRELOAD" ]; then
+      echo "=== Running $SERVER $SERVER_ARGS"
+    else
+      echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
+    fi
+
+    LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    SERVER_PID=$!
+
+    wait_for_server_live_v2 $SERVER_PID $SERVER_TIMEOUT
     if [ "$WAIT_RET" != "0" ]; then
         kill $SERVER_PID || true
         SERVER_PID=0

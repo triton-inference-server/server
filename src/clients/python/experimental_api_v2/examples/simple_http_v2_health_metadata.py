@@ -92,8 +92,9 @@ if __name__ == '__main__':
     try:
         metadata = triton_client.get_model_metadata("wrong_model_name")
     except InferenceServerException as ex:
-        if "no status available for unknown model" in ex.message():
-            sys.exit(0)
-
-    print("FAILED : get_model_metadata wrong_model_name")
-    sys.exit(1)
+        if "no status available for unknown model" not in ex.message():
+            print("FAILED : get_model_metadata wrong_model_name")
+            sys.exit(1)
+    else:
+        print("FAILED : get_model_metadata wrong_model_name")
+        sys.exit(1)

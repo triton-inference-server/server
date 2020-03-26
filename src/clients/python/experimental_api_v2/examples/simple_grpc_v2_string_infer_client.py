@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     results = triton_client.infer(inputs, outputs, model_name)
 
-    # Get the output arrays from the
+    # Get the output arrays from the results
     output0_data = results.as_numpy('OUTPUT0')
     output1_data = results.as_numpy('OUTPUT1')
 

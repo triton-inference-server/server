@@ -73,11 +73,7 @@ SERVER=/opt/tritonserver/bin/trtserver
 SERVER_ARGS="--model-repository=$DATADIR --api-version 2"
 source ../common/util.sh
 
-# FIXMEPV2
-# Cannot use run_server since it repeatedly curls the (old) HTTP health endpoint to know
-# when the server is ready. This endpoint would not exist in future.
-run_server_nowait
-sleep 10
+run_server_v2
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -87,11 +83,6 @@ fi
 # Test health
 python $SIMPLE_HEALTH_CLIENT -v >> ${CLIENT_LOG}.health 2>&1
 if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.health
-    RET=1
-fi
-
-if [ $(cat ${CLIENT_LOG}.health | grep "PASS" | wc -l) -ne 7 ]; then
     cat ${CLIENT_LOG}.health
     RET=1
 fi
@@ -133,11 +124,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit --api-version 2"
-# FIXMEPV2
-# Cannot use run_server since it repeatedly curls the (old) HTTP health endpoint to know
-# when the server is ready. This endpoint would not exist in future.
-run_server_nowait
-sleep 10
+run_server_v2
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
