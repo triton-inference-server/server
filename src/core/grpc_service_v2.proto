@@ -443,6 +443,11 @@ message InferParameter
   }
 }
 
+//@@
+//@@.. cpp:var:: message ModelStatisticsRequest
+//@@
+//@@   Request message for ModelStatistics.
+//@@
 message ModelStatisticsRequest
 {
   //@@  .. cpp:var:: string name
@@ -531,13 +536,18 @@ message InferStatistics
   StatisticDuration compute_output = 6;
 }
 
+//@@
+//@@.. cpp:var:: message ModelStatisticsResponse
+//@@
+//@@   Response message for ModelStatistics.
+//@@
 message ModelStatisticsResponse
 {
-  //@@  .. cpp:var:: map<string, InferenceStatistics> inference
+  //@@  .. cpp:var:: map<string, InferStatistics> inference
   //@@
   //@@     Map from version to inference statistics for that version.
   //@@
-  map<string, InferenceStatistics> inference = 1;
+  map<string, InferStatistics> inference = 1;
 }
 
 //@@

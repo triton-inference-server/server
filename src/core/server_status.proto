@@ -167,6 +167,28 @@ message InferRequestStats
   //@@     available model instance.
   //@@
   StatDuration queue = 4;
+
+  //@@  .. cpp:var:: StatisticDuration compute_input
+  //@@
+  //@@    The count and cumulative duration to prepare input tensor data as
+  //@@    required by the model framework / backend. For example, this duration
+  //@@    should include the time to copy input tensor data to the GPU.
+  //@@
+  StatDuration compute_input = 5;
+
+  //@@  .. cpp:var:: StatisticDuration compute_infer
+  //@@
+  //@@     The count and cumulative duration to execute the model.
+  //@@
+  StatDuration compute_infer = 6;
+
+  //@@  .. cpp:var:: StatisticDuration compute_output
+  //@@
+  //@@     The count and cumulative duration to extract output tensor data
+  //@@     produced by the model framework / backend. For example, this duration
+  //@@     should include the time to copy output tensor data from the GPU.
+  //@@
+  StatDuration compute_output = 7;
 }
 
 //@@
