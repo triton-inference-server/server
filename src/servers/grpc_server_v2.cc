@@ -319,7 +319,7 @@ class HandlerState {
     // The step of the entire context.
     Steps step_;
 
-    // True if this context should finish with OK, false if
+    // True if this context should finish with OK status, false if
     // should finish with CANCELLED status.
     bool finish_ok_;
   };

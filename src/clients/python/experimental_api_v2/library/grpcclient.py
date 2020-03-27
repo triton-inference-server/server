@@ -27,7 +27,6 @@
 import base64
 import numpy as np
 import grpc
-import concurrent.futures
 import rapidjson as json
 import threading
 import queue
@@ -1289,8 +1288,8 @@ class InferStream:
 
     def set_headers(self, headers):
         """Sets the specified headers to be used with the stream. Note
-        this call will block till response of all currently enqueued
-        requests onthe stream are not received. Also, the headers will
+        this call will block till responses of all currently enqueued
+        requests on the stream are received. Also, the headers will
         be sent only when the stream is established with first call
         to 'async_stream_infer'.
 
@@ -1305,8 +1304,8 @@ class InferStream:
 
     def set_callback(self, new_callback):
         """Sets the specified callback with the stream. Note this call
-        will block till response of all currently enqueued requests
-        onthe stream are not received.
+        will block till all the responses of currently enqueued requests
+        on the stream are received.
 
         Parameters
         ----------
@@ -1357,19 +1356,13 @@ class InferStream:
     def _get_request(self):
         """Returns the request details in the order they were added.
         The call to this function will block until the requests
-        are available in the queue. InferSequence.add_request
+        are available in the queue. InferStream._enqueue_request
         adds the request to the queue.
 
         Returns
         -------
         protobuf message
             The ModelInferRequest protobuf message.
-
-        Raises
-        ------
-        InferenceServerException
-            If the user tries get additional requests after the request with
-            'is_sequence_end' is delivered.
 
         """
         request = self._request_queue.get()
@@ -1383,7 +1376,7 @@ class InferStream:
         ----------
         responses : iterator
             The iterator to the response from the server for the
-            requests in the sequence.
+            requests in the stream.
         
         """
         try:

@@ -77,11 +77,8 @@ if __name__ == '__main__':
     outputs.append(grpcclient.InferOutput('OUTPUT0'))
     outputs.append(grpcclient.InferOutput('OUTPUT1'))
 
-    # Define the callback function. Note the last two parameters should be
-    # result and error. InferenceServerClient would povide the results of an
-    # inference as tritongrpcclient.core.InferResult in result. For successful
-    # inference, error will be None, otherwise it will be an object of
-    # tritongrpcclient.utils.InferenceServerException holding the error details.
+    # Callback function to be used with the response received over
+    # InferStream object. Note the last argument is **kwargs.
     def callback(user_data, **kwargs):
         if 'error' in kwargs:
             user_data.append(kwargs['error'])
