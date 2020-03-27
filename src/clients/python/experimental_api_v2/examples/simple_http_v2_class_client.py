@@ -224,7 +224,7 @@ if __name__ == '__main__':
     parser.add_argument('image_filename', type=str, help='Input image.')
     FLAGS = parser.parse_args()
 
-    # Create gRPC client for communicating with the server
+    # Create HTTP client for communicating with the server
     try:
         triton_client = httpclient.InferenceServerClient(FLAGS.url)
     except Exception as e:
@@ -262,8 +262,8 @@ if __name__ == '__main__':
         try:
             results.append(
                 triton_client.infer(inputs,
-                                  outputs,
-                                  model_name=FLAGS.model_name,
+                                  FLAGS.model_name,
+                                  outputs=outputs,
                                   model_version=FLAGS.model_version))
         except InferenceServerException as e:
             print("inference failed: " + str(e))
