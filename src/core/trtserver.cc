@@ -2177,14 +2177,16 @@ TRTSERVER2_InferenceRequestOutputClasses(
   const auto& response_header = lrequest->Response()->ResponseHeader();
   for (const auto& output : response_header.output()) {
     if (output.name() == name) {
+      int index = 0;
       uint64_t batch_size = output.batch_classes().size();
       for (uint64_t batch_id = 0; batch_id < batch_size; batch_id++) {
         auto& bcls = output.batch_classes(0);
         for (int i = 0; i < bcls.cls().size(); i++) {
           auto& cls = bcls.cls(i);
-          idx[batch_id * batch_size] = cls.idx();
-          value[batch_id * batch_size] = cls.value();
-          label[batch_id * batch_size] = const_cast<char*>(cls.label().c_str());
+          idx[index] = cls.idx();
+          value[index] = cls.value();
+          label[index] = const_cast<char*>(cls.label().c_str());
+          index++;
         }
       }
       return nullptr;  // Success
