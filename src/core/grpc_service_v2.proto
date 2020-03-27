@@ -184,6 +184,16 @@ service GRPCInferenceService
       returns (CudaSharedMemoryUnregisterResponse)
   {
   }
+
+  //@@  .. cpp:var:: rpc ModelStatistics(
+  //@@                     ModelStatisticsRequest)
+  //@@                   returns (ModelStatisticsResponse)
+  //@@
+  //@@     // Get the cumulative statistics for a model and version.
+  //@@
+  rpc ModelStatistics(ModelStatisticsRequest) returns (ModelStatisticsResponse)
+  {
+  }
 }
 
 //@@
@@ -433,6 +443,23 @@ message InferParameter
   }
 }
 
+message ModelStatisticsRequest
+{
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the model.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: string version
+  //@@
+  //@@     The version of the model. If not given returns statistics for
+  //@@     all model versions.
+  //@@
+  string version = 2;
+}
+
+
 //@@
 //@@.. cpp:var:: message StatisticDuration
 //@@
@@ -462,44 +489,55 @@ message InferStatistics
 {
   //@@  .. cpp:var:: StatisticDuration success
   //@@
-  //@@     Total time required to handle successful inference requests,
-  //@@     not including HTTP or GRPC endpoint time.
+  //@@     Cumulative count and duration for successful inference
+  //@@     request.
   //@@
   StatisticDuration success = 1;
 
   //@@  .. cpp:var:: StatisticDuration fail
   //@@
-  //@@     Total time required to handle failed inference requests,
-  //@@     not including HTTP or GRPC endpoint time.
+  //@@     Cumulative count and duration for failed inference
+  //@@     request.
   //@@
   StatisticDuration fail = 2;
 
   //@@  .. cpp:var:: StatisticDuration queue
   //@@
-  //@@     Total time inference requests are queued waiting for inference
-  //@@     resources.
+  //@@     The count and cumulative duration that inference requests wait in
+  //@@     scheduling or other queues.
   //@@
   StatisticDuration queue = 3;
 
   //@@  .. cpp:var:: StatisticDuration compute_input
   //@@
-  //@@     Total time spent preparing input tensors for inferencing, including
-  //@@     time required to copy tensor data to GPU memory.
+  //@@    The count and cumulative duration to prepare input tensor data as
+  //@@    required by the model framework / backend. For example, this duration
+  //@@    should include the time to copy input tensor data to the GPU.
   //@@
   StatisticDuration compute_input = 4;
 
   //@@  .. cpp:var:: StatisticDuration compute_infer
   //@@
-  //@@     Total time spent executing model to compute the output tensors.
+  //@@     The count and cumulative duration to execute the model.
   //@@
   StatisticDuration compute_infer = 5;
 
   //@@  .. cpp:var:: StatisticDuration compute_output
   //@@
-  //@@     Total time spent collecting output tensor results, including
-  //@@     time required to copy tensor data from GPU memory.
+  //@@     The count and cumulative duration to extract output tensor data
+  //@@     produced by the model framework / backend. For example, this duration
+  //@@     should include the time to copy output tensor data from the GPU.
   //@@
   StatisticDuration compute_output = 6;
+}
+
+message ModelStatisticsResponse
+{
+  //@@  .. cpp:var:: map<string, InferenceStatistics> inference
+  //@@
+  //@@     Map from version to inference statistics for that version.
+  //@@
+  map<string, InferenceStatistics> inference = 1;
 }
 
 //@@
