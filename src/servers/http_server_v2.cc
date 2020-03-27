@@ -1967,10 +1967,10 @@ HTTPAPIServerV2::HandleInfer(
       rapidjson::Document::AllocatorType& allocator =
           response_json.GetAllocator();
       response_json.SetObject();
-      rapidjson::Value model_name_val(model_name.c_str(), model_name.size());
+      rapidjson::Value model_name_val(model_name.c_str(), model_name.size(), allocator);
       response_json.AddMember("model_name", model_name_val, allocator);
       rapidjson::Value model_version_val(
-          model_version_str.c_str(), model_version_str.size());
+          model_version_str.c_str(), model_version_str.size(), allocator);
       response_json.AddMember("model_version", model_version_val, allocator);
 
       err = TRTSERVER2_ServerInferAsync(
@@ -2205,7 +2205,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
         rapidjson::Value class_array(rapidjson::kArrayType);
         for (size_t j = 0; j < class_size; j++) {
           const char* label_string = label[count];
-          if (strcmp(label_string, "") != 0) {
+          if (strcmp(label_string, "") == 0) {
             class_string[count] =
                 std::to_string(idx[count]) + ":" + std::to_string(value[count]);
           } else {
@@ -2214,7 +2214,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
                                   std::string(label_string);
           }
           rapidjson::Value class_str(
-              class_string[count].c_str(), class_string[count].size());
+              class_string[count].c_str(), class_string[count].size(), allocator);
           class_array.PushBack(class_str, allocator);
           count++;
         }

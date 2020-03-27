@@ -79,6 +79,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+IMAGE=../images/vulture.jpeg
 for i in \
         $SIMPLE_INFER_CLIENT \
         $SIMPLE_ASYNC_INFER_CLIENT \
