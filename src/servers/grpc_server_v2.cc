@@ -746,48 +746,46 @@ CommonHandler::SetUpAllRequests()
             // requested_version = std::max(requested_version, pr.first);
             if ((requested_version == -1) || (pr.first == requested_version)) {
               InferStatistics infer_stats;
-              // Iterate across all batch sizes to sum them up
-              for (const auto& ir : pr.second.infer_stats()) {
+              const auto& ir = pr.second.infer_stats().find(1);
+              if (ir == pr.second.infer_stats().end()) {
+                err = TRTSERVER_ErrorNew(
+                    TRTSERVER_ERROR_INVALID_ARG,
+                    std::string(
+                        "no inference status available for model '" +
+                        request.name() + "'")
+                        .c_str());
+              } else {
                 infer_stats.mutable_success()->set_count(
-                    infer_stats.success().count() +
-                    ir.second.success().count());
+                    ir->second.success().count());
                 infer_stats.mutable_success()->set_ns(
-                    infer_stats.success().ns() +
-                    ir.second.success().total_time_ns());
+                    ir->second.success().total_time_ns());
                 infer_stats.mutable_fail()->set_count(
-                    infer_stats.fail().count() + ir.second.failed().count());
+                    ir->second.failed().count());
                 infer_stats.mutable_fail()->set_ns(
-                    infer_stats.fail().ns() +
-                    ir.second.failed().total_time_ns());
+                    ir->second.failed().total_time_ns());
                 infer_stats.mutable_queue()->set_count(
-                    infer_stats.queue().count() + ir.second.queue().count());
+                    ir->second.queue().count());
                 infer_stats.mutable_queue()->set_ns(
-                    infer_stats.queue().ns() +
-                    ir.second.queue().total_time_ns());
+                    ir->second.queue().total_time_ns());
                 infer_stats.mutable_compute_input()->set_count(
-                    infer_stats.compute_input().count() +
-                    ir.second.compute_input().count());
+                    ir->second.compute_input().count());
                 infer_stats.mutable_compute_input()->set_ns(
-                    infer_stats.compute_input().ns() +
-                    ir.second.compute_input().total_time_ns());
+                    ir->second.compute_input().total_time_ns());
                 infer_stats.mutable_compute_infer()->set_count(
-                    infer_stats.compute_infer().count() +
-                    ir.second.compute_infer().count());
+                    ir->second.compute_infer().count());
                 infer_stats.mutable_compute_infer()->set_ns(
-                    infer_stats.compute_infer().ns() +
-                    ir.second.compute_infer().total_time_ns());
+                    ir->second.compute_infer().total_time_ns());
                 infer_stats.mutable_compute_output()->set_count(
-                    infer_stats.compute_output().count() +
-                    ir.second.compute_output().count());
+                    ir->second.compute_output().count());
                 infer_stats.mutable_compute_output()->set_ns(
-                    infer_stats.compute_output().ns() +
-                    ir.second.compute_output().total_time_ns());
-              }
-              // Add the statistics to the response
-              (*response->mutable_inference())[std::to_string(pr.first)] =
-                  infer_stats;
-              if (requested_version != -1) {
-                break;
+                    ir->second.compute_output().total_time_ns());
+
+                // Add the statistics to the response
+                (*response->mutable_inference())[std::to_string(pr.first)] =
+                    infer_stats;
+                if (requested_version != -1) {
+                  break;
+                }
               }
             }
           }

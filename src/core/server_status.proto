@@ -272,7 +272,8 @@ message ModelVersionStatus
   //@@     Inference statistics for the model, as a map from batch size
   //@@     to the statistics. A batch size will not occur in the map
   //@@     unless there has been at least one inference request of
-  //@@     that batch size.
+  //@@     that batch size. However, for V2 API all InferRequestStats are
+  //@@     recorded at a single key which is 1.
   //@@
   map<uint32, InferRequestStats> infer_stats = 2;
 

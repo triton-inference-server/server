@@ -222,8 +222,8 @@ class InferenceServerClient:
             metadata = ()
         try:
             request = grpc_service_v2_pb2.ServerMetadataRequest()
-            response = self._client_stub.ServerMetadata(
-                request=request, metadata=metadata)
+            response = self._client_stub.ServerMetadata(request=request,
+                                                        metadata=metadata)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -357,8 +357,8 @@ class InferenceServerClient:
             metadata = ()
         try:
             request = grpc_service_v2_pb2.RepositoryIndexRequest()
-            response = self._client_stub.RepositoryIndex(
-                request=request, metadata=metadata)
+            response = self._client_stub.RepositoryIndex(request=request,
+                                                         metadata=metadata)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -421,6 +421,52 @@ class InferenceServerClient:
                 model_name=model_name)
             self._client_stub.RepositoryModelUnload(request=request,
                                                     metadata=metadata)
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
+
+    def get_inference_statistics(self,
+                                 model_name,
+                                 model_version="",
+                                 headers=None,
+                                 as_json=False):
+        """Get the inference statistics for the specified model name and
+        version.
+
+        Parameters
+        ----------
+        model_name : str
+            The name of the model to be unloaded.
+        model_version: str
+            The version of the model to get inference statistics. The
+            default value is an empty string which means then the server
+            will return the statistics of all available model versions.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
+        as_json : bool
+            If True then returns inference statistics
+            as a json dict, otherwise as a protobuf message.
+            Default value is False.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to unload the model.
+
+        """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
+        try:
+            request = grpc_service_v2_pb2.ModelStatisticsRequest(
+                name=model_name, version=model_version)
+            response = self._client_stub.ModelStatistics(request=request,
+                                                         metadata=metadata)
+            if as_json:
+                return json.loads(MessageToJson(response))
+            else:
+                return response
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -511,8 +557,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.SystemSharedMemoryRegisterRequest(
                 name=name, key=key, offset=offset, byte_size=byte_size)
-            self._client_stub.SystemSharedMemoryRegister(
-                request=request, metadata=metadata)
+            self._client_stub.SystemSharedMemoryRegister(request=request,
+                                                         metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -543,8 +589,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.SystemSharedMemoryUnregisterRequest(
                 name=name)
-            self._client_stub.SystemSharedMemoryUnregister(
-                request=request, metadata=metadata)
+            self._client_stub.SystemSharedMemoryUnregister(request=request,
+                                                           metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -668,8 +714,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.CudaSharedMemoryUnregisterRequest(
                 name=name)
-            self._client_stub.CudaSharedMemoryUnregister(
-                request=request, metadata=metadata)
+            self._client_stub.CudaSharedMemoryUnregister(request=request,
+                                                         metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 

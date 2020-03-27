@@ -189,7 +189,7 @@ service GRPCInferenceService
   //@@                     ModelStatisticsRequest)
   //@@                   returns (ModelStatisticsResponse)
   //@@
-  //@@     // Get the cumulative statistics for a model and version.
+  //@@     Get the cumulative inference statistics for a model.
   //@@
   rpc ModelStatistics(ModelStatisticsRequest) returns (ModelStatisticsResponse)
   {
