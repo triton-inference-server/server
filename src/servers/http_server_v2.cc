@@ -29,6 +29,7 @@
 #include <event2/buffer.h>
 #include <evhtp/evhtp.h>
 #include <google/protobuf/text_format.h>
+#include <google/protobuf/util/json_util.h>
 #include <re2/re2.h>
 #include <algorithm>
 #include <thread>

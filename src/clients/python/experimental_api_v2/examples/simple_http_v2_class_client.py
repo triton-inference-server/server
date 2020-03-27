@@ -27,9 +27,7 @@
 
 import argparse
 import numpy as np
-import os
 from builtins import range
-from functools import partial
 from PIL import Image
 import sys
 
