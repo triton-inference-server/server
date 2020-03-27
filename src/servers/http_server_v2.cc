@@ -1967,7 +1967,8 @@ HTTPAPIServerV2::HandleInfer(
       rapidjson::Document::AllocatorType& allocator =
           response_json.GetAllocator();
       response_json.SetObject();
-      rapidjson::Value model_name_val(model_name.c_str(), model_name.size(), allocator);
+      rapidjson::Value model_name_val(
+          model_name.c_str(), model_name.size(), allocator);
       response_json.AddMember("model_name", model_name_val, allocator);
       rapidjson::Value model_version_val(
           model_version_str.c_str(), model_version_str.size(), allocator);
@@ -2107,7 +2108,6 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
 
     uint64_t class_size = 0;
     if (!CheckClassificationOutput(request_output, &class_size)) {
-
       // Get shape of output (Assume max dimensions are 6)
       uint64_t dim_count = 6;
       std::vector<int64_t> shape_vec(dim_count);
@@ -2214,7 +2214,8 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
                                   std::string(label_string);
           }
           rapidjson::Value class_str(
-              class_string[count].c_str(), class_string[count].size(), allocator);
+              class_string[count].c_str(), class_string[count].size(),
+              allocator);
           class_array.PushBack(class_str, allocator);
           count++;
         }
@@ -2233,7 +2234,6 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
   response_meta_data_.response_json_.Accept(writer);
   const char* response_metadata = buffer.GetString();
   evbuffer_add(req_->buffer_out, response_metadata, strlen(response_metadata));
-  LOG_VERBOSE(1) << "response_metadata:" << response_metadata;
   evhtp_headers_add_header(
       req_->headers_out,
       evhtp_header_new("Content-Type", "application/json", 1, 1));
