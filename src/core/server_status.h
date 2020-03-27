@@ -275,7 +275,7 @@ class ServerStatusManager {
       uint64_t request_duration_ns, uint64_t queue_duration_ns,
       uint64_t compute_duration_ns);
 
-  // [V2] durations to Infer stats for a successful inference request.
+  // [V2] Add durations to Infer stats for a successful inference request.
   void UpdateSuccessInferStats(
       const std::string& model_name, const int64_t model_version,
       uint32_t execution_cnt, uint64_t last_timestamp_ms,
