@@ -92,10 +92,10 @@ if __name__ == '__main__':
     user_data = []
 
     # Inference call
-    triton_client.async_infer(callback=partial(callback, user_data),
+    triton_client.async_infer(model_name=model_name,
                               inputs=inputs,
-                              outputs=outputs,
-                              model_name=model_name)
+                              callback=partial(callback, user_data),
+                              outputs=outputs)
 
     # Wait until the results are available in user_data
     time_out = 10

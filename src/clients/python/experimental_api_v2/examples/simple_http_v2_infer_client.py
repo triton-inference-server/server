@@ -30,6 +30,7 @@ import numpy as np
 
 import tritonhttpclient.core as httpclient
 
+
 def test_infer(model_name, input0_data, input1_data):
     inputs = []
     outputs = []
@@ -43,12 +44,13 @@ def test_infer(model_name, input0_data, input1_data):
     outputs.append(httpclient.InferOutput('OUTPUT0'))
     outputs.append(httpclient.InferOutput('OUTPUT1'))
     query_params = {'test_1': 1, 'test_2': 2}
-    results = triton_client.infer(inputs,
-                              model_name,
-                            outputs=outputs,
-                            query_params=query_params)
+    results = triton_client.infer(model_name=model_name,
+                                  inputs=inputs,
+                                  outputs=outputs,
+                                  query_params=query_params)
 
     return results
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -87,9 +89,9 @@ if __name__ == '__main__':
     output1_data = results.as_numpy('OUTPUT1')
     for i in range(16):
         print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
-                str(output0_data[0][i]))
+              str(output0_data[0][i]))
         print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
-                str(output1_data[0][i]))
+              str(output1_data[0][i]))
         if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
             print("sync infer error: incorrect sum")
             sys.exit(1)
@@ -98,7 +100,8 @@ if __name__ == '__main__':
             sys.exit(1)
 
     # Infer with incorrect model name
-    response = test_infer("wrong model name", input0_data, input1_data).get_response()
+    response = test_infer("wrong model name", input0_data,
+                          input1_data).get_response()
     print(response)
     if "error" not in response.keys():
         print("improper error message for wrong model name")

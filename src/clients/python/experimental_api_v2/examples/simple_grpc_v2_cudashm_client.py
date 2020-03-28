@@ -129,9 +129,9 @@ if __name__ == '__main__':
     # outputs[-1].set_parameter("shared_memory_region", "output1_data")
     # outputs[-1].set_parameter("shared_memory_byte_size", output_byte_size)
 
-    results = triton_client.infer(inputs=inputs,
-                                  outputs=outputs,
-                                  model_name=model_name)
+    results = triton_client.infer(model_name=model_name,
+                                  inputs=inputs,
+                                  outputs=outputs)
 
     # TODO : Currently, this example doesn't use shared memory for output.
     # This is done to effectively validate the results.

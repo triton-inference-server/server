@@ -58,8 +58,8 @@ def sync_send(triton_client, result_list, values, batch_size, sequence_id,
         outputs = []
         outputs.append(grpcclient.InferOutput('OUTPUT'))
         # Issue the asynchronous sequence inference.
-        result = triton_client.infer(inputs=inputs,
-                                     model_name=model_name,
+        result = triton_client.infer(model_name=model_name,
+                                     inputs=inputs,
                                      outputs=outputs,
                                      sequence_id=sequence_id,
                                      sequence_start=(count == 1),
@@ -124,10 +124,6 @@ if __name__ == '__main__':
     result1_list = []
 
     user_data = UserData()
-
-    # It is advisable to use InferStream object within with..as clause
-    # when sending streaming requests. This ensures the InferStream object
-    # is closed when the block inside with exits.
 
     try:
         sync_send(triton_client, result0_list, [0] + values, batch_size,

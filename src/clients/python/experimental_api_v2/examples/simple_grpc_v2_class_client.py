@@ -267,10 +267,10 @@ if __name__ == '__main__':
             input_name, output_name, c, h, w, format, dtype, FLAGS):
         try:
             results.append(
-                triton_client.infer(inputs=inputs,
-                                    outputs=outputs,
-                                    model_name=FLAGS.model_name,
-                                    model_version=FLAGS.model_version))
+                triton_client.infer(model_name=FLAGS.model_name,
+                                    model_version=FLAGS.model_version,
+                                    inputs=inputs,
+                                    outputs=outputs))
         except InferenceServerException as e:
             print("inference failed: " + str(e))
             sys.exit()

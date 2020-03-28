@@ -43,12 +43,16 @@ class UserData:
         self._completed_requests = queue.Queue()
 
 
-# Callback function to be used with the response received over
-# InferStream object. Note the last argument is **kwargs.
-def callback(user_data, **kwargs):
-    # Enqueue all the arguments on the user queue
-    # to be processed later.
-    user_data._completed_requests.put(kwargs)
+# Define the callback function. Note the last two parameters should be
+# result and error. InferenceServerClient would povide the results of an
+# inference as tritongrpcclient.core.InferResult in result. For successful
+# inference, error will be None, otherwise it will be an object of
+# tritongrpcclient.utils.InferenceServerException holding the error details
+def callback(user_data, result, error):
+    if error:
+        user_data._completed_requests.put(error)
+    else:
+        user_data._completed_requests.put(result)
 
 
 def async_send(triton_client, stream, values, batch_size, sequence_id,
@@ -67,10 +71,12 @@ def async_send(triton_client, stream, values, batch_size, sequence_id,
         outputs = []
         outputs.append(grpcclient.InferOutput('OUTPUT'))
         # Issue the asynchronous sequence inference.
-        triton_client.async_stream_infer(stream=stream,
+        triton_client.async_stream_infer(model_name=model_name,
                                          inputs=inputs,
-                                         model_name=model_name,
+                                         stream=stream,
                                          outputs=outputs,
+                                         request_id='{}_{}'.format(
+                                             sequence_id, count),
                                          sequence_id=sequence_id,
                                          sequence_start=(count == 1),
                                          sequence_end=(count == len(values)))
@@ -154,22 +160,17 @@ if __name__ == '__main__':
         recv_count = 0
         while recv_count < (2 * (len(values) + 1)):
             data_item = user_data._completed_requests.get()
-            if 'error' in data_item:
-                error_string = "Encountered an inference error. Details: {}".format(
-                    data_item['error'])
-                if 'sequence_id' in data_item:
-                    error_string = error_string + ", sequence id : {}".format(
-                        data_item['sequence_id'])
-                print(error_string)
+            if type(data_item) == InferenceServerException:
+                print(data_item)
                 sys.exit(1)
             else:
-                this_id = data_item['sequence_id']
+                this_id = int(data_item.get_response().id.split('_')[0])
                 if this_id == sequence_id0:
-                    result0_list.append(data_item['result'].as_numpy('OUTPUT'))
+                    result0_list.append(data_item.as_numpy('OUTPUT'))
                 elif this_id == sequence_id1:
-                    result1_list.append(data_item['result'].as_numpy('OUTPUT'))
+                    result1_list.append(data_item.as_numpy('OUTPUT'))
                 else:
-                    print("unexpected sequence id returned by the server {}".
+                    print("unexpected sequence id returned by the server: {}".
                           format(this_id))
                     sys.exit(1)
             recv_count = recv_count + 1

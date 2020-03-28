@@ -77,21 +77,24 @@ if __name__ == '__main__':
     outputs.append(grpcclient.InferOutput('OUTPUT0'))
     outputs.append(grpcclient.InferOutput('OUTPUT1'))
 
-    # Callback function to be used with the response received over
-    # InferStream object. Note the last argument is **kwargs.
-    def callback(user_data, **kwargs):
-        if 'error' in kwargs:
-            user_data.append(kwargs['error'])
+    # Define the callback function. Note the last two parameters should be
+    # result and error. InferenceServerClient would povide the results of an
+    # inference as tritongrpcclient.core.InferResult in result. For successful
+    # inference, error will be None, otherwise it will be an object of
+    # tritongrpcclient.utils.InferenceServerException holding the error details
+    def callback(user_data, result, error):
+        if error:
+            user_data.append(error)
         else:
-            user_data.append(kwargs['result'])
+            user_data.append(result)
 
     # list to hold the results of inference.
     user_data = []
 
     # Inference call
-    triton_client.async_infer(callback=partial(callback, user_data),
+    triton_client.async_infer(model_name=model_name,
                               inputs=inputs,
-                              model_name=model_name,
+                              callback=partial(callback, user_data),
                               outputs=outputs)
 
     # Wait until the results are available in user_data
