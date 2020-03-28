@@ -690,6 +690,135 @@ CommonHandler::SetUpAllRequests()
 
 
   //
+  //  ModelStatistics
+  //
+  auto OnRegisterModelStatistics =
+      [this](
+          grpc::ServerContext* ctx, ModelStatisticsRequest* request,
+          grpc::ServerAsyncResponseWriter<ModelStatisticsResponse>* responder,
+          void* tag) {
+        this->service_->RequestModelStatistics(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteModelStatistics = [this](
+                                      ModelStatisticsRequest& request,
+                                      ModelStatisticsResponse* response,
+                                      grpc::Status* status) {
+#ifdef TRTIS_ENABLE_STATS
+    ServerStatus server_status;
+
+    TRTSERVER_Protobuf* model_status_protobuf = nullptr;
+    TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
+        trtserver_.get(), request.name().c_str(), &model_status_protobuf);
+    if (err == nullptr) {
+      const char* status_buffer;
+      size_t status_byte_size;
+      err = TRTSERVER_ProtobufSerialize(
+          model_status_protobuf, &status_buffer, &status_byte_size);
+      if (err == nullptr) {
+        if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
+        }
+      }
+    }
+
+    TRTSERVER_ProtobufDelete(model_status_protobuf);
+
+    if (err == nullptr) {
+      const auto& nitr = server_status.model_status().find(request.name());
+      if (nitr == server_status.model_status().end()) {
+        err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "no status available for unknown model '" + request.name() +
+                "'")
+                .c_str());
+      } else {
+        const ModelStatus& model_status = nitr->second;
+
+        int64_t requested_version;
+        err = GetModelVersionFromString(request.version(), &requested_version);
+        if (err == nullptr) {
+          // If requested_version is -1 then sum
+          for (const auto& pr : model_status.version_status()) {
+            // requested_version = std::max(requested_version, pr.first);
+            if ((requested_version == -1) || (pr.first == requested_version)) {
+              InferStatistics infer_stats;
+              const auto& ir = pr.second.infer_stats().find(1);
+              if (ir == pr.second.infer_stats().end()) {
+                err = TRTSERVER_ErrorNew(
+                    TRTSERVER_ERROR_INVALID_ARG,
+                    std::string(
+                        "no inference status available for model '" +
+                        request.name() + "'")
+                        .c_str());
+              } else {
+                infer_stats.mutable_success()->set_count(
+                    ir->second.success().count());
+                infer_stats.mutable_success()->set_ns(
+                    ir->second.success().total_time_ns());
+                infer_stats.mutable_fail()->set_count(
+                    ir->second.failed().count());
+                infer_stats.mutable_fail()->set_ns(
+                    ir->second.failed().total_time_ns());
+                infer_stats.mutable_queue()->set_count(
+                    ir->second.queue().count());
+                infer_stats.mutable_queue()->set_ns(
+                    ir->second.queue().total_time_ns());
+                infer_stats.mutable_compute_input()->set_count(
+                    ir->second.compute_input().count());
+                infer_stats.mutable_compute_input()->set_ns(
+                    ir->second.compute_input().total_time_ns());
+                infer_stats.mutable_compute_infer()->set_count(
+                    ir->second.compute_infer().count());
+                infer_stats.mutable_compute_infer()->set_ns(
+                    ir->second.compute_infer().total_time_ns());
+                infer_stats.mutable_compute_output()->set_count(
+                    ir->second.compute_output().count());
+                infer_stats.mutable_compute_output()->set_ns(
+                    ir->second.compute_output().total_time_ns());
+
+                // Add the statistics to the response
+                (*response->mutable_inference())[std::to_string(pr.first)] =
+                    infer_stats;
+                if (requested_version != -1) {
+                  break;
+                }
+              }
+            }
+          }
+          if ((requested_version != -1) &&
+              (response->inference().size() == 0)) {
+            err = TRTSERVER_ErrorNew(
+                TRTSERVER_ERROR_INVALID_ARG,
+                std::string(
+                    "no status available for model '" + request.name() +
+                    "', version " + std::to_string(requested_version))
+                    .c_str());
+          }
+        }
+      }
+    }
+#else
+    TRTSERVER_Error* err = TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_UNAVAILABLE,
+        "the server does not suppport model statistics");
+#endif
+
+    GrpcStatusUtil::Create(status, err);
+    TRTSERVER_ErrorDelete(err);
+  };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<ModelStatisticsResponse>,
+      ModelStatisticsRequest, ModelStatisticsResponse>(
+      "ModelStatistics", 0, OnRegisterModelStatistics,
+      OnExecuteModelStatistics);
+
+
+  //
   // SystemSharedMemoryStatus
   //
   auto OnRegisterSystemSharedMemoryStatus =

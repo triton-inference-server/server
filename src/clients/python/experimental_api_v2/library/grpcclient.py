@@ -456,6 +456,52 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
+    def get_inference_statistics(self,
+                                 model_name,
+                                 model_version="",
+                                 headers=None,
+                                 as_json=False):
+        """Get the inference statistics for the specified model name and
+        version.
+
+        Parameters
+        ----------
+        model_name : str
+            The name of the model to be unloaded.
+        model_version: str
+            The version of the model to get inference statistics. The
+            default value is an empty string which means then the server
+            will return the statistics of all available model versions.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
+        as_json : bool
+            If True then returns inference statistics
+            as a json dict, otherwise as a protobuf message.
+            Default value is False.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to unload the model.
+
+        """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
+        try:
+            request = grpc_service_v2_pb2.ModelStatisticsRequest(
+                name=model_name, version=model_version)
+            response = self._client_stub.ModelStatistics(request=request,
+                                                         metadata=metadata)
+            if as_json:
+                return json.loads(MessageToJson(response))
+            else:
+                return response
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
+
     def get_system_shared_memory_status(self,
                                         region_name="",
                                         headers=None,

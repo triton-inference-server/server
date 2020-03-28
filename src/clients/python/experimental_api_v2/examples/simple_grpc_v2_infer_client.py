@@ -27,6 +27,7 @@
 
 import argparse
 import numpy as np
+import sys
 
 import tritongrpcclient.core as grpcclient
 
@@ -76,6 +77,12 @@ if __name__ == '__main__':
                                   inputs=inputs,
                                   outputs=outputs,
                                   headers={'test': '1'})
+
+    statistics = triton_client.get_inference_statistics(model_name=model_name)
+    print(statistics)
+    if len(statistics.inference) != 1:
+        print("FAILED: Inference Statistics")
+        sys.exit(1)
 
     # Get the output arrays from the results
     output0_data = results.as_numpy('OUTPUT0')
