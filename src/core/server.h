@@ -106,7 +106,11 @@ class InferenceServer {
 
   // Get / set the protocol version of the server.
   uint32_t ProtocolVersion() const { return protocol_version_; }
-  void SetProtocolVersion(const uint32_t v) { protocol_version_ = v; }
+  void SetProtocolVersion(const uint32_t v)
+  {
+    protocol_version_ = v;
+    status_manager_->SetProtocolVersion(v);
+  }
 
   // Get / set the model repository path
   const std::set<std::string>& ModelRepositoryPaths() const

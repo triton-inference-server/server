@@ -98,6 +98,16 @@ service GRPCInferenceService
   //@@
   rpc ModelConfig(ModelConfigRequest) returns (ModelConfigResponse) {}
 
+  //@@  .. cpp:var:: rpc ModelStatistics(
+  //@@                     ModelStatisticsRequest)
+  //@@                   returns (ModelStatisticsResponse)
+  //@@
+  //@@     Get the cumulative inference statistics for a model.
+  //@@
+  rpc ModelStatistics(ModelStatisticsRequest) returns (ModelStatisticsResponse)
+  {
+  }
+
   //@@  .. cpp:var:: rpc RepositoryIndex(RepositoryIndexRequest) returns
   //@@       (RepositoryIndexResponse)
   //@@
@@ -444,75 +454,6 @@ message InferParameter
 }
 
 //@@
-//@@.. cpp:var:: message StatisticDuration
-//@@
-//@@   Statistic recording a cumulative duration metric.
-//@@
-message StatisticDuration
-{
-  //@@  .. cpp:var:: uint64 count
-  //@@
-  //@@     Cumulative number of times this metric occurred.
-  //@@
-  uint64 count = 1;
-
-  //@@  .. cpp:var:: uint64 total_time_ns
-  //@@
-  //@@     Total collected duration of this metric in nanoseconds.
-  //@@
-  uint64 ns = 2;
-}
-
-//@@
-//@@.. cpp:var:: message InferStatistics
-//@@
-//@@   Inference statistics.
-//@@
-message InferStatistics
-{
-  //@@  .. cpp:var:: StatisticDuration success
-  //@@
-  //@@     Total time required to handle successful inference requests,
-  //@@     not including HTTP or GRPC endpoint time.
-  //@@
-  StatisticDuration success = 1;
-
-  //@@  .. cpp:var:: StatisticDuration fail
-  //@@
-  //@@     Total time required to handle failed inference requests,
-  //@@     not including HTTP or GRPC endpoint time.
-  //@@
-  StatisticDuration fail = 2;
-
-  //@@  .. cpp:var:: StatisticDuration queue
-  //@@
-  //@@     Total time inference requests are queued waiting for inference
-  //@@     resources.
-  //@@
-  StatisticDuration queue = 3;
-
-  //@@  .. cpp:var:: StatisticDuration compute_input
-  //@@
-  //@@     Total time spent preparing input tensors for inferencing, including
-  //@@     time required to copy tensor data to GPU memory.
-  //@@
-  StatisticDuration compute_input = 4;
-
-  //@@  .. cpp:var:: StatisticDuration compute_infer
-  //@@
-  //@@     Total time spent executing model to compute the output tensors.
-  //@@
-  StatisticDuration compute_infer = 5;
-
-  //@@  .. cpp:var:: StatisticDuration compute_output
-  //@@
-  //@@     Total time spent collecting output tensor results, including
-  //@@     time required to copy tensor data from GPU memory.
-  //@@
-  StatisticDuration compute_output = 6;
-}
-
-//@@
 //@@.. cpp:var:: message InferTensorContents
 //@@
 //@@   The data contained in a tensor. For a given data type the
@@ -846,6 +787,113 @@ message ModelConfigResponse
   //@@     The model configuration.
   //@@
   ModelConfig config = 1;
+}
+
+//@@
+//@@.. cpp:var:: message ModelStatisticsRequest
+//@@
+//@@   Request message for ModelStatistics.
+//@@
+message ModelStatisticsRequest
+{
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the model.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: string version
+  //@@
+  //@@     The version of the model. If not given returns statistics for
+  //@@     all model versions.
+  //@@
+  string version = 2;
+}
+
+
+//@@
+//@@.. cpp:var:: message StatisticDuration
+//@@
+//@@   Statistic recording a cumulative duration metric.
+//@@
+message StatisticDuration
+{
+  //@@  .. cpp:var:: uint64 count
+  //@@
+  //@@     Cumulative number of times this metric occurred.
+  //@@
+  uint64 count = 1;
+
+  //@@  .. cpp:var:: uint64 total_time_ns
+  //@@
+  //@@     Total collected duration of this metric in nanoseconds.
+  //@@
+  uint64 ns = 2;
+}
+
+//@@
+//@@.. cpp:var:: message InferStatistics
+//@@
+//@@   Inference statistics.
+//@@
+message InferStatistics
+{
+  //@@  .. cpp:var:: StatisticDuration success
+  //@@
+  //@@     Cumulative count and duration for successful inference
+  //@@     request.
+  //@@
+  StatisticDuration success = 1;
+
+  //@@  .. cpp:var:: StatisticDuration fail
+  //@@
+  //@@     Cumulative count and duration for failed inference
+  //@@     request.
+  //@@
+  StatisticDuration fail = 2;
+
+  //@@  .. cpp:var:: StatisticDuration queue
+  //@@
+  //@@     The count and cumulative duration that inference requests wait in
+  //@@     scheduling or other queues.
+  //@@
+  StatisticDuration queue = 3;
+
+  //@@  .. cpp:var:: StatisticDuration compute_input
+  //@@
+  //@@    The count and cumulative duration to prepare input tensor data as
+  //@@    required by the model framework / backend. For example, this duration
+  //@@    should include the time to copy input tensor data to the GPU.
+  //@@
+  StatisticDuration compute_input = 4;
+
+  //@@  .. cpp:var:: StatisticDuration compute_infer
+  //@@
+  //@@     The count and cumulative duration to execute the model.
+  //@@
+  StatisticDuration compute_infer = 5;
+
+  //@@  .. cpp:var:: StatisticDuration compute_output
+  //@@
+  //@@     The count and cumulative duration to extract output tensor data
+  //@@     produced by the model framework / backend. For example, this duration
+  //@@     should include the time to copy output tensor data from the GPU.
+  //@@
+  StatisticDuration compute_output = 6;
+}
+
+//@@
+//@@.. cpp:var:: message ModelStatisticsResponse
+//@@
+//@@   Response message for ModelStatistics.
+//@@
+message ModelStatisticsResponse
+{
+  //@@  .. cpp:var:: map<string, InferStatistics> inference
+  //@@
+  //@@     Map from version to inference statistics for that version.
+  //@@
+  map<string, InferStatistics> inference = 1;
 }
 
 //@@
