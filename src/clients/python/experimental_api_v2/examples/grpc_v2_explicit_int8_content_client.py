@@ -99,20 +99,19 @@ if __name__ == '__main__':
         shape = []
         for value in output.shape:
             shape.append(value)
-        output_results.append(np.frombuffer(
-                        output.contents.raw_contents,
-                        dtype=np.int32))
+        output_results.append(
+            np.frombuffer(output.contents.raw_contents, dtype=np.int32))
         output_results[-1] = np.resize(output_results[-1], shape)
-    
+
     if len(output_results) != 2:
         print("expected two output results")
         sys.exit(1)
 
     for i in range(16):
         print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +
-            str(output_results[0][0][i]))
+              str(output_results[0][0][i]))
         print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
-            str(output_results[1][0][i]))
+              str(output_results[1][0][i]))
         if (input0_data[i] + input1_data[i]) != output_results[0][0][i]:
             print("sync infer error: incorrect sum")
             sys.exit(1)

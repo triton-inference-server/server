@@ -52,21 +52,24 @@ if __name__ == '__main__':
         triton_client = grpcclient.InferenceServerClient(FLAGS.url)
     except Exception as e:
         print("context creation failed: " + str(e))
-        sys.exit()
+        sys.exit(1)
 
     model_name = 'simple'
 
     # There are five models in the repository directory
-    if len(triton_client.get_model_repository_index().models) != 5:
-        sys.exit()
+    if len(triton_client.get_model_repository_index().models) != 6:
+        print('FAILED : Repository Index')
+        sys.exit(1)
 
     triton_client.load_model(model_name)
     if not triton_client.is_model_ready(model_name):
-        sys.exit()
+        print('FAILED : Load Model')
+        sys.exit(1)
 
     triton_client.unload_model(model_name)
     if triton_client.is_model_ready(model_name):
-        sys.exit()
+        print('FAILED : Unload Model')
+        sys.exit(1)
 
     # Trying to load wrong model name should emit exception
     try:
@@ -74,3 +77,7 @@ if __name__ == '__main__':
     except InferenceServerException as e:
         if "failed to load" in e.message():
             print("PASS: model control")
+            sys.exit(0)
+
+    print("FAILED")
+    sys.exit(1)

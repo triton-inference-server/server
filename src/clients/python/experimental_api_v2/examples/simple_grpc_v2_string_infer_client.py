@@ -79,7 +79,9 @@ if __name__ == '__main__':
     outputs.append(grpcclient.InferOutput('OUTPUT0'))
     outputs.append(grpcclient.InferOutput('OUTPUT1'))
 
-    results = triton_client.infer(inputs, outputs, model_name)
+    results = triton_client.infer(model_name=model_name,
+                                  inputs=inputs,
+                                  outputs=outputs)
 
     # Get the output arrays from the results
     output0_data = results.as_numpy('OUTPUT0')

@@ -81,6 +81,16 @@ service GRPCInferenceService
   //@@
   rpc ModelInfer(ModelInferRequest) returns (ModelInferResponse) {}
 
+  //@@  .. cpp:var:: rpc ModelStreamInfer(stream ModelInferRequest) returns
+  //@@       (stream ModelStreamInferResponse)
+  //@@
+  //@@     Perform streaming inference.
+  //@@
+  rpc ModelStreamInfer(stream ModelInferRequest)
+      returns (stream ModelStreamInferResponse)
+  {
+  }
+
   //@@  .. cpp:var:: rpc ModelConfig(ModelConfigRequest) returns
   //@@       (ModelConfigResponse)
   //@@
@@ -776,6 +786,29 @@ message ModelInferResponse
   //@@     The output tensors holding inference results.
   //@@
   repeated InferOutputTensor outputs = 4;
+}
+
+//@@
+//@@.. cpp:var:: message ModelStreamInferResponse
+//@@
+//@@   Response message for ModelStreamInfer.
+//@@
+message ModelStreamInferResponse
+{
+  //@@
+  //@@  .. cpp:var:: string error_message
+  //@@
+  //@@     The message describing the error. The empty message
+  //@@     indicates the inference was successful without errors.
+  //@@
+  string error_message = 1;
+
+  //@@
+  //@@  .. cpp:var:: ModelInferResponse infer_response
+  //@@
+  //@@     Holds the results of the request.
+  //@@
+  ModelInferResponse infer_response = 2;
 }
 
 //@@

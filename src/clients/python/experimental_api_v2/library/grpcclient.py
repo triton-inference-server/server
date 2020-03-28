@@ -28,6 +28,8 @@ import base64
 import numpy as np
 import grpc
 import rapidjson as json
+import threading
+import queue
 from google.protobuf.json_format import MessageToJson
 
 from tritongrpcclient import grpc_service_v2_pb2
@@ -44,6 +46,36 @@ def get_error_grpc(rpc_error):
 
 def raise_error_grpc(rpc_error):
     raise get_error_grpc(rpc_error) from None
+
+
+def _get_inference_request(model_name,
+                           inputs,
+                           model_version,
+                           request_id,
+                           outputs,
+                           sequence_id=None,
+                           sequence_start=None,
+                           sequence_end=None):
+    request = grpc_service_v2_pb2.ModelInferRequest()
+    request.model_name = model_name
+    request.model_version = model_version
+    if request_id != None:
+        request.id = request_id
+    for infer_input in inputs:
+        request.inputs.extend([infer_input._get_tensor()])
+    for infer_output in outputs:
+        request.outputs.extend([infer_output._get_tensor()])
+    if sequence_id:
+        param = request.parameters['sequence_id']
+        param.int64_param = sequence_id
+    if sequence_start:
+        param = request.parameters['sequence_start']
+        param.bool_param = sequence_start
+    if sequence_end:
+        param = request.parameters['sequence_end']
+        param.bool_param = sequence_end
+
+    return request
 
 
 class InferenceServerClient:
@@ -222,8 +254,8 @@ class InferenceServerClient:
             metadata = ()
         try:
             request = grpc_service_v2_pb2.ServerMetadataRequest()
-            response = self._client_stub.ServerMetadata(
-                request=request, metadata=metadata)
+            response = self._client_stub.ServerMetadata(request=request,
+                                                        metadata=metadata)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -357,8 +389,8 @@ class InferenceServerClient:
             metadata = ()
         try:
             request = grpc_service_v2_pb2.RepositoryIndexRequest()
-            response = self._client_stub.RepositoryIndex(
-                request=request, metadata=metadata)
+            response = self._client_stub.RepositoryIndex(request=request,
+                                                         metadata=metadata)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -511,8 +543,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.SystemSharedMemoryRegisterRequest(
                 name=name, key=key, offset=offset, byte_size=byte_size)
-            self._client_stub.SystemSharedMemoryRegister(
-                request=request, metadata=metadata)
+            self._client_stub.SystemSharedMemoryRegister(request=request,
+                                                         metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -543,8 +575,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.SystemSharedMemoryUnregisterRequest(
                 name=name)
-            self._client_stub.SystemSharedMemoryUnregister(
-                request=request, metadata=metadata)
+            self._client_stub.SystemSharedMemoryUnregister(request=request,
+                                                           metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -668,46 +700,58 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.CudaSharedMemoryUnregisterRequest(
                 name=name)
-            self._client_stub.CudaSharedMemoryUnregister(
-                request=request, metadata=metadata)
+            self._client_stub.CudaSharedMemoryUnregister(request=request,
+                                                         metadata=metadata)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
     def infer(self,
-              inputs,
-              outputs,
               model_name,
+              inputs,
               model_version="",
+              outputs=None,
               request_id=None,
-              parameters=None,
+              sequence_id=0,
+              sequence_start=False,
+              sequence_end=False,
               headers=None):
         """Run synchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
 
         Parameters
         ----------
+        model_name: str
+            The name of the model to run inference.
         inputs : list
             A list of InferInput objects, each describing data for a input
             tensor required by the model.
-        outputs : list
-            A list of InferOutput objects, each describing how the output
-            data must be returned. Only the output tensors present in the
-            list will be requested from the server.
-        model_name: str
-            The name of the model to run inference.
         model_version: str
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. If not specified all outputs produced
+            by the model will be returned using default settings.
         request_id: str
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
-        parameters: dict
-            Optional inference parameters described as key-value pairs.
+        sequence_id : int
+            The unique identifier for the sequence being represented by the
+            object. Default value is 0 which means that the request does not
+            belong to a sequence.
+        sequence_start: bool
+            Indicates whether the request being added marks the start of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
+        sequence_end: bool
+            Indicates whether the request being added marks the end of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
         headers: dict
-            Optional dictionary specifying additional HTTP
-            headers to include in the request.
+            Optional dictionary specifying additional HTTP headers to include
+            in the request.
 
         Returns
         -------
@@ -726,9 +770,14 @@ class InferenceServerClient:
         else:
             metadata = ()
 
-        request = self._get_inference_request(inputs, outputs, model_name,
-                                              model_version, request_id,
-                                              parameters)
+        request = _get_inference_request(model_name=model_name,
+                                         inputs=inputs,
+                                         model_version=model_version,
+                                         request_id=request_id,
+                                         outputs=outputs,
+                                         sequence_id=sequence_id,
+                                         sequence_start=sequence_start,
+                                         sequence_end=sequence_end)
 
         try:
             response = self._client_stub.ModelInfer(request=request,
@@ -739,19 +788,26 @@ class InferenceServerClient:
             raise_error_grpc(rpc_error)
 
     def async_infer(self,
-                    callback,
-                    inputs,
-                    outputs,
                     model_name,
+                    inputs,
+                    callback,
                     model_version="",
+                    outputs=None,
                     request_id=None,
-                    parameters=None,
+                    sequence_id=0,
+                    sequence_start=False,
+                    sequence_end=False,
                     headers=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
 
         Parameters
         ----------
+        model_name: str
+            The name of the model to run inference.
+        inputs : list
+            A list of InferInput objects, each describing data for a input
+            tensor required by the model.
         callback : function
             Python function that is invoked once the request is completed.
             The function must reserve the last two arguments (result, error)
@@ -759,25 +815,30 @@ class InferenceServerClient:
             respectively which will be provided to the function when executing
             the callback. The ownership of these objects will be given to the
             user. The 'error' would be None for a successful inference.
-        inputs : list
-            A list of InferInput objects, each describing data for a input
-            tensor required by the model.
-        outputs : list
-            A list of InferOutput objects, each describing how the output
-            data must be returned. Only the output tensors present in the
-            list will be requested from the server.
-        model_name: str
-            The name of the model to run inference.
         model_version: str
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. If not specified all outputs produced
+            by the model will be returned using default settings.
         request_id: str
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
-        parameters: dict
-            Optional inference parameters described as key-value pairs.
+        sequence_id : int
+            The unique identifier for the sequence being represented by the
+            object. Default value is 0 which means that the request does not
+            belong to a sequence.
+        sequence_start: bool
+            Indicates whether the request being added marks the start of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
+        sequence_end: bool
+            Indicates whether the request being added marks the end of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
@@ -801,9 +862,14 @@ class InferenceServerClient:
         else:
             metadata = ()
 
-        request = self._get_inference_request(inputs, outputs, model_name,
-                                              model_version, request_id,
-                                              parameters)
+        request = _get_inference_request(model_name=model_name,
+                                         inputs=inputs,
+                                         model_version=model_version,
+                                         request_id=request_id,
+                                         outputs=outputs,
+                                         sequence_id=sequence_id,
+                                         sequence_start=sequence_start,
+                                         sequence_end=sequence_end)
 
         try:
             self._call_future = self._client_stub.ModelInfer.future(
@@ -812,92 +878,83 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
-    def _get_inference_request(self, inputs, outputs, model_name, model_version,
-                               request_id, parameters):
-        """Creates and initializes an inference request.
+    def async_stream_infer(self,
+                           model_name,
+                           inputs,
+                           stream,
+                           model_version="",
+                           outputs=None,
+                           request_id=None,
+                           sequence_id=0,
+                           sequence_start=False,
+                           sequence_end=False):
+        """Runs an asynchronous inference over gRPC bi-directional streaming
+        API.
 
         Parameters
         ----------
+        model_name: str
+            The name of the model to run inference.
         inputs : list
             A list of InferInput objects, each describing data for a input
             tensor required by the model.
-        outputs : list
-            A list of InferOutput objects, each describing how the output
-            data must be returned. Only the output tensors present in the
-            list will be requested from the server.
-        model_name: str
-            The name of the model to run inference.
+        stream : InferStream
+            The stream to use for sending/receiving inference requests/response.
         model_version: str
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. If not specified all outputs produced
+            by the model will be returned using default settings.
         request_id: str
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
-        parameters: dict
-            Optional inference parameters described as key-value pairs.
-
-        Returns
-        -------
-        ModelInferRequest
-            The protobuf message holding the inference request.
-        
+        sequence_id : int
+            The unique identifier for the sequence being represented by the
+            object. Default value is 0 which means that the request does not
+            belong to a sequence.
+        sequence_start: bool
+            Indicates whether the request being added marks the start of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
+        sequence_end: bool
+            Indicates whether the request being added marks the end of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
+    
         Raises
         ------
         InferenceServerException
             If server fails to issue inference.
-
         """
 
-        request = grpc_service_v2_pb2.ModelInferRequest()
-        request.model_name = model_name
-        request.model_version = model_version
-        if request_id != None:
-            request.id = request_id
-        for infer_input in inputs:
-            request.inputs.extend([infer_input._get_tensor()])
-        for infer_output in outputs:
-            request.outputs.extend([infer_output._get_tensor()])
-        if parameters:
-            for param_key in parameters:
-                _set_parameter(request,
-                               key=param_key,
-                               value=parameters[param_key])
+        if not stream._is_initialized():
+            # Inititate the response stream handler if required.
+            if stream._headers is not None:
+                metadata = stream._headers.items()
+            else:
+                metadata = ()
 
-        return request
+            try:
+                stream._init_handler(
+                    self._client_stub.ModelStreamInfer(_RequestIterator(stream),
+                                                       metadata=metadata))
+            except grpc.RpcError as rpc_error:
+                raise_error_grpc(rpc_error)
 
-    def _set_parameter(self, request, key, value):
-        """Adds the specified key-value pair to the request
-
-        Parameters
-        ----------
-        request : protobuf message
-            The ModelInferRequest object to add the parameter to.
-        key : str
-            The name of the parameter to be included in the request. 
-        value : str/int/bool
-            The value of the parameter
-
-        Raises
-        ------
-        InferenceServerException
-            If server fails to add the parameter to request.
-
-        """
-        if not type(key) is str:
-            raise_error(
-                "only string data type for key is supported in parameters")
-
-        param = request.parameters[key]
-        if type(value) is int:
-            param.int64_param = value
-        elif type(value) is bool:
-            param.bool_param = value
-        elif type(value) is str:
-            param.string_param = value
-        else:
-            raise_error("unsupported value type for the parameter")
+        request = _get_inference_request(model_name=model_name,
+                                         inputs=inputs,
+                                         model_version=model_version,
+                                         request_id=request_id,
+                                         outputs=outputs,
+                                         sequence_id=sequence_id,
+                                         sequence_start=sequence_start,
+                                         sequence_end=sequence_end)
+        # Enqueues the request to the stream
+        stream._enqueue_request(request)
 
 
 class InferInput:
@@ -1174,3 +1231,158 @@ class InferResult:
             return json.loads(MessageToJson(self._result))
         else:
             return self._result
+
+
+class InferStream:
+    """Supports sending inference requests and receiving corresponding
+    requests on a gRPC bi-directional stream.
+
+    Parameters
+    ----------
+    callback : function
+        Python function that is invoked upon receiving response from
+        the underlying stream. The function must reserve the last two
+        arguments (result, error) to hold InferResult and
+        InferenceServerException objects respectively which will be
+        provided to the function when executing the callback. The
+        ownership of these objects will be given to the user. The
+        'error' would be None for a successful inference.
+    """
+
+    def __init__(self, callback):
+        self._callback = callback
+        self._request_queue = queue.Queue()
+        self._handler = None
+        self._headers = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        """Gracefully close underlying gRPC streams. Note that this call
+        blocks till response of all currently enqueued requests are not
+        received.
+        """
+        if self._is_initialized():
+            self._request_queue.put(None)
+            if self._handler.is_alive():
+                self._handler.join()
+            self._handler = None
+
+    def set_headers(self, headers):
+        """Sets the specified headers to be used with the stream.
+
+        Parameters
+        ----------
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include while establising gRPC stream.
+        """
+        if self._is_initialized():
+            raise_error(
+                'Can not set headers for already initialized InferStream')
+        self._headers = headers
+
+    def _is_initialized(self):
+        """Returns whether the handler to this stream object
+        is initialized.
+        """
+        return (self._handler is not None)
+
+    def _init_handler(self, response_iterator):
+        """Initializes the handler to process the response from
+        stream and execute the callbacks.
+
+        Parameters
+        ----------
+        response_iterator : iterator
+            The iterator over the gRPC response stream.
+
+        """
+        if self._is_initialized():
+            raise_error(
+                'Attempted to initialize already initialized InferStream')
+        # Create a new thread to handle the gRPC response stream
+        self._handler = threading.Thread(target=self._process_response,
+                                         args=(response_iterator,))
+        self._handler.start()
+
+    def _enqueue_request(self, request):
+        """Enqueues the specified request object to be provided
+        in gRPC request stream.
+
+        Parameters
+        ----------
+        request : ModelInferRequest
+            The protobuf message holding the ModelInferRequest
+
+        """
+        self._request_queue.put(request)
+
+    def _get_request(self):
+        """Returns the request details in the order they were added.
+        The call to this function will block until the requests
+        are available in the queue. InferStream._enqueue_request
+        adds the request to the queue.
+
+        Returns
+        -------
+        protobuf message
+            The ModelInferRequest protobuf message.
+
+        """
+        request = self._request_queue.get()
+        return request
+
+    def _process_response(self, responses):
+        """Worker thread function to iterate through the response stream and
+        executes the provided callbacks. 
+
+        Parameters
+        ----------
+        responses : iterator
+            The iterator to the response from the server for the
+            requests in the stream.
+        
+        """
+        try:
+            for response in responses:
+                result = error = None
+                if not response.error_message:
+                    result = InferResult(response.infer_response)
+                else:
+                    error = InferenceServerException(msg=response.error_message)
+                self._callback(result=result, error=error)
+        except grpc.RpcError as rpc_error:
+            error = get_error_grpc(rpc_error)
+            self._callback(result=None, error=error)
+
+
+class _RequestIterator:
+    """An iterator class to provide data tp gRPC request stream.
+
+    Parameters
+    ----------
+    stream : InferStream
+        The InferStream that holds the context to an active stream.
+
+    """
+
+    def __init__(self, stream):
+        self._stream = stream
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        request = self._stream._get_request()
+        if not request:
+            raise StopIteration
+
+        return request

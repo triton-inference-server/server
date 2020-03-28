@@ -24,36 +24,48 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.5)
-
-if(${TRTIS_ENABLE_HTTP_V2})
-  install(
-    PROGRAMS
-      simple_http_v2_health_metadata.py
-      simple_http_v2_infer_client.py
-      simple_http_v2_async_infer_client.py
-    DESTINATION python
-  )
-endif() # TRTIS_ENABLE_HTTP_V2
-
-if(${TRTIS_ENABLE_GRPC_V2})
-  install(
-    PROGRAMS
-      grpc_v2_client.py
-      grpc_v2_explicit_byte_content_client.py
-      grpc_v2_explicit_int_content_client.py
-      grpc_v2_explicit_int8_content_client.py
-      grpc_v2_image_client.py
-      simple_grpc_v2_class_client.py
-      simple_grpc_v2_cudashm_client.py
-      simple_grpc_v2_health_metadata.py
-      simple_grpc_v2_async_infer_client.py
-      simple_grpc_v2_infer_client.py
-      simple_grpc_v2_sequence_stream_infer_client.py
-      simple_grpc_v2_sequence_sync_infer_client.py
-      simple_grpc_v2_string_infer_client.py
-      simple_grpc_v2_shm_client.py
-      simple_grpc_v2_model_control.py
-    DESTINATION python
-  )
-endif() # TRTIS_ENABLE_GRPC_V2
+name: "simple_sequence"
+platform: "custom"
+max_batch_size: 8
+default_model_filename: "libsequence.so"
+sequence_batching {
+  control_input [
+    {
+      name: "START"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_START
+          int32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "READY"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_READY
+          int32_false_true: [ 0, 1 ]
+        }
+      ]
+    }
+  ]
+}
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_CPU
+  }
+]
