@@ -595,7 +595,8 @@ class InferenceServerClient:
             If unable to register the specified system shared memory.     
 
         """
-        request_uri = "v2/systemsharedmemory/region/{}/register".format(quote(name))
+        request_uri = "v2/systemsharedmemory/region/{}/register".format(
+            quote(name))
 
         register_request = {
             'key': key,
@@ -725,7 +726,8 @@ class InferenceServerClient:
             If unable to register the specified cuda shared memory.     
 
         """
-        request_uri = "v2/cudasharedmemory/region/{}/register".format(quote(name))
+        request_uri = "v2/cudasharedmemory/region/{}/register".format(
+            quote(name))
 
         register_request = {
             'raw_handle': raw_handle,
@@ -779,8 +781,8 @@ class InferenceServerClient:
         _raise_if_error(response)
 
     def infer(self,
-              inputs,
               model_name,
+              inputs,
               model_version="",
               outputs=None,
               request_id=None,
@@ -792,19 +794,19 @@ class InferenceServerClient:
 
         Parameters
         ----------
+        model_name: str
+            The name of the model to run inference.
         inputs : list
             A list of InferInput objects, each describing data for a input
             tensor required by the model.
-        outputs : list
-            A list of InferOutput objects, each describing how the output
-            data must be returned. If not specified all outputs produced
-            by the model will be returned using default settings.
-        model_name: str
-            The name of the model to run inference.
         model_version: str
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. If not specified all outputs produced
+            by the model will be returned using default settings.
         request_id: str
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
@@ -858,12 +860,12 @@ class InferenceServerClient:
         return result
 
     def async_infer(self,
-                    callback,
-                    inputs,
-                    outputs,
                     model_name,
+                    inputs,
+                    callback,
                     model_version="",
                     request_id=None,
+                    outputs=None,
                     parameters=None,
                     headers=None,
                     query_params=None):
@@ -872,6 +874,11 @@ class InferenceServerClient:
 
         Parameters
         ----------
+        model_name: str
+            The name of the model to run inference.
+        inputs : list
+            A list of InferInput objects, each describing data for a input
+            tensor required by the model.
         callback : function
             Python function that is invoked once the request is completed.
             The function must reserve the last two arguments (result, error)
@@ -879,15 +886,6 @@ class InferenceServerClient:
             respectively which will be provided to the function when executing
             the callback. The ownership of these objects will be given to the
             user. The 'error' would be None for a successful inference.
-        inputs : list
-            A list of InferInput objects, each describing data for a input
-            tensor required by the model.
-        outputs : list
-            A list of InferOutput objects, each describing how the output
-            data must be returned. If not specified all outputs produced
-            by the model will be returned using default settings.
-        model_name: str
-            The name of the model to run inference.
         model_version: str
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
@@ -896,6 +894,10 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
+        outputs : list
+            A list of InferOutput objects, each describing how the output
+            data must be returned. If not specified all outputs produced
+            by the model will be returned using default settings.
         parameters: dict
             Optional inference parameters described as key-value pairs.
         headers: dict

@@ -147,15 +147,52 @@ SetInferenceRequestOptions(
 {
   RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetIdStr(
       request_options, request.id().c_str()));
+
+  const auto& sequence_id_it = request.parameters().find("sequence_id");
+  if (sequence_id_it != request.parameters().end()) {
+    const auto& infer_param = sequence_id_it->second;
+    if (infer_param.parameter_choice_case() !=
+        InferParameter::ParameterChoiceCase::kInt64Param) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          "invalid value type for 'sequence_id' parameter, expected "
+          "int64_param.");
+    }
+    RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetCorrelationId(
+        request_options, infer_param.int64_param()));
+    uint32_t flags = TRTSERVER_REQUEST_FLAG_NONE;
+    const auto& sequence_start_it = request.parameters().find("sequence_start");
+    if (sequence_start_it != request.parameters().end()) {
+      const auto& infer_param = sequence_start_it->second;
+      if (infer_param.parameter_choice_case() !=
+          InferParameter::ParameterChoiceCase::kBoolParam) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            "invalid value type for 'sequence_start' parameter, expected "
+            "bool_param.");
+      }
+      flags |= TRTSERVER_REQUEST_FLAG_SEQUENCE_START;
+    }
+    const auto& sequence_end_it = request.parameters().find("sequence_end");
+    if (sequence_end_it != request.parameters().end()) {
+      const auto& infer_param = sequence_end_it->second;
+      if (infer_param.parameter_choice_case() !=
+          InferParameter::ParameterChoiceCase::kBoolParam) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            "invalid value type for 'sequence_end' parameter, expected "
+            "bool_param.");
+      }
+      flags |= TRTSERVER_REQUEST_FLAG_SEQUENCE_END;
+    }
+    RETURN_IF_ERR(
+        TRTSERVER_InferenceRequestOptionsSetFlags(request_options, flags));
+  }
   // FIXMEV2 parameters
-  // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetFlags(
-  //    request_options, request_header.flags()));
   // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetPriority(
   //   request_options, request_header.priority()));
   // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetTimeoutMicroseconds(
   //   request_options, request_header.timeout_microseconds()));
-  // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetCorrelationId(
-  //    request_options, request.sequence_id()));
 
   // FIXMEV2 raw contents size?? Do we need it?
   for (const auto& input : request.inputs()) {
@@ -165,10 +202,9 @@ SetInferenceRequestOptions(
   }
 
   for (const auto& output : request.outputs()) {
-    // FIXMEV2 parameters
-    if (output.parameters().find("classification") !=
-        output.parameters().end()) {
-      const auto& infer_param = output.parameters().at("classification");
+    const auto& class_it = output.parameters().find("classification");
+    if (class_it != output.parameters().end()) {
+      const auto& infer_param = class_it->second;
       if (infer_param.parameter_choice_case() !=
           InferParameter::ParameterChoiceCase::kInt64Param) {
         return TRTSERVER_ErrorNew(

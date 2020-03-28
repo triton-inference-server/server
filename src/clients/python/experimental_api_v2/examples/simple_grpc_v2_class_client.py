@@ -240,13 +240,15 @@ if __name__ == '__main__':
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
     try:
-        model_meta = triton_client.get_model_metadata(model_name=FLAGS.model_name)
+        model_meta = triton_client.get_model_metadata(
+            model_name=FLAGS.model_name)
     except InferenceServerException as e:
         print("failed to retrieve the metadata: " + str(e))
         sys.exit()
 
     try:
-        model_config = triton_client.get_model_config(model_name=FLAGS.model_name)
+        model_config = triton_client.get_model_config(
+            model_name=FLAGS.model_name)
     except InferenceServerException as e:
         print("failed to retrieve the config: " + str(e))
         sys.exit()
@@ -265,10 +267,10 @@ if __name__ == '__main__':
             input_name, output_name, c, h, w, format, dtype, FLAGS):
         try:
             results.append(
-                triton_client.infer(inputs,
-                                  outputs,
-                                  model_name=FLAGS.model_name,
-                                  model_version=FLAGS.model_version))
+                triton_client.infer(model_name=FLAGS.model_name,
+                                    model_version=FLAGS.model_version,
+                                    inputs=inputs,
+                                    outputs=outputs))
         except InferenceServerException as e:
             print("inference failed: " + str(e))
             sys.exit()

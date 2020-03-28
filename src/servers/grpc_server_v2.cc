@@ -1852,9 +1852,9 @@ InferAllocatorPayload(
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const ModelInferRequest& request,
     AllocPayload::TensorSerializedDataMap* serialized_data_map,
-    ModelInferResponse& response, AllocPayload* alloc_payload)
+    ModelInferResponse* response, AllocPayload* alloc_payload)
 {
-  alloc_payload->response_ = &response;
+  alloc_payload->response_ = response;
   if (alloc_payload->shm_map_ != nullptr) {
     alloc_payload->shm_map_->clear();
   }
@@ -2271,7 +2271,7 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
     }
     if (err == nullptr) {
       err = InferAllocatorPayload(
-          trtserver_, shm_manager_, request, serialized_data_map, response,
+          trtserver_, shm_manager_, request, serialized_data_map, &response,
           &state->alloc_payload_);
     }
     if (err == nullptr) {
@@ -2450,17 +2450,17 @@ ModelInferHandler::InferComplete(
   state->context_->responder_->Finish(response, status, state);
 }
 
-#if 0
 //
-// StreamInferHandler
+// ModelStreamInferHandler
 //
-class StreamInferHandler
+class ModelStreamInferHandler
     : public Handler<
           GRPCInferenceService::AsyncService,
-          grpc::ServerAsyncReaderWriter<InferResponse, InferRequest>,
-          InferRequest, InferResponse> {
+          grpc::ServerAsyncReaderWriter<
+              ModelStreamInferResponse, ModelInferRequest>,
+          ModelInferRequest, ModelStreamInferResponse> {
  public:
-  StreamInferHandler(
+  ModelStreamInferHandler(
       const std::string& name,
       const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
       const std::shared_ptr<TraceManager>& trace_manager,
@@ -2494,7 +2494,7 @@ class StreamInferHandler
 };
 
 void
-StreamInferHandler::StartNewRequest()
+ModelStreamInferHandler::StartNewRequest()
 {
   const uint64_t unique_id = RequestStatusUtil::NextUniqueRequestId();
   auto context = std::make_shared<State::Context>(server_id_, unique_id);
@@ -2510,7 +2510,7 @@ StreamInferHandler::StartNewRequest()
   }
 #endif  // TRTIS_ENABLE_TRACING
 
-  service_->RequestStreamInfer(
+  service_->RequestModelStreamInfer(
       state->context_->ctx_.get(), state->context_->responder_.get(), cq_, cq_,
       state);
 
@@ -2519,7 +2519,7 @@ StreamInferHandler::StartNewRequest()
 }
 
 bool
-StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
+ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 {
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok
                  << ", context " << state->context_->unique_id_ << ", "
@@ -2548,6 +2548,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     state->context_->responder_->Read(&state->request_, state);
 
   } else if (state->step_ == Steps::READ) {
+    const ModelInferRequest& request = state->request_;
     int64_t requested_model_version;
     TRTSERVER_Error* err = GetModelVersionFromString(
         request.model_version(), &requested_model_version);
@@ -2599,8 +2600,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     std::shared_ptr<StateContext> context = state->context_;
 
     // Issue the inference request into server...
-    const InferRequest& request = state->request_;
-    InferResponse& response = state->response_;
+    ModelStreamInferResponse& response = state->response_;
 
     // Create the inference request provider which provides all the
     // input information needed for an inference.
@@ -2611,8 +2611,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
           requested_model_version);
     }
     if (err == nullptr) {
-      err = SetTRTSERVER_InferenceRequestOptions(
-          request_options, request.meta_data());
+      err = SetInferenceRequestOptions(request_options, request);
     }
 
     TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
@@ -2621,19 +2620,20 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
           &request_provider, trtserver_.get(), request_options);
     }
 
-    // Will be used when GRPC request contains explicit bytes tensors
+    // Will be used to hold the serialized data in case explicit string
+    // tensors are present in the request.
     AllocPayload::TensorSerializedDataMap* serialized_data_map =
         new AllocPayload::TensorSerializedDataMap();
 
     if (err == nullptr) {
       err = InferGRPCToInput(
-          trtserver_, shm_manager_, request.meta_data(), request,
-          serialized_data_map, request_provider);
+          trtserver_, shm_manager_, request, serialized_data_map,
+          request_provider);
     }
     if (err == nullptr) {
       err = InferAllocatorPayload(
-          trtserver_, shm_manager_, request.meta_data(), serialized_data_map,
-          response, &state->alloc_payload_);
+          trtserver_, shm_manager_, request, serialized_data_map,
+          response.mutable_infer_response(), &state->alloc_payload_);
     }
     if (err == nullptr) {
       // Provide the trace manager object to use for this request, if
@@ -2665,19 +2665,13 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // WRITEREADY or WRITTEN. If there was an error then enqueue the
     // error response and show it to be ready for writing.
     if (err != nullptr) {
-      RequestStatusUtil::Create(
-          response.mutable_request_status(), err, state->unique_id_,
-          server_id_);
-
       LOG_VERBOSE(1) << "Infer failed: " << TRTSERVER_ErrorMessage(err);
+      grpc::Status status;
+      GrpcStatusUtil::Create(&status, err);
       TRTSERVER_ErrorDelete(err);
+      response.set_error_message(status.error_message());
 
-      // Clear the meta-data and raw output as they may be partially
-      // initialized or uninitialized.
-      response.mutable_meta_data()->Clear();
-      response.mutable_raw_output()->Clear();
-
-      response.mutable_meta_data()->set_id(request.meta_data().id());
+      response.mutable_infer_response()->Clear();
 
       state->step_ = Steps::WRITEREADY;
       state->context_->WriteResponseIfReady(state);
@@ -2760,23 +2754,89 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 }
 
 void
-StreamInferHandler::StreamInferComplete(
+ModelStreamInferHandler::StreamInferComplete(
     TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
     TRTSERVER_InferenceResponse* trtserver_response, void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
 
-  LOG_VERBOSE(1) << "StreamInferHandler::StreamInferComplete, context "
+  LOG_VERBOSE(1) << "ModelStreamInferHandler::StreamInferComplete, context "
                  << state->context_->unique_id_ << ", " << state->unique_id_
                  << " step " << state->step_;
 
-  const InferRequest& request = state->request_;
-  InferResponse& response = state->response_;
+  ModelStreamInferResponse& response = state->response_;
+  InferResponseHeader response_header;
 
-  TRTSERVER_Error* response_status =
-      TRTSERVER_InferenceResponseStatus(trtserver_response);
-  if ((response_status == nullptr) && (response.ByteSizeLong() > INT_MAX)) {
-    response_status = TRTSERVER_ErrorNew(
+  TRTSERVER_Error* err = TRTSERVER_InferenceResponseStatus(trtserver_response);
+
+  if (err == nullptr) {
+    TRTSERVER_Protobuf* response_protobuf = nullptr;
+    err = TRTSERVER_InferenceResponseHeader(
+        trtserver_response, &response_protobuf);
+    if (err == nullptr) {
+      const char* buffer;
+      size_t byte_size;
+      err = TRTSERVER_ProtobufSerialize(response_protobuf, &buffer, &byte_size);
+      if (err == nullptr) {
+        if (!response_header.ParseFromArray(buffer, byte_size)) {
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INTERNAL, "failed to parse response header");
+        }
+      }
+
+      TRTSERVER_ProtobufDelete(response_protobuf);
+    }
+  }
+
+  const char* id;
+  if (err == nullptr) {
+    err = TRTSERVER_InferenceResponseIdStr(trtserver_response, &id);
+  }
+
+  // Convert the InferResponseHeader to the V2 response
+  if (err == nullptr) {
+    response.mutable_infer_response()->set_model_version(
+        std::to_string(response_header.model_version()));
+    response.mutable_infer_response()->set_id(id);
+    for (const auto& io : response_header.output()) {
+      // Find the tensor in the response and set its shape.
+      for (auto& output :
+           *(response.mutable_infer_response()->mutable_outputs())) {
+        if (output.name() == io.name()) {
+          if (io.batch_classes().size() == 0) {
+            for (const auto d : io.raw().dims()) {
+              output.add_shape(d);
+            }
+            output.set_datatype(DataTypeToProtocolString(io.data_type()));
+          } else {
+            int cls_count = 0;
+            for (const auto& classes : io.batch_classes()) {
+              cls_count = classes.cls().size();
+              for (const auto& cls : classes.cls()) {
+                if (!cls.label().empty()) {
+                  output.mutable_contents()->add_byte_contents(std::string(
+                      std::to_string(cls.idx()) + ":" +
+                      std::to_string(cls.value()) + ":" + cls.label()));
+                } else {
+                  output.mutable_contents()->add_byte_contents(std::string(
+                      std::to_string(cls.idx()) + ":" +
+                      std::to_string(cls.value())));
+                }
+              }
+            }
+            output.add_shape(io.batch_classes().size());
+            output.add_shape(cls_count);
+
+            output.set_datatype("BYTES");
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  if ((err == nullptr) && (response.ByteSizeLong() > INT_MAX)) {
+    err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INVALID_ARG,
         std::string(
             "Response has byte size " +
@@ -2786,50 +2846,28 @@ StreamInferHandler::StreamInferComplete(
             .c_str());
   }
 
-  if (response_status == nullptr) {
-    TRTSERVER_Protobuf* response_protobuf = nullptr;
-    response_status = TRTSERVER_InferenceResponseHeader(
-        trtserver_response, &response_protobuf);
-    if (response_status == nullptr) {
-      const char* buffer;
-      size_t byte_size;
-      response_status =
-          TRTSERVER_ProtobufSerialize(response_protobuf, &buffer, &byte_size);
-      if (response_status == nullptr) {
-        if (!response.mutable_meta_data()->ParseFromArray(buffer, byte_size)) {
-          response_status = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INTERNAL, "failed to parse response header");
-        }
-      }
 
-      TRTSERVER_ProtobufDelete(response_protobuf);
-    }
+  if (err != nullptr) {
+    response.mutable_infer_response()->Clear();
   }
 
-  // If the response is an error then clear the meta-data and raw
-  // output as they may be partially initialized or uninitialized.
-  if (response_status != nullptr) {
-    response.mutable_meta_data()->Clear();
-    response.mutable_raw_output()->Clear();
-  }
+  grpc::Status status;
+  GrpcStatusUtil::Create(&status, err);
 
-  RequestStatusUtil::Create(
-      response.mutable_request_status(), response_status, state->unique_id_,
-      state->context_->server_id_);
+  if (err != nullptr) {
+    response.set_error_message(status.error_message());
+  }
 
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'state'.
   LOG_TRTSERVER_ERROR(
       TRTSERVER_InferenceResponseDelete(trtserver_response),
       "deleting GRPC response");
-  TRTSERVER_ErrorDelete(response_status);
-
-  response.mutable_meta_data()->set_id(request.meta_data().id());
+  TRTSERVER_ErrorDelete(err);
 
   state->step_ = Steps::WRITEREADY;
   state->context_->WriteResponseIfReady(state);
 }
-#endif
 
 }  // namespace
 
@@ -2895,9 +2933,7 @@ GRPCServerV2::Start()
   model_config_cq_ = grpc_builder_.AddCompletionQueue();
   model_infer_cq_ = grpc_builder_.AddCompletionQueue();
   common_cq_ = grpc_builder_.AddCompletionQueue();
-#if 0
-  stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
-#endif
+  model_stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
   grpc_server_ = grpc_builder_.BuildAndStart();
 
   // Handler for server-live requests.
@@ -2950,22 +2986,20 @@ GRPCServerV2::Start()
   hmodelinfer->Start();
   model_infer_handler_.reset(hmodelinfer);
 
+  // Handler for streaming inference requests.
+  ModelStreamInferHandler* hmodelstreaminfer = new ModelStreamInferHandler(
+      "ModelStreamInferHandler", server_, server_id_, trace_manager_,
+      shm_manager_, &service_, model_stream_infer_cq_.get(),
+      infer_allocation_pool_size_ /* max_state_bucket_count */);
+  hmodelstreaminfer->Start();
+  model_stream_infer_handler_.reset(hmodelstreaminfer);
+
   // A common Handler for other non-critical requests
   CommonHandler* hcommon = new CommonHandler(
       "CommonHandler", server_, server_id_, shm_manager_, &service_,
       common_cq_.get());
   hcommon->Start();
   common_handler_.reset(hcommon);
-
-#if 0
-  // Handler for streaming inference requests.
-  StreamInferHandler* hstreaminfer = new StreamInferHandler(
-      "StreamInferHandler", server_, server_id_, trace_manager_, shm_manager_,
-      &service_, stream_infer_cq_.get(),
-      infer_allocation_pool_size_ /* max_state_bucket_count */);
-  hstreaminfer->Start();
-  stream_infer_handler_.reset(hstreaminfer);
-#endif
 
   running_ = true;
   LOG_INFO << "Started GRPCInferenceService at " << server_addr_;
@@ -2991,9 +3025,7 @@ GRPCServerV2::Stop()
   model_config_cq_->Shutdown();
   model_infer_cq_->Shutdown();
   common_cq_->Shutdown();
-#if 0
-  stream_infer_cq_->Shutdown();
-#endif
+  model_stream_infer_cq_->Shutdown();
 
   // Must stop all handlers explicitly to wait for all the handler
   // threads to join since they are referencing completion queue, etc.
@@ -3005,9 +3037,8 @@ GRPCServerV2::Stop()
   dynamic_cast<ModelConfigHandler*>(model_config_handler_.get())->Stop();
   dynamic_cast<ModelInferHandler*>(model_infer_handler_.get())->Stop();
   dynamic_cast<CommonHandler*>(common_handler_.get())->Stop();
-#if 0
-  dynamic_cast<StreamInferHandler*>(stream_infer_handler_.get())->Stop();
-#endif
+  dynamic_cast<ModelStreamInferHandler*>(model_stream_infer_handler_.get())
+      ->Stop();
 
   running_ = false;
   return nullptr;  // success
