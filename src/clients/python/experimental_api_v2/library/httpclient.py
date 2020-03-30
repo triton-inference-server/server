@@ -71,6 +71,30 @@ def _get_query_string(query_params):
     return ''
 
 
+def _get_inference_request(inputs, request_id, outputs, sequence_id,
+                           sequence_start, sequence_end):
+    infer_request = {}
+    parameters = {}
+    if request_id:
+        infer_request['id'] = request_id
+    if sequence_id:
+        parameters['sequence_id'] = sequence_id
+        parameters['sequence_start'] = sequence_start
+        parameters['sequence_end'] = sequence_end
+    infer_request['inputs'] = [
+        this_input._get_tensor() for this_input in inputs
+    ]
+    if outputs:
+        infer_request['outputs'] = [
+            this_output._get_tensor() for this_output in outputs
+        ]
+
+    if parameters:
+        infer_request['parameters'] = parameters
+
+    return infer_request
+
+
 class InferenceServerClient:
     """An InferenceServerClient object is used to perform any kind of
     communication with the InferenceServer using http protocol.
@@ -786,7 +810,9 @@ class InferenceServerClient:
               model_version="",
               outputs=None,
               request_id=None,
-              parameters=None,
+              sequence_id=0,
+              sequence_start=False,
+              sequence_end=False,
               headers=None,
               query_params=None):
         """Run synchronous inference using the supplied 'inputs' requesting
@@ -811,8 +837,18 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
-        parameters: dict
-            Optional inference parameters described as key-value pairs.
+        sequence_id : int
+            The unique identifier for the sequence being represented by the
+            object. Default value is 0 which means that the request does not
+            belong to a sequence.
+        sequence_start: bool
+            Indicates whether the request being added marks the start of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
+        sequence_end: bool
+            Indicates whether the request being added marks the end of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
@@ -831,18 +867,13 @@ class InferenceServerClient:
         InferenceServerException
             If server fails to perform inference.
         """
-        infer_request = {}
-        if request_id:
-            infer_request['id'] = request_id
-        if parameters:
-            infer_request['parameters'] = parameters
-        infer_request['inputs'] = [
-            this_input._get_tensor() for this_input in inputs
-        ]
-        if outputs:
-            infer_request['outputs'] = [
-                this_output._get_tensor() for this_output in outputs
-            ]
+
+        infer_request = _get_inference_request(inputs=inputs,
+                                               request_id=request_id,
+                                               outputs=outputs,
+                                               sequence_id=sequence_id,
+                                               sequence_start=sequence_start,
+                                               sequence_end=sequence_end)
 
         request_body = json.dumps(infer_request)
         if not model_version:
@@ -864,9 +895,11 @@ class InferenceServerClient:
                     inputs,
                     callback,
                     model_version="",
-                    request_id=None,
                     outputs=None,
-                    parameters=None,
+                    request_id=None,
+                    sequence_id=0,
+                    sequence_start=False,
+                    sequence_end=False,
                     headers=None,
                     query_params=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
@@ -890,16 +923,26 @@ class InferenceServerClient:
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
-        request_id: str
-            Optional identifier for the request. If specified will be returned
-            in the response. Default value is 'None' which means no request_id
-            will be used.
         outputs : list
             A list of InferOutput objects, each describing how the output
             data must be returned. If not specified all outputs produced
             by the model will be returned using default settings.
-        parameters: dict
-            Optional inference parameters described as key-value pairs.
+        request_id: str
+            Optional identifier for the request. If specified will be returned
+            in the response. Default value is 'None' which means no request_id
+            will be used.
+        sequence_id : int
+            The unique identifier for the sequence being represented by the
+            object. Default value is 0 which means that the request does not
+            belong to a sequence.
+        sequence_start: bool
+            Indicates whether the request being added marks the start of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
+        sequence_end: bool
+            Indicates whether the request being added marks the end of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request
@@ -920,18 +963,12 @@ class InferenceServerClient:
             callback(result=InferResult(response.read()),
                      error=_get_error(response))
 
-        infer_request = {}
-        if request_id:
-            infer_request['id'] = request_id
-        if parameters:
-            infer_request['parameters'] = parameters
-        infer_request['inputs'] = [
-            this_input._get_tensor() for this_input in inputs
-        ]
-        if outputs:
-            infer_request['outputs'] = [
-                this_output._get_tensor() for this_output in outputs
-            ]
+        infer_request = _get_inference_request(inputs=inputs,
+                                               request_id=request_id,
+                                               outputs=outputs,
+                                               sequence_id=sequence_id,
+                                               sequence_start=sequence_start,
+                                               sequence_end=sequence_end)
 
         request_body = json.dumps(infer_request)
         if not model_version:

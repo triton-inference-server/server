@@ -1238,26 +1238,6 @@ class InferResult:
                 return np_array
         return None
 
-    def get_statistics(self, as_json=False):
-        """Retrieves the InferStatistics for this response as
-        a json dict object or protobuf message
-
-        Parameters
-        ----------
-        as_json : bool
-            If True then returns statistics as a json dict, otherwise
-            as a protobuf message. Default value is False.
-        
-        Returns
-        -------
-        protobuf message or dict
-            The InferStatistics protobuf message or dict for this response.
-        """
-        if as_json:
-            return json.loads(MessageToJson(self._result.statistics))
-        else:
-            return self._result.statistics
-
     def get_response(self, as_json=False):
         """Retrieves the complete ModelInferResponse as a
         json dict object or protobuf message
@@ -1293,13 +1273,16 @@ class InferStream:
         provided to the function when executing the callback. The
         ownership of these objects will be given to the user. The
         'error' would be None for a successful inference.
+    headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include while establising gRPC stream.
     """
 
-    def __init__(self, callback):
+    def __init__(self, callback, headers):
         self._callback = callback
         self._request_queue = queue.Queue()
+        self._headers = headers
         self._handler = None
-        self._headers = None
 
     def __enter__(self):
         return self
@@ -1320,20 +1303,6 @@ class InferStream:
             if self._handler.is_alive():
                 self._handler.join()
             self._handler = None
-
-    def set_headers(self, headers):
-        """Sets the specified headers to be used with the stream.
-
-        Parameters
-        ----------
-        headers: dict
-            Optional dictionary specifying additional HTTP
-            headers to include while establising gRPC stream.
-        """
-        if self._is_initialized():
-            raise_error(
-                'Can not set headers for already initialized InferStream')
-        self._headers = headers
 
     def _is_initialized(self):
         """Returns whether the handler to this stream object
