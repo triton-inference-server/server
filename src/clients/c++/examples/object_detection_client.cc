@@ -172,7 +172,7 @@ Preprocess(
   }
 }
 
-void
+std::vector<float*>
 Postprocess(
     const std::map<std::string, std::unique_ptr<nic::InferContext::Result>>&
         results,
@@ -191,7 +191,7 @@ Postprocess(
               << filenames.size() << std::endl;
     exit(1);
   }
-
+  std::vector<float*> pointers_to_the_output_tensors;
   for (size_t b = 0; b < batch_size; ++b) {
 
     std::cout << "Image '" << filenames[b] << "':" << std::endl;
@@ -222,10 +222,16 @@ Postprocess(
             exit(1);
         }
     
-        std::cout<<"first element in the output tensor: "<<output_array[0][0][0]<<std::endl;
-
+        std::cout<<"first element in the output array: "<<output_array[0][0][0]<<std::endl;
+        float* output_array_to_return = &output_array[0][0][0];
+        cv::Mat output_tensor_mat = cv::Mat(output_tensor_shape[0], output_tensor_shape[1], CV_32FC(24), output_array);
+        std::cout<<"first element in the output array to return: "<<*(output_array_to_return)<<std::endl;
+        std::cout<<"first element in the output array using pointers: "<<**output_array[0]<<std::endl;
+        std::cout<<"first element in the output tensor cv mat: "<<output_tensor_mat.at<float>(0, 0, 0)<<std::endl;
+        pointers_to_the_output_tensors.push_back(output_array_to_return);
       }
   }
+  return pointers_to_the_output_tensors;
 }
 
 void
@@ -797,10 +803,11 @@ main(int argc, char** argv)
   }
 
   // Post-process the results to make prediction(s)
+  std::vector< std::vector<float*> > outputs;
   for (size_t idx = 0; idx < results.size(); idx++) {
     std::cout << "Request " << idx << ", batch size " << batch_size
               << std::endl;
-    Postprocess(results[idx], result_filenames[idx], batch_size, output_size);
+    outputs.push_back(Postprocess(results[idx], result_filenames[idx], batch_size, output_size));
   }
 
   return 0;
