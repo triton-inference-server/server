@@ -28,6 +28,7 @@
 import argparse
 import numpy as np
 import os
+import sys
 from builtins import range
 import tritongrpcclient.core as grpcclient
 import tritongrpcclient.cuda_shared_memory as cudashm
@@ -56,7 +57,7 @@ if __name__ == '__main__':
         triton_client = grpcclient.InferenceServerClient(FLAGS.url)
     except Exception as e:
         print("channel creation failed: " + str(e))
-        sys.exit()
+        sys.exit(1)
 
     # To make sure no shared memory regions are registered with the
     # server.
@@ -112,22 +113,20 @@ if __name__ == '__main__':
 
     # Set the parameters to use data from shared memory
     inputs = []
-    inputs.append(grpcclient.InferInput('INPUT0', [1, 16], "INT32"))
-    inputs[-1].set_parameter("shared_memory_region", "input0_data")
-    inputs[-1].set_parameter("shared_memory_byte_size", input_byte_size)
+    inputs.append(grpcclient.InferInput('INPUT0'))
+    inputs[-1].set_data_from_shared_memory("input0_data", input_byte_size,
+                                           [1, 16], "INT32")
 
-    inputs.append(grpcclient.InferInput('INPUT1', [1, 16], "INT32"))
-    inputs[-1].set_parameter("shared_memory_region", "input1_data")
-    inputs[-1].set_parameter("shared_memory_byte_size", input_byte_size)
+    inputs.append(grpcclient.InferInput('INPUT1'))
+    inputs[-1].set_data_from_shared_memory("input1_data", input_byte_size,
+                                           [1, 16], "INT32")
 
     outputs = []
     outputs.append(grpcclient.InferOutput('OUTPUT0'))
-    # outputs[-1].set_parameter("shared_memory_region", "output0_data")
-    # outputs[-1].set_parameter("shared_memory_byte_size", output_byte_size)
+    # outputs[-1].use_shared_memory("output0_data", output_byte_size)
 
     outputs.append(grpcclient.InferOutput('OUTPUT1'))
-    # outputs[-1].set_parameter("shared_memory_region", "output1_data")
-    # outputs[-1].set_parameter("shared_memory_byte_size", output_byte_size)
+    # outputs[-1].use_shared_memory("output1_data", output_byte_size)
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,

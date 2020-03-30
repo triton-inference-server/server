@@ -992,19 +992,14 @@ class InferInput:
     ----------
     name : str
         The name of input whose data will be described by this object
-    shape : list
-        The shape of the associated input. Default value is None.
-    datatype : str
-        The datatype of the associated input. Default is None.
-
     """
 
-    def __init__(self, name, shape=None, datatype=None):
+    def __init__(self, name):
         self._name = name
-        self._shape = shape
-        self._datatype = datatype
         self._parameters = {}
         self._data = None
+        self._shape = None
+        self._datatype = None
 
     def name(self):
         """Get the name of input associated with this object.
@@ -1052,28 +1047,35 @@ class InferInput:
         # FIXMEV2 Use Binary data when support available on the server.
         self._data = [val.item() for val in input_tensor.flatten()]
 
-    def set_parameter(self, key, value):
-        """Adds the specified key-value pair in the requested input parameters
+    def set_data_from_shared_memory(self, region_name, byte_size, shape,
+                                    datatype):
+        """Set the tensor data from the specified shared memory region.
 
         Parameters
         ----------
-        key : str
-            The name of the parameter to be included in the request. 
-        value : str/int/bool
-            The value of the parameter
+        region_name : str
+            The name of the shared memory region holding tensor data.
+        byte_size : int
+            The size of the shared memory region holding tensor data.
+        shape : list
+            The shape of the associated tensor input.
+        datatype : str
+            The datatype of the associated tensor input.
         
         """
-        if not type(key) is str:
-            raise_error(
-                "only string data type for key is supported in parameters")
+        self._parameters['shared_memory_region'] = region_name
+        self._parameters['shared_memory_byte_size'] = byte_size
+        self._shape = shape
+        self._datatype = datatype
 
-        self._parameters[key] = value
-
-    def clear_parameters(self):
-        """Clears all the parameters that have been added to the request.
+    def reset(self):
+        """Resets all the additional settings in the object.
         
         """
-        self._parameters.clear()
+        self._parameters = {}
+        self._data = None
+        self._shape = None
+        self._datatype = None
 
     def _get_tensor(self):
         """Retrieve the underlying input as json dict.
@@ -1116,28 +1118,39 @@ class InferOutput:
         """
         return self._name
 
-    def set_parameter(self, key, value):
-        """Adds the specified key-value pair in the requested output parameters
+    def mark_classification(self, count=1):
+        """Marks the output to return the classification result.
 
         Parameters
         ----------
-        key : str
-            The name of the parameter to be included in the request. 
-        value : str/int/bool
-            The value of the parameter
+        count : int
+            The number of classifications to be returned in result.
+            Default value is 1.
+
+        """
+        self._parameters['classification'] = count
+
+    def use_shared_memory(self, region_name, byte_size):
+        """Marks the output to return the inference result in
+        specified shared memory region.
+
+        Parameters
+        ----------
+        region_name : str
+            The name of the shared memory region to hold tensor data.
+        byte_size : int
+            The size of the shared memory region to hold tensor data.
         
         """
-        if not type(key) is str:
-            raise_error(
-                "only string data type for key is supported in parameters")
 
-        self._parameters[key] = value
+        self._parameters['shared_memory_region'] = region_name
+        self._parameters['shared_memory_byte_size'] = byte_size
 
-    def clear_parameters(self):
-        """Clears all the parameters that have been added to the request.
+    def reset(self):
+        """Resets all the additional settings in the object.
         
         """
-        self._parameters.clear()
+        self._parameters = {}
 
     def _get_tensor(self):
         """Retrieve the underlying input as json dict.

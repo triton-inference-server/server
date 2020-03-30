@@ -1010,22 +1010,13 @@ class InferInput:
     Parameters
     ----------
     name : str
-        The name of input whose data will be described by this object
-    shape : list
-        The shape of the associated input. Default value is None.
-    datatype : str
-        The datatype of the associated input. Default is None.
+        The name of input whose data will be described by this object.
 
     """
 
-    def __init__(self, name, shape=None, datatype=None):
+    def __init__(self, name):
         self._input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
         self._input.name = name
-        if shape:
-            self._input.ClearField('shape')
-            self._input.shape.extend(shape)
-        if datatype:
-            self._input.datatype = datatype
 
     def name(self):
         """Get the name of input associated with this object.
@@ -1077,36 +1068,39 @@ class InferInput:
         else:
             self._input.contents.raw_contents = input_tensor.tobytes()
 
-    def set_parameter(self, key, value):
-        """Adds the specified key-value pair in the requested input parameters
+    def set_data_from_shared_memory(self, region_name, byte_size, shape,
+                                    datatype):
+        """Set the tensor data from the specified shared memory region.
 
         Parameters
         ----------
-        key : str
-            The name of the parameter to be included in the request. 
-        value : str/int/bool
-            The value of the parameter
+        region_name : str
+            The name of the shared memory region holding tensor data.
+        byte_size : int
+            The size of the shared memory region holding tensor data.
+        shape : list
+            The shape of the associated tensor input.
+        datatype : str
+            The datatype of the associated tensor input.
         
         """
-        if not type(key) is str:
-            raise_error(
-                "only string data type for key is supported in parameters")
 
-        param = self._input.parameters[key]
-        if type(value) is int:
-            param.int64_param = value
-        elif type(value) is bool:
-            param.bool_param = value
-        elif type(value) is str:
-            param.string_param = value
-        else:
-            raise_error("unsupported value type for the parameter")
+        self._input.parameters[
+            'shared_memory_region'].string_param = region_name
+        self._input.parameters[
+            'shared_memory_byte_size'].int64_param = byte_size
 
-    def clear_parameters(self):
-        """Clears all the parameters that have been added to the input request.
+        self._input.ClearField('shape')
+        self._input.shape.extend(shape)
+        self._input.datatype = datatype
+
+    def reset(self):
+        """Resets all the additional settings in the object.
         
         """
-        self._input.parameters.clear()
+        name = self._input.name
+        self._input.clear()
+        self._input.name = name
 
     def _get_tensor(self):
         """Retrieve the underlying InferInputTensor message.
@@ -1143,36 +1137,43 @@ class InferOutput:
         """
         return self._output.name
 
-    def set_parameter(self, key, value):
-        """Adds the specified key-value pair in the requested output parameters
+    def mark_classification(self, count=1):
+        """Marks the output to return the classification result.
 
         Parameters
         ----------
-        key : str
-            The name of the parameter to be included in the request. 
-        value : str/int/bool
-            The value of the parameter
+        count : int
+            The number of classifications to be returned in result.
+            Default value is 1.
+
+        """
+        self._output.parameters['classification'].int64_param = count
+
+    def use_shared_memory(self, region_name, byte_size):
+        """Marks the output to return the inference result in
+        specified shared memory region.
+
+        Parameters
+        ----------
+        region_name : str
+            The name of the shared memory region to hold tensor data.
+        byte_size : int
+            The size of the shared memory region to hold tensor data.
         
         """
-        if not type(key) is str:
-            raise_error(
-                "only string data type for key is supported in parameters")
 
-        param = self._output.parameters[key]
-        if type(value) is int:
-            param.int64_param = value
-        elif type(value) is bool:
-            param.bool_param = value
-        elif type(value) is str:
-            param.string_param = value
-        else:
-            raise_error("unsupported value type for the parameter")
+        self._output.parameters[
+            'shared_memory_region'].string_param = region_name
+        self._output.parameters[
+            'shared_memory_byte_size'].int64_param = byte_size
 
-    def clear_parameters(self):
-        """Clears all the parameters that have been added to the output request.
+    def reset(self):
+        """Resets all the additional settings in the object.
         
         """
-        self._output.parameters.clear()
+        name = self._output.name
+        self._output.clear()
+        self._output.name = name
 
     def _get_tensor(self):
         """Retrieve the underlying InferRequestedOutputTensor message.
@@ -1278,7 +1279,7 @@ class InferStream:
             headers to include while establising gRPC stream.
     """
 
-    def __init__(self, callback, headers):
+    def __init__(self, callback, headers=None):
         self._callback = callback
         self._request_queue = queue.Queue()
         self._headers = headers
