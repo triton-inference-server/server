@@ -72,7 +72,7 @@ def _get_query_string(query_params):
 
 
 def _get_inference_request(inputs, request_id, outputs, sequence_id,
-                           sequence_start, sequence_end):
+                           sequence_start, sequence_end, priority, timeout_us):
     infer_request = {}
     parameters = {}
     if request_id:
@@ -81,6 +81,11 @@ def _get_inference_request(inputs, request_id, outputs, sequence_id,
         parameters['sequence_id'] = sequence_id
         parameters['sequence_start'] = sequence_start
         parameters['sequence_end'] = sequence_end
+    if priority:
+        parameters['priority'] = priority
+    if timeout_us:
+        parameters['timeout'] = timeout_us
+
     infer_request['inputs'] = [
         this_input._get_tensor() for this_input in inputs
     ]
@@ -812,6 +817,8 @@ class InferenceServerClient:
               sequence_id=0,
               sequence_start=False,
               sequence_end=False,
+              priority=0,
+              timeout_us=None,
               headers=None,
               query_params=None):
         """Run synchronous inference using the supplied 'inputs' requesting
@@ -848,6 +855,20 @@ class InferenceServerClient:
             Indicates whether the request being added marks the end of the 
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
+        priority : int
+            Indicates the priority of the request. Priority value zero
+            indicates that the default priority level should be used
+            (i.e. same behavior as not specifying the priority parameter).
+            Lower value priorities indicate higher priority levels. Thus
+            the highest priority level is indicated by setting the parameter
+            to 1, the next highest is 2, etc. If not provided, the server
+            will handle the request using default setting for the model.
+        timeout_us : int
+            The timeout value for the request, in microseconds. If the request
+            cannot be completed within the time the server can take a
+            model-specific action such as terminating the request. If not
+            provided, the server will handle the request using default setting
+            for the model.
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
@@ -872,7 +893,9 @@ class InferenceServerClient:
                                                outputs=outputs,
                                                sequence_id=sequence_id,
                                                sequence_start=sequence_start,
-                                               sequence_end=sequence_end)
+                                               sequence_end=sequence_end,
+                                               priority=priority,
+                                               timeout_us=timeout_us)
 
         request_body = json.dumps(infer_request)
         if not model_version:
@@ -899,6 +922,8 @@ class InferenceServerClient:
                     sequence_id=0,
                     sequence_start=False,
                     sequence_end=False,
+                    priority=0,
+                    timeout_us=None,
                     headers=None,
                     query_params=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
@@ -942,6 +967,20 @@ class InferenceServerClient:
             Indicates whether the request being added marks the end of the 
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
+        priority : int
+            Indicates the priority of the request. Priority value zero
+            indicates that the default priority level should be used
+            (i.e. same behavior as not specifying the priority parameter).
+            Lower value priorities indicate higher priority levels. Thus
+            the highest priority level is indicated by setting the parameter
+            to 1, the next highest is 2, etc. If not provided, the server
+            will handle the request using default setting for the model.
+        timeout_us : int
+            The timeout value for the request, in microseconds. If the request
+            cannot be completed within the time the server can take a
+            model-specific action such as terminating the request. If not
+            provided, the server will handle the request using default setting
+            for the model.
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request
@@ -967,7 +1006,9 @@ class InferenceServerClient:
                                                outputs=outputs,
                                                sequence_id=sequence_id,
                                                sequence_start=sequence_start,
-                                               sequence_end=sequence_end)
+                                               sequence_end=sequence_end,
+                                               priority=priority,
+                                               timeout_us=timeout_us)
 
         request_body = json.dumps(infer_request)
         if not model_version:
