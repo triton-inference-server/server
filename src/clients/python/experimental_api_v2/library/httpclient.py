@@ -72,7 +72,7 @@ def _get_query_string(query_params):
 
 
 def _get_inference_request(inputs, request_id, outputs, sequence_id,
-                           sequence_start, sequence_end, priority, timeout_us):
+                           sequence_start, sequence_end, priority, timeout):
     infer_request = {}
     parameters = {}
     if request_id:
@@ -83,8 +83,8 @@ def _get_inference_request(inputs, request_id, outputs, sequence_id,
         parameters['sequence_end'] = sequence_end
     if priority:
         parameters['priority'] = priority
-    if timeout_us:
-        parameters['timeout'] = timeout_us
+    if timeout:
+        parameters['timeout'] = timeout
 
     infer_request['inputs'] = [
         this_input._get_tensor() for this_input in inputs
@@ -818,7 +818,7 @@ class InferenceServerClient:
               sequence_start=False,
               sequence_end=False,
               priority=0,
-              timeout_us=None,
+              timeout=None,
               headers=None,
               query_params=None):
         """Run synchronous inference using the supplied 'inputs' requesting
@@ -863,7 +863,7 @@ class InferenceServerClient:
             the highest priority level is indicated by setting the parameter
             to 1, the next highest is 2, etc. If not provided, the server
             will handle the request using default setting for the model.
-        timeout_us : int
+        timeout : int
             The timeout value for the request, in microseconds. If the request
             cannot be completed within the time the server can take a
             model-specific action such as terminating the request. If not
@@ -895,7 +895,7 @@ class InferenceServerClient:
                                                sequence_start=sequence_start,
                                                sequence_end=sequence_end,
                                                priority=priority,
-                                               timeout_us=timeout_us)
+                                               timeout=timeout)
 
         request_body = json.dumps(infer_request)
         if not model_version:
@@ -923,7 +923,7 @@ class InferenceServerClient:
                     sequence_start=False,
                     sequence_end=False,
                     priority=0,
-                    timeout_us=None,
+                    timeout=None,
                     headers=None,
                     query_params=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
@@ -975,7 +975,7 @@ class InferenceServerClient:
             the highest priority level is indicated by setting the parameter
             to 1, the next highest is 2, etc. If not provided, the server
             will handle the request using default setting for the model.
-        timeout_us : int
+        timeout : int
             The timeout value for the request, in microseconds. If the request
             cannot be completed within the time the server can take a
             model-specific action such as terminating the request. If not
@@ -1008,7 +1008,7 @@ class InferenceServerClient:
                                                sequence_start=sequence_start,
                                                sequence_end=sequence_end,
                                                priority=priority,
-                                               timeout_us=timeout_us)
+                                               timeout=timeout)
 
         request_body = json.dumps(infer_request)
         if not model_version:

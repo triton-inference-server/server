@@ -57,7 +57,7 @@ def _get_inference_request(model_name,
                            sequence_start,
                            sequence_end,
                            priority,
-                           timeout_us):
+                           timeout):
     request = grpc_service_v2_pb2.ModelInferRequest()
     request.model_name = model_name
     request.model_version = model_version
@@ -75,8 +75,8 @@ def _get_inference_request(model_name,
         request.parameters['sequence_end'].bool_param = sequence_end
     if priority:
         request.parameters['priority'].int64_param = priority
-    if timeout_us:
-        request.parameters['timeout'].int64_param = timeout_us
+    if timeout:
+        request.parameters['timeout'].int64_param = timeout
 
     return request
 
@@ -764,7 +764,7 @@ class InferenceServerClient:
               sequence_start=False,
               sequence_end=False,
               priority=0,
-              timeout_us=None,
+              timeout=None,
               headers=None):
         """Run synchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
@@ -808,7 +808,7 @@ class InferenceServerClient:
             the highest priority level is indicated by setting the parameter
             to 1, the next highest is 2, etc. If not provided, the server
             will handle the request using default setting for the model.
-        timeout_us : int
+        timeout : int
             The timeout value for the request, in microseconds. If the request
             cannot be completed within the time the server can take a
             model-specific action such as terminating the request. If not
@@ -844,7 +844,7 @@ class InferenceServerClient:
                                          sequence_start=sequence_start,
                                          sequence_end=sequence_end,
                                          priority=priority,
-                                         timeout_us=timeout_us)
+                                         timeout=timeout)
 
         try:
             response = self._client_stub.ModelInfer(request=request,
@@ -865,7 +865,7 @@ class InferenceServerClient:
                     sequence_start=False,
                     sequence_end=False,
                     priority=0,
-                    timeout_us=None,
+                    timeout=None,
                     headers=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
@@ -916,7 +916,7 @@ class InferenceServerClient:
             the highest priority level is indicated by setting the parameter
             to 1, the next highest is 2, etc. If not provided, the server
             will handle the request using default setting for the model.
-        timeout_us : int
+        timeout : int
             The timeout value for the request, in microseconds. If the request
             cannot be completed within the time the server can take a
             model-specific action such as terminating the request. If not
@@ -954,7 +954,7 @@ class InferenceServerClient:
                                          sequence_start=sequence_start,
                                          sequence_end=sequence_end,
                                          priority=priority,
-                                         timeout_us=timeout_us)
+                                         timeout=timeout)
 
         try:
             self._call_future = self._client_stub.ModelInfer.future(
@@ -974,7 +974,7 @@ class InferenceServerClient:
                            sequence_start=False,
                            sequence_end=False,
                            priority=0,
-                           timeout_us=None):
+                           timeout=None):
         """Runs an asynchronous inference over gRPC bi-directional streaming
         API.
 
@@ -1019,7 +1019,7 @@ class InferenceServerClient:
             the highest priority level is indicated by setting the parameter
             to 1, the next highest is 2, etc. If not provided, the server
             will handle the request using default setting for the model.
-        timeout_us : int
+        timeout : int
             The timeout value for the request, in microseconds. If the request
             cannot be completed within the time the server can take a
             model-specific action such as terminating the request. If not
@@ -1055,7 +1055,7 @@ class InferenceServerClient:
                                          sequence_start=sequence_start,
                                          sequence_end=sequence_end,
                                          priority=priority,
-                                         timeout_us=timeout_us)
+                                         timeout=timeout)
         # Enqueues the request to the stream
         stream._enqueue_request(request)
 

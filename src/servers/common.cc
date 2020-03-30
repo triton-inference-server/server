@@ -188,11 +188,34 @@ SetInferenceRequestOptions(
     RETURN_IF_ERR(
         TRTSERVER_InferenceRequestOptionsSetFlags(request_options, flags));
   }
-  // FIXMEV2 parameters
-  // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetPriority(
-  //   request_options, request_header.priority()));
-  // RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetTimeoutMicroseconds(
-  //   request_options, request_header.timeout_microseconds()));
+
+  const auto& priority_it = request.parameters().find("priority");
+  if (priority_it != request.parameters().end()) {
+    const auto& infer_param = priority_it->second;
+    if (infer_param.parameter_choice_case() !=
+        InferParameter::ParameterChoiceCase::kInt64Param) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          "invalid value type for 'sequence_id' parameter, expected "
+          "int64_param.");
+    }
+    RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetPriority(
+        request_options, infer_param.int64_param()));
+  }
+
+  const auto& timeout_it = request.parameters().find("timeout");
+  if (timeout_it != request.parameters().end()) {
+    const auto& infer_param = timeout_it->second;
+    if (infer_param.parameter_choice_case() !=
+        InferParameter::ParameterChoiceCase::kInt64Param) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          "invalid value type for 'sequence_id' parameter, expected "
+          "int64_param.");
+    }
+    RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetTimeoutMicroseconds(
+        request_options, infer_param.int64_param()));
+  }
 
   // FIXMEV2 raw contents size?? Do we need it?
   for (const auto& input : request.inputs()) {
