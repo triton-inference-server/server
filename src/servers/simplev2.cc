@@ -596,8 +596,8 @@ main(int argc, char** argv)
     }
 
     bool found_version = false;
-    if (model_metadata.HasMember("version")) {
-      for (const auto& version : model_metadata["version"].GetArray()) {
+    if (model_metadata.HasMember("versions")) {
+      for (const auto& version : model_metadata["versions"].GetArray()) {
         if (strcmp(version.GetString(), "1") == 0) {
           found_version = true;
           break;
