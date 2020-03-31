@@ -25,7 +25,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 cmake_minimum_required (VERSION 3.5)
-
 # Source with include paths adjusted to reflect that all headers are
 # in the same directory. These source versions are used in the client
 # container install.
@@ -90,14 +89,25 @@ install(
 
 #
 # object_detection_client
+# Additional dependencies
+# https://github.com/xtensor-stack/xtl
+# https://github.com/xtensor-stack/xtensor
 #
+find_package(xtl REQUIRED)
+find_package(xtensor REQUIRED)
 find_package(OpenCV REQUIRED)
 add_executable(object_detection_client object_detection_client.cc)
-target_include_directories(object_detection_client PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_include_directories(
+  object_detection_client
+  PRIVATE ${OpenCV_INCLUDE_DIRS}
+  PUBLIC ${xtensor_INCLUDE_DIRS}
+)
+
 target_link_libraries(
   object_detection_client
   PRIVATE TRTIS::request_static
   PRIVATE ${OpenCV_LIBS}
+  PUBLIC xtensor
 )
 install(
   TARGETS object_detection_client

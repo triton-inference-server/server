@@ -37,6 +37,7 @@
 #include <mutex>
 #include <queue>
 #include <string>
+#include <cmath>
 #include "src/clients/c++/library/request_grpc.h"
 #include "src/clients/c++/library/request_http.h"
 #include "src/core/model_config.pb.h"
@@ -58,6 +59,10 @@
 #define GET_TRANSFORMATION_CODE(x) CV_##x
 #endif
 
+#include "xtensor/xarray.hpp"
+#include "xtensor/xio.hpp"
+#include "xtensor/xview.hpp"
+
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
 
@@ -66,6 +71,32 @@ namespace {
 enum ScaleType { NONE = 0, VGG = 1, INCEPTION = 2 };
 
 enum ProtocolType { HTTP = 0, GRPC = 1 };
+
+
+void xtensor_test(){
+  xt::xarray<double> arr1
+      {{1.0, 2.0, 3.0},
+       {2.0, 5.0, 7.0},
+       {2.0, 5.0, 7.0}};
+
+    xt::xarray<double> arr2
+      {5.0, 6.0, 7.0};
+
+    xt::xarray<double> res = xt::view(arr1, 1) + arr2;
+
+    std::cout << res << std::endl;
+}
+
+// std::vector< std::vector<int> > get_anchors(std::vector<int> image_shape)
+// {
+//   std::vector<float> config_backbone_strides = {1, 1, 1};
+//   std::vector< std::vector<int> > backbone_shapes;
+//   for(auto stride=config_backbone_strides.begin(); stride!=config_backbone_strides.end(); ++stride){
+//     backbone_shapes.push_back({int(ceil(image_shape[0])/(*stride)), int(ceil(image_shape[1])/(*stride))});
+//   }
+//   return backbone_shapes;
+  
+// }
 
 void
 Preprocess(
@@ -809,6 +840,8 @@ main(int argc, char** argv)
               << std::endl;
     outputs.push_back(Postprocess(results[idx], result_filenames[idx], batch_size, output_size));
   }
+
+  xtensor_test();
 
   return 0;
 }
