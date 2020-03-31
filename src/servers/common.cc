@@ -171,7 +171,7 @@ SetInferenceRequestOptions(
             "invalid value type for 'sequence_start' parameter, expected "
             "bool_param.");
       }
-      flags |= TRTSERVER_REQUEST_FLAG_SEQUENCE_START;
+      flags |= infer_param.bool_param() & TRTSERVER_REQUEST_FLAG_SEQUENCE_START;
     }
     const auto& sequence_end_it = request.parameters().find("sequence_end");
     if (sequence_end_it != request.parameters().end()) {
@@ -183,7 +183,7 @@ SetInferenceRequestOptions(
             "invalid value type for 'sequence_end' parameter, expected "
             "bool_param.");
       }
-      flags |= TRTSERVER_REQUEST_FLAG_SEQUENCE_END;
+      flags |= infer_param.bool_param() & TRTSERVER_REQUEST_FLAG_SEQUENCE_END;
     }
     RETURN_IF_ERR(
         TRTSERVER_InferenceRequestOptionsSetFlags(request_options, flags));

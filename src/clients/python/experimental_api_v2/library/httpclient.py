@@ -53,7 +53,7 @@ def _raise_if_error(response):
     response from the server
     """
     error = _get_error(response)
-    if error:
+    if error is not None:
         raise error
 
 
@@ -75,15 +75,15 @@ def _get_inference_request(inputs, request_id, outputs, sequence_id,
                            sequence_start, sequence_end, priority, timeout):
     infer_request = {}
     parameters = {}
-    if request_id:
+    if request_id != "":
         infer_request['id'] = request_id
-    if sequence_id:
+    if sequence_id != 0:
         parameters['sequence_id'] = sequence_id
         parameters['sequence_start'] = sequence_start
         parameters['sequence_end'] = sequence_end
-    if priority:
+    if priority != 0:
         parameters['priority'] = priority
-    if timeout:
+    if timeout is not None:
         parameters['timeout'] = timeout
 
     infer_request['inputs'] = [
@@ -138,7 +138,6 @@ class InferenceServerClient:
                  network_timeout=60.0,
                  verbose=False,
                  max_greenlets=None):
-        self._last_request_id = None
         self._parsed_url = URL("http://" + url)
         self._client_stub = HTTPClient.from_url(
             self._parsed_url,
@@ -183,12 +182,13 @@ class InferenceServerClient:
         geventhttpclient.response.HTTPSocketPoolResponse
             The response from server.
         """
-        if query_params:
+        if query_params is not None:
             request_uri = request_uri + "?" + _get_query_string(query_params)
-        if not headers:
-            response = self._client_stub.get(request_uri)
-        else:
+        if headers is not None:
             response = self._client_stub.get(request_uri, headers=headers)
+        else:
+            response = self._client_stub.get(request_uri)
+            
 
         return response
 
@@ -212,16 +212,16 @@ class InferenceServerClient:
         geventhttpclient.response.HTTPSocketPoolResponse
             The response from server.
         """
-        if query_params:
+        if query_params is not None:
             request_uri = request_uri + "?" + _get_query_string(query_params)
 
-        if not headers:
-            response = self._client_stub.post(request_uri=request_uri,
-                                              body=request_body)
-        else:
+        if headers is not None:
             response = self._client_stub.post(request_uri=request_uri,
                                               body=request_body,
                                               headers=headers)
+        else:
+            response = self._client_stub.post(request_uri=request_uri,
+                                              body=request_body)
 
         return response
 
@@ -319,11 +319,11 @@ class InferenceServerClient:
             If unable to get model readiness.
 
         """
-        if not model_version:
-            request_uri = "v2/models/{}/ready".format(quote(model_name))
-        else:
+        if model_version != "":
             request_uri = "v2/models/{}/versions/{}/ready".format(
                 quote(model_name), model_version)
+        else:
+            request_uri = "v2/models/{}/ready".format(quote(model_name))
 
         response = self._get(request_uri=request_uri,
                              headers=headers,
@@ -395,11 +395,12 @@ class InferenceServerClient:
             If unable to get model metadata.
 
         """
-        if not model_version:
-            request_uri = "v2/models/{}".format(quote(model_name))
-        else:
+        if model_version != "":
             request_uri = "v2/models/{}/versions/{}".format(
                 quote(model_name), model_version)
+        else:
+            request_uri = "v2/models/{}".format(quote(model_name))
+            
 
         response = self._get(request_uri=request_uri,
                              headers=headers,
@@ -443,11 +444,11 @@ class InferenceServerClient:
             If unable to get model configuration.
 
         """
-        if not model_version:
-            request_uri = "v2/models/{}/config".format(quote(model_name))
-        else:
+        if model_version != "":
             request_uri = "v2/models/{}/versions/{}/config".format(
                 quote(model_name), model_version)
+        else:
+            request_uri = "v2/models/{}/config".format(quote(model_name))
 
         response = self._get(request_uri=request_uri,
                              headers=headers,
@@ -573,11 +574,11 @@ class InferenceServerClient:
             If unable to get the status of specified shared memory.
 
         """
-        if not region_name:
-            request_uri = "v2/systemsharedmemory/status"
-        else:
+        if region_name != "":
             request_uri = "v2/systemsharedmemory/region/{}/status".format(
                 quote(region_name))
+        else:
+            request_uri = "v2/systemsharedmemory/status"
 
         response = self._get(request_uri=request_uri,
                              headers=headers,
@@ -665,11 +666,11 @@ class InferenceServerClient:
             If unable to unregister the specified system shared memory region.
 
         """
-        if not name:
-            request_uri = "v2/systemsharedmemory/unregister"
-        else:
+        if name != "":
             request_uri = "v2/systemsharedmemory/region/{}/unregister".format(
                 quote(name))
+        else:
+            request_uri = "v2/systemsharedmemory/unregister"
 
         response = self._post(request_uri=request_uri,
                               request_body="",
@@ -707,11 +708,11 @@ class InferenceServerClient:
             If unable to get the status of specified shared memory.
 
         """
-        if not region_name:
-            request_uri = "v2/cudasharedmemory/status"
-        else:
+        if region_name != "":
             request_uri = "v2/cudasharedmemory/region/{}/status".format(
                 quote(region_name))
+        else:
+            request_uri = "v2/cudasharedmemory/status"
 
         response = self._get(request_uri=request_uri,
                              headers=headers,
@@ -796,11 +797,12 @@ class InferenceServerClient:
             If unable to unregister the specified cuda shared memory region.
 
         """
-        if not name:
-            request_uri = "v2/cudasharedmemory/unregister"
-        else:
+        if name != "":
             request_uri = "v2/cudasharedmemory/region/{}/unregister".format(
                 quote(name))
+        else:
+            request_uri = "v2/cudasharedmemory/unregister"
+            
 
         response = self._post(request_uri=request_uri,
                               request_body="",
@@ -813,7 +815,7 @@ class InferenceServerClient:
               inputs,
               model_version="",
               outputs=None,
-              request_id=None,
+              request_id="",
               sequence_id=0,
               sequence_start=False,
               sequence_end=False,
@@ -841,8 +843,8 @@ class InferenceServerClient:
             by the model will be returned using default settings.
         request_id: str
             Optional identifier for the request. If specified will be returned
-            in the response. Default value is 'None' which means no request_id
-            will be used.
+            in the response. Default value is an empty string which means no
+            request_id will be used.
         sequence_id : int
             The unique identifier for the sequence being represented by the
             object. Default value is 0 which means that the request does not
@@ -898,11 +900,12 @@ class InferenceServerClient:
                                                timeout=timeout)
 
         request_body = json.dumps(infer_request)
-        if not model_version:
-            request_uri = "v2/models/{}/infer".format(quote(model_name))
-        else:
+        if model_version != "":
             request_uri = "v2/models/{}/versions/{}/infer".format(
                 quote(model_name), model_version)
+        else:
+            request_uri = "v2/models/{}/infer".format(quote(model_name))
+            
 
         response = self._post(request_uri=request_uri,
                               request_body=request_body,
@@ -918,7 +921,7 @@ class InferenceServerClient:
                     callback,
                     model_version="",
                     outputs=None,
-                    request_id=None,
+                    request_id="",
                     sequence_id=0,
                     sequence_start=False,
                     sequence_end=False,
@@ -1011,11 +1014,12 @@ class InferenceServerClient:
                                                timeout=timeout)
 
         request_body = json.dumps(infer_request)
-        if not model_version:
-            request_uri = "v2/models/{}/infer".format(quote(model_name))
-        else:
+        if model_version != "":
             request_uri = "v2/models/{}/versions/{}/infer".format(
                 quote(model_name), model_version)
+        else:
+            request_uri = "v2/models/{}/infer".format(quote(model_name))
+            
 
         g = self._pool.apply_async(
             wrapped_post, (request_uri, request_body, headers, query_params),
@@ -1126,7 +1130,7 @@ class InferInput:
         """
         self._parameters['shared_memory_region'] = region_name
         self._parameters['shared_memory_byte_size'] = byte_size
-        if offset:
+        if offset != 0:
             self._parameters['shared_memory_offset'].int64_param = offset
 
     def _get_tensor(self):
@@ -1163,7 +1167,7 @@ class InferOutput:
     def __init__(self, name, class_count=0):
         self._name = name
         self._parameters = {}
-        if class_count:
+        if class_count != 0:
             self._parameters['classification'] = class_count
 
     def name(self):
@@ -1194,7 +1198,7 @@ class InferOutput:
 
         self._parameters['shared_memory_region'] = region_name
         self._parameters['shared_memory_byte_size'] = byte_size
-        if offset:
+        if offset != 0:
             self._parameters['shared_memory_offset'] = offset
 
     def _get_tensor(self):

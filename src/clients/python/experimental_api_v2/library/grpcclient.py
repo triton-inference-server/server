@@ -61,23 +61,20 @@ def _get_inference_request(model_name,
     request = grpc_service_v2_pb2.ModelInferRequest()
     request.model_name = model_name
     request.model_version = model_version
-    if request_id != None:
+    if request_id != "":
         request.id = request_id
     for infer_input in inputs:
         request.inputs.extend([infer_input._get_tensor()])
     for infer_output in outputs:
         request.outputs.extend([infer_output._get_tensor()])
-    if sequence_id:
+    if sequence_id != 0:
         request.parameters['sequence_id'].int64_param = sequence_id
-    if sequence_start:
         request.parameters['sequence_start'].bool_param = sequence_start
-    if sequence_end:
         request.parameters['sequence_end'].bool_param = sequence_end
-    if priority:
+    if priority != 0:
         request.parameters['priority'].int64_param = priority
-    if timeout:
+    if timeout is not None:
         request.parameters['timeout'].int64_param = timeout
-
     return request
 
 
@@ -759,7 +756,7 @@ class InferenceServerClient:
               inputs,
               model_version="",
               outputs=None,
-              request_id=None,
+              request_id="",
               sequence_id=0,
               sequence_start=False,
               sequence_end=False,
@@ -786,8 +783,8 @@ class InferenceServerClient:
             by the model will be returned using default settings.
         request_id : str
             Optional identifier for the request. If specified will be returned
-            in the response. Default value is 'None' which means no request_id
-            will be used.
+            in the response. Default value is an empty string which means no
+            request_id will be used.
         sequence_id : int
             The unique identifier for the sequence being represented by the
             object. Default value is 0 which means that the request does not
@@ -860,7 +857,7 @@ class InferenceServerClient:
                     callback,
                     model_version="",
                     outputs=None,
-                    request_id=None,
+                    request_id="",
                     sequence_id=0,
                     sequence_start=False,
                     sequence_end=False,
@@ -892,10 +889,10 @@ class InferenceServerClient:
             A list of InferOutput objects, each describing how the output
             data must be returned. If not specified all outputs produced
             by the model will be returned using default settings.
-        request_id: str
+        request_id : str
             Optional identifier for the request. If specified will be returned
-            in the response. Default value is 'None' which means no request_id
-            will be used.
+            in the response. Default value is an empty string which means no
+            request_id will be used.
         sequence_id : int
             The unique identifier for the sequence being represented by the
             object. Default value is 0 which means that the request does not
@@ -969,7 +966,7 @@ class InferenceServerClient:
                            stream,
                            model_version="",
                            outputs=None,
-                           request_id=None,
+                           request_id="",
                            sequence_id=0,
                            sequence_start=False,
                            sequence_end=False,
@@ -995,10 +992,10 @@ class InferenceServerClient:
             A list of InferOutput objects, each describing how the output
             data must be returned. If not specified all outputs produced
             by the model will be returned using default settings.
-        request_id: str
+        request_id : str
             Optional identifier for the request. If specified will be returned
-            in the response. Default value is 'None' which means no request_id
-            will be used.
+            in the response. Default value is an empty string which means no
+            request_id will be used.
         sequence_id : int
             The unique identifier for the sequence being represented by the
             object. Default value is 0 which means that the request does not
@@ -1169,7 +1166,7 @@ class InferInput:
             'shared_memory_region'].string_param = region_name
         self._input.parameters[
             'shared_memory_byte_size'].int64_param = byte_size
-        if offset:
+        if offset != 0:
             self._input.parameters['shared_memory_offset'].int64_param = offset
 
     def _get_tensor(self):
@@ -1200,7 +1197,7 @@ class InferOutput:
         self._output = grpc_service_v2_pb2.ModelInferRequest(
         ).InferRequestedOutputTensor()
         self._output.name = name
-        if class_count:
+        if class_count != 0:
             self._output.parameters['classification'].int64_param = class_count
 
     def name(self):
@@ -1233,7 +1230,7 @@ class InferOutput:
             'shared_memory_region'].string_param = region_name
         self._output.parameters[
             'shared_memory_byte_size'].int64_param = byte_size
-        if offset:
+        if offset != 0:
             self._output.parameters['shared_memory_offset'].int64_param = offset
 
     def _get_tensor(self):
@@ -1431,10 +1428,10 @@ class InferStream:
         try:
             for response in responses:
                 result = error = None
-                if not response.error_message:
-                    result = InferResult(response.infer_response)
-                else:
+                if response.error_message != "":
                     error = InferenceServerException(msg=response.error_message)
+                else:
+                    result = InferResult(response.infer_response)
                 self._callback(result=result, error=error)
         except grpc.RpcError as rpc_error:
             error = get_error_grpc(rpc_error)
@@ -1459,7 +1456,7 @@ class _RequestIterator:
 
     def __next__(self):
         request = self._stream._get_request()
-        if not request:
+        if request is None:
             raise StopIteration
 
         return request
