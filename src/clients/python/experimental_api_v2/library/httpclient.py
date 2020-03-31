@@ -94,7 +94,6 @@ def _get_inference_request(inputs, request_id, outputs, sequence_id,
 
     return infer_request
 
-
 class InferenceServerClient:
     """An InferenceServerClient object is used to perform any kind of
     communication with the InferenceServer using http protocol.
@@ -1057,10 +1056,10 @@ class InferInput:
                 "got unexpected datatype {} from numpy array, expected {}".
                 format(dtype, self._datatype))
         valid_shape = True
-        if len(self._input.shape) != len(input_tensor.shape):
+        if len(self._shape) != len(input_tensor.shape):
             valid_shape = False
-        for i in range(len(self._input.shape)):
-            if self._input.shape[i] != input_tensor.shape[i]:
+        for i in range(len(self._shape)):
+            if self._shape[i] != input_tensor.shape[i]:
                 valid_shape = False
         if not valid_shape:
             raise_error(
