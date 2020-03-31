@@ -45,7 +45,7 @@ SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_grpc_v2_async_infer_client.py
 SIMPLE_STRING_INFER_CLIENT=../clients/simple_grpc_v2_string_infer_client.py
 SIMPLE_STREAM_INFER_CLIENT=../clients/simple_grpc_v2_sequence_stream_infer_client.py
 SIMPLE_SEQUENCE_INFER_CLIENT=../clients/simple_grpc_v2_sequence_sync_infer_client.py
-SIMPLE_CLASS_CLIENT=../clients/simple_grpc_v2_class_client.py
+V2_IMAGE_CLIENT=../clients/v2_image_client.py
 SIMPLE_SHM_CLIENT=../clients/simple_grpc_v2_shm_client.py
 SIMPLE_CUDASHM_CLIENT=../clients/simple_grpc_v2_cudashm_client.py
 SIMPLE_MODEL_CONTROL=../clients/simple_grpc_v2_model_control.py
@@ -94,7 +94,7 @@ for i in \
         $SIMPLE_INFER_CLIENT \
         $SIMPLE_ASYNC_INFER_CLIENT \
         $SIMPLE_STRING_INFER_CLIENT \
-        $SIMPLE_CLASS_CLIENT \
+        $V2_IMAGE_CLIENT \
         $SIMPLE_STREAM_INFER_CLIENT \
         $SIMPLE_SEQUENCE_INFER_CLIENT \
         $SIMPLE_SHM_CLIENT \
@@ -107,8 +107,10 @@ for i in \
         ; do
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"
-    if [[ $SUFFIX == "simple_grpc_v2_class_client" || $SUFFIX == "grpc_v2_image_client" ]]; then
+    if [ $SUFFIX == "grpc_v2_image_client" ]; then
         python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+    elif [ $SUFFIX == "v2_class_client"]; then
+        python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     else
         python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     fi

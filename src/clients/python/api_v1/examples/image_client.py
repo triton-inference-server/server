@@ -285,7 +285,7 @@ if __name__ == '__main__':
     image_idx = 0
     last_request = False
     user_data = UserData()
-    sent_count=0
+    sent_count = 0
     while not last_request:
         input_filenames = []
         input_batch = []

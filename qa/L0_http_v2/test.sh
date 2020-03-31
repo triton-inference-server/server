@@ -42,7 +42,7 @@ RET=0
 SIMPLE_HEALTH_CLIENT=../clients/simple_http_v2_health_metadata.py
 SIMPLE_INFER_CLIENT=../clients/simple_http_v2_infer_client.py
 SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_http_v2_async_infer_client.py
-SIMPLE_CLASS_CLIENT=../clients/simple_http_v2_class_client.py
+V2_IMAGE_CLIENT=../clients/v2_image_client.py
 SIMPLE_MODEL_CONTROL=../clients/simple_http_v2_model_control.py
 
 rm -f *.log
@@ -81,12 +81,12 @@ IMAGE=../images/vulture.jpeg
 for i in \
         $SIMPLE_INFER_CLIENT \
         $SIMPLE_ASYNC_INFER_CLIENT \
-        $SIMPLE_CLASS_CLIENT \
+        $V2_IMAGE_CLIENT \
         ; do
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"
-    if [[ $SUFFIX == "simple_http_v2_class_client" || $SUFFIX == "http_v2_image_client" ]]; then
-        python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+    if [ $SUFFIX == "v2_image_client" ]; then
+        python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 -i $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     else
         python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     fi
