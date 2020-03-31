@@ -290,7 +290,8 @@ ParseModelMetadata(
   }
 
   *is_int = (strcmp(seen_data_type.c_str(), "INT32") == 0);
-  *is_torch_model = (strcmp(model_metadata["platform"].GetString(), "pytorch_libtorch") == 0);
+  *is_torch_model =
+      (strcmp(model_metadata["platform"].GetString(), "pytorch_libtorch") == 0);
   return nullptr;
 }
 
@@ -555,13 +556,17 @@ main(int argc, char** argv)
   // Wait for the model to become available.
   bool is_torch_model = false;
   bool is_int = true;
-  while (true) {
-    bool is_ready;
+  bool is_ready = false;
+  health_iters = 0;
+  while (!is_ready) {
     FAIL_IF_TRITON_ERR(
         TRITONSERVER_ServerModelIsReady(
             server.get(), model_name.c_str(), "1", &is_ready),
         "unable to get model readiness");
     if (!is_ready) {
+      if (++health_iters >= 10) {
+        FAIL("model failed to be ready in 10 iterations");
+      }
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
       continue;
     }

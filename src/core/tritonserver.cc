@@ -1378,7 +1378,8 @@ TRITONSERVER_InferenceRequestNew(
       lserver->GetInferenceBackend(model_name, model_int_version, &backend));
 
   std::unique_ptr<ni::InferenceRequest> request(new ni::InferenceRequest(
-      model_name, model_int_version, backend->Version(), 2 /* protocol_version */));
+      model_name, model_int_version, backend->Version(),
+      2 /* protocol_version */));
 
   *inference_request = reinterpret_cast<TRITONSERVER_InferenceRequest*>(
       new TritonInferenceRequest(backend, request.release()));
