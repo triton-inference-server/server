@@ -316,7 +316,7 @@ ProtocolStringToDataType(const char* dtype, size_t len)
       return TYPE_FP64;
     }
   } else if (*dtype == 'B') {
-    if (strcmp(dtype + 1, "YTES")) {
+    if (!strcmp(dtype + 1, "YTES")) {
       return TYPE_STRING;
     }
   }
