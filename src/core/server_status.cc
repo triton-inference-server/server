@@ -474,8 +474,9 @@ ModelInferStats::Report()
 
   const uint64_t request_duration_ns =
       Duration(TimestampKind::kRequestStart, TimestampKind::kRequestEnd);
-  const uint64_t last_timestamp_ms =
-      TIMESPEC_TO_MILLIS(Timestamp(TimestampKind::kRequestStart));
+  struct timespec last_ts;
+  clock_gettime(CLOCK_REALTIME, &last_ts);
+  const uint64_t last_timestamp_ms = TIMESPEC_TO_MILLIS(last_ts);
 
   if (failed_) {
     status_manager_->UpdateFailedInferStats(
