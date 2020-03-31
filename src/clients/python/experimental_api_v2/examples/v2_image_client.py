@@ -252,11 +252,9 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
 
     outputs = []
     if FLAGS.protocol.lower() == "grpc":
-        outputs.append(grpcclient.InferOutput(output_name))
+        outputs.append(grpcclient.InferOutput(output_name, class_count=FLAGS.classes))
     else:
-        outputs.append(httpclient.InferOutput(output_name))
-
-    outputs[0].set_parameter("classification", FLAGS.classes)
+        outputs.append(httpclient.InferOutput(output_name, class_count=FLAGS.classes))
 
     yield inputs, outputs, FLAGS.model_name, FLAGS.model_version
 
