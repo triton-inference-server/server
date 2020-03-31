@@ -52,12 +52,12 @@ def sync_send(triton_client, result_list, values, batch_size, sequence_id,
                              fill_value=value,
                              dtype=np.int32)
         inputs = []
-        inputs.append(grpcclient.InferInput('INPUT'))
+        inputs.append(grpcclient.InferInput('INPUT', value_data.shape, "INT32"))
         # Initialize the data
         inputs[0].set_data_from_numpy(value_data)
         outputs = []
         outputs.append(grpcclient.InferOutput('OUTPUT'))
-        # Issue the asynchronous sequence inference.
+        # Issue the synchronous sequence inference.
         result = triton_client.infer(model_name=model_name,
                                      inputs=inputs,
                                      outputs=outputs,
@@ -114,7 +114,7 @@ if __name__ == '__main__':
 
     values = [11, 7, 5, 3, 2, 0, 1]
 
-    # Will use two sequences and send them asynchronously. Note the
+    # Will use two sequences and send them synchronously. Note the
     # sequence IDs should be non-zero because zero is reserved for
     # non-sequence requests.
     sequence_id0 = 1000 + FLAGS.offset * 2

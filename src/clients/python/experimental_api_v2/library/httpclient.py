@@ -71,6 +71,29 @@ def _get_query_string(query_params):
     return ''
 
 
+def _get_inference_request(inputs, request_id, outputs, sequence_id,
+                           sequence_start, sequence_end):
+    infer_request = {}
+    parameters = {}
+    if request_id:
+        infer_request['id'] = request_id
+    if sequence_id:
+        parameters['sequence_id'] = sequence_id
+        parameters['sequence_start'] = sequence_start
+        parameters['sequence_end'] = sequence_end
+    infer_request['inputs'] = [
+        this_input._get_tensor() for this_input in inputs
+    ]
+    if outputs:
+        infer_request['outputs'] = [
+            this_output._get_tensor() for this_output in outputs
+        ]
+
+    if parameters:
+        infer_request['parameters'] = parameters
+
+    return infer_request
+
 class InferenceServerClient:
     """An InferenceServerClient object is used to perform any kind of
     communication with the InferenceServer using http protocol.
@@ -786,7 +809,9 @@ class InferenceServerClient:
               model_version="",
               outputs=None,
               request_id=None,
-              parameters=None,
+              sequence_id=0,
+              sequence_start=False,
+              sequence_end=False,
               headers=None,
               query_params=None):
         """Run synchronous inference using the supplied 'inputs' requesting
@@ -811,8 +836,18 @@ class InferenceServerClient:
             Optional identifier for the request. If specified will be returned
             in the response. Default value is 'None' which means no request_id
             will be used.
-        parameters: dict
-            Optional inference parameters described as key-value pairs.
+        sequence_id : int
+            The unique identifier for the sequence being represented by the
+            object. Default value is 0 which means that the request does not
+            belong to a sequence.
+        sequence_start: bool
+            Indicates whether the request being added marks the start of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
+        sequence_end: bool
+            Indicates whether the request being added marks the end of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
@@ -831,18 +866,13 @@ class InferenceServerClient:
         InferenceServerException
             If server fails to perform inference.
         """
-        infer_request = {}
-        if request_id:
-            infer_request['id'] = request_id
-        if parameters:
-            infer_request['parameters'] = parameters
-        infer_request['inputs'] = [
-            this_input._get_tensor() for this_input in inputs
-        ]
-        if outputs:
-            infer_request['outputs'] = [
-                this_output._get_tensor() for this_output in outputs
-            ]
+
+        infer_request = _get_inference_request(inputs=inputs,
+                                               request_id=request_id,
+                                               outputs=outputs,
+                                               sequence_id=sequence_id,
+                                               sequence_start=sequence_start,
+                                               sequence_end=sequence_end)
 
         request_body = json.dumps(infer_request)
         if not model_version:
@@ -864,9 +894,11 @@ class InferenceServerClient:
                     inputs,
                     callback,
                     model_version="",
-                    request_id=None,
                     outputs=None,
-                    parameters=None,
+                    request_id=None,
+                    sequence_id=0,
+                    sequence_start=False,
+                    sequence_end=False,
                     headers=None,
                     query_params=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
@@ -890,16 +922,26 @@ class InferenceServerClient:
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
-        request_id: str
-            Optional identifier for the request. If specified will be returned
-            in the response. Default value is 'None' which means no request_id
-            will be used.
         outputs : list
             A list of InferOutput objects, each describing how the output
             data must be returned. If not specified all outputs produced
             by the model will be returned using default settings.
-        parameters: dict
-            Optional inference parameters described as key-value pairs.
+        request_id: str
+            Optional identifier for the request. If specified will be returned
+            in the response. Default value is 'None' which means no request_id
+            will be used.
+        sequence_id : int
+            The unique identifier for the sequence being represented by the
+            object. Default value is 0 which means that the request does not
+            belong to a sequence.
+        sequence_start: bool
+            Indicates whether the request being added marks the start of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
+        sequence_end: bool
+            Indicates whether the request being added marks the end of the 
+            sequence. Default value is False. This argument is ignored if
+            'sequence_id' is 0.
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request
@@ -920,18 +962,12 @@ class InferenceServerClient:
             callback(result=InferResult(response.read()),
                      error=_get_error(response))
 
-        infer_request = {}
-        if request_id:
-            infer_request['id'] = request_id
-        if parameters:
-            infer_request['parameters'] = parameters
-        infer_request['inputs'] = [
-            this_input._get_tensor() for this_input in inputs
-        ]
-        if outputs:
-            infer_request['outputs'] = [
-                this_output._get_tensor() for this_output in outputs
-            ]
+        infer_request = _get_inference_request(inputs=inputs,
+                                               request_id=request_id,
+                                               outputs=outputs,
+                                               sequence_id=sequence_id,
+                                               sequence_start=sequence_start,
+                                               sequence_end=sequence_end)
 
         request_body = json.dumps(infer_request)
         if not model_version:
@@ -956,13 +992,12 @@ class InferInput:
     name : str
         The name of input whose data will be described by this object
     shape : list
-        The shape of the associated input. Default value is None.
+        The shape of the associated input.
     datatype : str
-        The datatype of the associated input. Default is None.
-
+        The datatype of the associated input.
     """
 
-    def __init__(self, name, shape=None, datatype=None):
+    def __init__(self, name, shape, datatype):
         self._name = name
         self._shape = shape
         self._datatype = datatype
@@ -1000,43 +1035,58 @@ class InferInput:
         return self._datatype
 
     def set_data_from_numpy(self, input_tensor):
-        """Set the tensor data (datatype, shape and data) from the
-        specified numpy array for input associated with this object.
+        """Set the tensor data from the specified numpy array for
+        input associated with this object.
 
         Parameters
         ----------
         input_tensor : numpy array
             The tensor data in numpy array format
+            
+        Raises
+        ------
+        InferenceServerException
+            If failed to set data for the tensor.
         """
         if not isinstance(input_tensor, (np.ndarray,)):
             raise_error("input_tensor must be a numpy array")
-        self._datatype = np_to_triton_dtype(input_tensor.dtype)
-        self._shape = input_tensor.shape
+        dtype = np_to_triton_dtype(input_tensor.dtype)
+        if self._datatype != dtype:
+            raise_error(
+                "got unexpected datatype {} from numpy array, expected {}".
+                format(dtype, self._datatype))
+        valid_shape = True
+        if len(self._shape) != len(input_tensor.shape):
+            valid_shape = False
+        for i in range(len(self._shape)):
+            if self._shape[i] != input_tensor.shape[i]:
+                valid_shape = False
+        if not valid_shape:
+            raise_error(
+                "got unexpected numpy array shape [{}], expected [{}]".format(
+                    str(input_tensor.shape)[1:-1],
+                    str(self._shape)[1:-1]))
         # FIXMEV2 Use Binary data when support available on the server.
         self._data = [val.item() for val in input_tensor.flatten()]
 
-    def set_parameter(self, key, value):
-        """Adds the specified key-value pair in the requested input parameters
+    def set_shared_memory(self, region_name, byte_size, offset=0):
+        """Set the tensor data from the specified shared memory region.
 
         Parameters
         ----------
-        key : str
-            The name of the parameter to be included in the request. 
-        value : str/int/bool
-            The value of the parameter
+        region_name : str
+            The name of the shared memory region holding tensor data.
+        byte_size : int
+            The size of the shared memory region holding tensor data.
+        offset : int
+            The offset, in bytes, into the region where the data for
+            the tensor starts. The default value is 0.
         
         """
-        if not type(key) is str:
-            raise_error(
-                "only string data type for key is supported in parameters")
-
-        self._parameters[key] = value
-
-    def clear_parameters(self):
-        """Clears all the parameters that have been added to the request.
-        
-        """
-        self._parameters.clear()
+        self._parameters['shared_memory_region'] = region_name
+        self._parameters['shared_memory_byte_size'] = byte_size
+        if offset:
+            self._parameters['shared_memory_offset'].int64_param = offset
 
     def _get_tensor(self):
         """Retrieve the underlying input as json dict.
@@ -1063,11 +1113,17 @@ class InferOutput:
     ----------
     name : str
         The name of output tensor to associate with this object
+    class_count : int
+        The number of classifications to be requested. The default
+        value is 0 which means the classification results are not 
+        requested.
     """
 
-    def __init__(self, name):
+    def __init__(self, name, class_count=0):
         self._name = name
         self._parameters = {}
+        if class_count:
+            self._parameters['classification'] = class_count
 
     def name(self):
         """Get the name of output associated with this object.
@@ -1079,28 +1135,26 @@ class InferOutput:
         """
         return self._name
 
-    def set_parameter(self, key, value):
-        """Adds the specified key-value pair in the requested output parameters
+    def set_shared_memory(self, region_name, byte_size, offset=0):
+        """Marks the output to return the inference result in
+        specified shared memory region.
 
         Parameters
         ----------
-        key : str
-            The name of the parameter to be included in the request. 
-        value : str/int/bool
-            The value of the parameter
+        region_name : str
+            The name of the shared memory region to hold tensor data.
+        byte_size : int
+            The size of the shared memory region to hold tensor data.
+        offset : int
+            The offset, in bytes, into the region where the data for
+            the tensor starts. The default value is 0.
         
         """
-        if not type(key) is str:
-            raise_error(
-                "only string data type for key is supported in parameters")
 
-        self._parameters[key] = value
-
-    def clear_parameters(self):
-        """Clears all the parameters that have been added to the request.
-        
-        """
-        self._parameters.clear()
+        self._parameters['shared_memory_region'] = region_name
+        self._parameters['shared_memory_byte_size'] = byte_size
+        if offset:
+            self._parameters['shared_memory_offset'] = offset
 
     def _get_tensor(self):
         """Retrieve the underlying input as json dict.

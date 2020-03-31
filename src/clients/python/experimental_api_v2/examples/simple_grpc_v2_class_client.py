@@ -28,6 +28,7 @@
 import argparse
 import numpy as np
 import os
+import sys
 from builtins import range
 from functools import partial
 from PIL import Image
@@ -160,9 +161,6 @@ def postprocess(results, output_name, batch_size):
 
 
 def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
-    inputs = []
-    inputs.append(grpcclient.InferInput(input_name))
-
     # Preprocess image into input data according to model requirements
     image_data = None
     with Image.open(FLAGS.image_filename) as img:
@@ -172,11 +170,13 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
     batched_image_data = np.stack(repeated_image_data, axis=0)
 
     # Set the input data
+    inputs = []
+    inputs.append(
+        grpcclient.InferInput(input_name, batched_image_data.shape, "FP32"))
     inputs[0].set_data_from_numpy(batched_image_data)
 
     outputs = []
-    outputs.append(grpcclient.InferOutput(output_name))
-    outputs[0].set_parameter("classification", 2)
+    outputs.append(grpcclient.InferOutput(output_name, class_count=2))
 
     yield inputs, outputs, FLAGS.model_name, FLAGS.model_version
 
@@ -235,7 +235,7 @@ if __name__ == '__main__':
         triton_client = grpcclient.InferenceServerClient(FLAGS.url)
     except Exception as e:
         print("context creation failed: " + str(e))
-        sys.exit()
+        sys.exit(1)
 
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
@@ -244,14 +244,14 @@ if __name__ == '__main__':
             model_name=FLAGS.model_name)
     except InferenceServerException as e:
         print("failed to retrieve the metadata: " + str(e))
-        sys.exit()
+        sys.exit(1)
 
     try:
         model_config = triton_client.get_model_config(
             model_name=FLAGS.model_name)
     except InferenceServerException as e:
         print("failed to retrieve the config: " + str(e))
-        sys.exit()
+        sys.exit(1)
 
     input_name, output_name, c, h, w, format, dtype = parse_model(
         model_meta, model_config.config)
@@ -273,7 +273,7 @@ if __name__ == '__main__':
                                     outputs=outputs))
         except InferenceServerException as e:
             print("inference failed: " + str(e))
-            sys.exit()
+            sys.exit(1)
 
     for result in results:
         postprocess(result, output_name, FLAGS.batch_size)

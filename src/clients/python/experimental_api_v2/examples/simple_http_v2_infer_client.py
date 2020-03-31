@@ -34,8 +34,8 @@ import tritonhttpclient.core as httpclient
 def test_infer(model_name, input0_data, input1_data):
     inputs = []
     outputs = []
-    inputs.append(httpclient.InferInput('INPUT0'))
-    inputs.append(httpclient.InferInput('INPUT1'))
+    inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
+    inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
 
     # Initialize the data
     inputs[0].set_data_from_numpy(input0_data)

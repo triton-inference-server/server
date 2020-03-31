@@ -58,7 +58,7 @@ if __name__ == '__main__':
     if not triton_client.is_server_live(headers={'test': '1', 'dummy': '2'}):
         print("FAILED : is_server_live")
         sys.exit(1)
-    
+
     if not triton_client.is_server_ready():
         print("FAILED : is_server_ready")
         sys.exit(1)
@@ -100,4 +100,3 @@ if __name__ == '__main__':
     if not (config.config.name == model_name):
         print("FAILED: get_model_config")
         sys.exit(1)
-
