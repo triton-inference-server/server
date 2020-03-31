@@ -86,7 +86,7 @@ def parse_model(model_metadata, model_config):
             format(model_metadata.name, len(input_metadata.shape)))
 
     if ((input_config.format != mc.ModelInput.FORMAT_NCHW) and
-        (input_config.format != mc.ModelInput.FORMAT_NHWC)):
+            (input_config.format != mc.ModelInput.FORMAT_NHWC)):
         raise Exception("unexpected input format " +
                         mc.ModelInput.Format.Name(input_config.format) +
                         ", expecting " +
@@ -177,7 +177,8 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
     inputs[0].set_data_from_numpy(batched_image_data)
 
     outputs = []
-    outputs.append(grpcclient.InferOutput(output_name, class_count=2))
+    outputs.append(grpcclient.InferOutput(output_name))
+    outputs[0].set_parameter("classification", FLAGS.classes)
 
     yield inputs, outputs, FLAGS.model_name, FLAGS.model_version
 
@@ -195,13 +196,12 @@ if __name__ == '__main__':
                         type=str,
                         required=True,
                         help='Name of model')
-    parser.add_argument(
-        '-x',
-        '--model-version',
-        type=str,
-        required=False,
-        default="",
-        help='Version of model. Default is to use latest version.')
+    parser.add_argument('-x',
+                        '--model-version',
+                        type=str,
+                        required=False,
+                        default="",
+                        help='Version of model. Default is to use latest version.')
     parser.add_argument('-b',
                         '--batch-size',
                         type=int,
@@ -214,14 +214,13 @@ if __name__ == '__main__':
                         required=False,
                         default=1,
                         help='Number of class results to report. Default is 1.')
-    parser.add_argument(
-        '-s',
-        '--scaling',
-        type=str,
-        choices=['NONE', 'INCEPTION', 'VGG'],
-        required=False,
-        default='NONE',
-        help='Type of scaling to apply to image pixels. Default is NONE.')
+    parser.add_argument('-s',
+                        '--scaling',
+                        type=str,
+                        choices=['NONE', 'INCEPTION', 'VGG'],
+                        required=False,
+                        default='NONE',
+                        help='Type of scaling to apply to image pixels. Default is NONE.')
     parser.add_argument('-u',
                         '--url',
                         type=str,
