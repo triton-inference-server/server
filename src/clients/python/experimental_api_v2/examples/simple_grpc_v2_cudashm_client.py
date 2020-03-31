@@ -113,27 +113,27 @@ if __name__ == '__main__':
 
     # Set the parameters to use data from shared memory
     inputs = []
-    inputs.append(grpcclient.InferInput('INPUT0'))
-    inputs[-1].set_data_from_shared_memory("input0_data", input_byte_size,
-                                           [1, 16], "INT32")
+    inputs.append(grpcclient.InferInput('INPUT0', [1, 16], "INT32"))
+    inputs[-1].set_shared_memory("input0_data", input_byte_size)
 
-    inputs.append(grpcclient.InferInput('INPUT1'))
-    inputs[-1].set_data_from_shared_memory("input1_data", input_byte_size,
-                                           [1, 16], "INT32")
+    inputs.append(grpcclient.InferInput('INPUT1', [1, 16], "INT32"))
+    inputs[-1].set_shared_memory("input1_data", input_byte_size)
 
     outputs = []
     outputs.append(grpcclient.InferOutput('OUTPUT0'))
-    # outputs[-1].use_shared_memory("output0_data", output_byte_size)
+    # Uncomment with DLIS-1202
+    # outputs[-1].set_shared_memory("output0_data", output_byte_size)
 
     outputs.append(grpcclient.InferOutput('OUTPUT1'))
-    # outputs[-1].use_shared_memory("output1_data", output_byte_size)
+    # Uncomment with DLIS-1202
+    # outputs[-1].set_shared_memory("output1_data", output_byte_size)
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
                                   outputs=outputs)
 
-    # TODO : Currently, this example doesn't use shared memory for output.
-    # This is done to effectively validate the results.
+    # TODO [DLIS-1202] : Currently, this example doesn't use shared memory
+    # for output. This is done to effectively validate the results.
     # tritongrpcclient.cuda_shared_memory module will be enhanced to read
     # data from a specified shared memory handle, data_type and shape;
     # and later return the numpy array.

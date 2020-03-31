@@ -1010,13 +1010,20 @@ class InferInput:
     Parameters
     ----------
     name : str
-        The name of input whose data will be described by this object.
+        The name of input whose data will be described by this object
+    shape : list
+        The shape of the associated input.
+    datatype : str
+        The datatype of the associated input.
 
     """
 
-    def __init__(self, name):
+    def __init__(self, name, shape, datatype):
         self._input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
         self._input.name = name
+        self._input.ClearField('shape')
+        self._input.shape.extend(shape)
+        self._input.datatype = datatype
 
     def name(self):
         """Get the name of input associated with this object.
@@ -1049,27 +1056,44 @@ class InferInput:
         return self._input.shape
 
     def set_data_from_numpy(self, input_tensor):
-        """Set the tensor data (datatype, shape, contents) from the
-        specified numpy array for input associated with this object.
+        """Set the tensor data from the specified numpy array for
+        input associated with this object.
 
         Parameters
         ----------
         input_tensor : numpy array
             The tensor data in numpy array format
+        
+        Raises
+        ------
+        InferenceServerException
+            If failed to set data for the tensor.
         """
         if not isinstance(input_tensor, (np.ndarray,)):
             raise_error("input_tensor must be a numpy array")
-        self._input.datatype = np_to_triton_dtype(input_tensor.dtype)
-        self._input.ClearField('shape')
-        self._input.shape.extend(input_tensor.shape)
+        dtype = np_to_triton_dtype(input_tensor.dtype)
+        if self._input.datatype != dtype:
+            raise_error(
+                "got unexpected datatype {} from numpy array, expected {}".
+                format(dtype, self._input.datatype))
+        valid_shape = True
+        if len(self._input.shape) != len(input_tensor.shape):
+            valid_shape = False
+        for i in range(len(self._input.shape)):
+            if self._input.shape[i] != input_tensor.shape[i]:
+                valid_shape = False
+        if not valid_shape:
+            raise_error(
+                "got unexpected numpy array shape [{}], expected [{}]".format(
+                    str(input_tensor.shape)[1:-1],
+                    str(self._input.shape)[1:-1]))
         if self._input.datatype == "BYTES":
             self._input.contents.raw_contents = serialize_byte_tensor(
                 input_tensor).tobytes()
         else:
             self._input.contents.raw_contents = input_tensor.tobytes()
 
-    def set_data_from_shared_memory(self, region_name, byte_size, shape,
-                                    datatype):
+    def set_shared_memory(self, region_name, byte_size, offset=0):
         """Set the tensor data from the specified shared memory region.
 
         Parameters
@@ -1078,10 +1102,9 @@ class InferInput:
             The name of the shared memory region holding tensor data.
         byte_size : int
             The size of the shared memory region holding tensor data.
-        shape : list
-            The shape of the associated tensor input.
-        datatype : str
-            The datatype of the associated tensor input.
+        offset : int
+            The offset, in bytes, into the region where the data for
+            the tensor starts. The default value is 0.
         
         """
 
@@ -1089,18 +1112,8 @@ class InferInput:
             'shared_memory_region'].string_param = region_name
         self._input.parameters[
             'shared_memory_byte_size'].int64_param = byte_size
-
-        self._input.ClearField('shape')
-        self._input.shape.extend(shape)
-        self._input.datatype = datatype
-
-    def reset(self):
-        """Resets all the additional settings in the object.
-        
-        """
-        name = self._input.name
-        self._input.clear()
-        self._input.name = name
+        if offset:
+            self._input.parameters['shared_memory_offset'].int64_param = offset
 
     def _get_tensor(self):
         """Retrieve the underlying InferInputTensor message.
@@ -1120,12 +1133,18 @@ class InferOutput:
     ----------
     name : str
         The name of output tensor to associate with this object
+    class_count : int
+        The number of classifications to be requested. The default
+        value is 0 which means the classification results are not 
+        requested.
     """
 
-    def __init__(self, name):
+    def __init__(self, name, class_count=0):
         self._output = grpc_service_v2_pb2.ModelInferRequest(
         ).InferRequestedOutputTensor()
         self._output.name = name
+        if class_count:
+            self._output.parameters['classification'].int64_param = class_count
 
     def name(self):
         """Get the name of output associated with this object.
@@ -1137,19 +1156,7 @@ class InferOutput:
         """
         return self._output.name
 
-    def mark_classification(self, count=1):
-        """Marks the output to return the classification result.
-
-        Parameters
-        ----------
-        count : int
-            The number of classifications to be returned in result.
-            Default value is 1.
-
-        """
-        self._output.parameters['classification'].int64_param = count
-
-    def use_shared_memory(self, region_name, byte_size):
+    def set_shared_memory(self, region_name, byte_size, offset=0):
         """Marks the output to return the inference result in
         specified shared memory region.
 
@@ -1159,6 +1166,9 @@ class InferOutput:
             The name of the shared memory region to hold tensor data.
         byte_size : int
             The size of the shared memory region to hold tensor data.
+        offset : int
+            The offset, in bytes, into the region where the data for
+            the tensor starts. The default value is 0.
         
         """
 
@@ -1166,14 +1176,8 @@ class InferOutput:
             'shared_memory_region'].string_param = region_name
         self._output.parameters[
             'shared_memory_byte_size'].int64_param = byte_size
-
-    def reset(self):
-        """Resets all the additional settings in the object.
-        
-        """
-        name = self._output.name
-        self._output.clear()
-        self._output.name = name
+        if offset:
+            self._output.parameters['shared_memory_offset'].int64_param = offset
 
     def _get_tensor(self):
         """Retrieve the underlying InferRequestedOutputTensor message.

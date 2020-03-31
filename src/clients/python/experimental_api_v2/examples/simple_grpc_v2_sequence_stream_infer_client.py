@@ -65,7 +65,7 @@ def async_send(triton_client, stream, values, batch_size, sequence_id,
                              fill_value=value,
                              dtype=np.int32)
         inputs = []
-        inputs.append(grpcclient.InferInput('INPUT'))
+        inputs.append(grpcclient.InferInput('INPUT', value_data.shape, "INT32"))
         # Initialize the data
         inputs[0].set_data_from_numpy(value_data)
         outputs = []
