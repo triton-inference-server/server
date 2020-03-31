@@ -30,11 +30,14 @@
 #include "src/core/model_config.pb.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/status.h"
+#include "src/core/tracing.h"
 
 namespace nvidia { namespace inferenceserver {
 
 class MetricModelReporter;
 class ServerStatusManager;
+class OpaqueTraceManager;
+class Trace;
 
 // Updates a server stat with duration measured by a C++ scope.
 class ServerStatTimerScoped {
@@ -139,22 +142,22 @@ class ModelInferStats {
   void SetModelExecutionCount(uint32_t count) { execution_count_ = count; }
 
   // Set the trace manager associated with the inference.
-  void SetTraceManager(TRTSERVER_TraceManager* tm) { trace_manager_ = tm; }
+  void SetTraceManager(OpaqueTraceManager* tm) { trace_manager_ = tm; }
 
   // Get the trace manager associated with the inference.
-  TRTSERVER_TraceManager* GetTraceManager() const { return trace_manager_; }
+  OpaqueTraceManager* GetTraceManager() const { return trace_manager_; }
 
   // Create a trace object associated to the inference.
   // Optional 'parent' can be provided if the trace object has a parent.
   // Model name, model version, and trace manager should be set before calling
   // this function. And each ModelInferStats instance should not call this
   // function more than once.
-  void NewTrace(TRTSERVER_Trace* parent = nullptr);
+  void NewTrace(Trace* parent = nullptr);
 
   // Get the trace object associated to the inference.
   // Return nullptr if the inference will not be traced or if NewTrace()
   // has not been called.
-  TRTSERVER_Trace* GetTrace() const { return trace_; }
+  Trace* GetTrace() const { return trace_; }
 
   // Include queue time from another stat into this stat's queue time.
   void IncrementQueueDuration(const ModelInferStats& other);
@@ -213,11 +216,11 @@ class ModelInferStats {
 
   // The trace manager associated with these stats. This object is not owned by
   // this ModelInferStats object and so is not destroyed by this object.
-  TRTSERVER_TraceManager* trace_manager_;
+  OpaqueTraceManager* trace_manager_;
 
   // The trace associated with these stats. This object is not owned by
   // this ModelInferStats object and so is not destroyed by this object.
-  TRTSERVER_Trace* trace_;
+  Trace* trace_;
 #endif  // TRTIS_ENABLE_STATS
 
   std::vector<struct timespec> timestamps_;

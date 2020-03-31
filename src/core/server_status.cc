@@ -420,23 +420,27 @@ ServerStatTimerScoped::~ServerStatTimerScoped()
 #ifdef TRTIS_ENABLE_STATS
 
 void
-ModelInferStats::NewTrace(TRTSERVER_Trace* parent)
+ModelInferStats::NewTrace(Trace* parent)
 {
 #ifdef TRTIS_ENABLE_TRACING
   if (trace_manager_ != nullptr) {
     auto ltrace_manager = reinterpret_cast<OpaqueTraceManager*>(trace_manager_);
-    TRTSERVER_Trace* trace = nullptr;
-    ltrace_manager->create_fn_(
-        &trace, model_name_.c_str(), requested_model_version_,
-        ltrace_manager->userp_);
-    if (trace != nullptr) {
-      auto ltrace = reinterpret_cast<Trace*>(trace);
-      ltrace->SetModelName(model_name_);
-      ltrace->SetModelVersion(requested_model_version_);
+    trace_ = nullptr;
+    if (trace_manager_->using_triton_) {
+      ltrace_manager->triton_create_fn_(
+          reinterpret_cast<TRITONSERVER_Trace**>(&trace_), model_name_.c_str(),
+          requested_model_version_, ltrace_manager->userp_);
+    } else {
+      ltrace_manager->create_fn_(
+          reinterpret_cast<TRTSERVER_Trace**>(&trace_), model_name_.c_str(),
+          requested_model_version_, ltrace_manager->userp_);
+    }
+    if (trace_ != nullptr) {
+      trace_->SetModelName(model_name_);
+      trace_->SetModelVersion(requested_model_version_);
       if (parent != nullptr) {
-        ltrace->SetParentId(reinterpret_cast<Trace*>(parent)->Id());
+        trace_->SetParentId(parent->Id());
       }
-      trace_ = trace;
     }
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -447,12 +451,17 @@ ModelInferStats::Report()
 {
 #ifdef TRTIS_ENABLE_TRACING
   if (trace_ != nullptr) {
-    auto ltrace = reinterpret_cast<Trace*>(trace_);
-    ltrace->Report(this);
+    trace_->Report(this);
     // Inform that the trace object is done and can be released
-    auto ltrace_manager = reinterpret_cast<OpaqueTraceManager*>(trace_manager_);
-    ltrace_manager->release_fn_(
-        trace_, ltrace->ActivityUserp(), ltrace_manager->userp_);
+    if (trace_manager_->using_triton_) {
+      trace_manager_->triton_release_fn_(
+          reinterpret_cast<TRITONSERVER_Trace*>(trace_),
+          trace_->ActivityUserp(), trace_manager_->userp_);
+    } else {
+      trace_manager_->release_fn_(
+          reinterpret_cast<TRTSERVER_Trace*>(trace_), trace_->ActivityUserp(),
+          trace_manager_->userp_);
+    }
   }
 #endif  // TRTIS_ENABLE_TRACING
 

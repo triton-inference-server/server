@@ -125,4 +125,56 @@ RequestStatusToTrtServerCode(RequestStatusCode status_code)
   return TRTSERVER_ERROR_UNKNOWN;
 }
 
+RequestStatusCode
+TritonServerCodeToRequestStatus(TRITONSERVER_Error_Code code)
+{
+  switch (code) {
+    case TRITONSERVER_ERROR_UNKNOWN:
+      return RequestStatusCode::UNKNOWN;
+    case TRITONSERVER_ERROR_INTERNAL:
+      return RequestStatusCode::INTERNAL;
+    case TRITONSERVER_ERROR_NOT_FOUND:
+      return RequestStatusCode::NOT_FOUND;
+    case TRITONSERVER_ERROR_INVALID_ARG:
+      return RequestStatusCode::INVALID_ARG;
+    case TRITONSERVER_ERROR_UNAVAILABLE:
+      return RequestStatusCode::UNAVAILABLE;
+    case TRITONSERVER_ERROR_UNSUPPORTED:
+      return RequestStatusCode::UNSUPPORTED;
+    case TRITONSERVER_ERROR_ALREADY_EXISTS:
+      return RequestStatusCode::ALREADY_EXISTS;
+
+    default:
+      break;
+  }
+
+  return RequestStatusCode::UNKNOWN;
+}
+
+TRITONSERVER_Error_Code
+RequestStatusToTritonServerCode(RequestStatusCode status_code)
+{
+  switch (status_code) {
+    case RequestStatusCode::UNKNOWN:
+      return TRITONSERVER_ERROR_UNKNOWN;
+    case RequestStatusCode::INTERNAL:
+      return TRITONSERVER_ERROR_INTERNAL;
+    case RequestStatusCode::NOT_FOUND:
+      return TRITONSERVER_ERROR_NOT_FOUND;
+    case RequestStatusCode::INVALID_ARG:
+      return TRITONSERVER_ERROR_INVALID_ARG;
+    case RequestStatusCode::UNAVAILABLE:
+      return TRITONSERVER_ERROR_UNAVAILABLE;
+    case RequestStatusCode::UNSUPPORTED:
+      return TRITONSERVER_ERROR_UNSUPPORTED;
+    case RequestStatusCode::ALREADY_EXISTS:
+      return TRITONSERVER_ERROR_ALREADY_EXISTS;
+
+    default:
+      break;
+  }
+
+  return TRITONSERVER_ERROR_UNKNOWN;
+}
+
 }}  // namespace nvidia::inferenceserver

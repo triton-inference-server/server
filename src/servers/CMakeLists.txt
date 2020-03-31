@@ -540,6 +540,6 @@ install(
 )
 
 install(
-  FILES ../core/trtserver.h
+  FILES ../core/trtserver.h ../core/tritonserver.h
   DESTINATION include
 )

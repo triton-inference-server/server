@@ -26,14 +26,15 @@
 
 #include <unistd.h>
 #include <chrono>
+#include <cstring>
 #include <future>
 #include <iostream>
 #include <string>
 #include <thread>
 #include <vector>
-#include "src/core/api.pb.h"
-#include "src/core/server_status.pb.h"
-#include "src/core/trtserver2.h"
+#include "rapidjson/document.h"
+#include "rapidjson/error/en.h"
+#include "src/core/tritonserver.h"
 #include "src/servers/common.h"
 
 #ifdef TRTIS_ENABLE_GPU
@@ -45,7 +46,7 @@ namespace ni = nvidia::inferenceserver;
 namespace {
 
 bool enforce_memory_type = false;
-TRTSERVER_Memory_Type requested_memory_type;
+TRITONSERVER_Memory_Type requested_memory_type;
 
 #ifdef TRTIS_ENABLE_GPU
 static auto cuda_data_deleter = [](void* data) {
@@ -87,12 +88,12 @@ Usage(char** argv, const std::string& msg = std::string())
   exit(1);
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 ResponseAlloc(
-    TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
-    size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRITONSERVER_Memory_Type preferred_memory_type,
     int64_t preferred_memory_type_id, void* userp, void** buffer,
-    void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
+    void** buffer_userp, TRITONSERVER_Memory_Type* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
   // Pass the tensor name with buffer_userp so we can show it when
@@ -117,12 +118,12 @@ ResponseAlloc(
     }
     switch (*actual_memory_type) {
 #ifdef TRTIS_ENABLE_GPU
-      case TRTSERVER_MEMORY_CPU_PINNED: {
+      case TRITONSERVER_MEMORY_CPU_PINNED: {
         auto err = cudaSetDevice(*actual_memory_type_id);
         if ((err != cudaSuccess) && (err != cudaErrorNoDevice) &&
             (err != cudaErrorInsufficientDriver)) {
-          return TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INTERNAL,
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
               std::string(
                   "unable to recover current CUDA device: " +
                   std::string(cudaGetErrorString(err)))
@@ -131,8 +132,8 @@ ResponseAlloc(
 
         err = cudaHostAlloc(&allocated_ptr, byte_size, cudaHostAllocPortable);
         if (err != cudaSuccess) {
-          return TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INTERNAL,
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
               std::string(
                   "cudaHostAlloc failed: " +
                   std::string(cudaGetErrorString(err)))
@@ -140,12 +141,12 @@ ResponseAlloc(
         }
         break;
       }
-      case TRTSERVER_MEMORY_GPU: {
+      case TRITONSERVER_MEMORY_GPU: {
         auto err = cudaSetDevice(*actual_memory_type_id);
         if ((err != cudaSuccess) && (err != cudaErrorNoDevice) &&
             (err != cudaErrorInsufficientDriver)) {
-          return TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INTERNAL,
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
               std::string(
                   "unable to recover current CUDA device: " +
                   std::string(cudaGetErrorString(err)))
@@ -154,8 +155,8 @@ ResponseAlloc(
 
         err = cudaMalloc(&allocated_ptr, byte_size);
         if (err != cudaSuccess) {
-          return TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INTERNAL,
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
               std::string(
                   "cudaMalloc failed: " + std::string(cudaGetErrorString(err)))
                   .c_str());
@@ -164,9 +165,9 @@ ResponseAlloc(
       }
 #endif  // TRTIS_ENABLE_GPU
       // Fallback if unknown type.
-      case TRTSERVER_MEMORY_CPU:
+      case TRITONSERVER_MEMORY_CPU:
       default: {
-        *actual_memory_type = TRTSERVER_MEMORY_CPU;
+        *actual_memory_type = TRITONSERVER_MEMORY_CPU;
         allocated_ptr = malloc(byte_size);
         break;
       }
@@ -184,10 +185,11 @@ ResponseAlloc(
   return nullptr;  // Success
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 ResponseRelease(
-    TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
-    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
+    TRITONSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+    size_t byte_size, TRITONSERVER_Memory_Type memory_type,
+    int64_t memory_type_id)
 {
   std::string* name = nullptr;
   if (buffer_userp != nullptr) {
@@ -200,11 +202,11 @@ ResponseRelease(
             << " in " << ni::MemoryTypeString(memory_type) << " for result '"
             << *name << "'" << std::endl;
   switch (memory_type) {
-    case TRTSERVER_MEMORY_CPU:
+    case TRITONSERVER_MEMORY_CPU:
       free(buffer);
       break;
 #ifdef TRTIS_ENABLE_GPU
-    case TRTSERVER_MEMORY_CPU_PINNED: {
+    case TRITONSERVER_MEMORY_CPU_PINNED: {
       auto err = cudaSetDevice(memory_type_id);
       if (err == cudaSuccess) {
         err = cudaFreeHost(buffer);
@@ -215,7 +217,7 @@ ResponseRelease(
       }
       break;
     }
-    case TRTSERVER_MEMORY_GPU: {
+    case TRITONSERVER_MEMORY_GPU: {
       auto err = cudaSetDevice(memory_type_id);
       if (err == cudaSuccess) {
         err = cudaFree(buffer);
@@ -240,54 +242,56 @@ ResponseRelease(
 
 void
 InferComplete(
-    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
-    TRTSERVER2_InferenceRequest* request, void* userp)
+    TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
+    TRITONSERVER_InferenceRequest* request, void* userp)
 {
-  std::promise<TRTSERVER2_InferenceRequest*>* p =
-      reinterpret_cast<std::promise<TRTSERVER2_InferenceRequest*>*>(userp);
+  std::promise<TRITONSERVER_InferenceRequest*>* p =
+      reinterpret_cast<std::promise<TRITONSERVER_InferenceRequest*>*>(userp);
   p->set_value(request);
   delete p;
 
-  TRTSERVER_TraceManagerDelete(trace_manager);
+  TRITONSERVER_TraceManagerDelete(trace_manager);
 }
 
-TRTSERVER_Error*
-ParseModelConfig(
-    const ni::ModelConfig& config, bool* is_int, bool* is_torch_model)
+TRITONSERVER_Error*
+ParseModelMetadata(
+    const rapidjson::Document& model_metadata, bool* is_int,
+    bool* is_torch_model)
 {
-  auto data_type = ni::TYPE_INVALID;
-  for (const auto& input : config.input()) {
-    if ((input.data_type() != ni::TYPE_INT32) &&
-        (input.data_type() != ni::TYPE_FP32)) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_UNSUPPORTED,
+  std::string seen_data_type;
+  for (const auto& input : model_metadata["inputs"].GetArray()) {
+    if (strcmp(input["datatype"].GetString(), "INT32") &&
+        strcmp(input["datatype"].GetString(), "FP32")) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
           "simple lib example only supports model with data type INT32 or "
           "FP32");
     }
-    if (data_type == ni::TYPE_INVALID) {
-      data_type = input.data_type();
-    } else if (input.data_type() != data_type) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
+    if (seen_data_type.empty()) {
+      seen_data_type = input["datatype"].GetString();
+    } else if (strcmp(seen_data_type.c_str(), input["datatype"].GetString())) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
           "the inputs and outputs of 'simple' model must have the data type");
     }
   }
-  for (const auto& output : config.output()) {
-    if ((output.data_type() != ni::TYPE_INT32) &&
-        (output.data_type() != ni::TYPE_FP32)) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_UNSUPPORTED,
+  for (const auto& output : model_metadata["outputs"].GetArray()) {
+    if (strcmp(output["datatype"].GetString(), "INT32") &&
+        strcmp(output["datatype"].GetString(), "FP32")) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
           "simple lib example only supports model with data type INT32 or "
           "FP32");
-    } else if (output.data_type() != data_type) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
+    } else if (strcmp(seen_data_type.c_str(), output["datatype"].GetString())) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
           "the inputs and outputs of 'simple' model must have the data type");
     }
   }
 
-  *is_int = (data_type == ni::TYPE_INT32);
-  *is_torch_model = (config.platform() == "pytorch_libtorch");
+  *is_int = (strcmp(seen_data_type.c_str(), "INT32") == 0);
+  *is_torch_model =
+      (strcmp(model_metadata["platform"].GetString(), "pytorch_libtorch") == 0);
   return nullptr;
 }
 
@@ -328,16 +332,16 @@ CompareResult(
 
 void
 GetResult(
-    TRTSERVER2_InferenceRequest* request, const std::string& name,
+    TRITONSERVER_InferenceRequest* request, const std::string& name,
     const size_t expected_byte_size, std::vector<char>* scratch,
     const void** result)
 {
   const void* content;
   size_t byte_size;
-  TRTSERVER_Memory_Type memory_type;
+  TRITONSERVER_Memory_Type memory_type;
   int64_t memory_type_id;
-  FAIL_IF_ERR(
-      TRTSERVER2_InferenceRequestOutputData(
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_InferenceRequestOutputData(
           request, name.c_str(), &content, &byte_size, &memory_type,
           &memory_type_id),
       "getting result");
@@ -362,10 +366,10 @@ GetResult(
   scratch->clear();
   scratch->reserve(byte_size);
   switch (memory_type) {
-    case TRTSERVER_MEMORY_CPU:
+    case TRITONSERVER_MEMORY_CPU:
       std::cout << name << " is stored in system memory" << std::endl;
       break;
-    case TRTSERVER_MEMORY_CPU_PINNED:
+    case TRITONSERVER_MEMORY_CPU_PINNED:
       std::cout << name << " is stored in pinned memory" << std::endl;
       break;
     default: {
@@ -383,17 +387,18 @@ GetResult(
 
 void
 Check(
-    TRTSERVER2_InferenceRequest* request, const std::vector<char>& input0_data,
-    const std::vector<char>& input1_data, const std::string& output0,
-    const std::string& output1, const size_t expected_byte_size,
-    const std::string& expected_datatype, const bool is_int)
+    TRITONSERVER_InferenceRequest* request,
+    const std::vector<char>& input0_data, const std::vector<char>& input1_data,
+    const std::string& output0, const std::string& output1,
+    const size_t expected_byte_size, const std::string& expected_datatype,
+    const bool is_int)
 {
   for (const auto& name : {output0, output1}) {
     std::vector<int64_t> shape;
     uint64_t dim_count = 2;
     shape.reserve(dim_count);
-    FAIL_IF_ERR(
-        TRTSERVER2_InferenceRequestOutputShape(
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_InferenceRequestOutputShape(
             request, name.c_str(), &shape[0], &dim_count),
         "getting shape");
     if ((dim_count != 2) || (shape[0] != 1) || (shape[1] != 16)) {
@@ -401,8 +406,8 @@ Check(
     }
 
     const char* datatype;
-    FAIL_IF_ERR(
-        TRTSERVER2_InferenceRequestOutputDataType(
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_InferenceRequestOutputDataType(
             request, name.c_str(), &datatype),
         "getting datatype");
     if (datatype != expected_datatype) {
@@ -445,11 +450,11 @@ main(int argc, char** argv)
       case 'm': {
         enforce_memory_type = true;
         if (!strcmp(optarg, "system")) {
-          requested_memory_type = TRTSERVER_MEMORY_CPU;
+          requested_memory_type = TRITONSERVER_MEMORY_CPU;
         } else if (!strcmp(optarg, "pinned")) {
-          requested_memory_type = TRTSERVER_MEMORY_CPU_PINNED;
+          requested_memory_type = TRITONSERVER_MEMORY_CPU_PINNED;
         } else if (!strcmp(optarg, "gpu")) {
-          requested_memory_type = TRTSERVER_MEMORY_GPU;
+          requested_memory_type = TRITONSERVER_MEMORY_GPU;
         } else {
           Usage(
               argv,
@@ -474,43 +479,43 @@ main(int argc, char** argv)
     Usage(argv, "-r must be used to specify model repository path");
   }
 #ifndef TRTIS_ENABLE_GPU
-  if (enforce_memory_type && requested_memory_type != TRTSERVER_MEMORY_CPU) {
+  if (enforce_memory_type && requested_memory_type != TRITONSERVER_MEMORY_CPU) {
     Usage(argv, "-m can only be set to \"system\" without enabling GPU");
   }
 #endif  // TRTIS_ENABLE_GPU
 
   // Create the server...
-  TRTSERVER_ServerOptions* server_options = nullptr;
-  FAIL_IF_ERR(
-      TRTSERVER_ServerOptionsNew(&server_options), "creating server options");
-  FAIL_IF_ERR(
-      TRTSERVER_ServerOptionsSetModelRepositoryPath(
+  TRITONSERVER_ServerOptions* server_options = nullptr;
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_ServerOptionsNew(&server_options),
+      "creating server options");
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_ServerOptionsSetModelRepositoryPath(
           server_options, model_repository_path.c_str()),
       "setting model repository path");
-  FAIL_IF_ERR(
-      TRTSERVER_ServerOptionsSetLogVerbose(server_options, verbose_level),
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_ServerOptionsSetLogVerbose(server_options, verbose_level),
       "setting verbose logging level");
-  FAIL_IF_ERR(
-      TRTSERVER_ServerOptionsSetServerProtocolVersion(server_options, 2),
-      "setting protocol version");
 
-  TRTSERVER_Server* server_ptr = nullptr;
-  FAIL_IF_ERR(
-      TRTSERVER_ServerNew(&server_ptr, server_options), "creating server");
-  FAIL_IF_ERR(
-      TRTSERVER_ServerOptionsDelete(server_options), "deleting server options");
+  TRITONSERVER_Server* server_ptr = nullptr;
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_ServerNew(&server_ptr, server_options), "creating server");
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_ServerOptionsDelete(server_options),
+      "deleting server options");
 
-  std::shared_ptr<TRTSERVER_Server> server(server_ptr, TRTSERVER_ServerDelete);
+  std::shared_ptr<TRITONSERVER_Server> server(
+      server_ptr, TRITONSERVER_ServerDelete);
 
   // Wait until the server is both live and ready.
   size_t health_iters = 0;
   while (true) {
     bool live, ready;
-    FAIL_IF_ERR(
-        TRTSERVER_ServerIsLive(server.get(), &live),
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_ServerIsLive(server.get(), &live),
         "unable to get server liveness");
-    FAIL_IF_ERR(
-        TRTSERVER_ServerIsReady(server.get(), &ready),
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_ServerIsReady(server.get(), &ready),
         "unable to get server readiness");
     std::cout << "Server Health: live " << live << ", ready " << ready
               << std::endl;
@@ -527,28 +532,23 @@ main(int argc, char** argv)
 
   // Print status of the server.
   {
-    TRTSERVER_Protobuf* server_status_protobuf;
-    FAIL_IF_ERR(
-        TRTSERVER_ServerStatus(server.get(), &server_status_protobuf),
-        "unable to get server status protobuf");
+    TRITONSERVER_Message* server_metadata_message;
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_ServerMetadata(server.get(), &server_metadata_message),
+        "unable to get server metadata message");
     const char* buffer;
     size_t byte_size;
-    FAIL_IF_ERR(
-        TRTSERVER_ProtobufSerialize(
-            server_status_protobuf, &buffer, &byte_size),
-        "unable to serialize server status protobuf");
-
-    ni::ServerStatus server_status;
-    if (!server_status.ParseFromArray(buffer, byte_size)) {
-      FAIL("error: failed to parse server status");
-    }
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_MessageSerializeToJson(
+            server_metadata_message, &buffer, &byte_size),
+        "unable to serialize server metadata message");
 
     std::cout << "Server Status:" << std::endl;
-    std::cout << server_status.DebugString() << std::endl;
+    std::cout << std::string(buffer, byte_size) << std::endl;
 
-    FAIL_IF_ERR(
-        TRTSERVER_ProtobufDelete(server_status_protobuf),
-        "deleting status protobuf");
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_MessageDelete(server_metadata_message),
+        "deleting status metadata");
   }
 
   const std::string model_name("simple");
@@ -556,69 +556,86 @@ main(int argc, char** argv)
   // Wait for the model to become available.
   bool is_torch_model = false;
   bool is_int = true;
-  while (true) {
-    TRTSERVER_Protobuf* model_status_protobuf;
-    FAIL_IF_ERR(
-        TRTSERVER_ServerModelStatus(
-            server.get(), model_name.c_str(), &model_status_protobuf),
-        "unable to get model status protobuf");
+  bool is_ready = false;
+  health_iters = 0;
+  while (!is_ready) {
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_ServerModelIsReady(
+            server.get(), model_name.c_str(), "1", &is_ready),
+        "unable to get model readiness");
+    if (!is_ready) {
+      if (++health_iters >= 10) {
+        FAIL("model failed to be ready in 10 iterations");
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      continue;
+    }
+
+    TRITONSERVER_Message* model_metadata_message;
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_ServerModelMetadata(
+            server.get(), model_name.c_str(), "1", &model_metadata_message),
+        "unable to get model metadata message");
     const char* buffer;
     size_t byte_size;
-    FAIL_IF_ERR(
-        TRTSERVER_ProtobufSerialize(model_status_protobuf, &buffer, &byte_size),
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_MessageSerializeToJson(
+            model_metadata_message, &buffer, &byte_size),
         "unable to serialize model status protobuf");
 
-    ni::ServerStatus model_status;
-    if (!model_status.ParseFromArray(buffer, byte_size)) {
-      FAIL("error: failed to parse model status");
+    rapidjson::Document model_metadata;
+    model_metadata.Parse(buffer, byte_size);
+    if (model_metadata.HasParseError()) {
+      FAIL(
+          "error: failed to parse model metadata from JSON: " +
+          std::string(GetParseError_En(model_metadata.GetParseError())) +
+          " at " + std::to_string(model_metadata.GetErrorOffset()));
     }
 
-    auto itr = model_status.model_status().find(model_name);
-    if (itr == model_status.model_status().end()) {
-      FAIL("unable to find status for model");
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_MessageDelete(model_metadata_message),
+        "deleting status protobuf");
+
+    if (strcmp(model_metadata["name"].GetString(), model_name.c_str())) {
+      FAIL("unable to find metadata for model");
     }
 
-    auto vitr = itr->second.version_status().find(1);
-    if (vitr == itr->second.version_status().end()) {
+    bool found_version = false;
+    if (model_metadata.HasMember("versions")) {
+      for (const auto& version : model_metadata["versions"].GetArray()) {
+        if (strcmp(version.GetString(), "1") == 0) {
+          found_version = true;
+          break;
+        }
+      }
+    }
+    if (!found_version) {
       FAIL("unable to find version 1 status for model");
     }
 
-    std::cout << "model is "
-              << ni::ModelReadyState_Name(vitr->second.ready_state())
-              << std::endl;
-    if (vitr->second.ready_state() == ni::ModelReadyState::MODEL_READY) {
-      FAIL_IF_ERR(
-          ParseModelConfig(itr->second.config(), &is_int, &is_torch_model),
-          "parsing model config");
-      break;
-    }
-
-    // [TODO] do so before break
-    FAIL_IF_ERR(
-        TRTSERVER_ProtobufDelete(model_status_protobuf),
-        "deleting status protobuf");
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    FAIL_IF_TRITON_ERR(
+        ParseModelMetadata(model_metadata, &is_int, &is_torch_model),
+        "parsing model metadata");
   }
 
   // Create the allocator that will be used to allocate buffers for
   // the result tensors.
-  TRTSERVER_ResponseAllocator* allocator = nullptr;
-  FAIL_IF_ERR(
-      TRTSERVER_ResponseAllocatorNew(
+  TRITONSERVER_ResponseAllocator* allocator = nullptr;
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_ResponseAllocatorNew(
           &allocator, ResponseAlloc, ResponseRelease),
       "creating response allocator");
 
   // Inference
-  TRTSERVER2_InferenceRequest* irequest = nullptr;
-  FAIL_IF_ERR(
-      TRTSERVER2_InferenceRequestNew(
+  TRITONSERVER_InferenceRequest* irequest = nullptr;
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_InferenceRequestNew(
           &irequest, server.get(), model_name.c_str(),
           nullptr /* model_version */),
       "creating inference request");
 
-  FAIL_IF_ERR(
-      TRTSERVER2_InferenceRequestSetId(irequest, "my_request_id"),
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_InferenceRequestSetId(irequest, "my_request_id"),
       "setting ID for the request");
 
   auto input0 = is_torch_model ? "INPUT__0" : "INPUT0";
@@ -629,24 +646,24 @@ main(int argc, char** argv)
 
   const std::string datatype = (is_int) ? "INT32" : "FP32";
 
-  FAIL_IF_ERR(
-      TRTSERVER2_InferenceRequestAddInput(
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_InferenceRequestAddInput(
           irequest, input0, datatype.c_str(), &input0_shape[0],
           input0_shape.size()),
       "setting input 0 meta-data for the request");
-  FAIL_IF_ERR(
-      TRTSERVER2_InferenceRequestAddInput(
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_InferenceRequestAddInput(
           irequest, input1, datatype.c_str(), &input1_shape[0],
           input1_shape.size()),
       "setting input 1 meta-data for the request");
 
   auto output0 = is_torch_model ? "OUTPUT__0" : "OUTPUT0";
   auto output1 = is_torch_model ? "OUTPUT__1" : "OUTPUT1";
-  FAIL_IF_ERR(
-      TRTSERVER2_InferenceRequestAddRequestedOutput(irequest, output0),
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output0),
       "requesting output 0 for the request");
-  FAIL_IF_ERR(
-      TRTSERVER2_InferenceRequestAddRequestedOutput(irequest, output1),
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output1),
       "requesting output 1 for the request");
 
   // Create the data for the two input tensors. Initialize the first
@@ -670,10 +687,11 @@ main(int argc, char** argv)
   std::unique_ptr<void, decltype(cuda_data_deleter)> input1_gpu(
       nullptr, cuda_data_deleter);
   bool use_cuda_memory =
-      (enforce_memory_type && (requested_memory_type != TRTSERVER_MEMORY_CPU));
+      (enforce_memory_type &&
+       (requested_memory_type != TRITONSERVER_MEMORY_CPU));
   if (use_cuda_memory) {
     FAIL_IF_CUDA_ERR(cudaSetDevice(0), "setting CUDA device to device 0");
-    if (requested_memory_type != TRTSERVER_MEMORY_CPU_PINNED) {
+    if (requested_memory_type != TRITONSERVER_MEMORY_CPU_PINNED) {
       void* dst;
       FAIL_IF_CUDA_ERR(
           cudaMalloc(&dst, input0_size),
@@ -712,36 +730,37 @@ main(int argc, char** argv)
   input1_base = use_cuda_memory ? input1_gpu.get() : &input1_data[0];
 #endif  // TRTIS_ENABLE_GPU
 
-  FAIL_IF_ERR(
-      TRTSERVER2_InferenceRequestAppendInputData(
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_InferenceRequestAppendInputData(
           irequest, input0, input0_base, input0_size, requested_memory_type,
           0 /* memory_type_id */),
       "assigning INPUT0 data");
-  FAIL_IF_ERR(
-      TRTSERVER2_InferenceRequestAppendInputData(
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_InferenceRequestAppendInputData(
           irequest, input1, input1_base, input1_size, requested_memory_type,
           0 /* memory_type_id */),
       "assigning INPUT1 data");
 
   // Perform inference...
   {
-    auto p = new std::promise<TRTSERVER2_InferenceRequest*>();
-    std::future<TRTSERVER2_InferenceRequest*> completed = p->get_future();
+    auto p = new std::promise<TRITONSERVER_InferenceRequest*>();
+    std::future<TRITONSERVER_InferenceRequest*> completed = p->get_future();
 
-    FAIL_IF_ERR(
-        TRTSERVER2_ServerInferAsync(
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_ServerInferAsync(
             server.get(), nullptr /* trace_manager */, irequest, allocator,
             nullptr /* response_allocator_userp */, InferComplete,
             reinterpret_cast<void*>(p)),
         "running inference");
 
     // Wait for the inference to complete.
-    TRTSERVER2_InferenceRequest* completed_request = completed.get();
+    TRITONSERVER_InferenceRequest* completed_request = completed.get();
     if (completed_request != irequest) {
       FAIL("completed request differs from inference request");
     }
-    FAIL_IF_ERR(
-        TRTSERVER2_InferenceRequestError(completed_request), "request status");
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_InferenceRequestError(completed_request),
+        "request status");
 
     Check(
         completed_request, input0_data, input1_data, output0, output1,
@@ -751,7 +770,8 @@ main(int argc, char** argv)
   // Modify some input data in place and then reuse the request
   // object. For simplicity we only do this when the input tensors are
   // in non-pinned system memory.
-  if (!enforce_memory_type || (requested_memory_type == TRTSERVER_MEMORY_CPU)) {
+  if (!enforce_memory_type ||
+      (requested_memory_type == TRITONSERVER_MEMORY_CPU)) {
     if (is_int) {
       int32_t* input0_base = reinterpret_cast<int32_t*>(&input0_data[0]);
       input0_base[0] = 27;
@@ -760,23 +780,24 @@ main(int argc, char** argv)
       input0_base[0] = 27.0;
     }
 
-    auto p = new std::promise<TRTSERVER2_InferenceRequest*>();
-    std::future<TRTSERVER2_InferenceRequest*> completed = p->get_future();
+    auto p = new std::promise<TRITONSERVER_InferenceRequest*>();
+    std::future<TRITONSERVER_InferenceRequest*> completed = p->get_future();
 
-    FAIL_IF_ERR(
-        TRTSERVER2_ServerInferAsync(
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_ServerInferAsync(
             server.get(), nullptr /* trace_manager */, irequest, allocator,
             nullptr /* response_allocator_userp */, InferComplete,
             reinterpret_cast<void*>(p)),
         "running inference");
 
     // Wait for the inference to complete.
-    TRTSERVER2_InferenceRequest* completed_request = completed.get();
+    TRITONSERVER_InferenceRequest* completed_request = completed.get();
     if (completed_request != irequest) {
       FAIL("completed request differs from inference request");
     }
-    FAIL_IF_ERR(
-        TRTSERVER2_InferenceRequestError(completed_request), "request status");
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_InferenceRequestError(completed_request),
+        "request status");
 
     Check(
         completed_request, input0_data, input1_data, output0, output1,
@@ -785,32 +806,33 @@ main(int argc, char** argv)
 
   // Remove input data and then add back different data.
   {
-    FAIL_IF_ERR(
-        TRTSERVER2_InferenceRequestRemoveAllInputData(irequest, input0),
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_InferenceRequestRemoveAllInputData(irequest, input0),
         "removing INPUT0 data");
-    FAIL_IF_ERR(
-        TRTSERVER2_InferenceRequestAppendInputData(
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_InferenceRequestAppendInputData(
             irequest, input0, input1_base, input1_size, requested_memory_type,
             0 /* memory_type_id */),
         "assigning INPUT1 data to INPUT0");
 
-    auto p = new std::promise<TRTSERVER2_InferenceRequest*>();
-    std::future<TRTSERVER2_InferenceRequest*> completed = p->get_future();
+    auto p = new std::promise<TRITONSERVER_InferenceRequest*>();
+    std::future<TRITONSERVER_InferenceRequest*> completed = p->get_future();
 
-    FAIL_IF_ERR(
-        TRTSERVER2_ServerInferAsync(
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_ServerInferAsync(
             server.get(), nullptr /* trace_manager */, irequest, allocator,
             nullptr /* response_allocator_userp */, InferComplete,
             reinterpret_cast<void*>(p)),
         "running inference");
 
     // Wait for the inference to complete.
-    TRTSERVER2_InferenceRequest* completed_request = completed.get();
+    TRITONSERVER_InferenceRequest* completed_request = completed.get();
     if (completed_request != irequest) {
       FAIL("completed request differs from inference request");
     }
-    FAIL_IF_ERR(
-        TRTSERVER2_InferenceRequestError(completed_request), "request status");
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_InferenceRequestError(completed_request),
+        "request status");
 
     // Both inputs are using input1_data...
     Check(
@@ -818,12 +840,12 @@ main(int argc, char** argv)
         input0_size, datatype, is_int);
   }
 
-  FAIL_IF_ERR(
-      TRTSERVER2_InferenceRequestDelete(irequest),
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_InferenceRequestDelete(irequest),
       "deleting inference request");
 
-  FAIL_IF_ERR(
-      TRTSERVER_ResponseAllocatorDelete(allocator),
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_ResponseAllocatorDelete(allocator),
       "deleting response allocator");
 
   return 0;
