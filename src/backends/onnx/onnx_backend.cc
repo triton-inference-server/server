@@ -609,16 +609,12 @@ OnnxBackend::Context::Run(
     const InferenceRequest::Input* input = pr.second;
     const std::string& name = input->Name();
 
-    // FIXMEV2 don't need input_config once all requests have datatype
-    const ModelInput* input_config;
-    RETURN_IF_ERROR(base->GetInput(name, &input_config));
-
     // Create a tensor for each input sized correctly for the total
     // payload batch size. Concatenate input values from each payload
     // into the corresponding tensor.
     RETURN_IF_ERROR(SetInputTensor(
-        name, input_config->data_type(), input->Shape(), total_batch_size,
-        payloads, &input_buffers, &inputs, &input_names, &cuda_copy));
+        name, input->DType(), input->Shape(), total_batch_size, payloads,
+        &input_buffers, &inputs, &input_names, &cuda_copy));
   }
 
   // Request to retrieve all output specified in model config

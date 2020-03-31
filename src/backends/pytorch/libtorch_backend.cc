@@ -595,13 +595,9 @@ LibTorchBackend::Context::Run(
     const std::string& name = input->Name();
     int ip_index = input_index_map_[name];
 
-    // FIXMEV2 don't need input_config once all requests have datatype
-    const ModelInput* input_config;
-    RETURN_IF_ERROR(base->GetInput(name, &input_config));
-
     RETURN_IF_ERROR(SetInputMetaData(
-        name, input_config->data_type(), input->Shape(), total_batch_size,
-        payloads, &inputs, &(input_meta_data[ip_index]), &cuda_copy));
+        name, input->DType(), input->Shape(), total_batch_size, payloads,
+        &inputs, &(input_meta_data[ip_index]), &cuda_copy));
   }
 
 #ifdef TRTIS_ENABLE_GPU

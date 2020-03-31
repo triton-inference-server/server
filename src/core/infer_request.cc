@@ -211,6 +211,7 @@ InferenceRequest::AddOverrideInput(
 {
   std::shared_ptr<Input> i =
       std::make_shared<Input>(name, datatype, shape, batch_byte_size);
+  *(i->MutableShape()) = i->OriginalShape();
 
   RETURN_IF_ERROR(AddOverrideInput(i));
   if (input != nullptr) {
@@ -359,11 +360,13 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
             " inputs for model '" + model_name_ + "'");
   }
 
-  // Update each input to have shape and batch-byte-size.
+  // Update each input to have shape, datatype and batch-byte-size.
   for (auto& pr : original_inputs_) {
     const ModelInput* input_config;
     RETURN_IF_ERROR(backend.GetInput(pr.first, &input_config));
     auto& input = pr.second;
+
+    input.SetDType(input_config->data_type());
 
     auto new_shape = input.MutableShape();
     *new_shape = input.OriginalShape();
@@ -489,8 +492,6 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
     priority_ = backend.DefaultPriorityLevel();
   }
 
-  // FIXME check datatype for match
-
   // Validate if the requested output name exists in the model configuration
   for (const auto& pr : requested_outputs_) {
     const ModelOutput* output_config;
@@ -575,6 +576,16 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
 
     auto& input = pr.second;
     auto shape = input.MutableShape();
+
+    if (input.DType() != input_config->data_type()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "inference input data-type is '" +
+              std::string(DataTypeToProtocolString(input.DType())) +
+              "', model expects '" +
+              std::string(DataTypeToProtocolString(input_config->data_type())) +
+              " for '" + model_name_ + "'");
+    }
 
     if (!CompareDimsWithWildcard(input_config->dims(), *shape)) {
       return Status(

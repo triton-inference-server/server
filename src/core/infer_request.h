@@ -76,6 +76,9 @@ class InferenceRequest {
     // Data type of the input tensor.
     DataType DType() const { return datatype_; }
 
+    // FIXMEV2 Datatype should always be set by constructor for V2
+    void SetDType(const DataType t) { datatype_ = t; }
+
     // The original shape of the input tensor.
     const std::vector<int64_t>& OriginalShape() const
     {

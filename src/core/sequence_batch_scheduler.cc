@@ -199,10 +199,12 @@ GetBooleanOverrideInputs(
 
   auto ltrue_override = std::make_shared<InferenceRequest::Input>(
       tensor_name, tensor_datatype, tensor_shape, size_p);
+  *ltrue_override->MutableShape() = ltrue_override->OriginalShape();
   RETURN_IF_ERROR(ltrue_override->SetData(true_p));
 
   auto lfalse_override = std::make_shared<InferenceRequest::Input>(
       tensor_name, tensor_datatype, tensor_shape, size_p);
+  *lfalse_override->MutableShape() = lfalse_override->OriginalShape();
   RETURN_IF_ERROR(lfalse_override->SetData(false_p));
 
   *true_override = std::move(ltrue_override);
@@ -739,6 +741,7 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
       auto override = std::make_shared<InferenceRequest::Input>(
           correlation_id_tensor_name, correlation_id_datatype, tensor_shape,
           size_p);
+      *override->MutableShape() = override->OriginalShape();
       corrid_status = override->SetData(corrid_p);
       if (!corrid_status.IsOk()) {
         LOG_ERROR << "failed creating CORRID control for sequence-batch "

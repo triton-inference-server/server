@@ -704,13 +704,9 @@ BaseBackend::Context::Run(
     const InferenceRequest::Input* input = pr.second;
     const std::string& name = input->Name();
 
-    // FIXMEV2 don't need input_config once all requests have datatype
-    const ModelInput* input_config;
-    RETURN_IF_ERROR(base->GetInput(name, &input_config));
-
     RETURN_IF_ERROR(SetInput(
-        name, input_config->data_type(), input->Shape(), total_batch_size,
-        payloads, &inputs, input_tensors.get(), &cuda_copy));
+        name, input->DType(), input->Shape(), total_batch_size, payloads,
+        &inputs, input_tensors.get(), &cuda_copy));
   }
 
   // Collect the names of outputs requested by any request
