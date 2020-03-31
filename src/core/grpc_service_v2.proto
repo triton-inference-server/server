@@ -657,7 +657,8 @@ message ModelInferRequest
   //@@  .. cpp:var:: InferRequestedOutputTensor outputs (repeated)
   //@@
   //@@     The requested output tensors for the inference. Optional, if not
-  //@@     specified all outputs produced by the model will be returned.
+  //@@     specified all outputs specified in the model config will be
+  //@@     returned.
   //@@
   repeated InferRequestedOutputTensor outputs = 6;
 }
