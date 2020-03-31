@@ -109,7 +109,7 @@ for i in \
     SUFFIX="${BASE%.*}"
     if [ $SUFFIX == "grpc_v2_image_client" ]; then
         python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
-    elif [ $SUFFIX == "v2_class_client"]; then
+    elif [ $SUFFIX == "v2_image_client" ]; then
         python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     else
         python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1

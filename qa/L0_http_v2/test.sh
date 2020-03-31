@@ -86,7 +86,7 @@ for i in \
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"
     if [ $SUFFIX == "v2_image_client" ]; then
-        python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 -i $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+        python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     else
         python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     fi
