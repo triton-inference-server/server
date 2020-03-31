@@ -793,6 +793,15 @@ if [ "$unavailable_count" != "0" ]; then
     RET=1
 fi
 
+# Infer request with no 'NV-InferRequest' header should return 400 error and not crash server.
+set +e
+code=`curl -s -w %{http_code} -X POST localhost:8000/api/infer/graphdef_float32_float32_float32`
+set -e
+if [[ "$code" != *"400" ]]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
 kill $SERVER_PID
 wait $SERVER_PID
 
