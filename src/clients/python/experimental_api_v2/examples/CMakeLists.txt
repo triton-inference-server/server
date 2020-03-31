@@ -33,6 +33,7 @@ if(${TRTIS_ENABLE_HTTP_V2})
       simple_http_v2_infer_client.py
       simple_http_v2_async_infer_client.py
       simple_http_v2_class_client.py
+      simple_http_v2_model_control.py
     DESTINATION python
   )
 endif() # TRTIS_ENABLE_HTTP_V2

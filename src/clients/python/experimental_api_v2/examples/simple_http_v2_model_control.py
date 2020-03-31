@@ -51,21 +51,21 @@ if __name__ == '__main__':
         triton_client = httpclient.InferenceServerClient(FLAGS.url)
     except Exception as e:
         print("context creation failed: " + str(e))
-        sys.exit()
+        sys.exit(1)
 
     model_name = 'simple'
 
     # There are two models in the repository directory
     if len(triton_client.get_model_repository_index()["index"]) != 2:
-        sys.exit()
+        sys.exit(1)
 
     triton_client.load_model(model_name)
     if not triton_client.is_model_ready(model_name):
-        sys.exit()
+        sys.exit(1)
 
     triton_client.unload_model(model_name)
     if triton_client.is_model_ready(model_name):
-        sys.exit()
+        sys.exit(1)
 
     # Trying to load wrong model name should emit exception
     try:
@@ -73,3 +73,5 @@ if __name__ == '__main__':
     except InferenceServerException as e:
         if "failed to load" in e.message():
             print("PASS: model control")
+    else:
+        sys.exit(1)
