@@ -26,6 +26,7 @@
 #pragma once
 
 #include "src/core/request_status.pb.h"
+#include "src/core/tritonserver.h"
 #include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -73,6 +74,15 @@ RequestStatusCode TrtServerCodeToRequestStatus(TRTSERVER_Error_Code code);
 // Return the TRTSERVER_Error_Code corresponding to a
 // RequestStatusCode.
 TRTSERVER_Error_Code RequestStatusToTrtServerCode(
+    RequestStatusCode status_code);
+
+// Return the RequestStatusCode corresponding to a
+// TRITONSERVER_Error_Code.
+RequestStatusCode TritonServerCodeToRequestStatus(TRITONSERVER_Error_Code code);
+
+// Return the TRITONSERVER_Error_Code corresponding to a
+// RequestStatusCode.
+TRITONSERVER_Error_Code RequestStatusToTritonServerCode(
     RequestStatusCode status_code);
 
 // If status is non-OK, exit.

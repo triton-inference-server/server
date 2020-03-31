@@ -35,6 +35,7 @@
 #include "src/core/memory.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
+#include "src/core/tritonserver.h"
 #include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -191,6 +192,14 @@ class InferResponseProvider {
       TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
       std::shared_ptr<InferResponseProvider>* infer_provider);
 
+  static Status Create(
+      const std::shared_ptr<InferenceRequest>& irequest,
+      const std::shared_ptr<LabelProvider>& label_provider,
+      TRITONSERVER_ResponseAllocator* allocator,
+      TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
+      TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn,
+      std::shared_ptr<InferResponseProvider>* infer_provider);
+
   ~InferResponseProvider();
 
   // Get the full response header for this inference request.
@@ -219,6 +228,12 @@ class InferResponseProvider {
       const std::string& name, const void** content, size_t* content_byte_size,
       TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const;
 
+  // Get the address and byte-size of an output buffer. Error is
+  // returned if the buffer is not already allocated.
+  Status OutputBufferContents(
+      const std::string& name, const void** content, size_t* content_byte_size,
+      TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const;
+
   // Get label provider.
   const std::shared_ptr<LabelProvider>& GetLabelProvider() const
   {
@@ -244,6 +259,13 @@ class InferResponseProvider {
       TRTSERVER_ResponseAllocator* allocator,
       TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
       TRTSERVER_ResponseAllocatorReleaseFn_t release_fn);
+
+  InferResponseProvider(
+      const std::shared_ptr<InferenceRequest>& irequest,
+      const std::shared_ptr<LabelProvider>& label_provider,
+      TRITONSERVER_ResponseAllocator* allocator,
+      TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
+      TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn);
 
   std::shared_ptr<InferenceRequest> irequest_;
 
@@ -284,6 +306,11 @@ class InferResponseProvider {
   TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn_;
   void* alloc_userp_;
   TRTSERVER_ResponseAllocatorReleaseFn_t release_fn_;
+
+  bool using_triton_;
+  TRITONSERVER_ResponseAllocator* triton_allocator_;
+  TRITONSERVER_ResponseAllocatorAllocFn_t triton_alloc_fn_;
+  TRITONSERVER_ResponseAllocatorReleaseFn_t triton_release_fn_;
 
   InferResponseHeader response_header_;
 };

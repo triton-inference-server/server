@@ -335,7 +335,26 @@ InferResponseProvider::InferResponseProvider(
     TRTSERVER_ResponseAllocatorReleaseFn_t release_fn)
     : irequest_(irequest), label_provider_(label_provider),
       allocator_(allocator), alloc_fn_(alloc_fn), alloc_userp_(alloc_userp),
-      release_fn_(release_fn)
+      release_fn_(release_fn), using_triton_(false)
+{
+  // Create a map from output name to the InferenceRequest::Output
+  // object for that output.
+  for (const auto& pr : irequest_->RequestedOutputs()) {
+    const auto& output = pr.second;
+    output_map_.emplace(std::make_pair(output.Name(), output));
+  }
+}
+
+InferResponseProvider::InferResponseProvider(
+    const std::shared_ptr<InferenceRequest>& irequest,
+    const std::shared_ptr<LabelProvider>& label_provider,
+    TRITONSERVER_ResponseAllocator* allocator,
+    TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
+    TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn)
+    : irequest_(irequest), label_provider_(label_provider),
+      alloc_userp_(alloc_userp), using_triton_(true),
+      triton_allocator_(allocator), triton_alloc_fn_(alloc_fn),
+      triton_release_fn_(release_fn)
 {
   // Create a map from output name to the InferenceRequest::Output
   // object for that output.
@@ -361,6 +380,26 @@ InferResponseProvider::OutputBufferContents(
       *content = output.ptr_;
       *content_byte_size = output.byte_size_;
       *memory_type = output.memory_type_;
+      *memory_type_id = output.memory_type_id_;
+      return Status::Success;
+    }
+  }
+
+  return Status(
+      RequestStatusCode::UNAVAILABLE,
+      "request for unallocated output '" + name + "'");
+}
+
+Status
+InferResponseProvider::OutputBufferContents(
+    const std::string& name, const void** content, size_t* content_byte_size,
+    TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const
+{
+  for (const auto& output : outputs_) {
+    if ((name == output.name_) && (output.cls_count_ == 0)) {
+      *content = output.ptr_;
+      *content_byte_size = output.byte_size_;
+      *memory_type = TrtMemTypeToTriton(output.memory_type_);
       *memory_type_id = output.memory_type_id_;
       return Status::Success;
     }
@@ -573,6 +612,22 @@ InferResponseProvider::Create(
   return Status::Success;
 }
 
+Status
+InferResponseProvider::Create(
+    const std::shared_ptr<InferenceRequest>& irequest,
+    const std::shared_ptr<LabelProvider>& label_provider,
+    TRITONSERVER_ResponseAllocator* allocator,
+    TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
+    TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn,
+    std::shared_ptr<InferResponseProvider>* infer_provider)
+{
+  InferResponseProvider* provider = new InferResponseProvider(
+      irequest, label_provider, allocator, alloc_fn, alloc_userp, release_fn);
+  infer_provider->reset(provider);
+
+  return Status::Success;
+}
+
 InferResponseProvider::~InferResponseProvider()
 {
   for (const auto& output : outputs_) {
@@ -587,9 +642,26 @@ InferResponseProvider::~InferResponseProvider()
                   << cudaGetErrorString(cuerr);
       }
 #endif  // TRTIS_ENABLE_GPU
-      TRTSERVER_Error* err = release_fn_(
-          allocator_, output.release_buffer_, output.release_userp_,
-          output.byte_size_, output.memory_type_, output.memory_type_id_);
+      if (!using_triton_) {
+        auto err = release_fn_(
+            allocator_, output.release_buffer_, output.release_userp_,
+            output.byte_size_, output.memory_type_, output.memory_type_id_);
+        if (err != nullptr) {
+          LOG_ERROR << "failed to release result tensor '" << output.name_
+                    << "': " << TRTSERVER_ErrorMessage(err);
+          TRTSERVER_ErrorDelete(err);
+        }
+      } else {
+        auto err = triton_release_fn_(
+            triton_allocator_, output.release_buffer_, output.release_userp_,
+            output.byte_size_, TrtMemTypeToTriton(output.memory_type_),
+            output.memory_type_id_);
+        if (err != nullptr) {
+          LOG_ERROR << "failed to release result tensor '" << output.name_
+                    << "': " << TRITONSERVER_ErrorMessage(err);
+          TRITONSERVER_ErrorDelete(err);
+        }
+      }
 #ifdef TRTIS_ENABLE_GPU
       cuerr = cudaSetDevice(current_device);
       if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
@@ -598,11 +670,6 @@ InferResponseProvider::~InferResponseProvider()
                   << cudaGetErrorString(cuerr);
       }
 #endif  // TRTIS_ENABLE_GPU
-      if (err != nullptr) {
-        LOG_ERROR << "failed to release result tensor '" << output.name_
-                  << "': " << TRTSERVER_ErrorMessage(err);
-        TRTSERVER_ErrorDelete(err);
-      }
     }
   }
 }
@@ -688,10 +755,33 @@ InferResponseProvider::AllocateOutputBuffer(
             std::string(cudaGetErrorString(cuerr)));
   }
 #endif  // TRTIS_ENABLE_GPU
-  TRTSERVER_Error* err = alloc_fn_(
-      allocator_, name.c_str(), alloc_byte_size, preferred_memory_type,
-      preferred_memory_type_id, alloc_userp_, &buffer, &buffer_userp,
-      &raw_actual_memory_type, &raw_actual_memory_type_id);
+  Status status;
+  if (!using_triton_) {
+    auto err = alloc_fn_(
+        allocator_, name.c_str(), alloc_byte_size, preferred_memory_type,
+        preferred_memory_type_id, alloc_userp_, &buffer, &buffer_userp,
+        &raw_actual_memory_type, &raw_actual_memory_type_id);
+    if (err != nullptr) {
+      status = Status(
+          TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
+          TRTSERVER_ErrorMessage(err));
+      TRTSERVER_ErrorDelete(err);
+    }
+  } else {
+    TRITONSERVER_Memory_Type triton_actual_memory_type;
+    auto err = triton_alloc_fn_(
+        triton_allocator_, name.c_str(), alloc_byte_size,
+        TrtMemTypeToTriton(preferred_memory_type), preferred_memory_type_id,
+        alloc_userp_, &buffer, &buffer_userp, &triton_actual_memory_type,
+        &raw_actual_memory_type_id);
+    raw_actual_memory_type = TritonMemTypeToTrt(triton_actual_memory_type);
+    if (err != nullptr) {
+      status = Status(
+          TritonServerCodeToRequestStatus(TRITONSERVER_ErrorCode(err)),
+          TRITONSERVER_ErrorMessage(err));
+      TRITONSERVER_ErrorDelete(err);
+    }
+  }
   if (!is_class) {
     *content = buffer;
     loutput->ptr_ = buffer;
@@ -703,7 +793,6 @@ InferResponseProvider::AllocateOutputBuffer(
     loutput->memory_type_id_ = 0;
   }
 
-  Status status;
 #ifdef TRTIS_ENABLE_GPU
   cuerr = cudaSetDevice(current_device);
   if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
@@ -714,12 +803,6 @@ InferResponseProvider::AllocateOutputBuffer(
             std::string(cudaGetErrorString(cuerr)));
   }
 #endif  // TRTIS_ENABLE_GPU
-  if (err != nullptr) {
-    status = Status(
-        TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
-        TRTSERVER_ErrorMessage(err));
-    TRTSERVER_ErrorDelete(err);
-  }
   if (!status.IsOk()) {
     return status;
   }

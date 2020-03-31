@@ -33,6 +33,36 @@
 
 namespace nvidia { namespace inferenceserver {
 
+TRTSERVER_Memory_Type
+TritonMemTypeToTrt(TRITONSERVER_Memory_Type mem_type)
+{
+  switch (mem_type) {
+    case TRITONSERVER_MEMORY_CPU:
+      return TRTSERVER_MEMORY_CPU;
+      break;
+    case TRITONSERVER_MEMORY_CPU_PINNED:
+      return TRTSERVER_MEMORY_CPU_PINNED;
+    default:
+      return TRTSERVER_MEMORY_GPU;
+      break;
+  }
+}
+
+TRITONSERVER_Memory_Type
+TrtMemTypeToTriton(TRTSERVER_Memory_Type mem_type)
+{
+  switch (mem_type) {
+    case TRTSERVER_MEMORY_CPU:
+      return TRITONSERVER_MEMORY_CPU;
+      break;
+    case TRTSERVER_MEMORY_CPU_PINNED:
+      return TRITONSERVER_MEMORY_CPU_PINNED;
+    default:
+      return TRITONSERVER_MEMORY_GPU;
+      break;
+  }
+}
+
 InferenceRequest::InferenceRequest(
     const std::string& model_name, const int64_t requested_model_version,
     const int64_t actual_model_version, const uint32_t protocol_version)
@@ -574,6 +604,15 @@ InferenceRequest::Input::AppendData(
   }
 
   return Status::Success;
+}
+
+Status
+InferenceRequest::Input::AppendData(
+    const void* base, size_t byte_size, TRITONSERVER_Memory_Type memory_type,
+    int64_t memory_type_id)
+{
+  return AppendData(
+      base, byte_size, TritonMemTypeToTrt(memory_type), memory_type_id);
 }
 
 Status
