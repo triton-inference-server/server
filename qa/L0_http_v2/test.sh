@@ -50,12 +50,10 @@ rm -f *.log.*
 
 # Get the TensorFlow inception model
 mkdir -p models/inception_graphdef/1
-wget -O /workspace/inception_v3_2016_08_28_frozen.pb.tar.gz \
+wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
      https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz
-(cd /workspace && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
-mv /workspace/inception_v3_2016_08_28_frozen.pb models/inception_graphdef/1/model.graphdef
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_int8_int32_int32 models/
-cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/resnet_v1_50_graphdef models/
+(cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
+mv /tmp/inception_v3_2016_08_28_frozen.pb models/inception_graphdef/1/model.graphdef
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
