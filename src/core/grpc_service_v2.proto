@@ -656,7 +656,9 @@ message ModelInferRequest
   //@@
   //@@  .. cpp:var:: InferRequestedOutputTensor outputs (repeated)
   //@@
-  //@@     The requested output tensors for the inference.
+  //@@     The requested output tensors for the inference. Optional, if not
+  //@@     specified all outputs specified in the model config will be
+  //@@     returned.
   //@@
   repeated InferRequestedOutputTensor outputs = 6;
 }
@@ -703,30 +705,36 @@ message ModelInferResponse
     InferTensorContents contents = 4;
   }
 
+  //@@  .. cpp:var:: string model_name
+  //@@
+  //@@     The name of the model used for inference.
+  //@@
+  string model_name = 1;
+
   //@@  .. cpp:var:: string model_version
   //@@
   //@@     The version of the model used for inference.
   //@@
-  string model_version = 1;
+  string model_version = 2;
 
   //@@  .. cpp:var:: string id
   //@@
   //@@     The id of the inference request if one was specified.
   //@@
-  string id = 2;
+  string id = 3;
 
   //@@  .. cpp:var:: map<string,InferParameter> parameters
   //@@
   //@@     Optional inference response parameters.
   //@@
-  map<string, InferParameter> parameters = 3;
+  map<string, InferParameter> parameters = 4;
 
   //@@
   //@@  .. cpp:var:: InferOutputTensor outputs (repeated)
   //@@
   //@@     The output tensors holding inference results.
   //@@
-  repeated InferOutputTensor outputs = 4;
+  repeated InferOutputTensor outputs = 5;
 }
 
 //@@

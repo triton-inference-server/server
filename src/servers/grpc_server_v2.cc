@@ -2504,6 +2504,7 @@ ModelInferHandler::InferComplete(
 
   // Convert the InferResponseHeader to the V2 response
   if (err == nullptr) {
+    response.set_model_name(response_header.model_name());
     response.set_model_version(std::to_string(response_header.model_version()));
     response.set_id(id);
     for (const auto& io : response_header.output()) {
