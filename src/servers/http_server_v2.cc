@@ -616,12 +616,15 @@ ReadDataFromJson(
       ReadDataFromJsonHelper(int64_t_tensor, dtype, tensor_data, &counter);
       break;
     }
-    // FP16 needs a work around
+    // FP16 not supported via JSON
     case TYPE_FP16: {
-      // float* float16_tensor = reinterpret_cast<float*>(base->data());
-      // ReadDataFromJsonHelper(float16_t_tensor, dtype, tensor_data,
-      // &counter);
-      break;
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "receiving FP16 data via JSON is not supported. Please use the "
+              "binary data format for input " +
+              std::string(request_input["name"].GetString()))
+              .c_str());
     }
     case TYPE_FP32: {
       float* float_tensor = reinterpret_cast<float*>(base->data());
@@ -740,12 +743,15 @@ WriteDataToJson(
             &data_val, allocator, shape, 1, int64_t_base, &counter);
         break;
       }
-      // FP16 needs a work around
+      // FP16 not supported via JSON
       case TYPE_FP16: {
-        // float16* float16_base = reinterpret_cast<float16*>(base);
-        // WriteDataToJsonHelper(
-        //     &data_val, allocator, shape, 1, float16_base, &counter);
-        break;
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "sending FP16 data via JSON is not supported. Please use the "
+                "binary data format for output " +
+                std::string(response_output["name"].GetString()))
+                .c_str());
       }
       case TYPE_FP32: {
         float* float_base = reinterpret_cast<float*>(base);
