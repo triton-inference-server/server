@@ -29,7 +29,6 @@ import argparse
 import numpy as np
 from PIL import Image
 import os
-import sys
 
 import grpc
 from tritongrpcclient import grpc_service_v2_pb2
@@ -293,7 +292,8 @@ if __name__ == '__main__':
                         required=False,
                         default='localhost:8001',
                         help='Inference server URL. Default is localhost:8001.')
-    parser.add_argument('image_filename', type=str, help='Input image.')
+    parser.add_argument('image_filename', type=str, nargs='?', default=None,
+                        help='Input image / Input folder.')
     FLAGS = parser.parse_args()
 
     # Create gRPC stub for communicating with the server
