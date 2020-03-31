@@ -1140,12 +1140,22 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   }
 #endif  // TRTIS_ENABLE_TRACING
 
-  std::string infer_request_header(
-      evhtp_kv_find(req->headers_in, kInferRequestHTTPHeader));
+  std::string infer_request_header_str;
+  const char* infer_request_header =
+      evhtp_kv_find(req->headers_in, kInferRequestHTTPHeader);
+  if (infer_request_header != NULL) {
+    infer_request_header_str = std::string(infer_request_header);
+  } else {
+    std::string error_msg = "The request header should contain '" +
+                            std::string(kInferRequestHTTPHeader) + "'";
+    evbuffer_add(req->buffer_out, error_msg.c_str(), error_msg.size());
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
 
   InferRequestHeader request_header_protobuf;
   if (!google::protobuf::TextFormat::ParseFromString(
-          infer_request_header, &request_header_protobuf)) {
+          infer_request_header_str, &request_header_protobuf)) {
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
   }
