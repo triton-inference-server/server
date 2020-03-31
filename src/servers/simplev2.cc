@@ -664,7 +664,6 @@ main(int argc, char** argv)
 
   const void* input0_base = &input0_data[0];
   const void* input1_base = &input1_data[0];
-  auto memory_type = TRTSERVER_MEMORY_CPU;
 #ifdef TRTIS_ENABLE_GPU
   std::unique_ptr<void, decltype(cuda_data_deleter)> input0_gpu(
       nullptr, cuda_data_deleter);
@@ -715,12 +714,12 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       TRTSERVER2_InferenceRequestAppendInputData(
-          irequest, input0, input0_base, input0_size, memory_type,
+          irequest, input0, input0_base, input0_size, requested_memory_type,
           0 /* memory_type_id */),
       "assigning INPUT0 data");
   FAIL_IF_ERR(
       TRTSERVER2_InferenceRequestAppendInputData(
-          irequest, input1, input1_base, input1_size, memory_type,
+          irequest, input1, input1_base, input1_size, requested_memory_type,
           0 /* memory_type_id */),
       "assigning INPUT1 data");
 
@@ -791,7 +790,7 @@ main(int argc, char** argv)
         "removing INPUT0 data");
     FAIL_IF_ERR(
         TRTSERVER2_InferenceRequestAppendInputData(
-            irequest, input0, input1_base, input1_size, memory_type,
+            irequest, input0, input1_base, input1_size, requested_memory_type,
             0 /* memory_type_id */),
         "assigning INPUT1 data to INPUT0");
 
