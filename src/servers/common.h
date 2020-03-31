@@ -29,6 +29,7 @@
 #include "src/core/api.pb.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/request_status.pb.h"
+#include "src/core/tritonserver.h"
 #include "src/core/trtserver.h"
 
 #ifdef TRTIS_ENABLE_GRPC_V2
@@ -125,5 +126,31 @@ size_t GetDataTypeByteSize(const std::string& protocol_dtype);
 
 TRTSERVER_Error* GetModelVersionFromString(
     const std::string& version_string, int64_t* version_int);
+
+//
+// TRITON
+//
+
+#define FAIL_IF_TRITON_ERR(X, MSG)                                \
+  do {                                                            \
+    TRITONSERVER_Error* err__ = (X);                              \
+    if (err__ != nullptr) {                                       \
+      std::cerr << "error: " << (MSG) << ": "                     \
+                << TRITONSERVER_ErrorCodeString(err__) << " - "   \
+                << TRITONSERVER_ErrorMessage(err__) << std::endl; \
+      TRITONSERVER_ErrorDelete(err__);                            \
+      exit(1);                                                    \
+    }                                                             \
+  } while (false)
+
+#define RETURN_IF_TRITON_ERR(X)      \
+  do {                               \
+    TRITONSERVER_Error* err__ = (X); \
+    if (err__ != nullptr) {          \
+      return err__;                  \
+    }                                \
+  } while (false)
+
+std::string MemoryTypeString(TRITONSERVER_Memory_Type memory_type);
 
 }}  // namespace nvidia::inferenceserver

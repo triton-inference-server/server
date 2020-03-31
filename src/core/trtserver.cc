@@ -1795,7 +1795,8 @@ TRTSERVER_ServerInferAsync(
   infer_stats->SetMetricReporter(lbackend->MetricReporter());
   infer_stats->SetBatchSize(lrequest->BatchSize());
   infer_stats->SetFailed(true);
-  infer_stats->SetTraceManager(trace_manager);
+  infer_stats->SetTraceManager(
+      reinterpret_cast<ni::OpaqueTraceManager*>(trace_manager));
   infer_stats->NewTrace();
 #else
   auto infer_stats = std::make_shared<ni::ModelInferStats>();
@@ -2269,7 +2270,8 @@ TRTSERVER2_ServerInferAsync(
   infer_stats->SetMetricReporter(lbackend->MetricReporter());
   infer_stats->SetBatchSize(lrequest->BatchSize());
   infer_stats->SetFailed(true);
-  infer_stats->SetTraceManager(trace_manager);
+  infer_stats->SetTraceManager(
+      reinterpret_cast<ni::OpaqueTraceManager*>(trace_manager));
   infer_stats->NewTrace();
 #else
   auto infer_stats = std::make_shared<ni::ModelInferStats>();

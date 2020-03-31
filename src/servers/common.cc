@@ -385,4 +385,23 @@ GetModelVersionFromString(
   return nullptr;  // Success
 }
 
+//
+// TRITON
+//
+
+std::string
+MemoryTypeString(TRITONSERVER_Memory_Type memory_type)
+{
+  switch (memory_type) {
+    case TRITONSERVER_MEMORY_CPU:
+      return "CPU memory";
+    case TRITONSERVER_MEMORY_CPU_PINNED:
+      return "Pinned CPU memory";
+    case TRITONSERVER_MEMORY_GPU:
+      return "GPU memory";
+    default:
+      return "unknown memory type";
+  }
+}
+
 }}  // namespace nvidia::inferenceserver

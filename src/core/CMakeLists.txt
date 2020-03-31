@@ -189,6 +189,7 @@ set(
   status.cc
   tracing.cc
   trtserver.cc
+  tritonserver.cc
 )
 
 set(
@@ -223,6 +224,7 @@ set(
   tracing.h
   trtserver.h
   trtserver2.h
+  tritonserver.h
 )
 
 if(${TRTIS_ENABLE_GPU})

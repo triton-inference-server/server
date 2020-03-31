@@ -31,8 +31,14 @@
 #include "src/core/memory.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
+#include "src/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
+
+// FIXMEV2 shouldn't need the conversions
+TRTSERVER_Memory_Type TritonMemTypeToTrt(TRITONSERVER_Memory_Type mem_type);
+
+TRITONSERVER_Memory_Type TrtMemTypeToTriton(TRTSERVER_Memory_Type mem_type);
 
 class InferenceBackend;
 class InferenceServer;
@@ -87,6 +93,11 @@ class InferenceRequest {
     Status AppendData(
         const void* base, size_t byte_size, TRTSERVER_Memory_Type memory_type,
         int64_t memory_type_id);
+
+    // Append a new buffer of data to this input.
+    Status AppendData(
+        const void* base, size_t byte_size,
+        TRITONSERVER_Memory_Type memory_type, int64_t memory_type_id);
 
     // Set the data for this input. Error is input already has some
     // data.
