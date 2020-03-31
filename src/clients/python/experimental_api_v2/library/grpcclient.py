@@ -1012,20 +1012,18 @@ class InferInput:
     name : str
         The name of input whose data will be described by this object
     shape : list
-        The shape of the associated input. Default value is None.
+        The shape of the associated input.
     datatype : str
-        The datatype of the associated input. Default is None.
+        The datatype of the associated input.
 
     """
 
-    def __init__(self, name, shape=None, datatype=None):
+    def __init__(self, name, shape, datatype):
         self._input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
         self._input.name = name
-        if shape:
-            self._input.ClearField('shape')
-            self._input.shape.extend(shape)
-        if datatype:
-            self._input.datatype = datatype
+        self._input.ClearField('shape')
+        self._input.shape.extend(shape)
+        self._input.datatype = datatype
 
     def name(self):
         """Get the name of input associated with this object.
@@ -1058,55 +1056,64 @@ class InferInput:
         return self._input.shape
 
     def set_data_from_numpy(self, input_tensor):
-        """Set the tensor data (datatype, shape, contents) from the
-        specified numpy array for input associated with this object.
+        """Set the tensor data from the specified numpy array for
+        input associated with this object.
 
         Parameters
         ----------
         input_tensor : numpy array
             The tensor data in numpy array format
+        
+        Raises
+        ------
+        InferenceServerException
+            If failed to set data for the tensor.
         """
         if not isinstance(input_tensor, (np.ndarray,)):
             raise_error("input_tensor must be a numpy array")
-        self._input.datatype = np_to_triton_dtype(input_tensor.dtype)
-        self._input.ClearField('shape')
-        self._input.shape.extend(input_tensor.shape)
+        dtype = np_to_triton_dtype(input_tensor.dtype)
+        if self._input.datatype != dtype:
+            raise_error(
+                "got unexpected datatype {} from numpy array, expected {}".
+                format(dtype, self._input.datatype))
+        valid_shape = True
+        if len(self._input.shape) != len(input_tensor.shape):
+            valid_shape = False
+        for i in range(len(self._input.shape)):
+            if self._input.shape[i] != input_tensor.shape[i]:
+                valid_shape = False
+        if not valid_shape:
+            raise_error(
+                "got unexpected numpy array shape [{}], expected [{}]".format(
+                    str(input_tensor.shape)[1:-1],
+                    str(self._input.shape)[1:-1]))
         if self._input.datatype == "BYTES":
             self._input.contents.raw_contents = serialize_byte_tensor(
                 input_tensor).tobytes()
         else:
             self._input.contents.raw_contents = input_tensor.tobytes()
 
-    def set_parameter(self, key, value):
-        """Adds the specified key-value pair in the requested input parameters
+    def set_shared_memory(self, region_name, byte_size, offset=0):
+        """Set the tensor data from the specified shared memory region.
 
         Parameters
         ----------
-        key : str
-            The name of the parameter to be included in the request. 
-        value : str/int/bool
-            The value of the parameter
+        region_name : str
+            The name of the shared memory region holding tensor data.
+        byte_size : int
+            The size of the shared memory region holding tensor data.
+        offset : int
+            The offset, in bytes, into the region where the data for
+            the tensor starts. The default value is 0.
         
         """
-        if not type(key) is str:
-            raise_error(
-                "only string data type for key is supported in parameters")
 
-        param = self._input.parameters[key]
-        if type(value) is int:
-            param.int64_param = value
-        elif type(value) is bool:
-            param.bool_param = value
-        elif type(value) is str:
-            param.string_param = value
-        else:
-            raise_error("unsupported value type for the parameter")
-
-    def clear_parameters(self):
-        """Clears all the parameters that have been added to the input request.
-        
-        """
-        self._input.parameters.clear()
+        self._input.parameters[
+            'shared_memory_region'].string_param = region_name
+        self._input.parameters[
+            'shared_memory_byte_size'].int64_param = byte_size
+        if offset:
+            self._input.parameters['shared_memory_offset'].int64_param = offset
 
     def _get_tensor(self):
         """Retrieve the underlying InferInputTensor message.
@@ -1126,12 +1133,18 @@ class InferOutput:
     ----------
     name : str
         The name of output tensor to associate with this object
+    class_count : int
+        The number of classifications to be requested. The default
+        value is 0 which means the classification results are not 
+        requested.
     """
 
-    def __init__(self, name):
+    def __init__(self, name, class_count=0):
         self._output = grpc_service_v2_pb2.ModelInferRequest(
         ).InferRequestedOutputTensor()
         self._output.name = name
+        if class_count:
+            self._output.parameters['classification'].int64_param = class_count
 
     def name(self):
         """Get the name of output associated with this object.
@@ -1143,36 +1156,28 @@ class InferOutput:
         """
         return self._output.name
 
-    def set_parameter(self, key, value):
-        """Adds the specified key-value pair in the requested output parameters
+    def set_shared_memory(self, region_name, byte_size, offset=0):
+        """Marks the output to return the inference result in
+        specified shared memory region.
 
         Parameters
         ----------
-        key : str
-            The name of the parameter to be included in the request. 
-        value : str/int/bool
-            The value of the parameter
+        region_name : str
+            The name of the shared memory region to hold tensor data.
+        byte_size : int
+            The size of the shared memory region to hold tensor data.
+        offset : int
+            The offset, in bytes, into the region where the data for
+            the tensor starts. The default value is 0.
         
         """
-        if not type(key) is str:
-            raise_error(
-                "only string data type for key is supported in parameters")
 
-        param = self._output.parameters[key]
-        if type(value) is int:
-            param.int64_param = value
-        elif type(value) is bool:
-            param.bool_param = value
-        elif type(value) is str:
-            param.string_param = value
-        else:
-            raise_error("unsupported value type for the parameter")
-
-    def clear_parameters(self):
-        """Clears all the parameters that have been added to the output request.
-        
-        """
-        self._output.parameters.clear()
+        self._output.parameters[
+            'shared_memory_region'].string_param = region_name
+        self._output.parameters[
+            'shared_memory_byte_size'].int64_param = byte_size
+        if offset:
+            self._output.parameters['shared_memory_offset'].int64_param = offset
 
     def _get_tensor(self):
         """Retrieve the underlying InferRequestedOutputTensor message.
@@ -1238,26 +1243,6 @@ class InferResult:
                 return np_array
         return None
 
-    def get_statistics(self, as_json=False):
-        """Retrieves the InferStatistics for this response as
-        a json dict object or protobuf message
-
-        Parameters
-        ----------
-        as_json : bool
-            If True then returns statistics as a json dict, otherwise
-            as a protobuf message. Default value is False.
-        
-        Returns
-        -------
-        protobuf message or dict
-            The InferStatistics protobuf message or dict for this response.
-        """
-        if as_json:
-            return json.loads(MessageToJson(self._result.statistics))
-        else:
-            return self._result.statistics
-
     def get_response(self, as_json=False):
         """Retrieves the complete ModelInferResponse as a
         json dict object or protobuf message
@@ -1293,13 +1278,16 @@ class InferStream:
         provided to the function when executing the callback. The
         ownership of these objects will be given to the user. The
         'error' would be None for a successful inference.
+    headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include while establising gRPC stream.
     """
 
-    def __init__(self, callback):
+    def __init__(self, callback, headers=None):
         self._callback = callback
         self._request_queue = queue.Queue()
+        self._headers = headers
         self._handler = None
-        self._headers = None
 
     def __enter__(self):
         return self
@@ -1320,20 +1308,6 @@ class InferStream:
             if self._handler.is_alive():
                 self._handler.join()
             self._handler = None
-
-    def set_headers(self, headers):
-        """Sets the specified headers to be used with the stream.
-
-        Parameters
-        ----------
-        headers: dict
-            Optional dictionary specifying additional HTTP
-            headers to include while establising gRPC stream.
-        """
-        if self._is_initialized():
-            raise_error(
-                'Can not set headers for already initialized InferStream')
-        self._headers = headers
 
     def _is_initialized(self):
         """Returns whether the handler to this stream object

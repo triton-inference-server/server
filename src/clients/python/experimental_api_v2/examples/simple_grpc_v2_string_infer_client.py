@@ -56,8 +56,8 @@ if __name__ == '__main__':
 
     inputs = []
     outputs = []
-    inputs.append(grpcclient.InferInput('INPUT0'))
-    inputs.append(grpcclient.InferInput('INPUT1'))
+    inputs.append(grpcclient.InferInput('INPUT0', [1, 16], "BYTES"))
+    inputs.append(grpcclient.InferInput('INPUT1', [1, 16], "BYTES"))
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.

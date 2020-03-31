@@ -37,8 +37,6 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-set +e
-
 RET=0
 
 SIMPLE_HEALTH_CLIENT=../clients/simple_http_v2_health_metadata.py
@@ -61,6 +59,8 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+set +e
+
 # Test health
 python $SIMPLE_HEALTH_CLIENT -v >> ${CLIENT_LOG}.health 2>&1
 if [ $? -ne 0 ]; then
@@ -80,6 +80,8 @@ for i in \
         RET=1
     fi
 done
+
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
