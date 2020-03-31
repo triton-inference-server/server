@@ -28,6 +28,8 @@
 import argparse
 import numpy as np
 from PIL import Image
+import os
+import sys
 
 import grpc
 from tritongrpcclient import grpc_service_v2_pb2
@@ -88,7 +90,7 @@ def parse_model(model_metadata, model_config):
     if output_metadata.datatype != "FP32":
         raise Exception("expecting output datatype to be FP32, model '" +
                         model_metadata.name + "' output type is " +
-                        ouput.datatype)
+                        output_metadata.datatype)
 
     # Output is expected to be a vector. But allow any number of
     # dimensions as long as all but 1 is size 1 (e.g. { 10 }, { 1, 10
@@ -104,10 +106,10 @@ def parse_model(model_metadata, model_config):
     if len(input_metadata.shape) != 3:
         raise Exception(
             "expecting input to have 3 dimensions, model '{}' input has {}".
-            format(model_name, len(input_metadata.shape)))
+            format(model_metadata.name, len(input_metadata.shape)))
 
     if ((input_config.format != mc.ModelInput.FORMAT_NCHW) and
-        (input_config.format != mc.ModelInput.FORMAT_NHWC)):
+            (input_config.format != mc.ModelInput.FORMAT_NHWC)):
         raise Exception("unexpected input format " +
                         mc.ModelInput.Format.Name(input_config.format) +
                         ", expecting " +
@@ -170,29 +172,46 @@ def preprocess(img, format, dtype, c, h, w, scaling):
     return ordered
 
 
-def postprocess(results, batch_size):
+def postprocess(results, filenames, batch_size):
     """
     Post-process results to show classifications.
     """
     if len(results) != 1:
         raise Exception("expected 1 result, got {}".format(len(results)))
 
-    # FIXMEV2 should get datatype from result
-    contents = np.frombuffer(
-        results[0].contents.raw_contents,
-        dtype=model_dtype_to_np("FP32"))  #results[0].datatype
-    contents = np.reshape(contents, results[0].shape)
-    print(contents)
+    batched_result = np.array(results[0].contents.byte_contents)
+    contents = np.reshape(batched_result, results[0].shape)
+    
+    if len(contents) != batch_size:
+        raise Exception("expected {} results, got {}".format(batch_size, len(contents)))
+    if len(filenames) != batch_size:
+        raise Exception("expected {} filenames, got {}".format(batch_size, len(filenames)))
+
+    for (index, results) in enumerate(contents):
+        print("Image '{}':".format(filenames[index]))
+        for result in results:
+            cls = "".join(chr(x) for x in result).split(':')
+            print("    {} ({}) = {}".format(cls[0], cls[1], cls[2]))
 
 
-def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
+def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS, input_filenames):
     request = grpc_service_v2_pb2.ModelInferRequest()
     request.model_name = FLAGS.model_name
     request.model_version = FLAGS.model_version
 
-    output = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor(
-    )
+    filenames = []
+    if os.path.isdir(FLAGS.image_filename):
+        filenames = [os.path.join(FLAGS.image_filename, f)
+                     for f in os.listdir(FLAGS.image_filename)
+                     if os.path.isfile(os.path.join(FLAGS.image_filename, f))]
+    else:
+        filenames = [FLAGS.image_filename, ]
+
+    filenames.sort()
+
+    output = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output.name = output_name
+    output.parameters['classification'].int64_param = FLAGS.classes
     request.outputs.extend([output])
 
     input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
@@ -204,17 +223,23 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
         input.shape.extend([FLAGS.batch_size, c, h, w])
 
     # Preprocess image into input data according to model requirements
-    image_data = None
-    with Image.open(FLAGS.image_filename) as img:
-        image_data = preprocess(img, format, dtype, c, h, w, FLAGS.scaling)
+    # Preprocess the images into input data according to model
+    # requirements
+    image_data = []
+    for filename in filenames:
+        img = Image.open(filename)
+        image_data.append(preprocess(
+            img, format, dtype, c, h, w, FLAGS.scaling))
+
 
     # Send requests of FLAGS.batch_size images.
     input_bytes = None
     for idx in range(FLAGS.batch_size):
+        input_filenames.append(filenames[idx])
         if input_bytes is None:
-            input_bytes = image_data.tobytes()
+            input_bytes = image_data[idx].tobytes()
         else:
-            input_bytes += image_data.tobytes()
+            input_bytes += image_data[idx].tobytes()
 
     input_contents = grpc_service_v2_pb2.InferTensorContents()
     input_contents.raw_contents = input_bytes
@@ -237,13 +262,12 @@ if __name__ == '__main__':
                         type=str,
                         required=True,
                         help='Name of model')
-    parser.add_argument(
-        '-x',
-        '--model-version',
-        type=str,
-        required=False,
-        default="",
-        help='Version of model. Default is to use latest version.')
+    parser.add_argument('-x',
+                        '--model-version',
+                        type=str,
+                        required=False,
+                        default="",
+                        help='Version of model. Default is to use latest version.')
     parser.add_argument('-b',
                         '--batch-size',
                         type=int,
@@ -256,14 +280,13 @@ if __name__ == '__main__':
                         required=False,
                         default=1,
                         help='Number of class results to report. Default is 1.')
-    parser.add_argument(
-        '-s',
-        '--scaling',
-        type=str,
-        choices=['NONE', 'INCEPTION', 'VGG'],
-        required=False,
-        default='NONE',
-        help='Type of scaling to apply to image pixels. Default is NONE.')
+    parser.add_argument('-s',
+                        '--scaling',
+                        type=str,
+                        choices=['NONE', 'INCEPTION', 'VGG'],
+                        required=False,
+                        default='NONE',
+                        help='Type of scaling to apply to image pixels. Default is NONE.')
     parser.add_argument('-u',
                         '--url',
                         type=str,
@@ -295,13 +318,14 @@ if __name__ == '__main__':
     # start over with the first images until the batch is filled.
     requests = []
     responses = []
+    input_filenames = []
 
     # Send request
     for request in requestGenerator(input_name, output_name, c, h, w, format,
-                                    dtype, FLAGS):
+                                    dtype, FLAGS, input_filenames):
         responses.append(grpc_stub.ModelInfer(request))
 
     for response in responses:
-        postprocess(response.outputs, FLAGS.batch_size)
+        postprocess(response.outputs, input_filenames, FLAGS.batch_size)
 
     print("PASS")
