@@ -450,11 +450,11 @@ main(int argc, char** argv)
       case 'm': {
         enforce_memory_type = true;
         if (!strcmp(optarg, "system")) {
-          requested_memory_type = TRTSERVER_MEMORY_CPU;
+          requested_memory_type = TRITONSERVER_MEMORY_CPU;
         } else if (!strcmp(optarg, "pinned")) {
-          requested_memory_type = TRTSERVER_MEMORY_CPU_PINNED;
+          requested_memory_type = TRITONSERVER_MEMORY_CPU_PINNED;
         } else if (!strcmp(optarg, "gpu")) {
-          requested_memory_type = TRTSERVER_MEMORY_GPU;
+          requested_memory_type = TRITONSERVER_MEMORY_GPU;
         } else {
           Usage(
               argv,
