@@ -53,28 +53,28 @@ def _get_inference_request(model_name,
                            model_version,
                            request_id,
                            outputs,
-                           sequence_id=None,
-                           sequence_start=None,
-                           sequence_end=None):
+                           sequence_id,
+                           sequence_start,
+                           sequence_end,
+                           priority,
+                           timeout):
     request = grpc_service_v2_pb2.ModelInferRequest()
     request.model_name = model_name
     request.model_version = model_version
-    if request_id != None:
+    if request_id != "":
         request.id = request_id
     for infer_input in inputs:
         request.inputs.extend([infer_input._get_tensor()])
     for infer_output in outputs:
         request.outputs.extend([infer_output._get_tensor()])
-    if sequence_id:
-        param = request.parameters['sequence_id']
-        param.int64_param = sequence_id
-    if sequence_start:
-        param = request.parameters['sequence_start']
-        param.bool_param = sequence_start
-    if sequence_end:
-        param = request.parameters['sequence_end']
-        param.bool_param = sequence_end
-
+    if sequence_id != 0:
+        request.parameters['sequence_id'].int64_param = sequence_id
+        request.parameters['sequence_start'].bool_param = sequence_start
+        request.parameters['sequence_end'].bool_param = sequence_end
+    if priority != 0:
+        request.parameters['priority'].int64_param = priority
+    if timeout is not None:
+        request.parameters['timeout'].int64_param = timeout
     return request
 
 
@@ -756,10 +756,12 @@ class InferenceServerClient:
               inputs,
               model_version="",
               outputs=None,
-              request_id=None,
+              request_id="",
               sequence_id=0,
               sequence_start=False,
               sequence_end=False,
+              priority=0,
+              timeout=None,
               headers=None):
         """Run synchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
@@ -771,7 +773,7 @@ class InferenceServerClient:
         inputs : list
             A list of InferInput objects, each describing data for a input
             tensor required by the model.
-        model_version: str
+        model_version : str
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
@@ -779,23 +781,37 @@ class InferenceServerClient:
             A list of InferOutput objects, each describing how the output
             data must be returned. If not specified all outputs produced
             by the model will be returned using default settings.
-        request_id: str
+        request_id : str
             Optional identifier for the request. If specified will be returned
-            in the response. Default value is 'None' which means no request_id
-            will be used.
+            in the response. Default value is an empty string which means no
+            request_id will be used.
         sequence_id : int
             The unique identifier for the sequence being represented by the
             object. Default value is 0 which means that the request does not
             belong to a sequence.
-        sequence_start: bool
+        sequence_start : bool
             Indicates whether the request being added marks the start of the 
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
-        sequence_end: bool
+        sequence_end : bool
             Indicates whether the request being added marks the end of the 
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
-        headers: dict
+        priority : int
+            Indicates the priority of the request. Priority value zero
+            indicates that the default priority level should be used
+            (i.e. same behavior as not specifying the priority parameter).
+            Lower value priorities indicate higher priority levels. Thus
+            the highest priority level is indicated by setting the parameter
+            to 1, the next highest is 2, etc. If not provided, the server
+            will handle the request using default setting for the model.
+        timeout : int
+            The timeout value for the request, in microseconds. If the request
+            cannot be completed within the time the server can take a
+            model-specific action such as terminating the request. If not
+            provided, the server will handle the request using default setting
+            for the model.
+        headers : dict
             Optional dictionary specifying additional HTTP headers to include
             in the request.
 
@@ -823,7 +839,9 @@ class InferenceServerClient:
                                          outputs=outputs,
                                          sequence_id=sequence_id,
                                          sequence_start=sequence_start,
-                                         sequence_end=sequence_end)
+                                         sequence_end=sequence_end,
+                                         priority=priority,
+                                         timeout=timeout)
 
         try:
             response = self._client_stub.ModelInfer(request=request,
@@ -839,10 +857,12 @@ class InferenceServerClient:
                     callback,
                     model_version="",
                     outputs=None,
-                    request_id=None,
+                    request_id="",
                     sequence_id=0,
                     sequence_start=False,
                     sequence_end=False,
+                    priority=0,
+                    timeout=None,
                     headers=None):
         """Run asynchronous inference using the supplied 'inputs' requesting
         the outputs specified by 'outputs'.
@@ -869,10 +889,10 @@ class InferenceServerClient:
             A list of InferOutput objects, each describing how the output
             data must be returned. If not specified all outputs produced
             by the model will be returned using default settings.
-        request_id: str
+        request_id : str
             Optional identifier for the request. If specified will be returned
-            in the response. Default value is 'None' which means no request_id
-            will be used.
+            in the response. Default value is an empty string which means no
+            request_id will be used.
         sequence_id : int
             The unique identifier for the sequence being represented by the
             object. Default value is 0 which means that the request does not
@@ -885,6 +905,20 @@ class InferenceServerClient:
             Indicates whether the request being added marks the end of the 
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
+        priority : int
+            Indicates the priority of the request. Priority value zero
+            indicates that the default priority level should be used
+            (i.e. same behavior as not specifying the priority parameter).
+            Lower value priorities indicate higher priority levels. Thus
+            the highest priority level is indicated by setting the parameter
+            to 1, the next highest is 2, etc. If not provided, the server
+            will handle the request using default setting for the model.
+        timeout : int
+            The timeout value for the request, in microseconds. If the request
+            cannot be completed within the time the server can take a
+            model-specific action such as terminating the request. If not
+            provided, the server will handle the request using default setting
+            for the model.
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
@@ -915,7 +949,9 @@ class InferenceServerClient:
                                          outputs=outputs,
                                          sequence_id=sequence_id,
                                          sequence_start=sequence_start,
-                                         sequence_end=sequence_end)
+                                         sequence_end=sequence_end,
+                                         priority=priority,
+                                         timeout=timeout)
 
         try:
             self._call_future = self._client_stub.ModelInfer.future(
@@ -930,10 +966,12 @@ class InferenceServerClient:
                            stream,
                            model_version="",
                            outputs=None,
-                           request_id=None,
+                           request_id="",
                            sequence_id=0,
                            sequence_start=False,
-                           sequence_end=False):
+                           sequence_end=False,
+                           priority=0,
+                           timeout=None):
         """Runs an asynchronous inference over gRPC bi-directional streaming
         API.
 
@@ -954,10 +992,10 @@ class InferenceServerClient:
             A list of InferOutput objects, each describing how the output
             data must be returned. If not specified all outputs produced
             by the model will be returned using default settings.
-        request_id: str
+        request_id : str
             Optional identifier for the request. If specified will be returned
-            in the response. Default value is 'None' which means no request_id
-            will be used.
+            in the response. Default value is an empty string which means no
+            request_id will be used.
         sequence_id : int
             The unique identifier for the sequence being represented by the
             object. Default value is 0 which means that the request does not
@@ -970,6 +1008,20 @@ class InferenceServerClient:
             Indicates whether the request being added marks the end of the 
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
+        priority : int
+            Indicates the priority of the request. Priority value zero
+            indicates that the default priority level should be used
+            (i.e. same behavior as not specifying the priority parameter).
+            Lower value priorities indicate higher priority levels. Thus
+            the highest priority level is indicated by setting the parameter
+            to 1, the next highest is 2, etc. If not provided, the server
+            will handle the request using default setting for the model.
+        timeout : int
+            The timeout value for the request, in microseconds. If the request
+            cannot be completed within the time the server can take a
+            model-specific action such as terminating the request. If not
+            provided, the server will handle the request using default setting
+            for the model.
     
         Raises
         ------
@@ -998,7 +1050,9 @@ class InferenceServerClient:
                                          outputs=outputs,
                                          sequence_id=sequence_id,
                                          sequence_start=sequence_start,
-                                         sequence_end=sequence_end)
+                                         sequence_end=sequence_end,
+                                         priority=priority,
+                                         timeout=timeout)
         # Enqueues the request to the stream
         stream._enqueue_request(request)
 
@@ -1112,7 +1166,7 @@ class InferInput:
             'shared_memory_region'].string_param = region_name
         self._input.parameters[
             'shared_memory_byte_size'].int64_param = byte_size
-        if offset:
+        if offset != 0:
             self._input.parameters['shared_memory_offset'].int64_param = offset
 
     def _get_tensor(self):
@@ -1143,7 +1197,7 @@ class InferOutput:
         self._output = grpc_service_v2_pb2.ModelInferRequest(
         ).InferRequestedOutputTensor()
         self._output.name = name
-        if class_count:
+        if class_count != 0:
             self._output.parameters['classification'].int64_param = class_count
 
     def name(self):
@@ -1176,7 +1230,7 @@ class InferOutput:
             'shared_memory_region'].string_param = region_name
         self._output.parameters[
             'shared_memory_byte_size'].int64_param = byte_size
-        if offset:
+        if offset != 0:
             self._output.parameters['shared_memory_offset'].int64_param = offset
 
     def _get_tensor(self):
@@ -1374,10 +1428,10 @@ class InferStream:
         try:
             for response in responses:
                 result = error = None
-                if not response.error_message:
-                    result = InferResult(response.infer_response)
-                else:
+                if response.error_message != "":
                     error = InferenceServerException(msg=response.error_message)
+                else:
+                    result = InferResult(response.infer_response)
                 self._callback(result=result, error=error)
         except grpc.RpcError as rpc_error:
             error = get_error_grpc(rpc_error)
@@ -1402,7 +1456,7 @@ class _RequestIterator:
 
     def __next__(self):
         request = self._stream._get_request()
-        if not request:
+        if request is None:
             raise StopIteration
 
         return request

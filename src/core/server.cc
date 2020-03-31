@@ -90,6 +90,7 @@ InferenceServer::InferenceServer()
   extensions_.push_back("classification");
   extensions_.push_back("sequence");
   extensions_.push_back("model_repository");
+  extensions_.push_back("schedule_policy");
   extensions_.push_back("model_configuration");
   extensions_.push_back("system_shared_memory");
   extensions_.push_back("cuda_shared_memory");
