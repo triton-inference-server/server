@@ -94,7 +94,7 @@ InferenceServer::InferenceServer()
   extensions_.push_back("model_configuration");
   extensions_.push_back("system_shared_memory");
   extensions_.push_back("cuda_shared_memory");
-#ifdef TRTIS_ENABLE_GRPC_V2
+#ifdef TRTIS_ENABLE_HTTP_V2
   extensions_.push_back("binary_tensor_data");
 #endif
 #ifdef TRTIS_ENABLE_STATS
