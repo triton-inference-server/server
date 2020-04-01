@@ -1111,8 +1111,8 @@ class InferInput:
         binary_data : bool
             Indicates whether to set data for the input in binary format
             or explicit tensor within JSON. The default value is True,
-            which means the data will be delivered to the server in the
-            HTTP body after JSON object.
+            which means the data will be delivered as binary data in the
+            HTTP body after the JSON object.
             
         Raises
         ------
@@ -1203,8 +1203,8 @@ class InferOutput:
     binary_data : bool
         Indicates whether to return result data for the output in
         binary format or explicit tensor within JSON. The default
-        value is True, which means the data will be delivered in the
-        HTTP body after JSON object.
+        value is True, which means the data will be delivered as
+        binary data in the HTTP body after JSON object.
     class_count : int
         The number of classifications to be requested. The default
         value is 0 which means the classification results are not 
