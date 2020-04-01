@@ -49,6 +49,8 @@ class SequenceBatch;
 // inferences.
 class SequenceBatchScheduler : public Scheduler {
  public:
+  using ControlInputs = std::vector<std::shared_ptr<InferenceRequest::Input>>;
+
   SequenceBatchScheduler() = default;
   ~SequenceBatchScheduler();
 
@@ -65,7 +67,7 @@ class SequenceBatchScheduler : public Scheduler {
   // \see Scheduler::Enqueue()
   void Enqueue(
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const std::shared_ptr<InferenceRequest>& request,
       const std::shared_ptr<InferResponseProvider>& response_provider,
       std::function<void(const Status&)> OnComplete) override;
 
@@ -95,16 +97,11 @@ class SequenceBatchScheduler : public Scheduler {
 
   Status CreateBooleanControlTensors(
       const ModelConfig& config,
-      std::shared_ptr<InferRequestProvider::InputOverrideMap>*
-          start_input_overrides,
-      std::shared_ptr<InferRequestProvider::InputOverrideMap>*
-          end_input_overrides,
-      std::shared_ptr<InferRequestProvider::InputOverrideMap>*
-          startend_input_overrides,
-      std::shared_ptr<InferRequestProvider::InputOverrideMap>*
-          continue_input_overrides,
-      std::shared_ptr<InferRequestProvider::InputOverrideMap>*
-          notready_input_overrides);
+      std::shared_ptr<ControlInputs>* start_input_overrides,
+      std::shared_ptr<ControlInputs>* end_input_overrides,
+      std::shared_ptr<ControlInputs>* startend_input_overrides,
+      std::shared_ptr<ControlInputs>* continue_input_overrides,
+      std::shared_ptr<ControlInputs>* notready_input_overrides);
 
  private:
   struct BatcherSequenceSlotCompare {
@@ -170,15 +167,15 @@ class SequenceBatch {
       SequenceBatchScheduler* base, const uint32_t batcher_idx,
       const size_t seq_slot_cnt,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           start_input_overrides,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           end_input_overrides,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           startend_input_overrides,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           continue_input_overrides,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           notready_input_overrides);
   virtual ~SequenceBatch() = default;
 
@@ -187,16 +184,15 @@ class SequenceBatch {
   virtual void Enqueue(
       const uint32_t seq_slot, const CorrelationID correlation_id,
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const std::shared_ptr<InferenceRequest>& request,
       const std::shared_ptr<InferResponseProvider>& response_provider,
       std::function<void(const Status&)> OnComplete) = 0;
 
  protected:
   bool CreateCorrelationIDControl(const ModelConfig& config);
   void SetControlTensors(
-      const std::shared_ptr<InferenceRequest>& irequest,
-      const std::shared_ptr<InferRequestProvider>& request_provider,
-      const int32_t seq_slot, const CorrelationID corr_id);
+      const std::shared_ptr<InferenceRequest>& irequest, const int32_t seq_slot,
+      const CorrelationID corr_id, const bool not_ready = false);
 
   // The controlling scheduler.
   SequenceBatchScheduler* const base_;
@@ -219,27 +215,20 @@ class SequenceBatch {
   // The control values, delivered as input tensors, that should be
   // used when starting a sequence, continuing a sequence, ending a
   // sequence, and showing that a sequence has not input available.
-  std::shared_ptr<InferRequestProvider::InputOverrideMap>
-      start_input_overrides_;
-  std::shared_ptr<InferRequestProvider::InputOverrideMap> end_input_overrides_;
-  std::shared_ptr<InferRequestProvider::InputOverrideMap>
+  std::shared_ptr<SequenceBatchScheduler::ControlInputs> start_input_overrides_;
+  std::shared_ptr<SequenceBatchScheduler::ControlInputs> end_input_overrides_;
+  std::shared_ptr<SequenceBatchScheduler::ControlInputs>
       startend_input_overrides_;
-  std::shared_ptr<InferRequestProvider::InputOverrideMap>
+  std::shared_ptr<SequenceBatchScheduler::ControlInputs>
       continue_input_overrides_;
-  std::shared_ptr<InferRequestProvider::InputOverrideMap>
+  std::shared_ptr<SequenceBatchScheduler::ControlInputs>
       notready_input_overrides_;
 
-  // The name of the model input to which each sequence slot's
-  // correlation ID should be delivered. Empty if the model does not
-  // specify the CONTROL_SEQUENCE_CORRID control.
-  std::string correlation_id_tensor_;
-
-  // For each sequence slot the override map that provides the
-  // correlation ID for that slot. Empty if model does not specify
-  // the CONTROL_SEQUENCE_CORRID control.
-  std::vector<InferRequestProvider::InputOverride*> seq_slot_corrid_overrides_;
-  std::vector<std::shared_ptr<InferRequestProvider::InputOverrideMap>>
-      seq_slot_corrid_overrides_maps_;
+  // For each sequence slot the correlation ID input for that
+  // slot. Empty if model does not specify the CONTROL_SEQUENCE_CORRID
+  // control.
+  std::vector<std::shared_ptr<InferenceRequest::Input>>
+      seq_slot_corrid_overrides_;
 };
 
 // Scheduler that implements the Direct sequence scheduling strategy
@@ -254,15 +243,15 @@ class DirectSequenceBatch : public SequenceBatch {
       const Scheduler::StandardRunFunc& OnSchedule,
       const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           start_input_overrides,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           end_input_overrides,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           startend_input_overrides,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           continue_input_overrides,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           notready_input_overrides,
       std::promise<bool>* is_initialized);
   ~DirectSequenceBatch();
@@ -272,7 +261,7 @@ class DirectSequenceBatch : public SequenceBatch {
   void Enqueue(
       const uint32_t seq_slot, const CorrelationID correlation_id,
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const std::shared_ptr<InferenceRequest>& request,
       const std::shared_ptr<InferResponseProvider>& response_provider,
       std::function<void(const Status&)> OnComplete) override;
 
@@ -329,15 +318,15 @@ class OldestSequenceBatch : public SequenceBatch {
       const Scheduler::StandardRunFunc& OnSchedule,
       const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           start_input_overrides,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           end_input_overrides,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           startend_input_overrides,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           continue_input_overrides,
-      const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           notready_input_overrides,
       std::promise<bool>* is_initialized);
   ~OldestSequenceBatch();
@@ -347,7 +336,7 @@ class OldestSequenceBatch : public SequenceBatch {
   void Enqueue(
       const uint32_t seq_slot, const CorrelationID correlation_id,
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const std::shared_ptr<InferenceRequest>& request,
       const std::shared_ptr<InferResponseProvider>& response_provider,
       std::function<void(const Status&)> OnComplete) override;
 

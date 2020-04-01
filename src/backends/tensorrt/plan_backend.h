@@ -187,8 +187,7 @@ class PlanBackend : public InferenceBackend {
         std::map<int, std::vector<int32_t>>* request_shape_values);
 
     std::map<int, TensorRTContext>::iterator GetMostOptimizedProfile(
-        size_t total_batch_size,
-        const std::shared_ptr<InferRequestProvider>& input_request_provider,
+        size_t total_batch_size, const InferenceRequest& input_request,
         const std::map<int, std::vector<int32_t>>& request_shape_values);
 
     // The engine used for the context. If the model uses dynamic shape, then

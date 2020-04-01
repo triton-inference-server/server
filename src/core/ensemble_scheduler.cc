@@ -45,7 +45,7 @@ struct Step {
   Step(size_t step_idx) : step_idx_(step_idx) {}
 
   std::shared_ptr<InferenceBackend> backend_;
-  std::shared_ptr<InferRequestProvider> request_provider_;
+  std::shared_ptr<InferenceRequest> request_;
   std::shared_ptr<InferResponseProvider> response_provider_;
   std::unordered_map<std::string, std::shared_ptr<AllocatedMemory>> output_map_;
   Status infer_status_;
@@ -67,7 +67,7 @@ class EnsembleContext {
   EnsembleContext(
       InferenceServer* is, EnsembleInfo* info,
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const std::shared_ptr<InferenceRequest>& request,
       const std::shared_ptr<InferResponseProvider>& response_provider,
       std::function<void(const Status&)> OnComplete, cudaStream_t stream);
 
@@ -173,7 +173,7 @@ class EnsembleContext {
   // Objects related to the ensemble infer request
   Status ensemble_status_;
   std::shared_ptr<ModelInferStats> stats_;
-  std::shared_ptr<InferRequestProvider> request_provider_;
+  std::shared_ptr<InferenceRequest> request_;
   std::shared_ptr<InferResponseProvider> response_provider_;
   std::function<void(const Status&)> OnComplete_;
 
@@ -190,12 +190,12 @@ class EnsembleContext {
 EnsembleContext::EnsembleContext(
     InferenceServer* is, EnsembleInfo* info,
     const std::shared_ptr<ModelInferStats>& stats,
-    const std::shared_ptr<InferRequestProvider>& request_provider,
+    const std::shared_ptr<InferenceRequest>& request,
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(const Status&)> OnComplete, cudaStream_t stream)
     : is_(is), info_(info), stream_(stream), inflight_step_counter_(0),
-      stats_(stats), request_provider_(request_provider),
-      response_provider_(response_provider), OnComplete_(OnComplete),
+      stats_(stats), request_(request), response_provider_(response_provider),
+      OnComplete_(OnComplete),
       allocator_(nullptr, TRTSERVER_ResponseAllocatorDelete)
 {
   // Obtain backend handles of all models in ensemble request such that
@@ -225,7 +225,7 @@ EnsembleContext::EnsembleContext(
   for (const auto& ensemble_output : info_->ensemble_output_shape_) {
     ignored_tensor.insert(ensemble_output.first);
   }
-  for (const auto& pr : request_provider_->Request()->RequestedOutputs()) {
+  for (const auto& pr : request_->RequestedOutputs()) {
     ignored_tensor.erase(pr.first);
   }
   if (ignored_tensor.empty()) {
@@ -269,25 +269,23 @@ EnsembleContext::EnsembleContext(
   }
 
   if (ensemble_status_.IsOk()) {
-    const auto& irequest = request_provider_->Request();
+    batch_size_ = request_->BatchSize();
+    correlation_id_ = request_->CorrelationId();
+    flags_ = request_->Flags();
+    priority_ = request_->Priority();
 
-    batch_size_ = irequest->BatchSize();
-    correlation_id_ = irequest->CorrelationId();
-    flags_ = irequest->Flags();
-    priority_ = irequest->Priority();
-
-    for (const auto& pr : irequest->Inputs()) {
-      const auto& input = pr.second;
-      auto it = tensor_data_.find(input.Name());
+    for (const auto& pr : request_->ImmutableInputs()) {
+      const InferenceRequest::Input* input = pr.second;
+      auto it = tensor_data_.find(input->Name());
       if (it != tensor_data_.end()) {
         auto& tensor_data = it->second;
-        std::get<0>(tensor_data) = input;
+        std::get<0>(tensor_data) = *input;
         std::get<1>(tensor_data) = (info_->allow_batching_ ? batch_size_ : 0);
-        request_provider_->GetMemory(it->first, &(std::get<2>(tensor_data)));
+        std::get<2>(tensor_data) = input->Data();
       } else {
         ensemble_status_ = Status(
             RequestStatusCode::INVALID_ARG,
-            "unexpected input '" + input.Name() +
+            "unexpected input '" + input->Name() +
                 "' in request header that does not map to any ensemble inputs");
       }
     }
@@ -547,7 +545,7 @@ EnsembleContext::InitStep(const size_t step_idx, std::shared_ptr<Step>* step)
     const auto& other = std::get<0>(tensor_data_[pair.second]);
 
     // If the actual shape and config shape agree with each other without
-    // considering batch size, non-batch / batch conversion are not required
+    // considering batch size, non-batch / batch conversion are not required.
     const ModelInput* input_config;
     backend->GetInput(pair.first, &input_config);
 
@@ -576,14 +574,13 @@ EnsembleContext::InitStep(const size_t step_idx, std::shared_ptr<Step>* step)
 
   step->reset(new Step(step_idx));
   (*step)->backend_ = backend;
-  RETURN_IF_ERROR(
-      InferRequestProvider::Create(irequest, &((*step)->request_provider_)));
+  (*step)->request_ = std::move(irequest);
+
   // Request header is stored in response provider as reference, so use
   // header from request provider as the providers have same lifetime
   RETURN_IF_ERROR(InferResponseProvider::Create(
-      (*step)->request_provider_->Request(),
-      (*step)->backend_->GetLabelProvider(), allocator_.get(), ResponseAlloc,
-      &((*step)->output_map_), ResponseRelease,
+      (*step)->request_, (*step)->backend_->GetLabelProvider(),
+      allocator_.get(), ResponseAlloc, &((*step)->output_map_), ResponseRelease,
       &((*step)->response_provider_)));
 
   return Status::Success;
@@ -754,7 +751,7 @@ EnsembleContext::ScheduleSteps(
         ModelInferStats::TimestampKind::kRequestStart);
     infer_stats->SetRequestedVersion(step->backend_->Version());
     infer_stats->SetMetricReporter(step->backend_->MetricReporter());
-    infer_stats->SetBatchSize(step->request_provider_->Request()->BatchSize());
+    infer_stats->SetBatchSize(step->request_->BatchSize());
     infer_stats->SetFailed(true);
 
     // Passing trace-related objects down
@@ -765,8 +762,7 @@ EnsembleContext::ScheduleSteps(
 #endif  // TRTIS_ENABLE_STATS
 
     context->is_->InferAsync(
-        step->backend_, step->request_provider_, step->response_provider_,
-        infer_stats,
+        step->backend_, step->request_, step->response_provider_, infer_stats,
         [context, step, infer_stats](const Status& status) mutable {
           if (!status.IsOk()) {
             LOG_VERBOSE(1) << "Ensemble infer failed: " << status.Message();
@@ -810,12 +806,12 @@ EnsembleScheduler::Create(
 void
 EnsembleScheduler::Enqueue(
     const std::shared_ptr<ModelInferStats>& stats,
-    const std::shared_ptr<InferRequestProvider>& request_provider,
+    const std::shared_ptr<InferenceRequest>& request,
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(const Status&)> OnComplete)
 {
   std::shared_ptr<EnsembleContext> context(new EnsembleContext(
-      is_, info_.get(), stats, request_provider, response_provider, OnComplete,
+      is_, info_.get(), stats, request, response_provider, OnComplete,
       stream_));
   EnsembleContext::Proceed(context);
 }

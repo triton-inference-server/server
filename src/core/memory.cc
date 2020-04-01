@@ -64,6 +64,7 @@ MemoryReference::AddBuffer(
     int64_t memory_type_id)
 {
   total_byte_size_ += byte_size;
+  buffer_count_++;
   buffer_.emplace_back(buffer, byte_size, memory_type, memory_type_id);
   return buffer_.size() - 1;
 }
@@ -78,6 +79,7 @@ MutableMemory::MutableMemory(
       memory_type_id_(memory_type_id)
 {
   total_byte_size_ = byte_size;
+  buffer_count_ = (byte_size == 0) ? 0 : 1;
 }
 
 const char*
@@ -101,8 +103,13 @@ char*
 MutableMemory::MutableBuffer(
     TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id)
 {
-  *memory_type = memory_type_;
-  *memory_type_id = memory_type_id_;
+  if (memory_type != nullptr) {
+    *memory_type = memory_type_;
+  }
+  if (memory_type_id != nullptr) {
+    *memory_type_id = memory_type_id_;
+  }
+
   return buffer_;
 }
 

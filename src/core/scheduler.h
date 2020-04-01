@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -48,7 +48,7 @@ class Scheduler {
     Payload(const Payload& payload) = delete;
     Payload(Payload&& payload)
         : stats_(std::move(payload.stats_)),
-          request_provider_(std::move(payload.request_provider_)),
+          request_(std::move(payload.request_)),
           response_provider_(std::move(payload.response_provider_)),
           complete_function_(std::move(payload.complete_function_)),
           status_(payload.status_)
@@ -56,10 +56,10 @@ class Scheduler {
     }
     Payload(
         const std::shared_ptr<ModelInferStats>& stats,
-        const std::shared_ptr<InferRequestProvider>& request_provider,
+        const std::shared_ptr<InferenceRequest>& request,
         const std::shared_ptr<InferResponseProvider>& response_provider,
         const std::function<void(const Status&)> complete_function)
-        : stats_(stats), request_provider_(request_provider),
+        : stats_(stats), request_(request),
           response_provider_(response_provider),
           complete_function_(complete_function), status_(Status::Success)
     {
@@ -68,7 +68,7 @@ class Scheduler {
     Payload& operator=(Payload&& payload)
     {
       stats_ = std::move(payload.stats_);
-      request_provider_ = std::move(payload.request_provider_);
+      request_ = std::move(payload.request_);
       response_provider_ = std::move(payload.response_provider_);
       complete_function_ = std::move(payload.complete_function_);
       status_ = payload.status_;
@@ -76,7 +76,7 @@ class Scheduler {
     }
 
     std::shared_ptr<ModelInferStats> stats_;
-    std::shared_ptr<InferRequestProvider> request_provider_;
+    std::shared_ptr<InferenceRequest> request_;
     std::shared_ptr<InferResponseProvider> response_provider_;
     std::function<void(const Status&)> complete_function_;
     Status status_;
@@ -123,7 +123,7 @@ class Scheduler {
   // Enqueue a request with the scheduler.
   virtual void Enqueue(
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const std::shared_ptr<InferenceRequest>& request,
       const std::shared_ptr<InferResponseProvider>& response_provider,
       std::function<void(const Status&)> OnComplete) = 0;
 };

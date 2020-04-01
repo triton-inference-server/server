@@ -32,6 +32,7 @@
 #include "src/core/infer_request.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
+#include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/nvtx.h"
 #include "src/core/request_status.pb.h"
@@ -44,43 +45,6 @@
 namespace ni = nvidia::inferenceserver;
 
 namespace {
-
-const char*
-GetDataTypeProtocolString(const ni::DataType dtype)
-{
-  switch (dtype) {
-    case ni::DataType::TYPE_BOOL:
-      return "BOOL";
-    case ni::DataType::TYPE_UINT8:
-      return "UINT8";
-    case ni::DataType::TYPE_UINT16:
-      return "UINT16";
-    case ni::DataType::TYPE_UINT32:
-      return "UINT32";
-    case ni::DataType::TYPE_UINT64:
-      return "UINT64";
-    case ni::DataType::TYPE_INT8:
-      return "INT8";
-    case ni::DataType::TYPE_INT16:
-      return "INT16";
-    case ni::DataType::TYPE_INT32:
-      return "INT32";
-    case ni::DataType::TYPE_INT64:
-      return "INT64";
-    case ni::DataType::TYPE_FP16:
-      return "FP16";
-    case ni::DataType::TYPE_FP32:
-      return "FP32";
-    case ni::DataType::TYPE_FP64:
-      return "FP64";
-    case ni::DataType::TYPE_STRING:
-      return "BYTES";
-    default:
-      break;
-  }
-
-  return "";
-}
 
 //
 // TrtServerError
@@ -1802,10 +1766,6 @@ TRTSERVER_ServerInferAsync(
   auto infer_stats = std::make_shared<ni::ModelInferStats>();
 #endif  // TRTIS_ENABLE_STATS
 
-  std::shared_ptr<ni::InferRequestProvider> infer_request_provider;
-  RETURN_IF_STATUS_ERROR(
-      ni::InferRequestProvider::Create(lrequest, &infer_request_provider));
-
   std::shared_ptr<ni::InferResponseProvider> infer_response_provider;
   {
     std::shared_ptr<ni::InferResponseProvider> del_response_provider;
@@ -1823,7 +1783,7 @@ TRTSERVER_ServerInferAsync(
 #endif  // TRTIS_ENABLE_GRPC_V2
 
   lserver->InferAsync(
-      lbackend, infer_request_provider, infer_response_provider, infer_stats,
+      lbackend, lrequest, infer_response_provider, infer_stats,
       [infer_stats, id_str, trace_manager, infer_response_provider, server,
        complete_fn, complete_userp](const ni::Status& status) mutable {
         if (!status.IsOk()) {
@@ -2003,8 +1963,8 @@ TRTSERVER2_InferenceRequestAddInput(
 {
   TrtInferenceRequest* lrequest =
       reinterpret_cast<TrtInferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(
-      lrequest->Request()->AddOriginalInput(name, datatype, shape, dim_count));
+  RETURN_IF_STATUS_ERROR(lrequest->Request()->AddOriginalInput(
+      name, ni::ProtocolStringToDataType(datatype), shape, dim_count));
   return nullptr;  // Success
 }
 
@@ -2139,7 +2099,7 @@ TRTSERVER2_InferenceRequestOutputDataType(
   const auto& response_header = lrequest->Response()->ResponseHeader();
   for (const auto& output : response_header.output()) {
     if (output.name() == name) {
-      *datatype = GetDataTypeProtocolString(output.data_type());
+      *datatype = ni::DataTypeToProtocolString(output.data_type());
       return nullptr;  // Success
     }
   }
@@ -2277,10 +2237,6 @@ TRTSERVER2_ServerInferAsync(
   auto infer_stats = std::make_shared<ni::ModelInferStats>();
 #endif  // TRTIS_ENABLE_STATS
 
-  std::shared_ptr<ni::InferRequestProvider> infer_request_provider;
-  RETURN_IF_STATUS_ERROR(
-      ni::InferRequestProvider::Create(lrequest, &infer_request_provider));
-
   std::shared_ptr<ni::InferResponseProvider> infer_response_provider;
   {
     std::shared_ptr<ni::InferResponseProvider> del_response_provider;
@@ -2292,7 +2248,7 @@ TRTSERVER2_ServerInferAsync(
   }
 
   lserver->InferAsync(
-      lbackend, infer_request_provider, infer_response_provider, infer_stats,
+      lbackend, lrequest, infer_response_provider, infer_stats,
       [infer_stats, trace_manager, ltrtrequest, infer_response_provider, server,
        complete_fn, complete_userp](const ni::Status& status) mutable {
         if (!status.IsOk()) {

@@ -28,6 +28,7 @@
 
 #include <deque>
 #include "src/core/backend.h"
+#include "src/core/logging.h"
 #include "src/core/server.h"
 #include "src/core/status.h"
 
@@ -91,6 +92,21 @@ InferenceRequest::MutableOriginalInput(
 }
 
 Status
+InferenceRequest::ImmutableInput(
+    const std::string& name, const InferenceRequest::Input** input) const
+{
+  auto itr = inputs_.find(name);
+  if (itr == inputs_.end()) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "input '" + name + "' does not exist in request");
+  }
+
+  *input = itr->second;
+  return Status::Success;
+}
+
+Status
 InferenceRequest::MutableRequestedOutput(
     const std::string& name, RequestedOutput** output)
 {
@@ -117,20 +133,7 @@ InferenceRequest::AddOriginalInput(
     lshape.push_back(d);
   }
 
-  const auto& pr = original_inputs_.emplace(std::make_pair(
-      name, InferenceRequest::Input(name, lshape, batch_byte_size)));
-  if (!pr.second) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "input '" + name + "' already exists in request");
-  }
-
-  if (input != nullptr) {
-    *input = std::addressof(pr.first->second);
-  }
-
-  needs_normalization_ = true;
-  return Status::Success;
+  return AddOriginalInput(name, lshape, batch_byte_size, input);
 }
 
 Status
@@ -146,6 +149,8 @@ InferenceRequest::AddOriginalInput(
         "input '" + name + "' already exists in request");
   }
 
+  LOG_VERBOSE(1) << "add original input: " << *this;
+
   if (input != nullptr) {
     *input = std::addressof(pr.first->second);
   }
@@ -156,7 +161,7 @@ InferenceRequest::AddOriginalInput(
 
 Status
 InferenceRequest::AddOriginalInput(
-    const std::string& name, const std::string& datatype, const int64_t* shape,
+    const std::string& name, const DataType datatype, const int64_t* shape,
     const uint64_t dim_count, InferenceRequest::Input** input)
 {
   const auto& pr = original_inputs_.emplace(std::make_pair(
@@ -166,6 +171,8 @@ InferenceRequest::AddOriginalInput(
         RequestStatusCode::INVALID_ARG,
         "input '" + name + "' already exists in request");
   }
+
+  LOG_VERBOSE(1) << "add original input: " << *this;
 
   if (input != nullptr) {
     *input = std::addressof(pr.first->second);
@@ -193,6 +200,49 @@ InferenceRequest::RemoveAllOriginalInputs()
 {
   original_inputs_.clear();
   needs_normalization_ = true;
+  return Status::Success;
+}
+
+Status
+InferenceRequest::AddOverrideInput(
+    const std::string& name, const DataType datatype,
+    const std::vector<int64_t>& shape, const uint64_t batch_byte_size,
+    std::shared_ptr<InferenceRequest::Input>* input)
+{
+  std::shared_ptr<Input> i =
+      std::make_shared<Input>(name, datatype, shape, batch_byte_size);
+  *(i->MutableShape()) = i->OriginalShape();
+
+  RETURN_IF_ERROR(AddOverrideInput(i));
+  if (input != nullptr) {
+    *input = std::move(i);
+  }
+
+  return Status::Success;
+}
+
+Status
+InferenceRequest::AddOverrideInput(
+    const std::shared_ptr<InferenceRequest::Input>& input)
+{
+  LOG_VERBOSE(1) << "adding input override for " << input->Name() << ": "
+                 << *this;
+
+  const auto& pr =
+      override_inputs_.emplace(std::make_pair(input->Name(), input));
+  if (!pr.second) {
+    pr.first->second = input;
+  }
+
+  // Add or replace this override in the inputs...
+  const auto res = inputs_.emplace(std::make_pair(input->Name(), input.get()));
+  if (!res.second) {
+    res.first->second = input.get();
+  }
+
+  LOG_VERBOSE(1) << "added input override for " << input->Name() << ": "
+                 << *this;
+
   return Status::Success;
 }
 
@@ -236,10 +286,10 @@ InferenceRequest::RemoveAllRequestedOutputs()
 Status
 InferenceRequest::PrepareForInference(const InferenceBackend& backend)
 {
-  // Prepare all inputs...
-  for (auto& pr : original_inputs_) {
-    pr.second.PrepareForInference();
-  }
+  // Remove override inputs as those are added during any previous
+  // inference execution.
+  inputs_.clear();
+  override_inputs_.clear();
 
   // If anything has potentially changed in the inference request then
   // need to renormalize.
@@ -252,6 +302,15 @@ InferenceRequest::PrepareForInference(const InferenceBackend& backend)
 
     needs_normalization_ = false;
   }
+
+  // Initially show the actual inputs to be only the original
+  // inputs. If overrides are added later they will be added to
+  // inputs_.
+  for (auto& pr : original_inputs_) {
+    inputs_.emplace(std::make_pair(pr.first, std::addressof(pr.second)));
+  }
+
+  LOG_VERBOSE(1) << "prepared: " << *this;
 
   return Status::Success;
 }
@@ -301,11 +360,13 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
             " inputs for model '" + model_name_ + "'");
   }
 
-  // Update each input to have shape and batch-byte-size.
+  // Update each input to have shape, datatype and batch-byte-size.
   for (auto& pr : original_inputs_) {
     const ModelInput* input_config;
     RETURN_IF_ERROR(backend.GetInput(pr.first, &input_config));
     auto& input = pr.second;
+
+    input.SetDType(input_config->data_type());
 
     auto new_shape = input.MutableShape();
     *new_shape = input.OriginalShape();
@@ -431,8 +492,6 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
     priority_ = backend.DefaultPriorityLevel();
   }
 
-  // FIXME check datatype for match
-
   // Validate if the requested output name exists in the model configuration
   for (const auto& pr : requested_outputs_) {
     const ModelOutput* output_config;
@@ -518,6 +577,23 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
     auto& input = pr.second;
     auto shape = input.MutableShape();
 
+    // FIXMEV2 Can't have this check until the GRPCV2 and HTTPV2
+    // endpoints switch to new TRITONSERVER APIs where they always
+    // specify datatype.
+#if 0
+    if (input.DType() != input_config->data_type()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "inference input data-type is '" +
+              std::string(DataTypeToProtocolString(input.DType())) +
+              "', model expects '" +
+              std::string(DataTypeToProtocolString(input_config->data_type())) +
+              "' for '" + model_name_ + "'");
+    }
+#else
+    input.SetDType(input_config->data_type());
+#endif
+
     if (!CompareDimsWithWildcard(input_config->dims(), *shape)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
@@ -568,6 +644,8 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
 //
 // Input
 //
+InferenceRequest::Input::Input() : batch_byte_size_(0) {}
+
 InferenceRequest::Input::Input(
     const std::string& name, const std::vector<int64_t>& shape,
     const uint64_t batch_byte_size)
@@ -576,18 +654,21 @@ InferenceRequest::Input::Input(
 }
 
 InferenceRequest::Input::Input(
-    const std::string& name, const std::string& datatype, const int64_t* shape,
+    const std::string& name, const DataType datatype, const int64_t* shape,
     const uint64_t dim_count)
     : name_(name), datatype_(datatype),
       original_shape_(shape, shape + dim_count), batch_byte_size_(0)
 {
 }
 
-void
-InferenceRequest::Input::PrepareForInference()
+InferenceRequest::Input::Input(
+    const std::string& name, const DataType datatype,
+    const std::vector<int64_t>& shape, const uint64_t batch_byte_size)
+    : name_(name), datatype_(datatype), original_shape_(shape),
+      batch_byte_size_(batch_byte_size)
 {
-  data_idx_ = 0;
 }
+
 
 Status
 InferenceRequest::Input::AppendData(
@@ -637,17 +718,17 @@ InferenceRequest::Input::RemoveAllData()
 }
 
 Status
-InferenceRequest::Input::NextContent(
-    const void** content, size_t* content_byte_size,
-    TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id)
+InferenceRequest::Input::Content(
+    const size_t idx, const void** content, size_t* content_byte_size,
+    TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const
 {
   if (*content_byte_size == 0) {
     *content = nullptr;
     return Status::Success;
   }
 
-  *content = data_->BufferAt(
-      data_idx_++, content_byte_size, memory_type, memory_type_id);
+  *content =
+      data_->BufferAt(idx, content_byte_size, memory_type, memory_type_id);
 
   return Status::Success;
 }
@@ -659,6 +740,61 @@ InferenceRequest::RequestedOutput::RequestedOutput(
     const std::string& name, const uint32_t classification_cnt)
     : name_(name), classification_cnt_(classification_cnt)
 {
+}
+
+std::ostream&
+operator<<(std::ostream& out, const InferenceRequest& request)
+{
+  out << "[0x" << std::addressof(request) << "] "
+      << "request id: " << request.IdStr() << ", model: " << request.ModelName()
+      << ", requested version: " << request.RequestedModelVersion()
+      << ", actual version: " << request.ActualModelVersion() << ", flags: 0x"
+      << std::hex << request.Flags() << std::dec
+      << ", correlation id: " << request.CorrelationId()
+      << ", batch size: " << request.BatchSize()
+      << ", priority: " << request.Priority()
+      << ", timeout (us): " << request.TimeoutMicroseconds() << std::endl;
+
+  out << "original inputs:" << std::endl;
+  for (const auto& itr : request.OriginalInputs()) {
+    out << "[0x" << std::addressof(itr.second) << "] " << itr.second
+        << std::endl;
+  }
+
+  out << "override inputs:" << std::endl;
+  for (const auto& itr : request.OverrideInputs()) {
+    out << "[0x" << itr.second.get() << "] " << *itr.second << std::endl;
+  }
+
+  out << "inputs:" << std::endl;
+  for (const auto& itr : request.ImmutableInputs()) {
+    out << "[0x" << itr.second << "] " << *itr.second << std::endl;
+  }
+
+  out << "requested outputs:" << std::endl;
+  for (const auto& itr : request.RequestedOutputs()) {
+    out << itr.second << std::endl;
+  }
+
+  return out;
+}
+
+std::ostream&
+operator<<(std::ostream& out, const InferenceRequest::Input& input)
+{
+  out << "input: " << input.Name()
+      << ", type: " << DataTypeToProtocolString(input.DType())
+      << ", original shape: " << DimsListToString(input.OriginalShape())
+      << ", shape: " << DimsListToString(input.Shape());
+  return out;
+}
+
+std::ostream&
+operator<<(std::ostream& out, const InferenceRequest::RequestedOutput& output)
+{
+  out << "requested output: " << output.Name()
+      << ", class count: " << output.ClassificationCount();
+  return out;
 }
 
 }}  // namespace nvidia::inferenceserver
