@@ -31,6 +31,7 @@ from urllib.parse import quote, quote_plus
 import rapidjson as json
 import numpy as np
 import gevent.pool
+import sys
 
 from tritonhttpclient.utils import *
 
@@ -99,6 +100,7 @@ def _get_inference_request(inputs, request_id, outputs, sequence_id,
 
     return infer_request
 
+
 class InferenceServerClient:
     """An InferenceServerClient object is used to perform any kind of
     communication with the InferenceServer using http protocol.
@@ -130,7 +132,6 @@ class InferenceServerClient:
             If unable to create a client.
 
     """
-
     def __init__(self,
                  url,
                  connection_count=1,
@@ -188,7 +189,6 @@ class InferenceServerClient:
             response = self._client_stub.get(request_uri, headers=headers)
         else:
             response = self._client_stub.get(request_uri)
-            
 
         return response
 
@@ -400,7 +400,6 @@ class InferenceServerClient:
                 quote(model_name), model_version)
         else:
             request_uri = "v2/models/{}".format(quote(model_name))
-            
 
         response = self._get(request_uri=request_uri,
                              headers=headers,
@@ -802,7 +801,6 @@ class InferenceServerClient:
                 quote(name))
         else:
             request_uri = "v2/cudasharedmemory/unregister"
-            
 
         response = self._post(request_uri=request_uri,
                               request_body="",
@@ -900,18 +898,30 @@ class InferenceServerClient:
                                                timeout=timeout)
 
         request_body = json.dumps(infer_request)
+        json_size = sys.getsizeof(request_body)
+        has_binary_data = False
+        for input_tensor in inputs:
+            raw_data = input_tensor._get_binary_data()
+            if raw_data is not None:
+                request_body = request_body + raw_data.decode()
+                has_binary_data = True
+
+        if has_binary_data:
+            if headers is None:
+                headers = {}
+            headers["Inference-Header-Content-Length"] = json_size
+
         if model_version != "":
             request_uri = "v2/models/{}/versions/{}/infer".format(
                 quote(model_name), model_version)
         else:
             request_uri = "v2/models/{}/infer".format(quote(model_name))
-            
 
         response = self._post(request_uri=request_uri,
                               request_body=request_body,
                               headers=headers,
                               query_params=query_params)
-        result = InferResult(response.read())
+        result = InferResult(response)
 
         return result
 
@@ -996,13 +1006,11 @@ class InferenceServerClient:
         InferenceServerException
             If server fails to issue inference.
         """
-
         def wrapped_post(request_uri, request_body, headers, query_params):
             return self._post(request_uri, request_body, headers, query_params)
 
         def wrapped_callback(response):
-            callback(result=InferResult(response.read()),
-                     error=_get_error(response))
+            callback(result=InferResult(response), error=_get_error(response))
 
         infer_request = _get_inference_request(inputs=inputs,
                                                request_id=request_id,
@@ -1014,12 +1022,25 @@ class InferenceServerClient:
                                                timeout=timeout)
 
         request_body = json.dumps(infer_request)
+
+        json_size = sys.getsizeof(request_body)
+        has_binary_data = False
+        for input_tensor in inputs:
+            raw_data = input_tensor._get_binary_data()
+            if raw_data is not None:
+                request_body = request_body + raw_data.decode()
+                has_binary_data = True
+
+        if has_binary_data:
+            if headers is None:
+                headers = {}
+            headers["Inference-Header-Content-Length"] = json_size
+
         if model_version != "":
             request_uri = "v2/models/{}/versions/{}/infer".format(
                 quote(model_name), model_version)
         else:
             request_uri = "v2/models/{}/infer".format(quote(model_name))
-            
 
         g = self._pool.apply_async(
             wrapped_post, (request_uri, request_body, headers, query_params),
@@ -1041,13 +1062,13 @@ class InferInput:
     datatype : str
         The datatype of the associated input.
     """
-
     def __init__(self, name, shape, datatype):
         self._name = name
         self._shape = shape
         self._datatype = datatype
         self._parameters = {}
         self._data = None
+        self._raw_data = None
 
     def name(self):
         """Get the name of input associated with this object.
@@ -1079,7 +1100,7 @@ class InferInput:
         """
         return self._datatype
 
-    def set_data_from_numpy(self, input_tensor):
+    def set_data_from_numpy(self, input_tensor, binary_data=True):
         """Set the tensor data from the specified numpy array for
         input associated with this object.
 
@@ -1087,13 +1108,18 @@ class InferInput:
         ----------
         input_tensor : numpy array
             The tensor data in numpy array format
+        binary_data : bool
+            Indicates whether to set data for the input in binary format
+            or explicit tensor within JSON. The default value is True,
+            which means the data will be delivered as binary data in the
+            HTTP body after the JSON object.
             
         Raises
         ------
         InferenceServerException
             If failed to set data for the tensor.
         """
-        if not isinstance(input_tensor, (np.ndarray,)):
+        if not isinstance(input_tensor, (np.ndarray, )):
             raise_error("input_tensor must be a numpy array")
         dtype = np_to_triton_dtype(input_tensor.dtype)
         if self._datatype != dtype:
@@ -1111,8 +1137,14 @@ class InferInput:
                 "got unexpected numpy array shape [{}], expected [{}]".format(
                     str(input_tensor.shape)[1:-1],
                     str(self._shape)[1:-1]))
-        # FIXMEV2 Use Binary data when support available on the server.
-        self._data = [val.item() for val in input_tensor.flatten()]
+        if not binary_data:
+            self._data = [val.item() for val in input_tensor.flatten()]
+        else:
+            if self._datatype == "BYTES":
+                self._raw_data = serialize_byte_tensor(input_tensor).tobytes()
+            else:
+                self._raw_data = input_tensor.tobytes()
+            self._parameters['binary_data_size'] = len(self._raw_data)
 
     def set_shared_memory(self, region_name, byte_size, offset=0):
         """Set the tensor data from the specified shared memory region.
@@ -1132,6 +1164,16 @@ class InferInput:
         self._parameters['shared_memory_byte_size'] = byte_size
         if offset != 0:
             self._parameters['shared_memory_offset'].int64_param = offset
+
+    def _get_binary_data(self):
+        """Returns the raw binary data if available
+
+        Returns
+        -------
+        bytes
+            The raw data for the input tensor
+        """
+        return self._raw_data
 
     def _get_tensor(self):
         """Retrieve the underlying input as json dict.
@@ -1157,18 +1199,23 @@ class InferOutput:
     Parameters
     ----------
     name : str
-        The name of output tensor to associate with this object
+        The name of output tensor to associate with this object.
+    binary_data : bool
+        Indicates whether to return result data for the output in
+        binary format or explicit tensor within JSON. The default
+        value is True, which means the data will be delivered as
+        binary data in the HTTP body after JSON object.
     class_count : int
         The number of classifications to be requested. The default
         value is 0 which means the classification results are not 
         requested.
     """
-
-    def __init__(self, name, class_count=0):
+    def __init__(self, name, binary_data=True, class_count=0):
         self._name = name
         self._parameters = {}
         if class_count != 0:
             self._parameters['classification'] = class_count
+        self._parameters['binary_data'] = binary_data
 
     def name(self):
         """Get the name of output associated with this object.
@@ -1222,9 +1269,22 @@ class InferResult:
     result : dict
         The inference response from the server
     """
+    def __init__(self, response):
+        header_length = response.get('Inference-Header-Content-Length')
+        self._result = json.loads(response.read(length=header_length))
 
-    def __init__(self, result):
-        self._result = json.loads(result)
+        if header_length is not None:
+            # Maps the output name to the index in buffer for quick retrieval
+            self._output_name_to_buffer_map = {}
+            # Read the remaining data off the response body.
+            self._buffer = response.read()
+            buffer_index = 0
+            for output in self._result['ouputs']:
+                this_data_size = output.parameters.get("binary_data_size")
+                if this_data_size is not None:
+                    self._output_name_to_buffer_map[
+                        output['name']] = buffer_index
+                    buffer_index = buffer_index + this_data_size
 
     def as_numpy(self, name):
         """Get the tensor data for output associated with this object
@@ -1244,9 +1304,29 @@ class InferResult:
         for output in self._result['outputs']:
             if output['name'] == name:
                 datatype = output['datatype']
-                # FIXME: Add the support for binary data when available with server
-                np_array = np.array(output['data'],
+                has_binary_data = False
+                parameters = output.get("parameters")
+                if parameters is not None:
+                    this_data_size = parameters.get("binary_data_size")
+                    if this_data_size is not None:
+                        has_binary_data = True
+                        if this_data_size != 0:
+                            start_index = self._output_name_to_buffer_map[name]
+                            end_index = start_index + this_data_size
+                            if datatype == 'BYTES':
+                                # String results contain a 4-byte string length
+                                # followed by the actual string characters. Hence,
+                                # need to decode the raw bytes to convert into
+                                # array elements.
+                                np_array = deserialize_bytes_tensor(
+                                    self._buffer[start_index:end_index])
+                            else:
+                                np_array = np.frombuffer(
+                                    self._buffer[start_index:end_index],
                                     dtype=triton_to_np_dtype(datatype))
+                if not has_binary_data:
+                    np_array = np.array(output['data'],
+                                        dtype=triton_to_np_dtype(datatype))
                 np.resize(np_array, output['shape'])
                 return np_array
         return None
