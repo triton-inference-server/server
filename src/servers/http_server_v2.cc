@@ -652,19 +652,28 @@ void
 WriteDataToJsonHelper(
     rapidjson::Value* response_output_val,
     rapidjson::Document::AllocatorType& allocator,
-    const rapidjson::Value& shape, int shape_index, T* base, int* counter)
+    const rapidjson::Value& shape, int shape_index, T* base, int* counter,
+    const DataType dtype)
 {
   for (int i = 0; i < shape[shape_index].GetInt(); i++) {
     if ((shape_index + 1) != (int)shape.Size()) {
       rapidjson::Value response_output_array(rapidjson::kArrayType);
       WriteDataToJsonHelper(
           &response_output_array, allocator, shape, shape_index + 1, base,
-          counter);
+          counter, dtype);
       response_output_val->PushBack(response_output_array, allocator);
     } else {
-      rapidjson::Value data_val((T)(base[*counter]));
-      response_output_val->PushBack(data_val, allocator);
-      *counter += 1;
+      if (dtype != TYPE_STRING) {
+        rapidjson::Value data_val((T)(base[*counter]));
+        response_output_val->PushBack(data_val, allocator);
+        *counter += 1;
+      } else {
+        uint32_t* len = reinterpret_cast<uint32_t*>(base + *counter);
+        char* cstr =
+            reinterpret_cast<char*>(base + *counter + sizeof(uint32_t));
+        rapidjson::Value data_val(cstr, *len, allocator);
+        *counter += *len + sizeof(uint32_t);
+      }
     }
   }
 }
@@ -686,53 +695,53 @@ WriteDataToJson(
       case TYPE_BOOL: {
         uint8_t* bool_base = reinterpret_cast<uint8_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, bool_base, &counter);
+            &data_val, allocator, shape, 1, bool_base, &counter, dtype);
         break;
       }
       case TYPE_UINT8: {
         uint8_t* uint8_t_base = reinterpret_cast<uint8_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, uint8_t_base, &counter);
+            &data_val, allocator, shape, 1, uint8_t_base, &counter, dtype);
         break;
       }
       case TYPE_UINT16: {
         uint16_t* uint16_t_base = reinterpret_cast<uint16_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, uint16_t_base, &counter);
+            &data_val, allocator, shape, 1, uint16_t_base, &counter, dtype);
         break;
       }
       case TYPE_UINT32: {
         uint32_t* uint32_t_base = reinterpret_cast<uint32_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, uint32_t_base, &counter);
+            &data_val, allocator, shape, 1, uint32_t_base, &counter, dtype);
         break;
       }
       case TYPE_UINT64: {
         uint64_t* uint64_t_base = reinterpret_cast<uint64_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, uint64_t_base, &counter);
+            &data_val, allocator, shape, 1, uint64_t_base, &counter, dtype);
         break;
       }
       case TYPE_INT8: {
         int8_t* int8_t_base = reinterpret_cast<int8_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, int8_t_base, &counter);
+            &data_val, allocator, shape, 1, int8_t_base, &counter, dtype);
       } break;
       case TYPE_INT16: {
         int16_t* int16_t_base = reinterpret_cast<int16_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, int16_t_base, &counter);
+            &data_val, allocator, shape, 1, int16_t_base, &counter, dtype);
       } break;
       case TYPE_INT32: {
         int32_t* int32_t_base = reinterpret_cast<int32_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, int32_t_base, &counter);
+            &data_val, allocator, shape, 1, int32_t_base, &counter, dtype);
         break;
       }
       case TYPE_INT64: {
         int64_t* int64_t_base = reinterpret_cast<int64_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, int64_t_base, &counter);
+            &data_val, allocator, shape, 1, int64_t_base, &counter, dtype);
         break;
       }
       // FP16 not supported via JSON
@@ -748,18 +757,21 @@ WriteDataToJson(
       case TYPE_FP32: {
         float* float_base = reinterpret_cast<float*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, float_base, &counter);
+            &data_val, allocator, shape, 1, float_base, &counter, dtype);
         break;
       }
       case TYPE_FP64: {
         double* double_base = reinterpret_cast<double*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, double_base, &counter);
+            &data_val, allocator, shape, 1, double_base, &counter, dtype);
         break;
       }
-      // BYTES (String) needs a work around
-      case TYPE_STRING:
+      case TYPE_STRING: {
+        char* char_base = reinterpret_cast<char*>(base);
+        WriteDataToJsonHelper(
+            &data_val, allocator, shape, 1, char_base, &counter, dtype);
         break;
+      }
       case TYPE_INVALID: {
         break;
       }
