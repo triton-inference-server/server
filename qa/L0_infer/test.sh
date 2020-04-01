@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -55,7 +55,7 @@ rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 RET=0
 
 # Verify the flag is set only on CPU-only device
-if [ "$TENSORRT_SERVER_CPU_ONLY" == "1" ]; then
+if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
     gpu_count=`nvidia-smi -L | grep GPU | wc -l`
     if [ "$gpu_count" -ne 0 ]; then
     echo -e "\n***\n*** Running on a device with GPU\n***"
@@ -71,7 +71,7 @@ BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
 ENSEMBLES=${ENSEMBLES:="1"}
 
 for TARGET in cpu gpu; do
-    if [ "$TENSORRT_SERVER_CPU_ONLY" == "1" ]; then
+    if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
         if [ "$TARGET" == "gpu" ]; then
             echo -e "Skip GPU testing on CPU-only device"
             continue

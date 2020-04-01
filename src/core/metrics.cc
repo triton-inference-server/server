@@ -133,7 +133,7 @@ Metrics::EnableGPUMetrics()
     return;
   }
 
-  if (std::getenv("TENSORRT_SERVER_CPU_ONLY") == nullptr) {
+  if (std::getenv("TRITON_SERVER_CPU_ONLY") == nullptr) {
     singleton->InitializeNvmlMetrics();
   }
 

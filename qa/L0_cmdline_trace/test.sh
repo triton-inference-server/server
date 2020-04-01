@@ -28,7 +28,7 @@
 SIMPLE_CLIENT=../clients/simple_client
 TRACE_SUMMARY=../common/trace_summary.py
 
-REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi

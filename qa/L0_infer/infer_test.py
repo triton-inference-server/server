@@ -36,7 +36,7 @@ import os
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
-CPU_ONLY = (os.environ.get('TENSORRT_SERVER_CPU_ONLY') is not None)
+CPU_ONLY = (os.environ.get('TRITON_SERVER_CPU_ONLY') is not None)
 BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel netdef onnx libtorch plan custom")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 

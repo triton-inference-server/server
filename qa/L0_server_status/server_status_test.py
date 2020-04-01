@@ -51,7 +51,7 @@ class ServerStatusTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 model_name0 = "graphdef_int32_int8_int8"
                 server_status0, req_id0 = _get_server_status(pair[0], pair[1], model_name0)
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"],
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
                                 server_status0.version)
                 self.assertEqual("inference:0", server_status0.id)
                 uptime0 = server_status0.uptime_ns
@@ -62,7 +62,7 @@ class ServerStatusTest(unittest.TestCase):
 
                 model_name1 = "graphdef_float32_float32_float32"
                 server_status1, req_id1 = _get_server_status(pair[0], pair[1], model_name1)
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"],
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
                                 server_status1.version)
                 self.assertEqual("inference:0", server_status1.id)
                 uptime1 = server_status1.uptime_ns
@@ -74,7 +74,7 @@ class ServerStatusTest(unittest.TestCase):
                 self.assertNotEqual(req_id0, req_id1)
 
                 server_status2, req_id2 = _get_server_status(pair[0], pair[1])
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"],
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
                                 server_status2.version)
                 self.assertEqual("inference:0", server_status2.id)
                 uptime2 = server_status2.uptime_ns

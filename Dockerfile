@@ -306,6 +306,8 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
 ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
+ENV TRITON_SERVER_VERSION ${TRTIS_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
 ENV PATH /opt/tritonserver/bin:${PATH}
 
 COPY nvidia_entrypoint.sh /opt/tritonserver
@@ -321,7 +323,9 @@ ARG TRTIS_CONTAINER_VERSION=20.05dev
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
 ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
-LABEL com.nvidia.tritonserver.version="${TENSORRT_SERVER_VERSION}"
+ENV TRITON_SERVER_VERSION ${TRTIS_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
+LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 
 ENV PATH /opt/tritonserver/bin:${PATH}
 
@@ -338,10 +342,11 @@ ENV MKL_THREADING_LAYER GNU
 # non-root. Make sure that this user to given ID 1000. All server
 # artifacts copied below are assign to this user.
 ENV TENSORRT_SERVER_USER=triton-server
-RUN id -u $TENSORRT_SERVER_USER > /dev/null 2>&1 || \
-    useradd $TENSORRT_SERVER_USER && \
-    [ `id -u $TENSORRT_SERVER_USER` -eq 1000 ] && \
-    [ `id -g $TENSORRT_SERVER_USER` -eq 1000 ]
+ENV TRITON_SERVER_USER=triton-server
+RUN id -u $TRITON_SERVER_USER > /dev/null 2>&1 || \
+    useradd $TRITON_SERVER_USER && \
+    [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \
+    [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl is needed for GCS
