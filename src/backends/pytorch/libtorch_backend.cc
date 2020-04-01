@@ -588,12 +588,43 @@ LibTorchBackend::Context::Run(
   std::vector<torch::Tensor> outputs_;
   std::vector<InputInfo> inputs;
 
-  // Inputs from the request...
+  // Collect input metadata. FIXME override inputs from controls
+  // should be known from the model configuration at load time and so
+  // they should be processed then to initialze
+  // input_index_map_. Since they are not we do it here for every
+  // request which is unnecessary perf overhead.
   bool cuda_copy = false;
   for (const auto& pr : repr_input_request->ImmutableInputs()) {
     const InferenceRequest::Input* input = pr.second;
     const std::string& name = input->Name();
-    int ip_index = input_index_map_[name];
+    int ip_index;
+
+    const auto& itr = input_index_map_.find(name);
+    if (itr != input_index_map_.end()) {
+      ip_index = itr->second;
+    } else {
+      static const std::string deliminator = "__";
+
+      LOG_VERBOSE(1) << "Processing override input: " << name;
+
+      try {
+        int start_pos = name.find(deliminator);
+        if (start_pos == -1) {
+          throw std::invalid_argument(
+              "Input '" + name +
+              "' does not follow naming convention i.e. <name>__<index>.");
+        }
+        ip_index = std::atoi(name.substr(start_pos + 2).c_str());
+      }
+      catch (std::exception& ex) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "Input '" + name +
+                "' does not follow naming convention i.e. <name>__<index>.");
+      }
+
+      input_index_map_[name] = ip_index;
+    }
 
     RETURN_IF_ERROR(SetInputMetaData(
         name, input->DType(), input->Shape(), total_batch_size, payloads,
