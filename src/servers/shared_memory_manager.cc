@@ -502,8 +502,8 @@ SharedMemoryManager::GetStatusV2(
               .c_str());
     }
 
-    if (it->second->kind_ == memory_type) {
-      if (memory_type == TRTSERVER_MEMORY_GPU) {
+    if (it->second->kind_ != memory_type) {
+      if (it->second->kind_ == TRTSERVER_MEMORY_GPU) {
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_NOT_FOUND, std::string(
                                            "The region named '" + name +
