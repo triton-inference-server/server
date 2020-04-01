@@ -38,7 +38,7 @@ fi
 SIMPLE_CLIENT=../clients/simple_client
 SIMPLE_SEQ_CLIENT=../clients/simple_sequence_client
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS=--model-repository=`pwd`/models
 source ../common/util.sh
 

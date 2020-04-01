@@ -42,7 +42,7 @@ INFER_TEST=infer_variable_test.py
 
 DATADIR=`pwd`/models
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh

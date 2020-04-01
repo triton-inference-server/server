@@ -38,7 +38,7 @@ fi
 CLIENT_LOG="./client.log"
 CLIENT=model_config_test.py
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_TIMEOUT=20
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh

@@ -42,7 +42,7 @@ CLIENT_TEST=client_test.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS=--model-repository=$DATADIR/qa_model_repository
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

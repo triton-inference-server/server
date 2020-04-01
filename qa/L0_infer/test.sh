@@ -43,7 +43,7 @@ INFER_TEST=infer_test.py
 MODELDIR=`pwd`/models
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
-SERVER=${OPTDIR}/tensorrtserver/bin/trtserver
+SERVER=${OPTDIR}/tensorrtserver/bin/tritonserver
 
 # Allow more time to exit. Ensemble brings in too many models
 SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120"

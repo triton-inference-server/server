@@ -51,7 +51,7 @@ TENSOR_SIZE=${TENSOR_SIZE:=1}
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 RESULTDIR=${RESULTDIR:=.}
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS=--model-repository=`pwd`/models
 source ../common/util.sh
 

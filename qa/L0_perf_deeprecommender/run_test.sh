@@ -33,7 +33,7 @@ REQUIRED_CONCURRENCY=${REQUIRED_CONCURRENCY:=0}
 PERF_CLIENT=../clients/perf_client
 REPORTER=../common/reporter.py
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS=--model-repository=`pwd`/models
 source ../common/util.sh
 

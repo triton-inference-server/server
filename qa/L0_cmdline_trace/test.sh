@@ -44,7 +44,7 @@ MODELBASE=graphdef_int32_int32_int32
 
 MODELSDIR=`pwd`/trace_models
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
 rm -f *.log

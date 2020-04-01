@@ -42,7 +42,7 @@ CLIENT_LOG_BASE="./client"
 DATADIR=`pwd`/models
 MODEL_SRCDIR=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 # Allow more time to exit. Ensemble brings in too many models
 SERVER_LOG_BASE="./inference_server.log"
 

@@ -48,7 +48,7 @@ rm -f *.log.*
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR --api-version 2"
 source ../common/util.sh
 

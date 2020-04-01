@@ -30,7 +30,7 @@ export CUDA_VISIBLE_DEVICES=0
 SIMPLE_CLIENT=../clients/simple_sequence_client
 SIMPLE_CLIENT_PY=../clients/simple_sequence_client.py
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
 rm -f *.log

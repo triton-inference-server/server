@@ -40,10 +40,10 @@ A simple example of the library API can be found at
 `src/servers/simple.cc
 <https://github.com/NVIDIA/triton-inference-server/blob/master/src/servers/simple.cc>`_. A
 more complicated example can be found in the files that make up the
-inference server executable, *trtserver*. The trtserver executable
+inference server executable, *tritonserver*. The tritonserver executable
 implements the HTTP and GRPC endpoints and uses the library API to
 communicate with the inference server. The primary files composing
-*trtserver* are `src/servers/main.cc
+*tritonserver* are `src/servers/main.cc
 <https://github.com/NVIDIA/triton-inference-server/blob/master/src/servers/main.cc>`_,
 `src/servers/grpc_server.cc
 <https://github.com/NVIDIA/triton-inference-server/blob/master/src/servers/grpc_server.cc>`_,

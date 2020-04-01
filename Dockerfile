@@ -374,7 +374,7 @@ COPY --chown=1000:1000 --from=trtserver_onnx /data/dldt/openvino_2019.3.376/LICE
 COPY --chown=1000:1000 --from=trtserver_onnx /workspace/onnxruntime/LICENSE LICENSE.onnxruntime
 COPY --chown=1000:1000 --from=trtserver_tf /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
 COPY --chown=1000:1000 --from=trtserver_pytorch /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
-COPY --chown=1000:1000 --from=trtserver_build /opt/tritonserver/bin/trtserver bin/
+COPY --chown=1000:1000 --from=trtserver_build /opt/tritonserver/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=trtserver_build /opt/tritonserver/lib lib
 COPY --chown=1000:1000 --from=trtserver_build /opt/tritonserver/include include
 
@@ -401,7 +401,7 @@ RUN apt-get update && \
 
 # Add some links for backwards compatibility for now...
 RUN cd /opt && ln -s tritonserver tensorrtserver && \
-    cd /opt/tritonserver/bin && ln -s trtserver tritonserver
+    cd /opt/tritonserver/bin && ln -s tritonserver trtserver
 
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \

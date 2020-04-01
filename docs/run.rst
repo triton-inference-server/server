@@ -100,7 +100,7 @@ Assuming the sample model repository is available in
 /path/to/model/repository, the following command runs the container
 you pulled from NGC or built locally::
 
-  $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tritonserver image name> trtserver --model-repository=/models
+  $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tritonserver image name> tritonserver --model-repository=/models
 
 Where *<tritonserver image name>* will be something like
 **nvcr.io/nvidia/tritonserver:20.03-py3** if you :ref:`pulled the
@@ -133,7 +133,7 @@ On a system without GPUs, the inference server should be run using
 docker instead of nvidia-docker, but is otherwise identical to what is
 described in :ref:`section-running-the-inference-server`::
 
-  $ docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tritonserver image name> trtserver --model-repository=/models
+  $ docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tritonserver image name> tritonserver --model-repository=/models
 
 Because a GPU is not available, the inference server will be unable to
 load any model configuration that requires a GPU or that specifies a
@@ -146,15 +146,15 @@ Running The Inference Server Without Docker
 -------------------------------------------
 
 After :ref:`building the inference server outside of Docker
-<section-building-the-server-with-cmake>`, the *trtserver* executable
+<section-building-the-server-with-cmake>`, the *tritonserver* executable
 will be in builddir/trtis/install/bin and the required shared
-libraries will be in builddir/trtis/install/lib. The *trtserver*
+libraries will be in builddir/trtis/install/lib. The *tritonserver*
 executable and libraries are configured to be installed and executed
 from the /opt/tritonserver directory, so copy
 builddir/trtis/install/* to /opt/tritonserver/. . Then execute
-*trtserver* with the desired arguments::
+*tritonserver* with the desired arguments::
 
-  $ /opt/tritonserver/bin/trtserver --model-repository=/models
+  $ /opt/tritonserver/bin/tritonserver --model-repository=/models
 
 .. _section-checking-inference-server-status:
 

@@ -46,7 +46,7 @@ mkdir $DATADIR
 
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/*_nobatch_zero_1_float32 $DATADIR
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

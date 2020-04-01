@@ -41,7 +41,7 @@ VERIFY_TIMESTAMPS=verify_timestamps.py
 
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
-SERVER=${OPTDIR}/tensorrtserver/bin/trtserver
+SERVER=${OPTDIR}/tensorrtserver/bin/tritonserver
 
 source ../common/util.sh
 
