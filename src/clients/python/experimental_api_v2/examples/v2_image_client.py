@@ -233,12 +233,6 @@ def postprocess(results, output_name, batch_size):
             print("    {} ({}) = {}".format(cls[0], cls[1], cls[2]))
 
 def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
-    inputs = []
-    if FLAGS.protocol.lower() == "grpc":
-        inputs.append(grpcclient.InferInput(input_name))
-    else:
-        inputs.append(httpclient.InferInput(input_name))
-
     # Preprocess image into input data according to model requirements
     image_data = None
     with Image.open(FLAGS.image_filename) as img:
@@ -248,13 +242,20 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
     batched_image_data = np.stack(repeated_image_data, axis=0)
 
     # Set the input data
-    inputs[0].set_data_from_numpy(batched_image_data)
+    inputs = []
+    if FLAGS.protocol.lower() == "grpc":
+        inputs.append(grpcclient.InferInput(input_name, batched_image_data.shape, dtype))
+        inputs[0].set_data_from_numpy(batched_image_data)
+    else:
+        inputs.append(httpclient.InferInput(input_name, batched_image_data.shape, dtype))
+        inputs[0].set_data_from_numpy(batched_image_data, binary_data=False)
 
     outputs = []
     if FLAGS.protocol.lower() == "grpc":
         outputs.append(grpcclient.InferOutput(output_name, class_count=FLAGS.classes))
     else:
-        outputs.append(httpclient.InferOutput(output_name, class_count=FLAGS.classes))
+        outputs.append(httpclient.InferOutput(
+            output_name, binary_data=False, class_count=FLAGS.classes))
 
     yield inputs, outputs, FLAGS.model_name, FLAGS.model_version
 
