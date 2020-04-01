@@ -58,8 +58,10 @@ if(${TRTIS_ENABLE_GRPC_V2})
   )
 endif() # TRTIS_ENABLE_GRPC_V2
 
-install(
-  PROGRAMS
-    v2_image_client.py
-  DESTINATION python
-)
+if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_GRPC_V2})
+  install(
+    PROGRAMS
+      v2_image_client.py
+    DESTINATION python
+  )
+endif() # TRTIS_ENABLE_HTTP_V2 || TRTIS_ENABLE_GRPC_V2
