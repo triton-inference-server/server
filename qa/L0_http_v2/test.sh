@@ -42,9 +42,18 @@ RET=0
 SIMPLE_HEALTH_CLIENT=../clients/simple_http_v2_health_metadata.py
 SIMPLE_INFER_CLIENT=../clients/simple_http_v2_infer_client.py
 SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_http_v2_async_infer_client.py
+SIMPLE_CLASS_CLIENT=../clients/simple_http_v2_class_client.py
+SIMPLE_MODEL_CONTROL=../clients/simple_http_v2_model_control.py
 
 rm -f *.log
 rm -f *.log.*
+
+# Get the TensorFlow inception model
+mkdir -p models/inception_graphdef/1
+wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
+     https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz
+(cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
+mv /tmp/inception_v3_2016_08_28_frozen.pb models/inception_graphdef/1/model.graphdef
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
@@ -68,13 +77,20 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+IMAGE=../images/vulture.jpeg
 for i in \
         $SIMPLE_INFER_CLIENT \
         $SIMPLE_ASYNC_INFER_CLIENT \
+        $SIMPLE_CLASS_CLIENT \
         ; do
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"
-    python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+    if [[ $SUFFIX == "simple_http_v2_class_client" || $SUFFIX == "http_v2_image_client" ]]; then
+        python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+    else
+        python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+    fi
+
     if [ $? -ne 0 ]; then
         cat "${CLIENT_LOG}.${SUFFIX}"
         RET=1
@@ -82,6 +98,29 @@ for i in \
 done
 
 set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit --api-version 2"
+run_server_v2
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Test Model Control API
+python $SIMPLE_MODEL_CONTROL -v >> ${CLIENT_LOG}.model_control 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.model_control
+    RET=1
+fi
+
+if [ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]; then
+    cat ${CLIENT_LOG}.model_control
+    RET=1
+fi
 
 kill $SERVER_PID
 wait $SERVER_PID
