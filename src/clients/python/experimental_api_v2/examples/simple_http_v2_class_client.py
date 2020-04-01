@@ -82,9 +82,9 @@ def parse_model(model_metadata, model_config):
             format(model_metadata.name, len(input_metadata['shape'])))
 
     if ((input_config['format'] != "FORMAT_NCHW") and
-        (input_config['format'] != "FORMAT_NHWC")):
-        raise Exception("unexpected input format " + input_config['format'] 
-                    + ", expecting FORMAT_NCHW or FORMAT_NHWC")
+            (input_config['format'] != "FORMAT_NHWC")):
+        raise Exception("unexpected input format " + input_config['format']
+                        + ", expecting FORMAT_NCHW or FORMAT_NHWC")
 
     if input_config['format'] == "FORMAT_NHWC":
         h = input_metadata['shape'][0]
@@ -104,7 +104,7 @@ def preprocess(img, format, dtype, c, h, w, scaling):
     Pre-process an image to meet the size, type and format
     requirements specified by the parameters.
     """
-    #np.set_printoptions(threshold='nan')
+    # np.set_printoptions(threshold='nan')
 
     if c == 1:
         sample_img = img.convert('L')
@@ -154,9 +154,6 @@ def postprocess(results, output_name, batch_size):
 
 
 def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
-    inputs = []
-    inputs.append(httpclient.InferInput(input_name))
-
     # Preprocess image into input data according to model requirements
     image_data = None
     with Image.open(FLAGS.image_filename) as img:
@@ -166,10 +163,12 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
     batched_image_data = np.stack(repeated_image_data, axis=0)
 
     # Set the input data
-    inputs[0].set_data_from_numpy(batched_image_data)
+    inputs = []
+    inputs.append(httpclient.InferInput(input_name, batched_image_data.shape, dtype))
+    inputs[0].set_data_from_numpy(batched_image_data, binary_data=False)
 
     outputs = []
-    outputs.append(httpclient.InferOutput(output_name, class_count=FLAGS.classes))
+    outputs.append(httpclient.InferOutput(output_name, binary_data=False, class_count=FLAGS.classes))
 
     yield inputs, outputs, FLAGS.model_name, FLAGS.model_version
 
@@ -231,13 +230,15 @@ if __name__ == '__main__':
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
     try:
-        model_metadata = triton_client.get_model_metadata(model_name=FLAGS.model_name)
+        model_metadata = triton_client.get_model_metadata(
+            model_name=FLAGS.model_name)
     except InferenceServerException as e:
         print("failed to retrieve the metadata: " + str(e))
         sys.exit()
 
     try:
-        model_config = triton_client.get_model_config(model_name=FLAGS.model_name)
+        model_config = triton_client.get_model_config(
+            model_name=FLAGS.model_name)
     except InferenceServerException as e:
         print("failed to retrieve the config: " + str(e))
         sys.exit()
@@ -255,9 +256,9 @@ if __name__ == '__main__':
         for inputs, outputs, model_name, model_version in requestGenerator(
                 input_name, output_name, c, h, w, format, dtype, FLAGS):
             results.append(triton_client.infer(model_name,
-                                            inputs,
-                                            outputs=outputs,
-                                            model_version=model_version))
+                                               inputs,
+                                               outputs=outputs,
+                                               model_version=model_version))
     except InferenceServerException as e:
         print("inference failed: " + str(e))
         sys.exit()
