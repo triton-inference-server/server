@@ -85,7 +85,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
     def check_failure(self):
         # Check securely whether a failure has been registered
         # This is generic because the failure behavior is undefined
-        # for rugged batches.
+        # for ragged batches.
         with _deferred_exceptions_lock:
             if len(_deferred_exceptions) == 0:
                 raise Exception("Unexpected inference success")

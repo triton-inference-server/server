@@ -28,6 +28,7 @@
 
 #include <cassert>
 #include "src/core/constants.h"
+#include "src/core/logging.h"
 #include "src/core/provider.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -53,6 +54,10 @@ InitPendingShape(
       // addition to the tensor shape itself.
       if (itr->second) {
         RETURN_IF_ERROR(OnPeek(runner_id, *input, payload, &shapes.second));
+
+        LOG_VERBOSE(1) << "peek '" << input->Name() << "', shape "
+                       << DimsListToString(shapes.first) << ", value "
+                       << DimsListToString(shapes.second);
       }
 
       pending_batch_shapes->emplace(
