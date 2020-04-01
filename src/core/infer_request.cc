@@ -577,6 +577,10 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
     auto& input = pr.second;
     auto shape = input.MutableShape();
 
+    // FIXMEV2 Can't have this check until the GRPCV2 and HTTPV2
+    // endpoints switch to new TRITONSERVER APIs where they always
+    // specify datatype.
+#if 0
     if (input.DType() != input_config->data_type()) {
       return Status(
           RequestStatusCode::INVALID_ARG,
@@ -584,8 +588,11 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
               std::string(DataTypeToProtocolString(input.DType())) +
               "', model expects '" +
               std::string(DataTypeToProtocolString(input_config->data_type())) +
-              " for '" + model_name_ + "'");
+              "' for '" + model_name_ + "'");
     }
+#else
+    input.SetDType(input_config->data_type());
+#endif
 
     if (!CompareDimsWithWildcard(input_config->dims(), *shape)) {
       return Status(
