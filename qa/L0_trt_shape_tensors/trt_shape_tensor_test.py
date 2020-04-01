@@ -426,11 +426,11 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
 
     def test_sequence_different_shape_values(self):
         # Test model instances together are configured with
-        # total-batch-size 4. Send four equal-length sequences
-        # with different shape values in parallel. As the
-        # sequence batcher currently doesn't support ragged batch
-        # the requests will still get batched together but the
-        # result will be incorrect.
+        # total-batch-size 4. Send four equal-length sequences with
+        # different shape values in 2 sequences and 2 sequences that
+        # share the same shape value. Make sure that the 2 sequences
+        # with same shapes batch together but other two sequences do
+        # not.
         self.clear_deferred_exceptions()
         dtype = np.float32
 
@@ -535,7 +535,8 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
             for t in threads:
                 t.join()
 
-            self.check_failure()
+            self.check_deferred_exception()
+            self.check_status(model_name, (1,), 9, 12)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:

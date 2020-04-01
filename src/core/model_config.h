@@ -240,4 +240,22 @@ std::string DimsListToString(const DimsList& dims);
 std::string DimsListToString(
     const std::vector<int64_t>& dims, const int start_idx = 0);
 
+/// Get the server protocol string representation of a datatype.
+/// \param dtype The data type.
+/// \return The string representation.
+const char* DataTypeToProtocolString(const DataType dtype);
+
+/// Get the datatype corresponding to a server protocol string
+/// representation of a datatype.
+/// \param dtype string representation.
+/// \return The data type.
+DataType ProtocolStringToDataType(const std::string& dtype);
+
+/// Get the datatype corresponding to a server protocol string
+/// representation of a datatype.
+/// \param dtype Pointer to string.
+/// \param len Length of the string.
+/// \return The data type.
+DataType ProtocolStringToDataType(const char* dtype, size_t len);
+
 }}  // namespace nvidia::inferenceserver

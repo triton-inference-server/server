@@ -126,71 +126,80 @@ BackendContext::SetInputBuffer(
     auto& payload = (*payloads)[idx];
     const size_t expected_byte_size = expected_byte_sizes[idx];
 
-    const Memory* data;
-    payload.status_ =
-        payload.request_provider_->GetMemoryWithOverride(name, &data);
-    size_t copied_byte_size = 0;
-    size_t data_idx = 0;
-    while (payload.status_.IsOk()) {
-      auto src_memory_type = input->memory_type_;
-      auto src_memory_type_id = input->memory_type_id_;
-      size_t content_byte_size = expected_byte_size - copied_byte_size;
-      const void* content = data->BufferAt(
-          data_idx, &content_byte_size, &src_memory_type, &src_memory_type_id);
+    const InferenceRequest::Input* rinput;
+    Status status = payload.request_->ImmutableInput(name, &rinput);
+    if (!status.IsOk()) {
+      payload.status_ = status;
+    } else {
+      const std::shared_ptr<Memory>& data = rinput->Data();
 
-      // No more input content available then done with copying...
-      if (content == nullptr) {
-        break;
-      }
+      size_t copied_byte_size = 0;
+      size_t data_idx = 0;
+      while (payload.status_.IsOk()) {
+        auto src_memory_type = input->memory_type_;
+        auto src_memory_type_id = input->memory_type_id_;
+        size_t content_byte_size = expected_byte_size - copied_byte_size;
+        const void* content = data->BufferAt(
+            data_idx, &content_byte_size, &src_memory_type,
+            &src_memory_type_id);
 
-      if ((copied_byte_size + content_byte_size) > expected_byte_size) {
-        payload.status_ = Status(
-            RequestStatusCode::INVALID_ARG,
-            "unexpected size " +
-                std::to_string(copied_byte_size + content_byte_size) +
-                " for inference input '" + name + "', expecting " +
-                std::to_string(expected_byte_size));
-        break;
-      }
-
-      if (content_byte_size > 0) {
-        // Defer memory copy for the buffer if it's better put into an
-        // intermediate pinned buffer first.
-        if (need_buffer && (src_memory_type == candidate_type)) {
-          std::get<1>(pinned_buffer_info) += content_byte_size;
-          std::get<2>(pinned_buffer_info).emplace_back(idx, data, data_idx);
-        } else {
-          // If copy should be perform directly, two steps to be done:
-          // 1. Issue copy for the current buffer
-          // 2. Finalize the existing intermediate buffer
-          bool cuda_used = false;
-          payload.status_ = CopyBuffer(
-              name, src_memory_type, src_memory_type_id, input->memory_type_,
-              input->memory_type_id_, content_byte_size, content,
-              input->input_buffer_ + buffer_copy_offset + copied_byte_size,
-              stream, &cuda_used);
-          cuda_copy |= cuda_used;
-
-          if (std::get<1>(pinned_buffer_info) > 0) {
-            cuda_copy |= IssueIndirectInputBufferCopy(
-                name, pinned_buffer_info, payloads, stream, input);
-          }
-          // always reset 'pinned_buffer_info' to maintain proper input offset
-          pinned_buffer_info = BufferInfo{
-              buffer_copy_offset + copied_byte_size + content_byte_size, 0, {}};
+        // No more input content available then done with copying...
+        if (content == nullptr) {
+          break;
         }
+
+        if ((copied_byte_size + content_byte_size) > expected_byte_size) {
+          payload.status_ = Status(
+              RequestStatusCode::INVALID_ARG,
+              "unexpected size " +
+                  std::to_string(copied_byte_size + content_byte_size) +
+                  " for inference input '" + name + "', expecting " +
+                  std::to_string(expected_byte_size));
+          break;
+        }
+
+        if (content_byte_size > 0) {
+          // Defer memory copy for the buffer if it's better put into an
+          // intermediate pinned buffer first.
+          if (need_buffer && (src_memory_type == candidate_type)) {
+            std::get<1>(pinned_buffer_info) += content_byte_size;
+            std::get<2>(pinned_buffer_info)
+                .emplace_back(idx, data.get(), data_idx);
+          } else {
+            // If copy should be perform directly, two steps to be done:
+            // 1. Issue copy for the current buffer
+            // 2. Finalize the existing intermediate buffer
+            bool cuda_used = false;
+            payload.status_ = CopyBuffer(
+                name, src_memory_type, src_memory_type_id, input->memory_type_,
+                input->memory_type_id_, content_byte_size, content,
+                input->input_buffer_ + buffer_copy_offset + copied_byte_size,
+                stream, &cuda_used);
+            cuda_copy |= cuda_used;
+
+            if (std::get<1>(pinned_buffer_info) > 0) {
+              cuda_copy |= IssueIndirectInputBufferCopy(
+                  name, pinned_buffer_info, payloads, stream, input);
+            }
+            // always reset 'pinned_buffer_info' to maintain proper input offset
+            pinned_buffer_info = BufferInfo{
+                buffer_copy_offset + copied_byte_size + content_byte_size,
+                0,
+                {}};
+          }
+        }
+
+        copied_byte_size += content_byte_size;
+        data_idx++;
       }
 
-      copied_byte_size += content_byte_size;
-      data_idx++;
-    }
-
-    if (payload.status_.IsOk() && (copied_byte_size != expected_byte_size)) {
-      payload.status_ = Status(
-          RequestStatusCode::INTERNAL,
-          "expected " + std::to_string(expected_byte_size) +
-              " bytes of data for inference input '" + name + "', got " +
-              std::to_string(copied_byte_size));
+      if (payload.status_.IsOk() && (copied_byte_size != expected_byte_size)) {
+        payload.status_ = Status(
+            RequestStatusCode::INTERNAL,
+            "expected " + std::to_string(expected_byte_size) +
+                " bytes of data for inference input '" + name + "', got " +
+                std::to_string(copied_byte_size));
+      }
     }
 
     // When the payload has unexpected status, maintain a new indirect buffer
@@ -300,35 +309,53 @@ BackendContext::SetShapeInputBuffer(
     Scheduler::Payload* payload, TRTSERVER_Memory_Type dst_memory_type,
     int64_t dst_memory_type_id, char* input_buffer)
 {
-  bool cuda_copy = false;
+  if (!payload->status_.IsOk()) {
+    return false;
+  }
+
   size_t buffer_copy_offset = support_batching ? sizeof(int32_t) : 0;
 
-  if (payload->status_.IsOk()) {
-    auto src_memory_type = dst_memory_type;
-    auto src_memory_type_id = dst_memory_type_id;
-    const void* content;
-    size_t content_byte_size = expected_byte_size;
-    payload->status_ = payload->request_provider_->GetNextInputContent(
-        name, &content, &content_byte_size, &src_memory_type,
-        &src_memory_type_id);
+  const InferenceRequest::Input* rinput;
+  payload->status_ = payload->request_->ImmutableInput(name, &rinput);
+  if (!payload->status_.IsOk()) {
+    return false;
+  }
 
-    if ((expected_byte_size) != (int)content_byte_size) {
-      payload->status_ = Status(
-          RequestStatusCode::INVALID_ARG,
-          "unexpected size " + std::to_string(content_byte_size) +
-              " for inference input '" + name + "', expecting " +
-              std::to_string(expected_byte_size));
+  auto src_memory_type = dst_memory_type;
+  auto src_memory_type_id = dst_memory_type_id;
+  const void* content;
+  size_t content_byte_size = expected_byte_size;
+
+  // This code assumes that the entire tensor data is in a single
+  // buffer... but the expected_byte_size check below will fail if
+  // that is not the case.
+  payload->status_ = rinput->Content(
+      0 /* idx */, &content, &content_byte_size, &src_memory_type,
+      &src_memory_type_id);
+  if (!payload->status_.IsOk()) {
+    return false;
+  }
+
+  if ((expected_byte_size) != (int)content_byte_size) {
+    payload->status_ = Status(
+        RequestStatusCode::INVALID_ARG,
+        "unexpected size " + std::to_string(content_byte_size) +
+            " for inference input '" + name + "', expecting " +
+            std::to_string(expected_byte_size));
+    return false;
+  }
+
+  bool cuda_copy = false;
+
+  if (content_byte_size > 0) {
+    bool cuda_used = false;
+    payload->status_ = CopyBuffer(
+        name, src_memory_type, src_memory_type_id, dst_memory_type,
+        dst_memory_type_id, expected_byte_size, content,
+        input_buffer + buffer_copy_offset, stream_, &cuda_used);
+    cuda_copy |= cuda_used;
+    if (!payload->status_.IsOk()) {
       return cuda_copy;
-    }
-
-
-    if (content_byte_size > 0) {
-      bool cuda_used = false;
-      payload->status_ = CopyBuffer(
-          name, src_memory_type, src_memory_type_id, dst_memory_type,
-          dst_memory_type_id, expected_byte_size, content,
-          input_buffer + buffer_copy_offset, stream_, &cuda_used);
-      cuda_copy |= cuda_used;
     }
   }
 
@@ -359,7 +386,7 @@ BackendContext::SetFixedSizeOutputBuffer(
   output->indirect_buffers_.emplace_back();
   for (size_t idx = 0; idx < payloads->size(); idx++) {
     auto& payload = (*payloads)[idx];
-    const auto& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_;
     const size_t expected_byte_size = irequest->BatchSize() * batch1_byte_size;
 
     // If 'payload' should have valid output (status ok) and
@@ -517,7 +544,7 @@ BackendContext::SetOutputShapeTensorBuffer(
   int shape_index = (support_batching ? 1 : 0);
   int nb_shape_values = content_shape[shape_index];
   for (auto& payload : *payloads) {
-    int this_batch_size = payload.request_provider_->Request()->BatchSize();
+    int this_batch_size = payload.request_->BatchSize();
     // Fix the content shape for this payload
     if (support_batching) {
       content_shape[0] = this_batch_size;
@@ -577,18 +604,21 @@ BackendContext::GetContiguousInputContent(
 {
   contiguous_buffer->reset();
 
+  const InferenceRequest::Input* rinput;
+  RETURN_IF_ERROR(payload.request_->ImmutableInput(name, &rinput));
+
   // Peek input buffers to check if data copy is necessary
   MemoryReference input_buffers;
   size_t chunk_count = 0;
   bool type_mismatch = false;
-  while (true) {
+  for (size_t idx = 0; idx < rinput->ContentBufferCount(); ++idx) {
     TRTSERVER_Memory_Type src_memory_type = memory_type;
     int64_t src_memory_type_id = memory_type_id;
     size_t src_byte_size = *content_byte_size;
     const void* src_ptr;
 
-    RETURN_IF_ERROR(payload.request_provider_->GetNextInputContent(
-        name, &src_ptr, &src_byte_size, &src_memory_type, &src_memory_type_id));
+    RETURN_IF_ERROR(rinput->Content(
+        idx, &src_ptr, &src_byte_size, &src_memory_type, &src_memory_type_id));
 
     if (src_ptr != nullptr) {
       input_buffers.AddBuffer(
@@ -598,8 +628,6 @@ BackendContext::GetContiguousInputContent(
       type_mismatch |=
           ((src_memory_type != memory_type) ||
            (src_memory_type_id != memory_type_id));
-    } else {
-      break;
     }
   }
 

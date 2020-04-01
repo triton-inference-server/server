@@ -552,7 +552,7 @@ OnnxBackend::Context::Run(
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
 
-  std::shared_ptr<InferRequestProvider> input_request_provider;
+  const InferenceRequest* repr_input_request = nullptr;
 
   // For each request in 'payloads' collect the total batch size for
   // this inference execution. The batch-size, number of inputs, and
@@ -567,11 +567,11 @@ OnnxBackend::Context::Run(
               name_ + "'");
     }
 
-    total_batch_size += payload.request_provider_->Request()->BatchSize();
+    total_batch_size += payload.request_->BatchSize();
 
     // All payloads must have equally-sized input tensors so use any
     // payload as the representative for the input tensors.
-    input_request_provider = payload.request_provider_;
+    repr_input_request = payload.request_.get();
   }
 
   // If there are no valid payloads then no need to run the
@@ -605,33 +605,16 @@ OnnxBackend::Context::Run(
   std::vector<const char*> input_names;
   bool cuda_copy = false;
 
-  for (const auto& pr : input_request_provider->Request()->Inputs()) {
-    const auto& input = pr.second;
-    const std::string& name = input.Name();
-
-    const ModelInput* input_config;
-    RETURN_IF_ERROR(base->GetInput(name, &input_config));
+  for (const auto& pr : repr_input_request->ImmutableInputs()) {
+    const InferenceRequest::Input* input = pr.second;
+    const std::string& name = input->Name();
 
     // Create a tensor for each input sized correctly for the total
     // payload batch size. Concatenate input values from each payload
     // into the corresponding tensor.
     RETURN_IF_ERROR(SetInputTensor(
-        name, input_config->data_type(), input.Shape(), total_batch_size,
-        payloads, &input_buffers, &inputs, &input_names, &cuda_copy));
-  }
-
-  // Additional inputs added to the provider...
-  const InferRequestProvider::InputOverrideMapVec& input_override_maps =
-      input_request_provider->GetInputOverrides();
-  for (const auto& ovr_map : input_override_maps) {
-    for (const auto& pr : *ovr_map) {
-      const std::string& name = pr.first;
-      const InferRequestProvider::InputOverride& override = pr.second;
-
-      RETURN_IF_ERROR(SetInputTensor(
-          name, override.datatype_, override.dims_, total_batch_size, payloads,
-          &input_buffers, &inputs, &input_names, &cuda_copy));
-    }
+        name, input->DType(), input->Shape(), total_batch_size, payloads,
+        &input_buffers, &inputs, &input_names, &cuda_copy));
   }
 
   // Request to retrieve all output specified in model config
@@ -733,20 +716,17 @@ OnnxBackend::Context::SetInputTensor(
   std::vector<size_t> expected_byte_sizes;
   std::vector<size_t> expected_element_cnts;
   for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_;
 
     expected_element_cnts.push_back(irequest->BatchSize() * batch1_element_cnt);
 
     if (data_type == TYPE_STRING) {
-      // For String data byte, obtain expected byte size from 'batch_byte_size'
-      // The provider has already checked that batch_byte_size is set
-      for (const auto& pr : irequest->Inputs()) {
-        const auto& in = pr.second;
-        if (in.Name() == name) {
-          expected_byte_sizes.push_back(in.BatchByteSize());
-          break;
-        }
-      }
+      // For String data byte, obtain expected byte size from
+      // 'batch_byte_size' The request normalizer has already checked
+      // that batch_byte_size is set
+      const InferenceRequest::Input* in;
+      RETURN_IF_ERROR(irequest->ImmutableInput(name, &in));
+      expected_byte_sizes.push_back(in->BatchByteSize());
     } else {
       // Otherwise calculate expected byte size from 'expected_element_cnts',
       // so that the byte size for override input (not provided in request
@@ -1014,7 +994,7 @@ OnnxBackend::Context::SetStringOutputBuffer(
   size_t element_idx = 0;
   bool cuda_copy = false;
   for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_provider_->Request();
+    const auto& irequest = payload.request_;
     const size_t expected_element_cnt =
         irequest->BatchSize() * batch1_element_cnt;
 

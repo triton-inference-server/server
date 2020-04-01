@@ -155,13 +155,13 @@ struct BackendContext {
       TRTSERVER_Memory_Type src_memory_type, int64_t src_memory_type_id,
       std::vector<Scheduler::Payload>* payloads);
 
-  // Helper function for handling string input. This function will return
-  // the requested input content within a payload in a contiguous chunk. In
-  // some cases this will require copying the data. If it happens,
-  // 'contiguous_buffer' will be set to hold the contiguous chunk and
-  // 'cuda_copy' will be set to indicate whether CUDA copy is conducted.
-  // The data copy can be avoid if the input is already in contiguous chunk
-  // and the input is located in memory type and id specified.
+  // This function will return the requested input content within a
+  // payload in a contiguous chunk. In some cases this will require
+  // copying the data. If it happens, 'contiguous_buffer' will be set
+  // to hold the contiguous chunk and 'cuda_copy' will be set to
+  // indicate whether CUDA copy is conducted.  The data copy can be
+  // avoid if the input is already in contiguous chunk and the input
+  // is located in memory type and id specified.
   Status GetContiguousInputContent(
       const std::string& name, TRTSERVER_Memory_Type memory_type,
       int64_t memory_type_id, const Scheduler::Payload& payload,
