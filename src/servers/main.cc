@@ -1247,7 +1247,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #ifdef TRTIS_ENABLE_LOGGING
   // Initialize our own logging instance since it is used by GRPC and
   // HTTP endpoints. This logging instance is separate from the one in
-  // libtrtserver so we must initialize explicitly.
+  // libtritonserver so we must initialize explicitly.
   LOG_ENABLE_INFO(log_info);
   LOG_ENABLE_WARNING(log_warn);
   LOG_ENABLE_ERROR(log_error);

@@ -401,7 +401,8 @@ RUN apt-get update && \
 
 # Add some links for backwards compatibility for now...
 RUN cd /opt && ln -s tritonserver tensorrtserver && \
-    cd /opt/tritonserver/bin && ln -s tritonserver trtserver
+    cd /opt/tritonserver/bin && ln -s tritonserver trtserver && \
+    cd /opt/tritonserver/lib && ln -s libtritonserver.so libtrtserver.so
 
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \

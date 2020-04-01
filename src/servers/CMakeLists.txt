@@ -388,7 +388,7 @@ install(
 endif() # TRTIS_ENABLE_GPU
 
 #
-# libtrtserver.so
+# libtritonserver.so
 #
 set(BACKEND_OBJS $<TARGET_OBJECTS:ensemble-backend-library>)
 if(${TRTIS_ENABLE_TENSORFLOW})
@@ -415,7 +415,7 @@ if(${TRTIS_ENABLE_GPU})
   set(CUDA_OBJS $<TARGET_OBJECTS:model-config-cuda-library>)
 endif() # TRTIS_ENABLE_GPU
 
-configure_file(libtrtserver.ldscript libtrtserver.ldscript COPYONLY)
+configure_file(libtritonserver.ldscript libtritonserver.ldscript COPYONLY)
 
 add_library(
   tritonserver SHARED
@@ -432,8 +432,8 @@ set_target_properties(
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
     INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/tensorflow:$\{ORIGIN\}/pytorch:$\{ORIGIN\}/onnx"
-    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtrtserver.ldscript
-    LINK_FLAGS "-Wl,--version-script libtrtserver.ldscript"
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtritonserver.ldscript
+    LINK_FLAGS "-Wl,--version-script libtritonserver.ldscript"
 )
 target_link_libraries(
   tritonserver

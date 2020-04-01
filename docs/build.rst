@@ -91,7 +91,7 @@ When the build completes the binary, libraries and headers can be
 found in trtis/install. To overwrite the existing versions::
 
   # cp trtis/install/bin/tritonserver /opt/tritonserver/bin/.
-  # cp trtis/install/lib/libtrtserver.so /opt/tritonserver/lib/.
+  # cp trtis/install/lib/libtritonserver.so /opt/tritonserver/lib/.
 
 You can reconfigure the build by running *cmake* as described in
 :ref:`section-building-the-server-with-cmake`.

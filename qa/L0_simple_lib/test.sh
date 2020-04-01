@@ -41,7 +41,7 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 export CUDA_VISIBLE_DEVICES=0
 
 # Must explicitly set LD_LIBRARY_PATH so that clients can find
-# libtrtserver.so.
+# libtritonserver.so.
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH
 
 rm -f *.log
