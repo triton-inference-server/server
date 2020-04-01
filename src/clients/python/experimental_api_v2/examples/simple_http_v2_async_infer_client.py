@@ -71,11 +71,12 @@ if __name__ == '__main__':
     input1_data = np.ones(shape=(1, 16), dtype=np.int32)
 
     # Initialize the data
-    inputs[0].set_data_from_numpy(input0_data)
-    inputs[1].set_data_from_numpy(input1_data)
+    # Enable binary_data after DLIS-1204 is fixed.
+    inputs[0].set_data_from_numpy(input0_data, binary_data=False)
+    inputs[1].set_data_from_numpy(input1_data, binary_data=False)
 
-    outputs.append(httpclient.InferOutput('OUTPUT0'))
-    outputs.append(httpclient.InferOutput('OUTPUT1'))
+    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=False))
+    outputs.append(httpclient.InferOutput('OUTPUT1', binary_data=False))
 
     # Define the callback function. Note the last two parameters should be
     # result and error. InferenceServerClient would povide the results of an
