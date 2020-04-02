@@ -87,6 +87,11 @@ for i in \
     SUFFIX="${BASE%.*}"
     if [ $SUFFIX == "v2_image_client" ]; then
         python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+        if [ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
+            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
+            cat $CLIENT_LOG
+            RET=1
+        fi
     else
         python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     fi
@@ -110,6 +115,8 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+set +e
+
 # Test Model Control API
 python $SIMPLE_MODEL_CONTROL -v >> ${CLIENT_LOG}.model_control 2>&1
 if [ $? -ne 0 ]; then
@@ -122,10 +129,11 @@ if [ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]; then
     RET=1
 fi
 
+set -e
+
 kill $SERVER_PID
 wait $SERVER_PID
 
-set -e
 
 
 if [ $RET -eq 0 ]; then

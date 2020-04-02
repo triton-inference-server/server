@@ -889,8 +889,8 @@ HTTPAPIServer::HandleSharedMemoryControl(
   TRTSERVER_Error* err = nullptr;
 
   if (action_type_str == "register") {
-    err = shm_manager_->RegisterSystemSharedMemory(
-        name.c_str(), shm_key.c_str(), offset, byte_size);
+    err = TritonErrorToTrt(shm_manager_->RegisterSystemSharedMemory(
+        name.c_str(), shm_key.c_str(), offset, byte_size));
   } else if (action_type_str == "cudaregister") {
 #ifdef TRTIS_ENABLE_GPU
     int device_id = std::atoll(device_id_str.c_str());
@@ -899,8 +899,8 @@ HTTPAPIServer::HandleSharedMemoryControl(
     cudaIpcMemHandle_t* cuda_shm_handle;
     err = EVBufferToCudaHandle(req->buffer_in, &cuda_shm_handle);
     if (err == nullptr) {
-      err = shm_manager_->RegisterCUDASharedMemory(
-          name.c_str(), cuda_shm_handle, byte_size, device_id);
+      err = TritonErrorToTrt(shm_manager_->RegisterCUDASharedMemory(
+          name.c_str(), cuda_shm_handle, byte_size, device_id));
     }
 #else
     err = TRTSERVER_ErrorNew(
@@ -911,13 +911,14 @@ HTTPAPIServer::HandleSharedMemoryControl(
             .c_str());
 #endif  // TRTIS_ENABLE_GPU
   } else if ((action_type_str == "unregister") && (remaining == "all")) {
-    err = shm_manager_->UnregisterAll();
+    err = TritonErrorToTrt(shm_manager_->UnregisterAll());
   } else if (action_type_str == "unregister") {
-    err = shm_manager_->Unregister(name);
+    err = TritonErrorToTrt(shm_manager_->Unregister(name));
 
   } else if (action_type_str == "status") {
     SharedMemoryStatus shm_status;
-    TRTSERVER_Error* err = shm_manager_->GetStatus(&shm_status);
+    TRTSERVER_Error* err =
+        TritonErrorToTrt(shm_manager_->GetStatus(&shm_status));
     if (err == nullptr) {
       if (err == nullptr) {
         std::string format;
@@ -1031,14 +1032,14 @@ HTTPAPIServer::EVBufferToInput(
         }
 
         void* base;
-        TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
+        TRITONSERVER_Memory_Type memory_type = TRITONSERVER_MEMORY_CPU;
         int64_t memory_type_id;
-        RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
+        RETURN_IF_ERR(TritonErrorToTrt(shm_manager_->GetMemoryInfo(
             io.shared_memory().name(), io.shared_memory().offset(), &base,
-            &memory_type, &memory_type_id));
+            &memory_type, &memory_type_id)));
         RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-            request_provider, io.name().c_str(), base, byte_size, memory_type,
-            memory_type_id));
+            request_provider, io.name().c_str(), base, byte_size,
+            TritonMemTypeToTrt(memory_type), memory_type_id));
       } else {
         while ((byte_size > 0) && (v_idx < n)) {
           char* base = static_cast<char*>(v[v_idx].iov_base);
@@ -1084,17 +1085,17 @@ HTTPAPIServer::EVBufferToInput(
   for (const auto& io : request_header.output()) {
     if (io.has_shared_memory()) {
       void* base;
-      TRTSERVER_Memory_Type memory_type;
+      TRITONSERVER_Memory_Type memory_type;
       int64_t memory_type_id;
-      RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
+      RETURN_IF_ERR(TritonErrorToTrt(shm_manager_->GetMemoryInfo(
           io.shared_memory().name(), io.shared_memory().offset(), &base,
-          &memory_type, &memory_type_id));
+          &memory_type, &memory_type_id)));
 
       output_shm_map.emplace(
           io.name(),
           std::make_tuple(
               static_cast<const void*>(base), io.shared_memory().byte_size(),
-              memory_type, memory_type_id));
+              TritonMemTypeToTrt(memory_type), memory_type_id));
     }
   }
 
@@ -1131,10 +1132,10 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
     if (trace_meta_data != nullptr) {
       trace_meta_data->tracer_->SetModel(model_name, model_version);
       trace_meta_data->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "http recv start",
+          TRITONSERVER_TRACE_LEVEL_MIN, "http recv start",
           TIMESPEC_TO_NANOS(req->recv_start_ts));
       trace_meta_data->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "http recv end",
+          TRITONSERVER_TRACE_LEVEL_MIN, "http recv end",
           TIMESPEC_TO_NANOS(req->recv_end_ts));
     }
   }
@@ -1255,10 +1256,10 @@ HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 #ifdef TRTIS_ENABLE_TRACING
   if (infer_request->trace_meta_data_ != nullptr) {
     infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRTSERVER_TRACE_LEVEL_MIN, "http send start",
+        TRITONSERVER_TRACE_LEVEL_MIN, "http send start",
         TIMESPEC_TO_NANOS(request->send_start_ts));
     infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRTSERVER_TRACE_LEVEL_MIN, "http send end",
+        TRITONSERVER_TRACE_LEVEL_MIN, "http send end",
         TIMESPEC_TO_NANOS(request->send_end_ts));
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -1279,10 +1280,10 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 #ifdef TRTIS_ENABLE_TRACING
   if (infer_request->trace_meta_data_ != nullptr) {
     infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRTSERVER_TRACE_LEVEL_MIN, "http send start",
+        TRITONSERVER_TRACE_LEVEL_MIN, "http send start",
         TIMESPEC_TO_NANOS(request->send_start_ts));
     infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRTSERVER_TRACE_LEVEL_MIN, "http send end",
+        TRITONSERVER_TRACE_LEVEL_MIN, "http send end",
         TIMESPEC_TO_NANOS(request->send_end_ts));
   }
 #endif  // TRTIS_ENABLE_TRACING

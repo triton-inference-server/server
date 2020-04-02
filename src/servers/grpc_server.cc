@@ -205,7 +205,7 @@ class HandlerState {
 #ifdef TRTIS_ENABLE_TRACING
       if (state->trace_meta_data_ != nullptr) {
         state->trace_meta_data_->tracer_->CaptureTimestamp(
-            TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
+            TRITONSERVER_TRACE_LEVEL_MIN, "grpc send start");
       }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -863,11 +863,11 @@ InferAllocatorPayload(
   for (const auto& io : request_header.output()) {
     if (io.has_shared_memory()) {
       void* base;
-      TRTSERVER_Memory_Type memory_type;
+      TRITONSERVER_Memory_Type memory_type;
       int64_t memory_type_id;
-      RETURN_IF_ERR(shm_manager->GetMemoryInfo(
+      RETURN_IF_ERR(TritonErrorToTrt(shm_manager->GetMemoryInfo(
           io.shared_memory().name(), io.shared_memory().offset(), &base,
-          &memory_type, &memory_type_id));
+          &memory_type, &memory_type_id)));
 
       // if shm_map_ does not exist, then create an empty shm_map
       if (alloc_payload->shm_map_ == nullptr) {
@@ -876,7 +876,8 @@ InferAllocatorPayload(
 
       alloc_payload->shm_map_->emplace(
           io.name(), AllocPayload::ShmInfo{base, io.shared_memory().byte_size(),
-                                           memory_type, memory_type_id});
+                                           TritonMemTypeToTrt(memory_type),
+                                           memory_type_id});
     }
   }
 
@@ -896,13 +897,13 @@ InferGRPCToInput(
   for (const auto& io : request_header.input()) {
     const void* base;
     size_t byte_size;
-    TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
+    TRITONSERVER_Memory_Type memory_type = TRITONSERVER_MEMORY_CPU;
     int64_t memory_type_id = 0;
     if (io.has_shared_memory()) {
       void* tmp;
-      RETURN_IF_ERR(shm_manager->GetMemoryInfo(
+      RETURN_IF_ERR(TritonErrorToTrt(shm_manager->GetMemoryInfo(
           io.shared_memory().name(), io.shared_memory().offset(), &tmp,
-          &memory_type, &memory_type_id));
+          &memory_type, &memory_type_id)));
       base = tmp;
       byte_size = io.shared_memory().byte_size();
     } else if ((int)idx >= request.raw_input_size()) {
@@ -935,8 +936,8 @@ InferGRPCToInput(
     }
 
     RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-        request_provider, io.name().c_str(), base, byte_size, memory_type,
-        memory_type_id));
+        request_provider, io.name().c_str(), base, byte_size,
+        TritonMemTypeToTrt(memory_type), memory_type_id));
   }
 
   return nullptr;  // success
@@ -994,7 +995,7 @@ InferHandler::StartNewRequest()
     state->trace_meta_data_.reset(trace_manager_->SampleTrace());
     if (state->trace_meta_data_ != nullptr) {
       state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
+          TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
     }
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -1037,7 +1038,7 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
       state->trace_meta_data_->tracer_->SetModel(
           request.model_name(), request.model_version());
       state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
+          TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -1117,7 +1118,7 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
 #ifdef TRTIS_ENABLE_TRACING
       if (state->trace_meta_data_ != nullptr) {
         state->trace_meta_data_->tracer_->CaptureTimestamp(
-            TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
+            TRITONSERVER_TRACE_LEVEL_MIN, "grpc send start");
       }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -1128,7 +1129,7 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
 #ifdef TRTIS_ENABLE_TRACING
     if (state->trace_meta_data_ != nullptr) {
       state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc send end");
+          TRITONSERVER_TRACE_LEVEL_MIN, "grpc send end");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -1208,7 +1209,7 @@ InferHandler::InferComplete(
 #ifdef TRTIS_ENABLE_TRACING
   if (state->trace_meta_data_ != nullptr) {
     state->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
+        TRITONSERVER_TRACE_LEVEL_MIN, "grpc send start");
   }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -1270,7 +1271,7 @@ StreamInferHandler::StartNewRequest()
     state->trace_meta_data_.reset(trace_manager_->SampleTrace());
     if (state->trace_meta_data_ != nullptr) {
       state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
+          TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
     }
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -1318,7 +1319,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
       state->trace_meta_data_->tracer_->SetModel(
           state->request_.model_name(), state->request_.model_version());
       state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
+          TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -1442,7 +1443,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
       next_read_state->trace_meta_data_.reset(trace_manager_->SampleTrace());
       if (next_read_state->trace_meta_data_ != nullptr) {
         next_read_state->trace_meta_data_->tracer_->CaptureTimestamp(
-            TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
+            TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
       }
     }
 #endif  // TRTIS_ENABLE_TRACING
@@ -1454,7 +1455,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 #ifdef TRTIS_ENABLE_TRACING
     if (state->trace_meta_data_ != nullptr) {
       state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc send end");
+          TRITONSERVER_TRACE_LEVEL_MIN, "grpc send end");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -1727,11 +1728,11 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
     if (request.has_register_()) {
       if (request.register_().has_system_shared_memory()) {
         // system shared memory
-        err = shm_manager_->RegisterSystemSharedMemory(
+        err = TritonErrorToTrt(shm_manager_->RegisterSystemSharedMemory(
             request.register_().name(),
             request.register_().system_shared_memory().shared_memory_key(),
             request.register_().system_shared_memory().offset(),
-            request.register_().byte_size());
+            request.register_().byte_size()));
       } else if (request.register_().has_cuda_shared_memory()) {
         // cuda shared memory
 #ifdef TRTIS_ENABLE_GPU
@@ -1740,10 +1741,10 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
         char* handle_base = const_cast<char*>(raw_handle.c_str());
         cudaIpcMemHandle_t* cuda_shm_handle =
             reinterpret_cast<cudaIpcMemHandle_t*>(handle_base);
-        err = shm_manager_->RegisterCUDASharedMemory(
+        err = TritonErrorToTrt(shm_manager_->RegisterCUDASharedMemory(
             request.register_().name(), cuda_shm_handle,
             request.register_().byte_size(),
-            request.register_().cuda_shared_memory().device_id());
+            request.register_().cuda_shared_memory().device_id()));
 #else
         err = TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INVALID_ARG,
@@ -1761,12 +1762,13 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
                 .c_str());
       }
     } else if (request.has_unregister()) {
-      err = shm_manager_->Unregister(request.unregister().name());
+      err = TritonErrorToTrt(
+          shm_manager_->Unregister(request.unregister().name()));
     } else if (request.has_unregister_all()) {
-      err = shm_manager_->UnregisterAll();
+      err = TritonErrorToTrt(shm_manager_->UnregisterAll());
     } else if (request.has_status()) {
       SharedMemoryStatus shm_status;
-      err = shm_manager_->GetStatus(&shm_status);
+      err = TritonErrorToTrt(shm_manager_->GetStatus(&shm_status));
       if (err == nullptr) {
         std::string serialized;
         shm_status.SerializeToString(&serialized);

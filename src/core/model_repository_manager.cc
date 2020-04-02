@@ -296,10 +296,10 @@ class ModelRepositoryManager::BackendLifeCycle {
   // Get the VersionStateMap representation of the specified model.
   const VersionStateMap GetVersionStates(const std::string& model_name);
 
-  // The the state of a specific model version.
+  // Get the states of all recorded model version.
   Status GetModelState(
-      const std::string& model_name, const int64_t model_version,
-      ModelReadyState* state);
+      const std::string& model_name,
+      std::map<int64_t, ModelReadyState>* states);
 
  private:
   struct BackendInfo {
@@ -512,25 +512,21 @@ ModelRepositoryManager::BackendLifeCycle::GetVersionStates(
 
 Status
 ModelRepositoryManager::BackendLifeCycle::GetModelState(
-    const std::string& model_name, const int64_t model_version,
-    ModelReadyState* state)
+    const std::string& model_name, std::map<int64_t, ModelReadyState>* states)
 {
   std::lock_guard<std::mutex> map_lock(map_mtx_);
   auto mit = map_.find(model_name);
   if (mit != map_.end()) {
-    auto vit = mit->second.find(model_version);
-    if (vit != mit->second.end()) {
-      const auto& backend_info = vit->second;
+    for (const auto& version_state : mit->second) {
+      const auto& backend_info = version_state.second;
       std::lock_guard<std::recursive_mutex> lock(backend_info->mtx_);
-      *state = backend_info->state_;
-      return Status::Success;
+      (*states)[version_state.first] = backend_info->state_;
     }
+    return Status::Success;
   }
 
   return Status(
-      Status::Code::NOT_FOUND, "model '" + model_name + "', version " +
-                                   std::to_string(model_version) +
-                                   " is not found");
+      Status::Code::NOT_FOUND, "model '" + model_name + "' is not found");
 }
 
 Status
@@ -1377,10 +1373,9 @@ ModelRepositoryManager::GetVersionStates(const std::string& model_name)
 
 Status
 ModelRepositoryManager::GetModelState(
-    const std::string& model_name, const int64_t model_version,
-    ModelReadyState* state)
+    const std::string& model_name, std::map<int64_t, ModelReadyState>* states)
 {
-  return backend_life_cycle_->GetModelState(model_name, model_version, state);
+  return backend_life_cycle_->GetModelState(model_name, states);
 }
 
 Status

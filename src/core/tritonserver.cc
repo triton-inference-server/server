@@ -47,6 +47,19 @@ namespace ni = nvidia::inferenceserver;
 
 namespace {
 
+void
+SetDurationStats(
+    const nvidia::inferenceserver::StatDuration& stat,
+    rapidjson::MemoryPoolAllocator<>& allocator,
+    rapidjson::Value* duration_stat)
+{
+  duration_stat->SetObject();
+  duration_stat->AddMember(
+      "count", rapidjson::Value(stat.count()).Move(), allocator);
+  duration_stat->AddMember(
+      "ns", rapidjson::Value(stat.total_time_ns()).Move(), allocator);
+}
+
 //
 // TritonServerError
 //
@@ -437,11 +450,11 @@ TRITONSERVER_ResponseAllocatorDelete(TRITONSERVER_ResponseAllocator* allocator)
 // TRITONSERVER_Message
 //
 TRITONSERVER_Error*
-TRITONSERVER_MessageDelete(TRITONSERVER_Message* protobuf)
+TRITONSERVER_MessageDelete(TRITONSERVER_Message* message)
 {
-  TritonServerMessage* lprotobuf =
-      reinterpret_cast<TritonServerMessage*>(protobuf);
-  delete lprotobuf;
+  TritonServerMessage* lmessage =
+      reinterpret_cast<TritonServerMessage*>(message);
+  delete lmessage;
   return nullptr;  // Success
 }
 
@@ -1150,6 +1163,122 @@ TRITONSERVER_ServerModelMetadata(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_ServerModelStatistics(
+    TRITONSERVER_Server* server, const char* model_name,
+    const char* model_version, TRITONSERVER_Message** model_stats)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+#ifdef TRTIS_ENABLE_STATS
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::STATUS);
+#endif  // TRTIS_ENABLE_STATS
+
+  auto model_name_string = std::string(model_name);
+  int64_t model_version_int = -1;
+  if (model_version != nullptr) {
+    RETURN_IF_STATUS_ERROR(
+        ni::GetModelVersionFromString(model_version, &model_version_int));
+  }
+
+  ni::ServerStatus server_status;
+  RETURN_IF_STATUS_ERROR(lserver->GetStatus(&server_status, model_name_string));
+  const auto& model_status =
+      server_status.model_status().find(model_name_string)->second;
+
+  if ((model_version_int != -1) &&
+      (model_status.version_status().find(model_version_int) ==
+       model_status.version_status().end())) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        "requested model version is not found for the model");
+  }
+
+  rapidjson::Document metadata;
+  auto& allocator = metadata.GetAllocator();
+  metadata.SetObject();
+
+  rapidjson::Value versions(rapidjson::kArrayType);
+  for (const auto& v : model_status.version_status()) {
+    if ((model_version_int == -1) || (v.first == model_version_int)) {
+      rapidjson::Value inference_stats(rapidjson::kObjectType);
+      const auto& ir = v.second.infer_stats().find(1);
+      if (ir == v.second.infer_stats().end()) {
+        static nvidia::inferenceserver::StatDuration zero_duration;
+        rapidjson::Value duration_stats;
+        SetDurationStats(zero_duration, allocator, &duration_stats);
+        // Explicit use rapidjson's copy semantics to avoid calling
+        // SetDurationStats()
+        inference_stats.AddMember(
+            "success", rapidjson::Value(duration_stats, allocator), allocator);
+        inference_stats.AddMember(
+            "fail", rapidjson::Value(duration_stats, allocator), allocator);
+        ;
+        inference_stats.AddMember(
+            "queue", rapidjson::Value(duration_stats, allocator), allocator);
+        ;
+        inference_stats.AddMember(
+            "compute_input", rapidjson::Value(duration_stats, allocator),
+            allocator);
+        ;
+        inference_stats.AddMember(
+            "compute_infer", rapidjson::Value(duration_stats, allocator),
+            allocator);
+        ;
+        inference_stats.AddMember(
+            "compute_output", rapidjson::Value(duration_stats, allocator),
+            allocator);
+        ;
+      } else {
+        rapidjson::Value duration_stats;
+        SetDurationStats(ir->second.success(), allocator, &duration_stats);
+        inference_stats.AddMember("success", duration_stats, allocator);
+
+        SetDurationStats(ir->second.failed(), allocator, &duration_stats);
+        inference_stats.AddMember("fail", duration_stats, allocator);
+        ;
+
+        SetDurationStats(ir->second.queue(), allocator, &duration_stats);
+        inference_stats.AddMember("queue", duration_stats, allocator);
+        ;
+
+        SetDurationStats(
+            ir->second.compute_input(), allocator, &duration_stats);
+        inference_stats.AddMember("compute_input", duration_stats, allocator);
+        ;
+
+        SetDurationStats(
+            ir->second.compute_infer(), allocator, &duration_stats);
+        inference_stats.AddMember("compute_infer", duration_stats, allocator);
+        ;
+
+        SetDurationStats(
+            ir->second.compute_output(), allocator, &duration_stats);
+        inference_stats.AddMember("compute_output", duration_stats, allocator);
+        ;
+      }
+      rapidjson::Value stats(rapidjson::kObjectType);
+      stats.AddMember("inference", inference_stats, allocator);
+
+      rapidjson::Value version_stats(rapidjson::kObjectType);
+      auto version_str = std::to_string(v.first);
+      version_stats.AddMember(
+          "version", rapidjson::Value(version_str.c_str(), allocator).Move(),
+          allocator);
+      version_stats.AddMember("stats", stats, allocator);
+      versions.PushBack(version_stats, allocator);
+      if (model_version_int != -1) {
+        break;
+      }
+    }
+  }
+  metadata.AddMember("version_stats", versions, allocator);
+  *model_stats = reinterpret_cast<TRITONSERVER_Message*>(
+      new TritonServerMessage(metadata));
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_ServerModelConfig(
     TRITONSERVER_Server* server, const char* model_name,
     const char* model_version, TRITONSERVER_Message** model_config)
@@ -1521,6 +1650,22 @@ TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestRequestedOutputClassificationCount(
+    TRITONSERVER_InferenceRequest* inference_request, const char* name,
+    uint32_t* count)
+{
+  TritonInferenceRequest* lrequest =
+      reinterpret_cast<TritonInferenceRequest*>(inference_request);
+
+  ni::InferenceRequest::RequestedOutput* requested;
+  RETURN_IF_STATUS_ERROR(
+      lrequest->Request()->MutableRequestedOutput(name, &requested));
+  *count = requested->ClassificationCount();
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestError(
     TRITONSERVER_InferenceRequest* inference_request)
 {
@@ -1540,6 +1685,21 @@ TRITONSERVER_InferenceRequestOutputData(
       reinterpret_cast<TritonInferenceRequest*>(inference_request);
   RETURN_IF_STATUS_ERROR(lrequest->Response()->OutputBufferContents(
       name, base, byte_size, memory_type, memory_type_id));
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestOutputClasses(
+    TRITONSERVER_InferenceRequest* inference_request, const char* name,
+    const char* const** content, int64_t* shape)
+{
+  TritonInferenceRequest* lrequest =
+      reinterpret_cast<TritonInferenceRequest*>(inference_request);
+  size_t count;
+  RETURN_IF_STATUS_ERROR(
+      lrequest->Response()->OutputClassifications(name, content, &count));
+  shape[0] = lrequest->Response()->ResponseHeader().batch_size();
+  shape[1] = count / lrequest->Response()->ResponseHeader().batch_size();
   return nullptr;  // Success
 }
 
@@ -1565,7 +1725,7 @@ TRITONSERVER_InferenceRequestOutputDataType(
 TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestOutputShape(
     TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    int64_t* shape, uint64_t* dim_count)
+    const int64_t** shape, uint64_t* dim_count)
 {
   TritonInferenceRequest* lrequest =
       reinterpret_cast<TritonInferenceRequest*>(inference_request);
@@ -1588,9 +1748,7 @@ TRITONSERVER_InferenceRequestOutputShape(
       }
 
       *dim_count = output.raw().dims_size();
-      for (int d = 0; d < output.raw().dims_size(); ++d) {
-        shape[d] = output.raw().dims(d);
-      }
+      *shape = output.raw().dims().data();
 
       return nullptr;  // Success
     }

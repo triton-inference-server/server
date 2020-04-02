@@ -31,6 +31,7 @@
 #include <mutex>
 #include <sstream>
 #include <string>
+#include "src/core/tritonserver.h"
 #include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -52,20 +53,21 @@ class TraceManager : public std::enable_shared_from_this<TraceManager> {
  public:
   // Create a trace manager that appends trace information
   // to a specified file.
-  static TRTSERVER_Error* Create(
+  static TRITONSERVER_Error* Create(
       std::shared_ptr<TraceManager>* manager, const std::string& filepath);
 
   ~TraceManager();
 
   // Set the trace level and sampling rate.
-  TRTSERVER_Error* SetLevel(TRTSERVER_Trace_Level level);
-  TRTSERVER_Error* SetRate(uint32_t rate);
+  TRITONSERVER_Error* SetLevel(TRITONSERVER_Trace_Level level);
+  TRITONSERVER_Error* SetRate(uint32_t rate);
 
   // Return a trace meta data object that should be used to collected trace
   // activities for an inference request. Return nullptr if no tracing
   // should occur.
   TraceMetaData* SampleTrace();
 
+  // FIXMEV2 remove the static functions with TRTSERVER_Trace
   // Create a trace object that should be used to collected trace
   // activities for the model execution. Return nullptr if no tracing
   // should occur.
@@ -76,6 +78,13 @@ class TraceManager : public std::enable_shared_from_this<TraceManager> {
   static void ReleaseTrace(
       TRTSERVER_Trace* trace, void* activity_userp, void* userp);
 
+  static void CreateTrace(
+      TRITONSERVER_Trace** trace, const char* model_name, int64_t version,
+      void* userp);
+
+  static void ReleaseTrace(
+      TRITONSERVER_Trace* trace, void* activity_userp, void* userp);
+
   // Write to the trace file.
   void WriteTrace(const std::stringstream& ss);
 
@@ -83,13 +92,13 @@ class TraceManager : public std::enable_shared_from_this<TraceManager> {
   TraceManager(std::unique_ptr<std::ofstream> trace_file);
 
   // Helper function to create a new trace object.
-  void NewTrace(TRTSERVER_Trace** trace);
+  void NewTrace(TRITONSERVER_Trace** trace);
 
   std::mutex mu_;
   std::unique_ptr<std::ofstream> trace_file_;
   uint32_t trace_cnt_;
 
-  TRTSERVER_Trace_Level level_;
+  TRITONSERVER_Trace_Level level_;
   uint32_t rate_;
 
   // Atomically incrementing counter used to implement sampling rate.
@@ -103,11 +112,11 @@ class Tracer {
  public:
   Tracer(
       const std::shared_ptr<TraceManager>& manager,
-      TRTSERVER_Trace_Level level);
+      TRITONSERVER_Trace_Level level);
   ~Tracer();
 
   static void TraceActivity(
-      TRTSERVER_Trace* trace, TRTSERVER_Trace_Activity activity,
+      TRITONSERVER_Trace* trace, TRITONSERVER_Trace_Activity activity,
       uint64_t timestamp_ns, void* userp);
 
   void SetModel(const std::string& model_name, int64_t model_version)
@@ -122,19 +131,19 @@ class Tracer {
     parent_id_ = parent_id;
   }
 
-  void SetServerTrace(TRTSERVER_Trace* trace) { trace_ = trace; }
-  TRTSERVER_Trace* ServerTrace() const { return trace_; }
+  void SetServerTrace(TRITONSERVER_Trace* trace) { trace_ = trace; }
+  TRITONSERVER_Trace* ServerTrace() const { return trace_; }
 
   // Capture a named timestamp using a nanosecond precision time. If
   // the time is not given (or is given as zero) then the current time
   // will be used.
   void CaptureTimestamp(
-      TRTSERVER_Trace_Level level, const std::string& name,
+      TRITONSERVER_Trace_Level level, const std::string& name,
       uint64_t timestamp_ns = 0);
 
  private:
   std::shared_ptr<TraceManager> manager_;
-  const TRTSERVER_Trace_Level level_;
+  const TRITONSERVER_Trace_Level level_;
 
   std::string model_name_;
   int64_t model_version_;
@@ -145,7 +154,7 @@ class Tracer {
   std::stringstream tout_;
   uint32_t timestamp_cnt_;
 
-  TRTSERVER_Trace* trace_;
+  TRITONSERVER_Trace* trace_;
 };
 
 }}  // namespace nvidia::inferenceserver

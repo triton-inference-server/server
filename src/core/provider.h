@@ -104,6 +104,15 @@ class InferResponseProvider {
       const std::string& name, const void** content, size_t* content_byte_size,
       TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const;
 
+  // Get the classification results of an output. 'content' will be set to
+  // a flatten array of classification results as C strings. 'count' will be the
+  // number of results.
+  // Success is returned only if the output is requested for classification and
+  // FinalizeResponse() is called.
+  Status OutputClassifications(
+      const std::string& name, const char* const** content,
+      size_t* count) const;
+
   // Get label provider.
   const std::shared_ptr<LabelProvider>& GetLabelProvider() const
   {
@@ -156,6 +165,9 @@ class InferResponseProvider {
 
     // Created buffer for non-RAW results
     std::unique_ptr<char[]> buffer_;
+    std::vector<std::string> cls_contents_;
+    // Array that points to classification contents
+    std::vector<const char*> cls_array_;
 
     void* release_buffer_;
     void* release_userp_;

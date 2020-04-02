@@ -46,9 +46,9 @@ namespace {
 template <typename T>
 void
 AddClassResults(
-    InferResponseHeader::Output* poutput, char* poutput_buffer,
-    const size_t batch1_element_count, const size_t batch_size,
-    const size_t cls_count,
+    InferResponseHeader::Output* poutput, std::vector<std::string>* poutput_cls,
+    char* poutput_buffer, const size_t batch1_element_count,
+    const size_t batch_size, const size_t cls_count,
     const std::shared_ptr<LabelProvider>& label_provider,
     const InferResponseProvider::SecondaryLabelProviderMap& lookup_map)
 {
@@ -78,6 +78,14 @@ AddClassResults(
       }
 
       cls->set_value(static_cast<float>(probs[idx[k]]));
+
+      std::string cls_content =
+          std::to_string(cls->idx()) + ":" + std::to_string(cls->value());
+      if (!cls->label().empty()) {
+        cls_content += ":";
+        cls_content += cls->label();
+      }
+      poutput_cls->emplace_back(std::move(cls_content));
     }
 
     probs += entry_cnt;
@@ -172,6 +180,24 @@ InferResponseProvider::OutputBufferContents(
       "request for unallocated output '" + name + "'");
 }
 
+Status
+InferResponseProvider::OutputClassifications(
+    const std::string& name, const char* const** content, size_t* count) const
+{
+  for (const auto& output : outputs_) {
+    if ((name == output.name_) && (output.cls_count_ != 0) &&
+        (output.cls_array_.size() != 0)) {
+      *content = output.cls_array_.data();
+      *count = output.cls_array_.size();
+      return Status::Success;
+    }
+  }
+
+  return Status(
+      RequestStatusCode::UNAVAILABLE,
+      "request for output '" + name + "' that has no classification results");
+}
+
 bool
 InferResponseProvider::GetSecondaryLabelProvider(
     const std::string& name, SecondaryLabelProvider* provider)
@@ -204,7 +230,7 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
   response_header->set_batch_size(batch_size);
 
   int output_idx = 0;
-  for (const auto& output : outputs_) {
+  for (auto& output : outputs_) {
     const ModelOutput* output_config;
     RETURN_IF_ERROR(is.GetOutput(output.name_, &output_config));
 
@@ -282,65 +308,65 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
       switch (output_config->data_type()) {
         case DataType::TYPE_UINT8:
           AddClassResults<uint8_t>(
-              poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_,
-              secondary_label_provider_map_);
+              poutput, &output.cls_contents_, output.buffer_.get(),
+              batch1_element_count, batch_size, output.cls_count_,
+              label_provider_, secondary_label_provider_map_);
           break;
         case DataType::TYPE_UINT16:
           AddClassResults<uint16_t>(
-              poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_,
-              secondary_label_provider_map_);
+              poutput, &output.cls_contents_, output.buffer_.get(),
+              batch1_element_count, batch_size, output.cls_count_,
+              label_provider_, secondary_label_provider_map_);
           break;
         case DataType::TYPE_UINT32:
           AddClassResults<uint32_t>(
-              poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_,
-              secondary_label_provider_map_);
+              poutput, &output.cls_contents_, output.buffer_.get(),
+              batch1_element_count, batch_size, output.cls_count_,
+              label_provider_, secondary_label_provider_map_);
           break;
         case DataType::TYPE_UINT64:
           AddClassResults<uint64_t>(
-              poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_,
-              secondary_label_provider_map_);
+              poutput, &output.cls_contents_, output.buffer_.get(),
+              batch1_element_count, batch_size, output.cls_count_,
+              label_provider_, secondary_label_provider_map_);
           break;
 
         case DataType::TYPE_INT8:
           AddClassResults<int8_t>(
-              poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_,
-              secondary_label_provider_map_);
+              poutput, &output.cls_contents_, output.buffer_.get(),
+              batch1_element_count, batch_size, output.cls_count_,
+              label_provider_, secondary_label_provider_map_);
           break;
         case DataType::TYPE_INT16:
           AddClassResults<int16_t>(
-              poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_,
-              secondary_label_provider_map_);
+              poutput, &output.cls_contents_, output.buffer_.get(),
+              batch1_element_count, batch_size, output.cls_count_,
+              label_provider_, secondary_label_provider_map_);
           break;
         case DataType::TYPE_INT32:
           AddClassResults<int32_t>(
-              poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_,
-              secondary_label_provider_map_);
+              poutput, &output.cls_contents_, output.buffer_.get(),
+              batch1_element_count, batch_size, output.cls_count_,
+              label_provider_, secondary_label_provider_map_);
           break;
         case DataType::TYPE_INT64:
           AddClassResults<int64_t>(
-              poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_,
-              secondary_label_provider_map_);
+              poutput, &output.cls_contents_, output.buffer_.get(),
+              batch1_element_count, batch_size, output.cls_count_,
+              label_provider_, secondary_label_provider_map_);
           break;
 
         case DataType::TYPE_FP32:
           AddClassResults<float>(
-              poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_,
-              secondary_label_provider_map_);
+              poutput, &output.cls_contents_, output.buffer_.get(),
+              batch1_element_count, batch_size, output.cls_count_,
+              label_provider_, secondary_label_provider_map_);
           break;
         case DataType::TYPE_FP64:
           AddClassResults<double>(
-              poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_,
-              secondary_label_provider_map_);
+              poutput, &output.cls_contents_, output.buffer_.get(),
+              batch1_element_count, batch_size, output.cls_count_,
+              label_provider_, secondary_label_provider_map_);
           break;
 
         default:
@@ -349,6 +375,9 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
               "class result not available for output '" + output.name_ +
                   "' due to unsupported type '" +
                   DataType_Name(output_config->data_type()) + "'");
+      }
+      for (const auto& cls_content : output.cls_contents_) {
+        output.cls_array_.push_back(cls_content.c_str());
       }
     }
 

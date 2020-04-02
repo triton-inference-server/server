@@ -38,11 +38,13 @@
 #include "grpc++/server_builder.h"
 #include "grpc++/server_context.h"
 #include "grpc++/support/status.h"
+#include "rapidjson/document.h"
+#include "rapidjson/error/en.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/server_status.pb.h"
-#include "src/core/trtserver.h"
+#include "src/core/tritonserver.h"
 #include "src/servers/common.h"
 
 #ifdef TRTIS_ENABLE_TRACING
@@ -86,41 +88,41 @@ class Barrier {
 //
 class GrpcStatusUtil {
  public:
-  static void Create(grpc::Status* status, TRTSERVER_Error* err);
-  static grpc::StatusCode CodeToStatus(TRTSERVER_Error_Code code);
+  static void Create(grpc::Status* status, TRITONSERVER_Error* err);
+  static grpc::StatusCode CodeToStatus(TRITONSERVER_Error_Code code);
 };
 
 void
-GrpcStatusUtil::Create(grpc::Status* status, TRTSERVER_Error* err)
+GrpcStatusUtil::Create(grpc::Status* status, TRITONSERVER_Error* err)
 {
   if (err == nullptr) {
     *status = grpc::Status::OK;
   } else {
     *status = grpc::Status(
-        GrpcStatusUtil::CodeToStatus(TRTSERVER_ErrorCode(err)),
-        TRTSERVER_ErrorMessage(err));
+        GrpcStatusUtil::CodeToStatus(TRITONSERVER_ErrorCode(err)),
+        TRITONSERVER_ErrorMessage(err));
   }
 }
 
 grpc::StatusCode
-GrpcStatusUtil::CodeToStatus(TRTSERVER_Error_Code code)
+GrpcStatusUtil::CodeToStatus(TRITONSERVER_Error_Code code)
 {
   // GRPC status codes:
   // https://github.com/grpc/grpc/blob/master/include/grpc/impl/codegen/status.h
   switch (code) {
-    case TRTSERVER_ERROR_UNKNOWN:
+    case TRITONSERVER_ERROR_UNKNOWN:
       return grpc::StatusCode::UNKNOWN;
-    case TRTSERVER_ERROR_INTERNAL:
+    case TRITONSERVER_ERROR_INTERNAL:
       return grpc::StatusCode::INTERNAL;
-    case TRTSERVER_ERROR_NOT_FOUND:
+    case TRITONSERVER_ERROR_NOT_FOUND:
       return grpc::StatusCode::NOT_FOUND;
-    case TRTSERVER_ERROR_INVALID_ARG:
+    case TRITONSERVER_ERROR_INVALID_ARG:
       return grpc::StatusCode::INVALID_ARGUMENT;
-    case TRTSERVER_ERROR_UNAVAILABLE:
+    case TRITONSERVER_ERROR_UNAVAILABLE:
       return grpc::StatusCode::UNAVAILABLE;
-    case TRTSERVER_ERROR_UNSUPPORTED:
+    case TRITONSERVER_ERROR_UNSUPPORTED:
       return grpc::StatusCode::UNIMPLEMENTED;
-    case TRTSERVER_ERROR_ALREADY_EXISTS:
+    case TRITONSERVER_ERROR_ALREADY_EXISTS:
       return grpc::StatusCode::ALREADY_EXISTS;
   }
 
@@ -182,7 +184,7 @@ struct AllocPayload {
   struct ShmInfo {
     void* base_;
     size_t byte_size_;
-    TRTSERVER_Memory_Type memory_type_;
+    TRITONSERVER_Memory_Type memory_type_;
     int64_t device_id_;
   };
 
@@ -221,9 +223,8 @@ class HandlerState {
   // State that is shared across all state objects that make up a GRPC
   // transaction (e.g. a stream).
   struct Context {
-    explicit Context(const char* server_id, const uint64_t unique_id = 0)
-        : server_id_(server_id), unique_id_(unique_id), step_(Steps::START),
-          finish_ok_(true)
+    explicit Context(const uint64_t unique_id = 0)
+        : unique_id_(unique_id), step_(Steps::START), finish_ok_(true)
     {
       ctx_.reset(new grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
@@ -262,7 +263,7 @@ class HandlerState {
 #ifdef TRTIS_ENABLE_TRACING
       if (state->trace_meta_data_ != nullptr) {
         state->trace_meta_data_->tracer_->CaptureTimestamp(
-            TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
+            TRITONSERVER_TRACE_LEVEL_MIN, "grpc send start");
       }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -296,9 +297,6 @@ class HandlerState {
       std::lock_guard<std::mutex> lock(mu_);
       return ((step_ == Steps::WRITEREADY) && states_.empty());
     }
-
-    // ID for the server this context is on
-    const char* const server_id_;
 
     // Unique ID for the context.
     const uint64_t unique_id_;
@@ -369,7 +367,7 @@ class Handler : public GRPCServerV2::HandlerBase {
  public:
   Handler(
       const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       ServiceType* service, grpc::ServerCompletionQueue* cq,
       size_t max_state_bucket_count);
   virtual ~Handler();
@@ -429,8 +427,7 @@ class Handler : public GRPCServerV2::HandlerBase {
   virtual bool Process(State* state, bool rpc_ok) = 0;
 
   const std::string name_;
-  std::shared_ptr<TRTSERVER_Server> trtserver_;
-  const char* const server_id_;
+  std::shared_ptr<TRITONSERVER_Server> tritonserver_;
 
   ServiceType* service_;
   grpc::ServerCompletionQueue* cq_;
@@ -449,11 +446,11 @@ template <
     typename ServiceType, typename ServerResponderType, typename RequestType,
     typename ResponseType>
 Handler<ServiceType, ServerResponderType, RequestType, ResponseType>::Handler(
-    const std::string& name, const std::shared_ptr<TRTSERVER_Server>& trtserver,
-    const char* server_id, ServiceType* service,
-    grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-    : name_(name), trtserver_(trtserver), server_id_(server_id),
-      service_(service), cq_(cq),
+    const std::string& name,
+    const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
+    ServiceType* service, grpc::ServerCompletionQueue* cq,
+    size_t max_state_bucket_count)
+    : name_(name), tritonserver_(tritonserver), service_(service), cq_(cq),
       max_state_bucket_count_(max_state_bucket_count)
 {
 }
@@ -597,7 +594,7 @@ class CommonHandler : public GRPCServerV2::HandlerBase {
  public:
   CommonHandler(
       const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq);
@@ -615,8 +612,7 @@ class CommonHandler : public GRPCServerV2::HandlerBase {
   void SetUpAllRequests();
 
   const std::string name_;
-  std::shared_ptr<TRTSERVER_Server> trtserver_;
-  const char* const server_id_;
+  std::shared_ptr<TRITONSERVER_Server> tritonserver_;
 
   std::shared_ptr<SharedMemoryManager> shm_manager_;
 
@@ -626,13 +622,13 @@ class CommonHandler : public GRPCServerV2::HandlerBase {
 };
 
 CommonHandler::CommonHandler(
-    const std::string& name, const std::shared_ptr<TRTSERVER_Server>& trtserver,
-    const char* server_id,
+    const std::string& name,
+    const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     GRPCInferenceService::AsyncService* service,
     grpc::ServerCompletionQueue* cq)
-    : name_(name), trtserver_(trtserver), server_id_(server_id),
-      shm_manager_(shm_manager), service_(service), cq_(cq)
+    : name_(name), tritonserver_(tritonserver), shm_manager_(shm_manager),
+      service_(service), cq_(cq)
 {
 }
 
@@ -706,109 +702,75 @@ CommonHandler::SetUpAllRequests()
                                       ModelStatisticsResponse* response,
                                       grpc::Status* status) {
 #ifdef TRTIS_ENABLE_STATS
-    ServerStatus server_status;
-
-    TRTSERVER_Protobuf* model_status_protobuf = nullptr;
-    TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
-        trtserver_.get(), request.name().c_str(), &model_status_protobuf);
+    TRITONSERVER_Message* model_stats_message = nullptr;
+    auto err = TRITONSERVER_ServerModelStatistics(
+        tritonserver_.get(), request.name().c_str(), request.version().c_str(),
+        &model_stats_message);
+    rapidjson::Document model_stats_json;
     if (err == nullptr) {
-      const char* status_buffer;
-      size_t status_byte_size;
-      err = TRTSERVER_ProtobufSerialize(
-          model_status_protobuf, &status_buffer, &status_byte_size);
+      const char* buffer;
+      size_t byte_size;
+      err = TRITONSERVER_MessageSerializeToJson(
+          model_stats_message, &buffer, &byte_size);
       if (err == nullptr) {
-        if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
+        model_stats_json.Parse(buffer, byte_size);
+        if (model_stats_json.HasParseError()) {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
+              std::string(
+                  "failed to parse the model statistics JSON buffer: " +
+                  std::string(
+                      GetParseError_En(model_stats_json.GetParseError())) +
+                  " at " + std::to_string(model_stats_json.GetErrorOffset()))
+                  .c_str());
         }
       }
+      TRITONSERVER_MessageDelete(model_stats_message);
     }
 
-    TRTSERVER_ProtobufDelete(model_status_protobuf);
-
     if (err == nullptr) {
-      const auto& nitr = server_status.model_status().find(request.name());
-      if (nitr == server_status.model_status().end()) {
-        err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            std::string(
-                "no status available for unknown model '" + request.name() +
-                "'")
-                .c_str());
-      } else {
-        const ModelStatus& model_status = nitr->second;
+      for (const auto& version_stats :
+           model_stats_json["version_stats"].GetArray()) {
+        const auto& infer_stats_json = version_stats["stats"]["inference"];
+        InferStatistics infer_stats;
+        infer_stats.mutable_success()->set_count(
+            infer_stats_json["success"]["count"].GetInt());
+        infer_stats.mutable_success()->set_ns(
+            infer_stats_json["success"]["ns"].GetInt());
+        infer_stats.mutable_fail()->set_count(
+            infer_stats_json["fail"]["count"].GetInt());
+        infer_stats.mutable_fail()->set_ns(
+            infer_stats_json["fail"]["ns"].GetInt());
+        infer_stats.mutable_queue()->set_count(
+            infer_stats_json["queue"]["count"].GetInt());
+        infer_stats.mutable_queue()->set_ns(
+            infer_stats_json["queue"]["ns"].GetInt());
+        infer_stats.mutable_compute_input()->set_count(
+            infer_stats_json["compute_input"]["count"].GetInt());
+        infer_stats.mutable_compute_input()->set_ns(
+            infer_stats_json["compute_input"]["ns"].GetInt());
+        infer_stats.mutable_compute_infer()->set_count(
+            infer_stats_json["compute_infer"]["count"].GetInt());
+        infer_stats.mutable_compute_infer()->set_ns(
+            infer_stats_json["compute_infer"]["ns"].GetInt());
+        infer_stats.mutable_compute_output()->set_count(
+            infer_stats_json["compute_output"]["count"].GetInt());
+        infer_stats.mutable_compute_output()->set_ns(
+            infer_stats_json["compute_output"]["ns"].GetInt());
 
-        int64_t requested_version;
-        err = GetModelVersionFromString(request.version(), &requested_version);
-        if (err == nullptr) {
-          // If requested_version is -1 then sum
-          for (const auto& pr : model_status.version_status()) {
-            // requested_version = std::max(requested_version, pr.first);
-            if ((requested_version == -1) || (pr.first == requested_version)) {
-              InferStatistics infer_stats;
-              const auto& ir = pr.second.infer_stats().find(1);
-              if (ir == pr.second.infer_stats().end()) {
-                err = TRTSERVER_ErrorNew(
-                    TRTSERVER_ERROR_INVALID_ARG,
-                    std::string(
-                        "no inference status available for model '" +
-                        request.name() + "'")
-                        .c_str());
-              } else {
-                infer_stats.mutable_success()->set_count(
-                    ir->second.success().count());
-                infer_stats.mutable_success()->set_ns(
-                    ir->second.success().total_time_ns());
-                infer_stats.mutable_fail()->set_count(
-                    ir->second.failed().count());
-                infer_stats.mutable_fail()->set_ns(
-                    ir->second.failed().total_time_ns());
-                infer_stats.mutable_queue()->set_count(
-                    ir->second.queue().count());
-                infer_stats.mutable_queue()->set_ns(
-                    ir->second.queue().total_time_ns());
-                infer_stats.mutable_compute_input()->set_count(
-                    ir->second.compute_input().count());
-                infer_stats.mutable_compute_input()->set_ns(
-                    ir->second.compute_input().total_time_ns());
-                infer_stats.mutable_compute_infer()->set_count(
-                    ir->second.compute_infer().count());
-                infer_stats.mutable_compute_infer()->set_ns(
-                    ir->second.compute_infer().total_time_ns());
-                infer_stats.mutable_compute_output()->set_count(
-                    ir->second.compute_output().count());
-                infer_stats.mutable_compute_output()->set_ns(
-                    ir->second.compute_output().total_time_ns());
-
-                // Add the statistics to the response
-                (*response->mutable_inference())[std::to_string(pr.first)] =
-                    infer_stats;
-                if (requested_version != -1) {
-                  break;
-                }
-              }
-            }
-          }
-          if ((requested_version != -1) &&
-              (response->inference().size() == 0)) {
-            err = TRTSERVER_ErrorNew(
-                TRTSERVER_ERROR_INVALID_ARG,
-                std::string(
-                    "no status available for model '" + request.name() +
-                    "', version " + std::to_string(requested_version))
-                    .c_str());
-          }
-        }
+        // Add the statistics to the response
+        (*response->mutable_inference())[version_stats["version"].GetString()] =
+            infer_stats;
       }
     }
 #else
-    TRTSERVER_Error* err = TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_UNAVAILABLE,
+    auto err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE,
         "the server does not suppport model statistics");
 #endif
 
     GrpcStatusUtil::Create(status, err);
-    TRTSERVER_ErrorDelete(err);
+    TRITONSERVER_ErrorDelete(err);
   };
 
   new CommonCallData<
@@ -835,11 +797,11 @@ CommonHandler::SetUpAllRequests()
       [this](
           SystemSharedMemoryStatusRequest& request,
           SystemSharedMemoryStatusResponse* response, grpc::Status* status) {
-        TRTSERVER_Error* err =
-            shm_manager_->GetStatusV2(request.name(), response);
+        TRITONSERVER_Error* err =
+            shm_manager_->GetStatus(request.name(), response);
 
         GrpcStatusUtil::Create(status, err);
-        TRTSERVER_ErrorDelete(err);
+        TRITONSERVER_ErrorDelete(err);
       };
 
   new CommonCallData<
@@ -866,12 +828,12 @@ CommonHandler::SetUpAllRequests()
       [this](
           SystemSharedMemoryRegisterRequest& request,
           SystemSharedMemoryRegisterResponse* response, grpc::Status* status) {
-        TRTSERVER_Error* err = shm_manager_->RegisterSystemSharedMemory(
+        TRITONSERVER_Error* err = shm_manager_->RegisterSystemSharedMemory(
             request.name(), request.key(), request.offset(),
             request.byte_size());
 
         GrpcStatusUtil::Create(status, err);
-        TRTSERVER_ErrorDelete(err);
+        TRITONSERVER_ErrorDelete(err);
       };
 
   new CommonCallData<
@@ -900,16 +862,16 @@ CommonHandler::SetUpAllRequests()
           SystemSharedMemoryUnregisterRequest& request,
           SystemSharedMemoryUnregisterResponse* response,
           grpc::Status* status) {
-        TRTSERVER_Error* err = nullptr;
+        TRITONSERVER_Error* err = nullptr;
         if (request.name().empty()) {
-          err = shm_manager_->UnregisterAllV2(TRTSERVER_MEMORY_CPU);
+          err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_CPU);
         } else {
           err =
-              shm_manager_->UnregisterV2(request.name(), TRTSERVER_MEMORY_CPU);
+              shm_manager_->Unregister(request.name(), TRITONSERVER_MEMORY_CPU);
         }
 
         GrpcStatusUtil::Create(status, err);
-        TRTSERVER_ErrorDelete(err);
+        TRITONSERVER_ErrorDelete(err);
       };
 
   new CommonCallData<
@@ -936,11 +898,11 @@ CommonHandler::SetUpAllRequests()
       [this](
           CudaSharedMemoryStatusRequest& request,
           CudaSharedMemoryStatusResponse* response, grpc::Status* status) {
-        TRTSERVER_Error* err =
-            shm_manager_->GetStatusV2(request.name(), response);
+        TRITONSERVER_Error* err =
+            shm_manager_->GetStatus(request.name(), response);
 
         GrpcStatusUtil::Create(status, err);
-        TRTSERVER_ErrorDelete(err);
+        TRITONSERVER_ErrorDelete(err);
       };
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<CudaSharedMemoryStatusResponse>,
@@ -966,7 +928,7 @@ CommonHandler::SetUpAllRequests()
       [this](
           CudaSharedMemoryRegisterRequest& request,
           CudaSharedMemoryRegisterResponse* response, grpc::Status* status) {
-        TRTSERVER_Error* err = nullptr;
+        TRITONSERVER_Error* err = nullptr;
 #ifdef TRTIS_ENABLE_GPU
         err = shm_manager_->RegisterCUDASharedMemory(
             request.name(),
@@ -974,8 +936,8 @@ CommonHandler::SetUpAllRequests()
                 request.raw_handle().c_str()),
             request.byte_size(), request.device_id());
 #else
-        err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
+        err = TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
             std::string(
                 "failed to register CUDA shared memory region: '" +
                 request.name() + "', GPUs not supported")
@@ -983,7 +945,7 @@ CommonHandler::SetUpAllRequests()
 #endif  // TRTIS_ENABLE_GPU
 
         GrpcStatusUtil::Create(status, err);
-        TRTSERVER_ErrorDelete(err);
+        TRITONSERVER_ErrorDelete(err);
       };
 
   new CommonCallData<
@@ -1009,16 +971,16 @@ CommonHandler::SetUpAllRequests()
       [this](
           CudaSharedMemoryUnregisterRequest& request,
           CudaSharedMemoryUnregisterResponse* response, grpc::Status* status) {
-        TRTSERVER_Error* err = nullptr;
+        TRITONSERVER_Error* err = nullptr;
         if (request.name().empty()) {
-          err = shm_manager_->UnregisterAllV2(TRTSERVER_MEMORY_GPU);
+          err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_GPU);
         } else {
           err =
-              shm_manager_->UnregisterV2(request.name(), TRTSERVER_MEMORY_GPU);
+              shm_manager_->Unregister(request.name(), TRITONSERVER_MEMORY_GPU);
         }
 
         GrpcStatusUtil::Create(status, err);
-        TRTSERVER_ErrorDelete(err);
+        TRITONSERVER_ErrorDelete(err);
       };
 
   new CommonCallData<
@@ -1043,34 +1005,45 @@ CommonHandler::SetUpAllRequests()
                                       RepositoryIndexRequest& request,
                                       RepositoryIndexResponse* response,
                                       grpc::Status* status) {
-    TRTSERVER_Error* err = nullptr;
+    TRITONSERVER_Error* err = nullptr;
     if (request.repository_name().empty()) {
-      TRTSERVER_Protobuf* repository_index_protobuf = nullptr;
-      err = TRTSERVER_ServerModelRepositoryIndex(
-          trtserver_.get(), &repository_index_protobuf);
+      TRITONSERVER_Message* model_index_message = nullptr;
+      err = TRITONSERVER_ServerModelIndex(
+          tritonserver_.get(), &model_index_message);
       if (err == nullptr) {
-        const char* serialized_buffer;
-        size_t serialized_byte_size;
-        err = TRTSERVER_ProtobufSerialize(
-            repository_index_protobuf, &serialized_buffer,
-            &serialized_byte_size);
+        const char* buffer;
+        size_t byte_size;
+        err = TRITONSERVER_MessageSerializeToJson(
+            model_index_message, &buffer, &byte_size);
         if (err == nullptr) {
-          if (!response->ParseFromArray(
-                  serialized_buffer, serialized_byte_size)) {
-            err = TRTSERVER_ErrorNew(
-                TRTSERVER_ERROR_UNKNOWN, "failed to parse repository index");
+          rapidjson::Document model_index_json;
+          model_index_json.Parse(buffer, byte_size);
+          if (model_index_json.HasParseError()) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                std::string(
+                    "failed to parse the repository index JSON buffer: " +
+                    std::string(
+                        GetParseError_En(model_index_json.GetParseError())) +
+                    " at " + std::to_string(model_index_json.GetErrorOffset()))
+                    .c_str());
+          } else {
+            for (const auto& model : model_index_json.GetArray()) {
+              auto model_index = response->add_models();
+              model_index->set_name(model["name"].GetString());
+            }
           }
         }
-      }
-      TRTSERVER_ProtobufDelete(repository_index_protobuf);
+        TRITONSERVER_MessageDelete(model_index_message);
+      };
     } else {
-      err = TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_UNSUPPORTED,
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
           "'repository_name' specification is not supported");
     }
 
     GrpcStatusUtil::Create(status, err);
-    TRTSERVER_ErrorDelete(err);
+    TRITONSERVER_ErrorDelete(err);
   };
 
   new CommonCallData<
@@ -1096,18 +1069,18 @@ CommonHandler::SetUpAllRequests()
                                           RepositoryModelLoadRequest& request,
                                           RepositoryModelLoadResponse* response,
                                           grpc::Status* status) {
-    TRTSERVER_Error* err = nullptr;
+    TRITONSERVER_Error* err = nullptr;
     if (request.repository_name().empty()) {
-      err = TRTSERVER_ServerLoadModel(
-          trtserver_.get(), request.model_name().c_str());
+      err = TRITONSERVER_ServerLoadModel(
+          tritonserver_.get(), request.model_name().c_str());
     } else {
-      err = TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_UNSUPPORTED,
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
           "'repository_name' specification is not supported");
     }
 
     GrpcStatusUtil::Create(status, err);
-    TRTSERVER_ErrorDelete(err);
+    TRITONSERVER_ErrorDelete(err);
   };
 
   new CommonCallData<
@@ -1133,18 +1106,18 @@ CommonHandler::SetUpAllRequests()
       [this](
           RepositoryModelUnloadRequest& request,
           RepositoryModelUnloadResponse* response, grpc::Status* status) {
-        TRTSERVER_Error* err = nullptr;
+        TRITONSERVER_Error* err = nullptr;
         if (request.repository_name().empty()) {
-          err = TRTSERVER_ServerUnloadModel(
-              trtserver_.get(), request.model_name().c_str());
+          err = TRITONSERVER_ServerUnloadModel(
+              tritonserver_.get(), request.model_name().c_str());
         } else {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_UNSUPPORTED,
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
               "'repository_name' specification is not supported");
         }
 
         GrpcStatusUtil::Create(status, err);
-        TRTSERVER_ErrorDelete(err);
+        TRITONSERVER_ErrorDelete(err);
       };
 
   new CommonCallData<
@@ -1165,10 +1138,10 @@ class ServerLiveHandler
  public:
   ServerLiveHandler(
       const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, trtserver, server_id, service, cq, max_state_bucket_count)
+      : Handler(name, tritonserver, service, cq, max_state_bucket_count)
   {
   }
 
@@ -1180,7 +1153,7 @@ class ServerLiveHandler
 void
 ServerLiveHandler::StartNewRequest()
 {
-  auto context = std::make_shared<State::Context>(server_id_);
+  auto context = std::make_shared<State::Context>();
   State* state = StateNew(context);
   service_->RequestServerLive(
       state->context_->ctx_.get(), &state->request_,
@@ -1209,13 +1182,14 @@ ServerLiveHandler::Process(Handler::State* state, bool rpc_ok)
 
   if (state->step_ == Steps::START) {
     bool live = false;
-    TRTSERVER_Error* err = TRTSERVER_ServerIsLive(trtserver_.get(), &live);
+    TRITONSERVER_Error* err =
+        TRITONSERVER_ServerIsLive(tritonserver_.get(), &live);
 
     response.set_live((err == nullptr) && live);
 
     grpc::Status status;
     GrpcStatusUtil::Create(&status, err);
-    TRTSERVER_ErrorDelete(err);
+    TRITONSERVER_ErrorDelete(err);
 
     state->step_ = Steps::COMPLETE;
     state->context_->responder_->Finish(response, status, state);
@@ -1244,10 +1218,10 @@ class ServerReadyHandler
  public:
   ServerReadyHandler(
       const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, trtserver, server_id, service, cq, max_state_bucket_count)
+      : Handler(name, tritonserver, service, cq, max_state_bucket_count)
   {
   }
 
@@ -1259,7 +1233,7 @@ class ServerReadyHandler
 void
 ServerReadyHandler::StartNewRequest()
 {
-  auto context = std::make_shared<State::Context>(server_id_);
+  auto context = std::make_shared<State::Context>();
   State* state = StateNew(context);
   service_->RequestServerReady(
       state->context_->ctx_.get(), &state->request_,
@@ -1288,13 +1262,14 @@ ServerReadyHandler::Process(Handler::State* state, bool rpc_ok)
 
   if (state->step_ == Steps::START) {
     bool ready = false;
-    TRTSERVER_Error* err = TRTSERVER_ServerIsReady(trtserver_.get(), &ready);
+    TRITONSERVER_Error* err =
+        TRITONSERVER_ServerIsReady(tritonserver_.get(), &ready);
 
     response.set_ready((err == nullptr) && ready);
 
     grpc::Status status;
     GrpcStatusUtil::Create(&status, err);
-    TRTSERVER_ErrorDelete(err);
+    TRITONSERVER_ErrorDelete(err);
 
     state->step_ = Steps::COMPLETE;
     state->context_->responder_->Finish(response, status, state);
@@ -1323,10 +1298,10 @@ class ModelReadyHandler
  public:
   ModelReadyHandler(
       const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, trtserver, server_id, service, cq, max_state_bucket_count)
+      : Handler(name, tritonserver, service, cq, max_state_bucket_count)
   {
   }
 
@@ -1338,7 +1313,7 @@ class ModelReadyHandler
 void
 ModelReadyHandler::StartNewRequest()
 {
-  auto context = std::make_shared<State::Context>(server_id_);
+  auto context = std::make_shared<State::Context>();
   State* state = StateNew(context);
   service_->RequestModelReady(
       state->context_->ctx_.get(), &state->request_,
@@ -1367,73 +1342,16 @@ ModelReadyHandler::Process(Handler::State* state, bool rpc_ok)
   ModelReadyResponse& response = state->response_;
 
   if (state->step_ == Steps::START) {
-    ServerStatus server_status;
+    bool is_ready = false;
+    auto err = TRITONSERVER_ServerModelIsReady(
+        tritonserver_.get(), request.name().c_str(), request.version().c_str(),
+        &is_ready);
 
-    TRTSERVER_Protobuf* model_status_protobuf = nullptr;
-    TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
-        trtserver_.get(), request.name().c_str(), &model_status_protobuf);
-    if (err == nullptr) {
-      const char* status_buffer;
-      size_t status_byte_size;
-      err = TRTSERVER_ProtobufSerialize(
-          model_status_protobuf, &status_buffer, &status_byte_size);
-      if (err == nullptr) {
-        if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
-        }
-      }
-    }
-
-    TRTSERVER_ProtobufDelete(model_status_protobuf);
-
-    bool ready = false;
-    if (err == nullptr) {
-      const auto& nitr = server_status.model_status().find(request.name());
-      if (nitr == server_status.model_status().end()) {
-        err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            std::string(
-                "no status available for unknown model '" + request.name() +
-                "'")
-                .c_str());
-      } else {
-        const ModelStatus& model_status = nitr->second;
-
-        int64_t requested_version;
-        err = GetModelVersionFromString(request.version(), &requested_version);
-        if (err == nullptr) {
-          // If requested_version is -1 then find the highest valued
-          // version.
-          if (requested_version == -1) {
-            for (const auto& pr : model_status.version_status()) {
-              requested_version = std::max(requested_version, pr.first);
-            }
-          }
-
-          const auto& vitr =
-              model_status.version_status().find(requested_version);
-          if (vitr == model_status.version_status().end()) {
-            err = TRTSERVER_ErrorNew(
-                TRTSERVER_ERROR_INVALID_ARG,
-                std::string(
-                    "no status available for model '" + request.name() +
-                    "', version " + std::to_string(requested_version))
-                    .c_str());
-          } else {
-            const ModelVersionStatus& version_status = vitr->second;
-            ready =
-                version_status.ready_state() == ModelReadyState::MODEL_READY;
-          }
-        }
-      }
-    }
-
-    response.set_ready(ready);
+    response.set_ready(is_ready);
 
     grpc::Status status;
     GrpcStatusUtil::Create(&status, err);
-    TRTSERVER_ErrorDelete(err);
+    TRITONSERVER_ErrorDelete(err);
 
     state->step_ = Steps::COMPLETE;
     state->context_->responder_->Finish(response, status, state);
@@ -1462,10 +1380,10 @@ class ServerMetadataHandler
  public:
   ServerMetadataHandler(
       const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, trtserver, server_id, service, cq, max_state_bucket_count)
+      : Handler(name, tritonserver, service, cq, max_state_bucket_count)
   {
   }
 
@@ -1477,7 +1395,7 @@ class ServerMetadataHandler
 void
 ServerMetadataHandler::StartNewRequest()
 {
-  auto context = std::make_shared<State::Context>(server_id_);
+  auto context = std::make_shared<State::Context>();
   State* state = StateNew(context);
   service_->RequestServerMetadata(
       state->context_->ctx_.get(), &state->request_,
@@ -1505,31 +1423,42 @@ ServerMetadataHandler::Process(Handler::State* state, bool rpc_ok)
   ServerMetadataResponse& response = state->response_;
 
   if (state->step_ == Steps::START) {
-    const char* name = nullptr;
-    TRTSERVER_Error* err = TRTSERVER_ServerId(trtserver_.get(), &name);
+    TRITONSERVER_Message* server_metadata_message = nullptr;
+    TRITONSERVER_Error* err = TRITONSERVER_ServerMetadata(
+        tritonserver_.get(), &server_metadata_message);
     if (err == nullptr) {
-      response.set_name(name);
-
-      const char* version = nullptr;
-      err = TRTSERVER_ServerVersion(trtserver_.get(), &version);
+      const char* buffer;
+      size_t byte_size;
+      err = TRITONSERVER_MessageSerializeToJson(
+          server_metadata_message, &buffer, &byte_size);
       if (err == nullptr) {
-        response.set_version(version);
-
-        uint64_t extensions_count;
-        const char* const* extensions;
-        err = TRTSERVER_ServerExtensions(
-            trtserver_.get(), &extensions, &extensions_count);
-        if (err == nullptr) {
-          for (uint64_t i = 0; i < extensions_count; ++i) {
-            response.add_extensions(extensions[i]);
+        rapidjson::Document server_metadata_json;
+        server_metadata_json.Parse(buffer, byte_size);
+        if (server_metadata_json.HasParseError()) {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
+              std::string(
+                  "failed to parse the server metadata JSON buffer: " +
+                  std::string(
+                      GetParseError_En(server_metadata_json.GetParseError())) +
+                  " at " +
+                  std::to_string(server_metadata_json.GetErrorOffset()))
+                  .c_str());
+        } else {
+          response.set_name(server_metadata_json["name"].GetString());
+          response.set_version(server_metadata_json["version"].GetString());
+          for (const auto& extension :
+               server_metadata_json["extensions"].GetArray()) {
+            response.add_extensions(extension.GetString());
           }
         }
       }
+      TRITONSERVER_MessageDelete(server_metadata_message);
     }
 
     grpc::Status status;
     GrpcStatusUtil::Create(&status, err);
-    TRTSERVER_ErrorDelete(err);
+    TRITONSERVER_ErrorDelete(err);
 
     state->step_ = Steps::COMPLETE;
     state->context_->responder_->Finish(response, status, state);
@@ -1558,10 +1487,10 @@ class ModelMetadataHandler
  public:
   ModelMetadataHandler(
       const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, trtserver, server_id, service, cq, max_state_bucket_count)
+      : Handler(name, tritonserver, service, cq, max_state_bucket_count)
   {
   }
 
@@ -1573,7 +1502,7 @@ class ModelMetadataHandler
 void
 ModelMetadataHandler::StartNewRequest()
 {
-  auto context = std::make_shared<State::Context>(server_id_);
+  auto context = std::make_shared<State::Context>();
   State* state = StateNew(context);
   service_->RequestModelMetadata(
       state->context_->ctx_.get(), &state->request_,
@@ -1602,70 +1531,61 @@ ModelMetadataHandler::Process(Handler::State* state, bool rpc_ok)
   ModelMetadataResponse& response = state->response_;
 
   if (state->step_ == Steps::START) {
-    ServerStatus server_status;
-
-    TRTSERVER_Protobuf* model_status_protobuf = nullptr;
-    TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
-        trtserver_.get(), request.name().c_str(), &model_status_protobuf);
+    TRITONSERVER_Message* model_metadata_message = nullptr;
+    TRITONSERVER_Error* err = TRITONSERVER_ServerModelMetadata(
+        tritonserver_.get(), request.name().c_str(), request.version().c_str(),
+        &model_metadata_message);
     if (err == nullptr) {
-      const char* status_buffer;
-      size_t status_byte_size;
-      err = TRTSERVER_ProtobufSerialize(
-          model_status_protobuf, &status_buffer, &status_byte_size);
+      const char* buffer;
+      size_t byte_size;
+      err = TRITONSERVER_MessageSerializeToJson(
+          model_metadata_message, &buffer, &byte_size);
       if (err == nullptr) {
-        if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
-        }
-      }
-    }
-
-    TRTSERVER_ProtobufDelete(model_status_protobuf);
-
-    if (err == nullptr) {
-      const auto& nitr = server_status.model_status().find(request.name());
-      if (nitr == server_status.model_status().end()) {
-        err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            std::string(
-                "no metadata available for unknown model '" + request.name() +
-                "'")
-                .c_str());
-      } else {
-        // All models share the same metadata across versions so we
-        // ignore request.version().
-        const ModelStatus& model_status = nitr->second;
-        const ModelConfig& model_config = model_status.config();
-        response.set_name(model_config.name());
-        response.set_platform(model_config.platform());
-        for (const auto& pr : model_status.version_status()) {
-          response.add_versions(std::to_string(pr.first));
-        }
-
-        for (const auto& io : model_config.input()) {
-          ModelMetadataResponse::TensorMetadata* input = response.add_inputs();
-          input->set_name(io.name());
-          input->set_datatype(DataTypeToProtocolString(io.data_type()));
-          for (const auto d : io.dims()) {
-            input->add_shape(d);
+        rapidjson::Document model_metadata_json;
+        model_metadata_json.Parse(buffer, byte_size);
+        if (model_metadata_json.HasParseError()) {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
+              std::string(
+                  "failed to parse the model metadata JSON buffer: " +
+                  std::string(
+                      GetParseError_En(model_metadata_json.GetParseError())) +
+                  " at " + std::to_string(model_metadata_json.GetErrorOffset()))
+                  .c_str());
+        } else {
+          response.set_name(model_metadata_json["name"].GetString());
+          for (const auto& version :
+               model_metadata_json["versions"].GetArray()) {
+            response.add_versions(version.GetString());
           }
-        }
+          response.set_platform(model_metadata_json["platform"].GetString());
 
-        for (const auto& io : model_config.output()) {
-          ModelMetadataResponse::TensorMetadata* output =
-              response.add_outputs();
-          output->set_name(io.name());
-          output->set_datatype(DataTypeToProtocolString(io.data_type()));
-          for (const auto d : io.dims()) {
-            output->add_shape(d);
+          for (const auto& io_json : model_metadata_json["inputs"].GetArray()) {
+            ModelMetadataResponse::TensorMetadata* io = response.add_inputs();
+            io->set_name(io_json["name"].GetString());
+            io->set_datatype(io_json["datatype"].GetString());
+            for (const auto& d : io_json["shape"].GetArray()) {
+              io->add_shape(d.GetInt());
+            }
+          }
+
+          for (const auto& io_json :
+               model_metadata_json["outputs"].GetArray()) {
+            ModelMetadataResponse::TensorMetadata* io = response.add_outputs();
+            io->set_name(io_json["name"].GetString());
+            io->set_datatype(io_json["datatype"].GetString());
+            for (const auto& d : io_json["shape"].GetArray()) {
+              io->add_shape(d.GetInt());
+            }
           }
         }
       }
+      TRITONSERVER_MessageDelete(model_metadata_message);
     }
 
     grpc::Status status;
     GrpcStatusUtil::Create(&status, err);
-    TRTSERVER_ErrorDelete(err);
+    TRITONSERVER_ErrorDelete(err);
 
     state->step_ = Steps::COMPLETE;
     state->context_->responder_->Finish(response, status, state);
@@ -1694,10 +1614,10 @@ class ModelConfigHandler
  public:
   ModelConfigHandler(
       const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(name, trtserver, server_id, service, cq, max_state_bucket_count)
+      : Handler(name, tritonserver, service, cq, max_state_bucket_count)
   {
   }
 
@@ -1709,7 +1629,7 @@ class ModelConfigHandler
 void
 ModelConfigHandler::StartNewRequest()
 {
-  auto context = std::make_shared<State::Context>(server_id_);
+  auto context = std::make_shared<State::Context>();
   State* state = StateNew(context);
   service_->RequestModelConfig(
       state->context_->ctx_.get(), &state->request_,
@@ -1738,46 +1658,25 @@ ModelConfigHandler::Process(Handler::State* state, bool rpc_ok)
   ModelConfigResponse& response = state->response_;
 
   if (state->step_ == Steps::START) {
-    ServerStatus server_status;
-
-    TRTSERVER_Protobuf* model_status_protobuf = nullptr;
-    TRTSERVER_Error* err = TRTSERVER_ServerModelStatus(
-        trtserver_.get(), request.name().c_str(), &model_status_protobuf);
+    TRITONSERVER_Message* model_config_message = nullptr;
+    TRITONSERVER_Error* err = TRITONSERVER_ServerModelConfig(
+        tritonserver_.get(), request.name().c_str(), request.version().c_str(),
+        &model_config_message);
     if (err == nullptr) {
-      const char* status_buffer;
-      size_t status_byte_size;
-      err = TRTSERVER_ProtobufSerialize(
-          model_status_protobuf, &status_buffer, &status_byte_size);
+      const char* buffer;
+      size_t byte_size;
+      err = TRITONSERVER_MessageSerializeToJson(
+          model_config_message, &buffer, &byte_size);
       if (err == nullptr) {
-        if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
-        }
+        ::google::protobuf::util::JsonStringToMessage(
+            {buffer, (int)byte_size}, response.mutable_config());
       }
-    }
-
-    TRTSERVER_ProtobufDelete(model_status_protobuf);
-
-    if (err == nullptr) {
-      const auto& nitr = server_status.model_status().find(request.name());
-      if (nitr == server_status.model_status().end()) {
-        err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            std::string(
-                "no config available for unknown model '" + request.name() +
-                "'")
-                .c_str());
-      } else {
-        // All models share the same config across versions so we
-        // ignore request.version().
-        const ModelStatus& model_status = nitr->second;
-        response.mutable_config()->CopyFrom(model_status.config());
-      }
+      TRITONSERVER_MessageDelete(model_config_message);
     }
 
     grpc::Status status;
     GrpcStatusUtil::Create(&status, err);
-    TRTSERVER_ErrorDelete(err);
+    TRITONSERVER_ErrorDelete(err);
 
     state->step_ = Steps::COMPLETE;
     state->context_->responder_->Finish(response, status, state);
@@ -1798,12 +1697,12 @@ ModelConfigHandler::Process(Handler::State* state, bool rpc_ok)
 //
 // Infer utilities
 //
-TRTSERVER_Error*
+TRITONSERVER_Error*
 InferResponseAlloc(
-    TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
-    size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRITONSERVER_Memory_Type preferred_memory_type,
     int64_t preferred_memory_type_id, void* userp, void** buffer,
-    void** buffer_userp, TRTSERVER_Memory_Type* actual_memory_type,
+    void** buffer_userp, TRITONSERVER_Memory_Type* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
@@ -1831,8 +1730,8 @@ InferResponseAlloc(
         // If the output is in shared memory then check whether the shared
         // memory size is at least the byte size of the output.
         if (byte_size > pr->second.byte_size_) {
-          return TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INTERNAL,
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
               std::string(
                   "shared memory size specified with the request for output '" +
                   std::string(tensor_name) + "' (" +
@@ -1855,11 +1754,11 @@ InferResponseAlloc(
     if (!use_shm) {
       // Can't allocate for any memory type other than CPU. If asked to
       // allocate on GPU memory then force allocation on CPU instead.
-      if (*actual_memory_type != TRTSERVER_MEMORY_CPU) {
+      if (*actual_memory_type != TRITONSERVER_MEMORY_CPU) {
         LOG_VERBOSE(1) << "GRPC: unable to provide '" << tensor_name << "' in "
                        << MemoryTypeString(*actual_memory_type) << ", will use "
-                       << MemoryTypeString(TRTSERVER_MEMORY_CPU);
-        *actual_memory_type = TRTSERVER_MEMORY_CPU;
+                       << MemoryTypeString(TRITONSERVER_MEMORY_CPU);
+        *actual_memory_type = TRITONSERVER_MEMORY_CPU;
         *actual_memory_type_id = 0;
       }
 
@@ -1874,10 +1773,11 @@ InferResponseAlloc(
   return nullptr;  // Success
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 InferResponseRelease(
-    TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
-    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
+    TRITONSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+    size_t byte_size, TRITONSERVER_Memory_Type memory_type,
+    int64_t memory_type_id)
 {
   LOG_VERBOSE(1) << "GRPC release: "
                  << "size " << byte_size << ", addr " << buffer;
@@ -1888,7 +1788,7 @@ InferResponseRelease(
 }
 
 template <typename TensorType>
-TRTSERVER_Error*
+TRITONSERVER_Error*
 ParseSharedMemoryParams(
     const TensorType& tensor, bool* has_shared_memory, std::string* region_name,
     int64_t* offset, size_t* byte_size)
@@ -1901,8 +1801,8 @@ ParseSharedMemoryParams(
     const auto& infer_param = region_it->second;
     if (infer_param.parameter_choice_case() !=
         InferParameter::ParameterChoiceCase::kStringParam) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
               "invalid value type for 'shared_memory_region' parameter for "
               "tensor '" +
@@ -1915,8 +1815,8 @@ ParseSharedMemoryParams(
   const auto& offset_it = tensor.parameters().find("shared_memory_offset");
   if (offset_it != tensor.parameters().end()) {
     if (!*has_shared_memory) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
               "'shared_memory_offset' can not be specified without "
               "'shared_memory_region' parameter for tensor '" +
@@ -1926,8 +1826,8 @@ ParseSharedMemoryParams(
     const auto& infer_param = offset_it->second;
     if (infer_param.parameter_choice_case() !=
         InferParameter::ParameterChoiceCase::kInt64Param) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
               "invalid value type for 'shared_memory_offset' parameter for "
               "tensor '" +
@@ -1940,8 +1840,8 @@ ParseSharedMemoryParams(
   const auto& bs_it = tensor.parameters().find("shared_memory_byte_size");
   if (bs_it != tensor.parameters().end()) {
     if (!*has_shared_memory) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
               "'shared_memory_byte_size' can not be specified without "
               "'shared_memory_region' parameter for tensor '" +
@@ -1951,8 +1851,8 @@ ParseSharedMemoryParams(
     const auto& infer_param = bs_it->second;
     if (infer_param.parameter_choice_case() !=
         InferParameter::ParameterChoiceCase::kInt64Param) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
               "invalid value type for 'shared_memory_byte_size' parameter for "
               "tensor '" +
@@ -1962,8 +1862,8 @@ ParseSharedMemoryParams(
     *byte_size = infer_param.int64_param();
   } else {
     if (*has_shared_memory) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
               "'shared_memory_byte_size' must be specified along with "
               "'shared_memory_region' parameter for tensor '" +
@@ -1975,9 +1875,9 @@ ParseSharedMemoryParams(
   return nullptr;
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 InferAllocatorPayload(
-    const std::shared_ptr<TRTSERVER_Server>& trtserver,
+    const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const ModelInferRequest& request,
     AllocPayload::TensorSerializedDataMap* serialized_data_map,
@@ -2004,15 +1904,15 @@ InferAllocatorPayload(
     size_t byte_size;
     bool has_shared_memory;
 
-    RETURN_IF_ERR(
+    RETURN_IF_TRITON_ERR(
         ParseSharedMemoryParams<ModelInferRequest::InferRequestedOutputTensor>(
             io, &has_shared_memory, &region_name, &offset, &byte_size));
 
     if (has_shared_memory) {
       void* base;
-      TRTSERVER_Memory_Type memory_type;
+      TRITONSERVER_Memory_Type memory_type;
       int64_t memory_type_id;
-      RETURN_IF_ERR(shm_manager->GetMemoryInfo(
+      RETURN_IF_TRITON_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, &base, &memory_type, &memory_type_id));
 
       // if shm_map_ does not exist, then create an empty shm_map
@@ -2029,15 +1929,15 @@ InferAllocatorPayload(
   return nullptr;  // Success
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 InferGRPCToInputHelper(
     const std::string& input_name, const std::string& model_name,
     const std::string& tensor_dt, const std::string& input_dt,
     const size_t byte_size)
 {
   if (input_dt.compare(tensor_dt) != 0) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
             "unexpected explicit tensor data for input tensor '" + input_name +
             "' for model '" + model_name + "' of type '" + tensor_dt +
@@ -2045,8 +1945,8 @@ InferGRPCToInputHelper(
             .c_str());
   }
   if (byte_size != 0) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
             "unexpected explicit tensor data for input tensor '" + input_name +
             "' for model '" + model_name +
@@ -2056,37 +1956,38 @@ InferGRPCToInputHelper(
   return nullptr;  // success
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 InferGRPCToInput(
-    const std::shared_ptr<TRTSERVER_Server>& trtserver,
+    const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const ModelInferRequest& request,
     AllocPayload::TensorSerializedDataMap* serialized_data_map,
-    TRTSERVER_InferenceRequestProvider* request_provider)
+    TRITONSERVER_InferenceRequest* inference_request)
 {
   // Verify that the batch-byte-size of each input matches the size of
   // the provided tensor data (provided raw or from shared memory)
   for (const auto& io : request.inputs()) {
     const void* base;
     size_t byte_size;
-    TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
+    TRITONSERVER_Memory_Type memory_type = TRITONSERVER_MEMORY_CPU;
     int64_t memory_type_id = 0;
 
     std::string region_name;
     int64_t offset;
     bool has_shared_memory;
-    RETURN_IF_ERR(ParseSharedMemoryParams<ModelInferRequest::InferInputTensor>(
-        io, &has_shared_memory, &region_name, &offset, &byte_size));
+    RETURN_IF_TRITON_ERR(
+        ParseSharedMemoryParams<ModelInferRequest::InferInputTensor>(
+            io, &has_shared_memory, &region_name, &offset, &byte_size));
 
     if (has_shared_memory) {
       void* tmp;
-      RETURN_IF_ERR(shm_manager->GetMemoryInfo(
+      RETURN_IF_TRITON_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, &tmp, &memory_type, &memory_type_id));
       base = tmp;
     } else {
       if (!io.has_contents()) {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
             std::string(
                 "expected tensor data for input tensor '" + io.name() +
                 "' for model '" + request.model_name() + "'")
@@ -2101,7 +2002,7 @@ InferGRPCToInput(
       // Check the presence of explicit tensors
       const size_t elem_byte_size = GetDataTypeByteSize(io.datatype());
       if (io.contents().bool_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
+        RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "BOOL", io.datatype(), byte_size));
         base = (const void*)io.contents().bool_contents().data();
         byte_size = io.contents().bool_contents_size() * elem_byte_size;
@@ -2109,7 +2010,7 @@ InferGRPCToInput(
 
       if (io.contents().int_contents_size() != 0) {
         if (io.datatype().compare("INT8") == 0) {
-          RETURN_IF_ERR(InferGRPCToInputHelper(
+          RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), "INT8", io.datatype(),
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
@@ -2126,7 +2027,7 @@ InferGRPCToInput(
           base = serialized->c_str();
           byte_size = serialized->size();
         } else if (io.datatype().compare("INT16") == 0) {
-          RETURN_IF_ERR(InferGRPCToInputHelper(
+          RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), "INT16", io.datatype(),
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
@@ -2143,7 +2044,7 @@ InferGRPCToInput(
           base = serialized->c_str();
           byte_size = serialized->size();
         } else {
-          RETURN_IF_ERR(InferGRPCToInputHelper(
+          RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), "INT32", io.datatype(),
               byte_size));
           base = (const void*)io.contents().int_contents().data();
@@ -2152,7 +2053,7 @@ InferGRPCToInput(
       }
 
       if (io.contents().int64_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
+        RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "INT64", io.datatype(),
             byte_size));
         base = (const void*)io.contents().int64_contents().data();
@@ -2161,7 +2062,7 @@ InferGRPCToInput(
 
       if (io.contents().uint_contents_size() != 0) {
         if (io.datatype().compare("UINT8") == 0) {
-          RETURN_IF_ERR(InferGRPCToInputHelper(
+          RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), "UINT8", io.datatype(),
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
@@ -2178,7 +2079,7 @@ InferGRPCToInput(
           base = serialized->c_str();
           byte_size = serialized->size();
         } else if (io.datatype().compare("UINT16") == 0) {
-          RETURN_IF_ERR(InferGRPCToInputHelper(
+          RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), "UINT16", io.datatype(),
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
@@ -2195,7 +2096,7 @@ InferGRPCToInput(
           base = serialized->c_str();
           byte_size = serialized->size();
         } else {
-          RETURN_IF_ERR(InferGRPCToInputHelper(
+          RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), "UINT32", io.datatype(),
               byte_size));
           base = (const void*)io.contents().int_contents().data();
@@ -2204,7 +2105,7 @@ InferGRPCToInput(
       }
 
       if (io.contents().uint64_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
+        RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "UINT64", io.datatype(),
             byte_size));
         base = (const void*)io.contents().uint64_contents().data();
@@ -2212,21 +2113,21 @@ InferGRPCToInput(
       }
 
       if (io.contents().fp32_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
+        RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "FP32", io.datatype(), byte_size));
         base = (const void*)io.contents().fp32_contents().data();
         byte_size = io.contents().fp32_contents_size() * elem_byte_size;
       }
 
       if (io.contents().fp64_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
+        RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "FP64", io.datatype(), byte_size));
         base = (const void*)io.contents().fp64_contents().data();
         byte_size = io.contents().fp64_contents_size() * elem_byte_size;
       }
 
       if (io.contents().byte_contents_size() != 0) {
-        RETURN_IF_ERR(InferGRPCToInputHelper(
+        RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "BYTES", io.datatype(),
             byte_size));
         std::shared_ptr<std::string> serialized(new std::string());
@@ -2248,12 +2149,120 @@ InferGRPCToInput(
       }
     }
 
-    RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-        request_provider, io.name().c_str(), base, byte_size, memory_type,
+    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestAppendInputData(
+        inference_request, io.name().c_str(), base, byte_size, memory_type,
         memory_type_id));
   }
 
   return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+SetInferenceRequestMetadata(
+    TRITONSERVER_InferenceRequest* inference_request,
+    const ModelInferRequest& request)
+{
+  RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestSetId(
+      inference_request, request.id().c_str()));
+
+  const auto& sequence_id_it = request.parameters().find("sequence_id");
+  if (sequence_id_it != request.parameters().end()) {
+    const auto& infer_param = sequence_id_it->second;
+    if (infer_param.parameter_choice_case() !=
+        InferParameter::ParameterChoiceCase::kInt64Param) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          "invalid value type for 'sequence_id' parameter, expected "
+          "int64_param.");
+    }
+    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestSetCorrelationId(
+        inference_request, infer_param.int64_param()));
+    uint32_t flags = TRITONSERVER_REQUEST_FLAG_NONE;
+    const auto& sequence_start_it = request.parameters().find("sequence_start");
+    if (sequence_start_it != request.parameters().end()) {
+      const auto& infer_param = sequence_start_it->second;
+      if (infer_param.parameter_choice_case() !=
+          InferParameter::ParameterChoiceCase::kBoolParam) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "invalid value type for 'sequence_start' parameter, expected "
+            "bool_param.");
+      }
+      flags |=
+          infer_param.bool_param() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
+    }
+    const auto& sequence_end_it = request.parameters().find("sequence_end");
+    if (sequence_end_it != request.parameters().end()) {
+      const auto& infer_param = sequence_end_it->second;
+      if (infer_param.parameter_choice_case() !=
+          InferParameter::ParameterChoiceCase::kBoolParam) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "invalid value type for 'sequence_end' parameter, expected "
+            "bool_param.");
+      }
+      flags |=
+          infer_param.bool_param() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
+    }
+    RETURN_IF_TRITON_ERR(
+        TRITONSERVER_InferenceRequestSetFlags(inference_request, flags));
+  }
+
+  const auto& priority_it = request.parameters().find("priority");
+  if (priority_it != request.parameters().end()) {
+    const auto& infer_param = priority_it->second;
+    if (infer_param.parameter_choice_case() !=
+        InferParameter::ParameterChoiceCase::kInt64Param) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          "invalid value type for 'sequence_id' parameter, expected "
+          "int64_param.");
+    }
+    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestSetPriority(
+        inference_request, infer_param.int64_param()));
+  }
+
+  const auto& timeout_it = request.parameters().find("timeout");
+  if (timeout_it != request.parameters().end()) {
+    const auto& infer_param = timeout_it->second;
+    if (infer_param.parameter_choice_case() !=
+        InferParameter::ParameterChoiceCase::kInt64Param) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          "invalid value type for 'sequence_id' parameter, expected "
+          "int64_param.");
+    }
+    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
+        inference_request, infer_param.int64_param()));
+  }
+
+  for (const auto& input : request.inputs()) {
+    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestAddInput(
+        inference_request, input.name().c_str(), input.datatype().c_str(),
+        input.shape().data(), input.shape_size()));
+  }
+
+  for (const auto& output : request.outputs()) {
+    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestAddRequestedOutput(
+        inference_request, output.name().c_str()));
+
+    const auto& class_it = output.parameters().find("classification");
+    if (class_it != output.parameters().end()) {
+      const auto& infer_param = class_it->second;
+      if (infer_param.parameter_choice_case() !=
+          InferParameter::ParameterChoiceCase::kInt64Param) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "invalid value type for 'classification' parameter, expected "
+            "int64_param.");
+      }
+      RETURN_IF_TRITON_ERR(
+          TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
+              inference_request, output.name().c_str(),
+              infer_param.int64_param()));
+    }
+  }
+  return nullptr;  // Success
 }
 
 //
@@ -2267,19 +2276,18 @@ class ModelInferHandler
  public:
   ModelInferHandler(
       const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       const std::shared_ptr<TraceManager>& trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(
-            name, trtserver, server_id, service, cq, max_state_bucket_count),
+      : Handler(name, tritonserver, service, cq, max_state_bucket_count),
         trace_manager_(trace_manager), shm_manager_(shm_manager)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
-    FAIL_IF_ERR(
-        TRTSERVER_ResponseAllocatorNew(
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_ResponseAllocatorNew(
             &allocator_, InferResponseAlloc, InferResponseRelease),
         "creating inference response allocator");
   }
@@ -2290,18 +2298,18 @@ class ModelInferHandler
 
  private:
   static void InferComplete(
-      TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
-      TRTSERVER_InferenceResponse* response, void* userp);
+      TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
+      TRITONSERVER_InferenceRequest* request, void* userp);
 
   std::shared_ptr<TraceManager> trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
-  TRTSERVER_ResponseAllocator* allocator_;
+  TRITONSERVER_ResponseAllocator* allocator_;
 };
 
 void
 ModelInferHandler::StartNewRequest()
 {
-  auto context = std::make_shared<State::Context>(server_id_);
+  auto context = std::make_shared<State::Context>();
   State* state = StateNew(context);
 
 #ifdef TRTIS_ENABLE_TRACING
@@ -2309,7 +2317,7 @@ ModelInferHandler::StartNewRequest()
     state->trace_meta_data_.reset(trace_manager_->SampleTrace());
     if (state->trace_meta_data_ != nullptr) {
       state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
+          TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
     }
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -2347,11 +2355,12 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
   ModelInferResponse& response = state->response_;
 
   if (state->step_ == Steps::START) {
-    int64_t requested_model_version;
-    TRTSERVER_Error* err = GetModelVersionFromString(
-        request.model_version(), &requested_model_version);
+    TRITONSERVER_Error* err = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
     if (state->trace_meta_data_ != nullptr) {
+      int64_t requested_model_version;
+      err = GetModelVersionFromString(
+          request.model_version(), &requested_model_version);
       if (err == nullptr) {
         state->trace_meta_data_->tracer_->SetModel(
             request.model_name(), requested_model_version);
@@ -2362,7 +2371,7 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
         state->trace_meta_data_->tracer_->SetModel(request.model_name(), -1);
       }
       state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
+          TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -2370,22 +2379,17 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
     if (!shutdown) {
       StartNewRequest();
     }
-    // Create the inference request provider which provides all the
+    // Create the inference request which contians all the
     // input information needed for an inference.
-    TRTSERVER_InferenceRequestOptions* request_options = nullptr;
+    TRITONSERVER_InferenceRequest* irequest = nullptr;
     if (err == nullptr) {
-      err = TRTSERVER_InferenceRequestOptionsNew(
-          &request_options, request.model_name().c_str(),
-          requested_model_version);
-    }
-    if (err == nullptr) {
-      err = SetInferenceRequestOptions(request_options, request);
+      err = TRITONSERVER_InferenceRequestNew(
+          &irequest, tritonserver_.get(), request.model_name().c_str(),
+          request.model_version().c_str());
     }
 
-    TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
     if (err == nullptr) {
-      err = TRTSERVER_InferenceRequestProviderNewV2(
-          &request_provider, trtserver_.get(), request_options);
+      err = SetInferenceRequestMetadata(irequest, request);
     }
 
     // Will be used to hold the serialized data in case explicit string
@@ -2395,54 +2399,58 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
 
     if (err == nullptr) {
       err = InferGRPCToInput(
-          trtserver_, shm_manager_, request, serialized_data_map,
-          request_provider);
+          tritonserver_, shm_manager_, request, serialized_data_map, irequest);
     }
     if (err == nullptr) {
       err = InferAllocatorPayload(
-          trtserver_, shm_manager_, request, serialized_data_map, &response,
+          tritonserver_, shm_manager_, request, serialized_data_map, &response,
           &state->alloc_payload_);
     }
     if (err == nullptr) {
       // Provide the trace manager object to use for this request, if
       // nullptr then no tracing will be performed.
-      TRTSERVER_TraceManager* trace_manager = nullptr;
+      TRITONSERVER_TraceManager* trace_manager = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
       if (state->trace_meta_data_ != nullptr) {
-        TRTSERVER_TraceManagerNew(
+        TRITONSERVER_TraceManagerNew(
             &trace_manager, TraceManager::CreateTrace,
             TraceManager::ReleaseTrace, state->trace_meta_data_.get());
       }
 #endif  // TRTIS_ENABLE_TRACING
 
+      // Set fields that are known in advance.
+      response.set_id(request.id());
+      response.set_model_name(request.model_name());
+      response.set_model_version(request.model_version());
+
       state->step_ = ISSUED;
-      err = TRTSERVER_ServerInferAsync(
-          trtserver_.get(), trace_manager, request_provider, allocator_,
+
+      err = TRITONSERVER_ServerInferAsync(
+          tritonserver_.get(), trace_manager, irequest, allocator_,
           &state->alloc_payload_ /* response_allocator_userp */, InferComplete,
           reinterpret_cast<void*>(state));
     }
-
-    // The request provider can be deleted before ServerInferAsync
-    // callback completes.
-    TRTSERVER_InferenceRequestProviderDelete(request_provider);
-    TRTSERVER_InferenceRequestOptionsDelete(request_options);
 
     // If not error then state->step_ == ISSUED and inference request
     // has initiated... completion callback will transition to
     // COMPLETE. If error go immediately to COMPLETE.
     if (err != nullptr) {
-      LOG_VERBOSE(1) << "Infer failed: " << TRTSERVER_ErrorMessage(err);
+      LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
+
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceRequestDelete(irequest),
+          "deleting GRPC inference request");
 
       grpc::Status status;
       GrpcStatusUtil::Create(&status, err);
-      TRTSERVER_ErrorDelete(err);
+      TRITONSERVER_ErrorDelete(err);
 
       response.Clear();
 
 #ifdef TRTIS_ENABLE_TRACING
       if (state->trace_meta_data_ != nullptr) {
         state->trace_meta_data_->tracer_->CaptureTimestamp(
-            TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
+            TRITONSERVER_TRACE_LEVEL_MIN, "grpc send start");
       }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -2453,7 +2461,7 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
 #ifdef TRTIS_ENABLE_TRACING
     if (state->trace_meta_data_ != nullptr) {
       state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc send end");
+          TRITONSERVER_TRACE_LEVEL_MIN, "grpc send end");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -2466,8 +2474,8 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
 
 void
 ModelInferHandler::InferComplete(
-    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
-    TRTSERVER_InferenceResponse* trtserver_response, void* userp)
+    TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
+    TRITONSERVER_InferenceRequest* request, void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
 
@@ -2475,78 +2483,56 @@ ModelInferHandler::InferComplete(
                  << " step " << state->step_;
 
   ModelInferResponse& response = state->response_;
-  InferResponseHeader response_header;
 
-  TRTSERVER_Error* err = TRTSERVER_InferenceResponseStatus(trtserver_response);
+  TRITONSERVER_Error* err = TRITONSERVER_InferenceRequestError(request);
   if (err == nullptr) {
-    TRTSERVER_Protobuf* response_protobuf = nullptr;
-    err = TRTSERVER_InferenceResponseHeader(
-        trtserver_response, &response_protobuf);
-    if (err == nullptr) {
-      const char* buffer;
-      size_t byte_size;
-      err = TRTSERVER_ProtobufSerialize(response_protobuf, &buffer, &byte_size);
-      if (err == nullptr) {
-        if (!response_header.ParseFromArray(buffer, byte_size)) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INTERNAL, "failed to parse response header");
-        }
+    for (auto& output : *(response.mutable_outputs())) {
+      uint32_t cls_count = 0;
+      err = TRITONSERVER_InferenceRequestRequestedOutputClassificationCount(
+          request, output.name().c_str(), &cls_count);
+      if (err != nullptr) {
+        break;
       }
 
-      TRTSERVER_ProtobufDelete(response_protobuf);
-    }
-  }
-
-  const char* id;
-  if (err == nullptr) {
-    err = TRTSERVER_InferenceResponseIdStr(trtserver_response, &id);
-  }
-
-  // Convert the InferResponseHeader to the V2 response
-  if (err == nullptr) {
-    response.set_model_name(response_header.model_name());
-    response.set_model_version(std::to_string(response_header.model_version()));
-    response.set_id(id);
-    for (const auto& io : response_header.output()) {
-      // Find the tensor in the response and set its shape.
-      for (auto& output : *(response.mutable_outputs())) {
-        if (output.name() == io.name()) {
-          if (io.batch_classes().size() == 0) {
-            for (const auto d : io.raw().dims()) {
-              output.add_shape(d);
-            }
-            output.set_datatype(DataTypeToProtocolString(io.data_type()));
-          } else {
-            int cls_count = 0;
-            for (const auto& classes : io.batch_classes()) {
-              cls_count = classes.cls().size();
-              for (const auto& cls : classes.cls()) {
-                if (!cls.label().empty()) {
-                  output.mutable_contents()->add_byte_contents(std::string(
-                      std::to_string(cls.idx()) + ":" +
-                      std::to_string(cls.value()) + ":" + cls.label()));
-                } else {
-                  output.mutable_contents()->add_byte_contents(std::string(
-                      std::to_string(cls.idx()) + ":" +
-                      std::to_string(cls.value())));
-                }
-              }
-            }
-            output.add_shape(io.batch_classes().size());
-            output.add_shape(cls_count);
-
-            output.set_datatype("BYTES");
-          }
+      if (cls_count == 0) {
+        const int64_t* shape;
+        uint64_t dim_count;
+        const char* datatype;
+        err = TRITONSERVER_InferenceRequestOutputShape(
+            request, output.name().c_str(), &shape, &dim_count);
+        if (err == nullptr) {
+          err = TRITONSERVER_InferenceRequestOutputDataType(
+              request, output.name().c_str(), &datatype);
+        }
+        if (err != nullptr) {
           break;
         }
+
+        for (size_t idx = 0; idx < dim_count; idx++) {
+          output.add_shape(shape[idx]);
+        }
+        output.set_datatype(datatype);
+      } else {
+        const char* const* content;
+        int64_t shape[2];
+        err = TRITONSERVER_InferenceRequestOutputClasses(
+            request, output.name().c_str(), &content, shape);
+        size_t element_cnt = shape[0] * shape[1];
+        for (size_t idx = 0; idx < element_cnt; idx++) {
+          output.mutable_contents()->add_byte_contents(content[idx]);
+        }
+        output.add_shape(shape[0]);
+        output.add_shape(shape[1]);
+
+        output.set_datatype("BYTES");
       }
     }
   }
 
   // Make sure response doesn't exceed GRPC limits.
   if ((err == nullptr) && (response.ByteSizeLong() > INT_MAX)) {
-    err = TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
+    err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
             "Response has byte size " +
             std::to_string(response.ByteSizeLong()) +
@@ -2561,18 +2547,18 @@ ModelInferHandler::InferComplete(
 
   grpc::Status status;
   GrpcStatusUtil::Create(&status, err);
+  TRITONSERVER_ErrorDelete(err);
 
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'state'.
-  LOG_TRTSERVER_ERROR(
-      TRTSERVER_InferenceResponseDelete(trtserver_response),
-      "deleting GRPC response");
-  TRTSERVER_ErrorDelete(err);
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceRequestDelete(request),
+      "deleting GRPC inference request");
 
 #ifdef TRTIS_ENABLE_TRACING
   if (state->trace_meta_data_ != nullptr) {
     state->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
+        TRITONSERVER_TRACE_LEVEL_MIN, "grpc send start");
   }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -2592,19 +2578,18 @@ class ModelStreamInferHandler
  public:
   ModelStreamInferHandler(
       const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       const std::shared_ptr<TraceManager>& trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
-      : Handler(
-            name, trtserver, server_id, service, cq, max_state_bucket_count),
+      : Handler(name, tritonserver, service, cq, max_state_bucket_count),
         trace_manager_(trace_manager), shm_manager_(shm_manager)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
-    FAIL_IF_ERR(
-        TRTSERVER_ResponseAllocatorNew(
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_ResponseAllocatorNew(
             &allocator_, InferResponseAlloc, InferResponseRelease),
         "creating response allocator");
   }
@@ -2615,19 +2600,19 @@ class ModelStreamInferHandler
 
  private:
   static void StreamInferComplete(
-      TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
-      TRTSERVER_InferenceResponse* response, void* userp);
+      TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
+      TRITONSERVER_InferenceRequest* request, void* userp);
 
   std::shared_ptr<TraceManager> trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
-  TRTSERVER_ResponseAllocator* allocator_;
+  TRITONSERVER_ResponseAllocator* allocator_;
 };
 
 void
 ModelStreamInferHandler::StartNewRequest()
 {
   const uint64_t unique_id = RequestStatusUtil::NextUniqueRequestId();
-  auto context = std::make_shared<State::Context>(server_id_, unique_id);
+  auto context = std::make_shared<State::Context>(unique_id);
   State* state = StateNew(context);
 
 #ifdef TRTIS_ENABLE_TRACING
@@ -2635,7 +2620,7 @@ ModelStreamInferHandler::StartNewRequest()
     state->trace_meta_data_.reset(trace_manager_->SampleTrace());
     if (state->trace_meta_data_ != nullptr) {
       state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
+          TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
     }
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -2678,13 +2663,14 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     state->context_->responder_->Read(&state->request_, state);
 
   } else if (state->step_ == Steps::READ) {
+    TRITONSERVER_Error* err = nullptr;
     const ModelInferRequest& request = state->request_;
-    int64_t requested_model_version;
-    TRTSERVER_Error* err = GetModelVersionFromString(
-        request.model_version(), &requested_model_version);
 #ifdef TRTIS_ENABLE_TRACING
     if (state->trace_meta_data_ != nullptr) {
       if (err == nullptr) {
+        int64_t requested_model_version;
+        err = GetModelVersionFromString(
+            request.model_version(), &requested_model_version);
         state->trace_meta_data_->tracer_->SetModel(
             state->request_.model_name(), requested_model_version);
       } else {
@@ -2695,7 +2681,7 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
             state->request_.model_name(), -1);
       }
       state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
+          TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -2732,22 +2718,17 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // Issue the inference request into server...
     ModelStreamInferResponse& response = state->response_;
 
-    // Create the inference request provider which provides all the
+    // Create the inference request which contains all the
     // input information needed for an inference.
-    TRTSERVER_InferenceRequestOptions* request_options = nullptr;
+    TRITONSERVER_InferenceRequest* irequest = nullptr;
     if (err == nullptr) {
-      err = TRTSERVER_InferenceRequestOptionsNew(
-          &request_options, request.model_name().c_str(),
-          requested_model_version);
-    }
-    if (err == nullptr) {
-      err = SetInferenceRequestOptions(request_options, request);
+      err = TRITONSERVER_InferenceRequestNew(
+          &irequest, tritonserver_.get(), request.model_name().c_str(),
+          request.model_version().c_str());
     }
 
-    TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
     if (err == nullptr) {
-      err = TRTSERVER_InferenceRequestProviderNewV2(
-          &request_provider, trtserver_.get(), request_options);
+      err = SetInferenceRequestMetadata(irequest, request);
     }
 
     // Will be used to hold the serialized data in case explicit string
@@ -2757,37 +2738,37 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
     if (err == nullptr) {
       err = InferGRPCToInput(
-          trtserver_, shm_manager_, request, serialized_data_map,
-          request_provider);
+          tritonserver_, shm_manager_, request, serialized_data_map, irequest);
     }
     if (err == nullptr) {
       err = InferAllocatorPayload(
-          trtserver_, shm_manager_, request, serialized_data_map,
+          tritonserver_, shm_manager_, request, serialized_data_map,
           response.mutable_infer_response(), &state->alloc_payload_);
     }
     if (err == nullptr) {
       // Provide the trace manager object to use for this request, if
       // nullptr then no tracing will be performed.
-      TRTSERVER_TraceManager* trace_manager = nullptr;
+      TRITONSERVER_TraceManager* trace_manager = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
       if (state->trace_meta_data_ != nullptr) {
-        TRTSERVER_TraceManagerNew(
+        TRITONSERVER_TraceManagerNew(
             &trace_manager, TraceManager::CreateTrace,
             TraceManager::ReleaseTrace, state->trace_meta_data_.get());
       }
 #endif  // TRTIS_ENABLE_TRACING
 
+      // Set fields that are known in advance.
+      response.mutable_infer_response()->set_id(request.id());
+      response.mutable_infer_response()->set_model_name(request.model_name());
+      response.mutable_infer_response()->set_model_version(
+          request.model_version());
+
       state->step_ = ISSUED;
-      err = TRTSERVER_ServerInferAsync(
-          trtserver_.get(), trace_manager, request_provider, allocator_,
+      err = TRITONSERVER_ServerInferAsync(
+          tritonserver_.get(), trace_manager, irequest, allocator_,
           &state->alloc_payload_ /* response_allocator_userp */,
           StreamInferComplete, reinterpret_cast<void*>(state));
     }
-
-    // The request provider can be deleted before ServerInferAsync
-    // callback completes.
-    TRTSERVER_InferenceRequestProviderDelete(request_provider);
-    TRTSERVER_InferenceRequestOptionsDelete(request_options);
 
     // If there was not an error in issuing the 'state' request then
     // state->step_ == ISSUED and inference request has
@@ -2795,10 +2776,15 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // WRITEREADY or WRITTEN. If there was an error then enqueue the
     // error response and show it to be ready for writing.
     if (err != nullptr) {
-      LOG_VERBOSE(1) << "Infer failed: " << TRTSERVER_ErrorMessage(err);
+      LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
+
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceRequestDelete(irequest),
+          "deleting GRPC inference request");
+
       grpc::Status status;
       GrpcStatusUtil::Create(&status, err);
-      TRTSERVER_ErrorDelete(err);
+      TRITONSERVER_ErrorDelete(err);
       response.set_error_message(status.error_message());
 
       response.mutable_infer_response()->Clear();
@@ -2819,7 +2805,7 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
       next_read_state->trace_meta_data_.reset(trace_manager_->SampleTrace());
       if (next_read_state->trace_meta_data_ != nullptr) {
         next_read_state->trace_meta_data_->tracer_->CaptureTimestamp(
-            TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
+            TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
       }
     }
 #endif  // TRTIS_ENABLE_TRACING
@@ -2831,7 +2817,7 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 #ifdef TRTIS_ENABLE_TRACING
     if (state->trace_meta_data_ != nullptr) {
       state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc send end");
+          TRITONSERVER_TRACE_LEVEL_MIN, "grpc send end");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -2885,8 +2871,8 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
 void
 ModelStreamInferHandler::StreamInferComplete(
-    TRTSERVER_Server* server, TRTSERVER_TraceManager* trace_manager,
-    TRTSERVER_InferenceResponse* trtserver_response, void* userp)
+    TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
+    TRITONSERVER_InferenceRequest* request, void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
 
@@ -2895,79 +2881,56 @@ ModelStreamInferHandler::StreamInferComplete(
                  << " step " << state->step_;
 
   ModelStreamInferResponse& response = state->response_;
-  InferResponseHeader response_header;
 
-  TRTSERVER_Error* err = TRTSERVER_InferenceResponseStatus(trtserver_response);
-
+  TRITONSERVER_Error* err = TRITONSERVER_InferenceRequestError(request);
   if (err == nullptr) {
-    TRTSERVER_Protobuf* response_protobuf = nullptr;
-    err = TRTSERVER_InferenceResponseHeader(
-        trtserver_response, &response_protobuf);
-    if (err == nullptr) {
-      const char* buffer;
-      size_t byte_size;
-      err = TRTSERVER_ProtobufSerialize(response_protobuf, &buffer, &byte_size);
-      if (err == nullptr) {
-        if (!response_header.ParseFromArray(buffer, byte_size)) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_INTERNAL, "failed to parse response header");
-        }
+    for (auto& output :
+         *(response.mutable_infer_response()->mutable_outputs())) {
+      uint32_t cls_count = 0;
+      err = TRITONSERVER_InferenceRequestRequestedOutputClassificationCount(
+          request, output.name().c_str(), &cls_count);
+      if (err != nullptr) {
+        break;
       }
 
-      TRTSERVER_ProtobufDelete(response_protobuf);
-    }
-  }
-
-  const char* id;
-  if (err == nullptr) {
-    err = TRTSERVER_InferenceResponseIdStr(trtserver_response, &id);
-  }
-
-  // Convert the InferResponseHeader to the V2 response
-  if (err == nullptr) {
-    response.mutable_infer_response()->set_model_version(
-        std::to_string(response_header.model_version()));
-    response.mutable_infer_response()->set_id(id);
-    for (const auto& io : response_header.output()) {
-      // Find the tensor in the response and set its shape.
-      for (auto& output :
-           *(response.mutable_infer_response()->mutable_outputs())) {
-        if (output.name() == io.name()) {
-          if (io.batch_classes().size() == 0) {
-            for (const auto d : io.raw().dims()) {
-              output.add_shape(d);
-            }
-            output.set_datatype(DataTypeToProtocolString(io.data_type()));
-          } else {
-            int cls_count = 0;
-            for (const auto& classes : io.batch_classes()) {
-              cls_count = classes.cls().size();
-              for (const auto& cls : classes.cls()) {
-                if (!cls.label().empty()) {
-                  output.mutable_contents()->add_byte_contents(std::string(
-                      std::to_string(cls.idx()) + ":" +
-                      std::to_string(cls.value()) + ":" + cls.label()));
-                } else {
-                  output.mutable_contents()->add_byte_contents(std::string(
-                      std::to_string(cls.idx()) + ":" +
-                      std::to_string(cls.value())));
-                }
-              }
-            }
-            output.add_shape(io.batch_classes().size());
-            output.add_shape(cls_count);
-
-            output.set_datatype("BYTES");
-          }
+      if (cls_count == 0) {
+        const int64_t* shape;
+        uint64_t dim_count;
+        const char* datatype;
+        err = TRITONSERVER_InferenceRequestOutputShape(
+            request, output.name().c_str(), &shape, &dim_count);
+        if (err == nullptr) {
+          err = TRITONSERVER_InferenceRequestOutputDataType(
+              request, output.name().c_str(), &datatype);
+        }
+        if (err != nullptr) {
           break;
         }
+
+        for (size_t idx = 0; idx < dim_count; idx++) {
+          output.add_shape(shape[idx]);
+        }
+        output.set_datatype(datatype);
+      } else {
+        const char* const* content;
+        int64_t shape[2];
+        err = TRITONSERVER_InferenceRequestOutputClasses(
+            request, output.name().c_str(), &content, shape);
+        size_t element_cnt = shape[0] * shape[1];
+        for (size_t idx = 0; idx < element_cnt; idx++) {
+          output.mutable_contents()->add_byte_contents(content[idx]);
+        }
+        output.add_shape(shape[0]);
+        output.add_shape(shape[1]);
+
+        output.set_datatype("BYTES");
       }
     }
   }
 
   if ((err == nullptr) && (response.ByteSizeLong() > INT_MAX)) {
-    err = TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
+    err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
             "Response has byte size " +
             std::to_string(response.ByteSizeLong()) +
@@ -2987,13 +2950,13 @@ ModelStreamInferHandler::StreamInferComplete(
   if (err != nullptr) {
     response.set_error_message(status.error_message());
   }
+  TRITONSERVER_ErrorDelete(err);
 
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'state'.
-  LOG_TRTSERVER_ERROR(
-      TRTSERVER_InferenceResponseDelete(trtserver_response),
-      "deleting GRPC response");
-  TRTSERVER_ErrorDelete(err);
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceRequestDelete(request),
+      "deleting GRPC inference request");
 
   state->step_ = Steps::WRITEREADY;
   state->context_->WriteResponseIfReady(state);
@@ -3005,13 +2968,12 @@ ModelStreamInferHandler::StreamInferComplete(
 // GRPCServerV2
 //
 GRPCServerV2::GRPCServerV2(
-    const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<TRITONSERVER_Server>& server,
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const char* server_id, const std::string& server_addr,
-    const int infer_allocation_pool_size)
+    const std::string& server_addr, const int infer_allocation_pool_size)
     : server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
-      server_id_(server_id), server_addr_(server_addr),
+      server_addr_(server_addr),
       infer_allocation_pool_size_(infer_allocation_pool_size), running_(false)
 {
 }
@@ -3021,34 +2983,26 @@ GRPCServerV2::~GRPCServerV2()
   Stop();
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 GRPCServerV2::Create(
-    const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<TRITONSERVER_Server>& server,
     const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
     int infer_allocation_pool_size, std::unique_ptr<GRPCServerV2>* grpc_server)
 {
-  const char* server_id = nullptr;
-  TRTSERVER_Error* err = TRTSERVER_ServerId(server.get(), &server_id);
-  if (err != nullptr) {
-    server_id = "unknown:0";
-    TRTSERVER_ErrorDelete(err);
-  }
-
   const std::string addr = "0.0.0.0:" + std::to_string(port);
   grpc_server->reset(new GRPCServerV2(
-      server, trace_manager, shm_manager, server_id, addr,
-      infer_allocation_pool_size));
+      server, trace_manager, shm_manager, addr, infer_allocation_pool_size));
 
   return nullptr;  // success
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 GRPCServerV2::Start()
 {
   if (running_) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_ALREADY_EXISTS, "GRPC server is already running.");
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_ALREADY_EXISTS, "GRPC server is already running.");
   }
 
   grpc_builder_.AddListeningPort(
@@ -3068,66 +3022,65 @@ GRPCServerV2::Start()
 
   // Handler for server-live requests.
   ServerLiveHandler* hserverlive = new ServerLiveHandler(
-      "ServerLiveHandler", server_, server_id_, &service_,
-      server_live_cq_.get(), 2 /* max_state_bucket_count */);
+      "ServerLiveHandler", server_, &service_, server_live_cq_.get(),
+      2 /* max_state_bucket_count */);
   hserverlive->Start();
   server_live_handler_.reset(hserverlive);
 
   // Handler for server-ready requests.
   ServerReadyHandler* hserverready = new ServerReadyHandler(
-      "ServerReadyHandler", server_, server_id_, &service_,
-      server_ready_cq_.get(), 2 /* max_state_bucket_count */);
+      "ServerReadyHandler", server_, &service_, server_ready_cq_.get(),
+      2 /* max_state_bucket_count */);
   hserverready->Start();
   server_ready_handler_.reset(hserverready);
 
   // Handler for model-ready requests.
   ModelReadyHandler* hmodelready = new ModelReadyHandler(
-      "ModelReadyHandler", server_, server_id_, &service_,
-      model_ready_cq_.get(), 2 /* max_state_bucket_count */);
+      "ModelReadyHandler", server_, &service_, model_ready_cq_.get(),
+      2 /* max_state_bucket_count */);
   hmodelready->Start();
   model_ready_handler_.reset(hmodelready);
 
   // Handler for server-metadata requests.
   ServerMetadataHandler* hservermetadata = new ServerMetadataHandler(
-      "ServerMetadataHandler", server_, server_id_, &service_,
-      server_metadata_cq_.get(), 2 /* max_state_bucket_count */);
+      "ServerMetadataHandler", server_, &service_, server_metadata_cq_.get(),
+      2 /* max_state_bucket_count */);
   hservermetadata->Start();
   server_metadata_handler_.reset(hservermetadata);
 
   // Handler for model-metadata requests.
   ModelMetadataHandler* hmodelmetadata = new ModelMetadataHandler(
-      "ModelMetadataHandler", server_, server_id_, &service_,
-      model_metadata_cq_.get(), 2 /* max_state_bucket_count */);
+      "ModelMetadataHandler", server_, &service_, model_metadata_cq_.get(),
+      2 /* max_state_bucket_count */);
   hmodelmetadata->Start();
   model_metadata_handler_.reset(hmodelmetadata);
 
   // Handler for model-config requests.
   ModelConfigHandler* hmodelconfig = new ModelConfigHandler(
-      "ModelConfigHandler", server_, server_id_, &service_,
-      model_config_cq_.get(), 2 /* max_state_bucket_count */);
+      "ModelConfigHandler", server_, &service_, model_config_cq_.get(),
+      2 /* max_state_bucket_count */);
   hmodelconfig->Start();
   model_config_handler_.reset(hmodelconfig);
 
   // Handler for model inference requests.
   ModelInferHandler* hmodelinfer = new ModelInferHandler(
-      "ModelInferHandler", server_, server_id_, trace_manager_, shm_manager_,
-      &service_, model_infer_cq_.get(),
+      "ModelInferHandler", server_, trace_manager_, shm_manager_, &service_,
+      model_infer_cq_.get(),
       infer_allocation_pool_size_ /* max_state_bucket_count */);
   hmodelinfer->Start();
   model_infer_handler_.reset(hmodelinfer);
 
   // Handler for streaming inference requests.
   ModelStreamInferHandler* hmodelstreaminfer = new ModelStreamInferHandler(
-      "ModelStreamInferHandler", server_, server_id_, trace_manager_,
-      shm_manager_, &service_, model_stream_infer_cq_.get(),
+      "ModelStreamInferHandler", server_, trace_manager_, shm_manager_,
+      &service_, model_stream_infer_cq_.get(),
       infer_allocation_pool_size_ /* max_state_bucket_count */);
   hmodelstreaminfer->Start();
   model_stream_infer_handler_.reset(hmodelstreaminfer);
 
   // A common Handler for other non-critical requests
   CommonHandler* hcommon = new CommonHandler(
-      "CommonHandler", server_, server_id_, shm_manager_, &service_,
-      common_cq_.get());
+      "CommonHandler", server_, shm_manager_, &service_, common_cq_.get());
   hcommon->Start();
   common_handler_.reset(hcommon);
 
@@ -3136,12 +3089,12 @@ GRPCServerV2::Start()
   return nullptr;  // success
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 GRPCServerV2::Stop()
 {
   if (!running_) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_UNAVAILABLE, "GRPC server is not running.");
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is not running.");
   }
 
   // Always shutdown the completion queue after the server.

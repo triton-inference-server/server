@@ -31,13 +31,13 @@
 
 namespace nvidia { namespace inferenceserver {
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 TraceManager::Create(
     std::shared_ptr<TraceManager>* manager, const std::string& filepath)
 {
   if (filepath.empty()) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
         "trace configuration requires a non-empty file path");
   }
 
@@ -49,14 +49,14 @@ TraceManager::Create(
     manager->reset(new TraceManager(std::move(trace_file)));
   }
   catch (const std::ofstream::failure& e) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
         std::string("failed creating trace file: " + std::string(e.what()))
             .c_str());
   }
   catch (...) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
         "failed creating trace file: reason unknown");
   }
 
@@ -65,7 +65,7 @@ TraceManager::Create(
 
 TraceManager::TraceManager(std::unique_ptr<std::ofstream> trace_file)
     : trace_file_(std::move(trace_file)), trace_cnt_(0),
-      level_(TRTSERVER_TRACE_LEVEL_DISABLED), rate_(1000), sample_(1)
+      level_(TRITONSERVER_TRACE_LEVEL_DISABLED), rate_(1000), sample_(1)
 {
 }
 
@@ -80,8 +80,8 @@ TraceManager::~TraceManager()
   trace_file_->close();
 }
 
-TRTSERVER_Error*
-TraceManager::SetLevel(TRTSERVER_Trace_Level level)
+TRITONSERVER_Error*
+TraceManager::SetLevel(TRITONSERVER_Trace_Level level)
 {
   // We don't bother with a mutex here since this is the only writer.
   level_ = level;
@@ -91,7 +91,7 @@ TraceManager::SetLevel(TRTSERVER_Trace_Level level)
   return nullptr;  // success
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 TraceManager::SetRate(uint32_t rate)
 {
   // We don't bother with a mutex here since this is the only writer.
@@ -115,7 +115,7 @@ TraceManager::SampleTrace()
   trace_meta_data->trace_set_ = false;
 
   // An outermost tracer object that also in charge of collecting timestamps
-  // in server frontend, it will not bind to a particular TRTSERVER_Trace as
+  // in server frontend, it will not bind to a particular TRITONSERVER_Trace as
   // it lives longer than the trace.
   trace_meta_data->tracer_.reset(new Tracer(shared_from_this(), level_));
   return trace_meta_data;
@@ -124,6 +124,26 @@ TraceManager::SampleTrace()
 void
 TraceManager::CreateTrace(
     TRTSERVER_Trace** trace, const char* model_name, int64_t version,
+    void* userp)
+{
+  // Hack, knowing that the underlying object is the same
+  CreateTrace(
+      reinterpret_cast<TRITONSERVER_Trace**>(trace), model_name, version,
+      userp);
+}
+
+void
+TraceManager::ReleaseTrace(
+    TRTSERVER_Trace* trace, void* activity_userp, void* userp)
+{
+  // Hack, knowing that the underlying object is the same
+  ReleaseTrace(
+      reinterpret_cast<TRITONSERVER_Trace*>(trace), activity_userp, userp);
+}
+
+void
+TraceManager::CreateTrace(
+    TRITONSERVER_Trace** trace, const char* model_name, int64_t version,
     void* userp)
 {
   // 'userp' should be not be nullptr if the request should be traced
@@ -141,29 +161,29 @@ TraceManager::CreateTrace(
     // Otherwise, just link the trace with the tracer in meta data.
     // Note that SetServerTrace() is not called to hint that the tracer
     // should not share the same lifetime as the trace.
-    TRTSERVER_Error* err = TRTSERVER_TraceNew(
+    TRITONSERVER_Error* err = TRITONSERVER_TraceNew(
         trace, lmeta_data->manager_->level_, Tracer::TraceActivity,
         lmeta_data->tracer_.get() /* userp */);
     if (err != nullptr) {
-      LOG_ERROR << "error creating trace: " << TRTSERVER_ErrorCodeString(err)
-                << " - " << TRTSERVER_ErrorMessage(err);
-      TRTSERVER_ErrorDelete(err);
+      LOG_ERROR << "error creating trace: " << TRITONSERVER_ErrorCodeString(err)
+                << " - " << TRITONSERVER_ErrorMessage(err);
+      TRITONSERVER_ErrorDelete(err);
     }
   }
 }
 
 void
-TraceManager::NewTrace(TRTSERVER_Trace** trace)
+TraceManager::NewTrace(TRITONSERVER_Trace** trace)
 {
   auto tracer = new Tracer(shared_from_this(), level_);
-  TRTSERVER_Error* err = TRTSERVER_TraceNew(
+  TRITONSERVER_Error* err = TRITONSERVER_TraceNew(
       trace, level_, Tracer::TraceActivity, (void*)tracer /* userp */);
   if (err != nullptr) {
     delete tracer;
 
-    LOG_ERROR << "error creating trace: " << TRTSERVER_ErrorCodeString(err)
-              << " - " << TRTSERVER_ErrorMessage(err);
-    TRTSERVER_ErrorDelete(err);
+    LOG_ERROR << "error creating trace: " << TRITONSERVER_ErrorCodeString(err)
+              << " - " << TRITONSERVER_ErrorMessage(err);
+    TRITONSERVER_ErrorDelete(err);
   } else {
     tracer->SetServerTrace(*trace);
   }
@@ -171,20 +191,22 @@ TraceManager::NewTrace(TRTSERVER_Trace** trace)
 
 void
 TraceManager::ReleaseTrace(
-    TRTSERVER_Trace* trace, void* activity_userp, void* userp)
+    TRITONSERVER_Trace* trace, void* activity_userp, void* userp)
 {
   if (trace != nullptr) {
     // Gather trace info
     const char* model_name;
     int64_t model_version, id, parent_id;
-    LOG_TRTSERVER_ERROR(
-        TRTSERVER_TraceModelName(trace, &model_name), "getting model name");
-    LOG_TRTSERVER_ERROR(
-        TRTSERVER_TraceModelVersion(trace, &model_version),
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_TraceModelName(trace, &model_name), "getting model name");
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_TraceModelVersion(trace, &model_version),
         "getting model version");
-    LOG_TRTSERVER_ERROR(TRTSERVER_TraceId(trace, &id), "getting trace id");
-    LOG_TRTSERVER_ERROR(
-        TRTSERVER_TraceParentId(trace, &parent_id), "getting trace parent id");
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_TraceId(trace, &id), "getting trace id");
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_TraceParentId(trace, &parent_id),
+        "getting trace parent id");
 
     auto tracer = reinterpret_cast<Tracer*>(activity_userp);
     tracer->SetModel(model_name, model_version);
@@ -194,7 +216,7 @@ TraceManager::ReleaseTrace(
       delete tracer;
     } else {
       // If the tracer is not tied with a trace, then only delete the trace.
-      LOG_TRTSERVER_ERROR(TRTSERVER_TraceDelete(trace), "deleting trace");
+      LOG_TRITONSERVER_ERROR(TRITONSERVER_TraceDelete(trace), "deleting trace");
     }
   }
 }
@@ -218,7 +240,8 @@ TraceManager::WriteTrace(const std::stringstream& ss)
 }
 
 Tracer::Tracer(
-    const std::shared_ptr<TraceManager>& manager, TRTSERVER_Trace_Level level)
+    const std::shared_ptr<TraceManager>& manager,
+    TRITONSERVER_Trace_Level level)
     : manager_(manager), level_(level), model_version_(-1), id_(-1),
       parent_id_(-1), timestamp_cnt_(0), trace_(nullptr)
 {
@@ -240,13 +263,14 @@ Tracer::~Tracer()
   manager_->WriteTrace(tout_);
 
   if (trace_ != nullptr) {
-    LOG_TRTSERVER_ERROR(TRTSERVER_TraceDelete(trace_), "deleting trace");
+    LOG_TRITONSERVER_ERROR(TRITONSERVER_TraceDelete(trace_), "deleting trace");
   }
 }
 
 void
 Tracer::CaptureTimestamp(
-    TRTSERVER_Trace_Level level, const std::string& name, uint64_t timestamp_ns)
+    TRITONSERVER_Trace_Level level, const std::string& name,
+    uint64_t timestamp_ns)
 {
   if (level <= level_) {
     if (timestamp_ns == 0) {
@@ -266,32 +290,32 @@ Tracer::CaptureTimestamp(
 
 void
 Tracer::TraceActivity(
-    TRTSERVER_Trace* trace, TRTSERVER_Trace_Activity activity,
+    TRITONSERVER_Trace* trace, TRITONSERVER_Trace_Activity activity,
     uint64_t timestamp_ns, void* userp)
 {
   Tracer* tracer = reinterpret_cast<Tracer*>(userp);
 
   const char* activity_name = "<unknown>";
   switch (activity) {
-    case TRTSERVER_TRACE_REQUEST_START:
+    case TRITONSERVER_TRACE_REQUEST_START:
       activity_name = "request handler start";
       break;
-    case TRTSERVER_TRACE_QUEUE_START:
+    case TRITONSERVER_TRACE_QUEUE_START:
       activity_name = "queue start";
       break;
-    case TRTSERVER_TRACE_COMPUTE_START:
+    case TRITONSERVER_TRACE_COMPUTE_START:
       activity_name = "compute start";
       break;
-    case TRTSERVER_TRACE_COMPUTE_INPUT_END:
+    case TRITONSERVER_TRACE_COMPUTE_INPUT_END:
       activity_name = "compute input end";
       break;
-    case TRTSERVER_TRACE_COMPUTE_OUTPUT_START:
+    case TRITONSERVER_TRACE_COMPUTE_OUTPUT_START:
       activity_name = "compute output start";
       break;
-    case TRTSERVER_TRACE_COMPUTE_END:
+    case TRITONSERVER_TRACE_COMPUTE_END:
       activity_name = "compute end";
       break;
-    case TRTSERVER_TRACE_REQUEST_END:
+    case TRITONSERVER_TRACE_REQUEST_END:
       activity_name = "request handler end";
       break;
   }

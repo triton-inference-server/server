@@ -633,6 +633,19 @@ TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
     TRITONSERVER_InferenceRequest* inference_request, const char* name,
     uint32_t count);
 
+/// Get the classification count of the requested output.
+/// \param inference_request The request object.
+/// \param name The name of the output.
+/// \param count Indicates how many classification values will be
+/// returned for the output. The 'count' highest priority values are
+/// returned. A value of 0 indicates that the output tensor
+/// will not be returned as a classification.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestRequestedOutputClassificationCount(
+    TRITONSERVER_InferenceRequest* inference_request, const char* name,
+    uint32_t* count);
+
 /// Return the error status of an inference request corresponding to
 /// the most recent call to TRITONSERVER_ServerInferAsync. Return a
 /// TRITONSERVER_Error object on failure, return nullptr on success.  The
@@ -658,15 +671,14 @@ TRITONSERVER_InferenceRequestOutputDataType(
 /// Get the shape of an output tensor.
 /// \param inference_request The request object.
 /// \param name The name of the output.
-/// \param shape Buffer where the shape of the output is returned.
-/// \param dim_count Acts as input and output. On input gives the
-/// maximum number of dimensions that can be recorded in
-/// 'shape'. Returns the number of dimensions of the returned shape.
+/// \param shape Return the shape of the output. The returned value is owned by
+/// 'inference_request' and must not be modified or freed by the caller.
+/// \param dim_count Returns the number of dimensions of the returned shape.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestOutputShape(
     TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    int64_t* shape, uint64_t* dim_count);
+    const int64_t** shape, uint64_t* dim_count);
 
 /// Get the results data for a named output. The result data is
 /// returned as the base pointer to the data and the size, in bytes,
@@ -685,6 +697,20 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceRequestOutputData(
     TRITONSERVER_InferenceRequest* inference_request, const char* name,
     const void** base, size_t* byte_size, TRITONSERVER_Memory_Type* memory_type,
     int64_t* memory_type_id);
+
+/// Get the classification results of a named output.
+/// \param inference_request The request object.
+/// \param name The name of the output.
+/// \param content Returns the flatten array of the classification results.
+/// The returned value is owned by 'inference_request' and must not be modified
+/// or freed by the caller.
+/// \param shape Buffer where the shape of the output is returned, the buffer
+/// must be able to hold at least two elements.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestOutputClasses(
+    TRITONSERVER_InferenceRequest* inference_request, const char* name,
+    const char* const** content, int64_t* shape);
 
 /// Remove all the output tensors. The meta data of the output tensors will
 /// become unaccesible and the result data will be released.
@@ -1003,6 +1029,20 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerMetadata(
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelMetadata(
     TRITONSERVER_Server* server, const char* model_name,
     const char* model_version, TRITONSERVER_Message** model_metadata);
+
+/// Get the statistics of the model being served as a TRITONSERVER_Message
+/// object. The caller takes ownership of the object and must call
+/// TRITONSERVER_MessageDelete to release the object.
+/// \param server The inference server object.
+/// \param model_name The name of the model to get metadata for.
+/// \param model_version The version of the model to get readiness for.
+/// If nullptr or empty then the server will choose a version based on
+/// the model's policy.
+/// \param model_stats Returns the model statistics message.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelStatistics(
+    TRITONSERVER_Server* server, const char* model_name,
+    const char* model_version, TRITONSERVER_Message** model_stats);
 
 /// Get the configuration of the model being served as a
 /// TRITONSERVER_Message object.
