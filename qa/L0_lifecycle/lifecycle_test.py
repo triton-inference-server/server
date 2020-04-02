@@ -70,7 +70,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], None, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_FAILED_TO_INITIALIZE, ss.ready_state)
                 self.assertEqual(len(ss.model_status), 0)
@@ -93,7 +93,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], None, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_FAILED_TO_INITIALIZE, ss.ready_state)
                 self.assertEqual(len(ss.model_status), 0)
@@ -167,7 +167,7 @@ class LifeCycleTest(unittest.TestCase):
                 model_name = tu.get_model_name('graphdef', np.float32, np.float32, np.float32)
                 ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                 uptime = ss.uptime_ns
@@ -230,7 +230,7 @@ class LifeCycleTest(unittest.TestCase):
                 for model_name in model_names:
                     ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                     ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                     self.assertEqual("inference:0", ss.id)
                     self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                     uptime = ss.uptime_ns
@@ -283,7 +283,7 @@ class LifeCycleTest(unittest.TestCase):
                 model_name = tu.get_model_name('graphdef', np.float32, np.float32, np.float32)
                 ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                 uptime = ss.uptime_ns
@@ -334,7 +334,7 @@ class LifeCycleTest(unittest.TestCase):
                 model_name = tu.get_model_name('savedmodel', np.float32, np.float32, np.float32)
                 ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                 uptime = ss.uptime_ns
@@ -383,7 +383,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -409,7 +409,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -437,7 +437,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -475,7 +475,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -497,7 +497,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], netdef_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -576,7 +576,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], netdef_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -611,7 +611,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -639,7 +639,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -666,7 +666,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -706,7 +706,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -734,7 +734,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -765,7 +765,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -787,7 +787,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -826,7 +826,7 @@ class LifeCycleTest(unittest.TestCase):
                 for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                     ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                     ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                     self.assertEqual("inference:0", ss.id)
                     self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -874,7 +874,7 @@ class LifeCycleTest(unittest.TestCase):
                 for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                     ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                     ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                     self.assertEqual("inference:0", ss.id)
                     self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                     self.assertEqual(len(ss.model_status), 1)
@@ -927,7 +927,7 @@ class LifeCycleTest(unittest.TestCase):
                 for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                     ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                     ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                     self.assertEqual("inference:0", ss.id)
                     self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -961,7 +961,7 @@ class LifeCycleTest(unittest.TestCase):
                 for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                     ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                     ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                     self.assertEqual("inference:0", ss.id)
                     self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                     self.assertEqual(len(ss.model_status), 1)
@@ -999,7 +999,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -1032,7 +1032,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                 self.assertEqual(len(ss.model_status), 1)
@@ -1054,7 +1054,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                 self.assertEqual(len(ss.model_status), 1)
@@ -1115,7 +1115,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
 
@@ -1154,7 +1154,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                 self.assertEqual(len(ss.model_status), 1)
@@ -1180,7 +1180,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                 self.assertEqual(len(ss.model_status), 1)
@@ -1251,7 +1251,7 @@ class LifeCycleTest(unittest.TestCase):
                     for model in [model_name, ensemble_prefix + model_name]:
                         ctx = ServerStatusContext(pair[0], pair[1], model, True)
                         ss = ctx.get_server_status()
-                        self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                        self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                         self.assertEqual("inference:0", ss.id)
                         self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                         self.assertEqual(len(ss.model_status), 1)
@@ -1297,7 +1297,7 @@ class LifeCycleTest(unittest.TestCase):
 
                     ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                     ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                     self.assertEqual("inference:0", ss.id)
                     self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                     self.assertEqual(len(ss.model_status), 1)
@@ -1333,7 +1333,7 @@ class LifeCycleTest(unittest.TestCase):
                     for model in [model_name, ensemble_prefix + model_name]:
                         ctx = ServerStatusContext(pair[0], pair[1], model, True)
                         ss = ctx.get_server_status()
-                        self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                        self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                         self.assertEqual("inference:0", ss.id)
                         self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                         self.assertEqual(len(ss.model_status), 1)
@@ -1362,7 +1362,7 @@ class LifeCycleTest(unittest.TestCase):
                     for model in [model_name, ensemble_prefix + model_name]:
                         ctx = ServerStatusContext(pair[0], pair[1], model, True)
                         ss = ctx.get_server_status()
-                        self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                        self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                         self.assertEqual("inference:0", ss.id)
                         self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                         self.assertEqual(len(ss.model_status), 1)
@@ -1439,7 +1439,7 @@ class LifeCycleTest(unittest.TestCase):
                 for model in [model_name, ensemble_name]:
                     ctx = ServerStatusContext(pair[0], pair[1], model, True)
                     ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                     self.assertEqual("inference:0", ss.id)
                     self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                     self.assertEqual(len(ss.model_status), 1)
@@ -1482,7 +1482,7 @@ class LifeCycleTest(unittest.TestCase):
 
                 ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                 self.assertEqual(len(ss.model_status), 1)
@@ -1519,7 +1519,7 @@ class LifeCycleTest(unittest.TestCase):
                 for model in [model_name, ensemble_name]:
                     ctx = ServerStatusContext(pair[0], pair[1], model, True)
                     ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                     self.assertEqual("inference:0", ss.id)
                     self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                     self.assertEqual(len(ss.model_status), 1)
@@ -1547,7 +1547,7 @@ class LifeCycleTest(unittest.TestCase):
                 for model in [model_name, ensemble_name]:
                     ctx = ServerStatusContext(pair[0], pair[1], model, True)
                     ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                     self.assertEqual("inference:0", ss.id)
                     self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                     self.assertEqual(len(ss.model_status), 1)
@@ -1596,7 +1596,7 @@ class LifeCycleTest(unittest.TestCase):
 
                 ctx = ServerStatusContext(pair[0], pair[1], verbose=True)
                 ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
                 self.assertEqual("inference:0", ss.id)
                 self.assertEqual(server_status.SERVER_READY, ss.ready_state)
                 uptime = ss.uptime_ns

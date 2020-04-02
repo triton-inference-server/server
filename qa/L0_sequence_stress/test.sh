@@ -30,7 +30,7 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG="./client.log"
 STRESS_TEST=sequence_stress.py
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
 RET=0

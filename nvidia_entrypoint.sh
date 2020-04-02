@@ -32,7 +32,7 @@ cat <<EOF
 == Triton Inference Server ==
 =============================
 
-NVIDIA Release ${NVIDIA_TENSORRT_SERVER_VERSION} (build ${NVIDIA_BUILD_ID})
+NVIDIA Release ${NVIDIA_TRITON_SERVER_VERSION} (build ${NVIDIA_BUILD_ID})
 
 Copyright (c) 2018-2019, NVIDIA CORPORATION.  All rights reserved.
 
@@ -48,6 +48,7 @@ if [[ "$(find -L /usr -name libcuda.so.1 | grep -v "compat") " == " " || "$(ls /
   echo "   https://github.com/NVIDIA/nvidia-docker/wiki/nvidia-docker ."
   ln -s `find / -name libnvidia-ml.so -print -quit` /opt/tritonserver/lib/libnvidia-ml.so.1
   export TENSORRT_SERVER_CPU_ONLY=1
+  export TRITON_SERVER_CPU_ONLY=1
 else
   ( /usr/local/bin/checkSMVER.sh )
   DRIVER_VERSION=$(sed -n 's/^NVRM.*Kernel Module *\([0-9.]*\).*$/\1/p' /proc/driver/nvidia/version 2>/dev/null || true)

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-The test.sh script collects performance results using the trtserver in
+The test.sh script collects performance results using the tritonserver in
 this container and then compares it against the results in the
 'baseline' directory.
 
@@ -34,7 +34,7 @@ Legacy Comparison
 -----------------
 
 The results shown in directory 'legacy_baseline' are for older
-versions of trtserver and so may not contain complete results or may
+versions of tritonserver and so may not contain complete results or may
 require special handling for comparison.
 
 legacy_baseline/19.04:
@@ -52,7 +52,7 @@ legacy_baseline/19.04:
   $ PERF_CLIENT_PERCENTILE=0 bash -x test.sh
 
   $ # Show for min_latency_grpc, repeat for others...
-  $ perf_analysis.py --name='Compare to 19.04' --latency --slowdown-threshold=5.0 --speedup-threshold=5.0 --baseline-name=19.04 --baseline=legacy_baseline/19.04/min_latency_grpc --undertest-name=${NVIDIA_TENSORRT_SERVER_VERSION} --undertest=min_latency_grpc
+  $ perf_analysis.py --name='Compare to 19.04' --latency --slowdown-threshold=5.0 --speedup-threshold=5.0 --baseline-name=19.04 --baseline=legacy_baseline/19.04/min_latency_grpc --undertest-name=${NVIDIA_TRITON_SERVER_VERSION} --undertest=min_latency_grpc
 
 legacy_baseline/19.05:
 
@@ -69,4 +69,4 @@ legacy_baseline/19.05:
   $ PERF_CLIENT_PERCENTILE=0 bash -x test.sh
 
   $ # Show for min_latency_grpc, repeat for others...
-  $ perf_analysis.py --name='Compare to 19.05' --latency --slowdown-threshold=5.0 --speedup-threshold=5.0 --baseline-name=19.05 --baseline=legacy_baseline/19.05/min_latency_grpc --undertest-name=${NVIDIA_TENSORRT_SERVER_VERSION} --undertest=min_latency_grpc
+  $ perf_analysis.py --name='Compare to 19.05' --latency --slowdown-threshold=5.0 --speedup-threshold=5.0 --baseline-name=19.05 --baseline=legacy_baseline/19.05/min_latency_grpc --undertest-name=${NVIDIA_TRITON_SERVER_VERSION} --undertest=min_latency_grpc

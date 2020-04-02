@@ -36,10 +36,10 @@ your own inference server <section-building-the-server-with-cmake>`
 you must use the \-DTRTIS_ENABLE_TRACING=ON option when configuring
 cmake.
 
-Tracing is enable by command-line arguments when running the trtserver
+Tracing is enable by command-line arguments when running the tritonserver
 executable. For example::
 
-  $ trtserver --trace-file=/tmp/trace.json --trace-rate=100 --trace-level=MAX ...
+  $ tritonserver --trace-file=/tmp/trace.json --trace-rate=100 --trace-level=MAX ...
 
 The -\\-trace-file options indicates where the trace output should be
 written. The -\\-trace-rate option specifies the sampling rate. In

@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -42,7 +42,7 @@ INFER_TEST=saved_model_shape_test.py
 
 DATADIR=`pwd`/models
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 # Allow more time to exit. Ensemble brings in too many models
 SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
 SERVER_LOG_BASE="./server_saved_model_shape"

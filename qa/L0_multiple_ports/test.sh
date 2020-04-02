@@ -33,7 +33,7 @@ CLIENT_LOG="./client.log"
 SERVER_LOG="./inference_server.log"
 
 DATADIR=`pwd`/models
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
 HP_ARR=(8000 8005 -1)

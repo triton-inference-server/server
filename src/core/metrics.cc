@@ -105,7 +105,7 @@ Metrics::Metrics()
       gpu_energy_consumption_family_(
           prometheus::BuildCounter()
               .Name("nv_energy_consumption")
-              .Help("GPU energy consumption in joules since the trtserver "
+              .Help("GPU energy consumption in joules since the Triton Server "
                     "started")
               .Register(*registry_)),
 #endif  // TRTIS_ENABLE_METRICS_GPU
@@ -133,7 +133,7 @@ Metrics::EnableGPUMetrics()
     return;
   }
 
-  if (std::getenv("TENSORRT_SERVER_CPU_ONLY") == nullptr) {
+  if (std::getenv("TRITON_SERVER_CPU_ONLY") == nullptr) {
     singleton->InitializeNvmlMetrics();
   }
 

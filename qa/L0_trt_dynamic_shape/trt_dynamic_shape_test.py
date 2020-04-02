@@ -95,7 +95,7 @@ class TrtDynamicShapeTest(unittest.TestCase):
             model_name = tu.get_model_name(self.model_name_, self.dtype_, self.dtype_, self.dtype_)
             ctx = ServerStatusContext("localhost:8000", ProtocolType.HTTP, model_name, True)
             ss = ctx.get_server_status()
-            self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+            self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
             self.assertEqual("inference:0", ss.id)
             self.assertEqual(len(ss.model_status), 1)
             self.assertTrue(model_name in ss.model_status,
@@ -109,7 +109,7 @@ class TrtDynamicShapeTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        
+
 
 if __name__ == '__main__':
     unittest.main()

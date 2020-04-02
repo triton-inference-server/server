@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -41,7 +41,7 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
 NULLCHAR_CLIENT_PY=nullchar_string_client.py
 CLIENT_LOG="./client.log"
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS=--model-repository=$DATADIR
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
