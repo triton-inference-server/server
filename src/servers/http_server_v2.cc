@@ -502,10 +502,9 @@ HTTPAPIServerV2::ResponseRelease(
   return nullptr;  // Success
 }
 
-template <typename T>
 void
 ReadDataFromJsonHelper(
-    std::vector<T>* base, const DataType dtype,
+    std::vector<char>* base, const DataType dtype,
     const rapidjson::Value& payload_data, int* counter)
 {
   for (size_t i = 0; i < payload_data.Size(); i++) {
@@ -1242,7 +1241,7 @@ HTTPAPIServerV2::HandleModelConfig(
       ::google::protobuf::util::MessageToJsonString(
           model_config, &model_config_json);
       evbuffer_add(
-            req->buffer_out, model_config_json.c_str(), model_config_json.size());
+          req->buffer_out, model_config_json.c_str(), model_config_json.size());
     }
   }
 
@@ -2138,8 +2137,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       err = TRTSERVER2_InferenceRequestOutputShape(
           request, output_name, &shape_vec[0], &dim_count);
       if (err != nullptr) {
-        EVBufferAddErrorJson(req_->buffer_out, err);
-        return EVHTP_RES_BADREQ;
+        break;
       }
 
       rapidjson::Value shape_array(rapidjson::kArrayType);
@@ -2152,8 +2150,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       err = TRTSERVER2_InferenceRequestOutputDataType(
           request, output_name, &datatype);
       if (err != nullptr) {
-        EVBufferAddErrorJson(req_->buffer_out, err);
-        return EVHTP_RES_BADREQ;
+        break;
       }
 
       rapidjson::Value datatype_val(datatype, strlen(datatype));
@@ -2167,8 +2164,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
           request, output_name, &base, &byte_size, &memory_type,
           &memory_type_id);
       if (err != nullptr) {
-        EVBufferAddErrorJson(req_->buffer_out, err);
-        return EVHTP_RES_BADREQ;
+        break;
       }
 
       if (CheckBinaryOutputData(request_output)) {
@@ -2194,7 +2190,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
           err = WriteDataToJson(
               output_metadata[i], allocator, const_cast<void*>(base));
           if (err != nullptr) {
-            return EVHTP_RES_BADREQ;
+            break;
           }
         }
       }
@@ -2204,8 +2200,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       err = TRTSERVER2_InferenceRequestOutputClassBatchSize(
           request, output_name, &batch_size);
       if (err != nullptr) {
-        EVBufferAddErrorJson(req_->buffer_out, err);
-        return EVHTP_RES_BADREQ;
+        break;
       }
 
       rapidjson::Value shape_array(rapidjson::kArrayType);
@@ -2222,8 +2217,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       err = TRTSERVER2_InferenceRequestOutputClasses(
           request, output_name, idx.data(), value.data(), label.data());
       if (err != nullptr) {
-        EVBufferAddErrorJson(req_->buffer_out, err);
-        return EVHTP_RES_BADREQ;
+        break;
       }
 
       std::vector<std::string> class_string(batch_size * class_size);
@@ -2255,26 +2249,33 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
   }
   response_json.AddMember("outputs", response_outputs, allocator);
 
-  // write json metadata into evbuffer
-  rapidjson::StringBuffer buffer;
-  buffer.Clear();
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  response_meta_data_.response_json_.Accept(writer);
-  const char* response_metadata = buffer.GetString();
-  size_t json_length = strlen(response_metadata);
-  evbuffer_add(req_->buffer_out, response_metadata, json_length);
-  evbuffer_add_buffer(req_->buffer_out, binary_buf);
-  evhtp_headers_add_header(
-      req_->headers_out,
-      evhtp_header_new("Content-Type", "application/json", 1, 1));
-  if (has_binary) {
+  evhtp_res status = (err == nullptr) ? EVHTP_RES_OK : EVHTP_RES_BADREQ;
+  TRTSERVER_ErrorDelete(err);
+
+  if (status == EVHTP_RES_BADREQ) {
+    EVBufferAddErrorJson(req_->buffer_out, err);
+  } else {
+    // write json metadata into evbuffer followed by binary buffer
+    rapidjson::StringBuffer buffer;
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    response_meta_data_.response_json_.Accept(writer);
+    const char* response_metadata = buffer.GetString();
+    size_t json_length = strlen(response_metadata);
+    evbuffer_add(req_->buffer_out, response_metadata, json_length);
+    evbuffer_add_buffer(req_->buffer_out, binary_buf);
     evhtp_headers_add_header(
-        req_->headers_out, evhtp_header_new(
-                               kInferHeaderContentLengthHTTPHeader,
-                               std::to_string(json_length).c_str(), 1, 1));
+        req_->headers_out,
+        evhtp_header_new("Content-Type", "application/json", 1, 1));
+    if (has_binary) {
+      evhtp_headers_add_header(
+          req_->headers_out, evhtp_header_new(
+                                 kInferHeaderContentLengthHTTPHeader,
+                                 std::to_string(json_length).c_str(), 1, 1));
+    }
   }
 
-  return (err == nullptr) ? EVHTP_RES_OK : EVHTP_RES_BADREQ;
+  return status;
 }
 
 TRTSERVER_Error*
