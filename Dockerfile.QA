@@ -81,6 +81,7 @@ RUN mkdir -p qa/common && \
     mkdir qa/L0_http_v2/models && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_http_v2/models && \
     cp -r /workspace/docs/examples/model_repository/inception_graphdef qa/L0_http_v2/models && \
+    cp -r /workspace/docs/examples/ensemble_model_repository qa/L0_perf_client/ && \
     cp /opt/tritonserver/bin/simple qa/L0_simple_lib/. && \
     cp /opt/tritonserver/bin/simplev2 qa/L0_simple_lib/. && \
     cp /opt/tritonserver/bin/memory_alloc qa/L0_io/. && \
@@ -116,6 +117,10 @@ RUN mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
 RUN mkdir -p qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1 && \
     cp builddir/trtis-custom-backends/install/lib/libimagepreprocess.so \
         qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/.
+
+RUN mkdir -p qa/L0_perf_client/ensemble_model_repository/image_preprocess_nhwc_224x224x3/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libimagepreprocess.so \
+        qa/L0_perf_client/ensemble_model_repository/image_preprocess_nhwc_224x224x3/1/.
 
 RUN mkdir -p qa/L0_custom_param/models/param/1 && \
     cp builddir/trtis-custom-backends/install/lib/libparam.so \

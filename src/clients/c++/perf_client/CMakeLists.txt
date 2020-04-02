@@ -68,6 +68,7 @@ target_include_directories(
 target_link_libraries(
   perf_client
   PRIVATE TRTIS::request_static
+  PRIVATE -lb64
 )
 
 # If gpu is enabled then compile with CUDA dependencies
