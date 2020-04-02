@@ -132,6 +132,7 @@ class InferenceServerClient:
             If unable to create a client.
 
     """
+
     def __init__(self,
                  url,
                  connection_count=1,
@@ -382,7 +383,7 @@ class InferenceServerClient:
             HTTP headers to include in the request
         query_params: dict
             Optional url query parameters to use in network
-            transaction 
+            transaction
 
         Returns
         -------
@@ -429,8 +430,7 @@ class InferenceServerClient:
             HTTP headers to include in the request
         query_params: dict
             Optional url query parameters to use in network
-            transaction 
-        
+            transaction
 
         Returns
         -------
@@ -467,7 +467,7 @@ class InferenceServerClient:
             HTTP headers to include in the request
         query_params: dict
             Optional url query parameters to use in network
-            transaction 
+            transaction
 
         Returns
         -------
@@ -501,7 +501,7 @@ class InferenceServerClient:
             HTTP headers to include in the request
         query_params: dict
             Optional url query parameters to use in network
-            transaction 
+            transaction
 
         Raises
         ------
@@ -528,7 +528,7 @@ class InferenceServerClient:
             HTTP headers to include in the request
         query_params: dict
             Optional url query parameters to use in network
-            transaction 
+            transaction
 
         Raises
         ------
@@ -560,7 +560,7 @@ class InferenceServerClient:
             HTTP headers to include in the request
         query_params: dict
             Optional url query parameters to use in network
-            transaction 
+            transaction
 
         Returns
         -------
@@ -615,7 +615,7 @@ class InferenceServerClient:
             HTTP headers to include in the request
         query_params: dict
             Optional url query parameters to use in network
-            transaction 
+            transaction
 
         Raises
         ------
@@ -657,8 +657,8 @@ class InferenceServerClient:
             HTTP headers to include in the request
         query_params: dict
             Optional url query parameters to use in network
-            transaction 
-        
+            transaction
+
         Raises
         ------
         InferenceServerException
@@ -694,7 +694,7 @@ class InferenceServerClient:
             HTTP headers to include in the request
         query_params: dict
             Optional url query parameters to use in network
-            transaction 
+            transaction
 
         Returns
         -------
@@ -746,7 +746,7 @@ class InferenceServerClient:
             HTTP headers to include in the request
         query_params: dict
             Optional url query parameters to use in network
-            transaction 
+            transaction
 
         Raises
         ------
@@ -788,8 +788,8 @@ class InferenceServerClient:
             HTTP headers to include in the request
         query_params: dict
             Optional url query parameters to use in network
-            transaction 
-        
+            transaction
+
         Raises
         ------
         InferenceServerException
@@ -898,7 +898,7 @@ class InferenceServerClient:
                                                timeout=timeout)
 
         request_body = json.dumps(infer_request)
-        json_size = sys.getsizeof(request_body)
+        json_size = len(request_body)
         has_binary_data = False
         for input_tensor in inputs:
             raw_data = input_tensor._get_binary_data()
@@ -1062,6 +1062,7 @@ class InferInput:
     datatype : str
         The datatype of the associated input.
     """
+
     def __init__(self, name, shape, datatype):
         self._name = name
         self._shape = shape
@@ -1113,7 +1114,7 @@ class InferInput:
             or explicit tensor within JSON. The default value is True,
             which means the data will be delivered as binary data in the
             HTTP body after the JSON object.
-            
+
         Raises
         ------
         InferenceServerException
@@ -1158,7 +1159,7 @@ class InferInput:
         offset : int
             The offset, in bytes, into the region where the data for
             the tensor starts. The default value is 0.
-        
+
         """
         self._parameters['shared_memory_region'] = region_name
         self._parameters['shared_memory_byte_size'] = byte_size
@@ -1210,6 +1211,7 @@ class InferOutput:
         value is 0 which means the classification results are not 
         requested.
     """
+
     def __init__(self, name, binary_data=True, class_count=0):
         self._name = name
         self._parameters = {}
@@ -1240,7 +1242,7 @@ class InferOutput:
         offset : int
             The offset, in bytes, into the region where the data for
             the tensor starts. The default value is 0.
-        
+
         """
 
         self._parameters['shared_memory_region'] = region_name
@@ -1269,22 +1271,28 @@ class InferResult:
     result : dict
         The inference response from the server
     """
+
     def __init__(self, response):
         header_length = response.get('Inference-Header-Content-Length')
-        self._result = json.loads(response.read(length=header_length))
+        if header_length is None:
+            header_length = 0
+            self._result = json.loads(response.read())
+        else:
+            header_length = int(header_length)
+            self._result = json.loads(response.read(length=header_length))
 
-        if header_length is not None:
             # Maps the output name to the index in buffer for quick retrieval
             self._output_name_to_buffer_map = {}
             # Read the remaining data off the response body.
             self._buffer = response.read()
             buffer_index = 0
-            for output in self._result['ouputs']:
-                this_data_size = output.parameters.get("binary_data_size")
-                if this_data_size is not None:
-                    self._output_name_to_buffer_map[
-                        output['name']] = buffer_index
-                    buffer_index = buffer_index + this_data_size
+            for output in self._result['outputs']:
+                parameters = output.get("parameters")
+                if parameters is not None:
+                    this_data_size = parameters.get("binary_data_size")
+                    if this_data_size is not None:
+                        self._output_name_to_buffer_map[output['name']] = buffer_index
+                        buffer_index = buffer_index + this_data_size
 
     def as_numpy(self, name):
         """Get the tensor data for output associated with this object
@@ -1327,7 +1335,7 @@ class InferResult:
                 if not has_binary_data:
                     np_array = np.array(output['data'],
                                         dtype=triton_to_np_dtype(datatype))
-                np.resize(np_array, output['shape'])
+                np_array = np.resize(np_array, output['shape'])
                 return np_array
         return None
 
