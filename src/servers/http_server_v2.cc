@@ -503,6 +503,23 @@ HTTPAPIServerV2::ResponseRelease(
 }
 
 void
+GetDataByteSizeFromJson(const rapidjson::Value& payload_data, size_t* byte_size)
+{
+  for (size_t i = 0; i < payload_data.Size(); i++) {
+    // If last dimension
+    if (!payload_data[i].IsArray()) {
+      const char* cstr = payload_data[i].GetString();
+      uint32_t len = strlen(cstr);
+      *byte_size += len + sizeof(uint32_t);
+    }
+    // If not last dimension
+    else {
+      GetDataByteSizeFromJson(payload_data[i], byte_size);
+    }
+  }
+}
+
+void
 ReadDataFromJsonHelper(
     std::vector<char>* base, const DataType dtype,
     const rapidjson::Value& payload_data, int* counter)
@@ -569,19 +586,20 @@ ReadDataFromJsonHelper(
         case TYPE_STRING: {
           const char* cstr = payload_data[i].GetString();
           uint32_t len = strlen(cstr);
-          int base_len = base->size();
-          base->resize(base_len + sizeof(uint32_t) + len);
           memcpy(
-              base->data() + base_len, reinterpret_cast<char*>(&len),
+              base->data() + *counter, reinterpret_cast<char*>(&len),
               sizeof(uint32_t));
           std::copy(
-              cstr, cstr + len, base->begin() + base_len + sizeof(uint32_t));
+              cstr, cstr + len, base->begin() + *counter + sizeof(uint32_t));
+          *counter += len + sizeof(uint32_t);
           break;
         }
         default:
           break;
       }
-      *counter += 1;
+      if (dtype != TYPE_STRING) {
+        *counter += 1;
+      }
     }
     // If not last dimension
     else {
@@ -1832,12 +1850,19 @@ HTTPAPIServerV2::EVBufferToInput(
           }
         }
 
-        byte_size = element_cnt * GetDataTypeByteSize(dtype);
         if (element_cnt == 0) {
           RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
               irequest, input_name, nullptr, 0 /* byte_size */,
               TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
         } else {
+          size_t dtype_size = GetDataTypeByteSize(dtype);
+          if (dtype_size == 0) {
+            const rapidjson::Value& tensor_data = request_input["data"];
+            GetDataByteSizeFromJson(tensor_data, &byte_size);
+          } else {
+            byte_size = element_cnt * dtype_size;
+          }
+
           infer_req->response_meta_data_.request_buffer_[i].resize(byte_size);
           RETURN_IF_ERR(ReadDataFromJson(
               request_input, &infer_req->response_meta_data_.request_buffer_[i],
@@ -1845,8 +1870,7 @@ HTTPAPIServerV2::EVBufferToInput(
           RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
               irequest, input_name,
               infer_req->response_meta_data_.request_buffer_[i].data(),
-              infer_req->response_meta_data_.request_buffer_[i].size(),
-              TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+              byte_size, TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
         }
       }
     }
