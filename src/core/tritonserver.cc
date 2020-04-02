@@ -41,7 +41,6 @@
 #include "src/core/nvtx.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/server.h"
-#include "src/core/server_status.h"
 #include "src/core/status.h"
 #include "src/core/tracing.h"
 
@@ -1072,25 +1071,19 @@ TRITONSERVER_ServerModelMetadata(
       lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::STATUS);
 #endif  // TRTIS_ENABLE_STATS
 
-  auto model_name_string = std::string(model_name);
   int64_t model_version_int = -1;
   if (model_version != nullptr) {
     RETURN_IF_STATUS_ERROR(
         ni::GetModelVersionFromString(model_version, &model_version_int));
   }
 
-  ni::ServerStatus server_status;
-  RETURN_IF_STATUS_ERROR(lserver->GetStatus(&server_status, model_name_string));
-  const auto& model_status =
-      server_status.model_status().find(model_name_string)->second;
+  std::shared_ptr<ni::InferenceBackend> backend;
+  RETURN_IF_STATUS_ERROR(
+      lserver->GetInferenceBackend(model_name, model_version_int, &backend));
 
-  if ((model_version_int != -1) &&
-      (model_status.version_status().find(model_version_int) ==
-       model_status.version_status().end())) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        "requested model version is not found for the model");
-  }
+  std::vector<int64_t> ready_versions;
+  RETURN_IF_STATUS_ERROR(
+      lserver->ModelReadyVersions(model_name, &ready_versions));
 
   rapidjson::Document metadata;
   metadata.SetObject();
@@ -1100,20 +1093,15 @@ TRITONSERVER_ServerModelMetadata(
       "name", rapidjson::StringRef(model_name), metadata.GetAllocator());
 
   rapidjson::Value versions(rapidjson::kArrayType);
-  if (model_version_int != -1) {
+  for (const auto v : ready_versions) {
+    auto version_str = std::to_string(v);
     versions.PushBack(
-        rapidjson::StringRef(model_version), metadata.GetAllocator());
-  } else {
-    for (const auto& v : model_status.version_status()) {
-      auto version_str = std::to_string(v.first);
-      versions.PushBack(
-          rapidjson::Value(version_str.c_str(), version_str.size()),
-          metadata.GetAllocator());
-    }
+        rapidjson::Value(version_str.c_str(), version_str.size()),
+        metadata.GetAllocator());
   }
   metadata.AddMember("versions", versions, metadata.GetAllocator());
 
-  const auto& model_config = model_status.config();
+  const auto& model_config = backend->Config();
   metadata.AddMember(
       "platform", rapidjson::StringRef(model_config.platform().c_str()),
       metadata.GetAllocator());
@@ -1179,29 +1167,19 @@ TRITONSERVER_ServerModelConfig(
       lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::STATUS);
 #endif  // TRTIS_ENABLE_STATS
 
-  auto model_name_string = std::string(model_name);
   int64_t model_version_int = -1;
   if (model_version != nullptr) {
     RETURN_IF_STATUS_ERROR(
         ni::GetModelVersionFromString(model_version, &model_version_int));
   }
 
-  ni::ServerStatus server_status;
-  RETURN_IF_STATUS_ERROR(lserver->GetStatus(&server_status, model_name_string));
-  const auto& model_status =
-      server_status.model_status().find(model_name_string)->second;
-
-  if ((model_version_int != -1) &&
-      (model_status.version_status().find(model_version_int) ==
-       model_status.version_status().end())) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        "requested model version is not found for the model");
-  }
+  std::shared_ptr<ni::InferenceBackend> backend;
+  RETURN_IF_STATUS_ERROR(
+      lserver->GetInferenceBackend(model_name, model_version_int, &backend));
 
   std::string model_config_json;
   ::google::protobuf::util::MessageToJsonString(
-      model_status.config(), &model_config_json);
+      backend->Config(), &model_config_json);
 
   // Extra copies.. But this simplify TritonServerMessage class
   rapidjson::Document document;
