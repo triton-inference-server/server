@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -84,16 +84,6 @@ RequestStatusCode TritonServerCodeToRequestStatus(TRITONSERVER_Error_Code code);
 // RequestStatusCode.
 TRITONSERVER_Error_Code RequestStatusToTritonServerCode(
     RequestStatusCode status_code);
-
-// If status is non-OK, exit.
-#define CHECK_IF_ERROR(S)                            \
-  do {                                               \
-    const Status& status__ = (S);                    \
-    if (!status__.IsOk()) {                          \
-      std::cerr << status__.AsString() << std::endl; \
-      exit(1);                                       \
-    }                                                \
-  } while (false)
 
 // If status is non-OK, return the Status.
 #define RETURN_IF_ERROR(S)        \
