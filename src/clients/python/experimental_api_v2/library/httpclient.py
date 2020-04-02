@@ -1275,7 +1275,6 @@ class InferResult:
     def __init__(self, response):
         header_length = response.get('Inference-Header-Content-Length')
         if header_length is None:
-            header_length = 0
             self._result = json.loads(response.read())
         else:
             header_length = int(header_length)
