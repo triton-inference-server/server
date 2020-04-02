@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -41,7 +41,7 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 export CUDA_VISIBLE_DEVICES=0
 
 # Must explicitly set LD_LIBRARY_PATH so that clients can find
-# libtrtserver.so.
+# libtritonserver.so.
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH
 
 rm -f *.log

@@ -32,7 +32,7 @@ SIMPLE_CLIENT_PY=../clients/simple_string_client.py
 
 CLIENT_LOG="./client.log"
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS=--model-repository=`pwd`/models
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

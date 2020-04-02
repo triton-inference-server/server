@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@ import sys
 FLAGS = None
 
 ENVS = [ "CUDA_DRIVER_VERSION", "CUDA_VERSION",
-         "TENSORRT_SERVER_VERSION", "NVIDIA_TENSORRT_SERVER_VERSION",
+         "TRITON_SERVER_VERSION", "NVIDIA_TRITON_SERVER_VERSION",
          "TRT_VERSION", "CUDNN_VERSION", "CUBLAS_VERSION",
          "BENCHMARK_PIPELINE",
          "BENCHMARK_REPO_BRANCH", "BENCHMARK_REPO_COMMIT",

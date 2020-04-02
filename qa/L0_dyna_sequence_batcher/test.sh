@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -40,7 +40,7 @@ BATCHER_TEST=dyna_sequence_batcher_test.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
 export CUDA_VISIBLE_DEVICES=0

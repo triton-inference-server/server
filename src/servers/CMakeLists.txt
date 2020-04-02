@@ -197,10 +197,10 @@ if(${TRTIS_ENABLE_TRACING})
 endif() # TRTIS_ENABLE_TRACING
 
 #
-# trtserver
+# tritonserver
 #
 set(
-  TRTSERVER_SRCS
+  TRITONSERVER_SRCS
   main.cc
   common.cc
   shared_memory_manager.cc
@@ -208,7 +208,7 @@ set(
 )
 
 set(
-  TRTSERVER_HDRS
+  TRITONSERVER_HDRS
   common.h
   shared_memory_manager.h
   ../core/logging.h
@@ -216,14 +216,14 @@ set(
 
 add_executable(
   main
-  ${TRTSERVER_SRCS}
-  ${TRTSERVER_HDRS}
+  ${TRITONSERVER_SRCS}
+  ${TRITONSERVER_HDRS}
   ${HTTP_ENDPOINT_OBJECTS}
   ${GRPC_ENDPOINT_OBJECTS}
   ${TRACING_OBJECTS}
   $<TARGET_OBJECTS:proto-library>
 )
-set_property(TARGET main PROPERTY OUTPUT_NAME trtserver)
+set_property(TARGET main PROPERTY OUTPUT_NAME tritonserver)
 if(${TRTIS_ENABLE_GPU})
   target_include_directories(main PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRTIS_ENABLE_GPU
@@ -242,7 +242,7 @@ target_link_libraries(
   PRIVATE rt
   ${TRACING_LIBRARIES}
   PRIVATE protobuf::libprotobuf
-  PRIVATE trtserver
+  PRIVATE tritonserver
 )
 if(${TRTIS_ENABLE_GPU})
 target_link_libraries(
@@ -283,7 +283,7 @@ set_target_properties(
 )
 target_link_libraries(
   simple
-  PRIVATE trtserver
+  PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
 )
 if(${TRTIS_ENABLE_GPU})
@@ -328,7 +328,7 @@ set_target_properties(
 )
 target_link_libraries(
   simplev2
-  PRIVATE trtserver
+  PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
 )
 if(${TRTIS_ENABLE_GPU})
@@ -378,7 +378,7 @@ target_link_libraries(
   PUBLIC -L/usr/local/cuda/lib64/stubs
   PUBLIC -lnvidia-ml
   PRIVATE ${CUDA_LIBRARIES}
-  PRIVATE trtserver
+  PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
 )
 install(
@@ -388,7 +388,7 @@ install(
 endif() # TRTIS_ENABLE_GPU
 
 #
-# libtrtserver.so
+# libtritonserver.so
 #
 set(BACKEND_OBJS $<TARGET_OBJECTS:ensemble-backend-library>)
 if(${TRTIS_ENABLE_TENSORFLOW})
@@ -415,10 +415,10 @@ if(${TRTIS_ENABLE_GPU})
   set(CUDA_OBJS $<TARGET_OBJECTS:model-config-cuda-library>)
 endif() # TRTIS_ENABLE_GPU
 
-configure_file(libtrtserver.ldscript libtrtserver.ldscript COPYONLY)
+configure_file(libtritonserver.ldscript libtritonserver.ldscript COPYONLY)
 
 add_library(
-  trtserver SHARED
+  tritonserver SHARED
   $<TARGET_OBJECTS:server-library>
   $<TARGET_OBJECTS:model-config-library>
   $<TARGET_OBJECTS:proto-library>
@@ -426,17 +426,17 @@ add_library(
   ${BACKEND_OBJS}
 )
 set_target_properties(
-  trtserver
+  tritonserver
   PROPERTIES
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
     INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/tensorflow:$\{ORIGIN\}/pytorch:$\{ORIGIN\}/onnx"
-    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtrtserver.ldscript
-    LINK_FLAGS "-Wl,--version-script libtrtserver.ldscript"
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtritonserver.ldscript
+    LINK_FLAGS "-Wl,--version-script libtritonserver.ldscript"
 )
 target_link_libraries(
-  trtserver
+  tritonserver
   PRIVATE -ldl
   PRIVATE ${TRTIS_EXTRA_LDFLAGS}
   PRIVATE protobuf::libprotobuf
@@ -444,7 +444,7 @@ target_link_libraries(
 
 if(${TRTIS_ENABLE_TENSORRT})
   target_link_libraries(
-    trtserver
+    tritonserver
     PUBLIC -lnvinfer
     PUBLIC -lnvinfer_plugin
   )
@@ -452,7 +452,7 @@ endif() # TRTIS_ENABLE_TENSORRT
 
 if(${TRTIS_ENABLE_TENSORFLOW})
   target_link_libraries(
-    trtserver
+    tritonserver
     PUBLIC ${TRTIS_EXTRA_LDFLAGS}
     PUBLIC -ltensorflow_trtis
   )
@@ -460,7 +460,7 @@ endif() # TRTIS_ENABLE_TENSORFLOW
 
 if(${TRTIS_ENABLE_CAFFE2} OR ${TRTIS_ENABLE_PYTORCH})
   target_link_libraries(
-    trtserver
+    tritonserver
     PUBLIC ${TRTIS_EXTRA_LDFLAGS}
     PUBLIC -ltorch
     PUBLIC -ltorch_cpu
@@ -481,14 +481,14 @@ endif() # TRTIS_ENABLE_CAFFE2 || TRTIS_ENABLE_PYTORCH
 
 if(${TRTIS_ENABLE_ONNXRUNTIME})
   target_link_libraries(
-    trtserver
+    tritonserver
     PUBLIC ${TRTIS_EXTRA_LDFLAGS}
     PUBLIC -lonnxruntime
   )
 endif() # TRTIS_ENABLE_ONNXRUNTIME
 if(${TRTIS_ENABLE_ONNXRUNTIME_OPENVINO})
   target_link_libraries(
-    trtserver
+    tritonserver
     PUBLIC ${TRTIS_EXTRA_LDFLAGS}
     PUBLIC -ltbb
     PUBLIC -linference_engine
@@ -499,7 +499,7 @@ if(${TRTIS_ENABLE_METRICS})
   find_package(prometheus-cpp CONFIG REQUIRED)
   message(STATUS "Using prometheus-cpp ${prometheus-cpp_VERSION}")
   target_link_libraries(
-    trtserver
+    tritonserver
     PRIVATE prometheus-cpp::core
   )
 endif() # TRTIS_ENABLE_METRICS
@@ -508,7 +508,7 @@ if(${TRTIS_ENABLE_GCS})
   find_package(storage_client REQUIRED)
   message(STATUS "Using google-cloud-cpp ${storage_client_VERSION}")
   target_link_libraries(
-    trtserver
+    tritonserver
     PRIVATE storage_client
   )
 endif() # TRTIS_ENABLE_GCS
@@ -517,7 +517,7 @@ if(${TRTIS_ENABLE_S3})
   find_package(AWSSDK REQUIRED COMPONENTS s3)
   message(STATUS "Using aws-cpp-sdk-s3 ${AWSSDK_VERSION}")
   target_link_libraries(
-    trtserver
+    tritonserver
     PRIVATE aws-cpp-sdk-s3
     PRIVATE -lre2
   )
@@ -525,7 +525,7 @@ endif() # TRTIS_ENABLE_S3
 
 if(${TRTIS_ENABLE_GPU})
   target_link_libraries(
-    trtserver
+    tritonserver
     PUBLIC -L/usr/local/cuda/lib64/stubs
     PUBLIC -lnvidia-ml
     PRIVATE ${CUDA_LIBRARIES}
@@ -535,7 +535,7 @@ if(${TRTIS_ENABLE_GPU})
 endif() # TRTIS_ENABLE_GPU
 
 install(
-  TARGETS trtserver
+  TARGETS tritonserver
   LIBRARY DESTINATION lib
 )
 

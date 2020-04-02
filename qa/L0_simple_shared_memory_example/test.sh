@@ -32,7 +32,7 @@ SIMPLE_SHM_CLIENT_PY=../clients/simple_shm_client.py
 SIMPLE_SHM_STRING_CLIENT=../clients/simple_shm_string_client
 SIMPLE_SHM_STRING_CLIENT_PY=../clients/simple_shm_string_client.py
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS=--model-repository=`pwd`/models
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh

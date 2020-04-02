@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -38,7 +38,7 @@ fi
 SIMPLE_CLIENT=../clients/simple_client
 SIMPLE_SEQ_CLIENT=../clients/simple_sequence_client
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS=--model-repository=`pwd`/models
 source ../common/util.sh
 

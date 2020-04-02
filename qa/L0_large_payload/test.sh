@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -41,7 +41,7 @@ LARGE_PAYLOAD_TEST_PY=large_payload_test.py
 CLIENT_LOG_BASE="./client.log"
 DATADIR=`pwd`/models
 
-SERVER=/opt/tritonserver/bin/trtserver
+SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS=--model-repository=$DATADIR
 SERVER_LOG_BASE="./inference_server.log"
 source ../common/util.sh
