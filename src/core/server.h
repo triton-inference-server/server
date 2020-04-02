@@ -64,9 +64,11 @@ class InferenceServer {
   // based on those changes.
   Status PollModelRepository();
 
-  // Run health check
+  // Server and model health
   Status IsLive(bool* live);
   Status IsReady(bool* ready);
+  Status ModelIsReady(
+      const std::string& model_name, const int64_t model_version, bool* ready);
 
   // Perform inference on the given input for specified model. Status
   // is returned in the OnCompleteInfer callback.

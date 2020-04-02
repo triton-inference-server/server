@@ -1015,37 +1015,14 @@ TRITONSERVER_ServerModelIsReady(
       lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::HEALTH);
 #endif  // TRTIS_ENABLE_STATS
 
-  std::string model_name_string(model_name);
-  int64_t model_version_int = -1;
+  int64_t model_int_version = -1;
   if (model_version != nullptr) {
     RETURN_IF_STATUS_ERROR(
-        ni::GetModelVersionFromString(model_version, &model_version_int));
+        ni::GetModelVersionFromString(model_version, &model_int_version));
   }
 
-  ni::ServerStatus server_status;
-  RETURN_IF_STATUS_ERROR(lserver->GetStatus(&server_status, model_name_string));
-  const auto& model_status =
-      server_status.model_status().find(model_name_string)->second;
-
-  *ready = false;
-  if (model_version_int == -1) {
-    for (const auto& v : model_status.version_status()) {
-      if (v.second.ready_state() == ni::ModelReadyState::MODEL_READY) {
-        *ready = true;
-        break;
-      }
-    }
-  } else {
-    auto it = model_status.version_status().find(model_version_int);
-    if (it != model_status.version_status().end()) {
-      *ready = (it->second.ready_state() == ni::ModelReadyState::MODEL_READY);
-    } else {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          "requested model version is not found for the model");
-    }
-  }
-
+  RETURN_IF_STATUS_ERROR(
+      lserver->ModelIsReady(model_name, model_int_version, ready));
   return nullptr;  // Success
 }
 
