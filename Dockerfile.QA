@@ -118,9 +118,9 @@ RUN mkdir -p qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x
     cp builddir/trtis-custom-backends/install/lib/libimagepreprocess.so \
         qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/.
 
-RUN mkdir -p qa/L0_perf_client/ensemble_model_repository/image_preprocess_nhwc_224x224x3/1 && \
+RUN mkdir -p qa/L0_perf_client/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception/1 && \
     cp builddir/trtis-custom-backends/install/lib/libimagepreprocess.so \
-        qa/L0_perf_client/ensemble_model_repository/image_preprocess_nhwc_224x224x3/1/.
+        qa/L0_perf_client/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception/1/.
 
 RUN mkdir -p qa/L0_custom_param/models/param/1 && \
     cp builddir/trtis-custom-backends/install/lib/libparam.so \
