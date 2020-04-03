@@ -356,7 +356,7 @@ InferenceServer::ModelReadyVersions(
     const std::string& model_name, std::vector<int64_t>* versions)
 {
   if (ready_state_ == ServerReadyState::SERVER_EXITING) {
-    return Status(RequestStatusCode::UNAVAILABLE, "Server exiting");
+    return Status(Status::Code::UNAVAILABLE, "Server exiting");
   }
 
   ScopedAtomicIncrement inflight(inflight_request_counter_);
