@@ -27,7 +27,6 @@
 
 import argparse
 import numpy as np
-import os
 import sys
 from builtins import range
 import tritonhttpclient.core as httpclient
