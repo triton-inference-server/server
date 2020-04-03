@@ -39,7 +39,7 @@ CompareDims(
   if (supports_batching) {
     if ((model_shape->rank_ == 0) || (model_shape->dims_[0] != WILDCARD_DIM)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "model '" + model_name + "', tensor '" + tensor_name +
               "': for the model to support batching the shape should have at "
               "least 1 dimension and the first dimension must be -1; but shape "
@@ -65,7 +65,7 @@ CompareDims(
 
     if (!succ) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "model '" + model_name + "', tensor '" + tensor_name +
               "': the model expects " + std::to_string(model_shape->rank_) +
               " dimensions (shape " + ShapeToString(model_shape) +
@@ -90,7 +90,7 @@ CompareDims(
 
     if (!succ) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "model '" + model_name + "', tensor '" + tensor_name +
               "': the model expects " + std::to_string(model_shape->rank_) +
               " dimensions (shape " + ShapeToString(model_shape) +

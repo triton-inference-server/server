@@ -59,7 +59,7 @@ LabelProvider::AddLabels(const std::string& name, const std::string& filepath)
   auto p = label_map_.insert(std::make_pair(name, std::vector<std::string>()));
   if (!p.second) {
     return Status(
-        RequestStatusCode::INTERNAL, "multiple label files for '" + name + "'");
+        Status::Code::INTERNAL, "multiple label files for '" + name + "'");
   }
 
   auto itr = p.first;

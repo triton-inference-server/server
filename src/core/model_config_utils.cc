@@ -53,7 +53,7 @@ GetModelVersionFromString(const std::string& version_string, int64_t* version)
   }
   catch (std::exception& e) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "failed to get model version from specified version string '" +
             version_string + "' (details: " + e.what() +
             "), version should be an integral value > 0");
@@ -61,7 +61,7 @@ GetModelVersionFromString(const std::string& version_string, int64_t* version)
 
   if (*version < 0) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "invalid model version specified '" + version_string +
             "' , version should be an integral value > 0");
   }
@@ -80,7 +80,7 @@ GetModelVersionFromPath(const std::string& path, int64_t* version)
   }
   catch (...) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unable to determine model version from " + path);
   }
 
@@ -104,14 +104,14 @@ GetBooleanSequenceControlProperties(
   for (const auto& control_input : batcher.control_input()) {
     if (control_input.name().empty()) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "sequence batching control tensor must have a name for " +
               model_name);
     }
 
     if (seen_tensors.find(control_input.name()) != seen_tensors.end()) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "sequence batching control tensor '" + control_input.name() +
               "' is specified for multiple control kinds for " + model_name);
     }
@@ -122,7 +122,7 @@ GetBooleanSequenceControlProperties(
       if (c.kind() == control_kind) {
         if (seen_control) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "sequence batching specifies multiple " +
                   ModelSequenceBatching_Control_Kind_Name(control_kind) +
                   " tensors for " + model_name);
@@ -134,7 +134,7 @@ GetBooleanSequenceControlProperties(
         if (c.int32_false_true_size() > 0) {
           if (c.fp32_false_true_size() != 0) {
             return Status(
-                RequestStatusCode::INVALID_ARG,
+                Status::Code::INVALID_ARG,
                 "sequence batching specifies both 'int32_false_true' and "
                 "'fp32_false_true' for " +
                     ModelSequenceBatching_Control_Kind_Name(control_kind) +
@@ -143,7 +143,7 @@ GetBooleanSequenceControlProperties(
 
           if (c.int32_false_true_size() != 2) {
             return Status(
-                RequestStatusCode::INVALID_ARG,
+                Status::Code::INVALID_ARG,
                 "sequence batching control 'int32_false_true' must have "
                 "exactly 2 entries for " +
                     ModelSequenceBatching_Control_Kind_Name(control_kind) +
@@ -162,7 +162,7 @@ GetBooleanSequenceControlProperties(
         } else {
           if (c.fp32_false_true_size() == 0) {
             return Status(
-                RequestStatusCode::INVALID_ARG,
+                Status::Code::INVALID_ARG,
                 "sequence batching must specify either 'int32_false_true' or "
                 "'fp32_false_true' for " +
                     ModelSequenceBatching_Control_Kind_Name(control_kind) +
@@ -171,7 +171,7 @@ GetBooleanSequenceControlProperties(
 
           if (c.fp32_false_true_size() != 2) {
             return Status(
-                RequestStatusCode::INVALID_ARG,
+                Status::Code::INVALID_ARG,
                 "sequence batching control 'fp32_false_true' must have exactly "
                 "2 entries for " +
                     ModelSequenceBatching_Control_Kind_Name(control_kind) +
@@ -195,7 +195,7 @@ GetBooleanSequenceControlProperties(
   if (!seen_control) {
     if (required) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "sequence batching control tensor must specify a " +
               ModelSequenceBatching_Control_Kind_Name(control_kind) +
               " value for " + model_name);
@@ -222,14 +222,14 @@ GetTypedSequenceControlProperties(
   for (const auto& control_input : batcher.control_input()) {
     if (control_input.name().empty()) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "sequence batching control tensor must have a name for " +
               model_name);
     }
 
     if (seen_tensors.find(control_input.name()) != seen_tensors.end()) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "sequence batching control tensor '" + control_input.name() +
               "' is specified for multiple control kinds for " + model_name);
     }
@@ -240,7 +240,7 @@ GetTypedSequenceControlProperties(
       if (c.kind() == control_kind) {
         if (seen_control) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "sequence batching specifies multiple " +
                   ModelSequenceBatching_Control_Kind_Name(control_kind) +
                   " tensors for " + model_name);
@@ -255,7 +255,7 @@ GetTypedSequenceControlProperties(
 
         if ((c.int32_false_true_size() > 0) || (c.fp32_false_true_size() > 0)) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "sequence batching must not specify either 'int32_false_true' "
               "nor 'fp32_false_true' for " +
                   ModelSequenceBatching_Control_Kind_Name(control_kind) +
@@ -268,7 +268,7 @@ GetTypedSequenceControlProperties(
   if (!seen_control) {
     if (required) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "sequence batching control tensor must specify a " +
               ModelSequenceBatching_Control_Kind_Name(control_kind) +
               " value for " + model_name);
@@ -309,7 +309,7 @@ GetNormalizedModelConfig(
 
   if (config->platform().empty()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "must specify platform for model '" + config->name() + "'");
   }
 
@@ -352,9 +352,9 @@ GetNormalizedModelConfig(
       // No actual model file is needed to be loaded for ensemble.
     } else {
       return Status(
-          RequestStatusCode::INTERNAL, "unexpected platform type " +
-                                           config->platform() + " for " +
-                                           config->name());
+          Status::Code::INTERNAL, "unexpected platform type " +
+                                      config->platform() + " for " +
+                                      config->name());
     }
   }
 
@@ -474,39 +474,37 @@ ValidateModelConfig(
 {
   if (config.name().empty()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
-        "model configuration must specify 'name'");
+        Status::Code::INVALID_ARG, "model configuration must specify 'name'");
   }
 
   if (config.platform().empty()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "must specify 'platform' for " + config.name());
   }
 
   if (config.max_batch_size() < 0) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "'max_batch_size' must be non-negative value for " + config.name());
   }
 
   if (!expected_platform.empty() && (config.platform() != expected_platform)) {
     return Status(
-        RequestStatusCode::NOT_FOUND, "expected model of type " +
-                                          expected_platform + " for " +
-                                          config.name());
+        Status::Code::NOT_FOUND, "expected model of type " + expected_platform +
+                                     " for " + config.name());
   }
 
   if (GetPlatform(config.platform()) == Platform::PLATFORM_UNKNOWN) {
     return Status(
-        RequestStatusCode::INVALID_ARG, "unexpected platform type \'" +
-                                            config.platform() + "\' for " +
-                                            config.name());
+        Status::Code::INVALID_ARG, "unexpected platform type \'" +
+                                       config.platform() + "\' for " +
+                                       config.name());
   }
 
   if (!config.has_version_policy()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "must specify 'version policy' for " + config.name());
   }
 
@@ -514,14 +512,16 @@ ValidateModelConfig(
   for (const auto& io : config.input()) {
     status = ValidateModelInput(io, config.max_batch_size(), config.platform());
     if (!status.IsOk()) {
-      return Status(status.Code(), status.Message() + " for " + config.name());
+      return Status(
+          status.StatusCode(), status.Message() + " for " + config.name());
     }
   }
   for (const auto& io : config.output()) {
     status =
         ValidateModelOutput(io, config.max_batch_size(), config.platform());
     if (!status.IsOk()) {
-      return Status(status.Code(), status.Message() + " for " + config.name());
+      return Status(
+          status.StatusCode(), status.Message() + " for " + config.name());
     }
   }
 
@@ -531,13 +531,13 @@ ValidateModelConfig(
     for (const auto size : config.dynamic_batching().preferred_batch_size()) {
       if (size <= 0) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "dynamic batching preferred size must be positive for " +
                 config.name());
       }
       if (size > config.max_batch_size()) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "dynamic batching preferred size must be <= max batch size for " +
                 config.name());
       }
@@ -550,7 +550,7 @@ ValidateModelConfig(
           (config.dynamic_batching().default_priority_level() >
            priority_levels)) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "default priority level must be in range [1, " +
                 std::to_string(priority_levels) + "] for " + config.name());
       }
@@ -559,7 +559,7 @@ ValidateModelConfig(
         if ((queue_policy.first == 0) ||
             (queue_policy.first > priority_levels)) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "priority queue policy must have priority level in range [1, " +
                   std::to_string(priority_levels) + "] for " + config.name());
         }
@@ -570,7 +570,7 @@ ValidateModelConfig(
     if (config.dynamic_batching().preserve_ordering()) {
       if (priority_levels > 1) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "Only one priority level is allowed when 'preserve_ordering' is "
             "true for " +
                 config.name());
@@ -580,7 +580,7 @@ ValidateModelConfig(
       if ((default_policy.default_timeout_microseconds() != 0) &&
           (default_policy.timeout_action() == ModelQueuePolicy::DELAY)) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "Queue policy can not have DELAY as timeout action when "
             "'preserve_ordering' is true for " +
                 config.name());
@@ -592,7 +592,7 @@ ValidateModelConfig(
         if ((policy.second.default_timeout_microseconds() != 0) &&
             (policy.second.timeout_action() == ModelQueuePolicy::DELAY)) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "Queue policy can not have DELAY as timeout action when "
               "'preserve_ordering' is true for " +
                   config.name());
@@ -608,7 +608,7 @@ ValidateModelConfig(
 
     if (batcher.control_input_size() == 0) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "sequence batching must specify at least one control tensor for " +
               config.name());
     }
@@ -641,7 +641,7 @@ ValidateModelConfig(
       if ((tensor_datatype != TYPE_UINT64) && (tensor_datatype != TYPE_INT64) &&
           (tensor_datatype != TYPE_UINT32) && (tensor_datatype != TYPE_INT32)) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "unexpected data type for control " +
                 ModelSequenceBatching_Control_Kind_Name(
                     ModelSequenceBatching::Control::CONTROL_SEQUENCE_CORRID) +
@@ -658,13 +658,13 @@ ValidateModelConfig(
            config.sequence_batching().oldest().preferred_batch_size()) {
         if (size <= 0) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "sequence batching preferred batch size must be positive for " +
                   config.name());
         }
         if (size > config.max_batch_size()) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "sequence batching preferred batch size must be <= max batch "
               "size for " +
                   config.name());
@@ -680,14 +680,14 @@ ValidateModelConfig(
   } else {
     if (config.platform() == kEnsemblePlatform) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "ensemble scheduling must be set for ensemble " + config.name() +
               " whose platform is " + kEnsemblePlatform);
     }
 
     if (config.instance_group().size() == 0) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "must specify one or more 'instance group's for " + config.name());
     }
 
@@ -707,7 +707,7 @@ ValidateModelConfig(
       if (group.kind() == ModelInstanceGroup::KIND_MODEL) {
         if (group.gpus().size() > 0) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "instance group " + group.name() + " of model " + config.name() +
                   " has kind KIND_MODEL but specifies one or more GPUs");
         }
@@ -717,7 +717,7 @@ ValidateModelConfig(
 #endif  // TRTIS_ENABLE_TENSORFLOW
         {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "instance group " + group.name() + " of model " + config.name() +
                   "on platform " + config.platform() +
                   " has kind KIND_MODEL which is supported only on TensorFlow "
@@ -726,20 +726,20 @@ ValidateModelConfig(
       } else if (group.kind() == ModelInstanceGroup::KIND_GPU) {
 #ifndef TRTIS_ENABLE_GPU
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "instance group " + group.name() + " of model " + config.name() +
                 " has kind KIND_GPU but server does not support GPUs");
 #else
         if (group.gpus().size() == 0) {
           if (supported_gpus.size() == 0) {
             return Status(
-                RequestStatusCode::INVALID_ARG,
+                Status::Code::INVALID_ARG,
                 "instance group " + group.name() + " of model " +
                     config.name() +
                     " has kind KIND_GPU but no GPUs are available");
           } else {
             return Status(
-                RequestStatusCode::INVALID_ARG,
+                Status::Code::INVALID_ARG,
                 "instance group " + group.name() + " of model " +
                     config.name() + " has kind KIND_GPU but specifies no GPUs");
           }
@@ -748,7 +748,7 @@ ValidateModelConfig(
         for (const int32_t gid : group.gpus()) {
           if (supported_gpus.find(gid) == supported_gpus.end()) {
             return Status(
-                RequestStatusCode::INVALID_ARG,
+                Status::Code::INVALID_ARG,
                 "instance group " + group.name() + " of model " +
                     config.name() +
                     " specifies invalid or unsupported gpu id of " +
@@ -761,15 +761,15 @@ ValidateModelConfig(
       } else if (group.kind() == ModelInstanceGroup::KIND_CPU) {
         if (group.gpus().size() > 0) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "instance group " + group.name() + " of model " + config.name() +
                   " has kind KIND_CPU but specifies one or more GPUs");
         }
       } else {
         return Status(
-            RequestStatusCode::INTERNAL, "instance group " + group.name() +
-                                             " of model " + config.name() +
-                                             " has unexpected kind KIND_AUTO");
+            Status::Code::INTERNAL, "instance group " + group.name() +
+                                        " of model " + config.name() +
+                                        " has unexpected kind KIND_AUTO");
       }
 
       if (
@@ -778,7 +778,7 @@ ValidateModelConfig(
 #endif  // TRTIS_ENABLE_TENSORRT
           !group.profile().empty()) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "instance group " + group.name() + " of model " + config.name() +
                 " and platform " + config.platform() +
                 "specifies profile field which is only supported for "
@@ -789,7 +789,7 @@ ValidateModelConfig(
           RETURN_IF_ERROR(GetProfileIndex(profile, &profile_index));
           if (profile_index < 0) {
             return Status(
-                RequestStatusCode::INVALID_ARG,
+                Status::Code::INVALID_ARG,
                 "instance group " + group.name() + " of model " +
                     config.name() + " and platform " + config.platform() +
                     " specifies invalid profile " + profile +
@@ -832,19 +832,19 @@ BuildEnsembleGraph(
   for (const auto& element : config.ensemble_scheduling().step()) {
     if (element.model_name().empty()) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "must specify 'model_name' in step " + std::to_string(step_idx) +
               " of ensemble '" + config.name() + "'");
     }
     if (element.input_map().size() == 0) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "must specify 'input_map' in step " + std::to_string(step_idx) +
               " of ensemble '" + config.name() + "'");
     }
     if (element.output_map().size() == 0) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "must specify 'output_map' in step " + std::to_string(step_idx) +
               " of ensemble '" + config.name() + "'");
     }
@@ -856,7 +856,7 @@ BuildEnsembleGraph(
       if (it != keyed_ensemble_graph.end()) {
         if (it->second.isOutput) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "ensemble tensor '" + it->first +
                   "' can appear in an output map only once for ensemble '" +
                   config.name() + "' step " + std::to_string(step_idx));
@@ -876,7 +876,7 @@ BuildEnsembleGraph(
     for (const auto& input_map : element.input_map()) {
       if (model_inputs.find(input_map.first) != model_inputs.end()) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "input '" + input_map.first + "' in model '" +
                 element.model_name() +
                 "' is mapped to multiple ensemble tensors for ensemble '" +
@@ -910,25 +910,25 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
 {
   if (config.platform() != kEnsemblePlatform) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "ensemble scheduling cannot be set for model '" + config.name() +
             "' whose platform is not " + kEnsemblePlatform);
   }
   if (config.instance_group().size() != 0) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "instance group should not be specified for ensemble '" +
             config.name() + "'");
   }
   if (config.has_optimization()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "optimization should not be specified for ensemble '" + config.name() +
             "'");
   }
   if (config.model_warmup_size() != 0) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "model_warmup can not be specified for ensemble '" + config.name() +
             "'");
   }
@@ -936,7 +936,7 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
   // Make sure step is not empty and all fields are set
   if (config.ensemble_scheduling().step_size() == 0) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "must specify 'step' for ensemble '" + config.name() + "'");
   }
 
@@ -950,9 +950,9 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
     auto it = tensors.find(input.name());
     if (it == tensors.end()) {
       return Status(
-          RequestStatusCode::INVALID_ARG, "ensemble input '" + input.name() +
-                                              "' for ensemble " +
-                                              config.name() + "' is not used");
+          Status::Code::INVALID_ARG, "ensemble input '" + input.name() +
+                                         "' for ensemble " + config.name() +
+                                         "' is not used");
     }
     it->second.ready = true;
     ready_queue.push_back(&(it->second));
@@ -982,15 +982,15 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
     auto it = tensors.find(output.name());
     if (it == tensors.end()) {
       return Status(
-          RequestStatusCode::INVALID_ARG, "ensemble output '" + output.name() +
-                                              "' for ensemble " +
-                                              config.name() + "' is not used");
+          Status::Code::INVALID_ARG, "ensemble output '" + output.name() +
+                                         "' for ensemble " + config.name() +
+                                         "' is not used");
     }
     if (!it->second.ready) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
-          "output '" + output.name() + "' for ensemble '" + config.name() +
-              "' is not written");
+          Status::Code::INVALID_ARG, "output '" + output.name() +
+                                         "' for ensemble '" + config.name() +
+                                         "' is not written");
     } else {
       outputs.insert(it->first);
     }
@@ -1004,9 +1004,9 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
     }
     if (!tensor.second.ready || (tensor.second.next_nodes.size() == 0)) {
       return Status(
-          RequestStatusCode::INVALID_ARG, "ensemble tensor '" + tensor.first +
-                                              "' is unused in ensemble '" +
-                                              config.name() + "'");
+          Status::Code::INVALID_ARG, "ensemble tensor '" + tensor.first +
+                                         "' is unused in ensemble '" +
+                                         config.name() + "'");
     }
   }
   return Status::Success;
@@ -1022,18 +1022,17 @@ ValidateIOShape(
 {
   if (io.name().empty()) {
     return Status(
-        RequestStatusCode::INVALID_ARG, message_prefix + "must specify 'name'");
+        Status::Code::INVALID_ARG, message_prefix + "must specify 'name'");
   }
 
   if (io.data_type() == DataType::TYPE_INVALID) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
-        "model output must specify 'data_type'");
+        Status::Code::INVALID_ARG, "model output must specify 'data_type'");
   }
 
   if (io.dims_size() == 0) {
     return Status(
-        RequestStatusCode::INVALID_ARG, message_prefix + "must specify 'dims'");
+        Status::Code::INVALID_ARG, message_prefix + "must specify 'dims'");
   }
 
   // If the configuration is non-batching, then no input or output
@@ -1042,7 +1041,7 @@ ValidateIOShape(
   if (io.has_reshape() && (io.reshape().shape_size() == 0) &&
       (max_batch_size == 0)) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         message_prefix + "cannot have empty reshape for non-batching model");
   }
 
@@ -1050,7 +1049,7 @@ ValidateIOShape(
     // Dimension cannot be 0.
     if ((dim < 1) && (dim != WILDCARD_DIM)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           message_prefix + "dimension must be integer >= 1, or " +
               std::to_string(WILDCARD_DIM) +
               " to indicate a variable-size dimension");
@@ -1062,7 +1061,7 @@ ValidateIOShape(
     for (auto dim : io.reshape().shape()) {
       if ((dim < 1) && (dim != WILDCARD_DIM)) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             message_prefix + "reshape dimensions must be integer >= 1, or " +
                 std::to_string(WILDCARD_DIM) +
                 " to indicate a variable-size dimension");
@@ -1079,7 +1078,7 @@ ValidateIOShape(
     if ((dims_size != reshape_size) &&
         ((reshape_size != 0) || (dims_size != 1))) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           message_prefix + "has different size for dims and reshape");
     }
 
@@ -1114,7 +1113,7 @@ ValidateIOShape(
 
       if (dim_element_cnts.size() != reshape_element_cnts.size()) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             message_prefix +
                 "has different number of variable-size dimensions for dims "
                 "and reshape");
@@ -1122,7 +1121,7 @@ ValidateIOShape(
       for (size_t idx = 0; idx < dim_element_cnts.size(); idx++) {
         if (dim_element_cnts[idx] != reshape_element_cnts[idx]) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               message_prefix + "has different size for dims and reshape");
         }
       }
@@ -1144,7 +1143,7 @@ ValidateModelInput(
        (io.format() == ModelInput::FORMAT_NCHW)) &&
       (io.dims_size() != 3)) {
     return Status(
-        RequestStatusCode::INVALID_ARG, "model input NHWC/NCHW require 3 dims");
+        Status::Code::INVALID_ARG, "model input NHWC/NCHW require 3 dims");
   }
 
   if (
@@ -1153,7 +1152,7 @@ ValidateModelInput(
 #endif  // TRTIS_ENABLE_TENSORRT
       io.is_shape_tensor()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "shape tensors are only supported for TensorRT platform");
   }
 
@@ -1163,7 +1162,7 @@ ValidateModelInput(
 #endif  // TRTIS_ENABLE_CUSTOM
       io.allow_ragged_batch()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "ragged-batch input tensors are only supported for custom platform");
   }
 
@@ -1184,9 +1183,8 @@ CheckAllowedModelInput(
     }
 
     return Status(
-        RequestStatusCode::INVALID_ARG, "unexpected inference input '" +
-                                            io.name() +
-                                            "', allowed inputs are: " + astr);
+        Status::Code::INVALID_ARG, "unexpected inference input '" + io.name() +
+                                       "', allowed inputs are: " + astr);
   }
   return Status::Success;
 }
@@ -1203,7 +1201,7 @@ ValidateModelOutput(
 #endif  // TRTIS_ENABLE_TENSORRT
       io.is_shape_tensor()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "shape tensors are only supported for TensorRT platform");
   }
 
@@ -1224,9 +1222,8 @@ CheckAllowedModelOutput(
     }
 
     return Status(
-        RequestStatusCode::INVALID_ARG, "unexpected inference output '" +
-                                            io.name() +
-                                            "', allowed outputs are: " + astr);
+        Status::Code::INVALID_ARG, "unexpected inference output '" + io.name() +
+                                       "', allowed outputs are: " + astr);
   }
 
   return Status::Success;
@@ -1246,7 +1243,7 @@ ParseBoolParameter(
     *parsed_value = false;
   } else {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "failed to convert " + key + " '" + value + "' to boolean value");
   }
 
@@ -1262,7 +1259,7 @@ ParseLongLongParameter(
   }
   catch (const std::invalid_argument& ia) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "failed to convert " + key + " '" + value + "' to integral number");
   }
 
@@ -1273,15 +1270,14 @@ Status
 GetProfileIndex(const std::string& profile_name, int* profile_index)
 {
   if (profile_name.empty()) {
-    return Status(
-        RequestStatusCode::INVALID_ARG, "profile name must not be empty");
+    return Status(Status::Code::INVALID_ARG, "profile name must not be empty");
   } else {
     try {
       *profile_index = stoi(profile_name);
     }
     catch (const std::invalid_argument& ia) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unable to parse '" + profile_name + "': " + ia.what());
     }
     return Status::Success;

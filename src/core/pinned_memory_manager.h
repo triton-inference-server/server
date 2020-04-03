@@ -28,6 +28,7 @@
 
 #include <boost/interprocess/managed_external_buffer.hpp>
 #include <memory>
+#include <mutex>
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {

@@ -529,9 +529,9 @@ ModelRepositoryManager::BackendLifeCycle::GetModelState(
   }
 
   return Status(
-      RequestStatusCode::NOT_FOUND, "model '" + model_name + "', version " +
-                                        std::to_string(model_version) +
-                                        " is not found");
+      Status::Code::NOT_FOUND, "model '" + model_name + "', version " +
+                                   std::to_string(model_version) +
+                                   " is not found");
 }
 
 Status
@@ -545,8 +545,7 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
   auto mit = map_.find(model_name);
   if (mit == map_.end()) {
     return Status(
-        RequestStatusCode::NOT_FOUND,
-        "model '" + model_name + "' is not found");
+        Status::Code::NOT_FOUND, "model '" + model_name + "' is not found");
   }
 
   auto vit = mit->second.find(version);
@@ -571,9 +570,9 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
     }
     if (latest == -1) {
       return Status(
-          RequestStatusCode::NOT_FOUND, "model '" + model_name + "' version " +
-                                            std::to_string(version) +
-                                            " is not found");
+          Status::Code::NOT_FOUND, "model '" + model_name + "' version " +
+                                       std::to_string(version) +
+                                       " is not found");
     }
   } else {
     std::lock_guard<std::recursive_mutex> lock(vit->second->mtx_);
@@ -581,9 +580,9 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
       *backend = vit->second->backend_;
     } else {
       return Status(
-          RequestStatusCode::UNAVAILABLE,
-          "model '" + model_name + "' version " + std::to_string(version) +
-              " is not at ready state");
+          Status::Code::UNAVAILABLE, "model '" + model_name + "' version " +
+                                         std::to_string(version) +
+                                         " is not at ready state");
     }
   }
   return Status::Success;
@@ -754,10 +753,10 @@ ModelRepositoryManager::BackendLifeCycle::Unload(
       break;
     default:
       status = Status(
-          RequestStatusCode::NOT_FOUND,
-          "tried to unload model '" + model_name + "' version " +
-              std::to_string(version) + " which is at model state: " +
-              std::to_string(backend_info->state_));
+          Status::Code::NOT_FOUND, "tried to unload model '" + model_name +
+                                       "' version " + std::to_string(version) +
+                                       " which is at model state: " +
+                                       std::to_string(backend_info->state_));
       break;
   }
 
@@ -927,14 +926,14 @@ ModelRepositoryManager::Create(
     RETURN_IF_ERROR(IsDirectory(path, &path_is_dir));
     if (!path_is_dir) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "repository path is not a valid directory");
     }
   }
 
   if (polling_enabled && model_control_enabled) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "cannot enable both polling and explicit model control");
   }
 
@@ -969,7 +968,7 @@ ModelRepositoryManager::Create(
   *model_repository_manager = std::move(local_manager);
 
   if (!all_models_polled) {
-    return Status(RequestStatusCode::INTERNAL, "failed to load all models");
+    return Status(Status::Code::INTERNAL, "failed to load all models");
   }
   // Some models may failed to be loaded after model manager is created,
   // return proper error and let function caller decide whether to proceed.
@@ -980,11 +979,11 @@ ModelRepositoryManager::Create(
     // Return general error message, detail of each model's loading state
     // is logged separately.
     if (version_states.empty()) {
-      return Status(RequestStatusCode::INTERNAL, "failed to load all models");
+      return Status(Status::Code::INTERNAL, "failed to load all models");
     }
     for (const auto& state : version_states) {
       if (state.second != ModelReadyState::MODEL_READY) {
-        return Status(RequestStatusCode::INTERNAL, "failed to load all models");
+        return Status(Status::Code::INTERNAL, "failed to load all models");
       }
     }
   }
@@ -1027,7 +1026,7 @@ Status
 ModelRepositoryManager::PollAndUpdate()
 {
   if (!polling_enabled_) {
-    return Status(RequestStatusCode::UNAVAILABLE, "polling is disabled");
+    return Status(Status::Code::UNAVAILABLE, "polling is disabled");
   }
 
   bool all_models_polled;
@@ -1197,7 +1196,7 @@ ModelRepositoryManager::LoadUnloadModel(
 {
   if (!model_control_enabled_) {
     return Status(
-        RequestStatusCode::UNAVAILABLE,
+        Status::Code::UNAVAILABLE,
         "explicit model load / unload is not allowed if polling is enabled");
   }
 
@@ -1212,13 +1211,13 @@ ModelRepositoryManager::LoadUnloadModel(
   if (type == ActionType::LOAD) {
     if (version_states.empty()) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "failed to load '" + model_name + "', no version is available");
     }
     auto it = infos_.find(model_name);
     if (it == infos_.end()) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "failed to load '" + model_name +
               "', failed to poll from model repository");
     }
@@ -1242,7 +1241,7 @@ ModelRepositoryManager::LoadUnloadModel(
     if (!not_ready_version_str.empty()) {
       not_ready_version_str.pop_back();
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "failed to load '" + model_name +
               "', versions that are not available: " + not_ready_version_str);
     }
@@ -1257,7 +1256,7 @@ ModelRepositoryManager::LoadUnloadModel(
     if (!ready_version_str.empty()) {
       ready_version_str.pop_back();
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "failed to unload '" + model_name +
               "', versions that are still available: " + ready_version_str);
     }
@@ -1358,7 +1357,7 @@ ModelRepositoryManager::UnloadAllModels()
         empty_path, name_info.first, versions, model_config);
     if (!unload_status.IsOk()) {
       status = Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "Failed to gracefully unload models: " + unload_status.Message());
     }
   }
@@ -1389,7 +1388,7 @@ ModelRepositoryManager::GetInferenceBackend(
   if (!status.IsOk()) {
     backend->reset();
     status = Status(
-        RequestStatusCode::UNAVAILABLE,
+        Status::Code::UNAVAILABLE,
         "Inference request for unknown model '" + model_name + "'");
   }
   return status;
@@ -1525,7 +1524,7 @@ ModelRepositoryManager::Poll(
         // same name.
         if (model_config.name() != child) {
           status = Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "unexpected directory name '" + child + "' for model '" +
                   model_config.name() +
                   "', directory name must equal model name");
@@ -1545,7 +1544,7 @@ ModelRepositoryManager::Poll(
       const auto& ret = updated_infos->emplace(child, nullptr);
       if (!ret.second) {
         return Status(
-            RequestStatusCode::ALREADY_EXISTS,
+            Status::Code::ALREADY_EXISTS,
             "unexpected model info for model '" + child + "'");
       }
 
@@ -1727,8 +1726,7 @@ ModelRepositoryManager::GetModelConfig(
   const auto itr = infos_.find(name);
   if (itr == infos_.end()) {
     return Status(
-        RequestStatusCode::NOT_FOUND,
-        "no configuration for model '" + name + "'");
+        Status::Code::NOT_FOUND, "no configuration for model '" + name + "'");
   }
 
   *model_config = itr->second->model_config_;
@@ -1794,12 +1792,12 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
       }
       if (!upstream.first->status_.IsOk()) {
         node->status_ = Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "ensemble '" + node->model_name_ + "' depends on '" +
                 upstream.first->model_name_ + "' which is not valid");
       } else if (upstream.first->loaded_versions_.empty()) {
         node->status_ = Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "ensemble '" + node->model_name_ + "' depends on '" +
                 upstream.first->model_name_ + "' which has no loaded version");
       } else {
@@ -1811,7 +1809,7 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
           auto it = upstream.first->loaded_versions_.find(required_version);
           if (it == upstream.first->loaded_versions_.end()) {
             node->status_ = Status(
-                RequestStatusCode::INVALID_ARG,
+                Status::Code::INVALID_ARG,
                 "ensemble '" + node->model_name_ + "' depends on '" +
                     upstream.first->model_name_ + "' whose required version " +
                     std::to_string(required_version) + " is not loaded");
@@ -1886,7 +1884,7 @@ ModelRepositoryManager::VersionsToLoad(
 
   if (versions->empty()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "at least one version must be available under the version policy of "
         "model '" +
             name + "'");

@@ -59,7 +59,7 @@ EnsembleBackend::Run(
   LOG_ERROR << "Unexpectedly invoked EnsembleBackend::Run()";
 
   OnCompleteQueuedPayloads(Status(
-      RequestStatusCode::INTERNAL,
+      Status::Code::INTERNAL,
       "unexpected invocation of EnsembleBackend::Run()"));
 }
 

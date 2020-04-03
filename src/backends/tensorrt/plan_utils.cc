@@ -144,7 +144,7 @@ CompareDimsSupported(
   if (supports_batching && is_dynamic) {
     if ((model_dims.nbDims == 0) || (model_dims.d[0] != -1)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "model '" + model_name + "', tensor '" + binding_name +
               "': for the model to support batching the shape should have at "
               "least 1 dimension and the first dimension must be -1; but shape "
@@ -170,7 +170,7 @@ CompareDimsSupported(
 
     if (!succ) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "model '" + model_name + "', tensor '" + binding_name +
               "': the model expects " + std::to_string(model_dims.nbDims) +
               " dimensions (shape " + DimsDebugString(model_dims) +
@@ -195,7 +195,7 @@ CompareDimsSupported(
 
     if (!succ) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "model '" + model_name + "', tensor '" + binding_name +
               "': the model expects " + std::to_string(model_dims.nbDims) +
               " dimensions (shape " + DimsDebugString(model_dims) +
@@ -225,16 +225,16 @@ CompareShapeDimsSupported(
     }
   } else if (model_dims.nbDims > 1) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to load model '" + model_name + "', shape binding '" +
-            binding_name + "' can only be 0-d or 1-D tensor, got " +
-            DimsDebugString(model_dims));
+        Status::Code::INTERNAL, "unable to load model '" + model_name +
+                                    "', shape binding '" + binding_name +
+                                    "' can only be 0-d or 1-D tensor, got " +
+                                    DimsDebugString(model_dims));
   }
 
 
   if (not_supported) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "unable to load model '" + model_name + "', binding '" + binding_name +
             "' shape expected by framework " + DimsDebugString(model_dims) +
             " doesn't match model configuration shape " +
@@ -254,7 +254,7 @@ MaximumDims(
   const int nonbatch_start_idx = (support_batching ? 1 : 0);
   if (max_profile_dims.nbDims != (dims.size() + nonbatch_start_idx)) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "can not maximize dimension " + DimsListToString(dims) + " to " +
             DimsDebugString(max_profile_dims) + " due to  incompatibility.");
   }
@@ -262,7 +262,7 @@ MaximumDims(
   if (support_batching) {
     if (max_batch_size > max_profile_dims.d[0]) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unexpected configuration maximum batch size " +
               std::to_string(max_batch_size) + " binding maximum is " +
               std::to_string(max_profile_dims.d[0]));
@@ -277,7 +277,7 @@ MaximumDims(
       max_dims->emplace_back(dims[i]);
     } else {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "can not maximize dimension " + DimsListToString(dims) + " to " +
               DimsDebugString(max_profile_dims) + " due to  incompatibility.");
     }
@@ -293,7 +293,7 @@ ValidateDimension(
   const int nonbatch_start_idx = (skip_first_dimension ? 1 : 0);
   if ((this_dims.nbDims + nonbatch_start_idx) != max_dims.nbDims) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "model expected " +
             std::to_string(max_dims.nbDims - nonbatch_start_idx) +
             " dimensions but received " + std::to_string(this_dims.nbDims) +
@@ -304,7 +304,7 @@ ValidateDimension(
     if (this_dims.d[i] < min_dims.d[i + nonbatch_start_idx] ||
         this_dims.d[i] > max_dims.d[i + nonbatch_start_idx]) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "model expected the shape of dimension " + std::to_string(i) +
               " to be between " +
               std::to_string(min_dims.d[i + nonbatch_start_idx]) + " and " +
@@ -322,15 +322,15 @@ ValidateControlDimsDynamic(
   int expected_first_shape = (support_batching ? -1 : 1);
   if (dims.d[0] != expected_first_shape) {
     return Status(
-        RequestStatusCode::INTERNAL, "expects the first dimension to be " +
-                                         std::to_string(expected_first_shape) +
-                                         " but the model specified " +
-                                         std::to_string(dims.d[0]));
+        Status::Code::INTERNAL, "expects the first dimension to be " +
+                                    std::to_string(expected_first_shape) +
+                                    " but the model specified " +
+                                    std::to_string(dims.d[0]));
   }
   for (int i = 1; i < dims.nbDims; i++) {
     if (dims.d[i] != 1) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "expects all dimensions (conditionally first) to be 1 but the model "
           "specified shape " +
               DimsDebugString(dims));
@@ -347,7 +347,7 @@ ValidateShapeValues(
 {
   if (request_shape_values.size() != nb_shape_values) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "mismatch between the number of shape values. Expecting " +
             std::to_string(nb_shape_values) + ". Got " +
             std::to_string(request_shape_values.size()));
@@ -357,7 +357,7 @@ ValidateShapeValues(
     if (request_shape_values[i] < *(min_shape_values + i) ||
         request_shape_values[i] > *(max_shape_values + i)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "The shape value at index " + std::to_string(i) +
               " is expected to be in range from " +
               std::to_string(*(min_shape_values + i)) + " to " +

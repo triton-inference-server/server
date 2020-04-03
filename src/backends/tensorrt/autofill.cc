@@ -27,6 +27,7 @@
 #include "src/backends/tensorrt/autofill.h"
 
 #include <NvInfer.h>
+#include <vector>
 #include "src/backends/tensorrt/loader.h"
 #include "src/backends/tensorrt/plan_utils.h"
 #include "src/core/autofill.h"
@@ -239,7 +240,7 @@ AutoFillPlanImpl::Init(ModelConfig* config)
           RETURN_IF_ERROR(GetProfileIndex(profile, &profile_idx));
           if (profile_idx < 0 || profile_idx >= num_profiles) {
             return Status(
-                RequestStatusCode::INTERNAL,
+                Status::Code::INTERNAL,
                 "unable to autofill for '" + model_name_ +
                     "', configuration specified invalid profile " + profile +
                     " . Number of profiles supported by TensorRT engine: " +
@@ -310,7 +311,7 @@ AutoFillPlanImpl::Init(ModelConfig* config)
             }
             if (config_batch_hint && (!should_batch)) {
               return Status(
-                  RequestStatusCode::INTERNAL,
+                  Status::Code::INTERNAL,
                   "unable to autofill for '" + model_name_ +
                       "', model tensor configurations are contradicting " +
                       "each other in terms of whether batching is supported");
@@ -337,7 +338,7 @@ AutoFillPlanImpl::Init(ModelConfig* config)
             }
             if (config_batch_hint && (!should_batch)) {
               return Status(
-                  RequestStatusCode::INTERNAL,
+                  Status::Code::INTERNAL,
                   "unable to autofill for '" + model_name_ +
                       "', model tensor configurations are contradicting " +
                       "each other in terms of whether batching is supported");
@@ -352,7 +353,7 @@ AutoFillPlanImpl::Init(ModelConfig* config)
   if (tensors_with_config_shape_cnt != 0 &&
       tensors_with_config_shape_cnt != num_model_bindings) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unable to autofill for '" + model_name_ +
             "', either all model tensor configuration should specify their "
             "dims or none.");
@@ -360,7 +361,7 @@ AutoFillPlanImpl::Init(ModelConfig* config)
 
   if (config_batch_hint && max_batch_size_ == 0) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unable to autofill for '" + model_name_ +
             "', model tensor  shape configuration hints for dynamic batching "
             "but the underlying engine doesn't support batching.");
@@ -381,7 +382,7 @@ AutoFillPlanImpl::FixBatchingSupport(ModelConfig* config)
     config->set_max_batch_size(max_batch_size_);
   } else if (config->max_batch_size() > max_batch_size_) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unable to autofill for '" + model_name_ +
             "', configuration specified max-batch " +
             std::to_string(config->max_batch_size()) +
@@ -465,13 +466,13 @@ AutoFillPlanImpl::FixIO(
           int io_index = engine_->getBindingIndex(io.name().c_str());
           if (io_index == -1) {
             return Status(
-                RequestStatusCode::INVALID_ARG,
+                Status::Code::INVALID_ARG,
                 "binding for '" + io.name() + "' not found in the model.");
           }
           is_shape_tensor = engine_->isShapeBinding(io_index);
           if (io.is_shape_tensor() && (!is_shape_tensor)) {
             return Status(
-                RequestStatusCode::INVALID_ARG,
+                Status::Code::INVALID_ARG,
                 "'" + io.name() +
                     "' is incorrectly specified as a shape tensor.");
           }
@@ -498,8 +499,8 @@ AutoFillPlan::Create(
   // We can add more aggressive checks later.
   if (version_dirs.size() == 0) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "' due to no version directories");
+        Status::Code::INTERNAL, "unable to autofill for '" + model_name +
+                                    "' due to no version directories");
   }
 
   // The model configuration will be the same across all the version directories
@@ -541,7 +542,7 @@ AutoFillPlan::Create(
 
   if (!found) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unable to autofill for '" + model_name +
             "', unable to find a compatible plan file.");
   }

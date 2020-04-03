@@ -41,6 +41,7 @@
 #include <aws/s3/model/ListObjectsRequest.h>
 #endif  // TRTIS_ENABLE_S3
 
+#include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/text_format.h>
 #include <re2/re2.h>
 #include <stdio.h>
@@ -111,7 +112,7 @@ LocalFileSystem::IsDirectory(const std::string& path, bool* is_dir)
 
   struct stat st;
   if (stat(path.c_str(), &st) != 0) {
-    return Status(RequestStatusCode::INTERNAL, "failed to stat file " + path);
+    return Status(Status::Code::INTERNAL, "failed to stat file " + path);
   }
 
   *is_dir = S_ISDIR(st.st_mode);
@@ -124,7 +125,7 @@ LocalFileSystem::FileModificationTime(
 {
   struct stat st;
   if (stat(path.c_str(), &st) != 0) {
-    return Status(RequestStatusCode::INTERNAL, "failed to stat file " + path);
+    return Status(Status::Code::INTERNAL, "failed to stat file " + path);
   }
 
   *mtime_ns = TIMESPEC_TO_NANOS(st.st_mtim);
@@ -137,8 +138,7 @@ LocalFileSystem::GetDirectoryContents(
 {
   DIR* dir = opendir(path.c_str());
   if (dir == nullptr) {
-    return Status(
-        RequestStatusCode::INTERNAL, "failed to open directory " + path);
+    return Status(Status::Code::INTERNAL, "failed to open directory " + path);
   }
 
   struct dirent* entry;
@@ -200,7 +200,7 @@ LocalFileSystem::ReadTextFile(const std::string& path, std::string* contents)
   std::ifstream in(path, std::ios::in | std::ios::binary);
   if (!in) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "failed to open text file for read " + path + ": " + strerror(errno));
   }
 
@@ -237,7 +237,7 @@ LocalFileSystem::WriteTextFile(
   std::ofstream out(path, std::ios::out | std::ios::binary);
   if (!out) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "failed to open text file for write " + path + ": " + strerror(errno));
   }
 
@@ -294,7 +294,7 @@ GCSFileSystem::CheckClient()
   // valid
   if (!client_) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "Unable to create GCS client. Check account credentials.");
   }
   return Status::Success;
@@ -319,7 +319,7 @@ GCSFileSystem::ParsePath(
 
   if (bucket->empty()) {
     return Status(
-        RequestStatusCode::INTERNAL, "No bucket name found in path: " + path);
+        Status::Code::INTERNAL, "No bucket name found in path: " + path);
   }
 
   return Status::Success;
@@ -374,7 +374,7 @@ GCSFileSystem::IsDirectory(const std::string& path, bool* is_dir)
 
   if (!bucket_metadata) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "Could not get MetaData for bucket with name " + bucket);
   }
 
@@ -415,9 +415,8 @@ GCSFileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
 
   if (!object_metadata) {
     return Status(
-        RequestStatusCode::INTERNAL, "Failed to get metadata for " + object +
-                                         " : " +
-                                         object_metadata.status().message());
+        Status::Code::INTERNAL, "Failed to get metadata for " + object + " : " +
+                                    object_metadata.status().message());
   }
 
   // Get duration from time point with respect to object clock
@@ -444,7 +443,7 @@ GCSFileSystem::GetDirectoryContents(
        client_->ListObjects(bucket, gcs::Prefix(full_dir))) {
     if (!object_metadata) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "Could not list contents of directory at " + path);
     }
 
@@ -513,8 +512,7 @@ GCSFileSystem::ReadTextFile(const std::string& path, std::string* contents)
   RETURN_IF_ERROR(FileExists(path, &exists));
 
   if (!exists) {
-    return Status(
-        RequestStatusCode::INTERNAL, "File does not exist at " + path);
+    return Status(Status::Code::INTERNAL, "File does not exist at " + path);
   }
 
   std::string bucket, object;
@@ -524,7 +522,7 @@ GCSFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 
   if (!stream) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "Failed to open object read stream for " + path);
   }
 
@@ -561,7 +559,7 @@ GCSFileSystem::WriteTextFile(
     const std::string& path, const std::string& contents)
 {
   return Status(
-      RequestStatusCode::INTERNAL,
+      Status::Code::INTERNAL,
       "Write text file operation not yet implemented " + path);
 }
 
@@ -623,7 +621,7 @@ S3FileSystem::ParsePath(
 
   if (bucket->empty()) {
     return Status(
-        RequestStatusCode::INTERNAL, "No bucket name found in path: " + path);
+        Status::Code::INTERNAL, "No bucket name found in path: " + path);
   }
 
   return Status::Success;
@@ -701,7 +699,7 @@ S3FileSystem::IsDirectory(const std::string& path, bool* is_dir)
   auto head_bucket_outcome = client_.HeadBucket(head_request);
   if (!head_bucket_outcome.IsSuccess()) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "Could not get MetaData for bucket with name " + bucket);
   }
 
@@ -721,8 +719,7 @@ S3FileSystem::IsDirectory(const std::string& path, bool* is_dir)
     *is_dir = !list_objects_outcome.GetResult().GetContents().empty();
   } else {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "Failed to list objects with prefix " + path);
+        Status::Code::INTERNAL, "Failed to list objects with prefix " + path);
   }
   return Status::Success;
 }
@@ -752,7 +749,7 @@ S3FileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
     *mtime_ns = head_object_outcome.GetResult().GetLastModified().Millis();
   } else {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "Failed to get modification time for object at " + path);
   }
   return Status::Success;
@@ -797,7 +794,7 @@ S3FileSystem::GetDirectoryContents(
     }
   } else {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "Could not list contents of directory at " + true_path);
   }
   return Status::Success;
@@ -858,8 +855,7 @@ S3FileSystem::ReadTextFile(const std::string& path, std::string* contents)
   RETURN_IF_ERROR(FileExists(path, &exists));
 
   if (!exists) {
-    return Status(
-        RequestStatusCode::INTERNAL, "File does not exist at " + path);
+    return Status(Status::Code::INTERNAL, "File does not exist at " + path);
   }
 
   std::string bucket, object;
@@ -882,8 +878,7 @@ S3FileSystem::ReadTextFile(const std::string& path, std::string* contents)
 
     *contents = data;
   } else {
-    return Status(
-        RequestStatusCode::INTERNAL, "Failed to get object at " + path);
+    return Status(Status::Code::INTERNAL, "Failed to get object at " + path);
   }
 
   return Status::Success;
@@ -898,7 +893,7 @@ S3FileSystem::DownloadFileFolder(
 
   if (!exists) {
     return Status(
-        RequestStatusCode::INTERNAL, "File/folder does not exist at " + path);
+        Status::Code::INTERNAL, "File/folder does not exist at " + path);
   }
 
   std::string effective_path, host_name, host_port, bucket, object;
@@ -917,7 +912,7 @@ S3FileSystem::DownloadFileFolder(
     char* tmp_folder = mkdtemp(const_cast<char*>(file_template.c_str()));
     if (tmp_folder == nullptr) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "Failed to create local temp folder: " + file_template);
     }
 
@@ -936,7 +931,7 @@ S3FileSystem::DownloadFileFolder(
             S_IRUSR | S_IWUSR | S_IXUSR);
         if (!status) {
           return Status(
-              RequestStatusCode::INTERNAL,
+              Status::Code::INTERNAL,
               "Failed to create local folder: " + local_fpath);
         }
 
@@ -973,7 +968,7 @@ S3FileSystem::DownloadFileFolder(
         output_file.close();
       } else {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "Failed to get object at " + effective_path);
       }
     }
@@ -981,7 +976,7 @@ S3FileSystem::DownloadFileFolder(
     int status = mkstemp(const_cast<char*>(file_template.c_str()));
     if (!status) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "Failed to create local temp file: " + file_template);
     }
 
@@ -1003,8 +998,7 @@ S3FileSystem::DownloadFileFolder(
       output_file.close();
     } else {
       return Status(
-          RequestStatusCode::INTERNAL,
-          "Failed to get object at " + effective_path);
+          Status::Code::INTERNAL, "Failed to get object at " + effective_path);
     }
   }
   return Status::Success;
@@ -1022,7 +1016,7 @@ S3FileSystem::WriteTextFile(
     const std::string& path, const std::string& contents)
 {
   return Status(
-      RequestStatusCode::INTERNAL,
+      Status::Code::INTERNAL,
       "Write text file operation not yet implemented " + path);
 }
 
@@ -1036,7 +1030,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
   if (!path.empty() && !path.rfind("gs://", 0)) {
 #ifndef TRTIS_ENABLE_GCS
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "gs:// file-system not supported. To enable, build with "
         "-DTRTIS_ENABLE_GCS=ON.");
 #else
@@ -1051,7 +1045,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
   if (!path.empty() && !path.rfind("s3://", 0)) {
 #ifndef TRTIS_ENABLE_S3
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "s3:// file-system not supported. To enable, build with "
         "-DTRTIS_ENABLE_S3=ON.");
 #else
@@ -1232,7 +1226,7 @@ ReadTextProto(const std::string& path, google::protobuf::Message* msg)
 
   if (!google::protobuf::TextFormat::ParseFromString(contents, msg)) {
     return Status(
-        RequestStatusCode::INTERNAL, "failed to read text proto from " + path);
+        Status::Code::INTERNAL, "failed to read text proto from " + path);
   }
 
   return Status::Success;
@@ -1264,7 +1258,7 @@ WriteTextProto(const std::string& path, const google::protobuf::Message& msg)
   std::string prototxt;
   if (!google::protobuf::TextFormat::PrintToString(msg, &prototxt)) {
     return Status(
-        RequestStatusCode::INTERNAL, "failed to write text proto to " + path);
+        Status::Code::INTERNAL, "failed to write text proto to " + path);
   }
 
   return fs->WriteTextFile(path, prototxt);
@@ -1281,8 +1275,7 @@ ReadBinaryProto(const std::string& path, google::protobuf::MessageLite* msg)
   coded_stream.SetTotalBytesLimit(INT_MAX, INT_MAX);
   if (!msg->ParseFromCodedStream(&coded_stream)) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "Can't parse " + path + " as binary proto");
+        Status::Code::INTERNAL, "Can't parse " + path + " as binary proto");
   }
 
   return Status::Success;

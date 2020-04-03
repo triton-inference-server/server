@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,94 +28,86 @@
 
 namespace nvidia { namespace inferenceserver {
 
-const Status Status::Success(RequestStatusCode::SUCCESS);
+const Status Status::Success(Status::Code::SUCCESS);
 
 std::string
 Status::AsString() const
 {
-  std::string str;
-
-  switch (code_) {
-    case RequestStatusCode::INVALID:
-      str = "Invalid";
-      break;
-    case RequestStatusCode::SUCCESS:
-      str = "OK";
-      break;
-    case RequestStatusCode::UNKNOWN:
-      str = "Unknown";
-      break;
-    case RequestStatusCode::INTERNAL:
-      str = "Internal";
-      break;
-    case RequestStatusCode::NOT_FOUND:
-      str = "Not found";
-      break;
-    case RequestStatusCode::INVALID_ARG:
-      str = "Invalid argument";
-      break;
-    case RequestStatusCode::UNAVAILABLE:
-      str = "Unavailable";
-      break;
-    case RequestStatusCode::UNSUPPORTED:
-      str = "Unsupported";
-      break;
-    case RequestStatusCode::ALREADY_EXISTS:
-      str = "Already exists";
-      break;
-
-    default:
-      str = "Unknown status code (" + std::to_string(code_) + ")";
-      break;
-  }
-
+  std::string str(CodeString(code_));
   str += ": " + msg_;
   return str;
 }
 
-RequestStatusCode
-TrtServerCodeToRequestStatus(TRTSERVER_Error_Code code)
+const char*
+Status::CodeString(const Code code)
+{
+  switch (code) {
+    case Status::Code::SUCCESS:
+      return "OK";
+    case Status::Code::UNKNOWN:
+      return "Unknown";
+    case Status::Code::INTERNAL:
+      return "Internal";
+    case Status::Code::NOT_FOUND:
+      return "Not found";
+    case Status::Code::INVALID_ARG:
+      return "Invalid argument";
+    case Status::Code::UNAVAILABLE:
+      return "Unavailable";
+    case Status::Code::UNSUPPORTED:
+      return "Unsupported";
+    case Status::Code::ALREADY_EXISTS:
+      return "Already exists";
+    default:
+      break;
+  }
+
+  return "<invalid code>";
+}
+
+Status::Code
+TrtServerCodeToStatusCode(TRTSERVER_Error_Code code)
 {
   switch (code) {
     case TRTSERVER_ERROR_UNKNOWN:
-      return RequestStatusCode::UNKNOWN;
+      return Status::Code::UNKNOWN;
     case TRTSERVER_ERROR_INTERNAL:
-      return RequestStatusCode::INTERNAL;
+      return Status::Code::INTERNAL;
     case TRTSERVER_ERROR_NOT_FOUND:
-      return RequestStatusCode::NOT_FOUND;
+      return Status::Code::NOT_FOUND;
     case TRTSERVER_ERROR_INVALID_ARG:
-      return RequestStatusCode::INVALID_ARG;
+      return Status::Code::INVALID_ARG;
     case TRTSERVER_ERROR_UNAVAILABLE:
-      return RequestStatusCode::UNAVAILABLE;
+      return Status::Code::UNAVAILABLE;
     case TRTSERVER_ERROR_UNSUPPORTED:
-      return RequestStatusCode::UNSUPPORTED;
+      return Status::Code::UNSUPPORTED;
     case TRTSERVER_ERROR_ALREADY_EXISTS:
-      return RequestStatusCode::ALREADY_EXISTS;
+      return Status::Code::ALREADY_EXISTS;
 
     default:
       break;
   }
 
-  return RequestStatusCode::UNKNOWN;
+  return Status::Code::UNKNOWN;
 }
 
 TRTSERVER_Error_Code
-RequestStatusToTrtServerCode(RequestStatusCode status_code)
+StatusCodeToTrtServerCode(Status::Code status_code)
 {
   switch (status_code) {
-    case RequestStatusCode::UNKNOWN:
+    case Status::Code::UNKNOWN:
       return TRTSERVER_ERROR_UNKNOWN;
-    case RequestStatusCode::INTERNAL:
+    case Status::Code::INTERNAL:
       return TRTSERVER_ERROR_INTERNAL;
-    case RequestStatusCode::NOT_FOUND:
+    case Status::Code::NOT_FOUND:
       return TRTSERVER_ERROR_NOT_FOUND;
-    case RequestStatusCode::INVALID_ARG:
+    case Status::Code::INVALID_ARG:
       return TRTSERVER_ERROR_INVALID_ARG;
-    case RequestStatusCode::UNAVAILABLE:
+    case Status::Code::UNAVAILABLE:
       return TRTSERVER_ERROR_UNAVAILABLE;
-    case RequestStatusCode::UNSUPPORTED:
+    case Status::Code::UNSUPPORTED:
       return TRTSERVER_ERROR_UNSUPPORTED;
-    case RequestStatusCode::ALREADY_EXISTS:
+    case Status::Code::ALREADY_EXISTS:
       return TRTSERVER_ERROR_ALREADY_EXISTS;
 
     default:
@@ -125,49 +117,49 @@ RequestStatusToTrtServerCode(RequestStatusCode status_code)
   return TRTSERVER_ERROR_UNKNOWN;
 }
 
-RequestStatusCode
-TritonServerCodeToRequestStatus(TRITONSERVER_Error_Code code)
+Status::Code
+TritonServerCodeToStatusCode(TRITONSERVER_Error_Code code)
 {
   switch (code) {
     case TRITONSERVER_ERROR_UNKNOWN:
-      return RequestStatusCode::UNKNOWN;
+      return Status::Code::UNKNOWN;
     case TRITONSERVER_ERROR_INTERNAL:
-      return RequestStatusCode::INTERNAL;
+      return Status::Code::INTERNAL;
     case TRITONSERVER_ERROR_NOT_FOUND:
-      return RequestStatusCode::NOT_FOUND;
+      return Status::Code::NOT_FOUND;
     case TRITONSERVER_ERROR_INVALID_ARG:
-      return RequestStatusCode::INVALID_ARG;
+      return Status::Code::INVALID_ARG;
     case TRITONSERVER_ERROR_UNAVAILABLE:
-      return RequestStatusCode::UNAVAILABLE;
+      return Status::Code::UNAVAILABLE;
     case TRITONSERVER_ERROR_UNSUPPORTED:
-      return RequestStatusCode::UNSUPPORTED;
+      return Status::Code::UNSUPPORTED;
     case TRITONSERVER_ERROR_ALREADY_EXISTS:
-      return RequestStatusCode::ALREADY_EXISTS;
+      return Status::Code::ALREADY_EXISTS;
 
     default:
       break;
   }
 
-  return RequestStatusCode::UNKNOWN;
+  return Status::Code::UNKNOWN;
 }
 
 TRITONSERVER_Error_Code
-RequestStatusToTritonServerCode(RequestStatusCode status_code)
+StatusCodeToTritonServerCode(Status::Code status_code)
 {
   switch (status_code) {
-    case RequestStatusCode::UNKNOWN:
+    case Status::Code::UNKNOWN:
       return TRITONSERVER_ERROR_UNKNOWN;
-    case RequestStatusCode::INTERNAL:
+    case Status::Code::INTERNAL:
       return TRITONSERVER_ERROR_INTERNAL;
-    case RequestStatusCode::NOT_FOUND:
+    case Status::Code::NOT_FOUND:
       return TRITONSERVER_ERROR_NOT_FOUND;
-    case RequestStatusCode::INVALID_ARG:
+    case Status::Code::INVALID_ARG:
       return TRITONSERVER_ERROR_INVALID_ARG;
-    case RequestStatusCode::UNAVAILABLE:
+    case Status::Code::UNAVAILABLE:
       return TRITONSERVER_ERROR_UNAVAILABLE;
-    case RequestStatusCode::UNSUPPORTED:
+    case Status::Code::UNSUPPORTED:
       return TRITONSERVER_ERROR_UNSUPPORTED;
-    case RequestStatusCode::ALREADY_EXISTS:
+    case Status::Code::ALREADY_EXISTS:
       return TRITONSERVER_ERROR_ALREADY_EXISTS;
 
     default:

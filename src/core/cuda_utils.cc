@@ -28,7 +28,6 @@
 
 #include "src/core/model_config_utils.h"
 #include "src/core/nvtx.h"
-#include "src/core/request_status.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -64,7 +63,7 @@ EnablePeerAccess(const double min_compute_capability)
   }
   if (!all_enabled) {
     return Status(
-        RequestStatusCode::UNSUPPORTED,
+        Status::Code::UNSUPPORTED,
         "failed to enable peer access for some device pairs");
   }
 #endif  // TRTIS_ENABLE_GPU
@@ -115,7 +114,7 @@ CopyBuffer(
     *cuda_used = true;
 #else
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         msg + ": try to use CUDA copy while GPU is not supported");
 #endif  // TRTIS_ENABLE_GPU
   }
@@ -131,7 +130,7 @@ CheckGPUCompatibility(const int gpu_id, const double min_compute_capability)
   cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_id);
   if (cuerr != cudaSuccess) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unable to get CUDA device properties for GPU ID" +
             std::to_string(gpu_id) + ": " + cudaGetErrorString(cuerr));
   }
@@ -142,7 +141,7 @@ CheckGPUCompatibility(const int gpu_id, const double min_compute_capability)
     return Status::Success;
   } else {
     return Status(
-        RequestStatusCode::UNSUPPORTED,
+        Status::Code::UNSUPPORTED,
         "gpu " + std::to_string(gpu_id) + " has compute capability '" +
             std::to_string(cuprops.major) + "." +
             std::to_string(cuprops.minor) +
@@ -164,9 +163,8 @@ GetSupportedGPUs(
     device_cnt = 0;
   } else if (cuerr != cudaSuccess) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to get number of CUDA devices: " +
-            std::string(cudaGetErrorString(cuerr)));
+        Status::Code::INTERNAL, "unable to get number of CUDA devices: " +
+                                    std::string(cudaGetErrorString(cuerr)));
   }
 
   // populates supported_gpus

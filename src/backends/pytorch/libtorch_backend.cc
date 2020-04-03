@@ -203,9 +203,9 @@ LibTorchBackend::CreateExecutionContext(
     cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
     if (cuerr != cudaSuccess) {
       return Status(
-          RequestStatusCode::INTERNAL,
-          "unable to get CUDA device properties for " + Name() + ": " +
-              cudaGetErrorString(cuerr));
+          Status::Code::INTERNAL, "unable to get CUDA device properties for " +
+                                      Name() + ": " +
+                                      cudaGetErrorString(cuerr));
     }
 
     cc = std::to_string(cuprops.major) + "." + std::to_string(cuprops.minor);
@@ -214,15 +214,15 @@ LibTorchBackend::CreateExecutionContext(
                             ? Config().default_model_filename()
                             : cc_itr->second;
 #else
-    return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
+    return Status(Status::Code::INTERNAL, "GPU instances not supported");
 #endif  // TRTIS_ENABLE_GPU
   }
 
   const auto& lp_itr = models.find(cc_model_filename);
   if (lp_itr == models.end()) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to find LibTorch model '" +
-                                         cc_model_filename + "' for " + Name());
+        Status::Code::INTERNAL, "unable to find LibTorch model '" +
+                                    cc_model_filename + "' for " + Name());
   }
 
   if (gpu_device == Context::NO_GPU_DEVICE) {
@@ -265,8 +265,8 @@ LibTorchBackend::CreateExecutionContext(
   }
   catch (const std::exception& ex) {
     return Status(
-        RequestStatusCode::INTERNAL, "load failed for libtorch model -> '" +
-                                         Config().name() + "': " + ex.what());
+        Status::Code::INTERNAL, "load failed for libtorch model -> '" +
+                                    Config().name() + "': " + ex.what());
   }
 
   RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
@@ -285,7 +285,7 @@ LibTorchBackend::Context::ValidateInputs(
     const auto pr = ConvertDataTypeToTorchType(io.data_type());
     if (!pr.first) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
               " for input '" + io.name() + "' for model '" + name_ + "'");
     } else {
@@ -301,7 +301,7 @@ LibTorchBackend::Context::ValidateInputs(
       }
       catch (std::exception& ex) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "Input '" + name +
                 "' does not follow naming convention i.e. <name>__<index>.");
       }
@@ -324,7 +324,7 @@ LibTorchBackend::Context::ValidateOutputs(
     const auto pr = ConvertDataTypeToTorchType(io.data_type());
     if (!pr.first) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
               " for output '" + io.name() + "' for model '" + name_ + "'");
     } else {
@@ -340,7 +340,7 @@ LibTorchBackend::Context::ValidateOutputs(
       }
       catch (std::exception& ex) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "Output '" + name +
                 "' does not follow naming convention i.e. <name>__<index>.");
       }
@@ -370,7 +370,7 @@ LibTorchBackend::Context::SetInputTensor(
 
   if (input_tensor.nbytes() != total_byte_size) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unexpected size " + std::to_string(total_byte_size) +
             " for inference input '" + meta_data.name_ + "', expecting " +
             std::to_string(input_tensor.nbytes()));
@@ -404,7 +404,7 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
 
   if (byte_size != total_byte_size) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "unexpected size for output '" + name + "', byte-size " +
             std::to_string(byte_size) + " does not equal " +
             std::to_string(total_batch_size) + " * " +
@@ -433,7 +433,7 @@ LibTorchBackend::Context::GetOutputTensor(
     DataType rec_dtype = ConvertTorchTypeToDataType(output_flat.scalar_type());
     if (dtype != rec_dtype) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unexpected datatype " + DataType_Name(rec_dtype) +
               " for inference output '" + name + "', expecting " +
               DataType_Name(dtype));
@@ -449,7 +449,7 @@ LibTorchBackend::Context::GetOutputTensor(
     }
   }
   catch (std::exception& ex) {
-    return Status(RequestStatusCode::INTERNAL, "failed to get LibTorch output");
+    return Status(Status::Code::INTERNAL, "failed to get LibTorch output");
   }
 
   return Status::Success;
@@ -483,9 +483,9 @@ LibTorchBackend::Context::SetInputMetaData(
   const auto pr = ConvertDataTypeToTorchType(datatype);
   if (!pr.first) {
     return Status(
-        RequestStatusCode::INTERNAL, "Failed to convert DataType '" +
-                                         DataType_Name(datatype) +
-                                         "' to Torch datatype");
+        Status::Code::INTERNAL, "Failed to convert DataType '" +
+                                    DataType_Name(datatype) +
+                                    "' to Torch datatype");
   }
   meta_data->torch_type_ = pr.second;
 
@@ -549,7 +549,7 @@ LibTorchBackend::Context::Run(
   for (auto& payload : *payloads) {
     if (!payload.status_.IsOk()) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "unexpected payload with non-OK status given to runner for '" +
               name_ + "'");
     }
@@ -572,7 +572,7 @@ LibTorchBackend::Context::Run(
   // (i.e. max_batch_size_ == 0).
   if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size_)) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "dynamic batch size " + std::to_string(total_batch_size) + " for '" +
             name_ + "', max allowed is " + std::to_string(max_batch_size_));
   }
@@ -618,7 +618,7 @@ LibTorchBackend::Context::Run(
       }
       catch (std::exception& ex) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "Input '" + name +
                 "' does not follow naming convention i.e. <name>__<index>.");
       }
@@ -696,7 +696,7 @@ LibTorchBackend::Context::Run(
     int max_index = outputs_.size() - 1;
     if ((op_index < 0) || (op_index > max_index)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "The output " + output.name() +
               " in the model configuration refers to an output index which "
               "doesn't exist. This model has " +
@@ -796,8 +796,7 @@ LibTorchBackend::Context::Execute(
     }
     catch (std::exception& exx) {
       LOG_VERBOSE(1) << ex.what();
-      return Status(
-          RequestStatusCode::INTERNAL, "failed to run model '" + name_);
+      return Status(Status::Code::INTERNAL, "failed to run model '" + name_);
     }
   }
 

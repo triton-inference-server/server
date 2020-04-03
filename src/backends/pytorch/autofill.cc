@@ -65,8 +65,8 @@ AutoFillPyTorch::Create(
   // We can add more aggressive checks later.
   if (version_dirs.size() == 0) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "' due to no version directories");
+        Status::Code::INTERNAL, "unable to autofill for '" + model_name +
+                                    "' due to no version directories");
   }
 
   const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
@@ -81,10 +81,9 @@ AutoFillPyTorch::Create(
   // try to derive more of the configuration...
   if (pytorch_files.find(kPyTorchLibTorchFilename) == pytorch_files.end()) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to autofill for '" + model_name +
-            "', unable to find PyTorch file named '" +
-            kPyTorchLibTorchFilename + "'");
+        Status::Code::INTERNAL, "unable to autofill for '" + model_name +
+                                    "', unable to find PyTorch file named '" +
+                                    kPyTorchLibTorchFilename + "'");
   }
 
   autofill->reset(new AutoFillPyTorchImpl(model_name));

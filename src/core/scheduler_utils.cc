@@ -108,7 +108,7 @@ Status
 PriorityQueue::PolicyQueue::Enqueue(Scheduler::Payload&& payload)
 {
   if ((max_queue_size_ != 0) && (Size() >= max_queue_size_)) {
-    return Status(RequestStatusCode::UNAVAILABLE, "Exceeds maximum queue size");
+    return Status(Status::Code::UNAVAILABLE, "Exceeds maximum queue size");
   }
   queue_.emplace_back(std::move(payload));
   auto timeout_us = default_timeout_us_;
@@ -287,7 +287,7 @@ PriorityQueue::Dequeue(Scheduler::Payload* payload)
     // then raise exception
     break;
   }
-  return Status(RequestStatusCode::UNAVAILABLE, "dequeue on empty queue");
+  return Status(Status::Code::UNAVAILABLE, "dequeue on empty queue");
 }
 
 std::shared_ptr<std::vector<std::deque<Scheduler::Payload>>>

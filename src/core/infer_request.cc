@@ -82,7 +82,7 @@ InferenceRequest::MutableOriginalInput(
   auto itr = original_inputs_.find(name);
   if (itr == original_inputs_.end()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "input '" + name + "' does not exist in request");
   }
 
@@ -98,7 +98,7 @@ InferenceRequest::ImmutableInput(
   auto itr = inputs_.find(name);
   if (itr == inputs_.end()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "input '" + name + "' does not exist in request");
   }
 
@@ -113,7 +113,7 @@ InferenceRequest::MutableRequestedOutput(
   auto itr = requested_outputs_.find(name);
   if (itr == requested_outputs_.end()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "output '" + name + "' does not exist in request");
   }
 
@@ -145,7 +145,7 @@ InferenceRequest::AddOriginalInput(
       name, InferenceRequest::Input(name, shape, batch_byte_size)));
   if (!pr.second) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "input '" + name + "' already exists in request");
   }
 
@@ -168,7 +168,7 @@ InferenceRequest::AddOriginalInput(
       name, InferenceRequest::Input(name, datatype, shape, dim_count)));
   if (!pr.second) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "input '" + name + "' already exists in request");
   }
 
@@ -187,7 +187,7 @@ InferenceRequest::RemoveOriginalInput(const std::string& name)
 {
   if (original_inputs_.erase(name) != 1) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "input '" + name + "' does not exist in request");
   }
 
@@ -254,8 +254,7 @@ InferenceRequest::AddRequestedOutput(
       name, InferenceRequest::RequestedOutput(name, classification_cnt)));
   if (!pr.second) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
-        "output '" + name + "' already requested");
+        Status::Code::INVALID_ARG, "output '" + name + "' already requested");
   }
 
   needs_normalization_ = true;
@@ -267,7 +266,7 @@ InferenceRequest::RemoveRequestedOutput(const std::string& name)
 {
   if (requested_outputs_.erase(name) != 1) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "output '" + name + "' does not exist in request");
   }
 
@@ -328,7 +327,7 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
   // don't support batching the requested batch size must be 1.
   if (batch_size_ < 1) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "inference request batch-size must be >= 1 for '" + model_name_ + "'");
   }
 
@@ -338,7 +337,7 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
   if ((batch_size_ != 1) &&
       ((int)batch_size_ > model_config.max_batch_size())) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "inference request batch-size must be <= " +
             std::to_string(model_config.max_batch_size()) + " for '" +
             model_name_ + "'");
@@ -354,7 +353,7 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
   // as is expected by the model.
   if (original_inputs_.size() != (size_t)model_config.input_size()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "expected " + std::to_string(model_config.input_size()) +
             " inputs but got " + std::to_string(original_inputs_.size()) +
             " inputs for model '" + model_name_ + "'");
@@ -376,7 +375,7 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
     if (new_shape->size() > 0) {
       if (!CompareDimsWithWildcard(input_config->dims(), *new_shape)) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "unexpected shape for input '" + pr.first + "' for model '" +
                 model_name_ + "'. Expected " +
                 DimsListToString(input_config->dims()) + ", got " +
@@ -421,7 +420,7 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
       for (auto dim : dims) {
         if (dim < 0) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "model supports variable-size for input '" + pr.first +
                   "', request must specify input shape for model '" +
                   model_name_ + "'");
@@ -465,7 +464,7 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
       // calculated batch size matches
       if ((input.BatchByteSize() != 0) && (input.BatchByteSize() != bs)) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "specific batch-byte-size for input '" + pr.first +
                 "' does not match expected byte-size calculated from shape and "
                 "datatype for model '" +
@@ -502,7 +501,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
   // as is expected by the model.
   if (original_inputs_.size() != (size_t)model_config.input_size()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "expected " + std::to_string(model_config.input_size()) +
             " inputs but got " + std::to_string(original_inputs_.size()) +
             " inputs for model '" + model_name_ + "'");
@@ -527,7 +526,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
       auto& input = pr.second;
       if (input.OriginalShape().size() == 0) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "input '" + input.Name() +
                 "' has no shape but model requires batch dimension for '" +
                 model_name_ + "'");
@@ -537,7 +536,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
         batch_size_ = input.OriginalShape()[0];
       } else if (input.OriginalShape()[0] != batch_size_) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "input '" + input.Name() +
                 "' batch size does not match other inputs for '" + model_name_ +
                 "'");
@@ -552,7 +551,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
   // don't support batching the requested batch size must be 1.
   if (batch_size_ < 1) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "inference request batch-size must be >= 1 for '" + model_name_ + "'");
   }
 
@@ -562,7 +561,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
   if ((batch_size_ != 1) &&
       ((int)batch_size_ > model_config.max_batch_size())) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "inference request batch-size must be <= " +
             std::to_string(model_config.max_batch_size()) + " for '" +
             model_name_ + "'");
@@ -583,7 +582,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
 #if 0
     if (input.DType() != input_config->data_type()) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "inference input data-type is '" +
               std::string(DataTypeToProtocolString(input.DType())) +
               "', model expects '" +
@@ -596,7 +595,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
 
     if (!CompareDimsWithWildcard(input_config->dims(), *shape)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unexpected shape for input '" + pr.first + "' for model '" +
               model_name_ + "'. Expected " +
               DimsListToString(input_config->dims()) + ", got " +
@@ -701,7 +700,7 @@ InferenceRequest::Input::SetData(const std::shared_ptr<Memory>& data)
 {
   if (data_ != nullptr) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "input '" + name_ + "' already has data, can't overwrite");
   }
 

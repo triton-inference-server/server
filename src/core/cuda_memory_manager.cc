@@ -27,6 +27,7 @@
 #include "src/core/cuda_memory_manager.h"
 
 #include <cnmem.h>
+#include <string.h>
 #include <set>
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
@@ -38,7 +39,7 @@ namespace {
     auto status__ = (S);                                 \
     if (status__ != CNMEM_STATUS_SUCCESS) {              \
       return Status(                                     \
-          RequestStatusCode::INTERNAL,                   \
+          Status::Code::INTERNAL,                        \
           (MSG) + ": " + cnmemGetErrorString(status__)); \
     }                                                    \
   } while (false)
@@ -77,8 +78,7 @@ CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
 {
   if (instance_ != nullptr) {
     return Status(
-        RequestStatusCode::ALREADY_EXISTS,
-        "CudaMemoryManager has been created");
+        Status::Code::ALREADY_EXISTS, "CudaMemoryManager has been created");
   }
 
   std::set<int> supported_gpus;
@@ -104,7 +104,7 @@ CudaMemoryManager::Create(const CudaMemoryManager::Options& options)
     instance_.reset(new CudaMemoryManager());
   } else {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "Failed to initialize CUDA memory manager: " + status.Message());
   }
 
@@ -116,8 +116,7 @@ CudaMemoryManager::Alloc(void** ptr, uint64_t size, int64_t device_id)
 {
   if (instance_ == nullptr) {
     return Status(
-        RequestStatusCode::UNAVAILABLE,
-        "CudaMemoryManager has not been created");
+        Status::Code::UNAVAILABLE, "CudaMemoryManager has not been created");
   }
 
   int current_device;
@@ -147,8 +146,7 @@ CudaMemoryManager::Free(void* ptr, int64_t device_id)
 {
   if (instance_ == nullptr) {
     return Status(
-        RequestStatusCode::UNAVAILABLE,
-        "CudaMemoryManager has not been created");
+        Status::Code::UNAVAILABLE, "CudaMemoryManager has not been created");
   }
 
   int current_device;
