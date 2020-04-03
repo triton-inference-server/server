@@ -46,7 +46,7 @@ InferenceBackend::GetInput(
   const auto itr = input_map_.find(name);
   if (itr == input_map_.end()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "unexpected inference input '" + name + "' for model '" + Name() + "'");
   }
 
@@ -61,8 +61,8 @@ InferenceBackend::GetOutput(
   const auto itr = output_map_.find(name);
   if (itr == output_map_.end()) {
     return Status(
-        RequestStatusCode::INVALID_ARG, "unexpected inference output '" + name +
-                                            "' for model '" + Name() + "'");
+        Status::Code::INVALID_ARG, "unexpected inference output '" + name +
+                                       "' for model '" + Name() + "'");
   }
 
   *output = &itr->second;
@@ -114,7 +114,7 @@ InferenceBackend::SetScheduler(std::unique_ptr<Scheduler> scheduler)
 {
   if (scheduler_ != nullptr) {
     return Status(
-        RequestStatusCode::INTERNAL, "Attempt to change scheduler not allowed");
+        Status::Code::INTERNAL, "Attempt to change scheduler not allowed");
   }
 
   scheduler_ = std::move(scheduler);
@@ -243,7 +243,7 @@ InferenceBackend::Run(
   // Each runner executes using the corresponding context...
   if (runner_idx >= contexts_.size()) {
     OnCompleteQueuedPayloads(Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unexpected runner index" + std::to_string(runner_idx) +
             ", max allowed " + std::to_string(contexts_.size())));
     return;
@@ -315,7 +315,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
       auto element_count = GetElementCount(input_meta.second.dims());
       if (element_count == -1) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "warmup setting expects all variable-size dimensions are specified "
             "for input '" +
                 input_meta.first + "'");
@@ -420,7 +420,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
               batch_byte_size = input_data.size();
             } else if (((size_t)batch_byte_size) > input_data.size()) {
               return Status(
-                  RequestStatusCode::INVALID_ARG,
+                  Status::Code::INVALID_ARG,
                   "warmup setting expects " + std::to_string(batch_byte_size) +
                       " bytes, but the data "
                       "provided from " +
@@ -432,9 +432,9 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
           }
           default:
             return Status(
-                RequestStatusCode::INVALID_ARG,
-                "warmup setting expects input '" + input_meta.first +
-                    "' to have input_data_type set");
+                Status::Code::INVALID_ARG, "warmup setting expects input '" +
+                                               input_meta.first +
+                                               "' to have input_data_type set");
         }
 
         InferenceRequest::Input* input = nullptr;
@@ -488,7 +488,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
               batch_byte_size = input_data.size();
             } else if (((size_t)batch_byte_size) > input_data.size()) {
               return Status(
-                  RequestStatusCode::INVALID_ARG,
+                  Status::Code::INVALID_ARG,
                   "warmup setting expects " + std::to_string(batch_byte_size) +
                       " bytes, but the data "
                       "provided from " +
@@ -502,9 +502,9 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
           }
           default:
             return Status(
-                RequestStatusCode::INVALID_ARG,
-                "warmup setting expects input '" + input_meta.first +
-                    "' to have input_data_type set");
+                Status::Code::INVALID_ARG, "warmup setting expects input '" +
+                                               input_meta.first +
+                                               "' to have input_data_type set");
         }
 
         std::shared_ptr<InferenceRequest::Input> input;

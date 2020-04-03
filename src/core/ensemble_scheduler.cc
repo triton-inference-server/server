@@ -284,7 +284,7 @@ EnsembleContext::EnsembleContext(
         std::get<2>(tensor_data) = input->Data();
       } else {
         ensemble_status_ = Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "unexpected input '" + input->Name() +
                 "' in request header that does not map to any ensemble inputs");
       }
@@ -307,7 +307,7 @@ EnsembleContext::EnsembleContext(
       &allocator, ResponseAlloc, ResponseRelease);
   if (err != nullptr) {
     ensemble_status_ = Status(
-        TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
+        TrtServerCodeToStatusCode(TRTSERVER_ErrorCode(err)),
         TRTSERVER_ErrorMessage(err));
     TRTSERVER_ErrorDelete(err);
   } else {
@@ -470,13 +470,13 @@ EnsembleContext::UpdateEnsembleState(
           }
         } else {
           return Status(
-              RequestStatusCode::INTERNAL,
+              Status::Code::INTERNAL,
               "internal response header specified output '" + output.name() +
                   "' that does not map to any ensemble tensors");
         }
       } else {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "internal response header should return output '" + output.name() +
                 "' as raw data instead of classification result");
       }
@@ -637,8 +637,8 @@ EnsembleContext::FinishEnsemble()
   // Add ensemble name to make error message more trackable
   if (!ensemble_status_.IsOk()) {
     ensemble_status_ = Status(
-        ensemble_status_.Code(), "in ensemble '" + info_->ensemble_name_ +
-                                     "', " + ensemble_status_.Message());
+        ensemble_status_.StatusCode(), "in ensemble '" + info_->ensemble_name_ +
+                                           "', " + ensemble_status_.Message());
   }
   OnComplete_(ensemble_status_);
 
@@ -659,12 +659,12 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     const auto& memory_block = std::get<2>(tensor_data);
     if (memory_block == nullptr) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unexpected deadlock, output '" + output_pair.first +
               "' is not set while no more ensemble steps can be made");
     } else if (meta_data.BatchByteSize() != memory_block->TotalByteSize()) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "unexpected size for output '" + output_pair.first + "', byte-size " +
               std::to_string(meta_data.BatchByteSize()) + " does not equal " +
               std::to_string(memory_block->TotalByteSize()));
@@ -700,7 +700,7 @@ EnsembleContext::CheckAndSetEnsembleOutput()
       continue;
     } else if (buffer == nullptr) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "failed to allocate buffer for output '" + output_pair.first + "'");
     }
 
@@ -731,7 +731,7 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     cudaStreamSynchronize(stream_);
 #else
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unexpected CUDA copy flag set while GPU is not supported");
 #endif  // TRTIS_ENABLE_GPU
   }

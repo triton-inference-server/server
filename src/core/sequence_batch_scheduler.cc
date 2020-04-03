@@ -118,7 +118,7 @@ SequenceBatchScheduler::Create(
   }
   if (sched->batchers_.empty()) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "Initialization failed for all sequence-batch scheduler threads");
   }
 
@@ -173,7 +173,7 @@ GetBooleanOverrideInputs(
        (memory_type != TRTSERVER_MEMORY_CPU_PINNED)) ||
       (memory_type_id != 0)) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "failed to allocate sequence control signal in CPU memory");
   }
 
@@ -185,7 +185,7 @@ GetBooleanOverrideInputs(
        (memory_type != TRTSERVER_MEMORY_CPU_PINNED)) ||
       (memory_type_id != 0)) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "failed to allocate sequence control signal in CPU memory");
   }
 
@@ -330,7 +330,7 @@ SequenceBatchScheduler::Enqueue(
   // batched.
   if (irequest->BatchSize() != 1) {
     OnComplete(Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "inference request to model '" + irequest->ModelName() +
             "' must specify batch-size 1 due to requirements of sequence "
             "batcher"));
@@ -343,7 +343,7 @@ SequenceBatchScheduler::Enqueue(
   const CorrelationID correlation_id = irequest->CorrelationId();
   if (correlation_id == 0) {
     OnComplete(Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "inference request to model '" + irequest->ModelName() +
             "' must specify a non-zero correlation ID"));
     return;
@@ -369,7 +369,7 @@ SequenceBatchScheduler::Enqueue(
   if (!seq_start && (sb_itr == sequence_to_batcherseqslot_map_.end()) &&
       (bl_itr == sequence_to_backlog_map_.end())) {
     OnComplete(Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "inference request for sequence " + std::to_string(correlation_id) +
             " to model '" + irequest->ModelName() +
             "' must specify the START flag on the first request of the "

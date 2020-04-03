@@ -26,8 +26,7 @@
 
 #include "src/backends/tensorflow/tf_virtual_device.h"
 
-#include <unordered_map>
-#include <vector>
+#include <mutex>
 
 namespace nvidia { namespace inferenceserver {
 
@@ -85,7 +84,7 @@ VirtualDeviceTracker::GetNextVirtualDevice(
   // Check for instantiation
   if (!instance_) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "VirtualDeviceTracker has not been initialized");
   }
 
@@ -93,9 +92,9 @@ VirtualDeviceTracker::GetNextVirtualDevice(
   if (instance_->virtual_device_ids_.find(gpu_device) ==
       instance_->virtual_device_ids_.end()) {
     return Status(
-        RequestStatusCode::INTERNAL, "Invalid physical device ID " +
-                                         std::to_string(gpu_device) +
-                                         " while creating model instance");
+        Status::Code::INTERNAL, "Invalid physical device ID " +
+                                    std::to_string(gpu_device) +
+                                    " while creating model instance");
   }
 
   // Get device tracker and next device id

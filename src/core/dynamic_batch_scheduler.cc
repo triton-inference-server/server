@@ -135,7 +135,7 @@ DynamicBatchScheduler::Create(
 
   if (sched->scheduler_threads_.empty()) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "Initialization failed for all dynamic-batch scheduler threads");
   }
 
@@ -414,7 +414,7 @@ DynamicBatchScheduler::SchedulerThread(
     // Finish rejected payloads if any
     if (rejected_payloads != nullptr) {
       static Status rejected_status =
-          Status(RequestStatusCode::UNAVAILABLE, "Request timeout expired");
+          Status(Status::Code::UNAVAILABLE, "Request timeout expired");
       for (auto& rejected_queue : *rejected_payloads) {
         for (auto& rejected_payload : rejected_queue) {
           if (rejected_payload.complete_function_ != nullptr) {

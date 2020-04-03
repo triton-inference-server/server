@@ -108,11 +108,11 @@ SavedModelBackend::CreateTRTISTFModel(
   // is expected by the model.
   if (expected_inputs.size() != expected_input_cnt) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
-        "unable to load model '" + Name() + "', configuration expects " +
-            std::to_string(Config().input().size()) +
-            " inputs, model provides " +
-            std::to_string(expected_inputs.size()));
+        Status::Code::INVALID_ARG, "unable to load model '" + Name() +
+                                       "', configuration expects " +
+                                       std::to_string(Config().input().size()) +
+                                       " inputs, model provides " +
+                                       std::to_string(expected_inputs.size()));
   }
 
   for (const auto& io : Config().input()) {
@@ -121,7 +121,7 @@ SavedModelBackend::CreateTRTISTFModel(
     const TRTISTF_IO* input = FindIOByName(inputs, io.name());
     if (input == nullptr) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "unexpected inference input '" + io.name() + "'");
     }
 
@@ -149,7 +149,7 @@ SavedModelBackend::CreateTRTISTFModel(
 
     if (!CompareDataType(input->data_type_, io.data_type())) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unable to load model '" + Name() + "', input '" + io.name() +
               "' data-type " +
               DataType_Name(ConvertDataType(input->data_type_)) +
@@ -164,7 +164,7 @@ SavedModelBackend::CreateTRTISTFModel(
     const TRTISTF_IO* output = FindIOByName(outputs, io.name());
     if (output == nullptr) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "unexpected inference output '" + io.name() + "'");
     }
 
@@ -192,7 +192,7 @@ SavedModelBackend::CreateTRTISTFModel(
 
     if (!CompareDataType(output->data_type_, io.data_type())) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unable to load model '" + Name() + "', output '" + io.name() +
               "' data-type " +
               DataType_Name(ConvertDataType(output->data_type_)) +
@@ -219,7 +219,7 @@ SavedModelBackend::ValidateBooleanSequenceControl(
     const TRTISTF_IO* input = FindIOByName(inputs, tensor_name);
     if (input == nullptr) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "configuration specified sequence control '" + tensor_name +
               "', but model does not provide that input");
     }
@@ -233,14 +233,14 @@ SavedModelBackend::ValidateBooleanSequenceControl(
         true /* compare_exact */);
     if (!compare_status.IsOk()) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unable to load model '" + Name() + "', sequence control '" +
-              tensor_name + "': " + compare_status.Message());
+          Status::Code::INVALID_ARG, "unable to load model '" + Name() +
+                                         "', sequence control '" + tensor_name +
+                                         "': " + compare_status.Message());
     }
 
     if (!CompareDataType(input->data_type_, tensor_datatype)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unable to load model '" + Name() + "', sequence control '" +
               tensor_name + "': the model expects data-type " +
               DataType_Name(ConvertDataType(input->data_type_)) +
@@ -267,7 +267,7 @@ SavedModelBackend::ValidateTypedSequenceControl(
     const TRTISTF_IO* input = FindIOByName(inputs, tensor_name);
     if (input == nullptr) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "configuration specified sequence control '" + tensor_name +
               "', but model does not provide that input");
     }
@@ -281,14 +281,14 @@ SavedModelBackend::ValidateTypedSequenceControl(
         true /* compare_exact */);
     if (!compare_status.IsOk()) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unable to load model '" + Name() + "', sequence control '" +
-              tensor_name + "': " + compare_status.Message());
+          Status::Code::INVALID_ARG, "unable to load model '" + Name() +
+                                         "', sequence control '" + tensor_name +
+                                         "': " + compare_status.Message());
     }
 
     if (!CompareDataType(input->data_type_, tensor_datatype)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unable to load model '" + Name() + "', sequence control '" +
               tensor_name + "', the model expects data-type " +
               DataType_Name(ConvertDataType(input->data_type_)) +

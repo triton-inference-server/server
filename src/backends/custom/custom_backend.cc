@@ -176,9 +176,9 @@ CustomBackend::CreateExecutionContext(
     cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
     if (cuerr != cudaSuccess) {
       return Status(
-          RequestStatusCode::INTERNAL,
-          "unable to get CUDA device properties for " + Name() + ": " +
-              cudaGetErrorString(cuerr));
+          Status::Code::INTERNAL, "unable to get CUDA device properties for " +
+                                      Name() + ": " +
+                                      cudaGetErrorString(cuerr));
     }
 
     cc = std::to_string(cuprops.major) + "." + std::to_string(cuprops.minor);
@@ -187,15 +187,15 @@ CustomBackend::CreateExecutionContext(
                             ? Config().default_model_filename()
                             : cc_itr->second;
 #else
-    return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
+    return Status(Status::Code::INTERNAL, "GPU instances not supported");
 #endif  // TRTIS_ENABLE_GPU
   }
 
   const auto& mn_itr = libraries.find(cc_model_filename);
   if (mn_itr == libraries.end()) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to find Custom model '" +
-                                         cc_model_filename + "' for " + Name());
+        Status::Code::INTERNAL, "unable to find Custom model '" +
+                                    cc_model_filename + "' for " + Name());
   }
 
   if (gpu_device == Context::NO_GPU_DEVICE) {
@@ -258,7 +258,7 @@ CustomBackend::InitBackend(uint32_t runner_idx)
   // Each runner executes using the corresponding context...
   if (runner_idx >= contexts_.size()) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unexpected runner index" + std::to_string(runner_idx) +
             ", max allowed " + std::to_string(contexts_.size()));
   }
@@ -292,14 +292,14 @@ CustomBackend::InitBackend(uint32_t runner_idx)
       context->InitializeFn_(&init_data, &(context->library_context_handle_));
   if (context->library_context_handle_ == nullptr) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "initialize error for '" + Name() +
             "': failed to create instance, error code: " + std::to_string(err));
   } else if (err != 0) {
     return Status(
-        RequestStatusCode::INTERNAL, "initialize error for '" + Name() +
-                                         "': (" + std::to_string(err) + ") " +
-                                         context->LibraryErrorString(err));
+        Status::Code::INTERNAL, "initialize error for '" + Name() + "': (" +
+                                    std::to_string(err) + ") " +
+                                    context->LibraryErrorString(err));
   }
 
   return Status::Success;
@@ -322,7 +322,7 @@ CustomBackend::Context::Run(
   for (auto& payload : *payloads) {
     if (!payload.status_.IsOk()) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "unexpected payload with non-OK status given to custom runner for '" +
               name_ + "'");
     }
@@ -346,7 +346,7 @@ CustomBackend::Context::Run(
   if ((total_batch_size != 1) &&
       (total_batch_size > (uint32_t)max_batch_size_)) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "dynamic batch size " + std::to_string(total_batch_size) + " for '" +
             name_ + "', max allowed is " + std::to_string(max_batch_size_));
   }
@@ -495,16 +495,16 @@ CustomBackend::Context::Run(
 
   if (err != 0) {
     return Status(
-        RequestStatusCode::INTERNAL, "execute error for '" + name_ + "': (" +
-                                         std::to_string(err) + ") " +
-                                         LibraryErrorString(err));
+        Status::Code::INTERNAL, "execute error for '" + name_ + "': (" +
+                                    std::to_string(err) + ") " +
+                                    LibraryErrorString(err));
   }
 
   // Transfer payload errors back to the Payload objects.
   for (size_t i = 0; i < custom_payloads.size(); ++i) {
     if (custom_payloads[i].error_code != 0) {
       (*payloads)[i].status_ = Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "payload error for '" + name_ + "': (" +
               std::to_string(custom_payloads[i].error_code) + ") " +
               LibraryErrorString(custom_payloads[i].error_code));

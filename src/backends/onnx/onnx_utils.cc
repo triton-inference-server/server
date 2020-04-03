@@ -293,7 +293,7 @@ CompareDimsSupported(
   if (supports_batching) {
     if ((model_shape.size() == 0) || (model_shape[0] != -1)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "model '" + model_name + "', tensor '" + tensor_name +
               "': for the model to support batching the shape should have at "
               "least 1 dimension and the first dimension must be -1; but shape "
@@ -319,7 +319,7 @@ CompareDimsSupported(
 
     if (!succ) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "model '" + model_name + "', tensor '" + tensor_name +
               "': the model expects " + std::to_string(model_shape.size()) +
               " dimensions (shape " + DimsListToString(model_shape) +
@@ -344,7 +344,7 @@ CompareDimsSupported(
 
     if (!succ) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "model '" + model_name + "', tensor '" + tensor_name +
               "': the model expects " + std::to_string(model_shape.size()) +
               " dimensions (shape " + DimsListToString(model_shape) +

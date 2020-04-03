@@ -72,7 +72,7 @@ ServerStatusManager::UpdateConfigForModel(
   auto& ms = *server_status_.mutable_model_status();
   if (ms.find(model_name) == ms.end()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "try to update config for non-existing model '" + model_name + "'");
   } else {
     LOG_INFO << "Updating config for model '" << model_name << "'";
@@ -92,7 +92,7 @@ ServerStatusManager::SetModelVersionReadyState(
   auto itr = server_status_.mutable_model_status()->find(model_name);
   if (itr == server_status_.model_status().end()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "fail to update ready state for unknown model '" + model_name + "'");
   }
 
@@ -142,7 +142,7 @@ ServerStatusManager::Get(
   const auto& itr = server_status_.model_status().find(model_name);
   if (itr == server_status_.model_status().end()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "no status available for unknown model '" + model_name + "'");
   }
 

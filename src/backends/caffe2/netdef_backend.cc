@@ -166,9 +166,9 @@ NetDefBackend::CreateExecutionContext(
     cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
     if (cuerr != cudaSuccess) {
       return Status(
-          RequestStatusCode::INTERNAL,
-          "unable to get CUDA device properties for " + Name() + ": " +
-              cudaGetErrorString(cuerr));
+          Status::Code::INTERNAL, "unable to get CUDA device properties for " +
+                                      Name() + ": " +
+                                      cudaGetErrorString(cuerr));
     }
 
     cc = std::to_string(cuprops.major) + "." + std::to_string(cuprops.minor);
@@ -177,15 +177,15 @@ NetDefBackend::CreateExecutionContext(
                             ? Config().default_model_filename()
                             : cc_itr->second;
 #else
-    return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
+    return Status(Status::Code::INTERNAL, "GPU instances not supported");
 #endif  // TRTIS_ENABLE_GPU
   }
 
   const auto& mn_itr = models.find(cc_model_filename);
   if (mn_itr == models.end()) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to find NetDef model '" +
-                                         cc_model_filename + "' for " + Name());
+        Status::Code::INTERNAL, "unable to find NetDef model '" +
+                                    cc_model_filename + "' for " + Name());
   }
 
   // NetDef also requires an init network, the name of which is always
@@ -195,9 +195,8 @@ NetDefBackend::CreateExecutionContext(
   const auto& imn_itr = models.find(cc_init_filename);
   if (imn_itr == models.end()) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to find NetDef initialization model '" + cc_init_filename +
-            "' for " + Name());
+        Status::Code::INTERNAL, "unable to find NetDef initialization model '" +
+                                    cc_init_filename + "' for " + Name());
   }
 
   if (gpu_device == Context::NO_GPU_DEVICE) {
@@ -259,14 +258,14 @@ NetDefBackend::CreateExecutionContext(
         &c2ws, Config().name(), Config().max_batch_size(), input_names,
         output_names, gpu_device, imn_itr->second, mn_itr->second);
     if (!err.IsOk()) {
-      return Status(RequestStatusCode::INTERNAL, err.Message());
+      return Status(Status::Code::INTERNAL, err.Message());
     }
 
     context->workspace_.reset(c2ws);
   }
   catch (const std::exception& ex) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "load failed for '" + Config().name() + "': " + ex.what());
   }
 
@@ -322,7 +321,7 @@ NetDefBackend::Context::ValidateInputs(
     if (ConvertDataType(io.data_type()) ==
         Caffe2Workspace::DataType::TYPE_INVALID) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
               " for input '" + io.name() + "' for model '" + name_ + "'");
     }
@@ -346,7 +345,7 @@ NetDefBackend::Context::ValidateOutputs(
     if (ConvertDataType(io.data_type()) ==
         Caffe2Workspace::DataType::TYPE_INVALID) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
               " for output '" + io.name() + "' for model '" + name_ + "'");
     }
@@ -376,7 +375,7 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
       name, shape, dtype, static_cast<const char*>(input->input_buffer_),
       total_byte_size);
   if (!err.IsOk()) {
-    return Status(RequestStatusCode::INTERNAL, err.Message());
+    return Status(Status::Code::INTERNAL, err.Message());
   }
 
   return Status::Success;
@@ -400,7 +399,7 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
   Caffe2Workspace::Error err = workspace_->GetOutputTensor(
       name, dtype, &output->output_buffer_, &byte_size, &output->output_shape_);
   if (!err.IsOk()) {
-    return Status(RequestStatusCode::INTERNAL, err.Message());
+    return Status(Status::Code::INTERNAL, err.Message());
   }
 
   // verify shape of output matches shape from model config
@@ -414,7 +413,7 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
 
   if (byte_size != total_byte_size) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unexpected size for output '" + name + "', byte-size " +
             std::to_string(byte_size) + " does not equal " +
             std::to_string(total_batch_size) + " * " +
@@ -489,7 +488,7 @@ NetDefBackend::Context::Run(
   for (auto& payload : *payloads) {
     if (!payload.status_.IsOk()) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "unexpected payload with non-OK status given to runner for '" +
               name_ + "'");
     }
@@ -512,7 +511,7 @@ NetDefBackend::Context::Run(
   // (i.e. max_batch_size_ == 0).
   if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size_)) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "dynamic batch size " + std::to_string(total_batch_size) + " for '" +
             name_ + "', max allowed is " + std::to_string(max_batch_size_));
   }
@@ -585,7 +584,7 @@ NetDefBackend::Context::Run(
   // Run...
   Caffe2Workspace::Error err = workspace_->Run();
   if (!err.IsOk()) {
-    return Status(RequestStatusCode::INTERNAL, err.Message());
+    return Status(Status::Code::INTERNAL, err.Message());
   }
 
 #ifdef TRTIS_ENABLE_STATS

@@ -64,7 +64,7 @@ OnnxLoader::Init()
     RETURN_IF_ORT_ERROR(status);
   } else {
     return Status(
-        RequestStatusCode::ALREADY_EXISTS,
+        Status::Code::ALREADY_EXISTS,
         "OnnxLoader singleton already initialized");
   }
   return Status::Success;
@@ -92,7 +92,7 @@ OnnxLoader::Stop()
     TryRelease(false);
   } else {
     return Status(
-        RequestStatusCode::UNAVAILABLE,
+        Status::Code::UNAVAILABLE,
         "OnnxLoader singleton has not been initialized");
   }
   return Status::Success;
@@ -107,8 +107,7 @@ OnnxLoader::LoadSession(
     {
       std::lock_guard<std::mutex> lk(loader->mu_);
       if (loader->closing_) {
-        return Status(
-            RequestStatusCode::UNAVAILABLE, "OnnxLoader has been stopped");
+        return Status(Status::Code::UNAVAILABLE, "OnnxLoader has been stopped");
       } else {
         loader->live_session_cnt_++;
       }
@@ -132,7 +131,7 @@ OnnxLoader::LoadSession(
     RETURN_IF_ORT_ERROR(status);
   } else {
     return Status(
-        RequestStatusCode::UNAVAILABLE,
+        Status::Code::UNAVAILABLE,
         "OnnxLoader singleton has not been initialized");
   }
   return Status::Success;
@@ -146,7 +145,7 @@ OnnxLoader::UnloadSession(OrtSession* session)
     TryRelease(true);
   } else {
     return Status(
-        RequestStatusCode::UNAVAILABLE,
+        Status::Code::UNAVAILABLE,
         "OnnxLoader singleton has not been initialized");
   }
   return Status::Success;

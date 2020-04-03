@@ -53,9 +53,9 @@ CreateCudaEvent(const std::string& event_name, cudaEvent_t* event)
   auto cuerr = cudaEventCreateWithFlags(event, cudaEventDisableTiming);
   if (cuerr != cudaSuccess) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to create CUDA event for " +
-                                         event_name + ": " +
-                                         cudaGetErrorString(cuerr));
+        Status::Code::INTERNAL, "unable to create CUDA event for " +
+                                    event_name + ": " +
+                                    cudaGetErrorString(cuerr));
   }
   return Status::Success;
 }
@@ -168,7 +168,7 @@ PlanBackend::CreateExecutionContexts(
     if ((group.kind() != ModelInstanceGroup::KIND_GPU) ||
         (group.gpus().size() == 0)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "instance group " + group.name() + " of model " + Name() +
               " must be KIND_GPU and must specify at least one GPU id");
     }
@@ -206,7 +206,7 @@ PlanBackend::CreateExecutionContexts(
         auto cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
         if (cuerr != cudaSuccess) {
           return Status(
-              RequestStatusCode::INTERNAL,
+              Status::Code::INTERNAL,
               "unable to get CUDA device properties for " + Name() + ": " +
                   cudaGetErrorString(cuerr));
         }
@@ -222,9 +222,9 @@ PlanBackend::CreateExecutionContexts(
         const auto& mn_itr = models.find(cc_model_filename);
         if (mn_itr == models.end()) {
           return Status(
-              RequestStatusCode::INTERNAL, "unable to find PLAN model '" +
-                                               cc_model_filename + "' for " +
-                                               Name());
+              Status::Code::INTERNAL, "unable to find PLAN model '" +
+                                          cc_model_filename + "' for " +
+                                          Name());
         }
 
         // Create shared engine for the device if haven't tried so.
@@ -238,9 +238,8 @@ PlanBackend::CreateExecutionContexts(
           cuerr = cudaSetDevice(gpu_device);
           if (cuerr != cudaSuccess) {
             return Status(
-                RequestStatusCode::INTERNAL, "unable to set device for " +
-                                                 Name() + ": " +
-                                                 cudaGetErrorString(cuerr));
+                Status::Code::INTERNAL, "unable to set device for " + Name() +
+                                            ": " + cudaGetErrorString(cuerr));
           }
 
           RETURN_IF_ERROR(LoadPlan(
@@ -310,7 +309,7 @@ PlanBackend::PeekShapeTensor(
   // may require a CUDA stream to get the tensor contents.
   if (runner_idx >= contexts_.size()) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unexpected runner index" + std::to_string(runner_idx) +
             ", max allowed " + std::to_string(contexts_.size()));
   }
@@ -331,8 +330,7 @@ PlanBackend::Context::InitOptimizationProfiles(
   // and the previous context is destroyed.
   auto default_trt_context = engine_->createExecutionContext();
   if (default_trt_context == nullptr) {
-    return Status(
-        RequestStatusCode::INTERNAL, "unable to create TensorRT context");
+    return Status(Status::Code::INTERNAL, "unable to create TensorRT context");
   }
 
   if (total_profiles == 0) {
@@ -370,12 +368,12 @@ PlanBackend::Context::InitOptimizationProfiles(
         res.first->second.context_ = engine_->createExecutionContext();
         if (res.first->second.context_ == nullptr) {
           return Status(
-              RequestStatusCode::INTERNAL, "unable to create TensorRT context");
+              Status::Code::INTERNAL, "unable to create TensorRT context");
         }
         if (!res.first->second.context_->setOptimizationProfile(
                 profile_index)) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "Can not set the specified optimization profile " + profile_name +
                   "[" + std::to_string(profile_index) + "] for " + name_ +
                   ". Expected optimization profile index range 0-" +
@@ -417,8 +415,8 @@ PlanBackend::CreateExecutionContext(
   auto cuerr = cudaSetDevice(gpu_device);
   if (cuerr != cudaSuccess) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to set device for " + Name() +
-                                         ": " + cudaGetErrorString(cuerr));
+        Status::Code::INTERNAL, "unable to set device for " + Name() + ": " +
+                                    cudaGetErrorString(cuerr));
   }
 
   // Create CUDA streams associated with the execution context
@@ -491,12 +489,12 @@ PlanBackend::CreateExecutionContext(
   for (const auto& trt_context : context->trt_contexts_) {
     if (!trt_context.second.context_->allInputDimensionsSpecified()) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "failed to specify the dimensions of all input bindings");
     }
     if (!trt_context.second.context_->allInputShapesSpecified()) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "failed to specify the values for all input shape tensors");
     }
   }
@@ -506,7 +504,7 @@ PlanBackend::CreateExecutionContext(
   if (context->engine_->hasImplicitBatchDimension() &&
       (context->max_batch_size_ > context->engine_->getMaxBatchSize())) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "unexpected configuration maximum batch size " +
             std::to_string(Config().max_batch_size()) + " for '" + Name() +
             "', model maximum is " +
@@ -524,7 +522,7 @@ PlanBackend::CreateExecutionContext(
     if (context->buffers_[i] == nullptr &&
         context->engine_->isExecutionBinding(i)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "expected configuration for " +
               std::string(
                   (context->engine_->bindingIsInput(i) ? "input" : "output")) +
@@ -612,7 +610,7 @@ PlanBackend::Context::ValidateInputs(
   for (const auto& io : ios) {
     if (!ConvertDataTypeToTrtType(io.data_type()).first) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
               " for input '" + io.name() + "' for model '" + name_ + "'");
     }
@@ -621,7 +619,7 @@ PlanBackend::Context::ValidateInputs(
     if (allowed_shape_tensors.find(io.name()) != allowed_shape_tensors.end()) {
       if (!io.is_shape_tensor()) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "input '" + io.name() + "' for model '" + name_ +
                 "' is a shape tensor but the model configuration doesn't mark "
                 "it as a shape tensor.");
@@ -629,7 +627,7 @@ PlanBackend::Context::ValidateInputs(
     } else {
       if (io.is_shape_tensor()) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "input '" + io.name() + "' for model '" + name_ +
                 "' is incorrectly marked as a shape tensor in the model "
                 "configuration.");
@@ -649,7 +647,7 @@ PlanBackend::Context::ValidateOutputs(
   for (const auto& io : ios) {
     if (!ConvertDataTypeToTrtType(io.data_type()).first) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
               " for output '" + io.name() + "' for model '" + name_ + "'");
     }
@@ -658,7 +656,7 @@ PlanBackend::Context::ValidateOutputs(
     if (allowed_shape_tensors.find(io.name()) != allowed_shape_tensors.end()) {
       if (!io.is_shape_tensor()) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "output '" + io.name() + "' for model '" + name_ +
                 "' is a shape tensor but the model configuration doesn't mark "
                 "it as a shape tensor.");
@@ -666,7 +664,7 @@ PlanBackend::Context::ValidateOutputs(
     } else {
       if (io.is_shape_tensor()) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "output '" + io.name() + "' for model '" + name_ +
                 "' is incorrectly marked as a shape tensor in the model "
                 "configuration.");
@@ -691,20 +689,20 @@ PlanBackend::Context::InitializeShapeInputBinding(
     int binding_index = num_expected_bindings_ * profile_index + io_index;
     if (io_index < 0) {
       return Status(
-          RequestStatusCode::NOT_FOUND,
+          Status::Code::NOT_FOUND,
           "input '" + input_name + "' not found for " + name_);
     }
 
     if (buffers_[io_index] != nullptr) {
       return Status(
-          RequestStatusCode::INVALID_ARG, "input '" + input_name +
-                                              "' has already appeared as an " +
-                                              "input or output for " + name_);
+          Status::Code::INVALID_ARG, "input '" + input_name +
+                                         "' has already appeared as an " +
+                                         "input or output for " + name_);
     }
 
     if (!engine_->bindingIsInput(binding_index)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "input '" + input_name +
               "' is expected to be an output in model for " + name_);
     }
@@ -719,7 +717,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
 
     if (input_datatype != TYPE_INT32) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unexpected datatype " + DataType_Name(input_datatype) +
               "  in model configuration for shape input '" + input_name +
               "', expecting " + DataType_Name(TYPE_INT32) + " for " + name_);
@@ -729,7 +727,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
         ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
     if (dt != input_datatype) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unexpected datatype " + DataType_Name(dt) +
               " in engine for shape input '" + input_name + "', expecting " +
               DataType_Name(input_datatype) + " for " + name_);
@@ -739,7 +737,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
         ConvertTrtFmtToFmt(engine_->getBindingFormat(binding_index));
     if (fmt != MemoryFormat::LINEAR) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unexpected tensor format " + MemoryFormat_Name(fmt) +
               " for input '" + input_name +
               "'. Only LINEAR memory format is supported at present.");
@@ -760,7 +758,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
     if (!context.context_->setBindingDimensions(
             binding_index, context.max_dims_[io_index])) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "trt failed to set binding dimension to " +
               DimsDebugString(context.max_dims_[io_index]) + " for input '" +
               input_name + "' for " + name_);
@@ -779,7 +777,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
     if (!context.context_->setInputShapeBinding(
             binding_index, context.max_shapes_[io_index])) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "trt failed to set the input shape binding for '" + input_name +
               "' for " + name_ + ".");
     }
@@ -801,9 +799,9 @@ PlanBackend::Context::InitializeShapeInputBinding(
     cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
     if (err != cudaSuccess) {
       return Status(
-          RequestStatusCode::INTERNAL, "unable to allocate memory for input '" +
-                                           input_name + " for " + name_ + ": " +
-                                           cudaGetErrorString(err));
+          Status::Code::INTERNAL, "unable to allocate memory for input '" +
+                                      input_name + " for " + name_ + ": " +
+                                      cudaGetErrorString(err));
     }
 
     byte_sizes_[io_index] = max_byte_size;
@@ -834,7 +832,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
     int binding_index = num_expected_bindings_ * profile_index + io_index;
     if (io_index < 0) {
       return Status(
-          RequestStatusCode::NOT_FOUND,
+          Status::Code::NOT_FOUND,
           "input '" + input_name + "' not found for " + name_);
     }
 
@@ -845,14 +843,14 @@ PlanBackend::Context::InitializeExecuteInputBinding(
 
     if (buffers_[io_index] != nullptr) {
       return Status(
-          RequestStatusCode::INVALID_ARG, "input '" + input_name +
-                                              "' has already appeared as an " +
-                                              "input or output for " + name_);
+          Status::Code::INVALID_ARG, "input '" + input_name +
+                                         "' has already appeared as an " +
+                                         "input or output for " + name_);
     }
 
     if (!engine_->bindingIsInput(binding_index)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "input '" + input_name +
               "' is expected to be an output in model for " + name_);
     }
@@ -861,7 +859,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
         ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
     if (dt != input_datatype) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unexpected datatype " + DataType_Name(dt) + " for input '" +
               input_name + "', expecting " + DataType_Name(input_datatype) +
               " for " + name_);
@@ -871,7 +869,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
         ConvertTrtFmtToFmt(engine_->getBindingFormat(binding_index));
     if (fmt != MemoryFormat::LINEAR) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unexpected tensor format " + MemoryFormat_Name(fmt) +
               " for input '" + input_name +
               "'. Only LINEAR memory format is supported at present.");
@@ -889,7 +887,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
         (!ContainsWildcardAtExplicitBatchDim(engine_dims)) &&
         (max_batch_size_ > 1)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unexpected configuration maximum batch size " +
               std::to_string(max_batch_size_) + " for '" + name_ +
               "', model maximum is 1 as model does not contain an implicit "
@@ -906,7 +904,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
           ValidateControlDimsDynamic(engine_dims, support_batching_);
       if (!status.IsOk()) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "unexpected shape " + DimsDebugString(engine_dims) +
                 " for control input '" + input_name + "' for model " + name_ +
                 ": " + status.Message());
@@ -930,7 +928,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
           context.max_dims_[io_index], support_batching_);
       if (!status.IsOk()) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "model configuration specified invalid shape for input '" +
                 input_name + "' for " + name_ +
                 ". Error details: " + status.Message());
@@ -945,7 +943,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
       if (!context.context_->setBindingDimensions(
               binding_index, context.max_dims_[io_index])) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "trt failed to set binding dimension to " +
                 DimsDebugString(context.max_dims_[io_index]) + " for input '" +
                 input_name + "' for " + name_);
@@ -954,8 +952,8 @@ PlanBackend::Context::InitializeExecuteInputBinding(
 
     if (byte_size == -1) {
       return Status(
-          RequestStatusCode::INTERNAL, "unable to calculate size for input '" +
-                                           input_name + " for " + name_);
+          Status::Code::INTERNAL, "unable to calculate size for input '" +
+                                      input_name + " for " + name_);
     }
     max_byte_size = std::max(max_byte_size, byte_size);
   }
@@ -967,9 +965,9 @@ PlanBackend::Context::InitializeExecuteInputBinding(
   cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
   if (err != cudaSuccess) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to allocate memory for input '" +
-                                         input_name + " for " + name_ + ": " +
-                                         cudaGetErrorString(err));
+        Status::Code::INTERNAL, "unable to allocate memory for input '" +
+                                    input_name + " for " + name_ + ": " +
+                                    cudaGetErrorString(err));
   }
 
   byte_sizes_[io_index] = max_byte_size;
@@ -1088,27 +1086,27 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
       int binding_index = num_expected_bindings_ * profile_index + io_index;
       if (binding_index < 0) {
         return Status(
-            RequestStatusCode::NOT_FOUND,
+            Status::Code::NOT_FOUND,
             "output '" + io.name() + "' not found for " + name_);
       }
 
       if (buffers_[io_index] != nullptr) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
-            "output '" + io.name() + "' has already appeared as an " +
-                "input or output for " + name_);
+            Status::Code::INVALID_ARG, "output '" + io.name() +
+                                           "' has already appeared as an " +
+                                           "input or output for " + name_);
       }
 
       if (engine_->bindingIsInput(binding_index)) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "output '" + io.name() +
                 "' is expected to be an input in model for " + name_);
       }
 
       if (io.data_type() != TYPE_INT32) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "unexpected datatype " + DataType_Name(io.data_type()) +
                 "  in model configuration for shape output '" + io.name() +
                 "', expecting " + DataType_Name(TYPE_INT32) + " for " + name_);
@@ -1118,7 +1116,7 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
           ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
       if (dt != io.data_type()) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "unexpected datatype " + DataType_Name(dt) +
                 " for inference output '" + io.name() + "', expecting " +
                 DataType_Name(io.data_type()) + " for " + name_);
@@ -1128,7 +1126,7 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
           ConvertTrtFmtToFmt(engine_->getBindingFormat(binding_index));
       if (fmt != MemoryFormat::LINEAR) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "unexpected tensor format " + MemoryFormat_Name(fmt) +
                 " for output '" + io.name() +
                 "'. Only LINEAR memory format is supported at present.");
@@ -1161,9 +1159,9 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
           cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
       if (err != cudaSuccess) {
         return Status(
-            RequestStatusCode::INTERNAL,
-            "unable to allocate memory for input '" + io.name() + " for " +
-                name_ + ": " + std::string(cudaGetErrorString(err)));
+            Status::Code::INTERNAL, "unable to allocate memory for input '" +
+                                        io.name() + " for " + name_ + ": " +
+                                        std::string(cudaGetErrorString(err)));
       }
 
       byte_sizes_[io_index] = max_byte_size;
@@ -1200,20 +1198,20 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       int binding_index = num_expected_bindings_ * profile_index + io_index;
       if (binding_index < 0) {
         return Status(
-            RequestStatusCode::NOT_FOUND,
+            Status::Code::NOT_FOUND,
             "output '" + io.name() + "' not found for " + name_);
       }
 
       if (buffers_[io_index] != nullptr) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
-            "output '" + io.name() + "' has already appeared as an " +
-                "input or output for " + name_);
+            Status::Code::INVALID_ARG, "output '" + io.name() +
+                                           "' has already appeared as an " +
+                                           "input or output for " + name_);
       }
 
       if (engine_->bindingIsInput(binding_index)) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "output '" + io.name() +
                 "' is expected to be an input in model for " + name_);
       }
@@ -1222,7 +1220,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
           ConvertTrtTypeToDataType(engine_->getBindingDataType(binding_index));
       if (dt != io.data_type()) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "unexpected datatype " + DataType_Name(dt) +
                 " for inference output '" + io.name() + "', expecting " +
                 DataType_Name(io.data_type()) + " for " + name_);
@@ -1232,7 +1230,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
           ConvertTrtFmtToFmt(engine_->getBindingFormat(binding_index));
       if (fmt != MemoryFormat::LINEAR) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "unexpected tensor format " + MemoryFormat_Name(fmt) +
                 " for output '" + io.name() +
                 "'. Only LINEAR memory format is supported at present.");
@@ -1249,7 +1247,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
           (!ContainsWildcardAtExplicitBatchDim(engine_dims)) &&
           (max_batch_size_ > 1)) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "unexpected configuration maximum batch size " +
                 std::to_string(max_batch_size_) + " for '" + name_ +
                 "', model maximum is 1 as model does not contain an implicit "
@@ -1274,9 +1272,8 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
 
       if (byte_size == -1) {
         return Status(
-            RequestStatusCode::INTERNAL,
-            "unable to calculate size for output '" + io.name() + " for " +
-                name_);
+            Status::Code::INTERNAL, "unable to calculate size for output '" +
+                                        io.name() + " for " + name_);
       }
       max_byte_size = std::max(max_byte_size, byte_size);
     }
@@ -1288,9 +1285,9 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
     cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, max_byte_size));
     if (err != cudaSuccess) {
       return Status(
-          RequestStatusCode::INTERNAL,
-          "unable to allocate memory for input '" + io.name() + " for " +
-              name_ + ": " + std::string(cudaGetErrorString(err)));
+          Status::Code::INTERNAL, "unable to allocate memory for input '" +
+                                      io.name() + " for " + name_ + ": " +
+                                      std::string(cudaGetErrorString(err)));
     }
 
     byte_sizes_[io_index] = max_byte_size;
@@ -1329,7 +1326,7 @@ PlanBackend::Context::PeekShapeTensor(
       &content, &content_byte_size, &contiguous_buffer, &cuda_copy));
   if (expected_byte_size != content_byte_size) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unexpected content size of shape tensor peek. Got " +
             std::to_string(content_byte_size) + " expecting " +
             std::to_string(expected_byte_size));
@@ -1452,7 +1449,7 @@ PlanBackend::Run(
   // Each runner executes using the corresponding context...
   if (runner_idx >= available_context_queue_.size()) {
     OnCompleteQueuedPayloads(Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unexpected runner index" + std::to_string(runner_idx) +
             ", max allowed " +
             std::to_string(available_context_queue_.size())));
@@ -1516,7 +1513,7 @@ PlanBackend::WarmUp(
   // Each runner executes using the corresponding context...
   if (runner_idx >= available_context_queue_.size()) {
     OnCompleteWarmup(Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unexpected runner index" + std::to_string(runner_idx) +
             ", max allowed " +
             std::to_string(available_context_queue_.size())));
@@ -1624,7 +1621,7 @@ PlanBackend::Context::Run(
   for (auto& payload : *payloads) {
     if (!payload.status_.IsOk()) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "unexpected payload with non-OK status given to runner for '" +
               name_ + "'");
     }
@@ -1653,7 +1650,7 @@ PlanBackend::Context::Run(
   // (i.e. max_batch_size_ == 0).
   if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size_)) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "dynamic batch size " + std::to_string(total_batch_size) + " for '" +
             name_ + "', max allowed is " + std::to_string(max_batch_size_));
   }
@@ -1683,7 +1680,7 @@ PlanBackend::Context::Run(
             support_batching_);
       } else {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "unable to find shape values for shape input '" + name +
                 "' in request for " + name_);
       }
@@ -1691,7 +1688,7 @@ PlanBackend::Context::Run(
         citr->second.context_->setInputShapeBinding(io_index, &(it->second[0]));
       } else {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "request specifies invalid shape values for shape input '" + name +
                 "' for " + name_ + ". Error details: " + status.Message());
       }
@@ -1730,7 +1727,7 @@ PlanBackend::Context::Run(
       nvinfer1::Dims this_dim;
       if (!DimVecToDims(shape, &this_dim)) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "failed to create dims object for " + DimsListToString(shape) +
                 " for input '" + name + "' for " + name_ + ".");
       }
@@ -1739,16 +1736,16 @@ PlanBackend::Context::Run(
           citr->second.max_dims_[bindex], false);
       if (!status.IsOk()) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "request specifies invalid shape for input '" + name + "' for " +
                 name_ + ". Error details: " + status.Message());
       }
       if (!citr->second.context_->setBindingDimensions(io_index, this_dim)) {
         return Status(
-            RequestStatusCode::INTERNAL,
-            "trt failed to set binding dimension to " +
-                DimsDebugString(this_dim) + " for input '" + name + "' for " +
-                name_);
+            Status::Code::INTERNAL, "trt failed to set binding dimension to " +
+                                        DimsDebugString(this_dim) +
+                                        " for input '" + name + "' for " +
+                                        name_);
       }
     }
 
@@ -1821,9 +1818,8 @@ PlanBackend::Context::Run(
     if (err != cudaSuccess) {
       cudaStreamSynchronize(stream_);
       return Status(
-          RequestStatusCode::INTERNAL,
-          "unable to execute graph for inference " + name_ + ": " +
-              cudaGetErrorString(err));
+          Status::Code::INTERNAL, "unable to execute graph for inference " +
+                                      name_ + ": " + cudaGetErrorString(err));
     }
     // CUDA graph doesn't know when input is consumed, need to record
     // the event at the end
@@ -1836,12 +1832,12 @@ PlanBackend::Context::Run(
     if (is_dynamic_) {
       if (!citr->second.context_->allInputDimensionsSpecified()) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "failed to specify the dimensions of all input bindings");
       }
       if (!citr->second.context_->allInputShapesSpecified()) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "failed to specify the values for all input shape tensors");
       }
     }
@@ -1851,8 +1847,7 @@ PlanBackend::Context::Run(
               &events_[next_set_].ready_for_input_)) {
         cudaStreamSynchronize(stream_);
         return Status(
-            RequestStatusCode::INTERNAL,
-            "unable to enqueue for inference " + name_);
+            Status::Code::INTERNAL, "unable to enqueue for inference " + name_);
       }
     } else {
       if (!citr->second.context_->enqueue(
@@ -1860,8 +1855,7 @@ PlanBackend::Context::Run(
               &events_[next_set_].ready_for_input_)) {
         cudaStreamSynchronize(stream_);
         return Status(
-            RequestStatusCode::INTERNAL,
-            "unable to enqueue for inference " + name_);
+            Status::Code::INTERNAL, "unable to enqueue for inference " + name_);
       }
     }
   }
@@ -1897,7 +1891,7 @@ PlanBackend::Context::Run(
         if (!citr->second.context_->getShapeBinding(
                 io_index, shape_value_ptr)) {
           return Status(
-              RequestStatusCode::INTERNAL,
+              Status::Code::INTERNAL,
               "failed to retrieve the output shape values from binding '" +
                   name + "'");
         }
@@ -1906,11 +1900,11 @@ PlanBackend::Context::Run(
         if (support_batching_ &&
             total_batch_size != (uint32_t)*shape_value_ptr) {
           return Status(
-              RequestStatusCode::INTERNAL,
-              "unexpected batch shape value " +
-                  std::to_string(*shape_value_ptr) + " for '" + name +
-                  "', total batch size was " +
-                  std::to_string(total_batch_size));
+              Status::Code::INTERNAL, "unexpected batch shape value " +
+                                          std::to_string(*shape_value_ptr) +
+                                          " for '" + name +
+                                          "', total batch size was " +
+                                          std::to_string(total_batch_size));
         }
 
         std::vector<int64_t> content_shape;
@@ -1951,7 +1945,7 @@ PlanBackend::Context::Run(
 
       if (byte_sizes_[bindex] < (batch1_byte_size * total_batch_size)) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "unexpected size for output '" + name + "', byte-size " +
                 std::to_string(byte_sizes_[bindex]) + " is less than " +
                 std::to_string(total_batch_size) + " * " +
@@ -2036,7 +2030,7 @@ PlanBackend::Context::ProcessResponse(
           src += dst_byte_size;
           if (cuda_used) {
             (*payloads)[payload_output.first].status_ = Status(
-                RequestStatusCode::INTERNAL,
+                Status::Code::INTERNAL,
                 "unexpected cuda copy from indirect buffer to output buffer");
           }
         }
@@ -2122,7 +2116,7 @@ PlanBackend::Context::GetRequestShapeValues(
       std::vector<int64_t> shape;
       if (!PeekShapeTensor(*input, payload, &shape).IsOk()) {
         return Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "unable to peek shape values for input '" + input->Name() + "'");
       }
       for (auto value : shape) {

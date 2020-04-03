@@ -35,7 +35,6 @@
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/nvtx.h"
-#include "src/core/request_status.pb.h"
 #include "src/core/server.h"
 #include "src/core/server_status.h"
 #include "src/core/status.h"
@@ -55,57 +54,49 @@ class TrtServerError {
  public:
   static TRTSERVER_Error* Create(TRTSERVER_Error_Code code, const char* msg);
   static TRTSERVER_Error* Create(
-      ni::RequestStatusCode status_code, const std::string& msg);
+      TRTSERVER_Error_Code code, const std::string& msg);
   static TRTSERVER_Error* Create(const ni::Status& status);
 
-  ni::RequestStatusCode StatusCode() const { return status_code_; }
+  TRTSERVER_Error_Code Code() const { return code_; }
   const std::string& Message() const { return msg_; }
 
  private:
-  TrtServerError(ni::RequestStatusCode status_code, const std::string& msg);
-  TrtServerError(ni::RequestStatusCode status_code, const char* msg);
+  TrtServerError(TRTSERVER_Error_Code code, const std::string& msg)
+      : code_(code), msg_(msg)
+  {
+  }
+  TrtServerError(TRTSERVER_Error_Code code, const char* msg)
+      : code_(code), msg_(msg)
+  {
+  }
 
-  ni::RequestStatusCode status_code_;
+  TRTSERVER_Error_Code code_;
   const std::string msg_;
 };
 
 TRTSERVER_Error*
 TrtServerError::Create(TRTSERVER_Error_Code code, const char* msg)
 {
-  return reinterpret_cast<TRTSERVER_Error*>(
-      new TrtServerError(ni::TrtServerCodeToRequestStatus(code), msg));
+  return reinterpret_cast<TRTSERVER_Error*>(new TrtServerError(code, msg));
 }
 
 TRTSERVER_Error*
-TrtServerError::Create(
-    ni::RequestStatusCode status_code, const std::string& msg)
+TrtServerError::Create(TRTSERVER_Error_Code code, const std::string& msg)
 {
-  // If 'status_code' is success then return nullptr as that indicates
-  // success
-  if (status_code == ni::RequestStatusCode::SUCCESS) {
-    return nullptr;
-  }
-
-  return reinterpret_cast<TRTSERVER_Error*>(
-      new TrtServerError(status_code, msg));
+  return reinterpret_cast<TRTSERVER_Error*>(new TrtServerError(code, msg));
 }
 
 TRTSERVER_Error*
 TrtServerError::Create(const ni::Status& status)
 {
-  return Create(status.Code(), status.Message());
-}
+  // If 'status' is success then return nullptr as that indicates
+  // success
+  if (status.IsOk()) {
+    return nullptr;
+  }
 
-TrtServerError::TrtServerError(
-    ni::RequestStatusCode status_code, const std::string& msg)
-    : status_code_(status_code), msg_(msg)
-{
-}
-
-TrtServerError::TrtServerError(
-    ni::RequestStatusCode status_code, const char* msg)
-    : status_code_(status_code), msg_(msg)
-{
+  return Create(
+      ni::StatusCodeToTrtServerCode(status.StatusCode()), status.Message());
 }
 
 #define RETURN_IF_STATUS_ERROR(S)              \
@@ -658,14 +649,14 @@ TRTSERVER_Error_Code
 TRTSERVER_ErrorCode(TRTSERVER_Error* error)
 {
   TrtServerError* lerror = reinterpret_cast<TrtServerError*>(error);
-  return ni::RequestStatusToTrtServerCode(lerror->StatusCode());
+  return lerror->Code();
 }
 
 const char*
 TRTSERVER_ErrorCodeString(TRTSERVER_Error* error)
 {
   TrtServerError* lerror = reinterpret_cast<TrtServerError*>(error);
-  return ni::RequestStatusCode_Name(lerror->StatusCode()).c_str();
+  return ni::Status::CodeString(ni::TrtServerCodeToStatusCode(lerror->Code()));
 }
 
 const char*
@@ -1017,8 +1008,7 @@ TRTSERVER_InferenceRequestProviderNew(
   if (!request_header->ParseFromArray(
           request_header_base, request_header_byte_size)) {
     return TrtServerError::Create(
-        ni::RequestStatusCode::INVALID_ARG,
-        "failed to parse InferRequestHeader");
+        TRTSERVER_ERROR_INVALID_ARG, "failed to parse InferRequestHeader");
   }
 
   std::unique_ptr<TrtServerRequestOptions> request_options(
