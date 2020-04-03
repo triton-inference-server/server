@@ -113,6 +113,21 @@ SharedMemoryRegionSet(
 }
 
 int
+GetSharedMemoryHandleInfo(
+    void* shm_handle, char** shm_addr, const char** shm_key, int* shm_fd,
+    size_t* offset, size_t* byte_size)
+{
+  SharedMemoryHandle* handle =
+      reinterpret_cast<SharedMemoryHandle*>(shm_handle);
+  *shm_addr = reinterpret_cast<char*>(handle->base_addr_);
+  *shm_key = handle->shm_key_.c_str();
+  *shm_fd = handle->shm_fd_;
+  *offset = handle->offset_;
+  *byte_size = handle->byte_size_;
+  return 0;
+}
+
+int
 SharedMemoryRegionDestroy(void* shm_handle)
 {
   std::string shm_key =
