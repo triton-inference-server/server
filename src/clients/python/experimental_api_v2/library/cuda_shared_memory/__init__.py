@@ -293,7 +293,7 @@ class CudaSharedMemoryException(Exception):
             -1: "unable to set device successfully",
             -2: "unable to create cuda shared memory handle",
             -3: "unable to set values in cuda shared memory",
-            -4: "unable to free GPU device memory"
+            -4: "unable to free GPU device memory",
             -5: "failed to read cuda shared memory results"
         }
         self._msg = None
