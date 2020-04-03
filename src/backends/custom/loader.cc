@@ -42,14 +42,14 @@ GetEntrypoint(void* handle, const std::string& name, void** fn)
   if (dlsym_error != nullptr) {
     std::string errstr(dlsym_error);  // need copy as dlclose overwrites
     return Status(
-        RequestStatusCode::NOT_FOUND,
+        Status::Code::NOT_FOUND,
         "unable to find '" + name +
             "' entrypoint in custom library: " + errstr);
   }
 
   if (*fn == nullptr) {
     return Status(
-        RequestStatusCode::NOT_FOUND,
+        Status::Code::NOT_FOUND,
         "unable to find '" + name + "' entrypoint in custom library");
   }
 
@@ -77,7 +77,7 @@ LoadCustom(
   void* handle = dlopen(path.c_str(), RTLD_LAZY);
   if (handle == nullptr) {
     return Status(
-        RequestStatusCode::NOT_FOUND,
+        Status::Code::NOT_FOUND,
         "unable to load custom library: " + std::string(dlerror()));
   }
 
@@ -124,7 +124,7 @@ LoadCustom(
       break;
     default:
       status = Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "unable to load custom library: invalid custom version " +
               std::to_string(*custom_version) + " is provided");
       break;

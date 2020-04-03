@@ -71,15 +71,15 @@ DataType ConvertDataType(TRTISTF_DataType dtype);
 TRTISTF_DataType ConvertDataType(DataType dtype);
 
 // If TRTISTF Error is non-OK, return the equivalent TRTIS status.
-#define RETURN_IF_TRTISTF_ERROR(TFWS)                                   \
-  do {                                                                  \
-    TRTISTF_Error* error__ = (TFWS);                                    \
-    if (error__ != nullptr) {                                           \
-      auto status = Status(RequestStatusCode::INTERNAL, error__->msg_); \
-      TRTISTF_ErrorDelete(error__);                                     \
-      return status;                                                    \
-    }                                                                   \
-    TRTISTF_ErrorDelete(error__);                                       \
+#define RETURN_IF_TRTISTF_ERROR(TFWS)                              \
+  do {                                                             \
+    TRTISTF_Error* error__ = (TFWS);                               \
+    if (error__ != nullptr) {                                      \
+      auto status = Status(Status::Code::INTERNAL, error__->msg_); \
+      TRTISTF_ErrorDelete(error__);                                \
+      return status;                                               \
+    }                                                              \
+    TRTISTF_ErrorDelete(error__);                                  \
   } while (false)
 
 }}  // namespace nvidia::inferenceserver

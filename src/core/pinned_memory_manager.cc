@@ -88,12 +88,11 @@ PinnedMemoryManager::AllocInternal(
     *allocated_type = TRTSERVER_MEMORY_CPU_PINNED;
     if (*ptr == nullptr) {
       status = Status(
-          RequestStatusCode::INTERNAL,
-          "failed to allocate pinned system memory");
+          Status::Code::INTERNAL, "failed to allocate pinned system memory");
     }
   } else {
     status = Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "failed to allocate pinned system memory: no pinned memory pool");
   }
 
@@ -110,7 +109,7 @@ PinnedMemoryManager::AllocInternal(
     is_pinned = false;
     if (*ptr == nullptr) {
       status = Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "failed to allocate non-pinned system memory");
     } else {
       status = Status::Success;
@@ -124,9 +123,9 @@ PinnedMemoryManager::AllocInternal(
       auto res = memory_info_.emplace(*ptr, is_pinned);
       if (!res.second) {
         status = Status(
-            RequestStatusCode::INTERNAL,
-            "unexpected memory address collision, '" + PointerToString(*ptr) +
-                "' has been managed");
+            Status::Code::INTERNAL, "unexpected memory address collision, '" +
+                                        PointerToString(*ptr) +
+                                        "' has been managed");
       }
       LOG_VERBOSE(1) << (is_pinned ? "" : "non-")
                      << "pinned memory allocation: "
@@ -161,9 +160,9 @@ PinnedMemoryManager::FreeInternal(void* ptr)
       memory_info_.erase(it);
     } else {
       return Status(
-          RequestStatusCode::INTERNAL, "unexpected memory address '" +
-                                           PointerToString(ptr) +
-                                           "' is not being managed");
+          Status::Code::INTERNAL, "unexpected memory address '" +
+                                      PointerToString(ptr) +
+                                      "' is not being managed");
     }
   }
 
@@ -181,8 +180,7 @@ PinnedMemoryManager::Create(const Options& options)
 {
   if (instance_ != nullptr) {
     return Status(
-        RequestStatusCode::ALREADY_EXISTS,
-        "PinnedMemoryManager has been created");
+        Status::Code::ALREADY_EXISTS, "PinnedMemoryManager has been created");
   }
 
   void* buffer = nullptr;
@@ -211,8 +209,7 @@ PinnedMemoryManager::Alloc(
 {
   if (instance_ == nullptr) {
     return Status(
-        RequestStatusCode::UNAVAILABLE,
-        "PinnedMemoryManager has not been created");
+        Status::Code::UNAVAILABLE, "PinnedMemoryManager has not been created");
   }
 
   return instance_->AllocInternal(
@@ -224,8 +221,7 @@ PinnedMemoryManager::Free(void* ptr)
 {
   if (instance_ == nullptr) {
     return Status(
-        RequestStatusCode::UNAVAILABLE,
-        "PinnedMemoryManager has not been created");
+        Status::Code::UNAVAILABLE, "PinnedMemoryManager has not been created");
   }
 
   return instance_->FreeInternal(ptr);

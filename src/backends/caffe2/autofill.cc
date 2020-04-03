@@ -65,8 +65,8 @@ AutoFillNetDef::Create(
   // We can add more aggressive checks later.
   if (version_dirs.size() == 0) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "' due to no version directories");
+        Status::Code::INTERNAL, "unable to autofill for '" + model_name +
+                                    "' due to no version directories");
   }
 
   const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
@@ -85,10 +85,10 @@ AutoFillNetDef::Create(
   if ((netdef_files.find(expected_init_filename) == netdef_files.end()) ||
       (netdef_files.find(kCaffe2NetDefFilename) == netdef_files.end())) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "', unable to find netdef files: '" +
-                                         kCaffe2NetDefFilename + "' and '" +
-                                         expected_init_filename + "'");
+        Status::Code::INTERNAL, "unable to autofill for '" + model_name +
+                                    "', unable to find netdef files: '" +
+                                    kCaffe2NetDefFilename + "' and '" +
+                                    expected_init_filename + "'");
   }
 
   autofill->reset(new AutoFillNetDefImpl(model_name));

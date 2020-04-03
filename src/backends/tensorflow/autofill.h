@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <memory>
 #include <string>
 #include "src/core/model_config.h"
 #include "src/core/status.h"

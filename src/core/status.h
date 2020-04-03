@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/request_status.pb.h"
+#include <string>
 #include "src/core/tritonserver.h"
 #include "src/core/trtserver.h"
 
@@ -33,57 +33,65 @@ namespace nvidia { namespace inferenceserver {
 
 class Status {
  public:
+  // The status codes
+  enum class Code {
+    SUCCESS,
+    UNKNOWN,
+    INTERNAL,
+    NOT_FOUND,
+    INVALID_ARG,
+    UNAVAILABLE,
+    UNSUPPORTED,
+    ALREADY_EXISTS
+  };
+
+ public:
   // Construct a status from a code with no message.
-  explicit Status(RequestStatusCode code = RequestStatusCode::SUCCESS)
-      : code_(code)
-  {
-  }
+  explicit Status(Code code = Code::SUCCESS) : code_(code) {}
 
   // Construct a status from a code and message.
-  explicit Status(RequestStatusCode code, const std::string& msg)
-      : code_(code), msg_(msg)
-  {
-  }
+  explicit Status(Code code, const std::string& msg) : code_(code), msg_(msg) {}
 
   // Convenience "success" value. Can be used as Status::Success to
   // indicate no error.
   static const Status Success;
 
-  // Return the RequestStatusCode for this status.
-  RequestStatusCode Code() const { return code_; }
+  // Return the code for this status.
+  Code StatusCode() const { return code_; }
 
   // Return the message for this status.
   const std::string& Message() const { return msg_; }
 
   // Return true if this status indicates "ok"/"success", false if
   // status indicates some kind of failure.
-  bool IsOk() const { return code_ == RequestStatusCode::SUCCESS; }
+  bool IsOk() const { return code_ == Code::SUCCESS; }
 
   // Return the status as a string.
   std::string AsString() const;
 
+  // Return the constant string name for a code.
+  static const char* CodeString(const Code code);
+
  private:
-  RequestStatusCode code_;
+  Code code_;
   std::string msg_;
 };
 
-// Return the RequestStatusCode corresponding to a
-// TRTSERVER_Error_Code.
-RequestStatusCode TrtServerCodeToRequestStatus(TRTSERVER_Error_Code code);
+// Return the Status::Code corresponding to a
+// TRTSERVER_Error_Code. FIXMEV2 remove.
+Status::Code TrtServerCodeToStatusCode(TRTSERVER_Error_Code code);
 
 // Return the TRTSERVER_Error_Code corresponding to a
-// RequestStatusCode.
-TRTSERVER_Error_Code RequestStatusToTrtServerCode(
-    RequestStatusCode status_code);
+// Status::Code. FIXMEV2 remove.
+TRTSERVER_Error_Code StatusCodeToTrtServerCode(Status::Code code);
 
-// Return the RequestStatusCode corresponding to a
+// Return the Status::Code corresponding to a
 // TRITONSERVER_Error_Code.
-RequestStatusCode TritonServerCodeToRequestStatus(TRITONSERVER_Error_Code code);
+Status::Code TritonServerCodeToStatusCode(TRITONSERVER_Error_Code code);
 
 // Return the TRITONSERVER_Error_Code corresponding to a
-// RequestStatusCode.
-TRITONSERVER_Error_Code RequestStatusToTritonServerCode(
-    RequestStatusCode status_code);
+// Status::Code.
+TRITONSERVER_Error_Code StatusCodeToTritonServerCode(Status::Code status_code);
 
 // If status is non-OK, return the Status.
 #define RETURN_IF_ERROR(S)        \

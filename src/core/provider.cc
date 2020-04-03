@@ -148,7 +148,7 @@ InferResponseProvider::OutputBufferContents(
   }
 
   return Status(
-      RequestStatusCode::UNAVAILABLE,
+      Status::Code::UNAVAILABLE,
       "request for unallocated output '" + name + "'");
 }
 
@@ -168,7 +168,7 @@ InferResponseProvider::OutputBufferContents(
   }
 
   return Status(
-      RequestStatusCode::UNAVAILABLE,
+      Status::Code::UNAVAILABLE,
       "request for unallocated output '" + name + "'");
 }
 
@@ -228,7 +228,7 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
                                          : output_config->dims();
     if (!CompareDimsWithWildcard(expected_shape, batch1_backend_shape)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "output '" + output.name_ + "' for model '" + is.Name() +
               "' has shape " + DimsListToString(batch1_backend_shape) +
               " but model configuration specifies shape " +
@@ -345,7 +345,7 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
 
         default:
           return Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "class result not available for output '" + output.name_ +
                   "' due to unsupported type '" +
                   DataType_Name(output_config->data_type()) + "'");
@@ -460,8 +460,7 @@ InferResponseProvider::AllocateOutputBuffer(
 
   const auto& pr = output_map_.find(name);
   if (pr == output_map_.end()) {
-    return Status(
-        RequestStatusCode::INTERNAL, "unexpected output '" + name + "'");
+    return Status(Status::Code::INTERNAL, "unexpected output '" + name + "'");
   }
 
   outputs_.emplace_back();
@@ -484,7 +483,7 @@ InferResponseProvider::AllocateOutputBuffer(
     // For class result no additional buffer is needed.
     if (content_byte_size == 0) {
       Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "Classification result is requested for output '" + name + "'" +
               " while its output buffer size is 0");
     }
@@ -512,9 +511,8 @@ InferResponseProvider::AllocateOutputBuffer(
   if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
       (cuerr != cudaErrorInsufficientDriver)) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to get current CUDA device: " +
-            std::string(cudaGetErrorString(cuerr)));
+        Status::Code::INTERNAL, "unable to get current CUDA device: " +
+                                    std::string(cudaGetErrorString(cuerr)));
   }
 #endif  // TRTIS_ENABLE_GPU
   Status status;
@@ -525,7 +523,7 @@ InferResponseProvider::AllocateOutputBuffer(
         &raw_actual_memory_type, &raw_actual_memory_type_id);
     if (err != nullptr) {
       status = Status(
-          TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
+          TrtServerCodeToStatusCode(TRTSERVER_ErrorCode(err)),
           TRTSERVER_ErrorMessage(err));
       TRTSERVER_ErrorDelete(err);
     }
@@ -539,7 +537,7 @@ InferResponseProvider::AllocateOutputBuffer(
     raw_actual_memory_type = TritonMemTypeToTrt(triton_actual_memory_type);
     if (err != nullptr) {
       status = Status(
-          TritonServerCodeToRequestStatus(TRITONSERVER_ErrorCode(err)),
+          TritonServerCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
           TRITONSERVER_ErrorMessage(err));
       TRITONSERVER_ErrorDelete(err);
     }
@@ -560,9 +558,8 @@ InferResponseProvider::AllocateOutputBuffer(
   if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
       (cuerr != cudaErrorInsufficientDriver)) {
     status = Status(
-        RequestStatusCode::INTERNAL,
-        "unable to recover current CUDA device: " +
-            std::string(cudaGetErrorString(cuerr)));
+        Status::Code::INTERNAL, "unable to recover current CUDA device: " +
+                                    std::string(cudaGetErrorString(cuerr)));
   }
 #endif  // TRTIS_ENABLE_GPU
   if (!status.IsOk()) {

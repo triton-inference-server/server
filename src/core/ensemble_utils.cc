@@ -73,7 +73,7 @@ ValidateTensorConsistency(
 {
   if (lhs.type_ != rhs.type_) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         message + "inconsistent data type: " + DataType_Name(lhs.type_) +
             " is inferred from model " + lhs.model_name_ + " while " +
             DataType_Name(rhs.type_) + " is inferred from model " +
@@ -89,7 +89,7 @@ ValidateTensorConsistency(
   if (!CompareDimsWithWildcard(lhs.dims_, rhs.dims_) &&
       !CompareDimsWithWildcard(lhs.full_dims_, rhs.full_dims_)) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         message + "inconsistent shape: " + DimsListToString(lhs.full_dims_) +
             " is inferred from model " + lhs.model_name_ + " while " +
             DimsListToString(rhs.full_dims_) + " is inferred from model " +
@@ -114,7 +114,7 @@ ValidateTensorMapping(
   for (const auto& input_map : step.input_map()) {
     if (input_names.find(input_map.first) == input_names.end()) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "in ensemble " + ensemble + ", ensemble tensor " + input_map.second +
               " is mapping to non-existing input " + input_map.first +
               " in model " + step.model_name());
@@ -142,13 +142,13 @@ ValidateTensorMapping(
     }
     if (mapped_cnt == 0) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "in ensemble " + ensemble + ", input " + model_input.name() +
               " in model " + model_config.name() +
               " is not mapped to any ensemble tensors");
     } else if (mapped_cnt > 1) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "in ensemble " + ensemble + ", input " + model_input.name() +
               " in model " + model_config.name() +
               " is mapped to multiple ensemble tensors");
@@ -164,7 +164,7 @@ ValidateTensorMapping(
   for (const auto& output_map : step.output_map()) {
     if (output_names.find(output_map.first) == output_names.end()) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "in ensemble " + ensemble + ", ensemble tensor " + output_map.second +
               " is mapped from non-existing output " + output_map.first +
               " in model " + step.model_name());
@@ -192,7 +192,7 @@ ValidateTensorMapping(
     }
     if (mapped_cnt > 1) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "in ensemble " + ensemble + ", multiple outputs in model " +
               model_config.name() + " are mapped to the same ensemble tensor " +
               output_map.second);
@@ -230,7 +230,7 @@ ValidateEnsembleConfig(
       name_list += (*it)->model_name_;
     }
     return Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "ensemble " + ensemble_name +
             " contains models that are not available: " + name_list);
   }
@@ -266,7 +266,7 @@ ValidateEnsembleConfig(
     if ((model_config.max_batch_size() != 0) &&
         (model_config.max_batch_size() < ensemble_config.max_batch_size())) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "ensemble " + ensemble_name + " allows maximum batch size " +
               std::to_string(ensemble_config.max_batch_size()) +
               ", but it contains model " + model_name +
@@ -284,7 +284,7 @@ ValidateEnsembleConfig(
       }
       if (found) {
         return Status(
-            RequestStatusCode::INVALID_ARG,
+            Status::Code::INVALID_ARG,
             "circular dependency between ensembles: " + model_name +
                 " -> ... -> " + ensemble_name + " -> " + model_name);
       }
@@ -302,7 +302,7 @@ ValidateEnsembleConfig(
           ensemble_dependency->pop_back();
           if (!it->second.first->status_.IsOk()) {
             return Status(
-                RequestStatusCode::INVALID_ARG,
+                Status::Code::INVALID_ARG,
                 "ensemble " + ensemble_name + " depends on " + model_name +
                     " which contains invalid model config");
           }

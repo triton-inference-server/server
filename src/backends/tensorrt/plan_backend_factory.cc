@@ -58,8 +58,7 @@ PlanBackendFactory::Create(
   }
   if (!success) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to register default TensorRT Plugins");
+        Status::Code::INTERNAL, "unable to register default TensorRT Plugins");
   }
 
   auto plan_backend_config = std::static_pointer_cast<Config>(backend_config);

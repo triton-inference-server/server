@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <set>
 #include "src/core/status.h"
 
 #ifdef TRTIS_ENABLE_GPU
@@ -34,14 +35,13 @@
 namespace nvidia { namespace inferenceserver {
 
 #ifdef TRTIS_ENABLE_GPU
-#define RETURN_IF_CUDA_ERR(X, MSG)                   \
-  do {                                               \
-    cudaError_t err__ = (X);                         \
-    if (err__ != cudaSuccess) {                      \
-      return Status(                                 \
-          RequestStatusCode::INTERNAL,               \
-          (MSG) + ": " + cudaGetErrorString(err__)); \
-    }                                                \
+#define RETURN_IF_CUDA_ERR(X, MSG)                                           \
+  do {                                                                       \
+    cudaError_t err__ = (X);                                                 \
+    if (err__ != cudaSuccess) {                                              \
+      return Status(                                                         \
+          Status::Code::INTERNAL, (MSG) + ": " + cudaGetErrorString(err__)); \
+    }                                                                        \
   } while (false)
 #endif  // TRTIS_ENABLE_GPU
 

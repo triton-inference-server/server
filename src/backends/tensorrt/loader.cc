@@ -43,7 +43,7 @@ LoadPlan(
     *runtime = nvinfer1::createInferRuntime(tensorrt_logger);
     if (*runtime == nullptr) {
       return Status(
-          RequestStatusCode::INTERNAL, "unable to create TensorRT runtime");
+          Status::Code::INTERNAL, "unable to create TensorRT runtime");
     }
   }
 
@@ -51,15 +51,13 @@ LoadPlan(
 
   *runtime = nvinfer1::createInferRuntime(tensorrt_logger);
   if (*runtime == nullptr) {
-    return Status(
-        RequestStatusCode::INTERNAL, "unable to create TensorRT runtime");
+    return Status(Status::Code::INTERNAL, "unable to create TensorRT runtime");
   }
 
   *engine =
       (*runtime)->deserializeCudaEngine(&model_data[0], model_data.size());
   if (*engine == nullptr) {
-    return Status(
-        RequestStatusCode::INTERNAL, "unable to create TensorRT engine");
+    return Status(Status::Code::INTERNAL, "unable to create TensorRT engine");
   }
 
   return Status::Success;

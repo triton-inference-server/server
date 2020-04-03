@@ -26,6 +26,7 @@
 #pragma once
 
 #include <onnxruntime_c_api.h>
+#include <mutex>
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {

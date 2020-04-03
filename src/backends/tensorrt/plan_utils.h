@@ -116,7 +116,7 @@ ValidateDimension(
   const int nonbatch_start_idx = (skip_first_dimension ? 1 : 0);
   if (int(this_dims.size() + nonbatch_start_idx) != max_dims.nbDims) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "model expected " +
             std::to_string(max_dims.nbDims - nonbatch_start_idx) +
             " dimensions but received " + std::to_string(this_dims.size()) +
@@ -130,7 +130,7 @@ ValidateDimension(
     if (this_dims[i] < min_dims.d[i + nonbatch_start_idx] ||
         this_dims[i] > max_dims.d[i + nonbatch_start_idx]) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "model expected the shape of dimension " + std::to_string(i) +
               " to be between " +
               std::to_string(min_dims.d[i + nonbatch_start_idx]) + " and " +

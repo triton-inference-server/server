@@ -88,8 +88,8 @@ BackendContext::CreateCudaStream(
 
     if (cuerr != cudaSuccess) {
       return Status(
-          RequestStatusCode::INTERNAL, "unable to create stream for " + name_ +
-                                           ": " + cudaGetErrorString(cuerr));
+          Status::Code::INTERNAL, "unable to create stream for " + name_ +
+                                      ": " + cudaGetErrorString(cuerr));
     }
   }
 #endif  // TRTIS_ENABLE_GPU
@@ -150,7 +150,7 @@ BackendContext::SetInputBuffer(
 
         if ((copied_byte_size + content_byte_size) > expected_byte_size) {
           payload.status_ = Status(
-              RequestStatusCode::INVALID_ARG,
+              Status::Code::INVALID_ARG,
               "unexpected size " +
                   std::to_string(copied_byte_size + content_byte_size) +
                   " for inference input '" + name + "', expecting " +
@@ -195,7 +195,7 @@ BackendContext::SetInputBuffer(
 
       if (payload.status_.IsOk() && (copied_byte_size != expected_byte_size)) {
         payload.status_ = Status(
-            RequestStatusCode::INTERNAL,
+            Status::Code::INTERNAL,
             "expected " + std::to_string(expected_byte_size) +
                 " bytes of data for inference input '" + name + "', got " +
                 std::to_string(copied_byte_size));
@@ -338,7 +338,7 @@ BackendContext::SetShapeInputBuffer(
 
   if ((expected_byte_size) != (int)content_byte_size) {
     payload->status_ = Status(
-        RequestStatusCode::INVALID_ARG,
+        Status::Code::INVALID_ARG,
         "unexpected size " + std::to_string(content_byte_size) +
             " for inference input '" + name + "', expecting " +
             std::to_string(expected_byte_size));
@@ -409,7 +409,7 @@ BackendContext::SetFixedSizeOutputBuffer(
       if (status.IsOk() && (expected_byte_size != 0)) {
         if (buffer == nullptr) {
           status = Status(
-              RequestStatusCode::INTERNAL,
+              Status::Code::INTERNAL,
               "failed to allocate buffer for output '" + name + "'");
         } else {
           if (need_buffer && (dst_memory_type == candidate_type)) {
@@ -570,7 +570,7 @@ BackendContext::SetOutputShapeTensorBuffer(
       if (status.IsOk() && (expected_byte_size != 0)) {
         if (buffer == nullptr) {
           status = Status(
-              RequestStatusCode::INTERNAL,
+              Status::Code::INTERNAL,
               "failed to allocate buffer for output '" + name + "'");
         } else {
           bool cuda_used = false;
@@ -644,7 +644,7 @@ BackendContext::GetContiguousInputContent(
         (*contiguous_buffer)->MutableBuffer(&memory_type, &memory_type_id);
     if (dst_ptr == nullptr) {
       return Status(
-          RequestStatusCode::INTERNAL, "failed to allocate contiguous buffer");
+          Status::Code::INTERNAL, "failed to allocate contiguous buffer");
     }
 
     size_t offset = 0;
@@ -693,7 +693,7 @@ BackendContext::CompareOutputDims(
 
     if (!succ) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "tensor '" + tensor_name + "': the model expects " +
               std::to_string(model_shape.size()) + " dimensions (shape " +
               DimsListToString(model_shape) +
@@ -718,7 +718,7 @@ BackendContext::CompareOutputDims(
 
     if (!succ) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
+          Status::Code::INVALID_ARG,
           "tensor '" + tensor_name + "': the model expects " +
               std::to_string(model_shape.size()) + " dimensions (shape " +
               DimsListToString(model_shape) +
@@ -737,7 +737,7 @@ BackendContext::PeekShapeTensor(
     std::vector<int64_t>* shape)
 {
   // By default a backend doesn't support shape tensors.
-  return Status(RequestStatusCode::INTERNAL, "shape tensors not supported");
+  return Status(Status::Code::INTERNAL, "shape tensors not supported");
 }
 
 }}  // namespace nvidia::inferenceserver

@@ -76,10 +76,10 @@ ValidateIOInfoType(
     if (ConvertFromOnnxDataType(io_info.second.type_) ==
         DataType::TYPE_INVALID) {
       return Status(
-          RequestStatusCode::INTERNAL,
-          "unable to autofill for '" + model_name +
-              "', unsupported data-type '" +
-              OnnxDataTypeName(io_info.second.type_) + "'");
+          Status::Code::INTERNAL, "unable to autofill for '" + model_name +
+                                      "', unsupported data-type '" +
+                                      OnnxDataTypeName(io_info.second.type_) +
+                                      "'");
     }
   }
   return Status::Success;
@@ -145,7 +145,7 @@ AutoFillOnnxImpl::FixBatchingSupport(ModelConfig* config)
 {
   if (!model_support_batching_ && (config->max_batch_size() > 0)) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unable to autofill for '" + model_name_ +
             "', configuration specified max-batch " +
             std::to_string(config->max_batch_size()) +
@@ -172,7 +172,7 @@ AutoFillOnnxImpl::FixBatchingSupport(ModelConfig* config)
             if (config_batch_hint &&
                 (model_support_batching_ != should_batch)) {
               return Status(
-                  RequestStatusCode::INTERNAL,
+                  Status::Code::INTERNAL,
                   "unable to autofill for '" + model_name_ +
                       "', model tensor configurations are contradicting " +
                       "each other in terms of whether batching is supported");
@@ -194,7 +194,7 @@ AutoFillOnnxImpl::FixBatchingSupport(ModelConfig* config)
             if (config_batch_hint &&
                 (model_support_batching_ != should_batch)) {
               return Status(
-                  RequestStatusCode::INTERNAL,
+                  Status::Code::INTERNAL,
                   "unable to autofill for '" + model_name_ +
                       "', model tensor configurations are contradicting " +
                       "each other in terms of whether batching is supported");
@@ -302,8 +302,8 @@ AutoFillOnnx::Create(
 
   if (version_dirs.size() == 0) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "' due to no version directories");
+        Status::Code::INTERNAL, "unable to autofill for '" + model_name +
+                                    "' due to no version directories");
   }
 
   // Create resource wrapper to manage release of resource
@@ -423,8 +423,8 @@ AutoFillOnnx::Create(
   // due to reasons other than unsupported opset
   if (!found) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "', unable to find onnx file");
+        Status::Code::INTERNAL, "unable to autofill for '" + model_name +
+                                    "', unable to find onnx file");
   }
 
   OrtAllocator* allocator;

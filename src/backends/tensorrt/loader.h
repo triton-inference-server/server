@@ -26,6 +26,7 @@
 #pragma once
 
 #include <NvInfer.h>
+#include <vector>
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {

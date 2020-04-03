@@ -119,7 +119,7 @@ AutoFillSavedModelImpl::FixBatchingSupport(ModelConfig* config)
   // signature doesn't support batching then can't autofill.
   if (!sig_supports_batch && (config->max_batch_size() > 0)) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unable to autofill for '" + model_name_ +
             "', configuration specified max-batch " +
             std::to_string(config->max_batch_size()) +
@@ -149,7 +149,7 @@ AutoFillSavedModelImpl::FixBatchingSupport(ModelConfig* config)
               if (config_batch_hint &&
                   (model_support_batching_ != should_batch)) {
                 return Status(
-                    RequestStatusCode::INTERNAL,
+                    Status::Code::INTERNAL,
                     "unable to autofill for '" + model_name_ +
                         "', model tensor configurations are contradicting " +
                         "each other in terms of whether batching is supported");
@@ -174,7 +174,7 @@ AutoFillSavedModelImpl::FixBatchingSupport(ModelConfig* config)
               if (config_batch_hint &&
                   (model_support_batching_ != should_batch)) {
                 return Status(
-                    RequestStatusCode::INTERNAL,
+                    Status::Code::INTERNAL,
                     "unable to autofill for '" + model_name_ +
                         "', model tensor configurations are contradicting " +
                         "each other in terms of whether batching is supported");
@@ -263,8 +263,8 @@ AutoFillSavedModel::Create(
   // We can add more aggressive checks later.
   if (version_dirs.size() == 0) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "' due to no version directories");
+        Status::Code::INTERNAL, "unable to autofill for '" + model_name +
+                                    "' due to no version directories");
   }
 
   // The model configuration will be identical across all the version
@@ -277,9 +277,8 @@ AutoFillSavedModel::Create(
 
   if (savedmodel_dirs.empty()) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to autofill for '" + model_name +
-            "', unable to find savedmodel directory.");
+        Status::Code::INTERNAL, "unable to autofill for '" + model_name +
+                                    "', unable to find savedmodel directory.");
   }
 
   std::string savedmodel_dir;
@@ -316,7 +315,7 @@ AutoFillSavedModel::Create(
     std::string msg((err->msg_ == nullptr) ? "<unknown>" : err->msg_);
     TRTISTF_ErrorDelete(err);
     return Status(
-        RequestStatusCode::INTERNAL,
+        Status::Code::INTERNAL,
         "unable to autofill for '" + model_name + "': " + msg);
   }
 
@@ -361,8 +360,8 @@ AutoFillGraphDef::Create(
   // We can add more aggressive checks later.
   if (version_dirs.size() == 0) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "' due to no version directories");
+        Status::Code::INTERNAL, "unable to autofill for '" + model_name +
+                                    "' due to no version directories");
   }
 
   const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
@@ -379,10 +378,9 @@ AutoFillGraphDef::Create(
   if (graphdef_files.find(kTensorFlowGraphDefFilename) ==
       graphdef_files.end()) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to autofill for '" + model_name +
-            "', unable to find graphdef file named '" +
-            kTensorFlowGraphDefFilename + "'");
+        Status::Code::INTERNAL, "unable to autofill for '" + model_name +
+                                    "', unable to find graphdef file named '" +
+                                    kTensorFlowGraphDefFilename + "'");
   }
 
   autofill->reset(new AutoFillGraphDefImpl(model_name));

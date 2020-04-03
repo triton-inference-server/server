@@ -39,7 +39,6 @@
 #include "src/core/metrics.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/nvtx.h"
-#include "src/core/request_status.pb.h"
 #include "src/core/server.h"
 #include "src/core/status.h"
 #include "src/core/tracing.h"
@@ -58,17 +57,23 @@ class TritonServerError {
   static TRITONSERVER_Error* Create(
       TRITONSERVER_Error_Code code, const char* msg);
   static TRITONSERVER_Error* Create(
-      ni::RequestStatusCode status_code, const std::string& msg);
+      TRITONSERVER_Error_Code code, const std::string& msg);
   static TRITONSERVER_Error* Create(const ni::Status& status);
 
-  ni::RequestStatusCode StatusCode() const { return status_code_; }
+  TRITONSERVER_Error_Code Code() const { return code_; }
   const std::string& Message() const { return msg_; }
 
  private:
-  TritonServerError(ni::RequestStatusCode status_code, const std::string& msg);
-  TritonServerError(ni::RequestStatusCode status_code, const char* msg);
+  TritonServerError(TRITONSERVER_Error_Code code, const std::string& msg)
+      : code_(code), msg_(msg)
+  {
+  }
+  TritonServerError(TRITONSERVER_Error_Code code, const char* msg)
+      : code_(code), msg_(msg)
+  {
+  }
 
-  ni::RequestStatusCode status_code_;
+  TRITONSERVER_Error_Code code_;
   const std::string msg_;
 };
 
@@ -76,39 +81,27 @@ TRITONSERVER_Error*
 TritonServerError::Create(TRITONSERVER_Error_Code code, const char* msg)
 {
   return reinterpret_cast<TRITONSERVER_Error*>(
-      new TritonServerError(ni::TritonServerCodeToRequestStatus(code), msg));
+      new TritonServerError(code, msg));
 }
 
 TRITONSERVER_Error*
-TritonServerError::Create(
-    ni::RequestStatusCode status_code, const std::string& msg)
+TritonServerError::Create(TRITONSERVER_Error_Code code, const std::string& msg)
 {
-  // If 'status_code' is success then return nullptr as that indicates
-  // success
-  if (status_code == ni::RequestStatusCode::SUCCESS) {
-    return nullptr;
-  }
-
   return reinterpret_cast<TRITONSERVER_Error*>(
-      new TritonServerError(status_code, msg));
+      new TritonServerError(code, msg));
 }
 
 TRITONSERVER_Error*
 TritonServerError::Create(const ni::Status& status)
 {
-  return Create(status.Code(), status.Message());
-}
+  // If 'status' is success then return nullptr as that indicates
+  // success
+  if (status.IsOk()) {
+    return nullptr;
+  }
 
-TritonServerError::TritonServerError(
-    ni::RequestStatusCode status_code, const std::string& msg)
-    : status_code_(status_code), msg_(msg)
-{
-}
-
-TritonServerError::TritonServerError(
-    ni::RequestStatusCode status_code, const char* msg)
-    : status_code_(status_code), msg_(msg)
-{
+  return Create(
+      StatusCodeToTritonServerCode(status.StatusCode()), status.Message());
 }
 
 #define RETURN_IF_STATUS_ERROR(S)                 \
@@ -399,14 +392,15 @@ TRITONSERVER_Error_Code
 TRITONSERVER_ErrorCode(TRITONSERVER_Error* error)
 {
   TritonServerError* lerror = reinterpret_cast<TritonServerError*>(error);
-  return ni::RequestStatusToTritonServerCode(lerror->StatusCode());
+  return lerror->Code();
 }
 
 const char*
 TRITONSERVER_ErrorCodeString(TRITONSERVER_Error* error)
 {
   TritonServerError* lerror = reinterpret_cast<TritonServerError*>(error);
-  return ni::RequestStatusCode_Name(lerror->StatusCode()).c_str();
+  return ni::Status::CodeString(
+      ni::TritonServerCodeToStatusCode(lerror->Code()));
 }
 
 const char*

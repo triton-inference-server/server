@@ -71,11 +71,11 @@ GraphDefBackend::CreateTRTISTFModel(
 
   if (potential_inputs.size() < (size_t)Config().input().size()) {
     return Status(
-        RequestStatusCode::INVALID_ARG,
-        "unable to load model '" + Name() + "', configuration expects " +
-            std::to_string(Config().input().size()) +
-            " inputs, model provides at most " +
-            std::to_string(potential_inputs.size()));
+        Status::Code::INVALID_ARG, "unable to load model '" + Name() +
+                                       "', configuration expects " +
+                                       std::to_string(Config().input().size()) +
+                                       " inputs, model provides at most " +
+                                       std::to_string(potential_inputs.size()));
   }
 
   // If this is a sequence model then make sure that the required
@@ -118,7 +118,7 @@ GraphDefBackend::ValidateBooleanSequenceControl(
     const TRTISTF_IO* input = FindIOByName(inputs, tensor_name);
     if (input == nullptr) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "configuration specified sequence control '" + tensor_name +
               "', but model does not provide that input");
     }
@@ -140,7 +140,7 @@ GraphDefBackend::ValidateTypedSequenceControl(
     const TRTISTF_IO* input = FindIOByName(inputs, tensor_name);
     if (input == nullptr) {
       return Status(
-          RequestStatusCode::INTERNAL,
+          Status::Code::INTERNAL,
           "configuration specified sequence control '" + tensor_name +
               "', but model does not provide that input");
     }
