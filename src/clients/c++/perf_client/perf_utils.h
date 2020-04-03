@@ -124,9 +124,6 @@ size_t GetElementCount(std::shared_ptr<nic::InferContext::Input> input);
 void SerializeStringTensor(
     std::vector<std::string> string_tensor, std::vector<char>* serialized_data);
 
-nic::Error DecodeFromBase64(
-    const std::string& encoded_data, std::vector<char>* decoded_data);
-
 nic::Error SerializeExplicitTensor(
     const rapidjson::Value& tensor, ni::DataType dt,
     std::vector<char>* decoded_data);

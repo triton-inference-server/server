@@ -26,6 +26,7 @@
 
 
 #include "src/clients/c++/perf_client/data_loader.h"
+#include <b64/decode.h>
 #include "src/core/model_config.h"
 
 #include <fstream>
@@ -382,10 +383,15 @@ DataLoader::ReadInputTensorData(
       } else {
         if (content->HasMember("b64")) {
           if ((*content)["b64"].IsString()) {
-            RETURN_IF_ERROR(
-                DecodeFromBase64((*content)["b64"].GetString(), &it->second));
-            size_t batch1_byte = input->ByteSize();
-            if (batch1_byte != it->second.size()) {
+            const std::string& encoded = (*content)["b64"].GetString();
+            it->second.resize(encoded.length());
+            base64::decoder D;
+            int size =
+                D.decode(encoded.c_str(), encoded.length(), &it->second[0]);
+            it->second.resize(size);
+
+            int64_t batch1_byte = input->ByteSize();
+            if (batch1_byte > 0 && (size_t)batch1_byte != it->second.size()) {
               return nic::Error(
                   ni::RequestStatusCode::INVALID_ARG,
                   "mismatch in the data provided. "
