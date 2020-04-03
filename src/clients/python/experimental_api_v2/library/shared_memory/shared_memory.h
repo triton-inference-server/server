@@ -41,6 +41,9 @@ int SharedMemoryRegionCreate(
     void** shm_handle);
 int SharedMemoryRegionSet(
     void* shm_handle, size_t offset, size_t byte_size, const void* data);
+int GetSharedMemoryHandleInfo(
+    void* shm_handle, char** shm_addr, const char** shm_key, int* shm_fd,
+    size_t* offset, size_t* byte_size);
 int SharedMemoryRegionDestroy(void* shm_handle);
 
 //==============================================================================

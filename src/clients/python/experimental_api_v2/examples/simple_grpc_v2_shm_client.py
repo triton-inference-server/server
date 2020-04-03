@@ -32,6 +32,7 @@ import sys
 from builtins import range
 import tritongrpcclient.core as grpcclient
 import tritongrpcclient.shared_memory as shm
+import tritongrpcclient.utils as utils
 from ctypes import *
 
 FLAGS = None
@@ -123,24 +124,33 @@ if __name__ == '__main__':
 
     outputs = []
     outputs.append(grpcclient.InferOutput('OUTPUT0'))
-    # Uncomment with DLIS-1202
-    # outputs[-1].set_shared_memory("output0_data", output_byte_size)
+    outputs[-1].set_shared_memory("output0_data", output_byte_size)
 
     outputs.append(grpcclient.InferOutput('OUTPUT1'))
-    # Uncomment with DLIS-1202
-    # outputs[-1].set_shared_memory("output1_data", output_byte_size)
+    outputs[-1].set_shared_memory("output1_data", output_byte_size)
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
                                   outputs=outputs)
 
-    # TODO [DLIS-1202]: Currently, this example doesn't use shared memory
-    # for output. This is done to effectively validate the results.
-    # tritongrpcclient.shared_memory module will be enhanced to read
-    # data from a specified shared memory handle, data_type and shape;
-    # and later return the numpy array.
-    output0_data = results.as_numpy('OUTPUT0')
-    output1_data = results.as_numpy('OUTPUT1')
+    # Read results from the shared memory.
+    output0 = results.get_output("OUTPUT0")
+    if output0 is not None:
+        output0_data = shm.get_contents_as_numpy(
+            shm_op0_handle, utils.triton_to_np_dtype(output0.datatype),
+            output0.shape)
+    else:
+        print("OUTPUT0 is missing in the response.")
+        sys.exit(1)
+
+    output1 = results.get_output("OUTPUT1")
+    if output1 is not None:
+        output1_data = shm.get_contents_as_numpy(
+            shm_op1_handle, utils.triton_to_np_dtype(output1.datatype),
+            output1.shape)
+    else:
+        print("OUTPUT1 is missing in the response.")
+        sys.exit(1)
 
     for i in range(16):
         print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " +

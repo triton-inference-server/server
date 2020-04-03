@@ -150,6 +150,36 @@ CudaSharedMemoryRegionSet(
 }
 
 int
+GetCudaSharedMemoryHandleInfo(
+    void* shm_handle, char** shm_addr, size_t* offset, size_t* byte_size)
+{
+  SharedMemoryHandle* handle =
+      reinterpret_cast<SharedMemoryHandle*>(shm_handle);
+  // Must call CudaSharedMemoryReleaseBuffer to destroy 'new' object
+  // after writing into results. Numpy cannot read buffer from GPU and hence
+  // this is needed to maintain a copy of the data on GPU shared memory.
+  *shm_addr = new char[handle->byte_size_];
+  cudaError_t err = cudaMemcpy(
+      *shm_addr, handle->base_addr_, handle->byte_size_,
+      cudaMemcpyDeviceToHost);
+  if (err != cudaSuccess) {
+    return -5;
+  }
+  *offset = handle->offset_;
+  *byte_size = handle->byte_size_;
+  return 0;
+}
+
+int
+CudaSharedMemoryReleaseBuffer(char* ptr)
+{
+  if (ptr) {
+    delete ptr;
+  }
+  return 0;
+}
+
+int
 CudaSharedMemoryRegionDestroy(void* cuda_shm_handle)
 {
   // remember previous device and set to new device
