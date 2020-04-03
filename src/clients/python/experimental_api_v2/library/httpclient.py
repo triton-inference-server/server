@@ -757,7 +757,7 @@ class InferenceServerClient:
             quote(name))
 
         register_request = {
-            'raw_handle': raw_handle,
+            'raw_handle': {'b64': raw_handle},
             'device_id': device_id,
             'byte_size': byte_size
         }
