@@ -1230,7 +1230,7 @@ HTTPAPIServerV2::HandleModelConfig(
       ::google::protobuf::util::MessageToJsonString(
           model_config, &model_config_json);
       evbuffer_add(
-            req->buffer_out, model_config_json.c_str(), model_config_json.size());
+          req->buffer_out, model_config_json.c_str(), model_config_json.size());
     }
   }
 

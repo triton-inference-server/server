@@ -516,7 +516,6 @@ ModelRepositoryManager::BackendLifeCycle::GetModelState(
     ModelReadyState* state)
 {
   std::lock_guard<std::mutex> map_lock(map_mtx_);
-  VersionStateMap version_map;
   auto mit = map_.find(model_name);
   if (mit != map_.end()) {
     auto vit = mit->second.find(model_version);
@@ -1369,6 +1368,12 @@ const ModelRepositoryManager::ModelStateMap
 ModelRepositoryManager::GetLiveBackendStates()
 {
   return backend_life_cycle_->GetLiveBackendStates();
+}
+
+const ModelRepositoryManager::VersionStateMap
+ModelRepositoryManager::GetVersionStates(const std::string& model_name)
+{
+  return backend_life_cycle_->GetVersionStates(model_name);
 }
 
 Status

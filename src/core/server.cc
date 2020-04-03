@@ -352,6 +352,27 @@ InferenceServer::ModelIsReady(
   return Status::Success;
 }
 
+Status
+InferenceServer::ModelReadyVersions(
+    const std::string& model_name, std::vector<int64_t>* versions)
+{
+  if (ready_state_ == ServerReadyState::SERVER_EXITING) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server exiting");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  const ModelRepositoryManager::VersionStateMap version_states =
+      model_repository_manager_->GetVersionStates(model_name);
+  for (const auto& pr : version_states) {
+    if (pr.second == ModelReadyState::MODEL_READY) {
+      versions->push_back(pr.first);
+    }
+  }
+
+  return Status::Success;
+}
+
 void
 InferenceServer::InferAsync(
     const std::shared_ptr<InferenceBackend>& backend,

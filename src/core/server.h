@@ -69,6 +69,8 @@ class InferenceServer {
   Status IsReady(bool* ready);
   Status ModelIsReady(
       const std::string& model_name, const int64_t model_version, bool* ready);
+  Status ModelReadyVersions(
+      const std::string& model_name, std::vector<int64_t>* versions);
 
   // Perform inference on the given input for specified model. Status
   // is returned in the OnCompleteInfer callback.
