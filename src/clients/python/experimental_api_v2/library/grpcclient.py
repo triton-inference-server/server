@@ -48,16 +48,9 @@ def raise_error_grpc(rpc_error):
     raise get_error_grpc(rpc_error) from None
 
 
-def _get_inference_request(model_name,
-                           inputs,
-                           model_version,
-                           request_id,
-                           outputs,
-                           sequence_id,
-                           sequence_start,
-                           sequence_end,
-                           priority,
-                           timeout):
+def _get_inference_request(model_name, inputs, model_version, request_id,
+                           outputs, sequence_id, sequence_start, sequence_end,
+                           priority, timeout):
     request = grpc_service_v2_pb2.ModelInferRequest()
     request.model_name = model_name
     request.model_version = model_version
@@ -1295,6 +1288,35 @@ class InferResult:
                     np_array = np.array(output.contents.byte_contents)
                 np_array = np.resize(np_array, shape)
                 return np_array
+        return None
+
+    def get_output(self, name, as_json=False):
+        """Retrieves the InferOutputTensor corresponding to the
+        named ouput.
+
+        Parameters
+        ----------
+        name : str
+            The name of the tensor for which Output is to be
+            retrieved.
+        as_json : bool
+            If True then returns response as a json dict, otherwise
+            as a protobuf message. Default value is False.
+    
+        Returns
+        -------
+        protobuf message or dict
+            If a InferOutputTensor with specified name is present in
+            ModelIndferResponse then returns it as a protobuf messsage
+            or dict, otherwise returns None. 
+        """
+        for output in self._result.outputs:
+            if output.name == name:
+                if as_json:
+                    return json.loads(MessageToJson(output))
+                else:
+                    return output
+
         return None
 
     def get_response(self, as_json=False):

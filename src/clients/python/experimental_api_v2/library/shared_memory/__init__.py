@@ -34,7 +34,9 @@ from numpy.ctypeslib import ndpointer
 import pkg_resources
 import struct
 
+
 class _utf8(object):
+
     @classmethod
     def from_param(cls, value):
         if value is None:
@@ -44,20 +46,37 @@ class _utf8(object):
         else:
             return value.encode('utf8')
 
+
 import os
 _cshm_lib = "cshmv2" if os.name == 'nt' else 'libcshmv2.so'
-_cshm_path = pkg_resources.resource_filename('tritongrpcclient.shared_memory', _cshm_lib)
+_cshm_path = pkg_resources.resource_filename('tritongrpcclient.shared_memory',
+                                             _cshm_lib)
 _cshm = cdll.LoadLibrary(_cshm_path)
 
 _cshm_shared_memory_region_create = _cshm.SharedMemoryRegionCreate
 _cshm_shared_memory_region_create.restype = c_int
-_cshm_shared_memory_region_create.argtypes = [_utf8, _utf8, c_uint64, POINTER(c_void_p)]
+_cshm_shared_memory_region_create.argtypes = [
+    _utf8, _utf8, c_uint64, POINTER(c_void_p)
+]
 _cshm_shared_memory_region_set = _cshm.SharedMemoryRegionSet
 _cshm_shared_memory_region_set.restype = c_int
-_cshm_shared_memory_region_set.argtypes = [c_void_p, c_uint64, c_uint64, c_void_p]
+_cshm_shared_memory_region_set.argtypes = [
+    c_void_p, c_uint64, c_uint64, c_void_p
+]
+_cshm_get_shared_memory_handle_info = _cshm.GetSharedMemoryHandleInfo
+_cshm_get_shared_memory_handle_info.restype = c_int
+_cshm_get_shared_memory_handle_info.argtypes = [
+    c_void_p,
+    POINTER(c_char_p),
+    POINTER(c_char_p),
+    POINTER(c_int),
+    POINTER(c_uint64),
+    POINTER(c_uint64)
+]
 _cshm_shared_memory_region_destroy = _cshm.SharedMemoryRegionDestroy
 _cshm_shared_memory_region_destroy.restype = c_int
 _cshm_shared_memory_region_destroy.argtypes = [c_void_p]
+
 
 def _raise_if_error(errno):
     """
@@ -69,9 +88,11 @@ def _raise_if_error(errno):
         raise ex
     return
 
+
 def _raise_error(msg):
     ex = SharedMemoryException(msg)
     raise ex
+
 
 def create_shared_memory_region(triton_shm_name, shm_key, byte_size):
     """Creates a shared memory region with the specified name and size.
@@ -98,9 +119,12 @@ def create_shared_memory_region(triton_shm_name, shm_key, byte_size):
 
     shm_handle = c_void_p()
     _raise_if_error(
-        c_int(_cshm_shared_memory_region_create(triton_shm_name, shm_key, byte_size, byref(shm_handle))))
+        c_int(
+            _cshm_shared_memory_region_create(triton_shm_name, shm_key,
+                                              byte_size, byref(shm_handle))))
 
     return shm_handle
+
 
 def set_shared_memory_region(shm_handle, input_values):
     """Copy the contents of the numpy array into a shared memory region.
@@ -118,8 +142,9 @@ def set_shared_memory_region(shm_handle, input_values):
         If unable to mmap or set values in the shared memory region.
     """
 
-    if not isinstance(input_values, (list,tuple)):
-        _raise_error("input_values must be specified as a list/tuple of numpy arrays")
+    if not isinstance(input_values, (list, tuple)):
+        _raise_error(
+            "input_values must be specified as a list/tuple of numpy arrays")
     for input_value in input_values:
         if not isinstance(input_value, np.ndarray):
             _raise_error("each element of input_values must be a numpy array")
@@ -133,6 +158,71 @@ def set_shared_memory_region(shm_handle, input_values):
                 c_uint64(byte_size), input_value.ctypes.data_as(c_void_p))))
         offset_current += byte_size
     return
+
+
+def get_contents_as_numpy(shm_handle, datatype, shape):
+    """Generates a numpy array using the data stored in the shared memory
+    region specified with the handle.
+
+    Parameters
+    ----------
+    cuda_shm_handle : c_void_p
+        The handle for the cuda shared memory region.
+    datatype : np.dtype
+        The datatype of the array to be returned.
+    shape : list
+        The list of int describing the shape of the array to be returned.
+
+    Returns
+    -------
+    np.array
+        The numpy array generated using contents from the specified shared
+        memory region.
+    """
+    shm_fd = c_int()
+    offset = c_uint64()
+    byte_size = c_uint64()
+    shm_addr = c_char_p()
+    shm_key = c_char_p()
+    _raise_if_error(
+            c_int(_cshm_get_shared_memory_handle_info(shm_handle, byref(shm_addr), byref(shm_key), byref(shm_fd), \
+                                    byref(offset), byref(byte_size))))
+    start_pos = offset.value
+    if datatype != np.object:
+        requested_byte_size = np.prod(shape) * np.dtype(datatype).itemsize
+        cval_len = start_pos + requested_byte_size
+        if byte_size.value < cval_len:
+            _raise_error(
+                "The size of shared memory is unsufficient to provide numpy array with requested size"
+            )
+        if cval_len == 0:
+            result = np.empty(shape, dtype=datatype)
+        else:
+            val_buf = cast(shm_addr, POINTER(c_byte * cval_len))[0]
+            val = np.frombuffer(val_buf, dtype=datatype, offset=start_pos)
+
+            # Reshape the result to the appropriate shape.
+            result = np.reshape(val, shape)
+    else:
+        str_offset = start_pos
+        val_buf = cast(shm_addr, POINTER(c_byte * byte_size.value))[0]
+        ii = 0
+        strs = list()
+        while (ii % np.prod(shape) != 0) or (ii == 0):
+            l = struct.unpack_from("<I", val_buf, str_offset)[0]
+            str_offset += 4
+            sb = struct.unpack_from("<{}s".format(l), val_buf, str_offset)[0]
+            str_offset += l
+            strs.append(sb)
+            ii += 1
+
+        val = np.array(strs, dtype=object)
+
+        # Reshape the result to the appropriate shape.
+        result = np.reshape(val, shape)
+
+    return result
+
 
 def destroy_shared_memory_region(shm_handle):
     """Unlink a shared memory region with the specified handle.
@@ -148,9 +238,9 @@ def destroy_shared_memory_region(shm_handle):
         If unable to unlink the shared memory region.
     """
 
-    _raise_if_error(
-        c_int(_cshm_shared_memory_region_destroy(shm_handle)))
+    _raise_if_error(c_int(_cshm_shared_memory_region_destroy(shm_handle)))
     return
+
 
 class SharedMemoryException(Exception):
     """Exception indicating non-Success status.
@@ -161,11 +251,14 @@ class SharedMemoryException(Exception):
         Pointer to an Error that should be used to initialize the exception.
 
     """
+
     def __init__(self, err):
-        self.err_code_map = { -2: "unable to get shared memory descriptor",
-                            -3: "unable to initialize the size",
-                            -4: "unable to read/mmap the shared memory region",
-                            -5: "unable to unlink the shared memory region"}
+        self.err_code_map = {
+            -2: "unable to get shared memory descriptor",
+            -3: "unable to initialize the size",
+            -4: "unable to read/mmap the shared memory region",
+            -5: "unable to unlink the shared memory region"
+        }
         self._msg = None
         if type(err) == str:
             self._msg = err
