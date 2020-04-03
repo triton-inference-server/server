@@ -31,7 +31,6 @@ from urllib.parse import quote, quote_plus
 import rapidjson as json
 import numpy as np
 import gevent.pool
-import sys
 
 from tritonhttpclient.utils import *
 

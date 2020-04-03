@@ -686,9 +686,8 @@ WriteDataToJsonHelper(
         *counter += 1;
       } else {
         uint32_t* len = reinterpret_cast<uint32_t*>(base + *counter);
-        char* cstr =
-            reinterpret_cast<char*>(base + *counter + sizeof(uint32_t));
-        rapidjson::Value data_val(cstr, *len, allocator);
+        char* cstr = reinterpret_cast<char*>(base + *counter);
+        rapidjson::Value data_val(cstr, sizeof(uint32_t) + *len, allocator);
         *counter += *len + sizeof(uint32_t);
       }
     }
