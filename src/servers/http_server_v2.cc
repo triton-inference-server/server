@@ -1717,7 +1717,6 @@ HTTPAPIServerV2::EVBufferToInput(
   int v_idx = 0;
 
   int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
-  LOG_VERBOSE(1) << "n: " << n;
   if (n > 0) {
     v = static_cast<struct evbuffer_iovec*>(
         alloca(sizeof(struct evbuffer_iovec) * n));
@@ -1737,11 +1736,7 @@ HTTPAPIServerV2::EVBufferToInput(
     buffer_len = header_length;
   }
 
-  LOG_VERBOSE(1) << "header_length: " << buffer_len;
-  LOG_VERBOSE(1) << "total_lenght: " << evbuffer_get_length(input_buffer);
-
   RETURN_IF_ERR(EVBufferToJson(&request_json, v, &v_idx, buffer_len, n));
-  LOG_VERBOSE(1) << "v_idx: " << v_idx;
 
   // Set InferenceRequest request_id
   auto itr = request_json.FindMember("id");
@@ -1775,7 +1770,6 @@ HTTPAPIServerV2::EVBufferToInput(
           irequest, input_name, nullptr, 0 /* byte_size */,
           TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
     } else if (binary_input) {
-      LOG_VERBOSE(1) << "byte_size: " << byte_size;
       if (header_length == 0) {
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INVALID_ARG,
@@ -1799,8 +1793,6 @@ HTTPAPIServerV2::EVBufferToInput(
           v_idx++;
         }
 
-        LOG_VERBOSE(1) << "v_idx: " << v_idx;
-        LOG_VERBOSE(1) << "byte_size: " << byte_size;
         RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
             irequest, input_name, base, base_size, TRTSERVER_MEMORY_CPU,
             0 /* memory_type_id */));
