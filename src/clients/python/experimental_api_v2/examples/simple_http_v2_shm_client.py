@@ -30,7 +30,7 @@ import numpy as np
 import sys
 from builtins import range
 import tritonhttpclient.core as httpclient
-import tritongrpcclient.shared_memory as shm
+import tritonsharedmemoryutils.shared_memory as shm
 from ctypes import *
 
 FLAGS = None
@@ -135,7 +135,7 @@ if __name__ == '__main__':
 
     # TODO [DLIS-1202]: Currently, this example doesn't use shared memory
     # for output. This is done to effectively validate the results.
-    # tritongrpcclient.shared_memory module will be enhanced to read
+    # tritonsharedmemoryutils.shared_memory module will be enhanced to read
     # data from a specified shared memory handle, data_type and shape;
     # and later return the numpy array.
     output0_data = results.as_numpy('OUTPUT0')

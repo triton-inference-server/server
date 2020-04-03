@@ -33,9 +33,7 @@ if 'VERSION' not in os.environ:
 
 VERSION = os.environ['VERSION']
 
-REQUIRED = [
-    'numpy', 'python-rapidjson', 'protobuf>=3.5.0', 'grpcio'
-]
+REQUIRED = ['numpy']
 
 try:
     from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
@@ -53,17 +51,25 @@ try:
 except ImportError:
     bdist_wheel = None
 
-setup(
-    name='tritongrpcclient',
-    version=VERSION,
-    author='NVIDIA Inc.',
-    author_email='tanmayv@nvidia.com',
-    description='Python client library for communicating with NVIDIA Triton Inference Server using gRPC',
-    license='BSD',
-    url='http://nvidia.com',
-    keywords='triton tensorrt inference server service client',
-    packages=find_packages(),
-    install_requires=REQUIRED,
-    zip_safe=False,
-    cmdclass={'bdist_wheel': bdist_wheel},
-)
+if not os.name == 'nt':
+    platform_package_data = [ 'libcshmv2.so' ]
+    if bool(os.environ.get('CUDA_VERSION', 0)):
+        platform_package_data += ['libccudashmv2.so']
+
+    setup(
+        name='tritonsharedmemoryutils',
+        version=VERSION,
+        author='NVIDIA Inc.',
+        author_email='tanmayv@nvidia.com',
+        description='Python utils library for creating and managing system and cuda shared memory regions',
+        license='BSD',
+        url='http://nvidia.com',
+        keywords='triton tensorrt inference server system memory cuda system client',
+        packages=find_packages(),
+        install_requires=REQUIRED,
+        package_data={
+            '': platform_package_data,
+        },
+        zip_safe=False,
+        cmdclass={'bdist_wheel': bdist_wheel},
+    )
