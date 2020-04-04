@@ -109,8 +109,18 @@ for i in \
     SUFFIX="${BASE%.*}"
     if [ $SUFFIX == "grpc_v2_image_client" ]; then
         python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+        if [ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
+            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
+            cat $CLIENT_LOG
+            RET=1
+        fi
     elif [ $SUFFIX == "v2_image_client" ]; then
         python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+        if [ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
+            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
+            cat $CLIENT_LOG
+            RET=1
+        fi
     else
         python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     fi

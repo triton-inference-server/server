@@ -224,7 +224,10 @@ def postprocess(results, output_name, batch_size):
 
     for results in output_array:
         for result in results:
-            cls = result.split(':')
+            if output_array.dtype.type == np.bytes_:
+                cls = "".join(chr(x) for x in result).split(':')
+            else:
+                cls = result.split(':')
             print("    {} ({}) = {}".format(cls[0], cls[1], cls[2]))
 
 def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):

@@ -194,7 +194,7 @@ InferResponseProvider::OutputClassifications(
   }
 
   return Status(
-      RequestStatusCode::UNAVAILABLE,
+      Status::Code::UNAVAILABLE,
       "request for output '" + name + "' that has no classification results");
 }
 

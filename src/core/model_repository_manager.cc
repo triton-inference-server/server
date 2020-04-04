@@ -1389,7 +1389,7 @@ ModelRepositoryManager::GetInferenceBackend(
     backend->reset();
     status = Status(
         Status::Code::UNAVAILABLE,
-        "Inference request for unknown model '" + model_name + "'");
+        "Request for unknown model '" + model_name + "'");
   }
   return status;
 }
