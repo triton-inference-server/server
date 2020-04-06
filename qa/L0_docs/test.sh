@@ -33,7 +33,7 @@ RET=0
 apt-get update && \
     apt-get install -y --no-install-recommends python3-pip zip doxygen && \
     pip3 install --upgrade setuptools && \
-    pip3 install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale && \
+    pip3 install --upgrade sphinx==2.4.4 sphinx-rtd-theme nbsphinx exhale && \
     pip3 install --upgrade ../pkgs/tensorrtserver*.whl && \
     pip3 install --upgrade ../pkgs/triton*.whl
 
