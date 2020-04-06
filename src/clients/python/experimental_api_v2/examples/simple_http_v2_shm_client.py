@@ -135,8 +135,8 @@ if __name__ == '__main__':
     output0 = results.get_output("OUTPUT0")
     if output0 is not None:
         output0_data = shm.get_contents_as_numpy(
-            shm_op0_handle, utils.triton_to_np_dtype(output0.datatype),
-            output0.shape)
+            shm_op0_handle, utils.triton_to_np_dtype(output0['datatype']),
+            output0['shape'])
     else:
         print("OUTPUT0 is missing in the response.")
         sys.exit(1)
@@ -144,8 +144,8 @@ if __name__ == '__main__':
     output1 = results.get_output("OUTPUT1")
     if output1 is not None:
         output1_data = shm.get_contents_as_numpy(
-            shm_op1_handle, utils.triton_to_np_dtype(output1.datatype),
-            output1.shape)
+            shm_op1_handle, utils.triton_to_np_dtype(output1['datatype']),
+            output1['shape'])
     else:
         print("OUTPUT1 is missing in the response.")
         sys.exit(1)

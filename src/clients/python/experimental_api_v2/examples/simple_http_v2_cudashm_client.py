@@ -119,10 +119,10 @@ if __name__ == '__main__':
     inputs[-1].set_shared_memory("input1_data", input_byte_size)
 
     outputs = []
-    outputs.append(httpclient.InferOutput('OUTPUT0'))
+    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=False))
     outputs[-1].set_shared_memory("output0_data", output_byte_size)
 
-    outputs.append(httpclient.InferOutput('OUTPUT1'))
+    outputs.append(httpclient.InferOutput('OUTPUT1', binary_data=False))
     outputs[-1].set_shared_memory("output1_data", output_byte_size)
 
     results = triton_client.infer(model_name=model_name,
@@ -133,8 +133,8 @@ if __name__ == '__main__':
     output0 = results.get_output("OUTPUT0")
     if output0 is not None:
         output0_data = cudashm.get_contents_as_numpy(
-            shm_op0_handle, utils.triton_to_np_dtype(output0.datatype),
-            output0.shape)
+            shm_op0_handle, utils.triton_to_np_dtype(output0['datatype']),
+            output0['shape'])
     else:
         print("OUTPUT0 is missing in the response.")
         sys.exit(1)
@@ -142,8 +142,8 @@ if __name__ == '__main__':
     output1 = results.get_output("OUTPUT1")
     if output1 is not None:
         output1_data = cudashm.get_contents_as_numpy(
-            shm_op1_handle, utils.triton_to_np_dtype(output1.datatype),
-            output1.shape)
+            shm_op1_handle, utils.triton_to_np_dtype(output1['datatype']),
+            output1['shape'])
     else:
         print("OUTPUT1 is missing in the response.")
         sys.exit(1)

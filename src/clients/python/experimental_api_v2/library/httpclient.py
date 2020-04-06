@@ -1349,6 +1349,28 @@ class InferResult:
                 return np_array
         return None
 
+    def get_output(self, name):
+        """Retrieves the output tensor corresponding to the named ouput.
+
+        Parameters
+        ----------
+        name : str
+            The name of the tensor for which Output is to be
+            retrieved.
+    
+        Returns
+        -------
+        Dict
+            If an output tensor with specified name is present in
+            the infer resonse then returns it as a json dict, 
+            otherwise returns None. 
+        """
+        for output in self._result['outputs']:
+            if output['name'] == name:
+                return output
+
+        return None
+
     def get_response(self):
         """Retrieves the complete response
 

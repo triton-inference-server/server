@@ -1307,7 +1307,7 @@ class InferResult:
         -------
         protobuf message or dict
             If a InferOutputTensor with specified name is present in
-            ModelIndferResponse then returns it as a protobuf messsage
+            ModelInferResponse then returns it as a protobuf messsage
             or dict, otherwise returns None. 
         """
         for output in self._result.outputs:
