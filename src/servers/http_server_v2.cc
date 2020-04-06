@@ -682,8 +682,8 @@ ReadDataFromJson(
     }
     // FP16 not supported via JSON
     case TYPE_FP16: {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
               "receiving FP16 data via JSON is not supported. Please use the "
               "binary data format for input " +
@@ -730,13 +730,14 @@ WriteDataToJsonHelper(
         char* cstr =
             reinterpret_cast<char*>(base + *counter + sizeof(uint32_t));
         rapidjson::Value data_val(cstr, *len, allocator);
+        response_output_val->PushBack(data_val, allocator);
         *counter += *len + sizeof(uint32_t);
       }
     }
   }
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 WriteDataToJson(
     rapidjson::Value& response_output,
     rapidjson::Document::AllocatorType& allocator, void* base)
@@ -804,8 +805,8 @@ WriteDataToJson(
       }
       // FP16 not supported via JSON
       case TYPE_FP16: {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
             std::string(
                 "sending FP16 data via JSON is not supported. Please use the "
                 "binary data format for output " +
@@ -830,10 +831,14 @@ WriteDataToJson(
             &data_val, allocator, shape, 1, char_base, &counter, dtype);
         break;
       }
-      case TYPE_INVALID: {
-        break;
-      }
+      case TYPE_INVALID:
       default:
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "Unknown data type " + std::string(dtype_str) + " for output " +
+                std::string(response_output["name"].GetString()))
+                .c_str());
         break;
     }
     data_array.PushBack(data_val, allocator);
@@ -1780,10 +1785,9 @@ HTTPAPIServerV2::HandleInfer(
       rapidjson::Document::AllocatorType& allocator =
           response_json.GetAllocator();
       response_json.SetObject();
-      rapidjson::Value model_name_val(model_name.c_str(), model_name.size());
+      rapidjson::Value model_name_val(model_name.c_str(), allocator);
       response_json.AddMember("model_name", model_name_val, allocator);
-      rapidjson::Value model_version_val(
-          model_version_str.c_str(), model_version_str.size());
+      rapidjson::Value model_version_val(model_version_str.c_str(), allocator);
       response_json.AddMember("model_version", model_version_val, allocator);
 
       err = TRITONSERVER_ServerInferAsync(
@@ -1949,8 +1953,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     TRITONSERVER_Memory_Type memory_type;
     int64_t memory_type_id;
     err = TRITONSERVER_InferenceRequestOutputData(
-        request, output_name, &base, &byte_size, &memory_type,
-        &memory_type_id);
+        request, output_name, &base, &byte_size, &memory_type, &memory_type_id);
     if (err != nullptr) {
       break;
     }
@@ -1984,10 +1987,10 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
   response_json.AddMember("outputs", response_outputs, allocator);
 
   evhtp_res status = (err == nullptr) ? EVHTP_RES_OK : EVHTP_RES_BADREQ;
-  TRTSERVER_ErrorDelete(err);
 
   if (status == EVHTP_RES_BADREQ) {
     EVBufferAddErrorJson(req_->buffer_out, err);
+    TRITONSERVER_ErrorDelete(err);
   } else {
     // write json metadata into evbuffer followed by binary buffer
     rapidjson::StringBuffer buffer;
@@ -1998,9 +2001,6 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     size_t json_length = strlen(response_metadata);
     evbuffer_add(req_->buffer_out, response_metadata, json_length);
     evbuffer_add_buffer(req_->buffer_out, binary_buf);
-    evhtp_headers_add_header(
-        req_->headers_out,
-        evhtp_header_new("Content-Type", "application/json", 1, 1));
     if (has_binary) {
       evhtp_headers_add_header(
           req_->headers_out, evhtp_header_new(
