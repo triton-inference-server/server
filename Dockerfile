@@ -28,7 +28,7 @@
 # Multistage build.
 #
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:20.03-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:20.03-py3
 ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:20.03-py3
 ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:20.03-tf1-py3
 
@@ -343,8 +343,10 @@ ENV MKL_THREADING_LAYER GNU
 # artifacts copied below are assign to this user.
 ENV TENSORRT_SERVER_USER=triton-server
 ENV TRITON_SERVER_USER=triton-server
-RUN id -u $TRITON_SERVER_USER > /dev/null 2>&1 || \
-    useradd $TRITON_SERVER_USER && \
+RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
+    if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \
+        useradd $TRITON_SERVER_USER; \
+    fi && \
     [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \
     [ `id -g $TRITON_SERVER_USER` -eq 1000 ]
 
