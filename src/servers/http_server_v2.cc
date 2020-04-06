@@ -502,57 +502,108 @@ HTTPAPIServerV2::ResponseRelease(
   return nullptr;  // Success
 }
 
-template <typename T>
+void
+GetDataByteSizeFromJson(const rapidjson::Value& payload_data, size_t* byte_size)
+{
+  for (size_t i = 0; i < payload_data.Size(); i++) {
+    // If last dimension
+    if (!payload_data[i].IsArray()) {
+      const char* cstr = payload_data[i].GetString();
+      uint32_t len = strlen(cstr);
+      *byte_size += len + sizeof(uint32_t);
+    }
+    // If not last dimension
+    else {
+      GetDataByteSizeFromJson(payload_data[i], byte_size);
+    }
+  }
+}
+
 void
 ReadDataFromJsonHelper(
-    T* data_vec, const DataType dtype, const rapidjson::Value& payload_data,
-    int* counter)
+    std::vector<char>* base, const DataType dtype,
+    const rapidjson::Value& payload_data, int* counter)
 {
   for (size_t i = 0; i < payload_data.Size(); i++) {
     // If last dimension
     if (!payload_data[i].IsArray()) {
       switch (dtype) {
-        case TYPE_BOOL:
+        case TYPE_BOOL: {
+          uint8_t* data_vec = reinterpret_cast<uint8_t*>(base->data());
           data_vec[*counter] = (uint8_t)payload_data[i].GetBool();
           break;
-        case TYPE_UINT8:
+        }
+        case TYPE_UINT8: {
+          uint8_t* data_vec = reinterpret_cast<uint8_t*>(base->data());
           data_vec[*counter] = (uint8_t)payload_data[i].GetInt();
           break;
-        case TYPE_UINT16:
+        }
+        case TYPE_UINT16: {
+          uint16_t* data_vec = reinterpret_cast<uint16_t*>(base->data());
           data_vec[*counter] = (uint16_t)payload_data[i].GetInt();
           break;
-        case TYPE_UINT32:
+        }
+        case TYPE_UINT32: {
+          uint32_t* data_vec = reinterpret_cast<uint32_t*>(base->data());
           data_vec[*counter] = (uint32_t)payload_data[i].GetInt();
           break;
-        case TYPE_UINT64:
+        }
+        case TYPE_UINT64: {
+          uint64_t* data_vec = reinterpret_cast<uint64_t*>(base->data());
           data_vec[*counter] = (uint64_t)payload_data[i].GetInt();
           break;
-        case TYPE_INT8:
+        }
+        case TYPE_INT8: {
+          int8_t* data_vec = reinterpret_cast<int8_t*>(base->data());
           data_vec[*counter] = (int8_t)payload_data[i].GetInt();
           break;
-        case TYPE_INT16:
+        }
+        case TYPE_INT16: {
+          int16_t* data_vec = reinterpret_cast<int16_t*>(base->data());
           data_vec[*counter] = (int16_t)payload_data[i].GetInt();
           break;
-        case TYPE_INT32:
+        }
+        case TYPE_INT32: {
+          int32_t* data_vec = reinterpret_cast<int32_t*>(base->data());
           data_vec[*counter] = (int32_t)payload_data[i].GetInt();
           break;
-        case TYPE_INT64:
+        }
+        case TYPE_INT64: {
+          int64_t* data_vec = reinterpret_cast<int64_t*>(base->data());
           data_vec[*counter] = (int64_t)payload_data[i].GetInt();
           break;
-        case TYPE_FP32:
+        }
+        case TYPE_FP32: {
+          float* data_vec = reinterpret_cast<float*>(base->data());
           data_vec[*counter] = (float)payload_data[i].GetFloat();
           break;
-        case TYPE_FP64:
+        }
+        case TYPE_FP64: {
+          double* data_vec = reinterpret_cast<double*>(base->data());
           data_vec[*counter] = (double)payload_data[i].GetDouble();
           break;
+        }
+        case TYPE_STRING: {
+          const char* cstr = payload_data[i].GetString();
+          uint32_t len = strlen(cstr);
+          memcpy(
+              base->data() + *counter, reinterpret_cast<char*>(&len),
+              sizeof(uint32_t));
+          std::copy(
+              cstr, cstr + len, base->begin() + *counter + sizeof(uint32_t));
+          *counter += len + sizeof(uint32_t);
+          break;
+        }
         default:
           break;
       }
-      *counter += 1;
+      if (dtype != TYPE_STRING) {
+        *counter += 1;
+      }
     }
     // If not last dimension
     else {
-      ReadDataFromJsonHelper(data_vec, dtype, payload_data[i], counter);
+      ReadDataFromJsonHelper(base, dtype, payload_data[i], counter);
     }
   }
 }
@@ -573,76 +624,37 @@ ReadDataFromJson(
 
   int counter = 0;
   switch (dtype) {
-    case TYPE_BOOL: {
-      uint8_t* bool_tensor = reinterpret_cast<uint8_t*>(base->data());
-      ReadDataFromJsonHelper(bool_tensor, dtype, tensor_data, &counter);
+    case TYPE_BOOL:
+    case TYPE_UINT8:
+    case TYPE_UINT16:
+    case TYPE_UINT32:
+    case TYPE_UINT64:
+    case TYPE_INT8:
+    case TYPE_INT16:
+    case TYPE_INT32:
+    case TYPE_INT64:
+    case TYPE_FP32:
+    case TYPE_FP64:
+    case TYPE_STRING: {
+      ReadDataFromJsonHelper(base, dtype, tensor_data, &counter);
       break;
     }
-    case TYPE_UINT8: {
-      uint8_t* uint8_t_tensor = reinterpret_cast<uint8_t*>(base->data());
-      ReadDataFromJsonHelper(uint8_t_tensor, dtype, tensor_data, &counter);
-      break;
-    }
-    case TYPE_UINT16: {
-      uint16_t* uint16_t_tensor = reinterpret_cast<uint16_t*>(base->data());
-      ReadDataFromJsonHelper(uint16_t_tensor, dtype, tensor_data, &counter);
-      break;
-    }
-    case TYPE_UINT32: {
-      uint32_t* uint32_t_tensor = reinterpret_cast<uint32_t*>(base->data());
-      ReadDataFromJsonHelper(uint32_t_tensor, dtype, tensor_data, &counter);
-      break;
-    }
-    case TYPE_UINT64: {
-      uint64_t* uint64_t_tensor = reinterpret_cast<uint64_t*>(base->data());
-      ReadDataFromJsonHelper(uint64_t_tensor, dtype, tensor_data, &counter);
-      break;
-    }
-    case TYPE_INT8: {
-      int8_t* int8_t_tensor = reinterpret_cast<int8_t*>(base->data());
-      ReadDataFromJsonHelper(int8_t_tensor, dtype, tensor_data, &counter);
-    } break;
-    case TYPE_INT16: {
-      int16_t* int16_t_tensor = reinterpret_cast<int16_t*>(base->data());
-      ReadDataFromJsonHelper(int16_t_tensor, dtype, tensor_data, &counter);
-    } break;
-    case TYPE_INT32: {
-      int32_t* int32_t_tensor = reinterpret_cast<int32_t*>(base->data());
-      ReadDataFromJsonHelper(int32_t_tensor, dtype, tensor_data, &counter);
-      break;
-    }
-    case TYPE_INT64: {
-      int64_t* int64_t_tensor = reinterpret_cast<int64_t*>(base->data());
-      ReadDataFromJsonHelper(int64_t_tensor, dtype, tensor_data, &counter);
-      break;
-    }
-    // FP16 needs a work around
+    // FP16 not supported via JSON
     case TYPE_FP16: {
-      // float* float16_tensor = reinterpret_cast<float*>(base->data());
-      // ReadDataFromJsonHelper(float16_t_tensor, dtype, tensor_data,
-      // &counter);
-      break;
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "receiving FP16 data via JSON is not supported. Please use the "
+              "binary data format for input " +
+              std::string(request_input["name"].GetString()))
+              .c_str());
     }
-    case TYPE_FP32: {
-      float* float_tensor = reinterpret_cast<float*>(base->data());
-      ReadDataFromJsonHelper(float_tensor, dtype, tensor_data, &counter);
-      break;
-    }
-    case TYPE_FP64: {
-      double* double_tensor = reinterpret_cast<double*>(base->data());
-      ReadDataFromJsonHelper(double_tensor, dtype, tensor_data, &counter);
-      break;
-    }
-    // BYTES (String) needs a work around
-    case TYPE_STRING:
-      break;
     case TYPE_INVALID: {
       return TRTSERVER_ErrorNew(
           TRTSERVER_ERROR_INVALID_ARG,
           std::string(
-              "invalid datatype " +
-              std::string(DataTypeToProtocolString(dtype)) + " of input " +
-              request_input["name"].GetString())
+              "invalid datatype for input " +
+              std::string(request_input["name"].GetString()))
               .c_str());
     }
     default:
@@ -657,24 +669,32 @@ void
 WriteDataToJsonHelper(
     rapidjson::Value* response_output_val,
     rapidjson::Document::AllocatorType& allocator,
-    const rapidjson::Value& shape, int shape_index, T* base, int* counter)
+    const rapidjson::Value& shape, int shape_index, T* base, int* counter,
+    const DataType dtype)
 {
   for (int i = 0; i < shape[shape_index].GetInt(); i++) {
     if ((shape_index + 1) != (int)shape.Size()) {
       rapidjson::Value response_output_array(rapidjson::kArrayType);
       WriteDataToJsonHelper(
           &response_output_array, allocator, shape, shape_index + 1, base,
-          counter);
+          counter, dtype);
       response_output_val->PushBack(response_output_array, allocator);
     } else {
-      rapidjson::Value data_val((T)(base[*counter]));
-      response_output_val->PushBack(data_val, allocator);
-      *counter += 1;
+      if (dtype != TYPE_STRING) {
+        rapidjson::Value data_val((T)(base[*counter]));
+        response_output_val->PushBack(data_val, allocator);
+        *counter += 1;
+      } else {
+        uint32_t* len = reinterpret_cast<uint32_t*>(base + *counter);
+        char* cstr = reinterpret_cast<char*>(base + *counter);
+        rapidjson::Value data_val(cstr, sizeof(uint32_t) + *len, allocator);
+        *counter += *len + sizeof(uint32_t);
+      }
     }
   }
 }
 
-void
+TRTSERVER_Error*
 WriteDataToJson(
     rapidjson::Value& response_output,
     rapidjson::Document::AllocatorType& allocator, void* base)
@@ -691,77 +711,83 @@ WriteDataToJson(
       case TYPE_BOOL: {
         uint8_t* bool_base = reinterpret_cast<uint8_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, bool_base, &counter);
+            &data_val, allocator, shape, 1, bool_base, &counter, dtype);
         break;
       }
       case TYPE_UINT8: {
         uint8_t* uint8_t_base = reinterpret_cast<uint8_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, uint8_t_base, &counter);
+            &data_val, allocator, shape, 1, uint8_t_base, &counter, dtype);
         break;
       }
       case TYPE_UINT16: {
         uint16_t* uint16_t_base = reinterpret_cast<uint16_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, uint16_t_base, &counter);
+            &data_val, allocator, shape, 1, uint16_t_base, &counter, dtype);
         break;
       }
       case TYPE_UINT32: {
         uint32_t* uint32_t_base = reinterpret_cast<uint32_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, uint32_t_base, &counter);
+            &data_val, allocator, shape, 1, uint32_t_base, &counter, dtype);
         break;
       }
       case TYPE_UINT64: {
         uint64_t* uint64_t_base = reinterpret_cast<uint64_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, uint64_t_base, &counter);
+            &data_val, allocator, shape, 1, uint64_t_base, &counter, dtype);
         break;
       }
       case TYPE_INT8: {
         int8_t* int8_t_base = reinterpret_cast<int8_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, int8_t_base, &counter);
+            &data_val, allocator, shape, 1, int8_t_base, &counter, dtype);
       } break;
       case TYPE_INT16: {
         int16_t* int16_t_base = reinterpret_cast<int16_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, int16_t_base, &counter);
+            &data_val, allocator, shape, 1, int16_t_base, &counter, dtype);
       } break;
       case TYPE_INT32: {
         int32_t* int32_t_base = reinterpret_cast<int32_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, int32_t_base, &counter);
+            &data_val, allocator, shape, 1, int32_t_base, &counter, dtype);
         break;
       }
       case TYPE_INT64: {
         int64_t* int64_t_base = reinterpret_cast<int64_t*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, int64_t_base, &counter);
+            &data_val, allocator, shape, 1, int64_t_base, &counter, dtype);
         break;
       }
-      // FP16 needs a work around
+      // FP16 not supported via JSON
       case TYPE_FP16: {
-        // float16* float16_base = reinterpret_cast<float16*>(base);
-        // WriteDataToJsonHelper(
-        //     &data_val, allocator, shape, 1, float16_base, &counter);
-        break;
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "sending FP16 data via JSON is not supported. Please use the "
+                "binary data format for output " +
+                std::string(response_output["name"].GetString()))
+                .c_str());
       }
       case TYPE_FP32: {
         float* float_base = reinterpret_cast<float*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, float_base, &counter);
+            &data_val, allocator, shape, 1, float_base, &counter, dtype);
         break;
       }
       case TYPE_FP64: {
         double* double_base = reinterpret_cast<double*>(base);
         WriteDataToJsonHelper(
-            &data_val, allocator, shape, 1, double_base, &counter);
+            &data_val, allocator, shape, 1, double_base, &counter, dtype);
         break;
       }
-      // BYTES (String) needs a work around
-      case TYPE_STRING:
+      case TYPE_STRING: {
+        char* char_base = reinterpret_cast<char*>(base);
+        WriteDataToJsonHelper(
+            &data_val, allocator, shape, 1, char_base, &counter, dtype);
         break;
+      }
       case TYPE_INVALID: {
         break;
       }
@@ -772,6 +798,8 @@ WriteDataToJson(
   }
 
   response_output.AddMember("data", data_array, allocator);
+
+  return nullptr;
 }
 
 void
@@ -1688,7 +1716,6 @@ HTTPAPIServerV2::EVBufferToInput(
   int v_idx = 0;
 
   int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
-  LOG_VERBOSE(1) << "n: " << n;
   if (n > 0) {
     v = static_cast<struct evbuffer_iovec*>(
         alloca(sizeof(struct evbuffer_iovec) * n));
@@ -1708,11 +1735,7 @@ HTTPAPIServerV2::EVBufferToInput(
     buffer_len = header_length;
   }
 
-  LOG_VERBOSE(1) << "header_length: " << buffer_len;
-  LOG_VERBOSE(1) << "total_lenght: " << evbuffer_get_length(input_buffer);
-
   RETURN_IF_ERR(EVBufferToJson(&request_json, v, &v_idx, buffer_len, n));
-  LOG_VERBOSE(1) << "v_idx: " << v_idx;
 
   // Set InferenceRequest request_id
   auto itr = request_json.FindMember("id");
@@ -1746,7 +1769,6 @@ HTTPAPIServerV2::EVBufferToInput(
           irequest, input_name, nullptr, 0 /* byte_size */,
           TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
     } else if (binary_input) {
-      LOG_VERBOSE(1) << "byte_size: " << byte_size;
       if (header_length == 0) {
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INVALID_ARG,
@@ -1770,8 +1792,6 @@ HTTPAPIServerV2::EVBufferToInput(
           v_idx++;
         }
 
-        LOG_VERBOSE(1) << "v_idx: " << v_idx;
-        LOG_VERBOSE(1) << "byte_size: " << byte_size;
         RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
             irequest, input_name, base, base_size, TRTSERVER_MEMORY_CPU,
             0 /* memory_type_id */));
@@ -1821,12 +1841,19 @@ HTTPAPIServerV2::EVBufferToInput(
           }
         }
 
-        byte_size = element_cnt * GetDataTypeByteSize(dtype);
-        if (byte_size == 0) {
+        if (element_cnt == 0) {
           RETURN_IF_ERR(TRTSERVER2_InferenceRequestAppendInputData(
               irequest, input_name, nullptr, 0 /* byte_size */,
               TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
         } else {
+          size_t dtype_size = GetDataTypeByteSize(dtype);
+          if (dtype_size == 0) {
+            const rapidjson::Value& tensor_data = request_input["data"];
+            GetDataByteSizeFromJson(tensor_data, &byte_size);
+          } else {
+            byte_size = element_cnt * dtype_size;
+          }
+
           infer_req->response_meta_data_.request_buffer_[i].resize(byte_size);
           RETURN_IF_ERR(ReadDataFromJson(
               request_input, &infer_req->response_meta_data_.request_buffer_[i],
@@ -2125,8 +2152,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       err = TRTSERVER2_InferenceRequestOutputShape(
           request, output_name, &shape_vec[0], &dim_count);
       if (err != nullptr) {
-        EVBufferAddErrorJson(req_->buffer_out, err);
-        return EVHTP_RES_BADREQ;
+        break;
       }
 
       rapidjson::Value shape_array(rapidjson::kArrayType);
@@ -2139,8 +2165,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       err = TRTSERVER2_InferenceRequestOutputDataType(
           request, output_name, &datatype);
       if (err != nullptr) {
-        EVBufferAddErrorJson(req_->buffer_out, err);
-        return EVHTP_RES_BADREQ;
+        break;
       }
 
       rapidjson::Value datatype_val(datatype, strlen(datatype));
@@ -2154,8 +2179,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
           request, output_name, &base, &byte_size, &memory_type,
           &memory_type_id);
       if (err != nullptr) {
-        EVBufferAddErrorJson(req_->buffer_out, err);
-        return EVHTP_RES_BADREQ;
+        break;
       }
 
       if (CheckBinaryOutputData(request_output)) {
@@ -2178,8 +2202,11 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
         if (!CheckSharedMemoryData(
                 request_output, &shm_region, &offset, &byte_size)) {
           // Write outputs into json array (if not shared memory)
-          WriteDataToJson(
+          err = WriteDataToJson(
               output_metadata[i], allocator, const_cast<void*>(base));
+          if (err != nullptr) {
+            break;
+          }
         }
       }
     } else {
@@ -2188,8 +2215,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       err = TRTSERVER2_InferenceRequestOutputClassBatchSize(
           request, output_name, &batch_size);
       if (err != nullptr) {
-        EVBufferAddErrorJson(req_->buffer_out, err);
-        return EVHTP_RES_BADREQ;
+        break;
       }
 
       rapidjson::Value shape_array(rapidjson::kArrayType);
@@ -2206,8 +2232,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       err = TRTSERVER2_InferenceRequestOutputClasses(
           request, output_name, idx.data(), value.data(), label.data());
       if (err != nullptr) {
-        EVBufferAddErrorJson(req_->buffer_out, err);
-        return EVHTP_RES_BADREQ;
+        break;
       }
 
       std::vector<std::string> class_string(batch_size * class_size);
@@ -2239,26 +2264,33 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
   }
   response_json.AddMember("outputs", response_outputs, allocator);
 
-  // write json metadata into evbuffer
-  rapidjson::StringBuffer buffer;
-  buffer.Clear();
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  response_meta_data_.response_json_.Accept(writer);
-  const char* response_metadata = buffer.GetString();
-  size_t json_length = strlen(response_metadata);
-  evbuffer_add(req_->buffer_out, response_metadata, json_length);
-  evbuffer_add_buffer(req_->buffer_out, binary_buf);
-  evhtp_headers_add_header(
-      req_->headers_out,
-      evhtp_header_new("Content-Type", "application/json", 1, 1));
-  if (has_binary) {
+  evhtp_res status = (err == nullptr) ? EVHTP_RES_OK : EVHTP_RES_BADREQ;
+  TRTSERVER_ErrorDelete(err);
+
+  if (status == EVHTP_RES_BADREQ) {
+    EVBufferAddErrorJson(req_->buffer_out, err);
+  } else {
+    // write json metadata into evbuffer followed by binary buffer
+    rapidjson::StringBuffer buffer;
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    response_meta_data_.response_json_.Accept(writer);
+    const char* response_metadata = buffer.GetString();
+    size_t json_length = strlen(response_metadata);
+    evbuffer_add(req_->buffer_out, response_metadata, json_length);
+    evbuffer_add_buffer(req_->buffer_out, binary_buf);
     evhtp_headers_add_header(
-        req_->headers_out, evhtp_header_new(
-                               kInferHeaderContentLengthHTTPHeader,
-                               std::to_string(json_length).c_str(), 1, 1));
+        req_->headers_out,
+        evhtp_header_new("Content-Type", "application/json", 1, 1));
+    if (has_binary) {
+      evhtp_headers_add_header(
+          req_->headers_out, evhtp_header_new(
+                                 kInferHeaderContentLengthHTTPHeader,
+                                 std::to_string(json_length).c_str(), 1, 1));
+    }
   }
 
-  return (err == nullptr) ? EVHTP_RES_OK : EVHTP_RES_BADREQ;
+  return status;
 }
 
 TRTSERVER_Error*
