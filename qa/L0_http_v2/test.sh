@@ -89,7 +89,7 @@ for i in \
         python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
-            cat $CLIENT_LOG
+            cat $CLIENT_LOG.${SUFFIX}
             RET=1
         fi
     else

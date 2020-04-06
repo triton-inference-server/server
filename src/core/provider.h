@@ -60,6 +60,7 @@ class InferResponseProvider {
       TRTSERVER_ResponseAllocator* allocator,
       TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
       TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
+      const uint32_t protocol_version,
       std::shared_ptr<InferResponseProvider>* infer_provider);
 
   static Status Create(
@@ -68,6 +69,7 @@ class InferResponseProvider {
       TRITONSERVER_ResponseAllocator* allocator,
       TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
       TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn,
+      const uint32_t protocol_version,
       std::shared_ptr<InferResponseProvider>* infer_provider);
 
   ~InferResponseProvider();
@@ -104,14 +106,11 @@ class InferResponseProvider {
       const std::string& name, const void** content, size_t* content_byte_size,
       TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const;
 
-  // Get the classification results of an output. 'content' will be set to
-  // a flatten array of classification results as C strings. 'count' will be the
-  // number of results.
-  // Success is returned only if the output is requested for classification and
-  // FinalizeResponse() is called.
-  Status OutputClassifications(
-      const std::string& name, const char* const** content,
-      size_t* count) const;
+  // Get the shape of an output buffer. Error is
+  // returned if the buffer is not already allocated.
+  Status OutputShape(
+      const std::string& name, const int64_t** shape,
+      uint64_t* dim_count) const;
 
   // Get label provider.
   const std::shared_ptr<LabelProvider>& GetLabelProvider() const
@@ -137,14 +136,16 @@ class InferResponseProvider {
       const std::shared_ptr<LabelProvider>& label_provider,
       TRTSERVER_ResponseAllocator* allocator,
       TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
-      TRTSERVER_ResponseAllocatorReleaseFn_t release_fn);
+      TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
+      const uint32_t protocol_version);
 
   InferResponseProvider(
       const std::shared_ptr<InferenceRequest>& irequest,
       const std::shared_ptr<LabelProvider>& label_provider,
       TRITONSERVER_ResponseAllocator* allocator,
       TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
-      TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn);
+      TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn,
+      const uint32_t protocol_version);
 
   std::shared_ptr<InferenceRequest> irequest_;
 
@@ -165,9 +166,8 @@ class InferResponseProvider {
 
     // Created buffer for non-RAW results
     std::unique_ptr<char[]> buffer_;
-    std::vector<std::string> cls_contents_;
-    // Array that points to classification contents
-    std::vector<const char*> cls_array_;
+    // Classification contents in binary format (length bytes + raw data)
+    std::vector<char> cls_contents_;
 
     void* release_buffer_;
     void* release_userp_;
@@ -193,6 +193,9 @@ class InferResponseProvider {
   TRITONSERVER_ResponseAllocator* triton_allocator_;
   TRITONSERVER_ResponseAllocatorAllocFn_t triton_alloc_fn_;
   TRITONSERVER_ResponseAllocatorReleaseFn_t triton_release_fn_;
+
+  // FIXMEV2 use to differentiate how outputs should be represented
+  const uint32_t protocol_version_;
 
   InferResponseHeader response_header_;
 };

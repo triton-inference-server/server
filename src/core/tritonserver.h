@@ -698,20 +698,6 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceRequestOutputData(
     const void** base, size_t* byte_size, TRITONSERVER_Memory_Type* memory_type,
     int64_t* memory_type_id);
 
-/// Get the classification results of a named output.
-/// \param inference_request The request object.
-/// \param name The name of the output.
-/// \param content Returns the flatten array of the classification results.
-/// The returned value is owned by 'inference_request' and must not be modified
-/// or freed by the caller.
-/// \param shape Buffer where the shape of the output is returned, the buffer
-/// must be able to hold at least two elements.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestOutputClasses(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    const char* const** content, int64_t* shape);
-
 /// Remove all the output tensors. The meta data of the output tensors will
 /// become unaccesible and the result data will be released.
 /// \param inference_request The request object.

@@ -46,49 +46,83 @@ namespace {
 template <typename T>
 void
 AddClassResults(
-    InferResponseHeader::Output* poutput, std::vector<std::string>* poutput_cls,
+    InferResponseHeader::Output* poutput, std::vector<char>* poutput_cls,
     char* poutput_buffer, const size_t batch1_element_count,
     const size_t batch_size, const size_t cls_count,
     const std::shared_ptr<LabelProvider>& label_provider,
-    const InferResponseProvider::SecondaryLabelProviderMap& lookup_map)
+    const InferResponseProvider::SecondaryLabelProviderMap& lookup_map,
+    const uint32_t protocol_version)
 {
   T* probs = reinterpret_cast<T*>(poutput_buffer);
   const size_t entry_cnt = batch1_element_count;
   const size_t class_cnt = std::min(cls_count, entry_cnt);
   std::vector<size_t> idx(entry_cnt);
 
+  std::vector<std::string> raw_cls_contents;
+  size_t total_raw_size = 0;
   for (size_t i = 0; i < batch_size; ++i) {
     iota(idx.begin(), idx.end(), 0);
     sort(idx.begin(), idx.end(), [&probs](size_t i1, size_t i2) {
       return probs[i1] > probs[i2];
     });
 
-    auto bcls = poutput->add_batch_classes();
-    for (size_t k = 0; k < class_cnt; ++k) {
-      auto cls = bcls->add_cls();
-      cls->set_idx(idx[k]);
-      const auto& label = label_provider->GetLabel(poutput->name(), idx[k]);
-      cls->set_label(label);
+    if (protocol_version == 1) {
+      auto bcls = poutput->add_batch_classes();
+      for (size_t k = 0; k < class_cnt; ++k) {
+        auto cls = bcls->add_cls();
+        cls->set_idx(idx[k]);
+        const auto& label = label_provider->GetLabel(poutput->name(), idx[k]);
+        cls->set_label(label);
 
-      if (label == "" && !lookup_map.empty()) {
-        auto it = lookup_map.find(poutput->name());
-        if (it != lookup_map.end()) {
-          cls->set_label(it->second.second->GetLabel(it->second.first, idx[k]));
+        if (label == "" && !lookup_map.empty()) {
+          auto it = lookup_map.find(poutput->name());
+          if (it != lookup_map.end()) {
+            cls->set_label(
+                it->second.second->GetLabel(it->second.first, idx[k]));
+          }
         }
-      }
 
-      cls->set_value(static_cast<float>(probs[idx[k]]));
-
-      std::string cls_content =
-          std::to_string(cls->idx()) + ":" + std::to_string(cls->value());
-      if (!cls->label().empty()) {
-        cls_content += ":";
-        cls_content += cls->label();
+        cls->set_value(static_cast<float>(probs[idx[k]]));
       }
-      poutput_cls->emplace_back(std::move(cls_content));
+    } else {
+      for (size_t k = 0; k < class_cnt; ++k) {
+        std::string cls_content =
+            std::to_string(idx[k]) + ":" +
+            std::to_string(static_cast<float>(probs[idx[k]]));
+
+        const auto& label = label_provider->GetLabel(poutput->name(), idx[k]);
+        if (!label.empty()) {
+          cls_content += ":";
+          cls_content += label;
+        } else if (!lookup_map.empty()) {
+          auto it = lookup_map.find(poutput->name());
+          if (it != lookup_map.end()) {
+            cls_content += ":";
+            cls_content +=
+                it->second.second->GetLabel(it->second.first, idx[k]);
+          }
+        }
+
+        total_raw_size += cls_content.size();
+        raw_cls_contents.emplace_back(std::move(cls_content));
+      }
     }
 
     probs += entry_cnt;
+  }
+
+  if (protocol_version == 2) {
+    // Need to prepare cls results as "BYTES" tensor
+    poutput_cls->reserve(
+        sizeof(uint32_t) * raw_cls_contents.size() + total_raw_size);
+    size_t offset = 0;
+    char* base = poutput_cls->data();
+    for (const auto& raw_cls_str : raw_cls_contents) {
+      *(reinterpret_cast<uint32_t*>(base + offset)) = raw_cls_str.size();
+      offset += sizeof(uint32_t);
+      memcpy(base + offset, raw_cls_str.data(), raw_cls_str.size());
+      offset += raw_cls_str.size();
+    }
   }
 }
 
@@ -102,10 +136,12 @@ InferResponseProvider::InferResponseProvider(
     const std::shared_ptr<LabelProvider>& label_provider,
     TRTSERVER_ResponseAllocator* allocator,
     TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
-    TRTSERVER_ResponseAllocatorReleaseFn_t release_fn)
+    TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
+    const uint32_t protocol_version)
     : irequest_(irequest), label_provider_(label_provider),
       allocator_(allocator), alloc_fn_(alloc_fn), alloc_userp_(alloc_userp),
-      release_fn_(release_fn), using_triton_(false)
+      release_fn_(release_fn), using_triton_(false),
+      protocol_version_(protocol_version)
 {
   // Create a map from output name to the InferenceRequest::Output
   // object for that output.
@@ -120,11 +156,12 @@ InferResponseProvider::InferResponseProvider(
     const std::shared_ptr<LabelProvider>& label_provider,
     TRITONSERVER_ResponseAllocator* allocator,
     TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
-    TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn)
+    TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn,
+    const uint32_t protocol_version)
     : irequest_(irequest), label_provider_(label_provider),
       alloc_userp_(alloc_userp), using_triton_(true),
       triton_allocator_(allocator), triton_alloc_fn_(alloc_fn),
-      triton_release_fn_(release_fn)
+      triton_release_fn_(release_fn), protocol_version_(protocol_version)
 {
   // Create a map from output name to the InferenceRequest::Output
   // object for that output.
@@ -166,11 +203,18 @@ InferResponseProvider::OutputBufferContents(
     TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const
 {
   for (const auto& output : outputs_) {
-    if ((name == output.name_) && (output.cls_count_ == 0)) {
-      *content = output.ptr_;
-      *content_byte_size = output.byte_size_;
-      *memory_type = TrtMemTypeToTriton(output.memory_type_);
-      *memory_type_id = output.memory_type_id_;
+    if (name == output.name_) {
+      if ((output.cls_count_ == 0)) {
+        *content = output.ptr_;
+        *content_byte_size = output.byte_size_;
+        *memory_type = TrtMemTypeToTriton(output.memory_type_);
+        *memory_type_id = output.memory_type_id_;
+      } else {
+        *content = output.cls_contents_.data();
+        *content_byte_size = output.cls_contents_.size();
+        *memory_type = TRITONSERVER_MEMORY_CPU;
+        *memory_type_id = 0;
+      }
       return Status::Success;
     }
   }
@@ -181,21 +225,20 @@ InferResponseProvider::OutputBufferContents(
 }
 
 Status
-InferResponseProvider::OutputClassifications(
-    const std::string& name, const char* const** content, size_t* count) const
+InferResponseProvider::OutputShape(
+    const std::string& name, const int64_t** shape, uint64_t* dim_count) const
 {
   for (const auto& output : outputs_) {
-    if ((name == output.name_) && (output.cls_count_ != 0) &&
-        (output.cls_array_.size() != 0)) {
-      *content = output.cls_array_.data();
-      *count = output.cls_array_.size();
+    if (name == output.name_) {
+      *shape = output.shape_.data();
+      *dim_count = output.shape_.size();
       return Status::Success;
     }
   }
 
   return Status(
       Status::Code::UNAVAILABLE,
-      "request for output '" + name + "' that has no classification results");
+      "request for unallocated output '" + name + "'");
 }
 
 bool
@@ -265,7 +308,11 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
     poutput->set_name(output.name_);
 
     if (irequest_->ProtocolVersion() == 2) {
-      poutput->set_data_type(output_config->data_type());
+      if (output.cls_count_ == 0) {
+        poutput->set_data_type(output_config->data_type());
+      } else {
+        poutput->set_data_type(DataType::TYPE_STRING);
+      }
     }
 
     if (output.cls_count_ == 0) {
@@ -303,70 +350,95 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
       } else {
         poutput->mutable_raw()->mutable_dims()->MergeFrom(batch1_backend_shape);
       }
+
+      if (irequest_->ProtocolVersion() == 2) {
+        // override the output.shape_ to match the expected shape in v2
+        output.shape_.clear();
+        for (const auto d : poutput->raw().dims()) {
+          output.shape_.push_back(d);
+        }
+      }
     } else {
+      if (irequest_->ProtocolVersion() == 2) {
+        // override the output.shape_ to match the expected shape in v2
+        output.shape_.clear();
+        output.shape_.push_back(batch_size);
+        output.shape_.push_back(output.cls_count_);
+      }
+
       // Class result...
       switch (output_config->data_type()) {
         case DataType::TYPE_UINT8:
           AddClassResults<uint8_t>(
               poutput, &output.cls_contents_, output.buffer_.get(),
               batch1_element_count, batch_size, output.cls_count_,
-              label_provider_, secondary_label_provider_map_);
+              label_provider_, secondary_label_provider_map_,
+              protocol_version_);
           break;
         case DataType::TYPE_UINT16:
           AddClassResults<uint16_t>(
               poutput, &output.cls_contents_, output.buffer_.get(),
               batch1_element_count, batch_size, output.cls_count_,
-              label_provider_, secondary_label_provider_map_);
+              label_provider_, secondary_label_provider_map_,
+              protocol_version_);
           break;
         case DataType::TYPE_UINT32:
           AddClassResults<uint32_t>(
               poutput, &output.cls_contents_, output.buffer_.get(),
               batch1_element_count, batch_size, output.cls_count_,
-              label_provider_, secondary_label_provider_map_);
+              label_provider_, secondary_label_provider_map_,
+              protocol_version_);
           break;
         case DataType::TYPE_UINT64:
           AddClassResults<uint64_t>(
               poutput, &output.cls_contents_, output.buffer_.get(),
               batch1_element_count, batch_size, output.cls_count_,
-              label_provider_, secondary_label_provider_map_);
+              label_provider_, secondary_label_provider_map_,
+              protocol_version_);
           break;
 
         case DataType::TYPE_INT8:
           AddClassResults<int8_t>(
               poutput, &output.cls_contents_, output.buffer_.get(),
               batch1_element_count, batch_size, output.cls_count_,
-              label_provider_, secondary_label_provider_map_);
+              label_provider_, secondary_label_provider_map_,
+              protocol_version_);
           break;
         case DataType::TYPE_INT16:
           AddClassResults<int16_t>(
               poutput, &output.cls_contents_, output.buffer_.get(),
               batch1_element_count, batch_size, output.cls_count_,
-              label_provider_, secondary_label_provider_map_);
+              label_provider_, secondary_label_provider_map_,
+              protocol_version_);
           break;
         case DataType::TYPE_INT32:
           AddClassResults<int32_t>(
               poutput, &output.cls_contents_, output.buffer_.get(),
               batch1_element_count, batch_size, output.cls_count_,
-              label_provider_, secondary_label_provider_map_);
+              label_provider_, secondary_label_provider_map_,
+              protocol_version_);
           break;
         case DataType::TYPE_INT64:
           AddClassResults<int64_t>(
               poutput, &output.cls_contents_, output.buffer_.get(),
               batch1_element_count, batch_size, output.cls_count_,
-              label_provider_, secondary_label_provider_map_);
+              label_provider_, secondary_label_provider_map_,
+              protocol_version_);
           break;
 
         case DataType::TYPE_FP32:
           AddClassResults<float>(
               poutput, &output.cls_contents_, output.buffer_.get(),
               batch1_element_count, batch_size, output.cls_count_,
-              label_provider_, secondary_label_provider_map_);
+              label_provider_, secondary_label_provider_map_,
+              protocol_version_);
           break;
         case DataType::TYPE_FP64:
           AddClassResults<double>(
               poutput, &output.cls_contents_, output.buffer_.get(),
               batch1_element_count, batch_size, output.cls_count_,
-              label_provider_, secondary_label_provider_map_);
+              label_provider_, secondary_label_provider_map_,
+              protocol_version_);
           break;
 
         default:
@@ -375,9 +447,6 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
               "class result not available for output '" + output.name_ +
                   "' due to unsupported type '" +
                   DataType_Name(output_config->data_type()) + "'");
-      }
-      for (const auto& cls_content : output.cls_contents_) {
-        output.cls_array_.push_back(cls_content.c_str());
       }
     }
 
@@ -394,10 +463,12 @@ InferResponseProvider::Create(
     TRTSERVER_ResponseAllocator* allocator,
     TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
     TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
+    const uint32_t protocol_version,
     std::shared_ptr<InferResponseProvider>* infer_provider)
 {
   InferResponseProvider* provider = new InferResponseProvider(
-      irequest, label_provider, allocator, alloc_fn, alloc_userp, release_fn);
+      irequest, label_provider, allocator, alloc_fn, alloc_userp, release_fn,
+      protocol_version);
   infer_provider->reset(provider);
 
   return Status::Success;
@@ -410,10 +481,12 @@ InferResponseProvider::Create(
     TRITONSERVER_ResponseAllocator* allocator,
     TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
     TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn,
+    const uint32_t protocol_version,
     std::shared_ptr<InferResponseProvider>* infer_provider)
 {
   InferResponseProvider* provider = new InferResponseProvider(
-      irequest, label_provider, allocator, alloc_fn, alloc_userp, release_fn);
+      irequest, label_provider, allocator, alloc_fn, alloc_userp, release_fn,
+      protocol_version);
   infer_provider->reset(provider);
 
   return Status::Success;

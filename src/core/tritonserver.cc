@@ -1689,21 +1689,6 @@ TRITONSERVER_InferenceRequestOutputData(
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestOutputClasses(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    const char* const** content, int64_t* shape)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  size_t count;
-  RETURN_IF_STATUS_ERROR(
-      lrequest->Response()->OutputClassifications(name, content, &count));
-  shape[0] = lrequest->Response()->ResponseHeader().batch_size();
-  shape[1] = count / lrequest->Response()->ResponseHeader().batch_size();
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestOutputDataType(
     TRITONSERVER_InferenceRequest* inference_request, const char* name,
     const char** datatype)
@@ -1729,24 +1714,9 @@ TRITONSERVER_InferenceRequestOutputShape(
 {
   TritonInferenceRequest* lrequest =
       reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  const auto& response_header = lrequest->Response()->ResponseHeader();
-  for (const auto& output : response_header.output()) {
-    if (output.name() == name) {
-      if (!output.has_raw()) {
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            "output shape not available for classification");
-      }
-
-      *dim_count = output.raw().dims_size();
-      *shape = output.raw().dims().data();
-
-      return nullptr;  // Success
-    }
-  }
-
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_INVALID_ARG, "unknown output");
+  RETURN_IF_STATUS_ERROR(
+      lrequest->Response()->OutputShape(name, shape, dim_count));
+  return nullptr;  // Success
 }
 
 TRITONSERVER_Error*
@@ -1801,7 +1771,8 @@ TRITONSERVER_ServerInferAsync(
     RETURN_IF_STATUS_ERROR(ni::InferResponseProvider::Create(
         lrequest, lbackend->GetLabelProvider(), response_allocator,
         lresponsealloc->AllocFn(), response_allocator_userp,
-        lresponsealloc->ReleaseFn(), &del_response_provider));
+        lresponsealloc->ReleaseFn(), 2 /* protocol_version */,
+        &del_response_provider));
     infer_response_provider = std::move(del_response_provider);
   }
 

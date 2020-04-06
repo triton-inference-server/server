@@ -1920,101 +1920,65 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     rapidjson::Value name_val(output_name, strlen(output_name));
     output_metadata[i].AddMember("name", name_val, allocator);
 
-    uint64_t class_size = 0;
-    if (!CheckClassificationOutput(request_output, &class_size)) {
-      uint64_t dim_count;
-      const int64_t* shape_vec;
-      err = TRITONSERVER_InferenceRequestOutputShape(
-          request, output_name, &shape_vec, &dim_count);
-      if (err != nullptr) {
-        break;
-      }
+    uint64_t dim_count;
+    const int64_t* shape_vec;
+    err = TRITONSERVER_InferenceRequestOutputShape(
+        request, output_name, &shape_vec, &dim_count);
+    if (err != nullptr) {
+      break;
+    }
 
-      rapidjson::Value shape_array(rapidjson::kArrayType);
-      for (size_t i = 0; i < dim_count; i++) {
-        shape_array.PushBack(shape_vec[i], allocator);
-      }
-      output_metadata[i].AddMember("shape", shape_array, allocator);
+    rapidjson::Value shape_array(rapidjson::kArrayType);
+    for (size_t i = 0; i < dim_count; i++) {
+      shape_array.PushBack(shape_vec[i], allocator);
+    }
+    output_metadata[i].AddMember("shape", shape_array, allocator);
 
-      const char* datatype;
-      err = TRITONSERVER_InferenceRequestOutputDataType(
-          request, output_name, &datatype);
-      if (err != nullptr) {
-        break;
-      }
+    const char* datatype;
+    err = TRITONSERVER_InferenceRequestOutputDataType(
+        request, output_name, &datatype);
+    if (err != nullptr) {
+      break;
+    }
 
-      rapidjson::Value datatype_val(datatype, strlen(datatype));
-      output_metadata[i].AddMember("datatype", datatype_val, allocator);
+    rapidjson::Value datatype_val(datatype, strlen(datatype));
+    output_metadata[i].AddMember("datatype", datatype_val, allocator);
 
-      const void* base;
-      size_t byte_size;
-      TRITONSERVER_Memory_Type memory_type;
-      int64_t memory_type_id;
-      err = TRITONSERVER_InferenceRequestOutputData(
-          request, output_name, &base, &byte_size, &memory_type,
-          &memory_type_id);
-      if (err != nullptr) {
-        break;
-      }
+    const void* base;
+    size_t byte_size;
+    TRITONSERVER_Memory_Type memory_type;
+    int64_t memory_type_id;
+    err = TRITONSERVER_InferenceRequestOutputData(
+        request, output_name, &base, &byte_size, &memory_type,
+        &memory_type_id);
+    if (err != nullptr) {
+      break;
+    }
 
-      if (CheckBinaryOutputData(request_output)) {
-        // Write outputs into binary buffer. Copy it after JSON buffer
-        has_binary = true;
-        evbuffer_add(binary_buf, base, byte_size);
-        rapidjson::Value binary_size_val(byte_size);
-        auto itr = output_metadata[i].FindMember("parameters");
-        if (itr != output_metadata[i].MemberEnd()) {
-          itr->value.AddMember("binary_data_size", binary_size_val, allocator);
-        } else {
-          rapidjson::Value params;
-          params.SetObject();
-          params.AddMember("binary_data_size", binary_size_val, allocator);
-          output_metadata[i].AddMember("parameters", params, allocator);
-        }
+    if (CheckBinaryOutputData(request_output)) {
+      // Write outputs into binary buffer. Copy it after JSON buffer
+      has_binary = true;
+      evbuffer_add(binary_buf, base, byte_size);
+      rapidjson::Value binary_size_val(byte_size);
+      auto itr = output_metadata[i].FindMember("parameters");
+      if (itr != output_metadata[i].MemberEnd()) {
+        itr->value.AddMember("binary_data_size", binary_size_val, allocator);
       } else {
-        uint64_t offset = 0, byte_size = 0;
-        const char* shm_region = nullptr;
-        if (!CheckSharedMemoryData(
-                request_output, &shm_region, &offset, &byte_size)) {
-          // Write outputs into json array (if not shared memory)
-          err = WriteDataToJson(
-              output_metadata[i], allocator, const_cast<void*>(base));
-          if (err != nullptr) {
-            break;
-          }
-        }
+        rapidjson::Value params;
+        params.SetObject();
+        params.AddMember("binary_data_size", binary_size_val, allocator);
+        output_metadata[i].AddMember("parameters", params, allocator);
       }
     } else {
-      // Case when output uses classification
-      const char* const* cls_res = nullptr;
-      int64_t shape[2];
-      err = TRITONSERVER_InferenceRequestOutputClasses(
-          request, output_name, &cls_res, shape);
-      if (err != nullptr) {
-        break;
+      uint64_t offset = 0, byte_size = 0;
+      const char* shm_region = nullptr;
+      if (!CheckSharedMemoryData(
+              request_output, &shm_region, &offset, &byte_size)) {
+        // Write outputs into json array (if not shared memory)
+        WriteDataToJson(output_metadata[i], allocator, const_cast<void*>(base));
       }
-
-      rapidjson::Value shape_array(rapidjson::kArrayType);
-      shape_array.PushBack(shape[0], allocator);
-      shape_array.PushBack(shape[1], allocator);
-      output_metadata[i].AddMember("shape", shape_array, allocator);
-
-      rapidjson::Value datatype_val("BYTES", allocator);
-      output_metadata[i].AddMember("datatype", datatype_val, allocator);
-
-      rapidjson::Value batch_class_array(rapidjson::kArrayType);
-      size_t count = 0;
-      for (int64_t i = 0; i < shape[0]; i++) {
-        rapidjson::Value class_array(rapidjson::kArrayType);
-        for (int64_t j = 0; j < shape[1]; j++) {
-          class_array.PushBack(rapidjson::StringRef(cls_res[count]), allocator);
-          count++;
-        }
-        batch_class_array.PushBack(class_array, allocator);
-      }
-
-      output_metadata[i].AddMember("data", batch_class_array, allocator);
     }
+
     response_outputs.PushBack(output_metadata[i], allocator);
   }
   response_json.AddMember("outputs", response_outputs, allocator);

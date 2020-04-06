@@ -2487,44 +2487,49 @@ ModelInferHandler::InferComplete(
   TRITONSERVER_Error* err = TRITONSERVER_InferenceRequestError(request);
   if (err == nullptr) {
     for (auto& output : *(response.mutable_outputs())) {
-      uint32_t cls_count = 0;
-      err = TRITONSERVER_InferenceRequestRequestedOutputClassificationCount(
-          request, output.name().c_str(), &cls_count);
+      const int64_t* shape;
+      uint64_t dim_count;
+      const char* datatype;
+      err = TRITONSERVER_InferenceRequestOutputShape(
+          request, output.name().c_str(), &shape, &dim_count);
+      if (err == nullptr) {
+        err = TRITONSERVER_InferenceRequestOutputDataType(
+            request, output.name().c_str(), &datatype);
+      }
       if (err != nullptr) {
         break;
       }
 
-      if (cls_count == 0) {
-        const int64_t* shape;
-        uint64_t dim_count;
-        const char* datatype;
-        err = TRITONSERVER_InferenceRequestOutputShape(
-            request, output.name().c_str(), &shape, &dim_count);
-        if (err == nullptr) {
-          err = TRITONSERVER_InferenceRequestOutputDataType(
-              request, output.name().c_str(), &datatype);
-        }
-        if (err != nullptr) {
-          break;
-        }
+      for (size_t idx = 0; idx < dim_count; idx++) {
+        output.add_shape(shape[idx]);
+      }
+      output.set_datatype(datatype);
 
-        for (size_t idx = 0; idx < dim_count; idx++) {
-          output.add_shape(shape[idx]);
+      // Check if the output is classification results
+      // (no raw_contents and not using shared memory)
+      if (output.contents().raw_contents().size() == 0) {
+        if ((state->alloc_payload_.shm_map_ == nullptr) ||
+            (state->alloc_payload_.shm_map_->find(output.name()) ==
+             state->alloc_payload_.shm_map_->end())) {
+          size_t element_cnt = shape[0] * shape[1];
+          const char* base;
+          size_t byte_size;
+          TRITONSERVER_Memory_Type mem_type;
+          int64_t mem_id;
+          err = TRITONSERVER_InferenceRequestOutputData(
+              request, output.name().c_str(), (const void**)&base, &byte_size,
+              &mem_type, &mem_id);
+          if (err != nullptr) {
+            break;
+          }
+          size_t offset = 0;
+          for (size_t idx = 0; idx < element_cnt; idx++) {
+            size_t length = *(reinterpret_cast<const uint32_t*>(base + offset));
+            offset += sizeof(uint32_t);
+            output.mutable_contents()->add_byte_contents(base + offset, length);
+            offset += length;
+          }
         }
-        output.set_datatype(datatype);
-      } else {
-        const char* const* content;
-        int64_t shape[2];
-        err = TRITONSERVER_InferenceRequestOutputClasses(
-            request, output.name().c_str(), &content, shape);
-        size_t element_cnt = shape[0] * shape[1];
-        for (size_t idx = 0; idx < element_cnt; idx++) {
-          output.mutable_contents()->add_byte_contents(content[idx]);
-        }
-        output.add_shape(shape[0]);
-        output.add_shape(shape[1]);
-
-        output.set_datatype("BYTES");
       }
     }
   }
@@ -2886,44 +2891,49 @@ ModelStreamInferHandler::StreamInferComplete(
   if (err == nullptr) {
     for (auto& output :
          *(response.mutable_infer_response()->mutable_outputs())) {
-      uint32_t cls_count = 0;
-      err = TRITONSERVER_InferenceRequestRequestedOutputClassificationCount(
-          request, output.name().c_str(), &cls_count);
+      const int64_t* shape;
+      uint64_t dim_count;
+      const char* datatype;
+      err = TRITONSERVER_InferenceRequestOutputShape(
+          request, output.name().c_str(), &shape, &dim_count);
+      if (err == nullptr) {
+        err = TRITONSERVER_InferenceRequestOutputDataType(
+            request, output.name().c_str(), &datatype);
+      }
       if (err != nullptr) {
         break;
       }
 
-      if (cls_count == 0) {
-        const int64_t* shape;
-        uint64_t dim_count;
-        const char* datatype;
-        err = TRITONSERVER_InferenceRequestOutputShape(
-            request, output.name().c_str(), &shape, &dim_count);
-        if (err == nullptr) {
-          err = TRITONSERVER_InferenceRequestOutputDataType(
-              request, output.name().c_str(), &datatype);
-        }
-        if (err != nullptr) {
-          break;
-        }
+      for (size_t idx = 0; idx < dim_count; idx++) {
+        output.add_shape(shape[idx]);
+      }
+      output.set_datatype(datatype);
 
-        for (size_t idx = 0; idx < dim_count; idx++) {
-          output.add_shape(shape[idx]);
+      // Check if the output is classification results
+      // (no raw_contents and not using shared memory)
+      if (output.contents().raw_contents().size() == 0) {
+        if ((state->alloc_payload_.shm_map_ == nullptr) ||
+            (state->alloc_payload_.shm_map_->find(output.name()) ==
+             state->alloc_payload_.shm_map_->end())) {
+          size_t element_cnt = shape[0] * shape[1];
+          const char* base;
+          size_t byte_size;
+          TRITONSERVER_Memory_Type mem_type;
+          int64_t mem_id;
+          err = TRITONSERVER_InferenceRequestOutputData(
+              request, output.name().c_str(), (const void**)&base, &byte_size,
+              &mem_type, &mem_id);
+          if (err != nullptr) {
+            break;
+          }
+          size_t offset = 0;
+          for (size_t idx = 0; idx < element_cnt; idx++) {
+            size_t length = *(reinterpret_cast<const uint32_t*>(base + offset));
+            offset += sizeof(uint32_t);
+            output.mutable_contents()->add_byte_contents(base + offset, length);
+            offset += length;
+          }
         }
-        output.set_datatype(datatype);
-      } else {
-        const char* const* content;
-        int64_t shape[2];
-        err = TRITONSERVER_InferenceRequestOutputClasses(
-            request, output.name().c_str(), &content, shape);
-        size_t element_cnt = shape[0] * shape[1];
-        for (size_t idx = 0; idx < element_cnt; idx++) {
-          output.mutable_contents()->add_byte_contents(content[idx]);
-        }
-        output.add_shape(shape[0]);
-        output.add_shape(shape[1]);
-
-        output.set_datatype("BYTES");
       }
     }
   }
