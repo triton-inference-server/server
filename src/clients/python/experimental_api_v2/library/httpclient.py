@@ -31,7 +31,6 @@ from urllib.parse import quote, quote_plus
 import rapidjson as json
 import numpy as np
 import gevent.pool
-import sys
 
 from tritonhttpclient.utils import *
 
@@ -1022,8 +1021,7 @@ class InferenceServerClient:
                                                timeout=timeout)
 
         request_body = json.dumps(infer_request)
-
-        json_size = sys.getsizeof(request_body)
+        json_size = len(request_body)
         has_binary_data = False
         for input_tensor in inputs:
             raw_data = input_tensor._get_binary_data()
@@ -1139,7 +1137,10 @@ class InferInput:
                     str(input_tensor.shape)[1:-1],
                     str(self._shape)[1:-1]))
         if not binary_data:
-            self._data = [val.item() for val in input_tensor.flatten()]
+            if self._datatype == "BYTES":
+                self._data = [val for val in input_tensor.flatten()]
+            else:
+                self._data = [val.item() for val in input_tensor.flatten()]
         else:
             if self._datatype == "BYTES":
                 self._raw_data = serialize_byte_tensor(input_tensor).tobytes()
