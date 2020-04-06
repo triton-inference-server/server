@@ -1738,15 +1738,6 @@ TRITONSERVER_InferenceRequestOutputShape(
             "output shape not available for classification");
       }
 
-      if ((uint64_t)output.raw().dims_size() > *dim_count) {
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            std::string(
-                "output shape has " + std::to_string(output.raw().dims_size()) +
-                " dimensions, shape buffer too small")
-                .c_str());
-      }
-
       *dim_count = output.raw().dims_size();
       *shape = output.raw().dims().data();
 
