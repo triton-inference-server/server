@@ -633,19 +633,6 @@ TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
     TRITONSERVER_InferenceRequest* inference_request, const char* name,
     uint32_t count);
 
-/// Get the classification count of the requested output.
-/// \param inference_request The request object.
-/// \param name The name of the output.
-/// \param count Indicates how many classification values will be
-/// returned for the output. The 'count' highest priority values are
-/// returned. A value of 0 indicates that the output tensor
-/// will not be returned as a classification.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestRequestedOutputClassificationCount(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    uint32_t* count);
-
 /// Return the error status of an inference request corresponding to
 /// the most recent call to TRITONSERVER_ServerInferAsync. Return a
 /// TRITONSERVER_Error object on failure, return nullptr on success.  The
@@ -1020,7 +1007,7 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelMetadata(
 /// object. The caller takes ownership of the object and must call
 /// TRITONSERVER_MessageDelete to release the object.
 /// \param server The inference server object.
-/// \param model_name The name of the model to get metadata for.
+/// \param model_name The name of the model to get statistics for.
 /// \param model_version The version of the model to get readiness for.
 /// If nullptr or empty then the server will choose a version based on
 /// the model's policy.
@@ -1035,7 +1022,7 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelStatistics(
 /// The caller takes ownership of the object and must call
 /// TRITONSERVER_MessageDelete to release the object.
 /// \param server The inference server object.
-/// \param model_name The name of the model to get metadata for.
+/// \param model_name The name of the model to get configuration for.
 /// \param model_version The version of the model to get readiness for.
 /// If nullptr or empty then the server will choose a version based on
 /// the model's policy.

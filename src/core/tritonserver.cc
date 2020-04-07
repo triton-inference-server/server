@@ -1650,22 +1650,6 @@ TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestRequestedOutputClassificationCount(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    uint32_t* count)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-
-  ni::InferenceRequest::RequestedOutput* requested;
-  RETURN_IF_STATUS_ERROR(
-      lrequest->Request()->MutableRequestedOutput(name, &requested));
-  *count = requested->ClassificationCount();
-
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestError(
     TRITONSERVER_InferenceRequest* inference_request)
 {
