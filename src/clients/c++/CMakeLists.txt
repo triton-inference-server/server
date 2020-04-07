@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,6 +26,6 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-add_subdirectory(library)
-add_subdirectory(examples)
+add_subdirectory(api_v1/library)
+add_subdirectory(api_v1/examples)
 add_subdirectory(perf_client)

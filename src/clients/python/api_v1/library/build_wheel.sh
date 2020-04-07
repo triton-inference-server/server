@@ -56,7 +56,7 @@ function main() {
   if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
     cp libcrequest.so \
       "${WHLDIR}/tensorrtserver/api/."
-    cp ../../../c++/library/librequest.so \
+    cp ../../../c++/api_v1/library/librequest.so \
       "${WHLDIR}/tensorrtserver/api/."
   else
     cp Release/crequest.dll \

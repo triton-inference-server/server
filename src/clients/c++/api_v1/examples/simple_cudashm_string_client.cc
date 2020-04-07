@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,9 +27,11 @@
 #include <unistd.h>
 #include <iostream>
 #include <string>
-#include "src/clients/c++/examples/shm_utils.h"
-#include "src/clients/c++/library/request_grpc.h"
-#include "src/clients/c++/library/request_http.h"
+#include "src/clients/c++/api_v1/examples/shm_utils.h"
+#include "src/clients/c++/api_v1/library/request_grpc.h"
+#include "src/clients/c++/api_v1/library/request_http.h"
+
+#include <cuda_runtime_api.h>
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
@@ -63,6 +65,29 @@ Usage(char** argv, const std::string& msg = std::string())
 
   exit(1);
 }
+
+#define FAIL_IF_CUDA_ERR(FUNC)                                     \
+  {                                                                \
+    const cudaError_t result = FUNC;                               \
+    if (result != cudaSuccess) {                                   \
+      std::cerr << "CUDA exception (line " << __LINE__             \
+                << "): " << cudaGetErrorName(result) << " ("       \
+                << cudaGetErrorString(result) << ")" << std::endl; \
+      exit(1);                                                     \
+    }                                                              \
+  }
+
+void
+CreateCUDAIPCHandle(
+    cudaIpcMemHandle_t* cuda_handle, void* input_d_ptr, int device_id = 0)
+{
+  // Set the GPU device to the desired GPU
+  FAIL_IF_CUDA_ERR(cudaSetDevice(device_id));
+
+  //  Create IPC handle for data on the gpu
+  FAIL_IF_CUDA_ERR(cudaIpcGetMemHandle(cuda_handle, input_d_ptr));
+}
+
 
 void
 SerializeStringTensor(
@@ -267,28 +292,19 @@ main(int argc, char** argv)
   int output0_byte_size = expected_sum.size();
   int output1_byte_size = expected_diff.size();
 
-  // Create Output0 and Output1 in Shared Memory
-  std::string shm_key = "/output_simple_string";
-  int shm_fd_op;
-  uint8_t* output0_shm;
-  FAIL_IF_ERR(
-      nic::CreateSharedMemoryRegion(
-          shm_key, output0_byte_size + output1_byte_size, &shm_fd_op),
-      "");
-  FAIL_IF_ERR(
-      nic::MapSharedMemory(
-          shm_fd_op, 0, output0_byte_size + output1_byte_size,
-          (void**)&output0_shm),
-      "");
-  FAIL_IF_ERR(nic::CloseSharedMemory(shm_fd_op), "");
-  uint8_t* output1_shm =
-      reinterpret_cast<uint8_t*>(output0_shm + output0_byte_size);
+  // Create Output0 and Output1 in CUDA Shared Memory
+  uint8_t *output0_d_ptr, *output1_d_ptr;
+  cudaMalloc((void**)&output0_d_ptr, output0_byte_size + output1_byte_size);
+  output1_d_ptr = reinterpret_cast<uint8_t*>(output0_d_ptr + output0_byte_size);
+
+  cudaIpcMemHandle_t output_cuda_handle;
+  CreateCUDAIPCHandle(&output_cuda_handle, (void*)output0_d_ptr);
 
   // Register Output shared memory with TRTIS
   FAIL_IF_ERR(
-      shared_memory_ctx->RegisterSharedMemory(
-          "output_data", "/output_simple_string", 0,
-          output0_byte_size + output1_byte_size),
+      shared_memory_ctx->RegisterCudaSharedMemory(
+          "output_data", output_cuda_handle,
+          output0_byte_size + output1_byte_size, 0),
       "unable to register shared memory output region");
 
   // Set the context options to do batch-size 1 requests. Also request that
@@ -306,30 +322,26 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       infer_ctx->SetRunOptions(*options), "unable to set inference options");
 
-  // Create Input0 and Input1 in Shared Memory and set their values.
-  shm_key = "/input_simple_string";
-  int shm_fd_ip;
-  uint8_t* input0_shm;
-  FAIL_IF_ERR(
-      nic::CreateSharedMemoryRegion(
-          shm_key, input0_byte_size + input1_byte_size, &shm_fd_ip),
-      "");
-  FAIL_IF_ERR(
-      nic::MapSharedMemory(
-          shm_fd_ip, 0, input0_byte_size + input1_byte_size,
-          (void**)&input0_shm),
-      "");
-  FAIL_IF_ERR(nic::CloseSharedMemory(shm_fd_ip), "");
-  uint8_t* input1_shm =
-      reinterpret_cast<uint8_t*>(input0_shm + input0_byte_size);
-  memcpy(input0_shm, input0_data.data(), input0_byte_size);
-  memcpy(input1_shm, input1_data.data(), input1_byte_size);
+  // copy INPUT0 and INPUT1 data into GPU shared memory
+  int* input0_d_ptr;
+  cudaMalloc((void**)&input0_d_ptr, input0_byte_size + input1_byte_size);
+  cudaMemcpy(
+      input0_d_ptr, input0_data.data(), input0_byte_size,
+      cudaMemcpyHostToDevice);
+  cudaMemcpy(
+      input1_d_ptr, input1_data.data(), input1_byte_size,
+      cudaMemcpyHostToDevice);
+
+  cudaIpcMemHandle_t input_cuda_handle;
+  CreateCUDAIPCHandle(&input_cuda_handle, (void*)input0_d_ptr);
+  uint8_t* input1_d_ptr =
+      reinterpret_cast<uint8_t*>(input0_d_ptr + input0_byte_size);
 
   // Register Input shared memory with TRTIS
   FAIL_IF_ERR(
-      shared_memory_ctx->RegisterSharedMemory(
-          "input_data", "/input_simple_string", 0,
-          input0_byte_size + input1_byte_size),
+      shared_memory_ctx->RegisterCudaSharedMemory(
+          "input_data", input_cuda_handle, input0_byte_size + input1_byte_size,
+          0),
       "unable to register shared memory output region");
 
   // Set the shared memory region for Inputs
@@ -352,8 +364,8 @@ main(int argc, char** argv)
   }
 
   std::vector<int> output0_data(16), output1_data(16);
-  DerializeToIntTensor(output0_shm, &output0_data);
-  DerializeToIntTensor(output1_shm, &output1_data);
+  DerializeToIntTensor(output0_d_ptr, &output0_data);
+  DerializeToIntTensor(output1_d_ptr, &output1_data);
 
   for (int i = 0; i < 16; ++i) {
     std::cout << (i + 1) << " + " << 1 << " = " << output0_data[i] << std::endl;
@@ -385,16 +397,10 @@ main(int argc, char** argv)
       shared_memory_ctx->UnregisterSharedMemory("output_data"),
       "unable to unregister shared memory output region");
 
-  // Cleanup shared memory
-  FAIL_IF_ERR(
-      nic::UnmapSharedMemory(input0_shm, input0_byte_size + input1_byte_size),
-      "");
-  FAIL_IF_ERR(nic::UnlinkSharedMemoryRegion("/input_simple_string"), "");
-  FAIL_IF_ERR(
-      nic::UnmapSharedMemory(
-          output0_shm, output0_byte_size + output1_byte_size),
-      "");
-  FAIL_IF_ERR(nic::UnlinkSharedMemoryRegion("/output_simple_string"), "");
+
+  // Free GPU memory
+  FAIL_IF_CUDA_ERR(cudaFree(input0_d_ptr));
+  FAIL_IF_CUDA_ERR(cudaFree(output0_d_ptr));
 
   return 0;
 }

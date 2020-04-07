@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,13 +26,13 @@
 
 #define DLL_EXPORTING
 
-#include "src/clients/c++/library/request_grpc.h"
+#include "src/clients/c++/api_v1/library/request_grpc.h"
 
 #include <grpcpp/grpcpp.h>
 #include <cstdint>
 #include <future>
 #include <iostream>
-#include "src/clients/c++/library/request_common.h"
+#include "src/clients/c++/api_v1/library/request_common.h"
 #include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/model_config.pb.h"
 

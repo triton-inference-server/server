@@ -29,8 +29,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include "src/clients/c++/library/request_grpc.h"
-#include "src/clients/c++/library/request_http.h"
+#include "src/clients/c++/api_v1/library/request_grpc.h"
+#include "src/clients/c++/api_v1/library/request_http.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;

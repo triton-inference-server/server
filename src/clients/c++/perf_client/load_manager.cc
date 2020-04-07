@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "src/clients/c++/perf_client/load_manager.h"
-#include "src/clients/c++/examples/shm_utils.h"
+#include "src/clients/c++/api_v1/examples/shm_utils.h"
 #include "src/core/model_config.h"
 
 #include <algorithm>

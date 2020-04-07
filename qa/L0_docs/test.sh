@@ -39,7 +39,7 @@ apt-get update && \
 
 set +e
 
-(cd src/clients/c++/library &&
+(cd src/clients/c++/api_v1/library &&
     cp -f request.h.in request.h
     cp -f request_grpc.h.in request_grpc.h
     cp -f request_http.h.in request_http.h)

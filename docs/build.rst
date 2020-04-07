@@ -460,7 +460,7 @@ To get the Python client library API docs the Triton Inference
 Server Python package must be installed and a couple of files must be copied::
 
   $ pip install --upgrade tensorrtserver*.whl
-  $ cd src/clients/c++/library
+  $ cd src/clients/c++/api_v1/library
   $ cp -f request.h.in request.h
   $ cp -f request_grpc.h.in request_grpc.h
   $ cp -f request_http.h.in request_http.h

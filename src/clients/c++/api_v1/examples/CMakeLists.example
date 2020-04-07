@@ -37,16 +37,16 @@ message(STATUS "Using TRTIS client library ${TRTIS_VERSION}")
 #
 # Example applications
 #
-include_directories("${PROJECT_SOURCE_DIR}/../../include")
+include_directories("${PROJECT_SOURCE_DIR}/../../../include")
 
 # simple_client using static library, librequest_static.a
 add_executable(
   simple_client_static
-  ${PROJECT_SOURCE_DIR}/../../src/simple_client.cc
+  ${PROJECT_SOURCE_DIR}/../../../src/simple_client.cc
 )
 target_link_libraries(
   simple_client_static
-  PRIVATE -L${PROJECT_SOURCE_DIR}/../lib
+  PRIVATE -L${PROJECT_SOURCE_DIR}/../../lib
   PRIVATE TRTIS::request_static
   PRIVATE gRPC::grpc++
   PRIVATE gRPC::grpc
@@ -61,11 +61,11 @@ install(
 # simple_client using shared library, librequest.so
 add_executable(
   simple_client_shared
-  ${PROJECT_SOURCE_DIR}/../../src/simple_client.cc
+  ${PROJECT_SOURCE_DIR}/../../../src/simple_client.cc
 )
 target_link_libraries(
   simple_client_shared
-  PRIVATE -L${PROJECT_SOURCE_DIR}/../lib
+  PRIVATE -L${PROJECT_SOURCE_DIR}/../../lib
   PRIVATE TRTIS::request
   PUBLIC protobuf::libprotobuf
 )

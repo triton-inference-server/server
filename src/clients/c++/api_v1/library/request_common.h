@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,7 +34,7 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include "src/clients/c++/library/request.h"
+#include "src/clients/c++/api_v1/library/request.h"
 #include "src/core/constants.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
