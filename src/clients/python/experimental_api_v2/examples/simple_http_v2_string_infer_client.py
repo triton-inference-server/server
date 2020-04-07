@@ -74,11 +74,11 @@ if __name__ == '__main__':
     input1_data = in1n.reshape(in1.shape)
 
     # Initialize the data
-    inputs[0].set_data_from_numpy(input0_data)
-    inputs[1].set_data_from_numpy(input1_data)
+    inputs[0].set_data_from_numpy(input0_data, binary_data=True)
+    inputs[1].set_data_from_numpy(input1_data, binary_data=False)
 
-    outputs.append(httpclient.InferOutput('OUTPUT0'))
-    outputs.append(httpclient.InferOutput('OUTPUT1'))
+    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=True))
+    outputs.append(httpclient.InferOutput('OUTPUT1', binary_data=False))
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
