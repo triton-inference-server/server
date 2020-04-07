@@ -56,7 +56,7 @@ if __name__ == '__main__':
     model_name = 'simple'
 
     # There are two models in the repository directory
-    if len(triton_client.get_model_repository_index()) != 2:
+    if len(triton_client.get_model_repository_index()) != 3:
         sys.exit(1)
 
     triton_client.load_model(model_name)

@@ -43,8 +43,8 @@ if __name__ == '__main__':
                         '--url',
                         type=str,
                         required=False,
-                        default='localhost:8001',
-                        help='Inference server URL. Default is localhost:8001.')
+                        default='localhost:8000',
+                        help='Inference server URL. Default is localhost:8000.')
 
     FLAGS = parser.parse_args()
     try:
@@ -74,11 +74,11 @@ if __name__ == '__main__':
     input1_data = in1n.reshape(in1.shape)
 
     # Initialize the data
-    inputs[0].set_data_from_numpy(input0_data, binary_data=False)
-    inputs[1].set_data_from_numpy(input1_data, binary_data=False)
+    inputs[0].set_data_from_numpy(input0_data)
+    inputs[1].set_data_from_numpy(input1_data)
 
-    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=False))
-    outputs.append(httpclient.InferOutput('OUTPUT1', binary_data=False))
+    outputs.append(httpclient.InferOutput('OUTPUT0'))
+    outputs.append(httpclient.InferOutput('OUTPUT1'))
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,

@@ -31,6 +31,7 @@ if(${TRTIS_ENABLE_HTTP_V2})
     PROGRAMS
       simple_http_v2_health_metadata.py
       simple_http_v2_infer_client.py
+      simple_http_v2_string_infer_client.py
       simple_http_v2_async_infer_client.py
       simple_http_v2_cudashm_client.py
       simple_http_v2_shm_client.py
