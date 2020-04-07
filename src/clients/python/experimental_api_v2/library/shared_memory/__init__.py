@@ -49,8 +49,8 @@ class _utf8(object):
 
 import os
 _cshm_lib = "cshmv2" if os.name == 'nt' else 'libcshmv2.so'
-_cshm_path = pkg_resources.resource_filename('tritongrpcclient.shared_memory',
-                                             _cshm_lib)
+_cshm_path = pkg_resources.resource_filename(
+    'tritonsharedmemoryutils.shared_memory', _cshm_lib)
 _cshm = cdll.LoadLibrary(_cshm_path)
 
 _cshm_shared_memory_region_create = _cshm.SharedMemoryRegionCreate

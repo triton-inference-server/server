@@ -24,46 +24,52 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.5)
+import os
+from setuptools import find_packages
+from setuptools import setup
 
-if(${TRTIS_ENABLE_HTTP_V2})
-  install(
-    PROGRAMS
-      simple_http_v2_health_metadata.py
-      simple_http_v2_infer_client.py
-      simple_http_v2_async_infer_client.py
-      simple_http_v2_cudashm_client.py
-      simple_http_v2_shm_client.py
-      simple_http_v2_model_control.py
-    DESTINATION python
-  )
-endif() # TRTIS_ENABLE_HTTP_V2
+if 'VERSION' not in os.environ:
+    raise Exception('envvar VERSION must be specified')
 
-if(${TRTIS_ENABLE_GRPC_V2})
-  install(
-    PROGRAMS
-      grpc_v2_client.py
-      grpc_v2_explicit_byte_content_client.py
-      grpc_v2_explicit_int_content_client.py
-      grpc_v2_explicit_int8_content_client.py
-      grpc_v2_image_client.py
-      simple_grpc_v2_cudashm_client.py
-      simple_grpc_v2_health_metadata.py
-      simple_grpc_v2_async_infer_client.py
-      simple_grpc_v2_infer_client.py
-      simple_grpc_v2_sequence_stream_infer_client.py
-      simple_grpc_v2_sequence_sync_infer_client.py
-      simple_grpc_v2_string_infer_client.py
-      simple_grpc_v2_shm_client.py
-      simple_grpc_v2_model_control.py
-    DESTINATION python
-  )
-endif() # TRTIS_ENABLE_GRPC_V2
+VERSION = os.environ['VERSION']
 
-if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_GRPC_V2})
-  install(
-    PROGRAMS
-      v2_image_client.py
-    DESTINATION python
-  )
-endif() # TRTIS_ENABLE_HTTP_V2 || TRTIS_ENABLE_GRPC_V2
+REQUIRED = ['numpy']
+
+try:
+    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
+
+    class bdist_wheel(_bdist_wheel):
+
+        def finalize_options(self):
+            _bdist_wheel.finalize_options(self)
+            self.root_is_pure = False
+
+        def get_tag(self):
+            pyver, abi, plat = _bdist_wheel.get_tag(self)
+            pyver, abi = 'py3', 'none'
+            return pyver, abi, plat
+except ImportError:
+    bdist_wheel = None
+
+if not os.name == 'nt':
+    platform_package_data = [ 'libcshmv2.so' ]
+    if bool(os.environ.get('CUDA_VERSION', 0)):
+        platform_package_data += ['libccudashmv2.so']
+
+    setup(
+        name='tritonsharedmemoryutils',
+        version=VERSION,
+        author='NVIDIA Inc.',
+        author_email='tanmayv@nvidia.com',
+        description='Python utils library for creating and managing system and cuda shared memory regions',
+        license='BSD',
+        url='http://nvidia.com',
+        keywords='triton tensorrt inference server system memory cuda system client',
+        packages=find_packages(),
+        install_requires=REQUIRED,
+        package_data={
+            '': platform_package_data,
+        },
+        zip_safe=False,
+        cmdclass={'bdist_wheel': bdist_wheel},
+    )
