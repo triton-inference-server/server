@@ -150,14 +150,30 @@ if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_GRPC_V2})
     set(shared_memory_wheel_stamp_file "shared_memory_stamp.whl")
     configure_file(shared_memory_setup.py shared_memory_setup.py COPYONLY)
 
-    add_custom_command(
-      OUTPUT "${shared_memory_wheel_stamp_file}"
-      COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/shared_memory_build_wheel.sh"
-      ARGS "${CMAKE_CURRENT_BINARY_DIR}/shared_memory/"
-      DEPENDS
-        ${CMAKE_CURRENT_BINARY_DIR}/VERSION
-        ${CMAKE_CURRENT_BINARY_DIR}/shared_memory_setup.py
-    )
+    if(${TRTIS_ENABLE_GPU})
+      add_custom_command(
+        OUTPUT "${shared_memory_wheel_stamp_file}"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/shared_memory_build_wheel.sh"
+        ARGS "${CMAKE_CURRENT_BINARY_DIR}/shared_memory/"
+        DEPENDS
+          ${CMAKE_CURRENT_BINARY_DIR}/VERSION
+          ${CMAKE_CURRENT_BINARY_DIR}/shared_memory_setup.py
+          cshmv2
+          ccudashmv2
+      )
+    else()
+      add_custom_command(
+        OUTPUT "${shared_memory_wheel_stamp_file}"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/shared_memory_build_wheel.sh"
+        ARGS "${CMAKE_CURRENT_BINARY_DIR}/shared_memory/"
+        DEPENDS
+          ${CMAKE_CURRENT_BINARY_DIR}/VERSION
+          ${CMAKE_CURRENT_BINARY_DIR}/shared_memory_setup.py
+          cshmv2
+      )
+
+    endif()
+
 
     add_custom_target(
       client-wheel-shared-memory ALL
