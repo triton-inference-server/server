@@ -994,7 +994,7 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerMetadata(
 /// TRITONSERVER_MessageDelete to release the object.
 /// \param server The inference server object.
 /// \param model_name The name of the model to get metadata for.
-/// \param model_version The version of the model to get readiness for.
+/// \param model_version The version of the model to get metadata for.
 /// If nullptr or empty then the server will choose a version based on
 /// the model's policy.
 /// \param model_metadata Returns the model metadata message.
@@ -1008,7 +1008,7 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelMetadata(
 /// TRITONSERVER_MessageDelete to release the object.
 /// \param server The inference server object.
 /// \param model_name The name of the model to get statistics for.
-/// \param model_version The version of the model to get readiness for.
+/// \param model_version The version of the model to get statistics for.
 /// If nullptr or empty then the server will choose a version based on
 /// the model's policy.
 /// \param model_stats Returns the model statistics message.
@@ -1023,7 +1023,7 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelStatistics(
 /// TRITONSERVER_MessageDelete to release the object.
 /// \param server The inference server object.
 /// \param model_name The name of the model to get configuration for.
-/// \param model_version The version of the model to get readiness for.
+/// \param model_version The version of the model to get configuration for.
 /// If nullptr or empty then the server will choose a version based on
 /// the model's policy.
 /// \param model_config Returns the model config message.
