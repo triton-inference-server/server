@@ -74,8 +74,7 @@ InferenceServerGrpcClient::Create(
 }
 
 Error
-InferenceServerGrpcClient::IsServerLive(
-    bool* live, std::map<std::string, std::string>& headers)
+InferenceServerGrpcClient::IsServerLive(bool* live, const Headers& headers)
 {
   Error err;
 
@@ -101,8 +100,7 @@ InferenceServerGrpcClient::IsServerLive(
 }
 
 Error
-InferenceServerGrpcClient::IsServerReady(
-    bool* ready, std::map<std::string, std::string>& headers)
+InferenceServerGrpcClient::IsServerReady(bool* ready, const Headers& headers)
 {
   Error err;
 
@@ -130,8 +128,7 @@ InferenceServerGrpcClient::IsServerReady(
 Error
 InferenceServerGrpcClient::IsModelReady(
     bool* ready, const std::string& model_name,
-    std::map<std::string, std::string>& headers,
-    const std::string& model_version)
+    const std::string& model_version, const Headers& headers)
 {
   Error err;
 
@@ -165,8 +162,7 @@ InferenceServerGrpcClient::IsModelReady(
 
 Error
 InferenceServerGrpcClient::GetServerMetadata(
-    ServerMetadataResponse* server_metadata,
-    std::map<std::string, std::string>& headers)
+    ServerMetadataResponse* server_metadata, const Headers& headers)
 {
   server_metadata->Clear();
   Error err;
@@ -195,8 +191,7 @@ InferenceServerGrpcClient::GetServerMetadata(
 Error
 InferenceServerGrpcClient::GetModelMetadata(
     ModelMetadataResponse* model_metadata, const std::string& model_name,
-    std::map<std::string, std::string>& headers,
-    const std::string& model_version)
+    const std::string& model_version, const Headers& headers)
 {
   model_metadata->Clear();
   Error err;
@@ -227,8 +222,7 @@ InferenceServerGrpcClient::GetModelMetadata(
 Error
 InferenceServerGrpcClient::GetModelConfig(
     ModelConfigResponse* model_config, const std::string& model_name,
-    std::map<std::string, std::string>& headers,
-    const std::string& model_version)
+    const std::string& model_version, const Headers& headers)
 {
   model_config->Clear();
   Error err;

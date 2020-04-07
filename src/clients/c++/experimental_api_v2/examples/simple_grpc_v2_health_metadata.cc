@@ -69,7 +69,7 @@ main(int argc, char** argv)
 {
   bool verbose = false;
   std::string url("localhost:8001");
-  std::map<std::string, std::string> http_headers;
+  nic::Headers http_headers;
 
   // Parse commandline...
   int opt;
@@ -100,12 +100,12 @@ main(int argc, char** argv)
   // tensor is the element-wise sum of the inputs and one output is
   // the element-wise difference.
   std::string model_name = "simple";
+  std::string model_version = "";
 
   // Create a InferenceServerGrpcClient instance to communicate with the
   // server using gRPC protocol.
   std::unique_ptr<nic::InferenceServerGrpcClient> client;
   err = nic::InferenceServerGrpcClient::Create(&client, url, verbose);
-
   if (!err.IsOk()) {
     std::cerr << "error: unable to create grpc client: " << err << std::endl;
     exit(1);
@@ -113,12 +113,10 @@ main(int argc, char** argv)
 
   bool live;
   err = client->IsServerLive(&live, http_headers);
-
   if (!err.IsOk()) {
     std::cerr << "error: unable to get server liveness: " << err << std::endl;
     exit(1);
   }
-
   if (!live) {
     std::cerr << "error: server is not live" << std::endl;
     exit(1);
@@ -126,25 +124,22 @@ main(int argc, char** argv)
 
   bool ready;
   err = client->IsServerReady(&ready, http_headers);
-
   if (!err.IsOk()) {
     std::cerr << "error: unable to get server readiness: " << err << std::endl;
     exit(1);
   }
-
   if (!ready) {
     std::cerr << "error: server is not live" << std::endl;
     exit(1);
   }
 
   bool model_ready;
-  err = client->IsModelReady(&model_ready, model_name, http_headers);
-
+  err = client->IsModelReady(
+      &model_ready, model_name, model_version, http_headers);
   if (!err.IsOk()) {
     std::cerr << "error: unable to get server readiness: " << err << std::endl;
     exit(1);
   }
-
   if (!model_ready) {
     std::cerr << "error: model " << model_name << " is not live" << std::endl;
     exit(1);
@@ -152,12 +147,10 @@ main(int argc, char** argv)
 
   ni::ServerMetadataResponse server_metadata;
   err = client->GetServerMetadata(&server_metadata, http_headers);
-
   if (!err.IsOk()) {
     std::cerr << "error: unable to get server metadata: " << err << std::endl;
     exit(1);
   }
-
   if (server_metadata.name().compare("inference:0") != 0) {
     std::cerr << "error: unexpected server metadata: "
               << server_metadata.DebugString() << std::endl;
@@ -165,13 +158,12 @@ main(int argc, char** argv)
   }
 
   ni::ModelMetadataResponse model_metadata;
-  err = client->GetModelMetadata(&model_metadata, model_name, http_headers);
-
+  err = client->GetModelMetadata(
+      &model_metadata, model_name, model_version, http_headers);
   if (!err.IsOk()) {
     std::cerr << "error: unable to get model metadata: " << err << std::endl;
     exit(1);
   }
-
   if (model_metadata.name().compare(model_name) != 0) {
     std::cerr << "error: unexpected model metadata: "
               << model_metadata.DebugString() << std::endl;
@@ -179,13 +171,12 @@ main(int argc, char** argv)
   }
 
   ni::ModelConfigResponse model_config;
-  err = client->GetModelConfig(&model_config, model_name, http_headers);
-
+  err = client->GetModelConfig(
+      &model_config, model_name, model_version, http_headers);
   if (!err.IsOk()) {
     std::cerr << "error: unable to get model config: " << err << std::endl;
     exit(1);
   }
-
   if (model_config.config().name().compare(model_name) != 0) {
     std::cerr << "error: unexpected model config: "
               << model_config.DebugString() << std::endl;
@@ -193,7 +184,7 @@ main(int argc, char** argv)
   }
 
   err = client->GetModelMetadata(
-      &model_metadata, "wrong_model_name", http_headers);
+      &model_metadata, "wrong_model_name", model_version, http_headers);
   if (err.IsOk()) {
     std::cerr << "error: expected an error but got: " << err << std::endl;
     exit(1);

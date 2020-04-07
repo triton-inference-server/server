@@ -34,6 +34,10 @@
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
+/// The key-value map type to be included in the request
+/// metadata
+typedef std::map<std::string, std::string> Headers;
+
 //==============================================================================
 /// An InferenceServerGrpcClient object is used to perform any kind of
 /// communication with the InferenceServer using gRPC protocol.
@@ -41,9 +45,8 @@ namespace nvidia { namespace inferenceserver { namespace client {
 /// \code
 ///   std::unique_ptr<InferenceServerGrpcClient> client;
 ///   InferenceServerGrpcClient::Create(&client, "localhost:8001");
-///   std::map<std::string, std::string> headers;
 ///   bool live;
-///   client->IsServerLive(&live, headers);
+///   client->IsServerLive(&live);
 ///   ...
 ///   ...
 /// \endcode
@@ -62,70 +65,71 @@ class InferenceServerGrpcClient {
 
   /// Contact the inference server and get its liveness.
   /// \param live Returns whether the server is live or not.
-  /// \param headers Map specifying additional HTTP headers to include in the
-  /// metadata of gRPC request.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
-  Error IsServerLive(bool* live, std::map<std::string, std::string>& headers);
+  Error IsServerLive(bool* live, const Headers& headers = Headers());
 
   /// Contact the inference server and get its readiness.
   /// \param ready Returns whether the server is ready or not.
-  /// \param headers Map specifying additional HTTP headers to include in the
-  /// metadata of gRPC request.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
-  Error IsServerReady(bool* ready, std::map<std::string, std::string>& headers);
+  Error IsServerReady(bool* ready, const Headers& headers = Headers());
 
   /// Contact the inference server and get the readiness of specified model.
   /// \param ready Returns whether the specified model is ready or not.
   /// \param model_name The name of the model to check for readiness.
-  /// \param headers Map specifying additional HTTP headers to include in the
-  /// metadata of gRPC request.
   /// \param model_version The version of the model to check for readiness.
   /// The default value is an empty string which means then the server will
-  /// choose a versionbased on the model and internal policy.
+  /// choose a version based on the model and internal policy.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
   Error IsModelReady(
       bool* ready, const std::string& model_name,
-      std::map<std::string, std::string>& headers,
-      const std::string& model_version = "");
+      const std::string& model_version = "",
+      const Headers& headers = Headers());
 
   /// Contact the inference server and get its metadata.
   /// \param server_metadata Returns the server metadata as
-  /// SeverMetadataResponse message. \param headers Map specifying additional
-  /// HTTP headers to include in the metadata of gRPC request. \return Error
-  /// object indicating success or failure of the request.
+  /// SeverMetadataResponse message.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
+  /// \return Error object indicating success or failure of the request.
   Error GetServerMetadata(
       ServerMetadataResponse* server_metadata,
-      std::map<std::string, std::string>& headers);
+      const Headers& headers = Headers());
 
   /// Contact the inference server and get the metadata of specified model.
   /// \param model_metadata Returns model metadata as ModelMetadataResponse
   /// message.
   /// \param model_name The name of the model to get metadata.
-  /// \param headers Map specifying additional HTTP headers to include in the
-  /// metadata of gRPC request.
   /// \param model_version The version of the model to get metadata.
   /// The default value is an empty string which means then the server will
-  /// choose a versionbased on the model and internal policy.
+  /// choose a version based on the model and internal policy.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
   Error GetModelMetadata(
       ModelMetadataResponse* model_metadata, const std::string& model_name,
-      std::map<std::string, std::string>& headers,
-      const std::string& model_version = "");
+      const std::string& model_version = "",
+      const Headers& headers = Headers());
 
   /// Contact the inference server and get the configuration of specified model.
   /// \param model_config Returns model config as ModelConfigResponse
   /// message.
   /// \param model_name The name of the model to get configuration.
-  /// \param headers Map specifying additional HTTP headers to include in the
-  /// metadata of gRPC request.
   /// \param model_version The version of the model to get configuration.
   /// The default value is an empty string which means then the server will
-  /// choose a versionbased on the model and internal policy.
+  /// choose a version based on the model and internal policy.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
   Error GetModelConfig(
       ModelConfigResponse* model_config, const std::string& model_name,
-      std::map<std::string, std::string>& headers,
-      const std::string& model_version = "");
+      const std::string& model_version = "",
+      const Headers& headers = Headers());
 
  private:
   InferenceServerGrpcClient(const std::string& url, bool verbose);

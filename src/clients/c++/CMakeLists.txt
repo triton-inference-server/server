@@ -28,4 +28,11 @@ cmake_minimum_required (VERSION 3.5)
 
 add_subdirectory(api_v1/library)
 add_subdirectory(api_v1/examples)
+
+# Build V2 api if required
+if(TRTIS_ENABLE_GRPC_V2 OR TRTIS_ENABLE_HTTP_V2)
+    add_subdirectory(experimental_api_v2/library)
+    add_subdirectory(experimental_api_v2/examples)
+endif()
+
 add_subdirectory(perf_client)
