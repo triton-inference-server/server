@@ -1005,6 +1005,7 @@ class InferenceServerClient:
         InferenceServerException
             If server fails to issue inference.
         """
+
         def wrapped_post(request_uri, request_body, headers, query_params):
             return self._post(request_uri, request_body, headers, query_params)
 
@@ -1118,7 +1119,7 @@ class InferInput:
         InferenceServerException
             If failed to set data for the tensor.
         """
-        if not isinstance(input_tensor, (np.ndarray, )):
+        if not isinstance(input_tensor, (np.ndarray,)):
             raise_error("input_tensor must be a numpy array")
         dtype = np_to_triton_dtype(input_tensor.dtype)
         if self._datatype != dtype:
@@ -1185,13 +1186,22 @@ class InferInput:
         dict
             The underlying tensor specification as dict
         """
-        return {
-            'name': self._name,
-            'shape': self._shape,
-            'datatype': self._datatype,
-            'parameters': self._parameters,
-            'data': self._data
-        }
+        if self._parameters.get('shared_memory_region') is not None or \
+                                            self._raw_data is not None:
+            return {
+                'name': self._name,
+                'shape': self._shape,
+                'datatype': self._datatype,
+                'parameters': self._parameters,
+            }
+        else:
+            return {
+                'name': self._name,
+                'shape': self._shape,
+                'datatype': self._datatype,
+                'parameters': self._parameters,
+                'data': self._data
+            }
 
 
 class InferOutput:
