@@ -394,12 +394,11 @@ Check(
     const bool is_int)
 {
   for (const auto& name : {output0, output1}) {
-    std::vector<int64_t> shape;
-    uint64_t dim_count = 2;
-    shape.reserve(dim_count);
+    const int64_t* shape;
+    uint64_t dim_count;
     FAIL_IF_TRITON_ERR(
         TRITONSERVER_InferenceRequestOutputShape(
-            request, name.c_str(), &shape[0], &dim_count),
+            request, name.c_str(), &shape, &dim_count),
         "getting shape");
     if ((dim_count != 2) || (shape[0] != 1) || (shape[1] != 16)) {
       FAIL("unexpected shape for '" + name + "'");

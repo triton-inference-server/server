@@ -341,12 +341,14 @@ InferenceServer::ModelIsReady(
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
   std::shared_ptr<InferenceBackend> backend;
-  RETURN_IF_ERROR(GetInferenceBackend(model_name, model_version, &backend));
-
-  ModelReadyState state;
-  RETURN_IF_ERROR(model_repository_manager_->GetModelState(
-      model_name, backend->Version(), &state));
-  *ready = (state == ModelReadyState::MODEL_READY);
+  if (GetInferenceBackend(model_name, model_version, &backend).IsOk()) {
+    ModelReadyState state;
+    if (model_repository_manager_
+            ->GetModelState(model_name, backend->Version(), &state)
+            .IsOk()) {
+      *ready = (state == ModelReadyState::MODEL_READY);
+    }
+  }
 
   return Status::Success;
 }

@@ -196,7 +196,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
                 ex.message().startswith(
-                    "Inference request for unknown model 'graphdef_float32_float32_float32'"))
+                    "Request for unknown model 'graphdef_float32_float32_float32'"))
 
         # And other models should be loaded successfully
         try:
@@ -322,7 +322,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
                 ex.message().startswith(
-                    "Inference request for unknown model 'graphdef_float32_float32_float32'"))
+                    "Request for unknown model 'graphdef_float32_float32_float32'"))
 
     def test_parse_ignore_zero_prefixed_version(self):
         input_size = 16
@@ -466,7 +466,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
                 ex.message().startswith(
-                    "Inference request for unknown model 'savedmodel_float32_float32_float32'"))
+                    "Request for unknown model 'savedmodel_float32_float32_float32'"))
 
         # Add back the same model. The status/stats should be reset.
         try:
@@ -521,7 +521,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
                 ex.message().startswith(
-                    "Inference request for unknown model 'netdef_float32_float32_float32'"))
+                    "Request for unknown model 'netdef_float32_float32_float32'"))
 
     def test_dynamic_model_load_unload_disabled(self):
         input_size = 16
@@ -694,7 +694,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
                 ex.message().startswith(
-                    "Inference request for unknown model 'graphdef_int32_int32_int32'"))
+                    "Request for unknown model 'graphdef_int32_int32_int32'"))
 
         # Add back the same version. The status/stats should be
         # retained for versions (note that this is different behavior
@@ -902,7 +902,7 @@ class LifeCycleTest(unittest.TestCase):
             except InferenceServerException as ex:
                 self.assertEqual("inference:0", ex.server_id())
                 self.assertTrue(
-                    ex.message().startswith("Inference request for unknown model"))
+                    ex.message().startswith("Request for unknown model"))
 
         # Version 3 should continue to work...
         for model_name, model_shape in zip(models_base, models_shape):

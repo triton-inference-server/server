@@ -106,6 +106,6 @@ if __name__ == '__main__':
     if "error" not in response.keys():
         print("improper error message for wrong model name")
         sys.exit(1)
-    if not response['error'].startswith("Inference request for unknown model"):
+    if not response['error'].startswith("Request for unknown model"):
         print("improper error message for wrong model name")
         sys.exit(1)
