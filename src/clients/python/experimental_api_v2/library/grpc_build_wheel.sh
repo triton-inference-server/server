@@ -58,22 +58,6 @@ function main() {
   cp utils.py \
     "${WHLDIR}/tritongrpcclient/."
 
-  if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
-    mkdir -p ${WHLDIR}/tritongrpcclient/shared_memory
-    cp libcshmv2.so \
-      "${WHLDIR}/tritongrpcclient/shared_memory/."
-    cp shared_memory/__init__.py \
-      "${WHLDIR}/tritongrpcclient/shared_memory/."
-
-    if [ -f libccudashmv2.so ] && [ -f cuda_shared_memory/__init__.py ]; then
-      mkdir -p ${WHLDIR}/tritongrpcclient/cuda_shared_memory
-      cp libccudashmv2.so \
-        "${WHLDIR}/tritongrpcclient/cuda_shared_memory/."
-      cp cuda_shared_memory/__init__.py \
-        "${WHLDIR}/tritongrpcclient/cuda_shared_memory/."
-    fi
-  fi
-
   cp grpc_setup.py "${WHLDIR}"
   touch ${WHLDIR}/tritongrpcclient/__init__.py
 

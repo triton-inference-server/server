@@ -145,25 +145,29 @@ endif() # TRTIS_ENABLE_GRPC_V2
 #
 # shared memory utils wheel file
 #
-set(shared_memory_wheel_stamp_file "shared_memory_stamp.whl")
-configure_file(shared_memory_setup.py shared_memory_setup.py COPYONLY)
+if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_GRPC_V2})
+  if(NOT WIN32)
+    set(shared_memory_wheel_stamp_file "shared_memory_stamp.whl")
+    configure_file(shared_memory_setup.py shared_memory_setup.py COPYONLY)
 
-add_custom_command(
-  OUTPUT "${shared_memory_wheel_stamp_file}"
-  COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/shared_memory_build_wheel.sh"
-  ARGS "${CMAKE_CURRENT_BINARY_DIR}/shared_memory/"
-  DEPENDS
-    ${CMAKE_CURRENT_BINARY_DIR}/VERSION
-    ${CMAKE_CURRENT_BINARY_DIR}/shared_memory_setup.py
-)
+    add_custom_command(
+      OUTPUT "${shared_memory_wheel_stamp_file}"
+      COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/shared_memory_build_wheel.sh"
+      ARGS "${CMAKE_CURRENT_BINARY_DIR}/shared_memory/"
+      DEPENDS
+        ${CMAKE_CURRENT_BINARY_DIR}/VERSION
+        ${CMAKE_CURRENT_BINARY_DIR}/shared_memory_setup.py
+    )
 
-add_custom_target(
-  client-wheel-shared-memory ALL
-  DEPENDS
-    "${shared_memory_wheel_stamp_file}"
-)
+    add_custom_target(
+      client-wheel-shared-memory ALL
+      DEPENDS
+        "${shared_memory_wheel_stamp_file}"
+    )
 
-install(
-  CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/shared_memory/tritonsharedmemoryutils-*.whl\")"
-  CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
-)
+    install(
+      CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/shared_memory/tritonsharedmemoryutils-*.whl\")"
+      CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
+    )
+  endif() # NOT WIN32
+endif() # TRTIS_ENABLE_HTTP_V2 || TRTIS_ENABLE_GRPC_V2
