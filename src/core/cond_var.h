@@ -34,23 +34,25 @@ namespace nvidia { namespace inferenceserver {
 // Abstract class that acts like condition variable, which allows various
 // types of strategies for inter-thread communication
 //
-template<class TritonMutex>
+template <class TritonMutex>
 class CondVar {
  public:
-  virtual void Wait(std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) = 0;
+  virtual void Wait(
+      std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) = 0;
   virtual void NotifyAll() = 0;
 };
 
-template<class TritonMutex>
+template <class TritonMutex>
 class NullCondVar : public CondVar<TritonMutex> {
-public:
+ public:
   NullCondVar() = default;
 
-  void Wait(std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) override
+  void Wait(
+      std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) override
   {
     lock.unlock();
     while (true) {
-      while(!pred()) {
+      while (!pred()) {
         // busy-loop
       }
       lock.lock();
@@ -66,18 +68,20 @@ public:
   void NotifyAll() override { return; }
 };
 
-template<class TritonMutex>
+template <class TritonMutex>
 class StdCondVar : public CondVar<TritonMutex> {
-public:
+ public:
   StdCondVar() = default;
 
-  void Wait(std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) override
+  void Wait(
+      std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) override
   {
     cv_.wait(lock, pred);
   }
 
   void NotifyAll() override { cv_.notify_all(); }
-private:
+
+ private:
   std::condition_variable cv_;
 };
 

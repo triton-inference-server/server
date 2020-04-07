@@ -25,9 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/cond_var.h"
 #include <deque>
 #include <mutex>
+#include "src/core/cond_var.h"
 
 namespace nvidia { namespace inferenceserver {
 
