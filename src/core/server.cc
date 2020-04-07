@@ -340,17 +340,13 @@ InferenceServer::ModelIsReady(
 
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
-  std::map<int64_t, ModelReadyState> states;
-  RETURN_IF_ERROR(
-      model_repository_manager_->GetModelState(model_name, &states));
-  for (const auto& state : states) {
-    // Only check corresponding version state if specified
-    if ((model_version != -1) && (model_version != state.first)) {
-      continue;
-    }
-    if (state.second == ModelReadyState::MODEL_READY) {
-      *ready = true;
-      break;
+  std::shared_ptr<InferenceBackend> backend;
+  if (GetInferenceBackend(model_name, model_version, &backend).IsOk()) {
+    ModelReadyState state;
+    if (model_repository_manager_
+            ->GetModelState(model_name, backend->Version(), &state)
+            .IsOk()) {
+      *ready = (state == ModelReadyState::MODEL_READY);
     }
   }
 

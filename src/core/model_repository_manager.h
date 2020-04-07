@@ -127,11 +127,10 @@ class ModelRepositoryManager {
   /// \return the states of all versions of a specific model.
   const VersionStateMap GetVersionStates(const std::string& model_name);
 
-  /// Get the state of all model versions recorded.
   /// \return the ready-state of a specific model version.
   Status GetModelState(
-      const std::string& model_name,
-      std::map<int64_t, ModelReadyState>* states);
+      const std::string& model_name, const int64_t model_version,
+      ModelReadyState* state);
 
   /// Obtain the specified backend.
   /// \param model_name The model name of the backend handle.
