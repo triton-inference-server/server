@@ -29,12 +29,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "rapidjson/document.h"
-#include "rapidjson/error/en.h"
-#include "rapidjson/rapidjson.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/writer.h"
-#include "src/core/trtserver.h"
+#include "src/core/tritonserver.h"
 #include "src/servers/shared_memory_manager.h"
 #include "src/servers/tracer.h"
 
@@ -42,8 +37,8 @@ namespace nvidia { namespace inferenceserver {
 
 class HTTPServerV2 {
  public:
-  static TRTSERVER_Error* CreateAPIServer(
-      const std::shared_ptr<TRTSERVER_Server>& server,
+  static TRITONSERVER_Error* CreateAPIServer(
+      const std::shared_ptr<TRITONSERVER_Server>& server,
       const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
           trace_manager,
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
@@ -51,14 +46,14 @@ class HTTPServerV2 {
       const int thread_cnt,
       std::vector<std::unique_ptr<HTTPServerV2>>* http_servers);
 
-  static TRTSERVER_Error* CreateMetricsServer(
-      const std::shared_ptr<TRTSERVER_Server>& server, int32_t port,
+  static TRITONSERVER_Error* CreateMetricsServer(
+      const std::shared_ptr<TRITONSERVER_Server>& server, int32_t port,
       int thread_cnt, std::unique_ptr<HTTPServerV2>* metrics_server);
 
   virtual ~HTTPServerV2() = default;
 
-  virtual TRTSERVER_Error* Start() = 0;
-  virtual TRTSERVER_Error* Stop() = 0;
+  virtual TRITONSERVER_Error* Start() = 0;
+  virtual TRITONSERVER_Error* Stop() = 0;
 };
 
 }}  // namespace nvidia::inferenceserver

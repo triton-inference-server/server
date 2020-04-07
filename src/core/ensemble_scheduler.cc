@@ -581,7 +581,7 @@ EnsembleContext::InitStep(const size_t step_idx, std::shared_ptr<Step>* step)
   RETURN_IF_ERROR(InferResponseProvider::Create(
       (*step)->request_, (*step)->backend_->GetLabelProvider(),
       allocator_.get(), ResponseAlloc, &((*step)->output_map_), ResponseRelease,
-      &((*step)->response_provider_)));
+      1 /* protocol_version */, &((*step)->response_provider_)));
 
   return Status::Success;
 }

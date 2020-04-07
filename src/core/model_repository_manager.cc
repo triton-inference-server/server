@@ -296,7 +296,7 @@ class ModelRepositoryManager::BackendLifeCycle {
   // Get the VersionStateMap representation of the specified model.
   const VersionStateMap GetVersionStates(const std::string& model_name);
 
-  // The the state of a specific model version.
+  // Get the state of a specific model version.
   Status GetModelState(
       const std::string& model_name, const int64_t model_version,
       ModelReadyState* state);
@@ -1394,7 +1394,7 @@ ModelRepositoryManager::GetInferenceBackend(
     backend->reset();
     status = Status(
         Status::Code::UNAVAILABLE,
-        "Inference request for unknown model '" + model_name + "'");
+        "Request for unknown model '" + model_name + "'");
   }
   return status;
 }

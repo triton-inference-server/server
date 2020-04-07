@@ -221,12 +221,10 @@ def postprocess(results, output_name, batch_size):
     if len(output_array) != batch_size:
         raise Exception("expected {} results, got {}".format(
             batch_size, len(output_array)))
-    for content in output_array:
-        print(content)
 
     for results in output_array:
         for result in results:
-            if result.dtype.type != np.str_:
+            if output_array.dtype.type == np.bytes_:
                 cls = "".join(chr(x) for x in result).split(':')
             else:
                 cls = result.split(':')

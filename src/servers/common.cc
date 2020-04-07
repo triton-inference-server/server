@@ -138,115 +138,6 @@ SetTRTSERVER_InferenceRequestOptions(
   return nullptr;  // Success
 }
 
-#ifdef TRTIS_ENABLE_GRPC_V2
-
-TRTSERVER_Error*
-SetInferenceRequestOptions(
-    TRTSERVER_InferenceRequestOptions* request_options,
-    const ModelInferRequest& request)
-{
-  RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetIdStr(
-      request_options, request.id().c_str()));
-
-  const auto& sequence_id_it = request.parameters().find("sequence_id");
-  if (sequence_id_it != request.parameters().end()) {
-    const auto& infer_param = sequence_id_it->second;
-    if (infer_param.parameter_choice_case() !=
-        InferParameter::ParameterChoiceCase::kInt64Param) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
-          "invalid value type for 'sequence_id' parameter, expected "
-          "int64_param.");
-    }
-    RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetCorrelationId(
-        request_options, infer_param.int64_param()));
-    uint32_t flags = TRTSERVER_REQUEST_FLAG_NONE;
-    const auto& sequence_start_it = request.parameters().find("sequence_start");
-    if (sequence_start_it != request.parameters().end()) {
-      const auto& infer_param = sequence_start_it->second;
-      if (infer_param.parameter_choice_case() !=
-          InferParameter::ParameterChoiceCase::kBoolParam) {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            "invalid value type for 'sequence_start' parameter, expected "
-            "bool_param.");
-      }
-      flags |= infer_param.bool_param() & TRTSERVER_REQUEST_FLAG_SEQUENCE_START;
-    }
-    const auto& sequence_end_it = request.parameters().find("sequence_end");
-    if (sequence_end_it != request.parameters().end()) {
-      const auto& infer_param = sequence_end_it->second;
-      if (infer_param.parameter_choice_case() !=
-          InferParameter::ParameterChoiceCase::kBoolParam) {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            "invalid value type for 'sequence_end' parameter, expected "
-            "bool_param.");
-      }
-      flags |= infer_param.bool_param() & TRTSERVER_REQUEST_FLAG_SEQUENCE_END;
-    }
-    RETURN_IF_ERR(
-        TRTSERVER_InferenceRequestOptionsSetFlags(request_options, flags));
-  }
-
-  const auto& priority_it = request.parameters().find("priority");
-  if (priority_it != request.parameters().end()) {
-    const auto& infer_param = priority_it->second;
-    if (infer_param.parameter_choice_case() !=
-        InferParameter::ParameterChoiceCase::kInt64Param) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
-          "invalid value type for 'sequence_id' parameter, expected "
-          "int64_param.");
-    }
-    RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetPriority(
-        request_options, infer_param.int64_param()));
-  }
-
-  const auto& timeout_it = request.parameters().find("timeout");
-  if (timeout_it != request.parameters().end()) {
-    const auto& infer_param = timeout_it->second;
-    if (infer_param.parameter_choice_case() !=
-        InferParameter::ParameterChoiceCase::kInt64Param) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
-          "invalid value type for 'sequence_id' parameter, expected "
-          "int64_param.");
-    }
-    RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsSetTimeoutMicroseconds(
-        request_options, infer_param.int64_param()));
-  }
-
-  // FIXMEV2 raw contents size?? Do we need it?
-  for (const auto& input : request.inputs()) {
-    RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddInput(
-        request_options, input.name().c_str(), input.shape().data(),
-        input.shape_size(), input.contents().raw_contents().size()));
-  }
-
-  for (const auto& output : request.outputs()) {
-    const auto& class_it = output.parameters().find("classification");
-    if (class_it != output.parameters().end()) {
-      const auto& infer_param = class_it->second;
-      if (infer_param.parameter_choice_case() !=
-          InferParameter::ParameterChoiceCase::kInt64Param) {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INVALID_ARG,
-            "invalid value type for 'classification' parameter, expected "
-            "int64_param.");
-      }
-      RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddClassificationOutput(
-          request_options, output.name().c_str(), infer_param.int64_param()));
-    } else {
-      RETURN_IF_ERR(TRTSERVER_InferenceRequestOptionsAddOutput(
-          request_options, output.name().c_str()));
-    }
-  }
-  return nullptr;  // Success
-}
-
-#endif  // TRTIS_ENABLE_GRPC_V2
-
 std::string
 MemoryTypeString(TRTSERVER_Memory_Type memory_type)
 {
@@ -290,7 +181,7 @@ GetDataTypeByteSize(const std::string& protocol_dtype)
   }
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 GetModelVersionFromString(
     const std::string& version_string, int64_t* version_int)
 {
@@ -301,8 +192,8 @@ GetModelVersionFromString(
       *version_int = std::stol(version_string);
     }
     catch (std::exception& e) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
               "failed to get model version from specified version string '" +
               version_string + "' (details: " + e.what() +
@@ -310,8 +201,8 @@ GetModelVersionFromString(
               .c_str());
     }
     if (*version_int < 0) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
           std::string(
               "invalid model version specified '" +
               std::to_string(*version_int) +
@@ -326,6 +217,76 @@ GetModelVersionFromString(
 //
 // TRITON
 //
+
+namespace {
+
+TRTSERVER_Error_Code
+TritonErrorCodeToTrt(TRITONSERVER_Error_Code code)
+{
+  switch (code) {
+    case TRITONSERVER_ERROR_INTERNAL:
+      return TRTSERVER_ERROR_INTERNAL;
+    case TRITONSERVER_ERROR_NOT_FOUND:
+      return TRTSERVER_ERROR_NOT_FOUND;
+    case TRITONSERVER_ERROR_INVALID_ARG:
+      return TRTSERVER_ERROR_INVALID_ARG;
+    case TRITONSERVER_ERROR_UNAVAILABLE:
+      return TRTSERVER_ERROR_UNAVAILABLE;
+    case TRITONSERVER_ERROR_UNSUPPORTED:
+      return TRTSERVER_ERROR_UNSUPPORTED;
+    case TRITONSERVER_ERROR_ALREADY_EXISTS:
+      return TRTSERVER_ERROR_ALREADY_EXISTS;
+    case TRITONSERVER_ERROR_UNKNOWN:
+    default:
+      return TRTSERVER_ERROR_UNKNOWN;
+  }
+}
+
+}  // namespace
+
+
+TRTSERVER_Error*
+TritonErrorToTrt(TRITONSERVER_Error* err)
+{
+  if (err != nullptr) {
+    auto triton_err = TRTSERVER_ErrorNew(
+        TritonErrorCodeToTrt(TRITONSERVER_ErrorCode(err)),
+        TRITONSERVER_ErrorMessage(err));
+    TRITONSERVER_ErrorDelete(err);
+    return triton_err;
+  }
+  return nullptr;
+}
+
+TRTSERVER_Memory_Type
+TritonMemTypeToTrt(TRITONSERVER_Memory_Type mem_type)
+{
+  switch (mem_type) {
+    case TRITONSERVER_MEMORY_CPU:
+      return TRTSERVER_MEMORY_CPU;
+      break;
+    case TRITONSERVER_MEMORY_CPU_PINNED:
+      return TRTSERVER_MEMORY_CPU_PINNED;
+    default:
+      return TRTSERVER_MEMORY_GPU;
+      break;
+  }
+}
+
+TRITONSERVER_Memory_Type
+TrtMemTypeToTriton(TRTSERVER_Memory_Type mem_type)
+{
+  switch (mem_type) {
+    case TRTSERVER_MEMORY_CPU:
+      return TRITONSERVER_MEMORY_CPU;
+      break;
+    case TRTSERVER_MEMORY_CPU_PINNED:
+      return TRITONSERVER_MEMORY_CPU_PINNED;
+    default:
+      return TRITONSERVER_MEMORY_GPU;
+      break;
+  }
+}
 
 std::string
 MemoryTypeString(TRITONSERVER_Memory_Type memory_type)

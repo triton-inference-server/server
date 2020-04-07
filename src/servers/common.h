@@ -110,22 +110,16 @@ TRTSERVER_Error* SetTRTSERVER_InferenceRequestOptions(
     TRTSERVER_InferenceRequestOptions* request_options,
     const InferRequestHeader& request_header);
 
-#ifdef TRTIS_ENABLE_GRPC_V2
-TRTSERVER_Error* SetInferenceRequestOptions(
-    TRTSERVER_InferenceRequestOptions* request_options,
-    const ModelInferRequest& request);
-#endif  // TRTIS_ENABLE_GRPC_V2
-
 std::string MemoryTypeString(TRTSERVER_Memory_Type memory_type);
 
 size_t GetDataTypeByteSize(const std::string& protocol_dtype);
 
-TRTSERVER_Error* GetModelVersionFromString(
-    const std::string& version_string, int64_t* version_int);
-
 //
 // TRITON
 //
+
+TRITONSERVER_Error* GetModelVersionFromString(
+    const std::string& version_string, int64_t* version_int);
 
 #define FAIL_IF_TRITON_ERR(X, MSG)                                \
   do {                                                            \
@@ -146,6 +140,14 @@ TRTSERVER_Error* GetModelVersionFromString(
       return err__;                  \
     }                                \
   } while (false)
+
+// FIXMEV2 Error conversion should be dropped with TRTServer API deprecation
+// Transform TRITONSERVER_Error object to corresponding TRTSERVER_Error object,
+// the TRITONSERVER_Error object will be released by this function,
+// and the caller takes ownership of the TRTSERVER_Error object.
+TRTSERVER_Error* TritonErrorToTrt(TRITONSERVER_Error* err);
+TRTSERVER_Memory_Type TritonMemTypeToTrt(TRITONSERVER_Memory_Type mem_type);
+TRITONSERVER_Memory_Type TrtMemTypeToTriton(TRTSERVER_Memory_Type mem_type);
 
 std::string MemoryTypeString(TRITONSERVER_Memory_Type memory_type);
 
