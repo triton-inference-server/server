@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,46 +25,54 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.5)
+set -e
 
-if(${TRTIS_ENABLE_HTTP_V2})
-  install(
-    PROGRAMS
-      simple_http_v2_health_metadata.py
-      simple_http_v2_infer_client.py
-      simple_http_v2_async_infer_client.py
-      simple_http_v2_cudashm_client.py
-      simple_http_v2_shm_client.py
-      simple_http_v2_model_control.py
-    DESTINATION python
-  )
-endif() # TRTIS_ENABLE_HTTP_V2
+function main() {
+  if [[ $# -lt 1 ]] ; then
+    echo "usage: $0 <destination dir>"
+    exit 1
+  fi
 
-if(${TRTIS_ENABLE_GRPC_V2})
-  install(
-    PROGRAMS
-      grpc_v2_client.py
-      grpc_v2_explicit_byte_content_client.py
-      grpc_v2_explicit_int_content_client.py
-      grpc_v2_explicit_int8_content_client.py
-      grpc_v2_image_client.py
-      simple_grpc_v2_cudashm_client.py
-      simple_grpc_v2_health_metadata.py
-      simple_grpc_v2_async_infer_client.py
-      simple_grpc_v2_infer_client.py
-      simple_grpc_v2_sequence_stream_infer_client.py
-      simple_grpc_v2_sequence_sync_infer_client.py
-      simple_grpc_v2_string_infer_client.py
-      simple_grpc_v2_shm_client.py
-      simple_grpc_v2_model_control.py
-    DESTINATION python
-  )
-endif() # TRTIS_ENABLE_GRPC_V2
+  if [[ ! -f "VERSION" ]]; then
+    echo "Could not find VERSION"
+    exit 1
+  fi
 
-if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_GRPC_V2})
-  install(
-    PROGRAMS
-      v2_image_client.py
-    DESTINATION python
-  )
-endif() # TRTIS_ENABLE_HTTP_V2 || TRTIS_ENABLE_GRPC_V2
+  VERSION=`cat VERSION`
+  DEST="$1"
+  WHLDIR="$DEST/wheel"
+
+  echo $(date) : "=== Using builddir: ${WHLDIR}"
+  mkdir -p ${WHLDIR}/tritonsharedmemoryutils/
+
+  if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    mkdir -p ${WHLDIR}/tritonsharedmemoryutils/shared_memory
+    cp libcshmv2.so \
+      "${WHLDIR}/tritonsharedmemoryutils/shared_memory/."
+    cp shared_memory/__init__.py \
+      "${WHLDIR}/tritonsharedmemoryutils/shared_memory/."
+
+    if [ -f libccudashmv2.so ] && [ -f cuda_shared_memory/__init__.py ]; then
+      mkdir -p ${WHLDIR}/tritonsharedmemoryutils/cuda_shared_memory
+      cp libccudashmv2.so \
+        "${WHLDIR}/tritonsharedmemoryutils/cuda_shared_memory/."
+      cp cuda_shared_memory/__init__.py \
+        "${WHLDIR}/tritonsharedmemoryutils/cuda_shared_memory/."
+    fi
+  fi
+
+  cp shared_memory_setup.py "${WHLDIR}"
+  touch ${WHLDIR}/tritonsharedmemoryutils/__init__.py
+
+  pushd "${WHLDIR}"
+  echo $(date) : "=== Building wheel"
+  VERSION=$VERSION python${PYVER} shared_memory_setup.py bdist_wheel
+  mkdir -p "${DEST}"
+  cp dist/* "${DEST}"
+  popd
+  echo $(date) : "=== Output wheel file is in: ${DEST}"
+
+  touch ${DEST}/stamp.whl
+}
+
+main "$@"

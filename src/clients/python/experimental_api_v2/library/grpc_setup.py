@@ -53,11 +53,6 @@ try:
 except ImportError:
     bdist_wheel = None
 
-if not os.name == 'nt':
-    platform_package_data = [ 'libcshmv2.so' ]
-    if bool(os.environ.get('CUDA_VERSION', 0)):
-        platform_package_data += ['libccudashmv2.so']
-
 setup(
     name='tritongrpcclient',
     version=VERSION,
@@ -69,9 +64,6 @@ setup(
     keywords='triton tensorrt inference server service client',
     packages=find_packages(),
     install_requires=REQUIRED,
-    package_data={
-        '': platform_package_data,
-    },
     zip_safe=False,
     cmdclass={'bdist_wheel': bdist_wheel},
 )

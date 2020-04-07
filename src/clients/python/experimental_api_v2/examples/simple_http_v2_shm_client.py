@@ -27,13 +27,11 @@
 
 import argparse
 import numpy as np
-import os
 import sys
 from builtins import range
-import tritongrpcclient.core as grpcclient
-import tritonsharedmemoryutils.cuda_shared_memory as cudashm
-import tritongrpcclient.utils as utils
-from ctypes import *
+import tritonhttpclient.core as httpclient
+import tritonsharedmemoryutils.shared_memory as shm
+import tritonhttpclient.utils as utils
 
 FLAGS = None
 
@@ -49,13 +47,13 @@ if __name__ == '__main__':
                         '--url',
                         type=str,
                         required=False,
-                        default='localhost:8001',
-                        help='Inference server URL. Default is localhost:8001.')
+                        default='localhost:8000',
+                        help='Inference server URL. Default is localhost:8000.')
 
     FLAGS = parser.parse_args()
 
     try:
-        triton_client = grpcclient.InferenceServerClient(FLAGS.url)
+        triton_client = httpclient.InferenceServerClient(FLAGS.url)
     except Exception as e:
         print("channel creation failed: " + str(e))
         sys.exit(1)
@@ -81,50 +79,52 @@ if __name__ == '__main__':
     output_byte_size = input_byte_size
 
     # Create Output0 and Output1 in Shared Memory and store shared memory handles
-    shm_op0_handle = cudashm.create_shared_memory_region(
-        "output0_data", output_byte_size, 0)
-    shm_op1_handle = cudashm.create_shared_memory_region(
-        "output1_data", output_byte_size, 0)
+    shm_op0_handle = shm.create_shared_memory_region("output0_data",
+                                                     "/output0_simple",
+                                                     output_byte_size)
+    shm_op1_handle = shm.create_shared_memory_region("output1_data",
+                                                     "/output1_simple",
+                                                     output_byte_size)
 
     # Register Output0 and Output1 shared memory with Triton Server
-    triton_client.register_cuda_shared_memory(
-        "output0_data", cudashm.get_raw_handle(shm_op0_handle), 0,
-        output_byte_size)
-    triton_client.register_cuda_shared_memory(
-        "output1_data", cudashm.get_raw_handle(shm_op1_handle), 0,
-        output_byte_size)
+    triton_client.register_system_shared_memory("output0_data",
+                                                "/output0_simple",
+                                                output_byte_size)
+    triton_client.register_system_shared_memory("output1_data",
+                                                "/output1_simple",
+                                                output_byte_size)
 
     # Create Input0 and Input1 in Shared Memory and store shared memory handles
-    shm_ip0_handle = cudashm.create_shared_memory_region(
-        "input0_data", input_byte_size, 0)
-    shm_ip1_handle = cudashm.create_shared_memory_region(
-        "input1_data", input_byte_size, 0)
+    shm_ip0_handle = shm.create_shared_memory_region("input0_data",
+                                                     "/input0_simple",
+                                                     input_byte_size)
+    shm_ip1_handle = shm.create_shared_memory_region("input1_data",
+                                                     "/input1_simple",
+                                                     input_byte_size)
 
     # Put input data values into shared memory
-    cudashm.set_shared_memory_region(shm_ip0_handle, [input0_data])
-    cudashm.set_shared_memory_region(shm_ip1_handle, [input1_data])
+    shm.set_shared_memory_region(shm_ip0_handle, [input0_data])
+    shm.set_shared_memory_region(shm_ip1_handle, [input1_data])
 
     # Register Input0 and Input1 shared memory with Triton Server
-    triton_client.register_cuda_shared_memory(
-        "input0_data", cudashm.get_raw_handle(shm_ip0_handle), 0,
-        input_byte_size)
-    triton_client.register_cuda_shared_memory(
-        "input1_data", cudashm.get_raw_handle(shm_ip1_handle), 0,
-        input_byte_size)
+    triton_client.register_system_shared_memory("input0_data", "/input0_simple",
+                                                input_byte_size)
+    triton_client.register_system_shared_memory("input1_data", "/input1_simple",
+                                                input_byte_size)
 
     # Set the parameters to use data from shared memory
     inputs = []
-    inputs.append(grpcclient.InferInput('INPUT0', [1, 16], "INT32"))
+    inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
     inputs[-1].set_shared_memory("input0_data", input_byte_size)
 
-    inputs.append(grpcclient.InferInput('INPUT1', [1, 16], "INT32"))
+    inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
     inputs[-1].set_shared_memory("input1_data", input_byte_size)
 
     outputs = []
-    outputs.append(grpcclient.InferOutput('OUTPUT0'))
+    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=False))
     outputs[-1].set_shared_memory("output0_data", output_byte_size)
 
-    outputs.append(grpcclient.InferOutput('OUTPUT1'))
+    outputs.append(httpclient.InferOutput('OUTPUT1', binary_data=False))
     outputs[-1].set_shared_memory("output1_data", output_byte_size)
 
     results = triton_client.infer(model_name=model_name,
@@ -134,18 +134,18 @@ if __name__ == '__main__':
     # Read results from the shared memory.
     output0 = results.get_output("OUTPUT0")
     if output0 is not None:
-        output0_data = cudashm.get_contents_as_numpy(
-            shm_op0_handle, utils.triton_to_np_dtype(output0.datatype),
-            output0.shape)
+        output0_data = shm.get_contents_as_numpy(
+            shm_op0_handle, utils.triton_to_np_dtype(output0['datatype']),
+            output0['shape'])
     else:
         print("OUTPUT0 is missing in the response.")
         sys.exit(1)
 
     output1 = results.get_output("OUTPUT1")
     if output1 is not None:
-        output1_data = cudashm.get_contents_as_numpy(
-            shm_op1_handle, utils.triton_to_np_dtype(output1.datatype),
-            output1.shape)
+        output1_data = shm.get_contents_as_numpy(
+            shm_op1_handle, utils.triton_to_np_dtype(output1['datatype']),
+            output1['shape'])
     else:
         print("OUTPUT1 is missing in the response.")
         sys.exit(1)
@@ -156,17 +156,17 @@ if __name__ == '__main__':
         print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " +
               str(output1_data[0][i]))
         if (input0_data[i] + input1_data[i]) != output0_data[0][i]:
-            print("cudashm infer error: incorrect sum")
+            print("shm infer error: incorrect sum")
             sys.exit(1)
         if (input0_data[i] - input1_data[i]) != output1_data[0][i]:
-            print("cudashm infer error: incorrect difference")
+            print("shm infer error: incorrect difference")
             sys.exit(1)
 
-    print(triton_client.get_cuda_shared_memory_status())
-    triton_client.unregister_cuda_shared_memory()
-    cudashm.destroy_shared_memory_region(shm_ip0_handle)
-    cudashm.destroy_shared_memory_region(shm_ip1_handle)
-    cudashm.destroy_shared_memory_region(shm_op0_handle)
-    cudashm.destroy_shared_memory_region(shm_op1_handle)
+    print(triton_client.get_system_shared_memory_status())
+    triton_client.unregister_system_shared_memory()
+    shm.destroy_shared_memory_region(shm_ip0_handle)
+    shm.destroy_shared_memory_region(shm_ip1_handle)
+    shm.destroy_shared_memory_region(shm_op0_handle)
+    shm.destroy_shared_memory_region(shm_op1_handle)
 
-    print('PASS: cudashm')
+    print('PASS: system shared memory')
