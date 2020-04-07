@@ -25,50 +25,60 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/cond_var.h"
-#include <deque>
-#include <mutex>
+#include <condition_variable>
+#include <functional>
 
 namespace nvidia { namespace inferenceserver {
 
 //
-// C++11 doesn't have a sync queue so we implement a simple one.
+// Abstract class that acts like condition variable, which allows various
+// types of strategies for inter-thread communication
 //
-template <typename Item>
-class SyncQueue {
+template<class TritonMutex>
+class CondVar {
  public:
-  SyncQueue() = default;
+  virtual void Wait(std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) = 0;
+  virtual void NotifyAll() = 0;
+};
 
-  bool Empty()
-  {
-    std::lock_guard<std::mutex> lk(mu_);
-    return queue_.empty();
-  }
+template<class TritonMutex>
+class NullCondVar : public CondVar<TritonMutex> {
+public:
+  NullCondVar() = default;
 
-  Item Get()
+  void Wait(std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) override
   {
-    std::unique_lock<std::mutex> lk(mu_);
-    if (queue_.empty()) {
-      cv_.Wait(lk, [this] { return !queue_.empty(); });
+    lock.unlock();
+    while (true) {
+      while(!pred()) {
+        // busy-loop
+      }
+      lock.lock();
+      // must ensure the predicate still holds after acquiring the lock as
+      // multiple waiting threads may get out of the busy-loop simultaneously.
+      if (pred()) {
+        break;
+      }
+      lock.unlock();
     }
-    auto res = queue_.front();
-    queue_.pop_front();
-    return res;
   }
 
-  void Put(const Item& value)
+  void NotifyAll() override { return; }
+};
+
+template<class TritonMutex>
+class StdCondVar : public CondVar<TritonMutex> {
+public:
+  StdCondVar() = default;
+
+  void Wait(std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) override
   {
-    {
-      std::lock_guard<std::mutex> lk(mu_);
-      queue_.push_back(value);
-    }
-    cv_.NotifyAll();
+    cv_.wait(lock, pred);
   }
 
- private:
-  std::mutex mu_;
-  NullCondVar<std::mutex> cv_;
-  std::deque<Item> queue_;
+  void NotifyAll() override { cv_.notify_all(); }
+private:
+  std::condition_variable cv_;
 };
 
 }}  // namespace nvidia::inferenceserver
