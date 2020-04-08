@@ -216,7 +216,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
         model_regex_(
-            R"(/v2/models/([^/]+)(?:/version/([0-9]+))?(?:/(infer|ready|config))?)"),
+            R"(/v2/models/([^/]+)(?:/version/([0-9]+))?(?:/(infer|ready|config|stats))?)"),
         modelcontrol_regex_(
             R"(/v2/repository(?:/([^/]+))?/(index|model/([^/]+)/(load|unload)))"),
         systemsharedmemory_regex_(
@@ -367,6 +367,9 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
   void HandleInfer(
+      evhtp_request_t* req, const std::string& model_name,
+      const std::string& model_version_str);
+  void HandleModelStats(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
   void HandleRepositoryIndex(
@@ -879,6 +882,9 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
       // model configuration
       HandleModelConfig(req, model_name, version);
       return;
+    } else if (kind == "stats") {
+      // model statistics
+      HandleModelStats(req, model_name, version);
     } else if (kind == "") {
       // model metadata
       HandleModelMetadata(req, model_name, version);
@@ -1116,6 +1122,56 @@ HTTPAPIServerV2::HandleModelConfig(
     }
     TRITONSERVER_MessageDelete(message);
   }
+
+  if (err != nullptr) {
+    EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    TRITONSERVER_ErrorDelete(err);
+  }
+}
+
+void
+HTTPAPIServerV2::HandleModelStats(
+    evhtp_request_t* req, const std::string& model_name,
+    const std::string& model_version_str)
+{
+  if (req->method != htp_method_GET) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  if (model_name.empty()) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new("Content-Type", "application/json", 1, 1));
+
+#ifdef TRTIS_ENABLE_STATS
+  TRITONSERVER_Message* model_stats_message = nullptr;
+  auto err = TRITONSERVER_ServerModelStatistics(
+      server_.get(), model_name.c_str(), model_version_str.c_str(),
+      &model_stats_message);
+  if (err == nullptr) {
+    const char* buffer;
+    size_t byte_size;
+    err = TRITONSERVER_MessageSerializeToJson(
+        model_stats_message, &buffer, &byte_size);
+    if (err == nullptr) {
+      // Add the statistics to the response
+      evbuffer_add(req->buffer_out, buffer, byte_size);
+      evhtp_send_reply(req, EVHTP_RES_OK);
+    }
+    TRITONSERVER_MessageDelete(model_stats_message);
+  }
+
+#else
+  auto err = TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNAVAILABLE,
+      "the server does not suppport model statistics");
+#endif
 
   if (err != nullptr) {
     EVBufferAddErrorJson(req->buffer_out, err);
