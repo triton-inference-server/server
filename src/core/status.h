@@ -102,4 +102,17 @@ TRITONSERVER_Error_Code StatusCodeToTritonServerCode(Status::Code status_code);
     }                             \
   } while (false)
 
+// If TRITONSERVER error is non-OK, return the corresponding status.
+#define RETURN_IF_TRITONSERVER_ERROR(E)                                \
+  do {                                                                 \
+    TRITONSERVER_Error* err__ = (E);                                   \
+    if (err__ != nullptr) {                                            \
+      Status status__ = Status(                                        \
+          TritonServerCodeToStatusCode(TRITONSERVER_ErrorCode(err__)), \
+          TRITONSERVER_ErrorMessage(err__));                           \
+      TRITONSERVER_ErrorDelete(err__);                                 \
+      return status__;                                                 \
+    }                                                                  \
+  } while (false)
+
 }}  // namespace nvidia::inferenceserver

@@ -50,21 +50,20 @@ extern "C" {
 #endif
 
 struct TRITONSERVER_Error;
+struct TRITONSERVER_InferenceRequest;
+struct TRITONSERVER_Message;
+struct TRITONSERVER_Metrics;
 struct TRITONSERVER_ResponseAllocator;
 struct TRITONSERVER_Server;
 struct TRITONSERVER_ServerOptions;
 struct TRITONSERVER_Trace;
 struct TRITONSERVER_TraceManager;
 
-struct TRITONSERVER_Metrics;
-struct TRITONSERVER_Message;
-struct TRITONSERVER_InferenceRequest;
-
 /// Types of memory recognized by TRITONSERVER.
 typedef enum TRITONSERVER_memorytype_enum {
   TRITONSERVER_MEMORY_CPU,
-  TRITONSERVER_MEMORY_GPU,
-  TRITONSERVER_MEMORY_CPU_PINNED
+  TRITONSERVER_MEMORY_CPU_PINNED,
+  TRITONSERVER_MEMORY_GPU
 } TRITONSERVER_Memory_Type;
 
 /// TRITONSERVER_Error
@@ -128,42 +127,38 @@ TRITONSERVER_EXPORT const char* TRITONSERVER_ErrorMessage(
 
 /// TRITONSERVER_ResponseAllocator
 ///
-/// Object representing a memory allocator for inference response
-/// tensors.
+/// Object representing a memory allocator for output tensors in an
+/// inference response.
 ///
 
-/// Type for allocation function that allocates a buffer to hold a
-/// result tensor.
+/// Type for allocation function that allocates a buffer to hold an
+/// output tensor.
 ///
-/// Return in 'buffer' a pointer to the contiguous memory block of
-/// size 'byte_size' for result tensor called 'tensor_name'. The
-/// buffer must be allocated in the memory type identified by
-/// 'memory_type' and 'memory_type_id'. The 'userp' data is the same
-/// as what is supplied in the call to TRITONSERVER_ServerInferAsync.
-///
-/// Return in 'buffer_userp' a user-specified value to associate with
-/// the buffer. This value will be provided in the call to
-/// TRITONSERVER_ResponseAllocatorReleaseFn_t.
-///
-/// The function will be called once for each result tensor, even if
-/// the 'byte_size' required for that tensor is zero. When 'byte_size'
-/// is zero the function does not need to allocate any memory but may
-/// perform other tasks associated with the result tensor. In this
-/// case the function should return success and set 'buffer' ==
-/// nullptr.
-///
-/// If the function is called with 'byte_size' non-zero the function should
-/// allocate a contiguous buffer of the requested size. If possible the function
-/// should allocate the buffer in the requested 'memory_type' and
-/// 'memory_type_id', but the function is free to allocate the buffer in any
-/// memory. The function must return in 'actual_memory_type' and
-/// 'actual_memory_type_id' the memory where the buffer is allocated.
-///
-/// The function should return a TRITONSERVER_Error object if a failure
-/// occurs while attempting an allocation. If an error object is
-/// returned for a result tensor, the inference server will assume allocation
-/// is not possible for the result buffer and will abort the inference
-/// request.
+/// \param allocator The allocator that is provided in the call to
+/// TRITONSERVER_ServerInferAsync.
+/// \param tensor_name The name of the output tensor to allocate for.
+/// \param byte_size The size of the buffer to allocate.
+/// \param memory_type The type of memory that the caller prefers for
+/// the buffer allocation.
+/// \param memory_type_id The ID of the memory that the caller prefers
+/// for the buffer allocation.
+/// \param userp The user data pointer that is provided in the call to
+/// TRITONSERVER_ServerInferAsync.
+/// \param buffer Returns a pointer to the allocated memory.
+/// \param buffer_userp Returns a user-specified value to associate
+/// with the buffer, or nullptr if no user-specified value should be
+/// associated with the buffer. This value will be provided in the
+/// call to TRITONSERVER_ResponseAllocatorReleaseFn_t when the buffer
+/// is released.
+/// \param actual_memory_type Returns the type of memory where the
+/// allocation resides. May be different than the type of memory
+/// requested by 'memory_type'.
+/// \param actual_memory_type_id Returns the ID of the memory where
+/// the allocation resides. May be different than the ID of the memory
+/// requested by 'memory_type_id'.
+/// \return a TRITONSERVER_Error object if a failure occurs while
+/// attempting an allocation. If an error is returned all other return
+/// values will be ignored.
 typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorAllocFn_t)(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRITONSERVER_Memory_Type memory_type,
@@ -173,17 +168,21 @@ typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorAllocFn_t)(
 
 /// Type for function that is called when the server no longer holds
 /// any reference to a buffer allocated by
-/// TRITONSERVER_ResponseAllocatorAllocFn_t. In practice this function is
-/// called when the response object associated with the buffer is
-/// deleted by TRITONSERVER_InferenceResponseDelete.
+/// TRITONSERVER_ResponseAllocatorAllocFn_t. In practice this function
+/// is typically called when the response object associated with the
+/// buffer is deleted by TRITONSERVER_InferenceResponseDelete.
 ///
-/// The 'buffer' and 'buffer_userp' arguments equal those returned by
-/// TRITONSERVER_ResponseAllocatorAllocFn_t and 'byte_size',
-/// 'memory_type' and 'memory_type_id' equal the values passed to
-/// TRITONSERVER_ResponseAllocatorAllocFn_t.
-///
-/// Return a TRITONSERVER_Error object on failure, return nullptr on
-/// success.
+/// \param allocator The allocator that is provided in the call to
+/// TRITONSERVER_ServerInferAsync.
+/// \param buffer Pointer to the buffer to be freed.
+/// \param buffer_userp The user-specified value to associate
+/// with the buffer in TRITONSERVER_ResponseAllocatorReleaseFn_t.
+/// \param byte_size The size of the buffer.
+/// \param memory_type The type of memory holding the buffer.
+/// \param memory_type_id The ID of the memory holding the buffer.
+/// \return a TRITONSERVER_Error object if a failure occurs while
+/// attempting the release. If an error is returned Triton will not
+/// attempt to release the buffer again.
 typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorReleaseFn_t)(
     TRITONSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
     size_t byte_size, TRITONSERVER_Memory_Type memory_type,
