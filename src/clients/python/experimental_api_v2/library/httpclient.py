@@ -757,7 +757,9 @@ class InferenceServerClient:
             quote(name))
 
         register_request = {
-            'raw_handle': {'b64': raw_handle},
+            'raw_handle': {
+                'b64': raw_handle
+            },
             'device_id': device_id,
             'byte_size': byte_size
         }
@@ -1129,9 +1131,10 @@ class InferInput:
         valid_shape = True
         if len(self._shape) != len(input_tensor.shape):
             valid_shape = False
-        for i in range(len(self._shape)):
-            if self._shape[i] != input_tensor.shape[i]:
-                valid_shape = False
+        else:
+            for i in range(len(self._shape)):
+                if self._shape[i] != input_tensor.shape[i]:
+                    valid_shape = False
         if not valid_shape:
             raise_error(
                 "got unexpected numpy array shape [{}], expected [{}]".format(
@@ -1301,7 +1304,8 @@ class InferResult:
                 if parameters is not None:
                     this_data_size = parameters.get("binary_data_size")
                     if this_data_size is not None:
-                        self._output_name_to_buffer_map[output['name']] = buffer_index
+                        self._output_name_to_buffer_map[
+                            output['name']] = buffer_index
                         buffer_index = buffer_index + this_data_size
 
     def as_numpy(self, name):
@@ -1330,7 +1334,8 @@ class InferResult:
                         if this_data_size is not None:
                             has_binary_data = True
                             if this_data_size != 0:
-                                start_index = self._output_name_to_buffer_map[name]
+                                start_index = self._output_name_to_buffer_map[
+                                    name]
                                 end_index = start_index + this_data_size
                                 if datatype == 'BYTES':
                                     # String results contain a 4-byte string length
@@ -1345,7 +1350,7 @@ class InferResult:
                                         dtype=triton_to_np_dtype(datatype))
                     if not has_binary_data:
                         np_array = np.array(output['data'],
-                                    dtype=triton_to_np_dtype(datatype))
+                                            dtype=triton_to_np_dtype(datatype))
                     np_array = np.resize(np_array, output['shape'])
                     return np_array
         return None

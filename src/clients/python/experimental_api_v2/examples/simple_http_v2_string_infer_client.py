@@ -31,6 +31,31 @@ import sys
 
 import tritonhttpclient.core as httpclient
 
+
+def TestIdentityInference(np_array, binary_data):
+    model_name = "savedmodel_zero_1_object"
+    inputs = []
+    outputs = []
+
+    inputs.append(httpclient.InferInput('INPUT0', np_array.shape, "BYTES"))
+    inputs[0].set_data_from_numpy(np_array, binary_data=binary_data)
+
+    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=binary_data))
+
+    results = triton_client.infer(model_name=model_name,
+                                  inputs=inputs,
+                                  outputs=outputs)
+    if np_array.dtype == np.object:
+        if not np.array_equal(np_array,
+                              np.char.decode(results.as_numpy('OUTPUT0'))):
+            print(results.as_numpy('OUTPUT0'))
+            sys.exit(1)
+    else:
+        if not np.array_equal(np_array, results.as_numpy('OUTPUT0')):
+            print(results.as_numpy('OUTPUT0'))
+            sys.exit(1)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-v',
@@ -103,23 +128,18 @@ if __name__ == '__main__':
         if expected_diff[0][i] != r1:
             print("error: incorrect difference")
             sys.exit(1)
-    
-    # Test with an identity model
-    model_name = "savedmodel_zero_1_object"
-    inputs.clear()
-    outputs.clear()
-    inputs.append(httpclient.InferInput('INPUT0', [1, 16], "BYTES"))
 
-    null_chars_array = np.array([u'he\0llo' for i in range(16)], dtype=object)
+    # Test with null character
+    null_chars_array = np.array(["he\x00llo" for i in range(16)], dtype=object)
     null_char_data = null_chars_array.reshape([1, 16])
-    inputs[0].set_data_from_numpy(null_char_data, binary_data=False)
-    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=False))
+    TestIdentityInference(null_char_data, True) # Using binary data
+    TestIdentityInference(null_char_data, False) # Using JSON data
 
-    results = triton_client.infer(model_name=model_name,
-                                  inputs=inputs,
-                                  outputs=outputs)
-    if not np.array_equal(null_char_data, results.as_numpy('OUTPUT0')):
-        print(results.as_numpy('OUTPUT0'))
-        sys.exit(1)
+    # Test with byte arrays
+    bytes_data = [b'1' for i in range(16)]
+    np_bytes_data = np.array(bytes_data, dtype=bytes)
+    np_bytes_data = np_bytes_data.reshape([1, 16])
+    TestIdentityInference(np_bytes_data, True) # Using binary data
+    TestIdentityInference(np_bytes_data, False) # Using JSON data
 
     print('PASS: string')
