@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,76 +26,21 @@
 
 #define DLL_EXPORTING
 
-#include "src/clients/c++/library/request.h"
+#include "src/clients/c++/experimental_api_v2/library/utils.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
 //==============================================================================
 
-ServerHealthContext::~ServerHealthContext() {}
-ServerStatusContext::~ServerStatusContext() {}
-ModelRepositoryContext::~ModelRepositoryContext() {}
-ModelControlContext::~ModelControlContext() {}
-SharedMemoryControlContext::~SharedMemoryControlContext() {}
-InferContext::Input::~Input() {}
-InferContext::Output::~Output() {}
-InferContext::Result::~Result() {}
-InferContext::Options::~Options() {}
-InferContext::Request::~Request() {}
-InferContext::~InferContext() {}
+const Error Error::Success("");
 
-//==============================================================================
-
-template <>
-Error
-InferContext::Result::GetRawAtCursor(size_t batch_idx, std::string* out)
-{
-  Error err;
-
-  const uint8_t* len_ptr;
-  err = GetRawAtCursor(batch_idx, &len_ptr, sizeof(uint32_t));
-  if (!err.IsOk()) {
-    return err;
-  }
-
-  const uint32_t len = *(reinterpret_cast<const uint32_t*>(len_ptr));
-
-  const uint8_t* str_ptr;
-  err = GetRawAtCursor(batch_idx, &str_ptr, len);
-  if (!err.IsOk()) {
-    return err;
-  }
-
-  out->clear();
-  std::copy(str_ptr, str_ptr + len, std::back_inserter(*out));
-
-  return Error::Success;
-}
-
-//==============================================================================
-
-const Error Error::Success(RequestStatusCode::SUCCESS);
-
-Error::Error(RequestStatusCode code, const std::string& msg)
-    : code_(code), msg_(msg), request_id_(0)
-{
-}
-
-Error::Error(RequestStatusCode code) : code_(code), request_id_(0) {}
-
-Error::Error(const RequestStatus& status) : Error(status.code(), status.msg())
-{
-  server_id_ = status.server_id();
-  request_id_ = status.request_id();
-}
+Error::Error(const std::string& msg) : msg_(msg) {}
 
 std::ostream&
 operator<<(std::ostream& out, const Error& err)
 {
-  out << "[" << err.server_id_ << " " << err.request_id_ << "] "
-      << RequestStatusCode_Name(err.code_);
   if (!err.msg_.empty()) {
-    out << " - " << err.msg_;
+    out << err.msg_;
   }
   return out;
 }

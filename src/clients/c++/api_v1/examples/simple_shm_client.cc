@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -24,18 +24,12 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#cmakedefine TRTIS_CLIENT_HEADER_FLAT 1
-
 #include <unistd.h>
 #include <iostream>
 #include <string>
-#ifdef TRTIS_CLIENT_HEADER_FLAT
-#include "request_grpc.h"
-#include "request_http.h"
-#else
-#include "src/clients/c++/library/request_grpc.h"
-#include "src/clients/c++/library/request_http.h"
-#endif
+#include "src/clients/c++/api_v1/examples/shm_utils.h"
+#include "src/clients/c++/api_v1/library/request_grpc.h"
+#include "src/clients/c++/api_v1/library/request_http.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
@@ -63,14 +57,9 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-i <Protocol used to communicate with inference service>"
             << std::endl;
   std::cerr << "\t-u <URL for inference service>" << std::endl;
-  std::cerr << "\t-H <HTTP header>" << std::endl;
   std::cerr << std::endl;
-  std::cerr
-      << "For -i, available protocols are 'grpc' and 'http'. Default is 'http."
-      << std::endl;
-  std::cerr
-      << "For -H, header must be 'Header:Value'. May be given multiple times."
-      << std::endl;
+  std::cerr << "For -i, available protocols are 'grpc' and 'http'."
+            << "Default is 'http." << std::endl;
 
   exit(1);
 }
@@ -87,7 +76,7 @@ main(int argc, char** argv)
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vi:u:H:")) != -1) {
+  while ((opt = getopt(argc, argv, "vi:u:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
@@ -98,12 +87,6 @@ main(int argc, char** argv)
       case 'u':
         url = optarg;
         break;
-      case 'H': {
-        std::string arg = optarg;
-        std::string header = arg.substr(0, arg.find(":"));
-        http_headers[header] = arg.substr(header.size() + 1);
-        break;
-      }
       case '?':
         Usage(argv);
         break;
@@ -198,48 +181,108 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  // Set the context options to do batch-size 1 requests. Also request
-  // that all output tensors be returned.
+  // Create the shared memory control context
+  std::unique_ptr<nic::SharedMemoryControlContext> shared_memory_ctx;
+  if (protocol == "http") {
+    err = nic::SharedMemoryControlHttpContext::Create(
+        &shared_memory_ctx, url, http_headers, verbose);
+  } else {
+    err = nic::SharedMemoryControlGrpcContext::Create(
+        &shared_memory_ctx, url, verbose);
+  }
+  if (!err.IsOk()) {
+    std::cerr << "error: unable to create shared memory control context: "
+              << err << std::endl;
+    exit(1);
+  }
+
+  std::shared_ptr<nic::InferContext::Input> input0, input1;
+  std::shared_ptr<nic::InferContext::Output> output0, output1;
+  FAIL_IF_ERR(infer_ctx->GetInput("INPUT0", &input0), "unable to get INPUT0");
+  FAIL_IF_ERR(infer_ctx->GetInput("INPUT1", &input1), "unable to get INPUT1");
+  FAIL_IF_ERR(
+      infer_ctx->GetOutput("OUTPUT0", &output0), "unable to get OUTPUT0");
+  FAIL_IF_ERR(
+      infer_ctx->GetOutput("OUTPUT1", &output1), "unable to get OUTPUT1");
+
+  FAIL_IF_ERR(input0->Reset(), "unable to reset INPUT0");
+  FAIL_IF_ERR(input1->Reset(), "unable to reset INPUT1");
+
+  // Get the size of the inputs and outputs from the Shape and DataType
+  int input_byte_size =
+      infer_ctx->ByteSize(input0->Dims(), ni::DataType::TYPE_INT32);
+  int output_byte_size =
+      infer_ctx->ByteSize(output0->Dims(), ni::DataType::TYPE_INT32);
+
+  // Create Output0 and Output1 in Shared Memory
+  std::string shm_key = "/output_simple";
+  int shm_fd_op;
+  int* output0_shm;
+  FAIL_IF_ERR(
+      nic::CreateSharedMemoryRegion(shm_key, output_byte_size * 2, &shm_fd_op),
+      "");
+  FAIL_IF_ERR(
+      nic::MapSharedMemory(
+          shm_fd_op, 0, output_byte_size * 2, (void**)&output0_shm),
+      "");
+  FAIL_IF_ERR(nic::CloseSharedMemory(shm_fd_op), "");
+  int* output1_shm = (int*)(output0_shm + 16);
+
+  // Register Output shared memory with TRTIS
+  err = shared_memory_ctx->RegisterSharedMemory(
+      "output_data", "/output_simple", 0, output_byte_size * 2);
+  if (!err.IsOk()) {
+    std::cerr << "error: unable to register shared memory output region: "
+              << err << std::endl;
+    exit(1);
+  }
+
+  // Set the context options to do batch-size 1 requests. Also request that
+  // all output tensors be returned using shared memory.
   std::unique_ptr<nic::InferContext::Options> options;
   FAIL_IF_ERR(
       nic::InferContext::Options::Create(&options),
       "unable to create inference options");
 
   options->SetBatchSize(1);
-  for (const auto& output : infer_ctx->Outputs()) {
-    options->AddRawResult(output);
-  }
+  options->AddSharedMemoryResult(output0, "output_data", 0, output_byte_size);
+  options->AddSharedMemoryResult(
+      output1, "output_data", output_byte_size, output_byte_size);
 
   FAIL_IF_ERR(
       infer_ctx->SetRunOptions(*options), "unable to set inference options");
 
-  // Create the data for the two input tensors. Initialize the first
-  // to unique integers and the second to all ones.
-  std::vector<int32_t> input0_data(16);
-  std::vector<int32_t> input1_data(16);
+  // Create Input0 and Input1 in Shared Memory. Initialize Input0 to unique
+  // integers and Input1 to all ones.
+  shm_key = "/input_simple";
+  int shm_fd_ip, *input0_shm;
+  FAIL_IF_ERR(
+      nic::CreateSharedMemoryRegion(shm_key, input_byte_size * 2, &shm_fd_ip),
+      "");
+  FAIL_IF_ERR(
+      nic::MapSharedMemory(
+          shm_fd_ip, 0, input_byte_size * 2, (void**)&input0_shm),
+      "");
+  FAIL_IF_ERR(nic::CloseSharedMemory(shm_fd_ip), "");
+  int* input1_shm = (int*)(input0_shm + 16);
   for (size_t i = 0; i < 16; ++i) {
-    input0_data[i] = i;
-    input1_data[i] = 1;
+    *(input0_shm + i) = i;
+    *(input1_shm + i) = 1;
   }
 
-  // Initialize the inputs with the data.
-  std::shared_ptr<nic::InferContext::Input> input0, input1;
-  FAIL_IF_ERR(infer_ctx->GetInput("INPUT0", &input0), "unable to get INPUT0");
-  FAIL_IF_ERR(infer_ctx->GetInput("INPUT1", &input1), "unable to get INPUT1");
-
-  FAIL_IF_ERR(input0->Reset(), "unable to reset INPUT0");
-  FAIL_IF_ERR(input1->Reset(), "unable to reset INPUT1");
-
+  // Register Input shared memory with TRTIS
   FAIL_IF_ERR(
-      input0->SetRaw(
-          reinterpret_cast<uint8_t*>(&input0_data[0]),
-          input0_data.size() * sizeof(int32_t)),
-      "unable to set data for INPUT0");
+      shared_memory_ctx->RegisterSharedMemory(
+          "input_data", "/input_simple", 0, input_byte_size * 2),
+      "unable to register shared memory output region");
+
+  // Set the shared memory region for Inputs
   FAIL_IF_ERR(
-      input1->SetRaw(
-          reinterpret_cast<uint8_t*>(&input1_data[0]),
-          input1_data.size() * sizeof(int32_t)),
-      "unable to set data for INPUT1");
+      input0->SetSharedMemory("input_data", 0, input_byte_size),
+      "failed to set shared memory input");
+  FAIL_IF_ERR(
+      input1->SetSharedMemory("input_data", input_byte_size, input_byte_size),
+      "failed to set shared memory input");
 
   // Send inference request to the inference server.
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
@@ -253,27 +296,42 @@ main(int argc, char** argv)
   }
 
   for (size_t i = 0; i < 16; ++i) {
-    int32_t r0, r1;
-    FAIL_IF_ERR(
-        results["OUTPUT0"]->GetRawAtCursor(0 /* batch idx */, &r0),
-        "unable to get OUTPUT0 result at idx " + std::to_string(i));
-    FAIL_IF_ERR(
-        results["OUTPUT1"]->GetRawAtCursor(0 /* batch idx */, &r1),
-        "unable to get OUTPUT1 result at idx " + std::to_string(i));
-    std::cout << input0_data[i] << " + " << input1_data[i] << " = " << r0
-              << std::endl;
-    std::cout << input0_data[i] << " - " << input1_data[i] << " = " << r1
-              << std::endl;
+    std::cout << input0_shm[i] << " + " << input1_shm[i] << " = "
+              << output0_shm[i] << std::endl;
+    std::cout << input0_shm[i] << " - " << input1_shm[i] << " = "
+              << output1_shm[i] << std::endl;
 
-    if ((input0_data[i] + input1_data[i]) != r0) {
+    if ((input0_shm[i] + input1_shm[i]) != output0_shm[i]) {
       std::cerr << "error: incorrect sum" << std::endl;
       exit(1);
     }
-    if ((input0_data[i] - input1_data[i]) != r1) {
+    if ((input0_shm[i] - input1_shm[i]) != output1_shm[i]) {
       std::cerr << "error: incorrect difference" << std::endl;
       exit(1);
     }
   }
+
+  // Get shared memory regions all active/registered within TRTIS
+  ni::SharedMemoryStatus status;
+  FAIL_IF_ERR(
+      shared_memory_ctx->GetSharedMemoryStatus(&status),
+      "failed to get shared memory status");
+  std::cout << "Shared Memory Status:\n" << status.DebugString() << "\n";
+
+  // Unregister shared memory (One by one or all at a time) from TRTIS
+  // err = shared_memory_ctx->UnregisterAllSharedMemory();
+  FAIL_IF_ERR(
+      shared_memory_ctx->UnregisterSharedMemory("input_data"),
+      "unable to unregister shared memory input region");
+  FAIL_IF_ERR(
+      shared_memory_ctx->UnregisterSharedMemory("output_data"),
+      "unable to unregister shared memory output region");
+
+  // Cleanup shared memory
+  FAIL_IF_ERR(nic::UnmapSharedMemory(input0_shm, input_byte_size * 2), "");
+  FAIL_IF_ERR(nic::UnlinkSharedMemoryRegion("/input_simple"), "");
+  FAIL_IF_ERR(nic::UnmapSharedMemory(output0_shm, output_byte_size * 2), "");
+  FAIL_IF_ERR(nic::UnlinkSharedMemoryRegion("/output_simple"), "");
 
   return 0;
 }

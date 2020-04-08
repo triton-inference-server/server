@@ -34,8 +34,8 @@
 #include <rapidjson/document.h>
 #include <sys/stat.h>
 #include "rapidjson/rapidjson.h"
-#include "src/clients/c++/library/request_grpc.h"
-#include "src/clients/c++/library/request_http.h"
+#include "src/clients/c++/api_v1/library/request_grpc.h"
+#include "src/clients/c++/api_v1/library/request_http.h"
 #include "src/core/constants.h"
 
 namespace ni = nvidia::inferenceserver;

@@ -26,7 +26,7 @@
 #pragma once
 
 #include <stddef.h>
-#include "src/clients/c++/library/request.h"
+#include "src/clients/c++/api_v1/library/request.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;

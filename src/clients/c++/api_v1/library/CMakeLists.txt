@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -164,10 +164,10 @@ install(
 )
 install(
   FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/../../../core/api.pb.h
-    ${CMAKE_CURRENT_BINARY_DIR}/../../../core/model_config.pb.h
-    ${CMAKE_CURRENT_BINARY_DIR}/../../../core/request_status.pb.h
-    ${CMAKE_CURRENT_BINARY_DIR}/../../../core/server_status.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../../../core/api.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../../../core/model_config.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../../../core/request_status.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../../../core/server_status.pb.h
   DESTINATION include
 )
 

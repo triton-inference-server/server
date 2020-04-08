@@ -219,6 +219,7 @@ COPY --from=build /workspace/qa/ qa/
 RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp install/bin/* qa/clients/. && \
     cp install/lib/librequest.so qa/clients/. && \
+    cp install/lib/libgrpcclient.so qa/clients/. && \
     cp install/python/*.py qa/clients/. && \
     cp install/python/tensorrtserver*.whl qa/pkgs/. && \
     cp install/python/triton*.whl qa/pkgs/.
