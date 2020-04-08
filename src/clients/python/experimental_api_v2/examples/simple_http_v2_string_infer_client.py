@@ -104,7 +104,7 @@ if __name__ == '__main__':
             print("error: incorrect difference")
             sys.exit(1)
     
-    # Test with an identity model character
+    # Test with an identity model
     model_name = "savedmodel_zero_1_object"
     inputs.clear()
     outputs.clear()
