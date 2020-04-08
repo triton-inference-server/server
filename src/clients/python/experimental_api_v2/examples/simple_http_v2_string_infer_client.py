@@ -103,5 +103,23 @@ if __name__ == '__main__':
         if expected_diff[0][i] != r1:
             print("error: incorrect difference")
             sys.exit(1)
+    
+    # Test with an identity model character
+    model_name = "savedmodel_zero_1_object"
+    inputs.clear()
+    outputs.clear()
+    inputs.append(httpclient.InferInput('INPUT0', [1, 16], "BYTES"))
+
+    null_chars_array = np.array([u'he\0llo' for i in range(16)], dtype=object)
+    null_char_data = null_chars_array.reshape([1, 16])
+    inputs[0].set_data_from_numpy(null_char_data, binary_data=False)
+    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=False))
+
+    results = triton_client.infer(model_name=model_name,
+                                  inputs=inputs,
+                                  outputs=outputs)
+    if not np.array_equal(null_char_data, results.as_numpy('OUTPUT0')):
+        print(results.as_numpy('OUTPUT0'))
+        sys.exit(1)
 
     print('PASS: string')

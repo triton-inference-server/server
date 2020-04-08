@@ -58,6 +58,8 @@ wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
 (cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
 mv /tmp/inception_v3_2016_08_28_frozen.pb models/inception_graphdef/1/model.graphdef
 
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/savedmodel_zero_1_object models/
+
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver

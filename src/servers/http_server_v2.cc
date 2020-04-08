@@ -549,8 +549,7 @@ GetDataByteSizeFromJson(const rapidjson::Value& payload_data, size_t* byte_size)
   for (size_t i = 0; i < payload_data.Size(); i++) {
     // If last dimension
     if (!payload_data[i].IsArray()) {
-      const char* cstr = payload_data[i].GetString();
-      uint32_t len = strlen(cstr);
+      uint32_t len = payload_data[i].GetStringLength();
       *byte_size += len + sizeof(uint32_t);
     }
     // If not last dimension
@@ -626,7 +625,7 @@ ReadDataFromJsonHelper(
         }
         case TYPE_STRING: {
           const char* cstr = payload_data[i].GetString();
-          uint32_t len = strlen(cstr);
+          uint32_t len = payload_data[i].GetStringLength();
           memcpy(
               base->data() + *counter, reinterpret_cast<char*>(&len),
               sizeof(uint32_t));
