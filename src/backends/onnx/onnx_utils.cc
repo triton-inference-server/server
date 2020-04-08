@@ -32,6 +32,28 @@ const OrtApi* ort_api = OrtGetApiBase()->GetApi(ORT_API_VERSION);
 
 namespace {
 
+std::string
+OnnxTypeName(ONNXType onnx_type)
+{
+  switch (onnx_type) {
+    case ONNX_TYPE_TENSOR:
+      return "ONNX_TYPE_TENSOR";
+    case ONNX_TYPE_SEQUENCE:
+      return "ONNX_TYPE_SEQUENCE";
+    case ONNX_TYPE_MAP:
+      return "ONNX_TYPE_MAP";
+    case ONNX_TYPE_OPAQUE:
+      return "ONNX_TYPE_OPAQUE";
+    case ONNX_TYPE_SPARSETENSOR:
+      return "ONNX_TYPE_SPARSETENSOR";
+    case ONNX_TYPE_UNKNOWN:
+    default:
+      break;
+  }
+
+  return "ONNX_TYPE_UNKNOWN";
+}
+
 Status
 InputOutputNames(
     OrtSession* session, bool is_input, std::set<std::string>& names)
@@ -105,6 +127,16 @@ InputOutputInfos(
 
     OrtResourceWrapper<OrtTypeInfo*> typeinfo_wrapper(
         typeinfo, ort_api->ReleaseTypeInfo);
+
+    ONNXType onnx_type;
+    RETURN_IF_ORT_ERROR(ort_api->GetOnnxTypeFromTypeInfo(typeinfo, &onnx_type));
+    if (onnx_type != ONNX_TYPE_TENSOR) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "Unsupported ONNX Type '" + OnnxTypeName(onnx_type) + "' for I/O '" +
+              name + "', expected '" + OnnxTypeName(ONNX_TYPE_TENSOR) + "'.");
+    }
+
     const OrtTensorTypeAndShapeInfo* tensor_info;
     RETURN_IF_ORT_ERROR(
         ort_api->CastTypeInfoToTensorInfo(typeinfo, &tensor_info));
