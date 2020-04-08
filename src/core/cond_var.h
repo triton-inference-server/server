@@ -37,15 +37,19 @@ namespace nvidia { namespace inferenceserver {
 template <class TritonMutex>
 class CondVar {
  public:
+  // Wait until 'pred' is evaluated to true. 'lock' will be unlocked during
+  // the wait and it will be reaquired when the function returns.
   virtual void Wait(
       std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) = 0;
+
+  // Notify all waiting threads to re-evaluate their predicates.
   virtual void NotifyAll() = 0;
 };
 
 template <class TritonMutex>
-class NullCondVar : public CondVar<TritonMutex> {
+class BusyWaitCondVar : public CondVar<TritonMutex> {
  public:
-  NullCondVar() = default;
+  BusyWaitCondVar() = default;
 
   void Wait(
       std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) override
