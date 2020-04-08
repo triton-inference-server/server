@@ -150,7 +150,7 @@ exhale_args = {
     "exhaleExecutesDoxygen": True,
     "exhaleDoxygenStdin": textwrap.dedent('''
         JAVADOC_AUTOBRIEF = YES
-    INPUT = ../src/core/trtserver.h ../src/clients/c++/library/request.h ../src/clients/c++/library/request_grpc.h ../src/clients/c++/library/request_http.h ../src/backends/custom/custom.h ../src/custom/sdk/custom_instance.h
+    INPUT = ../src/core/trtserver.h ../src/clients/c++/api_v1/library/request.h ../src/clients/c++/api_v1/library/request_grpc.h ../src/clients/c++/api_v1/library/request_http.h ../src/backends/custom/custom.h ../src/custom/sdk/custom_instance.h
     ''')
 }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 #include <iostream>
 #include <string>
 
-#include "src/clients/c++/examples/shm_utils.h"
+#include "src/clients/c++/api_v1/examples/shm_utils.h"
 
 
 // namespace ni = nvidia::inferenceserver;

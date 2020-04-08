@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -37,8 +37,8 @@
 #include <mutex>
 #include <queue>
 #include <string>
-#include "src/clients/c++/library/request_grpc.h"
-#include "src/clients/c++/library/request_http.h"
+#include "src/clients/c++/api_v1/library/request_grpc.h"
+#include "src/clients/c++/api_v1/library/request_http.h"
 #include "src/core/model_config.pb.h"
 
 #include <opencv2/core/version.hpp>

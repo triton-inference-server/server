@@ -27,8 +27,8 @@
 #include "src/clients/python/api_v1/library/crequest.h"
 
 #include <iostream>
-#include "src/clients/c++/library/request_grpc.h"
-#include "src/clients/c++/library/request_http.h"
+#include "src/clients/c++/api_v1/library/request_grpc.h"
+#include "src/clients/c++/api_v1/library/request_http.h"
 #include "src/clients/python/api_v1/library/shared_memory/shared_memory_handle.h"
 
 namespace ni = nvidia::inferenceserver;

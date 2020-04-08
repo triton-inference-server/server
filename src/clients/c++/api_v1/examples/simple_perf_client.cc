@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -32,8 +32,8 @@
 #include <mutex>
 #include <string>
 #include <thread>
-#include "src/clients/c++/library/request_grpc.h"
-#include "src/clients/c++/library/request_http.h"
+#include "src/clients/c++/api_v1/library/request_grpc.h"
+#include "src/clients/c++/api_v1/library/request_http.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;

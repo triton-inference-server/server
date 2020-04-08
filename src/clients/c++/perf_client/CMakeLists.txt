@@ -44,7 +44,7 @@ set(
   concurrency_manager.cc
   request_rate_manager.cc
   custom_load_manager.cc
-  ../examples/shm_utils.cc
+  ../api_v1/examples/shm_utils.cc
 )
 
 set(
@@ -57,7 +57,7 @@ set(
   concurrency_manager.h
   request_rate_manager.h
   custom_load_manager.h
-  ../examples/shm_utils.h
+  ../api_v1/examples/shm_utils.h
 )
 
 add_executable(perf_client

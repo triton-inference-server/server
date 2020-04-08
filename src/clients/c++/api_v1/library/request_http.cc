@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,11 +26,11 @@
 
 #define DLL_EXPORTING
 
-#include "src/clients/c++/library/request_http.h"
+#include "src/clients/c++/api_v1/library/request_http.h"
 
 #include <curl/curl.h>
 #include <google/protobuf/text_format.h>
-#include "src/clients/c++/library/request_common.h"
+#include "src/clients/c++/api_v1/library/request_common.h"
 
 // MSVC equivalent of POSIX call
 #ifdef _MSC_VER

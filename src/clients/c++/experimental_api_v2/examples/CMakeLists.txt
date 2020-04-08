@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,13 +26,31 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-add_subdirectory(api_v1/library)
-add_subdirectory(api_v1/examples)
+if(WIN32)
+  message("Currently, CMake will only build client library and skip example "
+          "clients in Windows. Because the examples use functionalities that "
+		      "are UNIX specific.")
+else()
+  install(
+    FILES
+      ${CMAKE_SOURCE_DIR}/../../VERSION
+    DESTINATION .
+  )
 
-# Build V2 api if required
-if(TRTIS_ENABLE_GRPC_V2 OR TRTIS_ENABLE_HTTP_V2)
-    add_subdirectory(experimental_api_v2/library)
-    add_subdirectory(experimental_api_v2/examples)
-endif()
+  if(${TRTIS_ENABLE_GRPC_V2})
 
-add_subdirectory(perf_client)
+    #
+    # simple_grpc_v2_health_metadata
+    #
+    add_executable(simple_grpc_v2_health_metadata simple_grpc_v2_health_metadata.cc)
+    target_link_libraries(
+      simple_grpc_v2_health_metadata
+      PRIVATE TRTIS::grpcclient_static
+    )
+    install(
+      TARGETS simple_grpc_v2_health_metadata
+      RUNTIME DESTINATION bin
+    )
+  
+  endif()  # TRTIS_ENABLE_GRPC_V2
+endif() # WIN32

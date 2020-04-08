@@ -188,8 +188,8 @@ Image Classification Example Application
 ----------------------------------------
 
 The image classification example that uses the C++ client API is
-available at `src/clients/c++/examples/image\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/examples/image_client.cc>`_. The
+available at `src/clients/c++/api_v1/examples/image\_client.cc
+<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/api_v1/examples/image_client.cc>`_. The
 Python version of the image classification client is available at
 `src/clients/python/api_v1/examples/image\_client.py
 <https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/api_v1/examples/image_client.py>`_.
@@ -305,8 +305,8 @@ custom backend and a Caffe2 ResNet50 model. This ensemble allows you
 to send the raw image binaries in the request and receive
 classification results without preprocessing the images on the
 client. The ensemble image classification example that uses the C++
-client API is available at `src/clients/c++/examples/ensemble\_image\_client.cc
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/examples/ensemble_image_client.cc>`_.
+client API is available at `src/clients/c++/api_v1/examples/ensemble\_image\_client.cc
+<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/c%2B%2B/api_v1/examples/ensemble_image_client.cc>`_.
 The Python version of the image classification client is available at
 `src/clients/python/api_v1/examples/ensemble\_image\_client.py
 <https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/api_v1/examples/ensemble_image_client.py>`_.
