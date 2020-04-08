@@ -1708,37 +1708,41 @@ HTTPAPIServerV2::EVBufferToInput(
             .c_str());
   }
 
-  rapidjson::Value& outputs_array = request_json["outputs"];
-  for (size_t i = 0; i < outputs_array.Size(); i++) {
-    rapidjson::Value& output = outputs_array[i];
-    const char* output_name = output["name"].GetString();
-    TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output_name);
+  // outputs is optional
+  itr = request_json.FindMember("outputs");
+  if (itr != request_json.MemberEnd()) {
+    rapidjson::Value& outputs_array = itr->value;
+    for (size_t i = 0; i < outputs_array.Size(); i++) {
+      rapidjson::Value& output = outputs_array[i];
+      const char* output_name = output["name"].GetString();
+      TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output_name);
 
-    uint64_t class_size = 0;
-    if (!CheckClassificationOutput(output, &class_size)) {
-      // Initialize System Memory for Output if it uses shared memory
-      uint64_t offset = 0, byte_size = 0;
-      const char* shm_region = nullptr;
-      if (CheckSharedMemoryData(output, &shm_region, &offset, &byte_size)) {
-        void* base;
-        TRITONSERVER_Memory_Type memory_type;
-        int64_t memory_type_id;
-        RETURN_IF_TRITON_ERR(shm_manager_->GetMemoryInfo(
-            shm_region, offset, &base, &memory_type, &memory_type_id));
+      uint64_t class_size = 0;
+      if (!CheckClassificationOutput(output, &class_size)) {
+        // Initialize System Memory for Output if it uses shared memory
+        uint64_t offset = 0, byte_size = 0;
+        const char* shm_region = nullptr;
+        if (CheckSharedMemoryData(output, &shm_region, &offset, &byte_size)) {
+          void* base;
+          TRITONSERVER_Memory_Type memory_type;
+          int64_t memory_type_id;
+          RETURN_IF_TRITON_ERR(shm_manager_->GetMemoryInfo(
+              shm_region, offset, &base, &memory_type, &memory_type_id));
 
-        // if shm_map_ does not exist, then create an empty shm_map
-        if (infer_req->response_meta_data_.shm_map_ == nullptr) {
-          infer_req->response_meta_data_.shm_map_ = new TensorShmMap;
+          // if shm_map_ does not exist, then create an empty shm_map
+          if (infer_req->response_meta_data_.shm_map_ == nullptr) {
+            infer_req->response_meta_data_.shm_map_ = new TensorShmMap;
+          }
+
+          infer_req->response_meta_data_.shm_map_->emplace(
+              std::string(output_name),
+              ShmInfo{static_cast<void*>(base), byte_size, memory_type,
+                      memory_type_id});
         }
-
-        infer_req->response_meta_data_.shm_map_->emplace(
-            std::string(output_name),
-            ShmInfo{static_cast<void*>(base), byte_size, memory_type,
-                    memory_type_id});
+      } else {
+        TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
+            irequest, output_name, class_size);
       }
-    } else {
-      TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
-          irequest, output_name, class_size);
     }
   }
 

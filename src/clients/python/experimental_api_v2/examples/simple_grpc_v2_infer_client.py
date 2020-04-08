@@ -75,7 +75,7 @@ if __name__ == '__main__':
     outputs.append(grpcclient.InferOutput('OUTPUT1'))
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
-                                  outputs=outputs,
+                                  outputs=None,
                                   headers={'test': '1'})
 
     statistics = triton_client.get_inference_statistics(model_name=model_name)

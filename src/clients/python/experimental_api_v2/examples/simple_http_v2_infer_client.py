@@ -47,7 +47,7 @@ def test_infer(model_name, input0_data, input1_data):
     query_params = {'test_1': 1, 'test_2': 2}
     results = triton_client.infer(model_name,
                                   inputs,
-                                  outputs=outputs,
+                                  outputs=None,
                                   query_params=query_params)
 
     return results
