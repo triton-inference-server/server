@@ -43,7 +43,7 @@
 
 
 namespace nvidia { namespace inferenceserver { namespace client {
-  
+
 //==============================================================================
 /// Error status reported by client API.
 ///

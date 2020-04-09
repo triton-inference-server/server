@@ -49,8 +49,7 @@ class InferenceServer;
 // called to verify and prepare the request. Verification involves
 // ensuring that any changes made since the last inference are
 // valid. Preparing involves removing/resetting any state left over
-// from the previous inference. After each inference
-// CleanupFromInference() must be called.
+// from the previous inference.
 //
 class InferenceRequest {
  public:
@@ -69,7 +68,7 @@ class InferenceRequest {
         const uint64_t dim_count);
 
     // The name of the input tensor. There is no mutable operator for
-    // the name because it is used in a InferenceReference map and a
+    // the name because it is used in a InferenceRequest map and a
     // mutable method would allow it to get out-of-sync.
     const std::string& Name() const { return name_; }
 
@@ -160,7 +159,7 @@ class InferenceRequest {
     RequestedOutput(const std::string& name, const uint32_t classification_cnt);
 
     // The name of the output tensor. There is no mutable operator for
-    // the name because it is used in a InferenceReference map and a
+    // the name because it is used in a InferenceRequest map and a
     // mutable method would allow it to get out-of-sync.
     const std::string& Name() const { return name_; }
 
