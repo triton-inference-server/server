@@ -324,9 +324,15 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
 
     evhtp_request_t* EvHtpRequest() const { return req_; }
 
-    static void InferComplete(
+    static void InferRequestComplete(
+        TRITONSERVER_Server* server, TRITONSERVER_InferenceRequest* request,
+        void* userp);
+    static void InferResponseComplete(
+        TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* response,
+        void* userp);
+    static void TraceManagerComplete(
         TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
-        TRITONSERVER_InferenceRequest* request, void* userp);
+        void* userp);
     evhtp_res FinalizeResponse(TRITONSERVER_InferenceRequest* request);
 
 #ifdef TRTIS_ENABLE_TRACING
@@ -1972,10 +1978,12 @@ HTTPAPIServerV2::HandleInfer(
       response_json.AddMember("model_version", model_version_val, allocator);
 
       err = TRITONSERVER_ServerInferAsync(
-          server_.get(), trace_manager, irequest, allocator_,
+          server_.get(), irequest, allocator_,
           reinterpret_cast<void*>(&infer_request->response_meta_data_),
-          InferRequestClass::InferComplete,
-          reinterpret_cast<void*>(infer_request.get()));
+          InferRequestComplete, nullptr /* request_release_userp */,
+          InferResponseComplete, reinterpret_cast<void*>(infer_request.get()),
+          trace_manager, TraceManagerComplete,
+          nullptr /* trace_release_userp */);
       if (err == nullptr) {
         infer_request.release();
       }
@@ -2056,14 +2064,36 @@ HTTPAPIServerV2::InferRequestClass::InferRequestClass(
 }
 
 void
-HTTPAPIServerV2::InferRequestClass::InferComplete(
+HTTPAPIServerV2::InferRequestClass::TraceManagerComplete(
     TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
-    TRITONSERVER_InferenceRequest* request, void* userp)
+    void* userp)
+{
+  // FIXME need to sort out trace manager handling
+}
+
+void
+HTTPAPIServerV2::InferRequestClass::InferRequestComplete(
+    TRITONSERVER_Server* server, TRITONSERVER_InferenceRequest* request,
+    void* userp)
+{
+  // FIXME can't delete here because needed in the lifetime of the
+  // response complete??
+  //  LOG_TRITONSERVER_ERROR(
+  //      TRITONSERVER_InferenceRequestDelete(request),
+  //      "deleting GRPC inference request");
+}
+
+
+void
+HTTPAPIServerV2::InferRequestClass::InferResponseComplete(
+    TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* response,
+    void* userp)
 {
   HTTPAPIServerV2::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServerV2::InferRequestClass*>(userp);
 
-  if (infer_request->FinalizeResponse(request) == EVHTP_RES_OK) {
+  // FIXME finalize
+  if (false /*infer_request->FinalizeResponse(response) == EVHTP_RES_OK*/) {
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
     evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
@@ -2073,8 +2103,8 @@ HTTPAPIServerV2::InferRequestClass::InferComplete(
   // 'infer_request' which will be deleted after the response is sent
   // in ReplayCallback.
   LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceRequestDelete(request),
-      "deleting inference request");
+      TRITONSERVER_InferenceResponseDelete(response),
+      "deleting inference response");
 }
 
 evhtp_res

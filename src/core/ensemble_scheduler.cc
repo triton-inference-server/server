@@ -48,7 +48,6 @@ struct Step {
 
   std::shared_ptr<InferenceBackend> backend_;
   std::shared_ptr<InferenceRequest> request_;
-  std::shared_ptr<InferResponseProvider> response_provider_;
   std::unordered_map<std::string, std::shared_ptr<AllocatedMemory>> output_map_;
   Status infer_status_;
 
@@ -69,9 +68,7 @@ class EnsembleContext {
   EnsembleContext(
       InferenceServer* is, EnsembleInfo* info,
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferenceRequest>& request,
-      const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(const Status&)> OnComplete, cudaStream_t stream);
+      const std::shared_ptr<InferenceRequest>& request, cudaStream_t stream);
 
   // Perform transition on 'context' state given the information of
   // 'completed_step'
@@ -176,8 +173,6 @@ class EnsembleContext {
   Status ensemble_status_;
   std::shared_ptr<ModelInferStats> stats_;
   std::shared_ptr<InferenceRequest> request_;
-  std::shared_ptr<InferResponseProvider> response_provider_;
-  std::function<void(const Status&)> OnComplete_;
 
   // Output tensors whose labels are not provided by the ensemble
   std::set<std::string> no_label_tensors_;
@@ -192,12 +187,9 @@ class EnsembleContext {
 EnsembleContext::EnsembleContext(
     InferenceServer* is, EnsembleInfo* info,
     const std::shared_ptr<ModelInferStats>& stats,
-    const std::shared_ptr<InferenceRequest>& request,
-    const std::shared_ptr<InferResponseProvider>& response_provider,
-    std::function<void(const Status&)> OnComplete, cudaStream_t stream)
+    const std::shared_ptr<InferenceRequest>& request, cudaStream_t stream)
     : is_(is), info_(info), stream_(stream), inflight_step_counter_(0),
-      stats_(stats), request_(request), response_provider_(response_provider),
-      OnComplete_(OnComplete),
+      stats_(stats), request_(request),
       allocator_(nullptr, TRTSERVER_ResponseAllocatorDelete)
 {
   // Obtain backend handles of all models in ensemble request such that
@@ -457,6 +449,8 @@ EnsembleContext::UpdateEnsembleState(
             // Check the inner model's lookup map first in case it is also an
             // ensemble model. In that case, the label of the inner model may
             // come from another model.
+#if 0
+            // FIXME don't need secondary lable provider
             InferResponseProvider::SecondaryLabelProvider provider;
             if (completed_step->response_provider_->GetSecondaryLabelProvider(
                     it->first, &provider)) {
@@ -468,6 +462,7 @@ EnsembleContext::UpdateEnsembleState(
               response_provider_->SetSecondaryLabelProvider(
                   *tensor_it, std::make_pair(it->first, label_provider));
             }
+#endif
             no_label_tensors_.erase(tensor_it);
           }
         } else {
@@ -534,8 +529,7 @@ EnsembleContext::InitStep(const size_t step_idx, std::shared_ptr<Step>* step)
   // SetBatchSize and adjust the input/output tensors to have
   // appropriate shape
   auto irequest = std::make_shared<InferenceRequest>(
-      istep.model_name_, istep.model_version_, istep.model_version_,
-      1 /* protocol_version */);
+      backend, istep.model_version_, 1 /* protocol_version */);
 
   // Request for ensemble model cannot override the timeout values for the
   // composing models. Thus currently the timeout field in request has no
@@ -572,18 +566,11 @@ EnsembleContext::InitStep(const size_t step_idx, std::shared_ptr<Step>* step)
   irequest->SetBatchSize((batch_size == 0 ? 1 : batch_size));
   irequest->SetPriority(priority_);
 
-  RETURN_IF_ERROR(irequest->PrepareForInference(*backend));
+  RETURN_IF_ERROR(irequest->PrepareForInference());
 
   step->reset(new Step(step_idx));
   (*step)->backend_ = backend;
   (*step)->request_ = std::move(irequest);
-
-  // Request header is stored in response provider as reference, so use
-  // header from request provider as the providers have same lifetime
-  RETURN_IF_ERROR(InferResponseProvider::Create(
-      (*step)->request_, (*step)->backend_->GetLabelProvider(),
-      allocator_.get(), ResponseAlloc, &((*step)->output_map_), ResponseRelease,
-      1 /* protocol_version */, &((*step)->response_provider_)));
 
   return Status::Success;
 }
@@ -745,6 +732,8 @@ void
 EnsembleContext::ScheduleSteps(
     const std::shared_ptr<EnsembleContext>& context, const StepList& steps)
 {
+  // FIXME
+#if 0
   for (const auto& step : steps) {
 #ifdef TRTIS_ENABLE_STATS
     auto infer_stats = std::make_shared<ModelInferStats>(
@@ -792,6 +781,7 @@ EnsembleContext::ScheduleSteps(
           Proceed(context, step);
         });
   }
+#endif
 }
 
 }  // namespace
@@ -808,9 +798,7 @@ EnsembleScheduler::Create(
 void
 EnsembleScheduler::Enqueue(
     const std::shared_ptr<ModelInferStats>& stats,
-    const std::shared_ptr<InferenceRequest>& request,
-    const std::shared_ptr<InferResponseProvider>& response_provider,
-    std::function<void(const Status&)> OnComplete)
+    const std::shared_ptr<InferenceRequest>& request)
 {
   std::shared_ptr<EnsembleContext> context(new EnsembleContext(
       is_, info_.get(), stats, request, response_provider, OnComplete,
