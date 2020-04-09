@@ -33,6 +33,7 @@ if(${TRTIS_ENABLE_HTTP_V2})
       simple_http_v2_infer_client.py
       simple_http_v2_string_infer_client.py
       simple_http_v2_async_infer_client.py
+      simple_http_v2_sequence_sync_infer_client.py
       simple_http_v2_cudashm_client.py
       simple_http_v2_shm_client.py
       simple_http_v2_model_control.py
