@@ -31,6 +31,31 @@ import sys
 
 import tritonhttpclient.core as httpclient
 
+
+def TestIdentityInference(np_array, binary_data):
+    model_name = "savedmodel_zero_1_object"
+    inputs = []
+    outputs = []
+
+    inputs.append(httpclient.InferInput('INPUT0', np_array.shape, "BYTES"))
+    inputs[0].set_data_from_numpy(np_array, binary_data=binary_data)
+
+    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=binary_data))
+
+    results = triton_client.infer(model_name=model_name,
+                                  inputs=inputs,
+                                  outputs=outputs)
+    if np_array.dtype == np.object:
+        if not np.array_equal(np_array,
+                              np.char.decode(results.as_numpy('OUTPUT0'))):
+            print(results.as_numpy('OUTPUT0'))
+            sys.exit(1)
+    else:
+        if not np.array_equal(np_array, results.as_numpy('OUTPUT0')):
+            print(results.as_numpy('OUTPUT0'))
+            sys.exit(1)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-v',
@@ -43,8 +68,8 @@ if __name__ == '__main__':
                         '--url',
                         type=str,
                         required=False,
-                        default='localhost:8001',
-                        help='Inference server URL. Default is localhost:8001.')
+                        default='localhost:8000',
+                        help='Inference server URL. Default is localhost:8000.')
 
     FLAGS = parser.parse_args()
     try:
@@ -74,10 +99,10 @@ if __name__ == '__main__':
     input1_data = in1n.reshape(in1.shape)
 
     # Initialize the data
-    inputs[0].set_data_from_numpy(input0_data, binary_data=False)
+    inputs[0].set_data_from_numpy(input0_data, binary_data=True)
     inputs[1].set_data_from_numpy(input1_data, binary_data=False)
 
-    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=False))
+    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=True))
     outputs.append(httpclient.InferOutput('OUTPUT1', binary_data=False))
 
     results = triton_client.infer(model_name=model_name,
@@ -103,5 +128,18 @@ if __name__ == '__main__':
         if expected_diff[0][i] != r1:
             print("error: incorrect difference")
             sys.exit(1)
+
+    # Test with null character
+    null_chars_array = np.array(["he\x00llo" for i in range(16)], dtype=object)
+    null_char_data = null_chars_array.reshape([1, 16])
+    TestIdentityInference(null_char_data, True) # Using binary data
+    TestIdentityInference(null_char_data, False) # Using JSON data
+
+    # Test with byte arrays
+    bytes_data = [b'1' for i in range(16)]
+    np_bytes_data = np.array(bytes_data, dtype=bytes)
+    np_bytes_data = np_bytes_data.reshape([1, 16])
+    TestIdentityInference(np_bytes_data, True) # Using binary data
+    TestIdentityInference(np_bytes_data, False) # Using JSON data
 
     print('PASS: string')
