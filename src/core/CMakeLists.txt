@@ -226,7 +226,6 @@ set(
   status.h
   tracing.h
   trtserver.h
-  trtserver2.h
   tritonserver.h
 )
 
