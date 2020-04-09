@@ -1419,8 +1419,7 @@ TRITONSERVER_InferenceRequestNew(
       lserver->GetInferenceBackend(model_name, model_int_version, &backend));
 
   std::unique_ptr<ni::InferenceRequest> request(new ni::InferenceRequest(
-      model_name, model_int_version, backend->Version(),
-      2 /* protocol_version */));
+      backend, model_int_version, 2 /* protocol_version */));
 
   *inference_request = reinterpret_cast<TRITONSERVER_InferenceRequest*>(
       new TritonInferenceRequest(backend, request.release()));
@@ -1731,7 +1730,7 @@ TRITONSERVER_ServerInferAsync(
   const auto& lbackend = ltrtrequest->Backend();
 
   ltrtrequest->SetResponse(nullptr);
-  RETURN_IF_STATUS_ERROR(lrequest->PrepareForInference(*lbackend));
+  RETURN_IF_STATUS_ERROR(lrequest->PrepareForInference());
 
 #ifdef TRTIS_ENABLE_STATS
   auto infer_stats = std::make_shared<ni::ModelInferStats>(

@@ -368,9 +368,9 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
     // Use batch-1 for every request, batch size is simulated by
     // populating requests for single run. FIXMEV2 once
     // protocol_version 2 is the only one remove SetBatchSize and
-    // adjust the input/output tensors to have appropriate shape
+    // adjust the input/output tensors to have appropriate shape.
     warmup_data.request_ =
-        std::make_shared<InferenceRequest>(Name(), Version(), Version(), 1);
+        std::make_shared<InferenceRequest>(this, Version(), 1);
     warmup_data.request_->SetBatchSize(1);
 
     // Request all outputs
@@ -446,7 +446,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
       }
     }
 
-    RETURN_IF_ERROR(warmup_data.request_->PrepareForInference(*this));
+    RETURN_IF_ERROR(warmup_data.request_->PrepareForInference());
 
     // Third pass to prepare control inputs.
     for (const auto& input_meta : warmup_setting.inputs()) {

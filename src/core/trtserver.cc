@@ -1035,8 +1035,7 @@ TRTSERVER_InferenceRequestProviderNewV2(
       loptions->ModelName(), loptions->ModelVersion(), &backend));
 
   std::unique_ptr<ni::InferenceRequest> request(new ni::InferenceRequest(
-      loptions->ModelName(), loptions->ModelVersion(), backend->Version(),
-      lserver->ProtocolVersion()));
+      backend, loptions->ModelVersion(), lserver->ProtocolVersion()));
   request->SetId(loptions->InferRequestHeader()->id());
 #ifdef TRTIS_ENABLE_GRPC_V2
   request->SetIdStr(loptions->IdStr());
@@ -1057,7 +1056,7 @@ TRTSERVER_InferenceRequestProviderNewV2(
     RETURN_IF_STATUS_ERROR(request->AddRequestedOutput(io.name(), cls_cnt));
   }
 
-  RETURN_IF_STATUS_ERROR(request->PrepareForInference(*backend));
+  RETURN_IF_STATUS_ERROR(request->PrepareForInference());
 
   *request_provider = reinterpret_cast<TRTSERVER_InferenceRequestProvider*>(
       new TrtInferenceRequest(backend, request.release()));
@@ -1738,7 +1737,7 @@ TRTSERVER_ServerInferAsync(
   const auto& lbackend = ltrtrequest->Backend();
 
   ltrtrequest->SetResponse(nullptr);
-  RETURN_IF_STATUS_ERROR(lrequest->PrepareForInference(*lbackend));
+  RETURN_IF_STATUS_ERROR(lrequest->PrepareForInference());
 
 #ifdef TRTIS_ENABLE_STATS
   auto infer_stats = std::make_shared<ni::ModelInferStats>(
@@ -1828,8 +1827,7 @@ TRTSERVER2_InferenceRequestNew(
       lserver->GetInferenceBackend(model_name, model_int_version, &backend));
 
   std::unique_ptr<ni::InferenceRequest> request(new ni::InferenceRequest(
-      model_name, model_int_version, backend->Version(),
-      lserver->ProtocolVersion()));
+      backend, model_int_version, lserver->ProtocolVersion()));
 
   *inference_request = reinterpret_cast<TRTSERVER2_InferenceRequest*>(
       new TrtInferenceRequest(backend, request.release()));
@@ -2163,7 +2161,7 @@ TRTSERVER2_ServerInferAsync(
   const auto& lbackend = ltrtrequest->Backend();
 
   ltrtrequest->SetResponse(nullptr);
-  RETURN_IF_STATUS_ERROR(lrequest->PrepareForInference(*lbackend));
+  RETURN_IF_STATUS_ERROR(lrequest->PrepareForInference());
 
 #ifdef TRTIS_ENABLE_STATS
   auto infer_stats = std::make_shared<ni::ModelInferStats>(

@@ -26,14 +26,27 @@
 
 #include "src/core/infer_response.h"
 
-#include <deque>
-#include "src/core/backend.h"
 #include "src/core/logging.h"
 #include "src/core/server.h"
-#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
+//
+// InferenceResponseFactory
+//
+Status
+InferenceResponseFactory::CreateResponse(
+    std::unique_ptr<InferenceResponse>* response) const
+{
+  response->reset(new InferenceResponse(
+      backend_, id_, allocator_, alloc_fn_, release_fn_, alloc_userp_));
+
+  return Status::Success;
+}
+
+//
+// InferenceResponse
+//
 Status
 InferenceResponse::AddOutput(
     const std::string& name, const DataType datatype,
@@ -55,8 +68,29 @@ InferenceResponse::AddOutput(
 }
 
 //
-// Output
+// InferenceResponse::Output
 //
+InferenceResponse::Output::~Output()
+{
+  Status status = ReleaseBuffer();
+  if (!status.IsOk()) {
+    LOG_ERROR << "failed to release buffer for output '" << name_
+              << "': " << status.AsString();
+  }
+}
+
+Status
+InferenceResponse::Output::Buffer(
+    void** buffer, size_t* buffer_byte_size,
+    TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id)
+{
+  *buffer = allocated_buffer_;
+  *buffer_byte_size = allocated_buffer_byte_size_;
+  *memory_type = allocated_memory_type_;
+  *memory_type_id = allocated_memory_type_id_;
+  return Status::Success;
+}
+
 Status
 InferenceResponse::Output::AllocateBuffer(
     void** buffer, size_t buffer_byte_size,

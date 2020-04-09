@@ -182,14 +182,38 @@ class InferenceRequest {
   };
 
   // InferenceRequest
+  //
+  // The two constructors are identical except one takes backend as a
+  // shared pointer and the other as a raw pointer. The shared pointer
+  // version is the primary one and acts to keep the backend alive as
+  // long as the request is in flight. The raw pointer version is used
+  // only for cases where the backend itself is issuing a request
+  // (e.g. warmup) and no shared pointer version of the backend exists
+  // (because we aren't using shared_from_this).
   InferenceRequest(
-      const std::string& model_name, const int64_t requested_model_version,
-      const int64_t actual_model_version, const uint32_t protocol_version);
+      const std::shared_ptr<InferenceBackend>& backend,
+      const int64_t requested_model_version, const uint32_t protocol_version)
+      : InferenceRequest(
+            backend.get(), requested_model_version, protocol_version)
+  {
+    backend_shared_ = backend;
+  }
+
+  InferenceRequest(
+      InferenceBackend* backend, const int64_t requested_model_version,
+      const uint32_t protocol_version)
+      : needs_normalization_(true), backend_raw_(backend),
+        requested_model_version_(requested_model_version),
+        protocol_version_(protocol_version), flags_(0), correlation_id_(0),
+        batch_size_(0), priority_(0), timeout_us_(0)
+  {
+  }
 
   uint32_t ProtocolVersion() const { return protocol_version_; }
-  const std::string& ModelName() const { return model_name_; }
+
+  const std::string& ModelName() const;
   int64_t RequestedModelVersion() const { return requested_model_version_; }
-  int64_t ActualModelVersion() const { return actual_model_version_; }
+  int64_t ActualModelVersion() const;
 
   uint64_t Id() const { return id_; }
   void SetId(uint64_t i) { id_ = i; }
@@ -312,24 +336,31 @@ class InferenceRequest {
   Status RemoveRequestedOutput(const std::string& name);
   Status RemoveAllRequestedOutputs();
 
-  // Prepare this request for inference. We pass backend here as
-  // non-shared-ptr because normalize must be used in contexts where
-  // the backend shared_ptr does not yet exist (e.g. warmup).
-  Status PrepareForInference(const InferenceBackend& backend);
+  // Prepare this request for inference.
+  Status PrepareForInference();
 
  private:
   friend std::ostream& operator<<(
       std::ostream& out, const InferenceRequest& request);
 
-  Status NormalizeV1(const InferenceBackend& backend);
-  Status NormalizeV2(const InferenceBackend& backend);
+  Status NormalizeV1();
+  Status NormalizeV2();
 
   // Has anything in the request potentially changed in a way that
   // causes normalization to be required when preparing the request
   // for inference.
   bool needs_normalization_;
 
-  std::string model_name_;
+  // The backend associated with this request. For most requests
+  // backend_shared_ will be non-null and will act to keep the backend
+  // alive as long as this request is live. In this case backend_raw_
+  // will be the raw pointer from the shared pointer. For cases where
+  // the backend itself created the request (like running requests for
+  // warmup), backend_shared_ will be nullptr, but backend_raw_ will
+  // still be defined. Thus backend_raw_ is always defined and should
+  // always to used to access the backend.
+  std::shared_ptr<InferenceBackend> backend_shared_;
+  InferenceBackend* backend_raw_;
 
   // The model version as requested and based on version policy the
   // specific version that is actually used for inference.

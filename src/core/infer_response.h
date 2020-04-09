@@ -28,13 +28,13 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "src/core/backend.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
 #include "src/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class InferenceBackend;
 class InferenceResponse;
 
 //
@@ -43,11 +43,12 @@ class InferenceResponse;
 class InferenceResponseFactory {
  public:
   InferenceResponseFactory(
+      const std::shared_ptr<InferenceBackend>& backend, const std::string& id,
       TRITONSERVER_ResponseAllocator* allocator,
       TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn,
       TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn, void* alloc_userp)
-      : allocator_(allocator), alloc_fn_(alloc_fn), release_fn_(release_fn),
-        alloc_userp_(alloc_userp)
+      : backend_(backend), id_(id), allocator_(allocator), alloc_fn_(alloc_fn),
+        release_fn_(release_fn), alloc_userp_(alloc_userp)
   {
   }
 
@@ -55,6 +56,16 @@ class InferenceResponseFactory {
   Status CreateResponse(std::unique_ptr<InferenceResponse>* response) const;
 
  private:
+  // The backend associated with this factory. For normal
+  // requests/responses this will always be defined and acts to keep
+  // the backend loaded as long as this factory is live. It may be
+  // nullptr for cases where the backend itself created the request
+  // (like running requests for warmup) and so must protect any uses
+  // to handle the nullptr case.
+  std::shared_ptr<InferenceBackend> backend_;
+
+  std::string id_;
+
   // The allocation function and allocation object for responses
   // created by this factory. These pointers are not owned by this
   // object and so should not be destroyed when the object is
@@ -85,6 +96,8 @@ class InferenceResponse {
     {
     }
 
+    ~Output();
+
     // The name of the output tensor. There is no mutable operator for
     // the name because it is used in a InferenceResponse map and a
     // mutable method would allow it to get out-of-sync.
@@ -96,16 +109,24 @@ class InferenceResponse {
     // The shape of the output tensor.
     const std::vector<int64_t>& Shape() const { return shape_; }
 
-    // Get the buffer that should be used for this output tensor's
-    // data. 'buffer' must return a buffer of size 'buffer_byte_size'.
-    // 'memory_type' acts as both input and output. On input gives the
-    // buffer memory type preferred by the caller and on return holds
-    // the actual memory type of 'buffer'. 'memory_type_id' acts as
-    // both input and output. On input gives the buffer memory type id
-    // preferred by the caller and returns the actual memory type id
-    // of 'buffer'. Only a single buffer may be allocated for the
-    // output at any time, so multiple calls to AllocateBuffer without
-    // intervening ReleaseBuffer call will result in an error.
+    // Get information about the buffer allocated for this output
+    // tensor's data. If no buffer is allocated 'buffer' will return
+    // nullptr and the other returned values will be undefined.
+    Status Buffer(
+        void** buffer, size_t* buffer_byte_size,
+        TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
+
+    // Allocate the buffer that should be used for this output
+    // tensor's data. 'buffer' must return a buffer of size
+    // 'buffer_byte_size'.  'memory_type' acts as both input and
+    // output. On input gives the buffer memory type preferred by the
+    // caller and on return holds the actual memory type of
+    // 'buffer'. 'memory_type_id' acts as both input and output. On
+    // input gives the buffer memory type id preferred by the caller
+    // and returns the actual memory type id of 'buffer'. Only a
+    // single buffer may be allocated for the output at any time, so
+    // multiple calls to AllocateBuffer without intervening
+    // ReleaseBuffer call will result in an error.
     Status AllocateBuffer(
         void** buffer, const size_t buffer_byte_size,
         TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
@@ -144,20 +165,25 @@ class InferenceResponse {
 
   // InferenceResponse
   InferenceResponse(
-      const std::string& id, const std::string& model_name,
-      const int64_t actual_model_version,
+      const std::shared_ptr<InferenceBackend>& backend, const std::string& id,
       TRITONSERVER_ResponseAllocator* allocator,
       TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn,
       TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn, void* alloc_userp)
-      : id_(id), model_name_(model_name),
-        actual_model_version_(actual_model_version), allocator_(allocator),
-        alloc_fn_(alloc_fn), release_fn_(release_fn), alloc_userp_(alloc_userp)
+      : backend_(backend), id_(id), allocator_(allocator), alloc_fn_(alloc_fn),
+        release_fn_(release_fn), alloc_userp_(alloc_userp)
   {
   }
 
   const std::string& Id() const { return id_; }
-  const std::string& ModelName() const { return model_name_; }
-  int64_t ActualModelVersion() const { return actual_model_version_; }
+  const std::string& ModelName() const
+  {
+    static const std::string unknown("<unknown>");
+    return (backend_ == nullptr) ? unknown : backend_->Name();
+  }
+  int64_t ActualModelVersion() const
+  {
+    return (backend_ == nullptr) ? -1 : backend_->Version();
+  }
 
   const std::unordered_map<std::string, Output>& Outputs() const
   {
@@ -173,10 +199,15 @@ class InferenceResponse {
   friend std::ostream& operator<<(
       std::ostream& out, const InferenceResponse& response);
 
-  std::string id_;
-  std::string model_name_;
-  int64_t actual_model_version_;
+  // The backend associated with this factory. For normal
+  // requests/responses this will always be defined and acts to keep
+  // the backend loaded as long as this factory is live. It may be
+  // nullptr for cases where the backend itself created the request
+  // (like running requests for warmup) and so must protect any uses
+  // to handle the nullptr case.
+  std::shared_ptr<InferenceBackend> backend_;
 
+  std::string id_;
   std::unordered_map<std::string, Output> outputs_;
 
   // The allocation function and allocation object for responses
