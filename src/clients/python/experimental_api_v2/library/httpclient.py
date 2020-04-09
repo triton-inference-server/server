@@ -542,6 +542,56 @@ class InferenceServerClient:
                               query_params=query_params)
         _raise_if_error(response)
 
+    def get_inference_statistics(self,
+                                 model_name,
+                                 model_version="",
+                                 headers=None,
+                                 query_params=None):
+        """Get the inference statistics for the specified model name and
+        version.
+
+        Parameters
+        ----------
+        model_name : str
+            The name of the model to be unloaded.
+        model_version: str
+            The version of the model to get inference statistics. The
+            default value is an empty string which means then the server
+            will return the statistics of all available model versions.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
+        query_params: dict
+            Optional url query parameters to use in network
+            transaction
+
+        Returns
+        -------
+        dict
+            The JSON dict holding the model inference statistics.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to get the model inference statistics.
+
+        """
+
+        if model_version != "":
+            request_uri = "v2/models/{}/versions/{}/stats".format(
+                quote(model_name), model_version)
+        else:
+            request_uri = "v2/models/{}/stats".format(quote(model_name))
+
+        response = self._get(request_uri=request_uri,
+                             headers=headers,
+                             query_params=query_params)
+        _raise_if_error(response)
+        statistics = json.loads(response.read())
+
+        return statistics
+
+
     def get_system_shared_memory_status(self,
                                         region_name="",
                                         headers=None,
@@ -555,8 +605,8 @@ class InferenceServerClient:
             value is an empty string, which means that the status
             of all active system shared memory will be returned.
         headers: dict
-            Optional dictionary specifying additional
-            HTTP headers to include in the request
+            Optional dictionary specifying additional HTTP 
+            headers to include in the request
         query_params: dict
             Optional url query parameters to use in network
             transaction

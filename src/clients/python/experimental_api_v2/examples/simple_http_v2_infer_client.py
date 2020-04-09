@@ -85,6 +85,12 @@ if __name__ == '__main__':
     results = test_infer("simple", input0_data, input1_data)
     print(results.get_response())
 
+    statistics = triton_client.get_inference_statistics(model_name="simple")
+    print(statistics)
+    if len(statistics['version_stats']) != 1:
+        print("FAILED: Inference Statistics")
+        sys.exit(1)
+
     # Validate the results by comparing with precomputed values.
     output0_data = results.as_numpy('OUTPUT0')
     output1_data = results.as_numpy('OUTPUT1')

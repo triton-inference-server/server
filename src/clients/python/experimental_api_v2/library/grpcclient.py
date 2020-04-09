@@ -476,7 +476,7 @@ class InferenceServerClient:
         Raises
         ------
         InferenceServerException
-            If unable to unload the model.
+            If unable to get the model inference statistics.
 
         """
         if headers is not None:
