@@ -241,16 +241,23 @@ ResponseRelease(
 }
 
 void
-InferComplete(
-    TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
-    TRITONSERVER_InferenceRequest* request, void* userp)
+InferRequestComplete(
+    TRITONSERVER_Server* server, TRITONSERVER_InferenceRequest* request,
+    void* userp)
 {
-  std::promise<TRITONSERVER_InferenceRequest*>* p =
-      reinterpret_cast<std::promise<TRITONSERVER_InferenceRequest*>*>(userp);
-  p->set_value(request);
-  delete p;
+  // We reuse the request so we don't delete it here...
+}
 
-  TRITONSERVER_TraceManagerDelete(trace_manager);
+void
+InferResponseComplete(
+    TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* response,
+    void* userp)
+{
+  // Send 'response' to the future.
+  std::promise<TRITONSERVER_InferenceResponse*>* p =
+      reinterpret_cast<std::promise<TRITONSERVER_InferenceResponse*>*>(userp);
+  p->set_value(response);
+  delete p;
 }
 
 TRITONSERVER_Error*
@@ -312,8 +319,8 @@ template <typename T>
 void
 CompareResult(
     const std::string& output0_name, const std::string& output1_name,
-    const void* input0, const void* input1, const void* output0,
-    const void* output1)
+    const void* input0, const void* input1, const char* output0,
+    const char* output1)
 {
   for (size_t i = 0; i < 16; ++i) {
     std::cout << ((T*)input0)[i] << " + " << ((T*)input1)[i] << " = "
@@ -331,106 +338,116 @@ CompareResult(
 }
 
 void
-GetResult(
-    TRITONSERVER_InferenceRequest* request, const std::string& name,
-    const size_t expected_byte_size, std::vector<char>* scratch,
-    const void** result)
-{
-  const void* content;
-  size_t byte_size;
-  TRITONSERVER_Memory_Type memory_type;
-  int64_t memory_type_id;
-  FAIL_IF_TRITON_ERR(
-      TRITONSERVER_InferenceRequestOutputData(
-          request, name.c_str(), &content, &byte_size, &memory_type,
-          &memory_type_id),
-      "getting result");
-  if (byte_size != expected_byte_size) {
-    FAIL(
-        "unexpected byte-size, expected " + std::to_string(expected_byte_size) +
-        ", got " + std::to_string(byte_size) + " for " + name);
-  } else if (enforce_memory_type && (memory_type != requested_memory_type)) {
-    FAIL(
-        "unexpected memory type, expected to be allocated "
-        "in " +
-        ni::MemoryTypeString(requested_memory_type) + ", got " +
-        ni::MemoryTypeString(memory_type) + ", id " +
-        std::to_string(memory_type_id) + " for " + name);
-  }
-
-  *result = content;
-
-#ifdef TRTIS_ENABLE_GPU
-  // Different from CPU memory (system and pinned),
-  // outputs in GPU memory must be copied to CPU memory to be read directly.
-  scratch->clear();
-  scratch->reserve(byte_size);
-  switch (memory_type) {
-    case TRITONSERVER_MEMORY_CPU:
-      std::cout << name << " is stored in system memory" << std::endl;
-      break;
-    case TRITONSERVER_MEMORY_CPU_PINNED:
-      std::cout << name << " is stored in pinned memory" << std::endl;
-      break;
-    default: {
-      std::cout << name << " is stored in GPU memory" << std::endl;
-      FAIL_IF_CUDA_ERR(
-          cudaMemcpy(
-              &((*scratch)[0]), content, byte_size, cudaMemcpyDeviceToHost),
-          "getting " + name + " data from GPU memory");
-      *result = &((*scratch)[0]);
-      break;
-    }
-  }
-#endif  // TRTIS_ENABLE_GPU
-}
-
-void
 Check(
-    TRITONSERVER_InferenceRequest* request,
+    TRITONSERVER_InferenceResponse* response,
     const std::vector<char>& input0_data, const std::vector<char>& input1_data,
     const std::string& output0, const std::string& output1,
     const size_t expected_byte_size, const std::string& expected_datatype,
     const bool is_int)
 {
-  for (const auto& name : {output0, output1}) {
+  std::unordered_map<std::string, std::vector<char>> output_data;
+
+  uint32_t output_count;
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_InferenceResponseOutputCount(response, &output_count),
+      "getting number of response outputs");
+  if (output_count != 2) {
+    FAIL("expecting 2 response outputs, got " + std::to_string(output_count));
+  }
+
+  for (uint32_t idx = 0; idx < output_count; ++idx) {
+    const char* cname;
+    const char* datatype;
     const int64_t* shape;
     uint64_t dim_count;
+    const void* base;
+    size_t byte_size;
+    TRITONSERVER_Memory_Type memory_type;
+    int64_t memory_type_id;
+
     FAIL_IF_TRITON_ERR(
-        TRITONSERVER_InferenceRequestOutputShape(
-            request, name.c_str(), &shape, &dim_count),
-        "getting shape");
+        TRITONSERVER_InferenceResponseOutput(
+            response, idx, &cname, &datatype, &shape, &dim_count, &base,
+            &byte_size, &memory_type, &memory_type_id),
+        "getting output info");
+
+    if (cname == nullptr) {
+      FAIL("unable to get output name");
+    }
+
+    std::string name(cname);
+    if ((name != output0) && (name != output1)) {
+      FAIL("unexpected output '" + name + "'");
+    }
+
     if ((dim_count != 2) || (shape[0] != 1) || (shape[1] != 16)) {
       FAIL("unexpected shape for '" + name + "'");
     }
 
-    const char* datatype;
-    FAIL_IF_TRITON_ERR(
-        TRITONSERVER_InferenceRequestOutputDataType(
-            request, name.c_str(), &datatype),
-        "getting datatype");
     if (datatype != expected_datatype) {
       FAIL(
           "unexpected datatype '" + std::string(datatype) + "' for '" + name +
           "'");
     }
-  }
 
-  // Get results, may need to copy from GPU memory.
-  std::vector<char> scratch0, scratch1;
-  const void* output0_result;
-  const void* output1_result;
-  GetResult(request, output0, expected_byte_size, &scratch0, &output0_result);
-  GetResult(request, output1, expected_byte_size, &scratch1, &output1_result);
+    if (byte_size != expected_byte_size) {
+      FAIL(
+          "unexpected byte-size, expected " +
+          std::to_string(expected_byte_size) + ", got " +
+          std::to_string(byte_size) + " for " + name);
+    }
+
+    if (enforce_memory_type && (memory_type != requested_memory_type)) {
+      FAIL(
+          "unexpected memory type, expected to be allocated "
+          "in " +
+          ni::MemoryTypeString(requested_memory_type) + ", got " +
+          ni::MemoryTypeString(memory_type) + ", id " +
+          std::to_string(memory_type_id) + " for " + name);
+    }
+
+    // We make a copy of the data here... which we could avoid for
+    // performance reasons but ok for this simple example.
+    std::vector<char>& odata = output_data[name];
+    switch (memory_type) {
+      case TRITONSERVER_MEMORY_CPU: {
+        std::cout << name << " is stored in system memory" << std::endl;
+        const char* cbase = reinterpret_cast<const char*>(base);
+        odata.assign(cbase, cbase + byte_size);
+        break;
+      }
+
+      case TRITONSERVER_MEMORY_CPU_PINNED: {
+        std::cout << name << " is stored in pinned memory" << std::endl;
+        const char* cbase = reinterpret_cast<const char*>(base);
+        odata.assign(cbase, cbase + byte_size);
+        break;
+      }
+
+#ifdef TRTIS_ENABLE_GPU
+      case TRITONSERVER_MEMORY_GPU: {
+        std::cout << name << " is stored in GPU memory" << std::endl;
+        odata.reserve(byte_size);
+        FAIL_IF_CUDA_ERR(
+            cudaMemcpy(&odata[0], base, byte_size, cudaMemcpyDeviceToHost),
+            "getting " + name + " data from GPU memory");
+        break;
+      }
+#endif
+
+      default:
+        FAIL("unexpected memory type");
+    }
+  }
 
   if (is_int) {
     CompareResult<int32_t>(
-        output0, output1, &input0_data[0], &input1_data[0], output0_result,
-        output1_result);
+        output0, output1, &input0_data[0], &input1_data[0],
+        output_data[output0].data(), output_data[output1].data());
   } else {
     CompareResult<float>(
-        output0, output1, &input0_data[0], &input1_data[0], output0_result,
-        output1_result);
+        output0, output1, &input0_data[0], &input1_data[0],
+        output_data[output0].data(), output_data[output1].data());
   }
 }
 
@@ -637,6 +654,12 @@ main(int argc, char** argv)
       TRITONSERVER_InferenceRequestSetId(irequest, "my_request_id"),
       "setting ID for the request");
 
+  FAIL_IF_TRITON_ERR(
+      TRITONSERVER_InferenceRequestSetReleaseCallback(
+          irequest, InferRequestComplete, nullptr /* request_release_userp */),
+      "setting request release callback");
+
+  // Inputs
   auto input0 = is_torch_model ? "INPUT__0" : "INPUT0";
   auto input1 = is_torch_model ? "INPUT__1" : "INPUT1";
 
@@ -742,28 +765,35 @@ main(int argc, char** argv)
 
   // Perform inference...
   {
-    auto p = new std::promise<TRITONSERVER_InferenceRequest*>();
-    std::future<TRITONSERVER_InferenceRequest*> completed = p->get_future();
+    auto p = new std::promise<TRITONSERVER_InferenceResponse*>();
+    std::future<TRITONSERVER_InferenceResponse*> completed = p->get_future();
+
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_InferenceRequestSetResponseCallback(
+            irequest, allocator, nullptr /* response_allocator_userp */,
+            InferResponseComplete, reinterpret_cast<void*>(p)),
+        "setting response callback");
 
     FAIL_IF_TRITON_ERR(
         TRITONSERVER_ServerInferAsync(
-            server.get(), nullptr /* trace_manager */, irequest, allocator,
-            nullptr /* response_allocator_userp */, InferComplete,
-            reinterpret_cast<void*>(p)),
+            server.get(), irequest, nullptr /* trace_manager */,
+            nullptr /* trace_release_fn */, nullptr /* trace_release_userp */),
         "running inference");
 
     // Wait for the inference to complete.
-    TRITONSERVER_InferenceRequest* completed_request = completed.get();
-    if (completed_request != irequest) {
-      FAIL("completed request differs from inference request");
-    }
+    TRITONSERVER_InferenceResponse* completed_response = completed.get();
+
     FAIL_IF_TRITON_ERR(
-        TRITONSERVER_InferenceRequestError(completed_request),
-        "request status");
+        TRITONSERVER_InferenceResponseError(completed_response),
+        "response status");
 
     Check(
-        completed_request, input0_data, input1_data, output0, output1,
+        completed_response, input0_data, input1_data, output0, output1,
         input0_size, datatype, is_int);
+
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_InferenceResponseDelete(completed_response),
+        "deleting inference response");
   }
 
   // Modify some input data in place and then reuse the request
@@ -779,28 +809,36 @@ main(int argc, char** argv)
       input0_base[0] = 27.0;
     }
 
-    auto p = new std::promise<TRITONSERVER_InferenceRequest*>();
-    std::future<TRITONSERVER_InferenceRequest*> completed = p->get_future();
+    auto p = new std::promise<TRITONSERVER_InferenceResponse*>();
+    std::future<TRITONSERVER_InferenceResponse*> completed = p->get_future();
+
+    // Using a new promise so have to re-register the callback to set
+    // the promise as the userp.
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_InferenceRequestSetResponseCallback(
+            irequest, allocator, nullptr /* response_allocator_userp */,
+            InferResponseComplete, reinterpret_cast<void*>(p)),
+        "setting response callback");
 
     FAIL_IF_TRITON_ERR(
         TRITONSERVER_ServerInferAsync(
-            server.get(), nullptr /* trace_manager */, irequest, allocator,
-            nullptr /* response_allocator_userp */, InferComplete,
-            reinterpret_cast<void*>(p)),
+            server.get(), irequest, nullptr /* trace_manager */,
+            nullptr /* trace_release_fn */, nullptr /* trace_release_userp */),
         "running inference");
 
     // Wait for the inference to complete.
-    TRITONSERVER_InferenceRequest* completed_request = completed.get();
-    if (completed_request != irequest) {
-      FAIL("completed request differs from inference request");
-    }
+    TRITONSERVER_InferenceResponse* completed_response = completed.get();
     FAIL_IF_TRITON_ERR(
-        TRITONSERVER_InferenceRequestError(completed_request),
-        "request status");
+        TRITONSERVER_InferenceResponseError(completed_response),
+        "response status");
 
     Check(
-        completed_request, input0_data, input1_data, output0, output1,
+        completed_response, input0_data, input1_data, output0, output1,
         input0_size, datatype, is_int);
+
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_InferenceResponseDelete(completed_response),
+        "deleting inference response");
   }
 
   // Remove input data and then add back different data.
@@ -814,29 +852,37 @@ main(int argc, char** argv)
             0 /* memory_type_id */),
         "assigning INPUT1 data to INPUT0");
 
-    auto p = new std::promise<TRITONSERVER_InferenceRequest*>();
-    std::future<TRITONSERVER_InferenceRequest*> completed = p->get_future();
+    auto p = new std::promise<TRITONSERVER_InferenceResponse*>();
+    std::future<TRITONSERVER_InferenceResponse*> completed = p->get_future();
+
+    // Using a new promise so have to re-register the callback to set
+    // the promise as the userp.
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_InferenceRequestSetResponseCallback(
+            irequest, allocator, nullptr /* response_allocator_userp */,
+            InferResponseComplete, reinterpret_cast<void*>(p)),
+        "setting response callback");
 
     FAIL_IF_TRITON_ERR(
         TRITONSERVER_ServerInferAsync(
-            server.get(), nullptr /* trace_manager */, irequest, allocator,
-            nullptr /* response_allocator_userp */, InferComplete,
-            reinterpret_cast<void*>(p)),
+            server.get(), irequest, nullptr /* trace_manager */,
+            nullptr /* trace_release_fn */, nullptr /* trace_release_userp */),
         "running inference");
 
     // Wait for the inference to complete.
-    TRITONSERVER_InferenceRequest* completed_request = completed.get();
-    if (completed_request != irequest) {
-      FAIL("completed request differs from inference request");
-    }
+    TRITONSERVER_InferenceResponse* completed_response = completed.get();
     FAIL_IF_TRITON_ERR(
-        TRITONSERVER_InferenceRequestError(completed_request),
-        "request status");
+        TRITONSERVER_InferenceResponseError(completed_response),
+        "response status");
 
     // Both inputs are using input1_data...
     Check(
-        completed_request, input1_data, input1_data, output0, output1,
+        completed_response, input1_data, input1_data, output0, output1,
         input0_size, datatype, is_int);
+
+    FAIL_IF_TRITON_ERR(
+        TRITONSERVER_InferenceResponseDelete(completed_response),
+        "deleting inference response");
   }
 
   FAIL_IF_TRITON_ERR(
