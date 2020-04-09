@@ -46,7 +46,6 @@
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/pinned_memory_manager.h"
-#include "src/core/provider.h"
 #include "src/core/server.h"
 #include "src/core/server_status.pb.h"
 
@@ -376,36 +375,69 @@ InferenceServer::ModelReadyVersions(
   return Status::Success;
 }
 
-void
-InferenceServer::InferAsync(
-    const std::shared_ptr<InferenceBackend>& backend,
-    const std::shared_ptr<InferenceRequest>& request,
-    const std::shared_ptr<InferResponseProvider>& response_provider,
-    const std::shared_ptr<ModelInferStats>& infer_stats,
-    std::function<void(const Status&)> OnCompleteInfer)
+Status
+InferenceServer::InferAsync(std::unique_ptr<InferenceRequest>& request)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
-    OnCompleteInfer(Status(Status::Code::UNAVAILABLE, "Server not ready"));
-    return;
+    return Status(Status::Code::UNAVAILABLE, "Server not ready");
   }
 
+  // FIXME Shouldn't need this... request keeps backend alive...
   std::shared_ptr<ScopedAtomicIncrement> inflight(
       new ScopedAtomicIncrement(inflight_request_counter_));
 
-  // Need to capture 'backend' to keep it alive... it goes away when
-  // it goes out of scope which can cause the model to be unloaded,
-  // and we don't want that to happen when a request is in flight.
-  auto OnCompleteHandleInfer = [this, OnCompleteInfer, backend,
-                                response_provider,
-                                inflight](const Status& status) mutable {
-    if (status.IsOk()) {
-      OnCompleteInfer(response_provider->FinalizeResponse(*backend));
-    } else {
-      OnCompleteInfer(status);
-    }
-  };
+// FIXME this needs to move into InferenceRequest and be simplified
+#if 0
+#ifdef TRTIS_ENABLE_STATS
+  auto infer_stats = std::make_shared<ni::ModelInferStats>(
+      lserver->StatusManager(), lrequest->ModelName());
+  infer_stats->CaptureTimestamp(
+      ni::ModelInferStats::TimestampKind::kRequestStart);
+  infer_stats->SetRequestedVersion(lrequest->RequestedModelVersion());
+  infer_stats->SetMetricReporter(lbackend->MetricReporter());
+  infer_stats->SetBatchSize(lrequest->BatchSize());
+  infer_stats->SetFailed(true);
+  infer_stats->SetTraceManager(
+      reinterpret_cast<ni::OpaqueTraceManager*>(trace_manager));
+  infer_stats->NewTrace();
+#else
+  auto infer_stats = std::make_shared<ni::ModelInferStats>();
+#endif  // TRTIS_ENABLE_STATS
+#endif
 
-  backend->Run(infer_stats, request, response_provider, OnCompleteHandleInfer);
+#if 0
+      [infer_stats, trace_manager, lrequest, server](const ni::Status& status) mutable {
+        if (!status.IsOk()) {
+          LOG_VERBOSE(1) << "Infer failed: " << status.Message();
+        }
+
+#ifdef TRTIS_ENABLE_STATS
+        infer_stats->SetFailed(!status.IsOk());
+        infer_stats->CaptureTimestamp(
+            ni::ModelInferStats::TimestampKind::kRequestEnd);
+
+        // We must explicitly update the inference stats before
+        // sending the response... otherwise it is possible that the
+        // client will be able to query the stats after the response
+        // is received but before they've been updated for the request
+        // (this is especially important for testing).
+        infer_stats->Report();
+#endif  // TRTIS_ENABLE_STATS
+
+        // FIXMEV2 status should live in InferenceRequest instead of
+        // being a callback arg.
+        ltrtrequest->SetRequestStatus(status);
+
+        ltrtrequest->SetResponse(infer_response_provider);
+
+        complete_fn(
+            server, trace_manager,
+            reinterpret_cast<TRITONSERVER_InferenceRequest*>(ltrtrequest),
+            complete_userp);
+      });
+#endif
+
+  return InferenceRequest::Run(request);
 }
 
 Status

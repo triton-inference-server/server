@@ -36,7 +36,6 @@
 #include "src/core/api.pb.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_repository_manager.h"
-#include "src/core/provider.h"
 #include "src/core/server_status.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/status.h"
@@ -44,6 +43,7 @@
 namespace nvidia { namespace inferenceserver {
 
 class InferenceBackend;
+class InferenceRequest;
 
 enum ModelControlMode { MODE_NONE, MODE_POLL, MODE_EXPLICIT };
 
@@ -72,14 +72,11 @@ class InferenceServer {
   Status ModelReadyVersions(
       const std::string& model_name, std::vector<int64_t>* versions);
 
-  // Perform inference on the given input for specified model. Status
-  // is returned in the OnCompleteInfer callback.
-  void InferAsync(
-      const std::shared_ptr<InferenceBackend>& backend,
-      const std::shared_ptr<InferenceRequest>& request,
-      const std::shared_ptr<InferResponseProvider>& response_provider,
-      const std::shared_ptr<ModelInferStats>& infer_stats,
-      std::function<void(const Status&)> OnCompleteInfer);
+  // Inference. If Status::Success is returned then this function has
+  // taken ownership of the request object and so 'request' will be
+  // nullptr. If non-success is returned then the caller still retains
+  // ownership of 'request'.
+  Status InferAsync(std::unique_ptr<InferenceRequest>& request);
 
   // Update the ServerStatus object with the status of the model. If
   // 'model_name' is empty, update with the status of all models.

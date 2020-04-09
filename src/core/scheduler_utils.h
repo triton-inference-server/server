@@ -37,13 +37,13 @@ using PendingBatchShapes = std::unordered_map<
     std::string, std::pair<std::vector<int64_t>, std::vector<int64_t>>>;
 
 Status InitPendingShape(
-    const int64_t runner_id, const Scheduler::Payload& payload,
+    const int64_t runner_id, const std::unique_ptr<InferenceRequest>& request,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
     PendingBatchShapes* pending_batch_shapes);
 
 bool CompareWithPendingShape(
-    const int64_t runner_id, const Scheduler::Payload& payload,
+    const int64_t runner_id, const std::unique_ptr<InferenceRequest>& request,
     const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
     const PendingBatchShapes& pending_batch_shapes);
 
@@ -63,21 +63,28 @@ class PriorityQueue {
       const ModelQueuePolicy& default_queue_policy, uint32_t priority_levels,
       const ModelQueuePolicyMap queue_policy_map);
 
-  // Enqueue 'payload' with priority set to 'priority_level'.
-  Status Enqueue(uint32_t priority_level, Scheduler::Payload&& payload);
+  // Enqueue a request with priority set to 'priority_level'. If
+  // Status::Success is returned then the queue has taken ownership of
+  // the request object and so 'request' will be nullptr. If
+  // non-success is returned then the caller still retains ownership
+  // of 'request'.
+  Status Enqueue(
+      uint32_t priority_level, std::unique_ptr<InferenceRequest>& request);
 
-  // Dequeue the payload at the front of the queue.
-  Status Dequeue(Scheduler::Payload* payload);
+  // Dequeue the request at the front of the queue.
+  Status Dequeue(std::unique_ptr<InferenceRequest>* request);
 
-  // Retrieve the payloads that are rejected based on the queue policies.
-  std::shared_ptr<std::vector<std::deque<Scheduler::Payload>>>
-  ReleaseRejectedPayloads();
+  // Retrieve the requests that are rejected based on the queue policies.
+  void ReleaseRejectedRequests(
+      std::shared_ptr<
+          std::vector<std::deque<std::unique_ptr<InferenceRequest>>>>*
+          requests);
 
-  // Return the number of payloads in the queue, rejected payloads are not
-  // included.
+  // Return the number of requests in the queue, rejected requests are
+  // not included.
   size_t Size() { return size_; }
 
-  // Whether the queue is empty, rejected payloads are not included.
+  // Is the queue is empty? Rejected requests are not included.
   bool Empty() { return Size() == 0; }
 
   // Reset the cursor such that it is representing an empty pending batch.
@@ -96,8 +103,8 @@ class PriorityQueue {
   // Returns the total batch size of the newly rejected requests.
   size_t ApplyPolicyAtCursor();
 
-  // Return the payload at cursor.
-  Scheduler::Payload& PayloadAtCursor()
+  // Return the request at the cursor.
+  const std::unique_ptr<InferenceRequest>& RequestAtCursor()
   {
     return pending_cursor_.curr_it_->second.At(pending_cursor_.queue_idx_);
   }
@@ -116,19 +123,19 @@ class PriorityQueue {
   // batch is unchanged.
   bool IsCursorValid();
 
-  // Return the oldest queued time of payloads in pending batch.
+  // Return the oldest queued time of requests in pending batch.
   uint64_t OldestEnqueueTime()
   {
     return pending_cursor_.pending_batch_oldest_enqueue_time_ns_;
   }
 
-  // Return the closest timeout of payloads in pending batch.
+  // Return the closest timeout of requests in pending batch.
   uint64_t ClosestTimeout()
   {
     return pending_cursor_.pending_batch_closest_timeout_ns_;
   }
 
-  // Return the number of payloads in pending batch.
+  // Return the number of requests in pending batch.
   size_t PendingBatchCount() { return pending_cursor_.pending_batch_count_; }
 
  private:
@@ -151,30 +158,35 @@ class PriorityQueue {
     {
     }
 
-    // Enqueue an payload and set up its timeout accordingly.
-    Status Enqueue(Scheduler::Payload&& payload);
+    // Enqueue a request and set up its timeout accordingly. If
+    // Status::Success is returned then the queue has taken ownership
+    // of the request object and so 'request' will be nullptr. If
+    // non-success is returned then the caller still retains ownership
+    // of 'request'.
+    Status Enqueue(std::unique_ptr<InferenceRequest>& request);
 
-    // Dequeue the payload at the front of the queue.
-    Scheduler::Payload Dequeue();
+    // Dequeue the request at the front of the queue.
+    Status Dequeue(std::unique_ptr<InferenceRequest>* request);
 
-    // Apply the queue policy to payload at 'idx'.
+    // Apply the queue policy to the request at 'idx'.
     // 'rejected_count' will be incremented by the number of the newly rejected
     // requets after applying the policy.
     // 'rejected_batch_size' will be incremented by the total batch size of the
-    // newly rejected requets after applying the policy.
-    // Return true if the 'idx' still points to an payload after applying the
+    // newly rejected requests after applying the policy.
+    // Return true if the 'idx' still points to a request after applying the
     // policy, false otherwise.
     bool ApplyPolicy(
         size_t idx, size_t* rejected_count, size_t* rejected_batch_size);
 
-    // Return the rejected payloads held by the request queue.
-    std::deque<Scheduler::Payload> ReleaseRejectedQueue();
+    // Return the rejected requests held by the queue.
+    void ReleaseRejectedQueue(
+        std::deque<std::unique_ptr<InferenceRequest>>* requests);
 
-    // Return the payload at 'idx'.
-    Scheduler::Payload& At(size_t idx);
+    // Return the request at 'idx'.
+    const std::unique_ptr<InferenceRequest>& At(size_t idx) const;
 
-    // Return the timeout timestamp of the payload at 'idx', in ns. A value of 0
-    // indicates that the payload doesn't specify a timeout.
+    // Return the timeout timestamp of the request at 'idx', in ns. A value of 0
+    // indicates that the request doesn't specify a timeout.
     uint64_t TimeoutAt(size_t idx);
 
     // Return whether the queue is empty, rejected requests are not included.
@@ -195,9 +207,9 @@ class PriorityQueue {
     const uint32_t max_queue_size_;
 
     std::deque<uint64_t> timeout_timestamp_ns_;
-    std::deque<Scheduler::Payload> queue_;
-    std::deque<Scheduler::Payload> delayed_queue_;
-    std::deque<Scheduler::Payload> rejected_queue_;
+    std::deque<std::unique_ptr<InferenceRequest>> queue_;
+    std::deque<std::unique_ptr<InferenceRequest>> delayed_queue_;
+    std::deque<std::unique_ptr<InferenceRequest>> rejected_queue_;
   };
   using PriorityQueues = std::map<uint32_t, PolicyQueue>;
 
@@ -230,7 +242,7 @@ class PriorityQueue {
   PriorityQueues queues_;
   size_t size_;
 
-  // Keep track of the priority level that the first payload in the queue
+  // Keep track of the priority level that the first request in the queue
   // is at to avoid traversing 'queues_'
   uint32_t front_priority_level_;
   uint32_t last_priority_level_;
