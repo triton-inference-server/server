@@ -300,8 +300,9 @@ InferenceServerHttpClient::Get(
       std::cout << GetJsonText(*response) << std::endl;
     }
 
-    if (response->HasMember("error")) {
-      return Error((*response)["error"].GetString());
+    const auto& itr = response->FindMember("error");
+    if (itr != response->MemberEnd()) {
+      return Error(itr->value.GetString());
     }
   }
 
