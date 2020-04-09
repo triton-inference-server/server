@@ -25,58 +25,68 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <deque>
-#include <memory>
-#include <mutex>
-#include "src/core/cond_var.h"
+#include <condition_variable>
+#include <functional>
 
 namespace nvidia { namespace inferenceserver {
 
 //
-// C++11 doesn't have a sync queue so we implement a simple one.
+// Abstract class that acts like condition variable, which allows various
+// types of strategies for inter-thread communication
 //
-template <typename Item>
-class SyncQueue {
+template <class TritonMutex>
+class CondVar {
  public:
-  SyncQueue(bool busy_wait = true)
+  // Wait until 'pred' is evaluated to true. 'lock' will be unlocked during
+  // the wait and it will be reaquired when the function returns.
+  virtual void Wait(
+      std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) = 0;
+
+  // Notify all waiting threads to re-evaluate their predicates.
+  virtual void NotifyAll() = 0;
+};
+
+template <class TritonMutex>
+class BusyWaitCondVar : public CondVar<TritonMutex> {
+ public:
+  BusyWaitCondVar() = default;
+
+  void Wait(
+      std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) override
   {
-    if (busy_wait) {
-      cv_.reset(new BusyWaitCondVar<std::mutex>());
-    } else {
-      cv_.reset(new StdCondVar<std::mutex>());
+    lock.unlock();
+    while (true) {
+      while (!pred()) {
+        // busy-loop
+      }
+      lock.lock();
+      // must ensure the predicate still holds after acquiring the lock as
+      // multiple waiting threads may get out of the busy-loop simultaneously.
+      if (pred()) {
+        break;
+      }
+      lock.unlock();
     }
   }
 
-  bool Empty()
+  void NotifyAll() override { return; }
+};
+
+template <class TritonMutex>
+class StdCondVar : public CondVar<TritonMutex> {
+ public:
+  StdCondVar() = default;
+
+  void Wait(
+      std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) override
   {
-    std::lock_guard<std::mutex> lk(mu_);
-    return queue_.empty();
+    cv_.wait(lock, pred);
   }
 
-  Item Get()
-  {
-    std::unique_lock<std::mutex> lk(mu_);
-    if (queue_.empty()) {
-      cv_->Wait(lk, [this] { return !queue_.empty(); });
-    }
-    auto res = queue_.front();
-    queue_.pop_front();
-    return res;
-  }
-
-  void Put(const Item& value)
-  {
-    {
-      std::lock_guard<std::mutex> lk(mu_);
-      queue_.push_back(value);
-    }
-    cv_->NotifyAll();
-  }
+  void NotifyAll() override { cv_.notify_all(); }
 
  private:
-  std::mutex mu_;
-  std::unique_ptr<CondVar<std::mutex>> cv_;
-  std::deque<Item> queue_;
+  std::condition_variable cv_;
 };
 
 }}  // namespace nvidia::inferenceserver
