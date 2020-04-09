@@ -42,6 +42,7 @@ RET=0
 SIMPLE_HEALTH_CLIENT=../clients/simple_http_v2_health_metadata.py
 SIMPLE_INFER_CLIENT=../clients/simple_http_v2_infer_client.py
 SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_http_v2_async_infer_client.py
+SIMPLE_STRING_INFER_CLIENT=../clients/simple_http_v2_string_infer_client.py
 V2_IMAGE_CLIENT=../clients/v2_image_client.py
 SIMPLE_SHM_CLIENT=../clients/simple_http_v2_shm_client.py
 SIMPLE_CUDASHM_CLIENT=../clients/simple_http_v2_cudashm_client.py
@@ -56,6 +57,8 @@ wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
      https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz
 (cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
 mv /tmp/inception_v3_2016_08_28_frozen.pb models/inception_graphdef/1/model.graphdef
+
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/savedmodel_zero_1_object models/
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
@@ -86,6 +89,7 @@ for i in \
         $V2_IMAGE_CLIENT \
         $SIMPLE_SHM_CLIENT \
         $SIMPLE_CUDASHM_CLIENT \
+        $SIMPLE_STRING_INFER_CLIENT \
         ; do
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"

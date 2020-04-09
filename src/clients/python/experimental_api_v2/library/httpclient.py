@@ -757,7 +757,9 @@ class InferenceServerClient:
             quote(name))
 
         register_request = {
-            'raw_handle': {'b64': raw_handle},
+            'raw_handle': {
+                'b64': raw_handle
+            },
             'device_id': device_id,
             'byte_size': byte_size
         }
@@ -1129,9 +1131,10 @@ class InferInput:
         valid_shape = True
         if len(self._shape) != len(input_tensor.shape):
             valid_shape = False
-        for i in range(len(self._shape)):
-            if self._shape[i] != input_tensor.shape[i]:
-                valid_shape = False
+        else:
+            for i in range(len(self._shape)):
+                if self._shape[i] != input_tensor.shape[i]:
+                    valid_shape = False
         if not valid_shape:
             raise_error(
                 "got unexpected numpy array shape [{}], expected [{}]".format(
@@ -1301,7 +1304,8 @@ class InferResult:
                 if parameters is not None:
                     this_data_size = parameters.get("binary_data_size")
                     if this_data_size is not None:
-                        self._output_name_to_buffer_map[output['name']] = buffer_index
+                        self._output_name_to_buffer_map[
+                            output['name']] = buffer_index
                         buffer_index = buffer_index + this_data_size
 
     def as_numpy(self, name):
@@ -1319,34 +1323,36 @@ class InferResult:
             The numpy array containing the response data for the tensor or
             None if the data for specified tensor name is not found.
         """
-        for output in self._result['outputs']:
-            if output['name'] == name:
-                datatype = output['datatype']
-                has_binary_data = False
-                parameters = output.get("parameters")
-                if parameters is not None:
-                    this_data_size = parameters.get("binary_data_size")
-                    if this_data_size is not None:
-                        has_binary_data = True
-                        if this_data_size != 0:
-                            start_index = self._output_name_to_buffer_map[name]
-                            end_index = start_index + this_data_size
-                            if datatype == 'BYTES':
-                                # String results contain a 4-byte string length
-                                # followed by the actual string characters. Hence,
-                                # need to decode the raw bytes to convert into
-                                # array elements.
-                                np_array = deserialize_bytes_tensor(
-                                    self._buffer[start_index:end_index])
-                            else:
-                                np_array = np.frombuffer(
-                                    self._buffer[start_index:end_index],
-                                    dtype=triton_to_np_dtype(datatype))
-                if not has_binary_data:
-                    np_array = np.array(output['data'],
+        if self._result.get('outputs') is not None:
+            for output in self._result['outputs']:
+                if output['name'] == name:
+                    datatype = output['datatype']
+                    has_binary_data = False
+                    parameters = output.get("parameters")
+                    if parameters is not None:
+                        this_data_size = parameters.get("binary_data_size")
+                        if this_data_size is not None:
+                            has_binary_data = True
+                            if this_data_size != 0:
+                                start_index = self._output_name_to_buffer_map[
+                                    name]
+                                end_index = start_index + this_data_size
+                                if datatype == 'BYTES':
+                                    # String results contain a 4-byte string length
+                                    # followed by the actual string characters. Hence,
+                                    # need to decode the raw bytes to convert into
+                                    # array elements.
+                                    np_array = deserialize_bytes_tensor(
+                                        self._buffer[start_index:end_index])
+                                else:
+                                    np_array = np.frombuffer(
+                                        self._buffer[start_index:end_index],
                                         dtype=triton_to_np_dtype(datatype))
-                np_array = np.resize(np_array, output['shape'])
-                return np_array
+                    if not has_binary_data:
+                        np_array = np.array(output['data'],
+                                            dtype=triton_to_np_dtype(datatype))
+                    np_array = np.resize(np_array, output['shape'])
+                    return np_array
         return None
 
     def get_output(self, name):

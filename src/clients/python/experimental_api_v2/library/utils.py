@@ -128,8 +128,7 @@ def np_to_triton_dtype(np_dtype):
         return "FP32"
     elif np_dtype == np.float64:
         return "FP64"
-    # FIXMEPV2 support np.bytes_ or np.str_
-    elif np_dtype == np.object:
+    elif np_dtype == np.object or np_dtype.type == np.bytes_:
         return "BYTES"
     return None
 
@@ -160,7 +159,7 @@ def triton_to_np_dtype(dtype):
     elif dtype == "FP64":
         return np.float64
     elif dtype == "BYTES":
-        return np.object
+        return np.bytes_
     return None
 
 
@@ -245,4 +244,4 @@ def deserialize_bytes_tensor(encoded_tensor):
         sb = struct.unpack_from("<{}s".format(l), val_buf, offset)[0]
         offset += l
         strs.append(sb)
-    return (np.array(strs, dtype=str))
+    return (np.array(strs, dtype=bytes))
