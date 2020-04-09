@@ -73,9 +73,11 @@ if __name__ == '__main__':
 
     outputs.append(grpcclient.InferOutput('OUTPUT0'))
     outputs.append(grpcclient.InferOutput('OUTPUT1'))
+
+    # Test with outputs
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
-                                  outputs=None,
+                                  outputs=outputs,
                                   headers={'test': '1'})
 
     statistics = triton_client.get_inference_statistics(model_name=model_name)
@@ -99,4 +101,26 @@ if __name__ == '__main__':
         if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
             print("sync infer error: incorrect difference")
             sys.exit(1)
+
+    # Test with no outputs
+    results = triton_client.infer(model_name=model_name,
+                                  inputs=inputs,
+                                  outputs=None)
+
+    # Get the output arrays from the results
+    output0_data = results.as_numpy('OUTPUT0')
+    output1_data = results.as_numpy('OUTPUT1')
+
+    for i in range(16):
+        print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
+              str(output0_data[0][i]))
+        print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
+              str(output1_data[0][i]))
+        if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
+            print("sync infer error: incorrect sum")
+            sys.exit(1)
+        if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
+            print("sync infer error: incorrect difference")
+            sys.exit(1)
+
     print('PASS: infer')
