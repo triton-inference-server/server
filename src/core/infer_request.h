@@ -28,8 +28,10 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "src/core/infer_response.h"
 #include "src/core/memory.h"
 #include "src/core/model_config.h"
+#include "src/core/response_allocator.h"
 #include "src/core/status.h"
 #include "src/core/tritonserver.h"
 
@@ -45,12 +47,11 @@ class InferenceServer;
 
 //
 // An inference request. A request can be used multiple times for
-// inference but before each inference PrepareForInference() must be
-// called to verify and prepare the request. Verification involves
+// inference but before each inference run, PrepareForInference() must
+// be called to verify and prepare the request. Verification involves
 // ensuring that any changes made since the last inference are
 // valid. Preparing involves removing/resetting any state left over
-// from the previous inference. After each inference
-// CleanupFromInference() must be called.
+// from the previous inference.
 //
 class InferenceRequest {
  public:
@@ -69,7 +70,7 @@ class InferenceRequest {
         const uint64_t dim_count);
 
     // The name of the input tensor. There is no mutable operator for
-    // the name because it is used in a InferenceReference map and a
+    // the name because it is used in a InferenceRequest map and a
     // mutable method would allow it to get out-of-sync.
     const std::string& Name() const { return name_; }
 
@@ -141,6 +142,7 @@ class InferenceRequest {
         TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const;
 
    private:
+    DISALLOW_COPY_AND_ASSIGN(Input);
     friend std::ostream& operator<<(
         std::ostream& out, const InferenceRequest::Input& input);
 
@@ -166,7 +168,7 @@ class InferenceRequest {
     RequestedOutput(const std::string& name, const uint32_t classification_cnt);
 
     // The name of the output tensor. There is no mutable operator for
-    // the name because it is used in a InferenceReference map and a
+    // the name because it is used in a InferenceRequest map and a
     // mutable method would allow it to get out-of-sync.
     const std::string& Name() const { return name_; }
 
@@ -178,6 +180,7 @@ class InferenceRequest {
     void SetClassificationCount(uint32_t c) { classification_cnt_ = c; }
 
    private:
+    DISALLOW_COPY_AND_ASSIGN(RequestedOutput);
     friend std::ostream& operator<<(
         std::ostream& out, const InferenceRequest::RequestedOutput& output);
 
@@ -189,14 +192,38 @@ class InferenceRequest {
   };
 
   // InferenceRequest
+  //
+  // The two constructors are identical except one takes backend as a
+  // shared pointer and the other as a raw pointer. The shared pointer
+  // version is the primary one and acts to keep the backend alive as
+  // long as the request is in flight. The raw pointer version is used
+  // only for cases where the backend itself is issuing a request
+  // (e.g. warmup) and no shared pointer version of the backend exists
+  // (because we aren't using shared_from_this).
   InferenceRequest(
-      const std::string& model_name, const int64_t requested_model_version,
-      const int64_t actual_model_version, const uint32_t protocol_version);
+      const std::shared_ptr<InferenceBackend>& backend,
+      const int64_t requested_model_version, const uint32_t protocol_version)
+      : InferenceRequest(
+            backend.get(), requested_model_version, protocol_version)
+  {
+    backend_shared_ = backend;
+  }
+
+  InferenceRequest(
+      InferenceBackend* backend, const int64_t requested_model_version,
+      const uint32_t protocol_version)
+      : needs_normalization_(true), backend_raw_(backend),
+        requested_model_version_(requested_model_version),
+        protocol_version_(protocol_version), flags_(0), correlation_id_(0),
+        batch_size_(0), priority_(0), timeout_us_(0)
+  {
+  }
 
   uint32_t ProtocolVersion() const { return protocol_version_; }
-  const std::string& ModelName() const { return model_name_; }
+
+  const std::string& ModelName() const;
   int64_t RequestedModelVersion() const { return requested_model_version_; }
-  int64_t ActualModelVersion() const { return actual_model_version_; }
+  int64_t ActualModelVersion() const;
 
   uint64_t Id() const { return id_; }
   void SetId(uint64_t i) { id_ = i; }
@@ -319,24 +346,86 @@ class InferenceRequest {
   Status RemoveRequestedOutput(const std::string& name);
   Status RemoveAllRequestedOutputs();
 
-  // Prepare this request for inference. We pass backend here as
-  // non-shared-ptr because normalize must be used in contexts where
-  // the backend shared_ptr does not yet exist (e.g. warmup).
-  Status PrepareForInference(const InferenceBackend& backend);
+  // Initialize the release callback for the request.
+  Status SetReleaseCallback(
+      TRITONSERVER_InferenceRequestReleaseFn_t release_fn, void* release_userp)
+  {
+    release_fn_ = release_fn;
+    release_userp_ = release_userp;
+    return Status::Success;
+  }
+
+  // Initialize the response factory that is to be used with any
+  // responses produced for this request.
+  Status SetResponseCallback(
+      const ResponseAllocator* allocator, void* alloc_userp,
+      TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
+      void* response_userp)
+  {
+    response_factory_ = InferenceResponseFactory(
+        backend_shared_, id_str_, allocator, alloc_userp, response_fn,
+        response_userp);
+    return Status::Success;
+  }
+
+  // Prepare this request for inference.
+  Status PrepareForInference();
+
+  // Run this inference request using the backend associated with the
+  // request. If Status::Success is returned then the call has taken
+  // ownership of the request object and so 'request' will be
+  // nullptr. If non-success is returned then the caller still retains
+  // ownership of 'request'.
+  static Status Run(std::unique_ptr<InferenceRequest>& request);
+
+  // Send an error response for this request. If 'status' is Success
+  // then no response is sent. If 'release_request' is true then the
+  // release callback is called for this request and ownership is
+  // given to the callback. Thus, if 'release_request' is true the
+  // caller no longer has ownership of this object and so should drop
+  // all references not access or destroy this object.
+  static void RespondWithError(
+      const InferenceRequest& request, const Status& status,
+      const bool release_request);
+
+  // Send an error response to a set of 'requests'. If 'status' is
+  // Success then no responses are sent. If 'release_request' is true
+  // then the release callback is called for each request, and the request is
+  // ownership is given to the callback. Thus, if 'release_request' is
+  // true the caller no longer has ownership of this object and so
+  // should drop all references not access or destroy this object.
+  static void RespondWithError(
+      std::vector<std::unique_ptr<InferenceRequest>>* requests,
+      const Status& status, const bool release_requests);
+
+  // Create a copy of 'from' suitable for use as a "null" request as
+  // required for the direct sequence batcher. The returned copy will
+  // contain only the minimum content required for a null request.
+  static InferenceRequest* CopyAsNull(const InferenceRequest& from);
 
  private:
+  DISALLOW_COPY_AND_ASSIGN(InferenceRequest);
   friend std::ostream& operator<<(
       std::ostream& out, const InferenceRequest& request);
 
-  Status NormalizeV1(const InferenceBackend& backend);
-  Status NormalizeV2(const InferenceBackend& backend);
+  Status NormalizeV1();
+  Status NormalizeV2();
 
   // Has anything in the request potentially changed in a way that
   // causes normalization to be required when preparing the request
   // for inference.
   bool needs_normalization_;
 
-  std::string model_name_;
+  // The backend associated with this request. For most requests
+  // backend_shared_ will be non-null and will act to keep the backend
+  // alive as long as this request is live. In this case backend_raw_
+  // will be the raw pointer from the shared pointer. For cases where
+  // the backend itself created the request (like running requests for
+  // warmup), backend_shared_ will be nullptr, but backend_raw_ will
+  // still be defined. Thus backend_raw_ is always defined and should
+  // always to used to access the backend.
+  std::shared_ptr<InferenceBackend> backend_shared_;
+  InferenceBackend* backend_raw_;
 
   // The model version as requested and based on version policy the
   // specific version that is actually used for inference.
@@ -360,6 +449,13 @@ class InferenceRequest {
   std::unordered_map<std::string, std::shared_ptr<Input>> override_inputs_;
   std::unordered_map<std::string, Input*> inputs_;
   std::unordered_map<std::string, RequestedOutput> requested_outputs_;
+
+  // The release function and user pointer for this request.
+  TRITONSERVER_InferenceRequestReleaseFn_t release_fn_;
+  void* release_userp_;
+
+  // The response factory associated with this request.
+  InferenceResponseFactory response_factory_;
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceRequest& request);
