@@ -31,6 +31,7 @@
 #include "src/core/constants.h"
 #include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/filesystem.h"
+#include "src/core/infer_request.h"
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/model_config_utils.h"
@@ -142,7 +143,7 @@ InferenceBackend::SetConfiguredScheduler(
   }
 
   auto OnWarmup = [this, &samples](uint32_t runner_idx) -> Status {
-    for (const auto& sample : samples) {
+    for (auto& sample : samples) {
       LOG_VERBOSE(1) << "model '" << sample.request_->ModelName()
                      << "' instance " << std::to_string(runner_idx)
                      << " is running warmup sample '" << sample.sample_name_
@@ -225,34 +226,36 @@ InferenceBackend::Init(
   return Status::Success;
 }
 
-void
-InferenceBackend::Run(
+Status
+InferenceBackend::Enqueue(
     const std::shared_ptr<ModelInferStats>& stats,
-    const std::shared_ptr<InferenceRequest>& request,
-    const std::shared_ptr<InferResponseProvider>& response_provider,
-    std::function<void(const Status&)> OnCompleteHandleInfer)
+    std::unique_ptr<InferenceRequest>& request)
 {
-  scheduler_->Enqueue(stats, request, response_provider, OnCompleteHandleInfer);
+  scheduler_->Enqueue(stats, request);
+  return Status::Success;
 }
 
 void
 InferenceBackend::Run(
-    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-    std::function<void(Status)> OnCompleteQueuedPayloads)
+    uint32_t runner_idx,
+    std::vector<std::unique_ptr<InferenceRequest>>&& requests)
 {
   // Each runner executes using the corresponding context...
   if (runner_idx >= contexts_.size()) {
-    OnCompleteQueuedPayloads(Status(
-        Status::Code::INTERNAL,
-        "unexpected runner index" + std::to_string(runner_idx) +
-            ", max allowed " + std::to_string(contexts_.size())));
+    InferenceRequest::RespondWithError(
+        &requests,
+        Status(
+            Status::Code::INTERNAL,
+            "unexpected runner index" + std::to_string(runner_idx) +
+                ", max allowed " + std::to_string(contexts_.size())),
+        true /* release_requests */);
     return;
   }
 
 #ifdef TRTIS_ENABLE_STATS
-  // Stop queue timer and start compute timer when the payload is
+  // Stop queue timer and start compute timer when the request is
   // scheduled to run
-  for (auto& payload : *payloads) {
+  for (auto& request : *requests) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeStart);
@@ -261,7 +264,7 @@ InferenceBackend::Run(
   }
 #endif  // TRTIS_ENABLE_STATS
 
-  Status status = contexts_[runner_idx]->Run(this, payloads);
+  contexts_[runner_idx]->Run(this, std::move(requests));
 
 #ifdef TRTIS_ENABLE_STATS
   // Stop compute timers.
@@ -272,30 +275,34 @@ InferenceBackend::Run(
     }
   }
 #endif  // TRTIS_ENABLE_STATS
-
-  OnCompleteQueuedPayloads(status);
 }
 
 void
 InferenceBackend::WarmUp(
-    uint32_t runner_idx, const WarmupData& sample,
+    uint32_t runner_idx, WarmupData& sample,
     std::function<void(Status)> OnCompleteWarmup)
 {
-  std::vector<Scheduler::Payload> payloads;
+  std::vector<std::unique_ptr<InferenceRequest>> requests;
 
-  // Add the sample request directly to the payloads. For the case of
+  // Add the sample request directly to 'requests'. For the case of
   // batch-size 1 no other request is needed.
-  payloads.emplace_back(nullptr, sample.request_, nullptr, nullptr);
+  requests.emplace_back(std::move(sample.request_));
 
   // For batch-size > 1 make copies of the request to fill out the
-  // payloads
+  // payloads.
+  //
+  // FIXME can't copy InferenceRequest so need to add an explicit Copy
+  // functions or better to revisit sample creation to include the
+  // batch dimension so don't need this at all.
+#if 0
   for (size_t idx = 1; idx < sample.batch_size_; idx++) {
     auto request = std::make_shared<InferenceRequest>(*sample.request_);
     payloads.emplace_back(nullptr, request, nullptr, nullptr);
   }
+#endif
 
   // Unless necessary, simply invoke Run()
-  Run(runner_idx, &payloads, OnCompleteWarmup);
+  Run(runner_idx, std::move(requests));
 }
 
 Status
@@ -368,9 +375,8 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
     // Use batch-1 for every request, batch size is simulated by
     // populating requests for single run. FIXMEV2 once
     // protocol_version 2 is the only one remove SetBatchSize and
-    // adjust the input/output tensors to have appropriate shape
-    warmup_data.request_ =
-        std::make_shared<InferenceRequest>(Name(), Version(), Version(), 1);
+    // adjust the input/output tensors to have appropriate shape.
+    warmup_data.request_.reset(new InferenceRequest(this, Version(), 1));
     warmup_data.request_->SetBatchSize(1);
 
     // Request all outputs
@@ -446,7 +452,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
       }
     }
 
-    RETURN_IF_ERROR(warmup_data.request_->PrepareForInference(*this));
+    RETURN_IF_ERROR(warmup_data.request_->PrepareForInference());
 
     // Third pass to prepare control inputs.
     for (const auto& input_meta : warmup_setting.inputs()) {

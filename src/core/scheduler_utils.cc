@@ -29,20 +29,18 @@
 #include <cassert>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
-#include "src/core/provider.h"
 
 namespace nvidia { namespace inferenceserver {
 
 Status
 InitPendingShape(
-    const int64_t runner_id, const Scheduler::Payload& payload,
+    const int64_t runner_id, const std::unique_ptr<InferenceRequest>& irequest,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
     PendingBatchShapes* pending_batch_shapes)
 {
   pending_batch_shapes->clear();
 
-  const auto& irequest = payload.request_;
   for (const auto& pr : irequest->ImmutableInputs()) {
     const InferenceRequest::Input* input = pr.second;
     const auto itr = enforce_equal_shape_tensors.find(input->Name());
@@ -53,7 +51,7 @@ InitPendingShape(
       // For shape tensors must compare the contents of the tensor in
       // addition to the tensor shape itself.
       if (itr->second) {
-        RETURN_IF_ERROR(OnPeek(runner_id, *input, payload, &shapes.second));
+        RETURN_IF_ERROR(OnPeek(runner_id, *input, irequest, &shapes.second));
 
         LOG_VERBOSE(1) << "peek '" << input->Name() << "', shape "
                        << DimsListToString(shapes.first) << ", value "
@@ -70,12 +68,10 @@ InitPendingShape(
 
 bool
 CompareWithPendingShape(
-    const int64_t runner_id, const Scheduler::Payload& payload,
+    const int64_t runner_id, const std::unique_ptr<InferenceRequest>& irequest,
     const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
     const PendingBatchShapes& pending_batch_shapes)
 {
-  const auto& irequest = payload.request_;
-
   for (const auto& pr : irequest->ImmutableInputs()) {
     const InferenceRequest::Input* input = pr.second;
     const auto itr = pending_batch_shapes.find(input->Name());
@@ -91,7 +87,7 @@ CompareWithPendingShape(
 
         // If fail getting the tensor shape then conservatively return
         // false to indicate that the shapes don't match.
-        if (!OnPeek(runner_id, *input, payload, &shape).IsOk()) {
+        if (!OnPeek(runner_id, *input, irequest, &shape).IsOk()) {
           return false;
         }
         if (!CompareDims(itr->second.second, shape)) {
@@ -105,15 +101,16 @@ CompareWithPendingShape(
 }
 
 Status
-PriorityQueue::PolicyQueue::Enqueue(Scheduler::Payload&& payload)
+PriorityQueue::PolicyQueue::Enqueue(std::unique_ptr<InferenceRequest>& request)
 {
   if ((max_queue_size_ != 0) && (Size() >= max_queue_size_)) {
     return Status(Status::Code::UNAVAILABLE, "Exceeds maximum queue size");
   }
-  queue_.emplace_back(std::move(payload));
+
+  queue_.emplace_back(std::move(request));
   auto timeout_us = default_timeout_us_;
   if (allow_timeout_override_) {
-    auto override_timeout_us = queue_.back().request_->TimeoutMicroseconds();
+    auto override_timeout_us = queue_.back()->TimeoutMicroseconds();
     if (override_timeout_us != 0 && override_timeout_us < timeout_us) {
       timeout_us = override_timeout_us;
     }
@@ -130,19 +127,19 @@ PriorityQueue::PolicyQueue::Enqueue(Scheduler::Payload&& payload)
   return Status::Success;
 }
 
-Scheduler::Payload
-PriorityQueue::PolicyQueue::Dequeue()
+Status
+PriorityQueue::PolicyQueue::Dequeue(std::unique_ptr<InferenceRequest>* request)
 {
   if (!queue_.empty()) {
-    auto res = std::move(queue_.front());
+    *request = std::move(queue_.front());
     queue_.pop_front();
     timeout_timestamp_ns_.pop_front();
-    return res;
   } else {
-    auto res = std::move(delayed_queue_.front());
+    *request = std::move(delayed_queue_.front());
     delayed_queue_.pop_front();
-    return res;
   }
+
+  return Status::Success;
 }
 
 bool
@@ -162,7 +159,7 @@ PriorityQueue::PolicyQueue::ApplyPolicy(
         } else {
           rejected_queue_.emplace_back(std::move(queue_[curr_idx]));
           *rejected_count += 1;
-          *rejected_batch_size += rejected_queue_.back().request_->BatchSize();
+          *rejected_batch_size += rejected_queue_.back()->BatchSize();
         }
         curr_idx++;
       } else {
@@ -191,16 +188,15 @@ PriorityQueue::PolicyQueue::ApplyPolicy(
   return ((idx - queue_.size()) < delayed_queue_.size());
 }
 
-std::deque<Scheduler::Payload>
-PriorityQueue::PolicyQueue::ReleaseRejectedQueue()
+void
+PriorityQueue::PolicyQueue::ReleaseRejectedQueue(
+    std::deque<std::unique_ptr<InferenceRequest>>* requests)
 {
-  std::deque<Scheduler::Payload> res;
-  rejected_queue_.swap(res);
-  return res;
+  rejected_queue_.swap(*requests);
 }
 
-Scheduler::Payload&
-PriorityQueue::PolicyQueue::At(size_t idx)
+const std::unique_ptr<InferenceRequest>&
+PriorityQueue::PolicyQueue::At(size_t idx) const
 {
   if (idx < queue_.size()) {
     return queue_[idx];
@@ -250,14 +246,15 @@ PriorityQueue::PriorityQueue(
 }
 
 Status
-PriorityQueue::Enqueue(uint32_t priority_level, Scheduler::Payload&& payload)
+PriorityQueue::Enqueue(
+    uint32_t priority_level, std::unique_ptr<InferenceRequest>& request)
 {
-  auto status = queues_[priority_level].Enqueue(std::move(payload));
+  auto status = queues_[priority_level].Enqueue(request);
   if (status.IsOk()) {
     size_++;
     front_priority_level_ = std::min(front_priority_level_, priority_level);
     // Invalidate the pending batch cursor if the enqueued item is placed
-    // within the pending batch. At the same priority level, the payload is
+    // within the pending batch. At the same priority level the request is
     // guaranteed to be after pending batch if the batch hasn't reached
     // delayed queue.
     if ((priority_level < pending_cursor_.curr_it_->first) ||
@@ -266,41 +263,47 @@ PriorityQueue::Enqueue(uint32_t priority_level, Scheduler::Payload&& payload)
       pending_cursor_.valid_ = false;
     }
   }
+
   return status;
 }
 
 Status
-PriorityQueue::Dequeue(Scheduler::Payload* payload)
+PriorityQueue::Dequeue(std::unique_ptr<InferenceRequest>* request)
 {
   pending_cursor_.valid_ = false;
   while (true) {
     if (!queues_[front_priority_level_].Empty()) {
+      RETURN_IF_ERROR(queues_[front_priority_level_].Dequeue(request));
       size_--;
-      *payload = std::move(queues_[front_priority_level_].Dequeue());
       return Status::Success;
     } else if (front_priority_level_ != last_priority_level_) {
       front_priority_level_++;
       continue;
     }
 
-    // Control reach here if the queue for last priority level is also empty,
-    // then raise exception
+    // Control reach here if the queue for last priority level is also
+    // empty, then return error below.
     break;
   }
+
   return Status(Status::Code::UNAVAILABLE, "dequeue on empty queue");
 }
 
-std::shared_ptr<std::vector<std::deque<Scheduler::Payload>>>
-PriorityQueue::ReleaseRejectedPayloads()
+void
+PriorityQueue::ReleaseRejectedRequests(
+    std::shared_ptr<std::vector<std::deque<std::unique_ptr<InferenceRequest>>>>*
+        requests)
 {
-  auto res = std::make_shared<std::vector<std::deque<Scheduler::Payload>>>(
+  auto res = std::make_shared<
+      std::vector<std::deque<std::unique_ptr<InferenceRequest>>>>(
       queues_.size());
   size_t idx = 0;
   for (auto& queue : queues_) {
-    (*res)[idx] = std::move(queue.second.ReleaseRejectedQueue());
+    queue.second.ReleaseRejectedQueue(&((*res)[idx]));
     idx++;
   }
-  return std::move(res);
+
+  requests->swap(res);
 }
 
 bool
@@ -338,8 +341,8 @@ PriorityQueue::ApplyPolicyAtCursor()
         continue;
       }
     }
-    // Control reach here if the cursor points to a payload that is candidate
-    // for pending batch, or if all payloads are in pending batch.
+    // Control reach here if the cursor points to a request that is candidate
+    // for pending batch, or if all requests are in pending batch.
     break;
   }
   size_ -= rejected_count;
@@ -364,9 +367,10 @@ PriorityQueue::AdvanceCursor()
     }
   }
 
-  auto curr_enqueue_time_ns = TIMESPEC_TO_NANOS(
+  // FIXME stats
+  uint64_t curr_enqueue_time_ns = 0; /* TIMESPEC_TO_NANOS(
       pending_cursor_.curr_it_->second.At(pending_cursor_.queue_idx_)
-          .stats_->Timestamp(ModelInferStats::TimestampKind::kQueueStart));
+          .stats_->Timestamp(ModelInferStats::TimestampKind::kQueueStart)); */
   if (pending_cursor_.pending_batch_oldest_enqueue_time_ns_ != 0) {
     pending_cursor_.pending_batch_oldest_enqueue_time_ns_ = std::min(
         pending_cursor_.pending_batch_oldest_enqueue_time_ns_,
@@ -377,7 +381,7 @@ PriorityQueue::AdvanceCursor()
   }
   ++pending_cursor_.queue_idx_;
   ++pending_cursor_.pending_batch_count_;
-  // pending batch includes delayed payload if (queue_idx_ - 1) points to
+  // pending batch includes delayed request if (queue_idx_ - 1) points to
   // delayed queue.
   pending_cursor_.at_delayed_queue_ =
       (pending_cursor_.queue_idx_ >
