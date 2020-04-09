@@ -50,6 +50,11 @@ struct TRITONCUSTOM_ResponseFactory;
 struct TRITONCUSTOM_Response;
 struct TRITONCUSTOM_Instance;
 
+/// GPU device number that indicates that no GPU is available for a
+/// custom backend instance. Typically a custom backend will then
+/// execute using only CPU.
+#define TRITONCUSTOM_NO_GPU_DEVICE -1
+
 /// Type for the TRITONCUSTOM_InstanceNew function.
 typedef TRITONCUSTOM_Error* TRITONCUSTOM_InstanceNewFn_t(
     TRITONCUSTOM_Instance**, const char*, const char*, const int64_t);
@@ -62,17 +67,29 @@ typedef TRITONCUSTOM_Error* TRITONCUSTOM_InstanceDeleteFn_t(
 typedef TRITONCUSTOM_Error* TRITONCUSTOM_InstanceExecuteFn_t(
     TRITONCUSTOM_Instance*, const uint32_t, TRITONCUSTOM_Request**);
 
-/// GPU device number that indicates that no GPU is available for a
-/// custom backend instance. Typically a custom backend will then
-/// execute using only CPU.
-#define TRITONCUSTOM_NO_GPU_DEVICE -1
+/// Tensor data types recognized by Triton and custom backends.
+typedef enum custom_datatype_enum {
+  TRITONCUSTOM_TYPE_BOOL,
+  TRITONCUSTOM_TYPE_UINT8,
+  TRITONCUSTOM_TYPE_UINT16,
+  TRITONCUSTOM_TYPE_UINT32,
+  TRITONCUSTOM_TYPE_UINT64,
+  TRITONCUSTOM_TYPE_INT8,
+  TRITONCUSTOM_TYPE_INT16,
+  TRITONCUSTOM_TYPE_INT32,
+  TRITONCUSTOM_TYPE_INT64,
+  TRITONCUSTOM_TYPE_FP16,
+  TRITONCUSTOM_TYPE_FP32,
+  TRITONCUSTOM_TYPE_FP64,
+  TRITONCUSTOM_TYPE_BYTES
+} TRITONCUSTOM_DataType;
 
-/// Types of memory recognized by Triton and custom backend.
+/// Types of memory recognized by Triton and custom backends.
 typedef enum custom_memorytype_enum {
-  CUSTOM_MEMORY_CPU,
-  CUSTOM_MEMORY_CPU_PINNED,
-  CUSTOM_MEMORY_GPU
-} CustomMemoryType;
+  TRITONCUSTOM_MEMORY_CPU,
+  TRITONCUSTOM_MEMORY_CPU_PINNED,
+  TRITONCUSTOM_MEMORY_GPU
+} TRITONCUSTOM_MemoryType;
 
 ///
 /// TRITONCUSTOM_Error
@@ -210,7 +227,7 @@ TRITONCUSTOM_EXPORT TRITONCUSTOM_Error* TRITONCUSTOM_InputProperties(
 /// \return a TRITONCUSTOM_Error indicating success or failure.
 TRITONCUSTOM_EXPORT TRITONCUSTOM_Error* TRITONCUSTOM_InputBuffer(
     TRITONCUSTOM_Input* input, const uint32_t index, const void** buffer,
-    uint64_t* buffer_byte_size, CustomMemoryType* memory_type,
+    uint64_t* buffer_byte_size, TRITONCUSTOM_MemoryType* memory_type,
     int64_t* memory_type_id);
 
 ///
@@ -255,8 +272,8 @@ TRITONCUSTOM_EXPORT TRITONCUSTOM_Error* TRITONCUSTOM_RequestedOutputName(
 /// the actual memory type id of 'buffer'.
 /// \return a TRITONCUSTOM_Error indicating success or failure.
 TRITONCUSTOM_EXPORT TRITONCUSTOM_Error* TRITONCUSTOM_OutputBuffer(
-    TRITONCUSTOM_Output* output, const void** buffer,
-    const uint64_t buffer_byte_size, CustomMemoryType* memory_type,
+    TRITONCUSTOM_Output* output, void** buffer,
+    const uint64_t buffer_byte_size, TRITONCUSTOM_MemoryType* memory_type,
     int64_t* memory_type_id);
 
 ///
