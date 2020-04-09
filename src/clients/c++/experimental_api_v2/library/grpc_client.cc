@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -90,7 +90,7 @@ InferenceServerGrpcClient::IsServerLive(bool* live, const Headers& headers)
   if (grpc_status.ok()) {
     *live = response.live();
     if (verbose_) {
-      std::cout << "IsServerLive: " << *live << std::endl;
+      std::cout << "Server Live : " << *live << std::endl;
     }
   } else {
     err = Error(grpc_status.error_message());
@@ -146,7 +146,7 @@ InferenceServerGrpcClient::IsModelReady(
   if (grpc_status.ok()) {
     *ready = response.ready();
     if (verbose_) {
-      std::cout << "name: " << model_name;
+      std::cout << "Model Ready : name: " << model_name;
       if (!model_version.empty()) {
         std::cout << "(version: " << model_version << ") ";
       }
