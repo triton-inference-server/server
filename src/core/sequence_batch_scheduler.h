@@ -36,7 +36,6 @@
 #include <unordered_map>
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
-#include "src/core/provider.h"
 #include "src/core/scheduler.h"
 #include "src/core/scheduler_utils.h"
 #include "src/core/status.h"
@@ -65,11 +64,9 @@ class SequenceBatchScheduler : public Scheduler {
       std::unique_ptr<Scheduler>* scheduler);
 
   // \see Scheduler::Enqueue()
-  void Enqueue(
+  Status Enqueue(
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferenceRequest>& request,
-      const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(const Status&)> OnComplete) override;
+      std::unique_ptr<InferenceRequest>& request) override;
 
   // A batcher-sequence_slot combination. The batcher is represented
   // by the index into 'batchers_'.
@@ -85,7 +82,7 @@ class SequenceBatchScheduler : public Scheduler {
   // that the sequence slot is no longer being used.
   CorrelationID ReleaseSequenceSlot(
       const BatcherSequenceSlot& seq_slot,
-      std::deque<Scheduler::Payload>* payloads);
+      std::deque<std::unique_ptr<InferenceRequest>>* requests);
 
   // For debugging/testing, batcher reports how many waiting requests
   // and returns true if the batcher should continue waiting.
@@ -135,11 +132,13 @@ class SequenceBatchScheduler : public Scheduler {
   // Map from a request's correlation ID to the backlog queue
   // collecting requests for that correlation ID.
   using BacklogMap = std::unordered_map<
-      CorrelationID, std::shared_ptr<std::deque<Scheduler::Payload>>>;
+      CorrelationID,
+      std::shared_ptr<std::deque<std::unique_ptr<InferenceRequest>>>>;
   BacklogMap sequence_to_backlog_map_;
 
   // The ordered backlog of sequences waiting for a free sequenceslot.
-  std::deque<std::shared_ptr<std::deque<Scheduler::Payload>>> backlog_queues_;
+  std::deque<std::shared_ptr<std::deque<std::unique_ptr<InferenceRequest>>>>
+      backlog_queues_;
 
   // The batcher/sequence-slot locations ready to accept a new
   // sequence. Ordered from lowest sequence-slot-number to highest so
@@ -179,19 +178,18 @@ class SequenceBatch {
           notready_input_overrides);
   virtual ~SequenceBatch() = default;
 
-  // Enqueue a payload into the appropriate queue for the requested
-  // sequence slot.
+  // Enqueue a request into the appropriate queue for the requested
+  // sequence slot. This function takes ownership of 'request' so on
+  // request 'request' will be nullptr.
   virtual void Enqueue(
       const uint32_t seq_slot, const CorrelationID correlation_id,
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferenceRequest>& request,
-      const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(const Status&)> OnComplete) = 0;
+      std::unique_ptr<InferenceRequest>& request) = 0;
 
  protected:
   bool CreateCorrelationIDControl(const ModelConfig& config);
   void SetControlTensors(
-      const std::shared_ptr<InferenceRequest>& irequest, const int32_t seq_slot,
+      std::unique_ptr<InferenceRequest>& irequest, const int32_t seq_slot,
       const CorrelationID corr_id, const bool not_ready = false);
 
   // The controlling scheduler.
@@ -256,14 +254,10 @@ class DirectSequenceBatch : public SequenceBatch {
       std::promise<bool>* is_initialized);
   ~DirectSequenceBatch();
 
-  // Enqueue a payload into the appropriate queue for the requested
-  // sequence slot.
   void Enqueue(
       const uint32_t seq_slot, const CorrelationID correlation_id,
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferenceRequest>& request,
-      const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(const Status&)> OnComplete) override;
+      std::unique_ptr<InferenceRequest>& request) override;
 
  private:
   void SchedulerThread(const int nice, std::promise<bool>* is_initialized);
@@ -280,7 +274,7 @@ class DirectSequenceBatch : public SequenceBatch {
   // Function the scheduler will call to peek at shape tensors.
   const Scheduler::StandardShapeTensorPeekFunc OnPeek_;
 
-  // The thread scheduling payloads queued in this batch.
+  // The thread scheduling requests that are queued in this batch.
   std::unique_ptr<std::thread> scheduler_thread_;
   bool scheduler_thread_exit_;
   bool scheduler_idle_;
@@ -292,7 +286,7 @@ class DirectSequenceBatch : public SequenceBatch {
   // Queues holding inference requests. There are 'seq_slot_cnt'
   // queues, one for each sequence slot where requests assigned to
   // that slot are enqueued to wait for inferencing.
-  std::vector<std::deque<Scheduler::Payload>> queues_;
+  std::vector<std::deque<std::unique_ptr<InferenceRequest>>> queues_;
 
   // Is each sequence slot active or not? A zero value indicates
   // inactive, a non-zero value indicates active and is the
@@ -331,14 +325,10 @@ class OldestSequenceBatch : public SequenceBatch {
       std::promise<bool>* is_initialized);
   ~OldestSequenceBatch();
 
-  // Enqueue a payload into the appropriate queue for the requested
-  // sequence slot.
   void Enqueue(
       const uint32_t seq_slot, const CorrelationID correlation_id,
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferenceRequest>& request,
-      const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(const Status&)> OnComplete) override;
+      std::unique_ptr<InferenceRequest>& request) override;
 
  private:
   void CompleteAndNext(
@@ -359,7 +349,7 @@ class OldestSequenceBatch : public SequenceBatch {
   // Queues holding inference requests. There are 'seq_slot_cnt'
   // queues, one for each sequence slot where requests assigned to
   // that slot are enqueued to wait for inferencing.
-  std::vector<std::deque<Scheduler::Payload>> queues_;
+  std::vector<std::deque<std::unique_ptr<InferenceRequest>>> queues_;
 };
 
 }}  // namespace nvidia::inferenceserver

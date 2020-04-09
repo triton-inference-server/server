@@ -28,9 +28,11 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "src/core/infer_request.h"
+#include "src/core/memory.h"
 #include "src/core/model_config.h"
-#include "src/core/provider.h"
-#include "src/core/scheduler.h"
+#include "src/core/status.h"
+#include "src/core/trtserver.h"
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -39,13 +41,14 @@
 namespace nvidia { namespace inferenceserver {
 
 class InferenceBackend;
+class InferenceRequest;
 
 struct InputInfo {
   char* input_buffer_;
   TRTSERVER_Memory_Type memory_type_;
   int64_t memory_type_id_;
   // indirect pinned memory buffers, their locations in 'input_buffer_',
-  // and the payloads that are associated with this buffer (for reporting error)
+  // and the requests that are associated with this buffer (for reporting error)
   std::vector<
       std::tuple<std::unique_ptr<AllocatedMemory>, size_t, std::vector<size_t>>>
       indirect_buffers_;
@@ -57,7 +60,7 @@ struct OutputInfo {
   TRTSERVER_Memory_Type memory_type_;
   int64_t memory_type_id_;
   // indirect pinned memory buffers, the memory references appointing to
-  // the destinations in payloads and the payload's index
+  // the destinations in requests and the request's index
   std::vector<std::pair<
       std::unique_ptr<AllocatedMemory>,
       std::vector<std::pair<size_t, std::unique_ptr<MutableMemory>>>>>
@@ -90,40 +93,42 @@ struct BackendContext {
   Status CreateCudaStream(
       const int cuda_stream_priority = 0, cudaStream_t* stream = nullptr);
 
-  // Run model to execute for one or more requests. This function
-  // assumes that it is only called by the single runner thread that
-  // is assigned to this context. A non-OK return status indicates
-  // an internal error that prevents any of the of requests from
-  // completing. If an error is isolate to a single request payload
-  // it will be reported in that payload.
-  virtual Status Run(
+  // Run model to execute one or more requests. This function assumes
+  // that it is only called by the single runner thread that is
+  // assigned to this context. This function takes ownership of
+  // 'requests' and is responsible for generating responses and
+  // releasing the requests.
+  virtual void Run(
       const InferenceBackend* base,
-      std::vector<Scheduler::Payload>* payloads) = 0;
+      std::vector<std::unique_ptr<InferenceRequest>>&& requests) = 0;
 
   // Return the contents of a shape tensor. It is the caller's
   // responsibility to call this only for shape tensors that are
   // 1-dimensional, INT32 tensors. A non-OK status indicates that the
   // contents of the tensor could not be peeked.
   virtual Status PeekShapeTensor(
-      const InferenceRequest::Input& input, const Scheduler::Payload& payload,
+      const InferenceRequest::Input& input,
+      const std::unique_ptr<InferenceRequest>& request,
       std::vector<int64_t>* shape);
 
-  // Helper function to batch input data from payloads into 'input_buffer'.
-  // 'input_buffer' must be a continuous block that can hold the sum of
-  // 'expected_byte_sizes' bytes. On byte size mismatch, the function will
-  // set the status of the payload accordingly.
-  // Return true if cudaMemcpyAsync is called, and the caller should call
-  // cudaStreamSynchronize before using the data. Otherwise, return false.
+  // Helper function to batch input data from requests into
+  // 'input_buffer'.  'input_buffer' must be a continuous block that
+  // can hold the sum of 'expected_byte_sizes' bytes. On byte size
+  // mismatch, the function will send an appropriate error response
+  // for the request.  Return true if cudaMemcpyAsync is called, and
+  // the caller should call cudaStreamSynchronize before using the
+  // data. Otherwise, return false.
   bool SetInputBuffer(
       const std::string& name, const std::vector<size_t>& expected_byte_sizes,
-      std::vector<Scheduler::Payload>* payloads, InputInfo* input);
+      std::vector<std::unique_ptr<InferenceRequest>>* requests,
+      InputInfo* input);
 
   // Overload of SetInputBuffer() which issues the CUDA copies on 'stream'
   // instead of 'stream_'.
   bool SetInputBuffer(
       const std::string& name, const std::vector<size_t>& expected_byte_sizes,
-      std::vector<Scheduler::Payload>* payloads, cudaStream_t stream,
-      InputInfo* input);
+      std::vector<std::unique_ptr<InferenceRequest>>* requests,
+      cudaStream_t stream, InputInfo* input);
 
   // Helper function to populate the shape value of specified shape input
   // that corresponds with the batch size. The first shape value is asssumed
@@ -134,37 +139,40 @@ struct BackendContext {
   bool SetShapeInputBuffer(
       const std::string& name, const int32_t total_batch_size,
       const int expected_byte_size, const bool support_batching,
-      Scheduler::Payload* payload, TRTSERVER_Memory_Type dst_memory_type,
-      int64_t dst_memory_type_id, char* input_buffer);
+      std::unique_ptr<InferenceRequest>& request,
+      TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
+      char* input_buffer);
 
-  // Helper function to set output buffer of fixed size data type to
-  // payloads Return true if cudaMemcpyAsync is called, and the caller
-  // should call cudaStreamSynchronize before using the data. Otherwise,
-  // return false.
+  // Helper function to set output buffer of fixed size data
+  // type. Return true if cudaMemcpyAsync is called, and the caller
+  // should call cudaStreamSynchronize before using the
+  // data. Otherwise, return false.
   bool SetFixedSizeOutputBuffer(
       const std::string& name, const size_t batch1_byte_size,
-      OutputInfo* output, std::vector<Scheduler::Payload>* payloads);
+      OutputInfo* output,
+      std::vector<std::unique_ptr<InferenceRequest>>* requests);
 
-  // Helper function to set output buffer Output Shape tensor to payloads. It is
-  // callers resposibilty to ensure this method is called only for the shape
-  // tensors. Return true if cudaMemcpyAsync is called, and the caller should
-  // call cudaStreamSynchronize before using the data. Otherwise, return false.
+  // Helper function to set output buffer for a shape tensor. It is
+  // callers resposibilty to ensure this method is called only for the
+  // shape tensors. Return true if cudaMemcpyAsync is called, and the
+  // caller should call cudaStreamSynchronize before using the
+  // data. Otherwise, return false.
   bool SetOutputShapeTensorBuffer(
       const std::string& name, const int32_t* content,
       std::vector<int64_t>& content_shape, const bool support_batching,
       TRTSERVER_Memory_Type src_memory_type, int64_t src_memory_type_id,
-      std::vector<Scheduler::Payload>* payloads);
+      std::vector<std::unique_ptr<InferenceRequest>>* requests);
 
-  // This function will return the requested input content within a
-  // payload in a contiguous chunk. In some cases this will require
-  // copying the data. If it happens, 'contiguous_buffer' will be set
-  // to hold the contiguous chunk and 'cuda_copy' will be set to
-  // indicate whether CUDA copy is conducted.  The data copy can be
-  // avoid if the input is already in contiguous chunk and the input
-  // is located in memory type and id specified.
+  // This function will return a tensor's contents as a contiguous
+  // chunk. In some cases this will require copying the data. If that
+  // happens, 'contiguous_buffer' will be set to hold the contiguous
+  // chunk and 'cuda_copy' will be set to indicate whether CUDA copy
+  // is conducted.  The data copy can be avoided if the input is
+  // already in a contiguous chunk and the input is located in memory
+  // type and id specified.
   Status GetContiguousInputContent(
       const std::string& name, TRTSERVER_Memory_Type memory_type,
-      int64_t memory_type_id, const Scheduler::Payload& payload,
+      int64_t memory_type_id, const std::unique_ptr<InferenceRequest>& request,
       const char** content, size_t* content_byte_size,
       std::unique_ptr<AllocatedMemory>* contiguous_buffer, bool* cuda_copy);
 
@@ -183,7 +191,7 @@ struct BackendContext {
   // Meta data for constructing an indirect pinned memory buffer for input
   // <offset in input buffer,
   //  indirect buffer size,
-  //  vector of <index of the payload (for status update),
+  //  vector of <index of the request (for status update),
   //             memory block of the provider's input,
   //             index in the memory block>>
   using BufferInfo = std::tuple<
@@ -192,24 +200,25 @@ struct BackendContext {
   // Meta data for constructing an indirect pinned memory buffer for output
   // <offset in output buffer,
   //  indirect buffer size,
-  //  vector of <index of the payload (for status update),
+  //  vector of <index of the request (for status update),
   //             memory block of the provider's output>>
   using OutputBufferInfo = std::tuple<
       size_t, size_t, std::vector<std::pair<size_t, MutableMemory*>>>;
 
-  // Helper function to construct an 'indirect_buffer', and to copy data in
-  // 'payloads' to the indirect buffer first, then to copy the indirect buffer
-  // to proper location in 'input_buffer', according to 'pinned_buffer_info'.
+  // Helper function to construct an 'indirect_buffer', and to copy
+  // data in 'requests' to the indirect buffer first, then to copy the
+  // indirect buffer to proper location in 'input_buffer', according
+  // to 'pinned_buffer_info'.
   bool IssueIndirectInputBufferCopy(
       const std::string& name, const BufferInfo& pinned_buffer_info,
-      std::vector<Scheduler::Payload>* payloads, cudaStream_t stream,
-      InputInfo* input);
+      std::vector<std::unique_ptr<InferenceRequest>>* requests,
+      cudaStream_t stream, InputInfo* input);
 
   bool IssueIndirectOutputBufferCopy(
       const std::string& name,
       const BackendContext::OutputBufferInfo& pinned_buffer_info,
-      std::vector<Scheduler::Payload>* payloads, cudaStream_t stream,
-      OutputInfo* output);
+      std::vector<std::unique_ptr<InferenceRequest>>* requests,
+      cudaStream_t stream, OutputInfo* output);
 
   // Helper function to return whether an indirect buffer is needed in
   // 'need_indirect_buffer', and the memory type that should utilize the

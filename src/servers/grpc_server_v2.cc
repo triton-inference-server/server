@@ -2283,7 +2283,30 @@ SetInferenceRequestMetadata(
               infer_param.int64_param()));
     }
   }
+
   return nullptr;  // Success
+}
+
+void
+TraceManagerComplete(
+    TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
+    void* userp)
+{
+  LOG_VERBOSE(1) << "ModelInferHandler::TraceManagerComplete";
+
+  // FIXME need to sort out trace manager handling
+}
+
+void
+InferRequestComplete(
+    TRITONSERVER_Server* server, TRITONSERVER_InferenceRequest* request,
+    void* userp)
+{
+  LOG_VERBOSE(1) << "ModelInferHandler::InferRequestComplete";
+
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceRequestDelete(request),
+      "deleting GRPC inference request");
 }
 
 //
@@ -2318,9 +2341,9 @@ class ModelInferHandler
   bool Process(State* state, bool rpc_ok) override;
 
  private:
-  static void InferComplete(
-      TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
-      TRITONSERVER_InferenceRequest* request, void* userp);
+  static void InferResponseComplete(
+      TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* response,
+      void* userp);
 
   std::shared_ptr<TraceManager> trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
@@ -2447,9 +2470,11 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
       state->step_ = ISSUED;
 
       err = TRITONSERVER_ServerInferAsync(
-          tritonserver_.get(), trace_manager, irequest, allocator_,
-          &state->alloc_payload_ /* response_allocator_userp */, InferComplete,
-          reinterpret_cast<void*>(state));
+          tritonserver_.get(), irequest, allocator_,
+          &state->alloc_payload_ /* response_allocator_userp */,
+          InferRequestComplete, nullptr /* request_release_userp */,
+          InferResponseComplete, reinterpret_cast<void*>(state), trace_manager,
+          TraceManagerComplete, nullptr /* trace_release_userp */);
     }
 
     // If not error then state->step_ == ISSUED and inference request
@@ -2494,28 +2519,28 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
 }
 
 void
-ModelInferHandler::InferComplete(
-    TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
-    TRITONSERVER_InferenceRequest* request, void* userp)
+ModelInferHandler::InferResponseComplete(
+    TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* iresponse,
+    void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
 
-  LOG_VERBOSE(1) << "ModelInferHandler::InferComplete, " << state->unique_id_
-                 << " step " << state->step_;
+  LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
+                 << state->unique_id_ << " step " << state->step_;
 
   ModelInferResponse& response = state->response_;
 
-  TRITONSERVER_Error* err = TRITONSERVER_InferenceRequestError(request);
+  TRITONSERVER_Error* err = TRITONSERVER_InferenceResponseError(iresponse);
   if (err == nullptr) {
     for (auto& output : *(response.mutable_outputs())) {
       const int64_t* shape;
       uint64_t dim_count;
       const char* datatype;
-      err = TRITONSERVER_InferenceRequestOutputShape(
-          request, output.name().c_str(), &shape, &dim_count);
+      err = TRITONSERVER_InferenceResponseOutputShape(
+          iresponse, output.name().c_str(), &shape, &dim_count);
       if (err == nullptr) {
-        err = TRITONSERVER_InferenceRequestOutputDataType(
-            request, output.name().c_str(), &datatype);
+        err = TRITONSERVER_InferenceResponseOutputDataType(
+            iresponse, output.name().c_str(), &datatype);
       }
       if (err != nullptr) {
         break;
@@ -2537,8 +2562,8 @@ ModelInferHandler::InferComplete(
           size_t byte_size;
           TRITONSERVER_Memory_Type mem_type;
           int64_t mem_id;
-          err = TRITONSERVER_InferenceRequestOutputData(
-              request, output.name().c_str(), (const void**)&base, &byte_size,
+          err = TRITONSERVER_InferenceResponseOutputData(
+              iresponse, output.name().c_str(), (const void**)&base, &byte_size,
               &mem_type, &mem_id);
           if (err != nullptr) {
             break;
@@ -2582,8 +2607,8 @@ ModelInferHandler::InferComplete(
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'state'.
   LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceRequestDelete(request),
-      "deleting GRPC inference request");
+      TRITONSERVER_InferenceResponseDelete(iresponse),
+      "deleting GRPC inference response");
 
 #ifdef TRTIS_ENABLE_TRACING
   if (state->trace_meta_data_ != nullptr) {
@@ -2629,9 +2654,9 @@ class ModelStreamInferHandler
   bool Process(State* state, bool rpc_ok) override;
 
  private:
-  static void StreamInferComplete(
-      TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
-      TRITONSERVER_InferenceRequest* request, void* userp);
+  static void StreamInferResponseComplete(
+      TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* response,
+      void* userp);
 
   std::shared_ptr<TraceManager> trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
@@ -2795,9 +2820,12 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
       state->step_ = ISSUED;
       err = TRITONSERVER_ServerInferAsync(
-          tritonserver_.get(), trace_manager, irequest, allocator_,
+          tritonserver_.get(), irequest, allocator_,
           &state->alloc_payload_ /* response_allocator_userp */,
-          StreamInferComplete, reinterpret_cast<void*>(state));
+          InferRequestComplete, nullptr /* request_release_userp */,
+          StreamInferResponseComplete, reinterpret_cast<void*>(state),
+          trace_manager, TraceManagerComplete,
+          nullptr /* trace_release_userp */);
     }
 
     // If there was not an error in issuing the 'state' request then
@@ -2900,9 +2928,9 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 }
 
 void
-ModelStreamInferHandler::StreamInferComplete(
-    TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
-    TRITONSERVER_InferenceRequest* request, void* userp)
+ModelStreamInferHandler::StreamInferResponseComplete(
+    TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* iresponse,
+    void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
 
@@ -2912,18 +2940,18 @@ ModelStreamInferHandler::StreamInferComplete(
 
   ModelStreamInferResponse& response = state->response_;
 
-  TRITONSERVER_Error* err = TRITONSERVER_InferenceRequestError(request);
+  TRITONSERVER_Error* err = TRITONSERVER_InferenceResponseError(iresponse);
   if (err == nullptr) {
     for (auto& output :
          *(response.mutable_infer_response()->mutable_outputs())) {
       const int64_t* shape;
       uint64_t dim_count;
       const char* datatype;
-      err = TRITONSERVER_InferenceRequestOutputShape(
-          request, output.name().c_str(), &shape, &dim_count);
+      err = TRITONSERVER_InferenceResponseOutputShape(
+          iresponse, output.name().c_str(), &shape, &dim_count);
       if (err == nullptr) {
-        err = TRITONSERVER_InferenceRequestOutputDataType(
-            request, output.name().c_str(), &datatype);
+        err = TRITONSERVER_InferenceResponseOutputDataType(
+            iresponse, output.name().c_str(), &datatype);
       }
       if (err != nullptr) {
         break;
@@ -2945,8 +2973,8 @@ ModelStreamInferHandler::StreamInferComplete(
           size_t byte_size;
           TRITONSERVER_Memory_Type mem_type;
           int64_t mem_id;
-          err = TRITONSERVER_InferenceRequestOutputData(
-              request, output.name().c_str(), (const void**)&base, &byte_size,
+          err = TRITONSERVER_InferenceResponseOutputData(
+              iresponse, output.name().c_str(), (const void**)&base, &byte_size,
               &mem_type, &mem_id);
           if (err != nullptr) {
             break;
@@ -2990,8 +3018,8 @@ ModelStreamInferHandler::StreamInferComplete(
   // Don't need to explicitly delete 'trace_manager'. It will be deleted by
   // the TraceMetaData object in 'state'.
   LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceRequestDelete(request),
-      "deleting GRPC inference request");
+      TRITONSERVER_InferenceResponseDelete(iresponse),
+      "deleting GRPC inference response");
 
   state->step_ = Steps::WRITEREADY;
   state->context_->WriteResponseIfReady(state);
