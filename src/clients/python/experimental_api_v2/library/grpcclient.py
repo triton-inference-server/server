@@ -1102,6 +1102,17 @@ class InferInput:
         """
         return self._input.shape
 
+    def set_shape(self, shape):
+        """Set the shape of input.
+
+        Parameters
+        ----------
+        shape : list
+            The shape of the associated input.
+        """
+        self._input.ClearField('shape')
+        self._input.shape.extend(shape)
+
     def set_data_from_numpy(self, input_tensor):
         """Set the tensor data from the specified numpy array for
         input associated with this object.
