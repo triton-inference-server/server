@@ -47,6 +47,24 @@ def test_infer(model_name, input0_data, input1_data):
     query_params = {'test_1': 1, 'test_2': 2}
     results = triton_client.infer(model_name,
                                   inputs,
+                                  outputs=outputs,
+                                  query_params=query_params)
+
+    return results
+
+
+def test_infer_no_outputs(model_name, input0_data, input1_data):
+    inputs = []
+    inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
+    inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
+
+    # Initialize the data
+    inputs[0].set_data_from_numpy(input0_data, binary_data=False)
+    inputs[1].set_data_from_numpy(input1_data, binary_data=True)
+
+    query_params = {'test_1': 1, 'test_2': 2}
+    results = triton_client.infer(model_name,
+                                  inputs,
                                   outputs=None,
                                   query_params=query_params)
 
@@ -81,7 +99,7 @@ if __name__ == '__main__':
     input0_data = np.expand_dims(input0_data, axis=0)
     input1_data = np.ones(shape=(1, 16), dtype=np.int32)
 
-    # Infer with simple
+    # Infer with simple (With requested Outputs)
     results = test_infer("simple", input0_data, input1_data)
     print(results.get_response())
 
@@ -90,6 +108,25 @@ if __name__ == '__main__':
     if len(statistics['version_stats']) != 1:
         print("FAILED: Inference Statistics")
         sys.exit(1)
+
+    # Validate the results by comparing with precomputed values.
+    output0_data = results.as_numpy('OUTPUT0')
+    output1_data = results.as_numpy('OUTPUT1')
+    for i in range(16):
+        print(str(input0_data[0][i]) + " + " + str(input1_data[0][i]) + " = " +
+              str(output0_data[0][i]))
+        print(str(input0_data[0][i]) + " - " + str(input1_data[0][i]) + " = " +
+              str(output1_data[0][i]))
+        if (input0_data[0][i] + input1_data[0][i]) != output0_data[0][i]:
+            print("sync infer error: incorrect sum")
+            sys.exit(1)
+        if (input0_data[0][i] - input1_data[0][i]) != output1_data[0][i]:
+            print("sync infer error: incorrect difference")
+            sys.exit(1)
+
+    # Infer with simple (Without requested Outputs)
+    results = test_infer_no_outputs("simple", input0_data, input1_data)
+    print(results.get_response())
 
     # Validate the results by comparing with precomputed values.
     output0_data = results.as_numpy('OUTPUT0')
