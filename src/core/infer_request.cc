@@ -30,7 +30,6 @@
 #include "src/core/backend.h"
 #include "src/core/logging.h"
 #include "src/core/server.h"
-#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -64,15 +63,42 @@ TrtMemTypeToTriton(TRTSERVER_Memory_Type mem_type)
   }
 }
 
-InferenceRequest::InferenceRequest(
-    const std::string& model_name, const int64_t requested_model_version,
-    const int64_t actual_model_version, const uint32_t protocol_version)
-    : needs_normalization_(true), model_name_(model_name),
-      requested_model_version_(requested_model_version),
-      actual_model_version_(actual_model_version),
-      protocol_version_(protocol_version), flags_(0), correlation_id_(0),
-      batch_size_(0), priority_(0), timeout_us_(0)
+const std::string&
+InferenceRequest::ModelName() const
 {
+  return backend_raw_->Name();
+}
+
+int64_t
+InferenceRequest::ActualModelVersion() const
+{
+  return backend_raw_->Version();
+}
+
+Status
+InferenceRequest::Run(std::unique_ptr<InferenceRequest>& request)
+{
+  return request->backend_raw_->Enqueue(nullptr, request);
+}
+
+void
+InferenceRequest::RespondWithError(
+    const InferenceRequest& request, const Status& status,
+    const bool release_request)
+{
+}
+
+void
+InferenceRequest::RespondWithError(
+    std::vector<std::unique_ptr<InferenceRequest>>* requests,
+    const Status& status, const bool release_request)
+{
+}
+
+InferenceRequest*
+InferenceRequest::CopyAsNull(const InferenceRequest& from)
+{
+  return nullptr;
 }
 
 Status
@@ -143,8 +169,9 @@ InferenceRequest::AddOriginalInput(
     const std::string& name, const std::vector<int64_t>& shape,
     const uint64_t batch_byte_size, InferenceRequest::Input** input)
 {
-  const auto& pr = original_inputs_.emplace(std::make_pair(
-      name, InferenceRequest::Input(name, shape, batch_byte_size)));
+  const auto& pr = original_inputs_.emplace(
+      std::piecewise_construct, std::forward_as_tuple(name),
+      std::forward_as_tuple(name, shape, batch_byte_size));
   if (!pr.second) {
     return Status(
         Status::Code::INVALID_ARG,
@@ -166,8 +193,9 @@ InferenceRequest::AddOriginalInput(
     const std::string& name, const DataType datatype, const int64_t* shape,
     const uint64_t dim_count, InferenceRequest::Input** input)
 {
-  const auto& pr = original_inputs_.emplace(std::make_pair(
-      name, InferenceRequest::Input(name, datatype, shape, dim_count)));
+  const auto& pr = original_inputs_.emplace(
+      std::piecewise_construct, std::forward_as_tuple(name),
+      std::forward_as_tuple(name, datatype, shape, dim_count));
   if (!pr.second) {
     return Status(
         Status::Code::INVALID_ARG,
@@ -252,8 +280,10 @@ Status
 InferenceRequest::AddRequestedOutput(
     const std::string& name, const uint32_t classification_cnt)
 {
-  const auto& pr = requested_outputs_.emplace(std::make_pair(
-      name, InferenceRequest::RequestedOutput(name, classification_cnt)));
+  const auto& pr = requested_outputs_.emplace(
+      std::piecewise_construct, std::forward_as_tuple(name),
+      std::forward_as_tuple(name, classification_cnt));
+
   if (!pr.second) {
     return Status(
         Status::Code::INVALID_ARG, "output '" + name + "' already requested");
@@ -285,7 +315,7 @@ InferenceRequest::RemoveAllRequestedOutputs()
 }
 
 Status
-InferenceRequest::PrepareForInference(const InferenceBackend& backend)
+InferenceRequest::PrepareForInference()
 {
   // Remove override inputs as those are added during any previous
   // inference execution.
@@ -296,9 +326,9 @@ InferenceRequest::PrepareForInference(const InferenceBackend& backend)
   // need to renormalize.
   if (needs_normalization_) {
     if (protocol_version_ == 1) {
-      RETURN_IF_ERROR(NormalizeV1(backend));
+      RETURN_IF_ERROR(NormalizeV1());
     } else {
-      RETURN_IF_ERROR(NormalizeV2(backend));
+      RETURN_IF_ERROR(NormalizeV2());
     }
 
     needs_normalization_ = false;
@@ -306,7 +336,7 @@ InferenceRequest::PrepareForInference(const InferenceBackend& backend)
 
   // Initially show the actual inputs to be only the original
   // inputs. If overrides are added later they will be added to
-  // inputs_.
+  // 'inputs_'.
   for (auto& pr : original_inputs_) {
     inputs_.emplace(std::make_pair(pr.first, std::addressof(pr.second)));
   }
@@ -317,12 +347,12 @@ InferenceRequest::PrepareForInference(const InferenceBackend& backend)
 }
 
 Status
-InferenceRequest::NormalizeV1(const InferenceBackend& backend)
+InferenceRequest::NormalizeV1()
 {
-  const ModelConfig& model_config = backend.Config();
+  const ModelConfig& model_config = backend_raw_->Config();
 
-  if ((priority_ == 0) || (priority_ > backend.MaxPriorityLevel())) {
-    priority_ = backend.DefaultPriorityLevel();
+  if ((priority_ == 0) || (priority_ > backend_raw_->MaxPriorityLevel())) {
+    priority_ = backend_raw_->DefaultPriorityLevel();
   }
 
   // Make sure the request has a batch-size > 0. Even for models that
@@ -330,7 +360,7 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
   if (batch_size_ < 1) {
     return Status(
         Status::Code::INVALID_ARG,
-        "inference request batch-size must be >= 1 for '" + model_name_ + "'");
+        "inference request batch-size must be >= 1 for '" + ModelName() + "'");
   }
 
   // Make sure request batch-size doesn't exceed what is supported by
@@ -342,13 +372,13 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
         Status::Code::INVALID_ARG,
         "inference request batch-size must be <= " +
             std::to_string(model_config.max_batch_size()) + " for '" +
-            model_name_ + "'");
+            ModelName() + "'");
   }
 
   // Validate if the requested output name exists in the model configuration
   for (const auto& pr : requested_outputs_) {
     const ModelOutput* output_config;
-    RETURN_IF_ERROR(backend.GetOutput(pr.first, &output_config));
+    RETURN_IF_ERROR(backend_raw_->GetOutput(pr.first, &output_config));
   }
 
   // Make sure that the request is providing the same number of inputs
@@ -358,13 +388,13 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
         Status::Code::INVALID_ARG,
         "expected " + std::to_string(model_config.input_size()) +
             " inputs but got " + std::to_string(original_inputs_.size()) +
-            " inputs for model '" + model_name_ + "'");
+            " inputs for model '" + ModelName() + "'");
   }
 
   // Update each input to have shape, datatype and batch-byte-size.
   for (auto& pr : original_inputs_) {
     const ModelInput* input_config;
-    RETURN_IF_ERROR(backend.GetInput(pr.first, &input_config));
+    RETURN_IF_ERROR(backend_raw_->GetInput(pr.first, &input_config));
     auto& input = pr.second;
 
     input.SetDType(input_config->data_type());
@@ -379,7 +409,7 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
         return Status(
             Status::Code::INVALID_ARG,
             "unexpected shape for input '" + pr.first + "' for model '" +
-                model_name_ + "'. Expected " +
+                ModelName() + "'. Expected " +
                 DimsListToString(input_config->dims()) + ", got " +
                 DimsListToString(*new_shape));
       }
@@ -425,7 +455,7 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
               Status::Code::INVALID_ARG,
               "model supports variable-size for input '" + pr.first +
                   "', request must specify input shape for model '" +
-                  model_name_ + "'");
+                  ModelName() + "'");
         }
 
         new_shape->push_back(dim);
@@ -470,7 +500,7 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
             "specific batch-byte-size for input '" + pr.first +
                 "' does not match expected byte-size calculated from shape and "
                 "datatype for model '" +
-                model_name_ + "'");
+                ModelName() + "'");
       }
     } else {
       // The input's datatype is not fixed-sized (like TYPE_STRING),
@@ -485,25 +515,25 @@ InferenceRequest::NormalizeV1(const InferenceBackend& backend)
 }
 
 Status
-InferenceRequest::NormalizeV2(const InferenceBackend& backend)
+InferenceRequest::NormalizeV2()
 {
-  const ModelConfig& model_config = backend.Config();
+  const ModelConfig& model_config = backend_raw_->Config();
 
-  if ((priority_ == 0) || (priority_ > backend.MaxPriorityLevel())) {
-    priority_ = backend.DefaultPriorityLevel();
+  if ((priority_ == 0) || (priority_ > backend_raw_->MaxPriorityLevel())) {
+    priority_ = backend_raw_->DefaultPriorityLevel();
   }
 
+  // FIXME need original requested
   // If requested_outputs_ is empty return all outputs specified in model config
   if (requested_outputs_.size() == 0) {
     for (const auto& output : model_config.output()) {
-      requested_outputs_.emplace(std::make_pair(
-          output.name(), InferenceRequest::RequestedOutput(output.name(), 0)));
+      AddRequestedOutput(output.name(), 0 /* classification_count */);
     }
   } else {
     // Validate if the requested output name exists in the model configuration
     for (const auto& pr : requested_outputs_) {
       const ModelOutput* output_config;
-      RETURN_IF_ERROR(backend.GetOutput(pr.first, &output_config));
+      RETURN_IF_ERROR(backend_raw_->GetOutput(pr.first, &output_config));
     }
   }
 
@@ -515,7 +545,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
         Status::Code::INVALID_ARG,
         "expected " + std::to_string(model_config.input_size()) +
             " inputs but got " + std::to_string(original_inputs_.size()) +
-            " inputs for model '" + model_name_ + "'");
+            " inputs for model '" + ModelName() + "'");
   }
 
   // Determine the batch size and shape of each input.
@@ -540,7 +570,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
             Status::Code::INVALID_ARG,
             "input '" + input.Name() +
                 "' has no shape but model requires batch dimension for '" +
-                model_name_ + "'");
+                ModelName() + "'");
       }
 
       if (batch_size_ == 0) {
@@ -549,7 +579,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
         return Status(
             Status::Code::INVALID_ARG,
             "input '" + input.Name() +
-                "' batch size does not match other inputs for '" + model_name_ +
+                "' batch size does not match other inputs for '" + ModelName() +
                 "'");
       }
 
@@ -563,7 +593,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
   if (batch_size_ < 1) {
     return Status(
         Status::Code::INVALID_ARG,
-        "inference request batch-size must be >= 1 for '" + model_name_ + "'");
+        "inference request batch-size must be >= 1 for '" + ModelName() + "'");
   }
 
   // Make sure request batch-size doesn't exceed what is supported by
@@ -575,14 +605,14 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
         Status::Code::INVALID_ARG,
         "inference request batch-size must be <= " +
             std::to_string(model_config.max_batch_size()) + " for '" +
-            model_name_ + "'");
+            ModelName() + "'");
   }
 
   // Verify that each input shape is valid for the model, make
   // adjustments for reshapes and find the total tensor size.
   for (auto& pr : original_inputs_) {
     const ModelInput* input_config;
-    RETURN_IF_ERROR(backend.GetInput(pr.first, &input_config));
+    RETURN_IF_ERROR(backend_raw_->GetInput(pr.first, &input_config));
 
     auto& input = pr.second;
     auto shape = input.MutableShape();
@@ -598,7 +628,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
               std::string(DataTypeToProtocolString(input.DType())) +
               "', model expects '" +
               std::string(DataTypeToProtocolString(input_config->data_type())) +
-              "' for '" + model_name_ + "'");
+              "' for '" + ModelName() + "'");
     }
 #else
     input.SetDType(input_config->data_type());
@@ -608,7 +638,7 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
       return Status(
           Status::Code::INVALID_ARG,
           "unexpected shape for input '" + pr.first + "' for model '" +
-              model_name_ + "'. Expected " +
+              ModelName() + "'. Expected " +
               DimsListToString(input_config->dims()) + ", got " +
               DimsListToString(*shape));
     }

@@ -30,7 +30,6 @@
 #include <memory>
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
-#include "src/core/provider.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 
@@ -89,9 +88,7 @@ class EnsembleScheduler : public Scheduler {
   // \see Scheduler::Enqueue()
   void Enqueue(
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferenceRequest>& request,
-      const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(const Status&)> OnComplete) override;
+      const std::shared_ptr<InferenceRequest>& request) override;
 
  private:
   EnsembleScheduler(InferenceServer* const server, const ModelConfig& config);
