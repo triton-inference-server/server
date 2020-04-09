@@ -33,8 +33,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class InferRequestProvider;
-class InferResponseProvider;
 class ModelInferStats;
 
 // Scheduler interface.
@@ -42,74 +40,32 @@ class Scheduler {
  public:
   virtual ~Scheduler() {}
 
-  // The data associated with each request being scheduled.
-  struct Payload {
-    Payload() = default;
-    Payload(const Payload& payload) = delete;
-    Payload(Payload&& payload)
-        : stats_(std::move(payload.stats_)),
-          request_(std::move(payload.request_)),
-          response_provider_(std::move(payload.response_provider_)),
-          complete_function_(std::move(payload.complete_function_)),
-          status_(std::move(payload.status_))
-    {
-    }
-    Payload(
-        const std::shared_ptr<ModelInferStats>& stats,
-        const std::shared_ptr<InferenceRequest>& request,
-        const std::shared_ptr<InferResponseProvider>& response_provider,
-        const std::function<void(const Status&)> complete_function)
-        : stats_(stats), request_(request),
-          response_provider_(response_provider),
-          complete_function_(complete_function), status_(Status::Success)
-    {
-    }
-
-    Payload& operator=(Payload&& payload)
-    {
-      stats_ = std::move(payload.stats_);
-      request_ = std::move(payload.request_);
-      response_provider_ = std::move(payload.response_provider_);
-      complete_function_ = std::move(payload.complete_function_);
-      status_ = std::move(payload.status_);
-      return *this;
-    }
-
-    std::shared_ptr<ModelInferStats> stats_;
-    std::shared_ptr<InferenceRequest> request_;
-    std::shared_ptr<InferResponseProvider> response_provider_;
-    std::function<void(const Status&)> complete_function_;
-    Status status_;
-  };
-
   // The prototype for the initialization function that will be called
   // by the "standard" schedulers created based on a model's
   // scheduling_choice settings. The init function is called once by
-  // the runner that will later execute payloads for 'runner_idx'. A
+  // the runner that will later execute requests for 'runner_idx'. A
   // non-OK error status indicates an initialization error that
   // prevents scheduler from using the runner.
   using StandardInitFunc = std::function<Status(uint32_t runner_idx)>;
 
-  // The prototype for the warmup function that will be called
-  // by the "standard" schedulers created based on a model's
+  // The prototype for the warmup function that will be called by the
+  // "standard" schedulers created based on a model's
   // scheduling_choice settings. The warmup function is called once by
-  // the runner that will later execute payloads for 'runner_idx'. A
-  // non-OK error status indicates an warmup error that
-  // prevents scheduler from sending sample payloads to the runner.
+  // the runner that will later execute requests for 'runner_idx'. A
+  // non-OK error status indicates an error that prevents scheduler
+  // from sending warmup requests to the runner.
   using StandardWarmupFunc = std::function<Status(uint32_t runner_idx)>;
 
   // The prototype for the run function that will be called by the
   // "standard" schedulers created based on a model's
   // scheduling_choice settings. The run function must accept a
   // 'runner_idx' indicating which runner should execute the
-  // 'payloads'. When the execution completes the runner must call the
-  // 'OnRunComplete' function with error status. A non-OK error status
-  // indicates an internal error that prevents any of the of
-  // 'payloads' requests from completing. If an error is isolated to a
-  // single request in 'payloads' it will be reported in that payload.
+  // 'requests'. Ownership of the 'requests' is transferred to the
+  // runner which is responsible for generating responses and
+  // releasing the requests.
   using StandardRunFunc = std::function<void(
-      uint32_t runner_idx, std::vector<Payload>* payloads,
-      std::function<void(const Status&)> OnRunComplete)>;
+      uint32_t runner_idx,
+      std::vector<std::unique_ptr<InferenceRequest>>&& requests)>;
 
   // The prototype for the shape-tensor peek function that can be
   // called by the "standard" schedulers created based on a model's
@@ -118,14 +74,16 @@ class Scheduler {
   // indicates that the peek failed.
   using StandardShapeTensorPeekFunc = std::function<Status(
       uint32_t runner_idx, const InferenceRequest::Input& input,
-      const Scheduler::Payload& payload, std::vector<int64_t>* shape)>;
+      const std::unique_ptr<InferenceRequest>& request,
+      std::vector<int64_t>* shape)>;
 
-  // Enqueue a request with the scheduler.
-  virtual void Enqueue(
+  // Enqueue a request with the scheduler. If Status::Success is returned
+  // then the backend has taken ownership of the request object and so
+  // 'request' will be nullptr. If non-success is returned then the
+  // caller still retains ownership of 'request'.
+  virtual Status Enqueue(
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferenceRequest>& request,
-      const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(const Status&)> OnComplete) = 0;
+      std::unique_ptr<InferenceRequest>& request) = 0;
 };
 
 }}  // namespace nvidia::inferenceserver
