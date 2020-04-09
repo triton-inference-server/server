@@ -1614,6 +1614,18 @@ TRITONSERVER_InferenceRequestAddRequestedOutput(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestGetAllOutputs(
+    TRITONSERVER_InferenceRequest* inference_request, const char** names,
+    uint64_t* name_count)
+{
+  TritonInferenceRequest* lrequest =
+      reinterpret_cast<TritonInferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->Request()->OutputNames(names, name_count));
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestRemoveRequestedOutput(
     TRITONSERVER_InferenceRequest* inference_request, const char* name)
 {

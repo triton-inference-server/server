@@ -311,6 +311,7 @@ class InferenceRequest {
 
   // Remove a single requested output or all requested outputs.
   Status RemoveRequestedOutput(const std::string& name);
+  Status OutputNames(const char** name_vec, uint64_t* name_count);
   Status RemoveAllRequestedOutputs();
 
   // Prepare this request for inference. We pass backend here as

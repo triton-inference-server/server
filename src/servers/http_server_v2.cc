@@ -1964,12 +1964,12 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
 
   TRITONSERVER_Error* err;
   bool has_binary = false;
+  struct evbuffer* binary_buf = evbuffer_new();
   auto output_itr = response_meta_data_.request_json_.FindMember("outputs");
   if (output_itr != response_meta_data_.request_json_.MemberEnd()) {
     rapidjson::Value& request_outputs = output_itr->value;
     rapidjson::Value response_outputs(rapidjson::kArrayType);
     rapidjson::Value output_metadata[request_outputs.Size()];
-    struct evbuffer* binary_buf = evbuffer_new();
     for (size_t i = 0; i < request_outputs.Size(); i++) {
       output_metadata[i].SetObject();
       rapidjson::Value& request_output = request_outputs[i];
@@ -2040,6 +2040,61 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       response_outputs.PushBack(output_metadata[i], allocator);
     }
     response_json.AddMember("outputs", response_outputs, allocator);
+  } else {
+    // Get outputs from model config (Assume max is 10)
+    uint64_t name_count;
+    std::vector<const char*> names(10);
+    const char** names_start = names.data();
+    err = TRITONSERVER_InferenceRequestGetAllOutputs(
+        request, names_start, &name_count);
+    rapidjson::Value response_outputs(rapidjson::kArrayType);
+    rapidjson::Value output_metadata[name_count];
+    for (size_t i = 0; i < name_count; i++) {
+      output_metadata[i].SetObject();
+      const char* output_name = names[i];
+      rapidjson::Value name_val(output_name, strlen(output_name));
+      output_metadata[i].AddMember("name", name_val, allocator);
+
+      uint64_t dim_count;
+      const int64_t* shape_vec;
+      err = TRITONSERVER_InferenceRequestOutputShape(
+          request, output_name, &shape_vec, &dim_count);
+      if (err != nullptr) {
+        break;
+      }
+
+      rapidjson::Value shape_array(rapidjson::kArrayType);
+      for (size_t i = 0; i < dim_count; i++) {
+        shape_array.PushBack(shape_vec[i], allocator);
+      }
+      output_metadata[i].AddMember("shape", shape_array, allocator);
+
+      const char* datatype;
+      err = TRITONSERVER_InferenceRequestOutputDataType(
+          request, output_name, &datatype);
+      if (err != nullptr) {
+        break;
+      }
+
+      rapidjson::Value datatype_val(datatype, strlen(datatype));
+      output_metadata[i].AddMember("datatype", datatype_val, allocator);
+
+      const void* base;
+      size_t byte_size;
+      TRITONSERVER_Memory_Type memory_type;
+      int64_t memory_type_id;
+      err = TRITONSERVER_InferenceRequestOutputData(
+          request, output_name, &base, &byte_size, &memory_type,
+          &memory_type_id);
+      if (err != nullptr) {
+        break;
+      }
+
+      // Write outputs into json array
+      WriteDataToJson(output_metadata[i], allocator, const_cast<void*>(base));
+      response_outputs.PushBack(output_metadata[i], allocator);
+    }
+    response_json.AddMember("outputs", response_outputs, allocator);
   }
 
   evhtp_res status = (err == nullptr) ? EVHTP_RES_OK : EVHTP_RES_BADREQ;
@@ -2056,8 +2111,8 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     const char* response_metadata = buffer.GetString();
     size_t json_length = strlen(response_metadata);
     evbuffer_add(req_->buffer_out, response_metadata, json_length);
-    evbuffer_add_buffer(req_->buffer_out, binary_buf);
     if (has_binary) {
+      evbuffer_add_buffer(req_->buffer_out, binary_buf);
       evhtp_headers_add_header(
           req_->headers_out, evhtp_header_new(
                                  kInferHeaderContentLengthHTTPHeader,

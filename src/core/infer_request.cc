@@ -275,6 +275,19 @@ InferenceRequest::RemoveRequestedOutput(const std::string& name)
 }
 
 Status
+InferenceRequest::OutputNames(const char** name_vec, uint64_t* name_count)
+{
+  *name_count = 0;
+  for (auto it = requested_outputs_.begin(); it != requested_outputs_.end();
+       ++it) {
+    name_vec[*name_count] = it->first.c_str();
+    *name_count += 1;
+  }
+
+  return Status::Success;
+}
+
+Status
 InferenceRequest::RemoveAllRequestedOutputs()
 {
   requested_outputs_.clear();
