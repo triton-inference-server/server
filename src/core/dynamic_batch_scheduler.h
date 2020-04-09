@@ -81,11 +81,9 @@ class DynamicBatchScheduler : public Scheduler {
   ~DynamicBatchScheduler();
 
   // \see Scheduler::Enqueue()
-  void Enqueue(
+  Status Enqueue(
       const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferenceRequest>& request,
-      const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(const Status&)> OnComplete) override;
+      std::unique_ptr<InferenceRequest>& request) override;
 
  private:
   DynamicBatchScheduler(
@@ -108,7 +106,7 @@ class DynamicBatchScheduler : public Scheduler {
   uint64_t GetDynamicBatch(const int64_t runner_id);
   void FinalizePayloads(
       const uint32_t completion_id,
-      std::shared_ptr<std::vector<Scheduler::Payload>> payloads,
+      std::shared_ptr<std::vector<std::unique_ptr<InferenceRequest>>> requests,
       const Status& status);
 
   // Function the scheduler will call to initialize a runner.
@@ -117,8 +115,7 @@ class DynamicBatchScheduler : public Scheduler {
   // Function the scheduler will call to warmup a runner.
   const StandardWarmupFunc OnWarmup_;
 
-  // Function the scheduler will call to schedule a payload(s) for
-  // execution.
+  // Function the scheduler will call to schedule a batch of requests.
   const StandardRunFunc OnSchedule_;
 
   // Function the scheduler will call to peek at shape tensors.
@@ -168,13 +165,14 @@ class DynamicBatchScheduler : public Scheduler {
   const bool preserve_ordering_;
 
   // Holds the sequence of completion-queue indices in order the
-  // payloads were issued.
+  // requests were issued.
   std::queue<size_t> completion_id_queue_;
   // Lock to protect the completion_id_queue_
   std::mutex completion_id_queue_mtx_;
 
-  // Per completion-id queues to store the ready payloads
-  std::vector<std::queue<std::shared_ptr<std::vector<Scheduler::Payload>>>>
+  // Per completion-id queues to store the ready requests
+  std::vector<std::queue<
+      std::shared_ptr<std::vector<std::unique_ptr<InferenceRequest>>>>>
       completion_queues_;
   // Lock to protect the completion_queues_
   std::mutex completion_queues_mtx_;

@@ -33,7 +33,6 @@
 #include "src/core/logging.h"
 #include "src/core/model_config_cuda.h"
 #include "src/core/model_config_utils.h"
-#include "src/core/provider.h"
 #include "src/core/server_status.h"
 
 #ifdef TRTIS_ENABLE_GPU
