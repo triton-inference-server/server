@@ -139,6 +139,9 @@ RUN mkdir -p qa/L0_simple_sequence_example/models/simple_sequence/1 && \
     mkdir -p qa/L0_grpc_v2/models/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/L0_grpc_v2/models/simple_sequence/1/. && \
+    mkdir -p qa/L0_http_v2/models/simple_sequence/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libsequence.so \
+        qa/L0_http_v2/models/simple_sequence/1/. && \
     mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/custom_models/custom_sequence_int32/1/. && \
