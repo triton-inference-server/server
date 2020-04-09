@@ -35,10 +35,12 @@
 #include "rapidjson/writer.h"
 #include "src/core/backend.h"
 #include "src/core/infer_request.h"
+#include "src/core/infer_response.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/nvtx.h"
+#include "src/core/response_allocator.h"
 #include "src/core/server.h"
 #include "src/core/status.h"
 #include "src/core/tracing.h"
@@ -124,35 +126,6 @@ TritonServerError::Create(const ni::Status& status)
       return TritonServerError::Create(status__); \
     }                                             \
   } while (false)
-
-//
-// TritonServerResponseAllocator
-//
-// Implementation for TRITONSERVER_ResponseAllocator.
-//
-class TritonServerResponseAllocator {
- public:
-  explicit TritonServerResponseAllocator(
-      TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn,
-      TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn);
-
-  TRITONSERVER_ResponseAllocatorAllocFn_t AllocFn() const { return alloc_fn_; }
-  TRITONSERVER_ResponseAllocatorReleaseFn_t ReleaseFn() const
-  {
-    return release_fn_;
-  }
-
- private:
-  TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn_;
-  TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn_;
-};
-
-TritonServerResponseAllocator::TritonServerResponseAllocator(
-    TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn,
-    TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn)
-    : alloc_fn_(alloc_fn), release_fn_(release_fn)
-{
-}
 
 //
 // TritonServerMessage
@@ -337,47 +310,6 @@ TritonServerOptions::TritonServerOptions()
 #endif  // TRTIS_ENABLE_METRICS_GPU
 }
 
-//
-// TritonInferenceRequest
-//
-class TritonInferenceRequest {
- public:
-  TritonInferenceRequest(
-      const std::shared_ptr<ni::InferenceBackend>& backend,
-      ni::InferenceRequest* request)
-      : backend_(backend), request_(request), status_(ni::Status::Success)
-  {
-  }
-
-  const std::shared_ptr<ni::InferenceBackend>& Backend() const
-  {
-    return backend_;
-  }
-
-  const std::shared_ptr<ni::InferenceRequest>& Request() const
-  {
-    return request_;
-  }
-
-  const ni::Status& RequestStatus() const { return status_; }
-  void SetRequestStatus(const ni::Status& s) { status_ = s; }
-
-  const std::shared_ptr<ni::InferResponseProvider>& Response() const
-  {
-    return response_provider_;
-  }
-  void SetResponse(const std::shared_ptr<ni::InferResponseProvider>& r)
-  {
-    response_provider_ = r;
-  }
-
- private:
-  std::shared_ptr<ni::InferenceBackend> backend_;
-  std::shared_ptr<ni::InferenceRequest> request_;
-  ni::Status status_;
-  std::shared_ptr<ni::InferResponseProvider> response_provider_;
-};
-
 }  // namespace
 
 #ifdef __cplusplus
@@ -433,15 +365,15 @@ TRITONSERVER_ResponseAllocatorNew(
     TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn)
 {
   *allocator = reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
-      new TritonServerResponseAllocator(alloc_fn, release_fn));
+      new ni::ResponseAllocator(alloc_fn, release_fn));
   return nullptr;  // Success
 }
 
 TRITONSERVER_Error*
 TRITONSERVER_ResponseAllocatorDelete(TRITONSERVER_ResponseAllocator* allocator)
 {
-  TritonServerResponseAllocator* lalloc =
-      reinterpret_cast<TritonServerResponseAllocator*>(allocator);
+  ni::ResponseAllocator* lalloc =
+      reinterpret_cast<ni::ResponseAllocator*>(allocator);
   delete lalloc;
   return nullptr;  // Success
 }
@@ -899,6 +831,354 @@ TRITONSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
       gpu_device, num_vgpus, per_vgpu_memory_mbytes);
   return nullptr;  // Success
 }
+
+//
+// TRITONSERVER_InferenceRequest
+//
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestNew(
+    TRITONSERVER_InferenceRequest** inference_request,
+    TRITONSERVER_Server* server, const char* model_name,
+    const char* model_version)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  int64_t model_int_version = -1;
+  if (model_version != nullptr) {
+    RETURN_IF_STATUS_ERROR(
+        ni::GetModelVersionFromString(model_version, &model_int_version));
+  }
+
+  std::shared_ptr<ni::InferenceBackend> backend;
+  RETURN_IF_STATUS_ERROR(
+      lserver->GetInferenceBackend(model_name, model_int_version, &backend));
+
+  *inference_request =
+      reinterpret_cast<TRITONSERVER_InferenceRequest*>(new ni::InferenceRequest(
+          backend, model_int_version, 2 /* protocol_version */));
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestDelete(
+    TRITONSERVER_InferenceRequest* inference_request)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  delete lrequest;
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestId(
+    TRITONSERVER_InferenceRequest* inference_request, const char** id)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  *id = lrequest->IdStr().c_str();
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestSetId(
+    TRITONSERVER_InferenceRequest* inference_request, const char* id)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  lrequest->SetIdStr(id);
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestFlags(
+    TRITONSERVER_InferenceRequest* inference_request, uint32_t* flags)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  *flags = lrequest->Flags();
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestSetFlags(
+    TRITONSERVER_InferenceRequest* inference_request, uint32_t flags)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  lrequest->SetFlags(flags);
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestCorrelationId(
+    TRITONSERVER_InferenceRequest* inference_request, uint64_t* correlation_id)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  *correlation_id = lrequest->CorrelationId();
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestSetCorrelationId(
+    TRITONSERVER_InferenceRequest* inference_request, uint64_t correlation_id)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  lrequest->SetCorrelationId(correlation_id);
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestPriority(
+    TRITONSERVER_InferenceRequest* inference_request, uint32_t* priority)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  *priority = lrequest->Priority();
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestSetPriority(
+    TRITONSERVER_InferenceRequest* inference_request, uint32_t priority)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  lrequest->SetPriority(priority);
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestTimeoutMicroseconds(
+    TRITONSERVER_InferenceRequest* inference_request, uint64_t* timeout_us)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  *timeout_us = lrequest->TimeoutMicroseconds();
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
+    TRITONSERVER_InferenceRequest* inference_request, uint64_t timeout_us)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  lrequest->SetTimeoutMicroseconds(timeout_us);
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestAddInput(
+    TRITONSERVER_InferenceRequest* inference_request, const char* name,
+    const char* datatype, const int64_t* shape, uint64_t dim_count)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->AddOriginalInput(
+      name, ni::ProtocolStringToDataType(datatype), shape, dim_count));
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestRemoveInput(
+    TRITONSERVER_InferenceRequest* inference_request, const char* name)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->RemoveOriginalInput(name));
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestRemoveAllInputs(
+    TRITONSERVER_InferenceRequest* inference_request)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->RemoveAllOriginalInputs());
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestAppendInputData(
+    TRITONSERVER_InferenceRequest* inference_request, const char* name,
+    const void* base, size_t byte_size, TRITONSERVER_Memory_Type memory_type,
+    int64_t memory_type_id)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+
+  ni::InferenceRequest::Input* input;
+  RETURN_IF_STATUS_ERROR(lrequest->MutableOriginalInput(name, &input));
+  RETURN_IF_STATUS_ERROR(
+      input->AppendData(base, byte_size, memory_type, memory_type_id));
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestRemoveAllInputData(
+    TRITONSERVER_InferenceRequest* inference_request, const char* name)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+
+  ni::InferenceRequest::Input* input;
+  RETURN_IF_STATUS_ERROR(lrequest->MutableOriginalInput(name, &input));
+  RETURN_IF_STATUS_ERROR(input->RemoveAllData());
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestAddRequestedOutput(
+    TRITONSERVER_InferenceRequest* inference_request, const char* name)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->AddRequestedOutput(name));
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestRemoveRequestedOutput(
+    TRITONSERVER_InferenceRequest* inference_request, const char* name)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->RemoveRequestedOutput(name));
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestRemoveAllRequestedOutputs(
+    TRITONSERVER_InferenceRequest* inference_request)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(lrequest->RemoveAllRequestedOutputs());
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
+    TRITONSERVER_InferenceRequest* inference_request, const char* name,
+    uint32_t count)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+
+  ni::InferenceRequest::RequestedOutput* requested;
+  RETURN_IF_STATUS_ERROR(lrequest->MutableRequestedOutput(name, &requested));
+  requested->SetClassificationCount(count);
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestSetReleaseCallback(
+    TRITONSERVER_InferenceRequest* inference_request,
+    TRITONSERVER_InferenceRequestReleaseFn_t request_release_fn,
+    void* request_release_userp)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  RETURN_IF_STATUS_ERROR(
+      lrequest->SetReleaseCallback(request_release_fn, request_release_userp));
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestSetResponseCallback(
+    TRITONSERVER_InferenceRequest* inference_request,
+    TRITONSERVER_ResponseAllocator* response_allocator,
+    void* response_allocator_userp,
+    TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
+    void* response_userp)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  ni::ResponseAllocator* lallocator =
+      reinterpret_cast<ni::ResponseAllocator*>(response_allocator);
+  RETURN_IF_STATUS_ERROR(lrequest->SetResponseCallback(
+      lallocator, response_allocator_userp, response_fn, response_userp));
+  return nullptr;  // Success
+}
+
+//
+// TRITONSERVER_InferenceResponse
+//
+TRITONSERVER_Error*
+TRITONSERVER_InferenceResponseDelete(
+    TRITONSERVER_InferenceResponse* inference_response)
+{
+  ni::InferenceResponse* lresponse =
+      reinterpret_cast<ni::InferenceResponse*>(inference_response);
+  delete lresponse;
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceResponseError(
+    TRITONSERVER_InferenceResponse* inference_response)
+{
+  ni::InferenceResponse* lresponse =
+      reinterpret_cast<ni::InferenceResponse*>(inference_response);
+  RETURN_IF_STATUS_ERROR(lresponse->ResponseStatus());
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceResponseOutputCount(
+    TRITONSERVER_InferenceResponse* inference_response, uint32_t* count)
+{
+  ni::InferenceResponse* lresponse =
+      reinterpret_cast<ni::InferenceResponse*>(inference_response);
+
+  const std::vector<ni::InferenceResponse::Output>& outputs =
+      lresponse->Outputs();
+  *count = outputs.size();
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceResponseOutput(
+    TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
+    const char** name, const char** datatype, const int64_t** shape,
+    uint64_t* dim_count, const void** base, size_t* byte_size,
+    TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id)
+{
+  ni::InferenceResponse* lresponse =
+      reinterpret_cast<ni::InferenceResponse*>(inference_response);
+
+  const std::vector<ni::InferenceResponse::Output>& outputs =
+      lresponse->Outputs();
+  if (index >= outputs.size()) {
+    return TritonServerError::Create(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        "out of bounds index " + std::to_string(index) +
+            std::string(": response has ") + std::to_string(outputs.size()) +
+            " outputs");
+  }
+
+  const ni::InferenceResponse::Output& output = outputs[index];
+
+  *datatype = ni::DataTypeToProtocolString(output.DType());
+
+  const std::vector<int64_t>& oshape = output.Shape();
+  *shape = &oshape[0];
+  *dim_count = oshape.size();
+
+  RETURN_IF_STATUS_ERROR(
+      output.Buffer(base, byte_size, memory_type, memory_type_id));
+
+  return nullptr;  // Success
+}
+
 
 //
 // TRITONSERVER_Server
@@ -1409,423 +1689,49 @@ TRITONSERVER_ServerMetrics(
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestNew(
-    TRITONSERVER_InferenceRequest** inference_request,
-    TRITONSERVER_Server* server, const char* model_name,
-    const char* model_version)
-{
-  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-
-  int64_t model_int_version = -1;
-  if (model_version != nullptr) {
-    RETURN_IF_STATUS_ERROR(
-        ni::GetModelVersionFromString(model_version, &model_int_version));
-  }
-
-  std::shared_ptr<ni::InferenceBackend> backend;
-  RETURN_IF_STATUS_ERROR(
-      lserver->GetInferenceBackend(model_name, model_int_version, &backend));
-
-  std::unique_ptr<ni::InferenceRequest> request(new ni::InferenceRequest(
-      model_name, model_int_version, backend->Version(),
-      2 /* protocol_version */));
-
-  *inference_request = reinterpret_cast<TRITONSERVER_InferenceRequest*>(
-      new TritonInferenceRequest(backend, request.release()));
-
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestDelete(
-    TRITONSERVER_InferenceRequest* inference_request)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  delete lrequest;
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestId(
-    TRITONSERVER_InferenceRequest* inference_request, const char** id)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  *id = lrequest->Request()->IdStr().c_str();
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestSetId(
-    TRITONSERVER_InferenceRequest* inference_request, const char* id)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  lrequest->Request()->SetIdStr(id);
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestFlags(
-    TRITONSERVER_InferenceRequest* inference_request, uint32_t* flags)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  *flags = lrequest->Request()->Flags();
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestSetFlags(
-    TRITONSERVER_InferenceRequest* inference_request, uint32_t flags)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  lrequest->Request()->SetFlags(flags);
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestCorrelationId(
-    TRITONSERVER_InferenceRequest* inference_request, uint64_t* correlation_id)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  *correlation_id = lrequest->Request()->CorrelationId();
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestSetCorrelationId(
-    TRITONSERVER_InferenceRequest* inference_request, uint64_t correlation_id)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  lrequest->Request()->SetCorrelationId(correlation_id);
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestPriority(
-    TRITONSERVER_InferenceRequest* inference_request, uint32_t* priority)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  *priority = lrequest->Request()->Priority();
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestSetPriority(
-    TRITONSERVER_InferenceRequest* inference_request, uint32_t priority)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  lrequest->Request()->SetPriority(priority);
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestTimeoutMicroseconds(
-    TRITONSERVER_InferenceRequest* inference_request, uint64_t* timeout_us)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  *timeout_us = lrequest->Request()->TimeoutMicroseconds();
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
-    TRITONSERVER_InferenceRequest* inference_request, uint64_t timeout_us)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  lrequest->Request()->SetTimeoutMicroseconds(timeout_us);
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestAddInput(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    const char* datatype, const int64_t* shape, uint64_t dim_count)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(lrequest->Request()->AddOriginalInput(
-      name, ni::ProtocolStringToDataType(datatype), shape, dim_count));
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestRemoveInput(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(lrequest->Request()->RemoveOriginalInput(name));
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestRemoveAllInputs(
-    TRITONSERVER_InferenceRequest* inference_request)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(lrequest->Request()->RemoveAllOriginalInputs());
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestAppendInputData(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    const void* base, size_t byte_size, TRITONSERVER_Memory_Type memory_type,
-    int64_t memory_type_id)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-
-  ni::InferenceRequest::Input* input;
-  RETURN_IF_STATUS_ERROR(
-      lrequest->Request()->MutableOriginalInput(name, &input));
-  RETURN_IF_STATUS_ERROR(
-      input->AppendData(base, byte_size, memory_type, memory_type_id));
-
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestRemoveAllInputData(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-
-  ni::InferenceRequest::Input* input;
-  RETURN_IF_STATUS_ERROR(
-      lrequest->Request()->MutableOriginalInput(name, &input));
-  RETURN_IF_STATUS_ERROR(input->RemoveAllData());
-
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestAddRequestedOutput(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(lrequest->Request()->AddRequestedOutput(name));
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestOutputCount(
-    TRITONSERVER_InferenceRequest* inference_request, uint64_t* output_count)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  auto requested_outputs = lrequest->Request()->RequestedOutputs();
-  *output_count = requested_outputs.size();
-
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestOutputName(
-    TRITONSERVER_InferenceRequest* inference_request, uint64_t index,
-    const char** name)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  auto iter = lrequest->Request()->RequestedOutputs().begin();
-  std::advance(iter, index);
-  *name = iter->first.c_str();
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestRemoveRequestedOutput(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(lrequest->Request()->RemoveRequestedOutput(name));
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestRemoveAllRequestedOutputs(
-    TRITONSERVER_InferenceRequest* inference_request)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(lrequest->Request()->RemoveAllRequestedOutputs());
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    uint32_t count)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-
-  ni::InferenceRequest::RequestedOutput* requested;
-  RETURN_IF_STATUS_ERROR(
-      lrequest->Request()->MutableRequestedOutput(name, &requested));
-  requested->SetClassificationCount(count);
-
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestError(
-    TRITONSERVER_InferenceRequest* inference_request)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(lrequest->RequestStatus());
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestOutputData(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    const void** base, size_t* byte_size, TRITONSERVER_Memory_Type* memory_type,
-    int64_t* memory_type_id)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(lrequest->Response()->OutputBufferContents(
-      name, base, byte_size, memory_type, memory_type_id));
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestOutputDataType(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    const char** datatype)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  const auto& response_header = lrequest->Response()->ResponseHeader();
-  for (const auto& output : response_header.output()) {
-    if (output.name() == name) {
-      *datatype = ni::DataTypeToProtocolString(output.data_type());
-      return nullptr;  // Success
-    }
-  }
-
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_INVALID_ARG, "unknown output");
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestOutputShape(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    const int64_t** shape, uint64_t* dim_count)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(
-      lrequest->Response()->OutputShape(name, shape, dim_count));
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestRemoveAllOutputs(
-    TRITONSERVER_InferenceRequest* inference_request)
-{
-  TritonInferenceRequest* lrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  lrequest->SetResponse(nullptr);
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
 TRITONSERVER_ServerInferAsync(
-    TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
+    TRITONSERVER_Server* server,
     TRITONSERVER_InferenceRequest* inference_request,
-    TRITONSERVER_ResponseAllocator* response_allocator,
-    void* response_allocator_userp,
-    TRITONSERVER_InferenceCompleteFn_t complete_fn, void* complete_userp)
+    TRITONSERVER_TraceManager* trace_manager,
+    TRITONSERVER_TraceManagerReleaseFn_t trace_release_fn,
+    void* trace_release_userp)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-  TritonInferenceRequest* ltrtrequest =
-      reinterpret_cast<TritonInferenceRequest*>(inference_request);
-  TritonServerResponseAllocator* lresponsealloc =
-      reinterpret_cast<TritonServerResponseAllocator*>(response_allocator);
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
 
-  const auto& lrequest = ltrtrequest->Request();
-  const auto& lbackend = ltrtrequest->Backend();
+  RETURN_IF_STATUS_ERROR(lrequest->PrepareForInference());
 
-  ltrtrequest->SetResponse(nullptr);
-  RETURN_IF_STATUS_ERROR(lrequest->PrepareForInference(*lbackend));
+  // FIXME trace manager should have callback set and then be set in
+  // the inference request
 
-#ifdef TRTIS_ENABLE_STATS
-  auto infer_stats = std::make_shared<ni::ModelInferStats>(
-      lserver->StatusManager(), lrequest->ModelName());
-  infer_stats->CaptureTimestamp(
-      ni::ModelInferStats::TimestampKind::kRequestStart);
-  infer_stats->SetRequestedVersion(lrequest->RequestedModelVersion());
-  infer_stats->SetMetricReporter(lbackend->MetricReporter());
-  infer_stats->SetBatchSize(lrequest->BatchSize());
-  infer_stats->SetFailed(true);
-  infer_stats->SetTraceManager(
-      reinterpret_cast<ni::OpaqueTraceManager*>(trace_manager));
-  infer_stats->NewTrace();
-#else
-  auto infer_stats = std::make_shared<ni::ModelInferStats>();
-#endif  // TRTIS_ENABLE_STATS
+  // We wrap the request in a unique pointer to ensure that the
+  // request flows through inferencing with clear ownership.
+  //
+  // FIXME add a custom deleter that logs an error if ever called. We
+  // expect the request to never be destroyed during the inference
+  // flow... instead we expect it to be released from the unique
+  // pointer and its completion callback envoked.
+  std::unique_ptr<ni::InferenceRequest> ureq(lrequest);
+  ni::Status status = lserver->InferAsync(ureq);
 
-  std::shared_ptr<ni::InferResponseProvider> infer_response_provider;
-  {
-    std::shared_ptr<ni::InferResponseProvider> del_response_provider;
-    RETURN_IF_STATUS_ERROR(ni::InferResponseProvider::Create(
-        lrequest, lbackend->GetLabelProvider(), response_allocator,
-        lresponsealloc->AllocFn(), response_allocator_userp,
-        lresponsealloc->ReleaseFn(), 2 /* protocol_version */,
-        &del_response_provider));
-    infer_response_provider = std::move(del_response_provider);
+  // If there is error then should not release trace manager since in
+  // that case the caller retains ownership.
+  //
+  // FIXME, this release should not occur here... it should occur when
+  // trace manager is no longer in use by the requests or any
+  // response. So this code should be removed eventually.
+  if (status.IsOk() && (trace_manager != nullptr)) {
+    trace_release_fn(server, trace_manager, trace_release_userp);
   }
 
-  lserver->InferAsync(
-      lbackend, lrequest, infer_response_provider, infer_stats,
-      [infer_stats, trace_manager, ltrtrequest, infer_response_provider, server,
-       complete_fn, complete_userp](const ni::Status& status) mutable {
-        if (!status.IsOk()) {
-          LOG_VERBOSE(1) << "Infer failed: " << status.Message();
-        }
+  // If there is error then ureq will still have 'lrequest' and we
+  // must release it from unique_ptr since the caller should retain
+  // ownership when there is error. If there is not an error the ureq
+  // == nullptr and so this release is a nop.
+  ureq.release();
 
-#ifdef TRTIS_ENABLE_STATS
-        infer_stats->SetFailed(!status.IsOk());
-        infer_stats->CaptureTimestamp(
-            ni::ModelInferStats::TimestampKind::kRequestEnd);
-
-        // We must explicitly update the inference stats before
-        // sending the response... otherwise it is possible that the
-        // client will be able to query the stats after the response
-        // is received but before they've been updated for the request
-        // (this is especially important for testing).
-        infer_stats->Report();
-#endif  // TRTIS_ENABLE_STATS
-
-        // FIXMEV2 status should live in InferenceRequest instead of
-        // being a callback arg.
-        ltrtrequest->SetRequestStatus(status);
-
-        ltrtrequest->SetResponse(infer_response_provider);
-
-        complete_fn(
-            server, trace_manager,
-            reinterpret_cast<TRITONSERVER_InferenceRequest*>(ltrtrequest),
-            complete_userp);
-      });
-
+  RETURN_IF_STATUS_ERROR(status);
   return nullptr;  // Success
 }
 

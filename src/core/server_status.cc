@@ -31,7 +31,6 @@
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/metrics.h"
-#include "src/core/provider.h"
 #include "src/core/tracing.h"
 
 namespace nvidia { namespace inferenceserver {

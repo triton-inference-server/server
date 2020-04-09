@@ -26,7 +26,6 @@
 {
   global:
     TRTSERVER_*;
-    TRTSERVER2_*;
     TRITONSERVER_*;
   local: *;
 };
