@@ -47,6 +47,7 @@ V2_IMAGE_CLIENT_PY=../clients/v2_image_client.py
 SIMPLE_SHM_CLIENT_PY=../clients/simple_http_v2_shm_client.py
 SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_http_v2_cudashm_client.py
 SIMPLE_MODEL_CONTROL_PY=../clients/simple_http_v2_model_control.py
+SIMPLE_SEQUENCE_INFER_CLIENT_PY=../clients/simple_http_v2_sequence_sync_infer_client.py
 
 SIMPLE_HEALTH_CLIENT=../clients/simple_http_v2_health_metadata
 
@@ -98,6 +99,7 @@ for i in \
         $SIMPLE_SHM_CLIENT_PY \
         $SIMPLE_CUDASHM_CLIENT_PY \
         $SIMPLE_STRING_INFER_CLIENT_PY \
+        $SIMPLE_SEQUENCE_INFER_CLIENT_PY \
         ; do
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"

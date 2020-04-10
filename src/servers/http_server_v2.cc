@@ -1576,6 +1576,36 @@ HTTPAPIServerV2::EVBufferToInput(
     RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestSetId(irequest, id));
   }
 
+  // Set sequence correlation ID and flags if any
+  const auto& param_it = request_json.FindMember("parameters");
+  if (param_it != request_json.MemberEnd()) {
+    const auto& params = param_it->value;
+    {
+      const auto& itr = params.FindMember("sequence_id");
+      if (itr != params.MemberEnd()) {
+        RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestSetCorrelationId(
+            irequest, itr->value.GetInt()));
+      }
+    }
+
+    uint32_t flags = TRITONSERVER_REQUEST_FLAG_NONE;
+    {
+      const auto& itr = params.FindMember("sequence_start");
+      if (itr != params.MemberEnd()) {
+        flags |=
+            itr->value.GetBool() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
+      }
+    }
+    {
+      const auto& itr = params.FindMember("sequence_end");
+      if (itr != params.MemberEnd()) {
+        flags |= itr->value.GetBool() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
+      }
+    }
+    RETURN_IF_TRITON_ERR(
+        TRITONSERVER_InferenceRequestSetFlags(irequest, flags));
+  }
+
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
   const rapidjson::Value& inputs = request_json["inputs"];
