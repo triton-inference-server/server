@@ -27,40 +27,52 @@
 
 /// \file
 
+#include <map>
+#include <memory>
+#include "rapidjson/document.h"
+#include "rapidjson/error/en.h"
+#include "rapidjson/prettywriter.h"
+#include "rapidjson/rapidjson.h"
+#include "rapidjson/stringbuffer.h"
 #include "src/clients/c++/experimental_api_v2/library/utils.h"
-#include "src/core/constants.h"
-#include "src/core/grpc_service_v2.grpc.pb.h"
-#include "src/core/model_config.pb.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
 /// The key-value map type to be included in the request
-/// metadata
+/// as custom headers.
 typedef std::map<std::string, std::string> Headers;
+/// The key-value map type to be included as URL parameters.
+typedef std::map<std::string, std::string> Parameters;
+
+/// Returns reader friendly text representation of
+/// the DOM object.
+/// \param json_dom The json DOM object.
+/// \return Formatted string representation of passed JSON.
+std::string GetJsonText(rapidjson::Document& json_dom);
 
 //==============================================================================
-/// An InferenceServerGrpcClient object is used to perform any kind of
+/// An InferenceServerHttpClient object is used to perform any kind of
 /// communication with the InferenceServer using gRPC protocol.
 ///
 /// \code
-///   std::unique_ptr<InferenceServerGrpcClient> client;
-///   InferenceServerGrpcClient::Create(&client, "localhost:8001");
+///   std::unique_ptr<InferenceServerHttpClient> client;
+///   InferenceServerHttpClient::Create(&client, "localhost:8000");
 ///   bool live;
 ///   client->IsServerLive(&live);
 ///   ...
 ///   ...
 /// \endcode
 ///
-class InferenceServerGrpcClient {
+class InferenceServerHttpClient {
  public:
   /// Create a client that can be used to communicate with the server.
-  /// \param client Returns a new InferenceServerGrpcClient object.
+  /// \param client Returns a new InferenceServerHttpClient object.
   /// \param server_url The inference server name and port.
   /// \param verbose If true generate verbose output when contacting
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
-      std::unique_ptr<InferenceServerGrpcClient>* client,
+      std::unique_ptr<InferenceServerHttpClient>* client,
       const std::string& server_url, bool verbose = false);
 
   /// Contact the inference server and get its liveness.
@@ -68,14 +80,20 @@ class InferenceServerGrpcClient {
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
-  Error IsServerLive(bool* live, const Headers& headers = Headers());
+  Error IsServerLive(
+      bool* live, const Headers& headers = Headers(),
+      const Parameters& query_params = Parameters());
 
   /// Contact the inference server and get its readiness.
   /// \param ready Returns whether the server is ready or not.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
+  /// \param query_params Optional map specifying parameters that must be
+  /// included with URL query.
   /// \return Error object indicating success or failure of the request.
-  Error IsServerReady(bool* ready, const Headers& headers = Headers());
+  Error IsServerReady(
+      bool* ready, const Headers& headers = Headers(),
+      const Parameters& query_params = Parameters());
 
   /// Contact the inference server and get the readiness of specified model.
   /// \param ready Returns whether the specified model is ready or not.
@@ -85,57 +103,70 @@ class InferenceServerGrpcClient {
   /// choose a version based on the model and internal policy.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
+  /// \param query_params Optional map specifying parameters that must be
+  /// included with URL query.
   /// \return Error object indicating success or failure of the request.
   Error IsModelReady(
       bool* ready, const std::string& model_name,
-      const std::string& model_version = "",
-      const Headers& headers = Headers());
+      const std::string& model_version = "", const Headers& headers = Headers(),
+      const Parameters& query_params = Parameters());
 
   /// Contact the inference server and get its metadata.
-  /// \param server_metadata Returns the server metadata as
-  /// SeverMetadataResponse message.
+  /// \param server_metadata Returns the server metadata as JSON DOM object.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
+  /// \param query_params Optional map specifying parameters that must be
+  /// included with URL query.
   /// \return Error object indicating success or failure of the request.
   Error GetServerMetadata(
-      ServerMetadataResponse* server_metadata,
-      const Headers& headers = Headers());
+      rapidjson::Document* server_metadata, const Headers& headers = Headers(),
+      const Parameters& query_params = Parameters());
 
   /// Contact the inference server and get the metadata of specified model.
-  /// \param model_metadata Returns model metadata as ModelMetadataResponse
-  /// message.
+  /// \param model_metadata Returns model metadata as JSON DOM object.
   /// \param model_name The name of the model to get metadata.
   /// \param model_version The version of the model to get metadata.
   /// The default value is an empty string which means then the server will
   /// choose a version based on the model and internal policy.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
+  /// \param query_params Optional map specifying parameters that must be
+  /// included with URL query.
   /// \return Error object indicating success or failure of the request.
   Error GetModelMetadata(
-      ModelMetadataResponse* model_metadata, const std::string& model_name,
-      const std::string& model_version = "",
-      const Headers& headers = Headers());
+      rapidjson::Document* model_metadata, const std::string& model_name,
+      const std::string& model_version = "", const Headers& headers = Headers(),
+      const Parameters& query_params = Parameters());
 
   /// Contact the inference server and get the configuration of specified model.
-  /// \param model_config Returns model config as ModelConfigResponse
-  /// message.
+  /// \param model_config Returns model config as JSON DOM object.
   /// \param model_name The name of the model to get configuration.
   /// \param model_version The version of the model to get configuration.
   /// The default value is an empty string which means then the server will
   /// choose a version based on the model and internal policy.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
+  /// \param query_params Optional map specifying parameters that must be
+  /// included with URL query.
   /// \return Error object indicating success or failure of the request.
   Error GetModelConfig(
-      ModelConfigResponse* model_config, const std::string& model_name,
-      const std::string& model_version = "",
-      const Headers& headers = Headers());
+      rapidjson::Document* model_config, const std::string& model_name,
+      const std::string& model_version = "", const Headers& headers = Headers(),
+      const Parameters& query_params = Parameters());
 
  private:
-  InferenceServerGrpcClient(const std::string& url, bool verbose);
-  // GRPC end point.
-  std::unique_ptr<GRPCInferenceService::Stub> stub_;
+  InferenceServerHttpClient(const std::string& url, bool verbose);
 
+  Error Get(
+      std::string& request_uri, const Headers& headers,
+      const Parameters& query_params, rapidjson::Document* response,
+      long* http_code);
+
+  static size_t ResponseHandler(
+      void* contents, size_t size, size_t nmemb, void* userp);
+
+  // The server url
+  const std::string url_;
   // Enable verbose output
   const bool verbose_;
 };

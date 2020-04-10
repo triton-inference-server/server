@@ -39,14 +39,16 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
-SIMPLE_HEALTH_CLIENT=../clients/simple_http_v2_health_metadata.py
-SIMPLE_INFER_CLIENT=../clients/simple_http_v2_infer_client.py
-SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_http_v2_async_infer_client.py
-SIMPLE_STRING_INFER_CLIENT=../clients/simple_http_v2_string_infer_client.py
-V2_IMAGE_CLIENT=../clients/v2_image_client.py
-SIMPLE_SHM_CLIENT=../clients/simple_http_v2_shm_client.py
-SIMPLE_CUDASHM_CLIENT=../clients/simple_http_v2_cudashm_client.py
-SIMPLE_MODEL_CONTROL=../clients/simple_http_v2_model_control.py
+SIMPLE_HEALTH_CLIENT_PY=../clients/simple_http_v2_health_metadata.py
+SIMPLE_INFER_CLIENT_PY=../clients/simple_http_v2_infer_client.py
+SIMPLE_ASYNC_INFER_CLIENT_PY=../clients/simple_http_v2_async_infer_client.py
+SIMPLE_STRING_INFER_CLIENT_PY=../clients/simple_http_v2_string_infer_client.py
+V2_IMAGE_CLIENT_PY=../clients/v2_image_client.py
+SIMPLE_SHM_CLIENT_PY=../clients/simple_http_v2_shm_client.py
+SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_http_v2_cudashm_client.py
+SIMPLE_MODEL_CONTROL_PY=../clients/simple_http_v2_model_control.py
+
+SIMPLE_HEALTH_CLIENT=../clients/simple_http_v2_health_metadata
 
 rm -f *.log
 rm -f *.log.*
@@ -76,20 +78,26 @@ fi
 set +e
 
 # Test health
-python $SIMPLE_HEALTH_CLIENT -v >> ${CLIENT_LOG}.health 2>&1
+python $SIMPLE_HEALTH_CLIENT_PY -v >> ${CLIENT_LOG}.health 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.health
     RET=1
 fi
 
+$SIMPLE_HEALTH_CLIENT -v -H test1:1 >> ${CLIENT_LOG}.c++.health 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.health
+    RET=1
+fi
+
 IMAGE=../images/vulture.jpeg
 for i in \
-        $SIMPLE_INFER_CLIENT \
-        $SIMPLE_ASYNC_INFER_CLIENT \
-        $V2_IMAGE_CLIENT \
-        $SIMPLE_SHM_CLIENT \
-        $SIMPLE_CUDASHM_CLIENT \
-        $SIMPLE_STRING_INFER_CLIENT \
+        $SIMPLE_INFER_CLIENT_PY \
+        $SIMPLE_ASYNC_INFER_CLIENT_PY \
+        $V2_IMAGE_CLIENT_PY \
+        $SIMPLE_SHM_CLIENT_PY \
+        $SIMPLE_CUDASHM_CLIENT_PY \
+        $SIMPLE_STRING_INFER_CLIENT_PY \
         ; do
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"
@@ -126,7 +134,7 @@ fi
 set +e
 
 # Test Model Control API
-python $SIMPLE_MODEL_CONTROL -v >> ${CLIENT_LOG}.model_control 2>&1
+python $SIMPLE_MODEL_CONTROL_PY -v >> ${CLIENT_LOG}.model_control 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
