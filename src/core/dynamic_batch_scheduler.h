@@ -25,8 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <src/core/cond_var.h>
 #include <atomic>
-#include <condition_variable>
 #include <deque>
 #include <future>
 #include <map>
@@ -135,7 +135,7 @@ class DynamicBatchScheduler : public Scheduler {
 
   // Mutex and condvar protecting the scheduling queue.
   std::mutex mu_;
-  std::condition_variable cv_;
+  std::unique_ptr<CondVar<std::mutex>> cv_;
 
   // Map from priority level to queue holding inference requests for the model
   // represented by this scheduler. If priority queues are not supported by the

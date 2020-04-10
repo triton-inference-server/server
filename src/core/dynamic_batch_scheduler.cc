@@ -63,6 +63,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
       enforce_equal_shape_tensors_(enforce_equal_shape_tensors),
       preserve_ordering_(preserve_ordering)
 {
+  cv_.reset(new StdCondVar<std::mutex>());
   max_preferred_batch_size_ = 0;
   for (const auto size : preferred_batch_sizes_) {
     max_preferred_batch_size_ =
@@ -157,7 +158,7 @@ DynamicBatchScheduler::~DynamicBatchScheduler()
       ex->store(true);
     }
 
-    cv_.notify_all();
+    cv_->NotifyAll();
   }
 
   // It is possible for (one of) the scheduler threads to be the last
@@ -213,7 +214,7 @@ DynamicBatchScheduler::Enqueue(
   }
 
   if (wake_runner) {
-    cv_.notify_one();
+    cv_->NotifyOne();
   }
 
   if (!enqueue_status.IsOk()) {
@@ -384,14 +385,13 @@ DynamicBatchScheduler::SchedulerThread(
       // for the specified timeout before checking the queue again.
       if (wait_microseconds > 0) {
         idle_scheduler_thread_cnt_++;
-        std::chrono::microseconds wait_timeout(wait_microseconds);
-        cv_.wait_for(lock, wait_timeout);
+        cv_->WaitFor(lock, wait_microseconds);
         idle_scheduler_thread_cnt_--;
       }
     }
 
     if (wake_thread) {
-      cv_.notify_one();
+      cv_->NotifyOne();
     }
 
     if ((payloads != nullptr) && !payloads->empty()) {
