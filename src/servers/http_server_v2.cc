@@ -1986,8 +1986,8 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       }
 
       rapidjson::Value shape_array(rapidjson::kArrayType);
-      for (size_t i = 0; i < dim_count; i++) {
-        shape_array.PushBack(shape_vec[i], allocator);
+      for (size_t j = 0; j < dim_count; j++) {
+        shape_array.PushBack(shape_vec[j], allocator);
       }
       output_metadata[i].AddMember("shape", shape_array, allocator);
 
@@ -2041,17 +2041,15 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     }
     response_json.AddMember("outputs", response_outputs, allocator);
   } else {
-    // Get outputs from model config (Assume max is 10)
-    uint64_t name_count;
-    std::vector<const char*> names(10);
-    const char** names_start = names.data();
-    err = TRITONSERVER_InferenceRequestGetAllOutputs(
-        request, names_start, &name_count);
+    // Get the number of outputs and their names from the request object.
+    uint64_t output_count;
+    err = TRITONSERVER_InferenceRequestOutputCount(request, &output_count);
     rapidjson::Value response_outputs(rapidjson::kArrayType);
-    rapidjson::Value output_metadata[name_count];
-    for (size_t i = 0; i < name_count; i++) {
+    rapidjson::Value output_metadata[output_count];
+    for (uint64_t i = 0; i < output_count; i++) {
       output_metadata[i].SetObject();
-      const char* output_name = names[i];
+      const char* output_name = nullptr;
+      err = TRITONSERVER_InferenceRequestOutputName(request, i, &output_name);
       rapidjson::Value name_val(output_name, strlen(output_name));
       output_metadata[i].AddMember("name", name_val, allocator);
 
@@ -2064,8 +2062,8 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
       }
 
       rapidjson::Value shape_array(rapidjson::kArrayType);
-      for (size_t i = 0; i < dim_count; i++) {
-        shape_array.PushBack(shape_vec[i], allocator);
+      for (size_t j = 0; j < dim_count; j++) {
+        shape_array.PushBack(shape_vec[j], allocator);
       }
       output_metadata[i].AddMember("shape", shape_array, allocator);
 
