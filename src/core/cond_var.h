@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <src/core/constants.h>
 #include <condition_variable>
 #include <functional>
 #include <list>
