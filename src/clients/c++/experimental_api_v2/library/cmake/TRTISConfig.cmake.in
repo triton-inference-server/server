@@ -43,6 +43,6 @@ if(NOT Threads_FOUND)
   find_package(Threads REQUIRED)
 endif()
 
-if (NOT (TARGET TRTIS::request_grpc))
+if (NOT (TARGET TRTIS::grpcclient OR TARGET TRTIS::httpclient))
   include ("${CMAKE_CURRENT_LIST_DIR}/TRTISTargets.cmake")
 endif ()

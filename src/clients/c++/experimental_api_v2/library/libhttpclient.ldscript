@@ -23,51 +23,10 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-cmake_minimum_required (VERSION 3.5)
-
-if(WIN32)
-  message("Currently, CMake will only build client library and skip example "
-          "clients in Windows. Because the examples use functionalities that "
-		      "are UNIX specific.")
-else()
-  install(
-    FILES
-      ${CMAKE_SOURCE_DIR}/../../VERSION
-    DESTINATION .
-  )
-
-  if(${TRTIS_ENABLE_GRPC_V2})
-
-    #
-    # simple_grpc_v2_health_metadata
-    #
-    add_executable(simple_grpc_v2_health_metadata simple_grpc_v2_health_metadata.cc)
-    target_link_libraries(
-      simple_grpc_v2_health_metadata
-      PRIVATE TRTIS::grpcclient_static
-    )
-    install(
-      TARGETS simple_grpc_v2_health_metadata
-      RUNTIME DESTINATION bin
-    )
-  
-  endif()  # TRTIS_ENABLE_GRPC_V2
-
-  if(${TRTIS_ENABLE_HTTP_V2})
-
-    #
-    # simple_http_v2_health_metadata
-    #
-    add_executable(simple_http_v2_health_metadata simple_http_v2_health_metadata.cc)
-    target_link_libraries(
-      simple_http_v2_health_metadata
-      PRIVATE TRTIS::httpclient_static
-    )
-    install(
-      TARGETS simple_http_v2_health_metadata
-      RUNTIME DESTINATION bin
-    )
-  
-  endif()  # TRTIS_ENABLE_HTTP_V2
-endif() # WIN32
+{
+  global:
+    extern "C++" {
+      nvidia::inferenceserver*
+    };
+  local: *;
+};
