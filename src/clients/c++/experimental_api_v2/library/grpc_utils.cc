@@ -34,10 +34,10 @@ namespace nvidia { namespace inferenceserver { namespace client {
 
 Error
 InferInputGrpc::Create(
-    std::shared_ptr<InferInputGrpc>* infer_input, const std::string& name,
+    InferInputGrpc** infer_input, const std::string& name,
     const std::vector<int64_t>& dims, const std::string& datatype)
 {
-  infer_input->reset(new InferInputGrpc(name, dims, datatype));
+  *infer_input = new InferInputGrpc(name, dims, datatype);
   return Error::Success;
 }
 
@@ -131,10 +131,10 @@ InferInputGrpc::InferInputGrpc(
 
 Error
 InferOutputGrpc::Create(
-    std::shared_ptr<InferOutputGrpc>* infer_output, const std::string& name,
+    InferOutputGrpc** infer_output, const std::string& name,
     const size_t class_count)
 {
-  infer_output->reset(new InferOutputGrpc(name, class_count));
+  *infer_output = new InferOutputGrpc(name, class_count);
   return Error::Success;
 }
 
@@ -175,10 +175,10 @@ InferOutputGrpc::InferOutputGrpc(
 
 Error
 InferResultGrpc::Create(
-    std::shared_ptr<InferResultGrpc>* infer_result,
+    InferResultGrpc** infer_result,
     std::shared_ptr<ModelInferResponse> response)
 {
-  infer_result->reset(new InferResultGrpc(response));
+  *infer_result = new InferResultGrpc(response);
   return Error::Success;
 }
 

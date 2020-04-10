@@ -283,10 +283,9 @@ InferenceServerGrpcClient::GetModelConfig(
 
 Error
 InferenceServerGrpcClient::Infer(
-    std::shared_ptr<InferResultGrpc>* result, const InferOptions& options,
-    const std::vector<std::shared_ptr<InferInputGrpc>>& inputs,
-    const std::vector<std::shared_ptr<InferOutputGrpc>>& outputs,
-    const Headers& headers)
+    InferResultGrpc** result, const InferOptions& options,
+    const std::vector<const InferInputGrpc*>& inputs,
+    const std::vector<const InferOutputGrpc*>& outputs, const Headers& headers)
 {
   Error err;
 
@@ -294,10 +293,10 @@ InferenceServerGrpcClient::Infer(
   std::shared_ptr<ModelInferResponse> response_ptr(new ModelInferResponse());
 
   InitModelInferRequest(&request, options);
-  for (auto& input : inputs) {
+  for (auto input : inputs) {
     request.mutable_inputs()->Add(input->GetTensor());
   }
-  for (auto& output : outputs) {
+  for (auto output : outputs) {
     request.mutable_outputs()->Add(output->GetTensor());
   }
 

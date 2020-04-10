@@ -27,7 +27,6 @@
 
 /// \file
 
-#include "src/clients/c++/experimental_api_v2/library/common_utils.h"
 #include "src/clients/c++/experimental_api_v2/library/grpc_utils.h"
 #include "src/core/constants.h"
 #include "src/core/grpc_service_v2.grpc.pb.h"
@@ -145,10 +144,10 @@ class InferenceServerGrpcClient {
   /// \return Error object indicating success or failure of the
   /// request.
   Error Infer(
-      std::shared_ptr<InferResultGrpc>* result, const InferOptions& options,
-      const std::vector<std::shared_ptr<InferInputGrpc>>& inputs,
-      const std::vector<std::shared_ptr<InferOutputGrpc>>& outputs =
-          std::vector<std::shared_ptr<InferOutputGrpc>>(),
+      InferResultGrpc** result, const InferOptions& options,
+      const std::vector<const InferInputGrpc*>& inputs,
+      const std::vector<const InferOutputGrpc*>& outputs =
+          std::vector<const InferOutputGrpc*>(),
       const Headers& headers = Headers());
 
  private:

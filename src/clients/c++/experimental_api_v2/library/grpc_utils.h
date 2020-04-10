@@ -27,8 +27,7 @@
 
 /// \file
 
-#include "src/clients/c++/experimental_api_v2/library/base_utils.h"
-#include "src/clients/c++/experimental_api_v2/library/common_utils.h"
+#include "src/clients/c++/experimental_api_v2/library/common.h"
 #include "src/core/constants.h"
 #include "src/core/grpc_service_v2.grpc.pb.h"
 #include "src/core/model_config.pb.h"
@@ -48,7 +47,7 @@ class InferInputGrpc : public InferInput {
   /// \param datatype The datatype of the input.
   /// \return Error object indicating success or failure.
   static Error Create(
-      std::shared_ptr<InferInputGrpc>* infer_input, const std::string& name,
+      InferInputGrpc** infer_input, const std::string& name,
       const std::vector<int64_t>& dims, const std::string& datatype);
 
   /// See InferInput::GetName(std::string* name)
@@ -81,7 +80,10 @@ class InferInputGrpc : public InferInput {
 
   /// Returns the unferlying InferInputTensor message.
   /// \return ModelInferRequest::InferInputTensor
-  ModelInferRequest::InferInputTensor GetTensor() { return input_tensor_; }
+  ModelInferRequest::InferInputTensor GetTensor() const
+  {
+    return input_tensor_;
+  }
 
  private:
   InferInputGrpc(
@@ -106,7 +108,7 @@ class InferOutputGrpc : public InferOutput {
   /// requested.
   /// \return Error object indicating success or failure.
   static Error Create(
-      std::shared_ptr<InferOutputGrpc>* infer_output, const std::string& name,
+      InferOutputGrpc** infer_output, const std::string& name,
       const size_t class_count = 0);
 
   /// See InferOutput::GetName(std::string* name)
@@ -121,7 +123,7 @@ class InferOutputGrpc : public InferOutput {
 
   /// Returns the unferlying InferRequestedOutputTensor message.
   /// \return ModelInferRequest::InferRequestedOutputTensor
-  ModelInferRequest::InferRequestedOutputTensor GetTensor()
+  ModelInferRequest::InferRequestedOutputTensor GetTensor() const
   {
     return output_tensor_;
   }
@@ -144,7 +146,7 @@ class InferResultGrpc : public InferResult {
   /// \param response  The response of server for an inference request.
   /// \return Error object indicating success or failure.
   static Error Create(
-      std::shared_ptr<InferResultGrpc>* infer_result,
+      InferResultGrpc** infer_result,
       std::shared_ptr<ModelInferResponse> response);
 
   /// See InferResult::GetShape(const std::string& output_name,

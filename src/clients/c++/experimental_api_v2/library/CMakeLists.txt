@@ -37,12 +37,12 @@ if(${TRTIS_ENABLE_GRPC_V2})
   # libgrpcclient object build
   set(
     REQUEST_SRCS
-    grpc_client.cc common_utils.cc grpc_utils.cc
+    grpc_client.cc common.cc grpc_utils.cc
   )
 
   set(
     REQUEST_HDRS
-    grpc_client.h common_utils.h grpc_utils.h base_utils.h
+    grpc_client.h common.h grpc_utils.h
   )
 
   add_library(
@@ -156,12 +156,12 @@ if(${TRTIS_ENABLE_HTTP_V2})
   # libhttpclient object build
   set(
     REQUEST_SRCS
-    http_client.cc common_utils.cc
+    http_client.cc common.cc
   )
 
   set(
     REQUEST_HDRS
-    http_client.h common_utils.h
+    http_client.h common.h
   )
 
   add_library(

@@ -45,8 +45,7 @@ namespace nic = nvidia::inferenceserver::client;
 namespace {
 
 void
-ValidateShapeAndDatatype(
-    const std::string& name, std::shared_ptr<nic::InferResultGrpc> result)
+ValidateShapeAndDatatype(const std::string& name, nic::InferResultGrpc* result)
 {
   std::vector<int64_t> shape;
   FAIL_IF_ERR(
@@ -144,7 +143,9 @@ main(int argc, char** argv)
   std::vector<int64_t> shape{1, 16};
 
   // Initialize the inputs with the data.
-  std::shared_ptr<nic::InferInputGrpc> input0, input1;
+  nic::InferInputGrpc* input0;
+  nic::InferInputGrpc* input1;
+
   FAIL_IF_ERR(
       nic::InferInputGrpc::Create(&input0, "INPUT0", shape, "INT32"),
       "unable to get INPUT0");
@@ -164,7 +165,9 @@ main(int argc, char** argv)
       "unable to set data for INPUT1");
 
   // Generate the outputs to be requested.
-  std::shared_ptr<nic::InferOutputGrpc> output0, output1;
+  nic::InferOutputGrpc* output0;
+  nic::InferOutputGrpc* output1;
+
   FAIL_IF_ERR(
       nic::InferOutputGrpc::Create(&output0, "OUTPUT0"),
       "unable to get OUTPUT0");
@@ -176,10 +179,9 @@ main(int argc, char** argv)
   // The inference settings. Will be using default for now.
   nic::InferOptions options(model_name);
   options.model_version_ = model_version;
-  std::shared_ptr<nic::InferResultGrpc> results;
-  std::vector<std::shared_ptr<nic::InferInputGrpc>> inputs = {input0, input1};
-  std::vector<std::shared_ptr<nic::InferOutputGrpc>> outputs = {output0,
-                                                                output1};
+  nic::InferResultGrpc* results;
+  std::vector<const nic::InferInputGrpc*> inputs = {input0, input1};
+  std::vector<const nic::InferOutputGrpc*> outputs = {output0, output1};
   FAIL_IF_ERR(
       client->Infer(&results, options, inputs, outputs, http_headers),
       "unable to run model");
