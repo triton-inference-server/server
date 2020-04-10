@@ -76,11 +76,14 @@ constexpr char kCustomPlatform[] = "custom";
 constexpr char kCustomFilename[] = "libcustom.so";
 #endif  // TRTIS_ENABLE_CUSTOM
 
+#ifdef TRTIS_ENABLE_ENSEMBLE
+constexpr char kEnsemblePlatform[] = "ensemble";
+#endif  // TRTIS_ENABLE_ENSEMBLE
+
 constexpr char kTensorRTExecutionAccelerator[] = "tensorrt";
 constexpr char kOpenVINOExecutionAccelerator[] = "openvino";
 constexpr char kGPUIOExecutionAccelerator[] = "gpu_io";
 
-constexpr char kEnsemblePlatform[] = "ensemble";
 constexpr char kModelConfigPbTxt[] = "config.pbtxt";
 
 constexpr char kMetricsLabelModelName[] = "model";

@@ -40,6 +40,335 @@
 
 namespace nvidia { namespace inferenceserver {
 
+namespace {
+
+#ifdef TRTIS_ENABLE_ENSEMBLE
+
+struct EnsembleTensor {
+  EnsembleTensor(bool isOutput) : ready(false), isOutput(isOutput) {}
+  bool ready;
+  bool isOutput;
+  std::vector<EnsembleTensor*> prev_nodes;
+  std::vector<EnsembleTensor*> next_nodes;
+};
+
+/// Build a graph that represents the data flow in the ensemble specified in
+/// given model config. the node (ensemble tensor) in the graph can be looked
+/// up using its name as key.
+/// \param ensemble_config The model configuration that specifies
+/// ensemble_scheduling field.
+/// \param keyed_ensemble_graph Returned the ensemble graph.
+/// \return The error status. A non-OK status indicates the build fails because
+/// the ensemble configuration is not valid.
+Status
+BuildEnsembleGraph(
+    const ModelConfig& config,
+    std::unordered_map<std::string, EnsembleTensor>& keyed_ensemble_graph)
+{
+  keyed_ensemble_graph.clear();
+  size_t step_idx = 0;
+  for (const auto& element : config.ensemble_scheduling().step()) {
+    if (element.model_name().empty()) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "must specify 'model_name' in step " + std::to_string(step_idx) +
+              " of ensemble '" + config.name() + "'");
+    }
+    if (element.input_map().size() == 0) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "must specify 'input_map' in step " + std::to_string(step_idx) +
+              " of ensemble '" + config.name() + "'");
+    }
+    if (element.output_map().size() == 0) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "must specify 'output_map' in step " + std::to_string(step_idx) +
+              " of ensemble '" + config.name() + "'");
+    }
+
+    // Link ensemble tensors
+    std::vector<EnsembleTensor*> tensor_as_output;
+    for (const auto& output_map : element.output_map()) {
+      auto it = keyed_ensemble_graph.find(output_map.second);
+      if (it != keyed_ensemble_graph.end()) {
+        if (it->second.isOutput) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              "ensemble tensor '" + it->first +
+                  "' can appear in an output map only once for ensemble '" +
+                  config.name() + "' step " + std::to_string(step_idx));
+        } else {
+          it->second.isOutput = true;
+        }
+      } else {
+        it = keyed_ensemble_graph
+                 .emplace(
+                     std::make_pair(output_map.second, EnsembleTensor(true)))
+                 .first;
+      }
+      tensor_as_output.push_back(&(it->second));
+    }
+
+    std::set<std::string> model_inputs;
+    for (const auto& input_map : element.input_map()) {
+      if (model_inputs.find(input_map.first) != model_inputs.end()) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "input '" + input_map.first + "' in model '" +
+                element.model_name() +
+                "' is mapped to multiple ensemble tensors for ensemble '" +
+                config.name() + "' step " + std::to_string(step_idx));
+      } else {
+        model_inputs.emplace(input_map.first);
+      }
+      auto it = keyed_ensemble_graph.find(input_map.second);
+      if (it == keyed_ensemble_graph.end()) {
+        it = keyed_ensemble_graph
+                 .emplace(
+                     std::make_pair(input_map.second, EnsembleTensor(false)))
+                 .first;
+      }
+      for (auto output : tensor_as_output) {
+        output->prev_nodes.push_back(&(it->second));
+        it->second.next_nodes.push_back(output);
+      }
+    }
+
+    step_idx++;
+  }
+
+  return Status::Success;
+}
+
+Status
+ValidateEnsembleSchedulingConfig(const ModelConfig& config)
+{
+  if (config.platform() != kEnsemblePlatform) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "ensemble scheduling cannot be set for model '" + config.name() +
+            "' whose platform is not " + kEnsemblePlatform);
+  }
+  if (config.instance_group().size() != 0) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "instance group should not be specified for ensemble '" +
+            config.name() + "'");
+  }
+  if (config.has_optimization()) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "optimization should not be specified for ensemble '" + config.name() +
+            "'");
+  }
+  if (config.model_warmup_size() != 0) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "model_warmup can not be specified for ensemble '" + config.name() +
+            "'");
+  }
+
+  // Make sure step is not empty and all fields are set
+  if (config.ensemble_scheduling().step_size() == 0) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "must specify 'step' for ensemble '" + config.name() + "'");
+  }
+
+  std::unordered_map<std::string, EnsembleTensor> tensors;
+
+  RETURN_IF_ERROR(BuildEnsembleGraph(config, tensors));
+
+  // check data flow
+  std::deque<EnsembleTensor*> ready_queue;
+  for (const auto& input : config.input()) {
+    auto it = tensors.find(input.name());
+    if (it == tensors.end()) {
+      return Status(
+          Status::Code::INVALID_ARG, "ensemble input '" + input.name() +
+                                         "' for ensemble " + config.name() +
+                                         "' is not used");
+    }
+    it->second.ready = true;
+    ready_queue.push_back(&(it->second));
+  }
+  while (!ready_queue.empty()) {
+    auto& ready_node = ready_queue.front();
+    for (auto& next_node : ready_node->next_nodes) {
+      if (next_node->ready) {
+        continue;
+      }
+      bool next_node_ready = true;
+      for (auto& prev_node : next_node->prev_nodes) {
+        if (!prev_node->ready) {
+          next_node_ready = false;
+          break;
+        }
+      }
+      next_node->ready = next_node_ready;
+      if (next_node_ready) {
+        ready_queue.push_back(next_node);
+      }
+    }
+    ready_queue.pop_front();
+  }
+  std::set<std::string> outputs;
+  for (const auto& output : config.output()) {
+    auto it = tensors.find(output.name());
+    if (it == tensors.end()) {
+      return Status(
+          Status::Code::INVALID_ARG, "ensemble output '" + output.name() +
+                                         "' for ensemble " + config.name() +
+                                         "' is not used");
+    }
+    if (!it->second.ready) {
+      return Status(
+          Status::Code::INVALID_ARG, "output '" + output.name() +
+                                         "' for ensemble '" + config.name() +
+                                         "' is not written");
+    } else {
+      outputs.insert(it->first);
+    }
+  }
+  // Check redundant ensemble tensors
+  for (const auto& tensor : tensors) {
+    // skip ensemble outputs as they have been checked and can have no
+    // next nodes
+    if (outputs.find(tensor.first) != outputs.end()) {
+      continue;
+    }
+    if (!tensor.second.ready || (tensor.second.next_nodes.size() == 0)) {
+      return Status(
+          Status::Code::INVALID_ARG, "ensemble tensor '" + tensor.first +
+                                         "' is unused in ensemble '" +
+                                         config.name() + "'");
+    }
+  }
+  return Status::Success;
+}
+
+#endif  // TRTIS_ENABLE_ENSEMBLE
+
+template <class ModelIO>
+Status
+ValidateIOShape(
+    const ModelIO& io, int32_t max_batch_size,
+    const std::string& message_prefix = "")
+{
+  if (io.name().empty()) {
+    return Status(
+        Status::Code::INVALID_ARG, message_prefix + "must specify 'name'");
+  }
+
+  if (io.data_type() == DataType::TYPE_INVALID) {
+    return Status(
+        Status::Code::INVALID_ARG, "model output must specify 'data_type'");
+  }
+
+  if (io.dims_size() == 0) {
+    return Status(
+        Status::Code::INVALID_ARG, message_prefix + "must specify 'dims'");
+  }
+
+  // If the configuration is non-batching, then no input or output
+  // reshape can be empty as that would mean that input or output was
+  // always empty (no data).
+  if (io.has_reshape() && (io.reshape().shape_size() == 0) &&
+      (max_batch_size == 0)) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        message_prefix + "cannot have empty reshape for non-batching model");
+  }
+
+  for (auto dim : io.dims()) {
+    // Dimension cannot be 0.
+    if ((dim < 1) && (dim != WILDCARD_DIM)) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          message_prefix + "dimension must be integer >= 1, or " +
+              std::to_string(WILDCARD_DIM) +
+              " to indicate a variable-size dimension");
+    }
+  }
+
+  if (io.has_reshape()) {
+    // Zeros are not allowed in reshape.
+    for (auto dim : io.reshape().shape()) {
+      if ((dim < 1) && (dim != WILDCARD_DIM)) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            message_prefix + "reshape dimensions must be integer >= 1, or " +
+                std::to_string(WILDCARD_DIM) +
+                " to indicate a variable-size dimension");
+      }
+    }
+
+    const int64_t dims_size = GetElementCount(io.dims());
+    const int64_t reshape_size = GetElementCount(io.reshape().shape());
+
+    // dims and reshape must both have same element count
+    // or both have variable-size dimension.
+    // Special case for empty reshape... expect dims to have element
+    // count of 1.
+    if ((dims_size != reshape_size) &&
+        ((reshape_size != 0) || (dims_size != 1))) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          message_prefix + "has different size for dims and reshape");
+    }
+
+    // shape contains variable-size dimension, in this case we compare if
+    // each pair of the trunks separated by variable-size dimension has
+    // the same element count. For instance, from [2, 4, -1, 6] to [8, -1, 1, 6]
+    // is valid reshape as 2 * 4 = 8 and 6 = 1 * 6.
+    if (dims_size == -1) {
+      std::vector<int64_t> dim_element_cnts;
+      std::vector<int64_t> reshape_element_cnts;
+      int64_t current_cnt = 1;
+      for (const auto& dim : io.dims()) {
+        if (dim != -1) {
+          current_cnt *= dim;
+        } else {
+          dim_element_cnts.push_back(current_cnt);
+          current_cnt = 1;
+        }
+      }
+      dim_element_cnts.push_back(current_cnt);
+
+      current_cnt = 1;
+      for (const auto& dim : io.reshape().shape()) {
+        if (dim != -1) {
+          current_cnt *= dim;
+        } else {
+          reshape_element_cnts.push_back(current_cnt);
+          current_cnt = 1;
+        }
+      }
+      reshape_element_cnts.push_back(current_cnt);
+
+      if (dim_element_cnts.size() != reshape_element_cnts.size()) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            message_prefix +
+                "has different number of variable-size dimensions for dims "
+                "and reshape");
+      }
+      for (size_t idx = 0; idx < dim_element_cnts.size(); idx++) {
+        if (dim_element_cnts[idx] != reshape_element_cnts[idx]) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              message_prefix + "has different size for dims and reshape");
+        }
+      }
+    }
+  }
+
+  return Status::Success;
+}
+
+}  // namespace
+
 Status
 GetModelVersionFromString(const std::string& version_string, int64_t* version)
 {
@@ -348,9 +677,12 @@ GetNormalizedModelConfig(
       config->set_default_model_filename(kCustomFilename);
     } else
 #endif  // TRTIS_ENABLE_CUSTOM
+#ifdef TRTIS_ENABLE_ENSEMBLE
         if (config->platform() == kEnsemblePlatform) {
       // No actual model file is needed to be loaded for ensemble.
-    } else {
+    } else
+#endif  // TRTIS_ENABLE_ENSEMBLE
+    {
       return Status(
           Status::Code::INTERNAL, "unexpected platform type " +
                                       config->platform() + " for " +
@@ -676,14 +1008,21 @@ ValidateModelConfig(
   // If ensemble scheduling is specified, validate it.
   // Otherwise, must validate platform and instance_group
   if (config.has_ensemble_scheduling()) {
+#ifdef TRTIS_ENABLE_ENSEMBLE
     RETURN_IF_ERROR(ValidateEnsembleSchedulingConfig(config));
+#else
+    return Status(
+        Status::Code::INVALID_ARG, "ensemble scheduling not supported");
+#endif  // TRTIS_ENABLE_ENSEMBLE
   } else {
+#ifdef TRTIS_ENABLE_ENSEMBLE
     if (config.platform() == kEnsemblePlatform) {
       return Status(
           Status::Code::INVALID_ARG,
           "ensemble scheduling must be set for ensemble " + config.name() +
               " whose platform is " + kEnsemblePlatform);
     }
+#endif  // TRTIS_ENABLE_ENSEMBLE
 
     if (config.instance_group().size() == 0) {
       return Status(
@@ -803,335 +1142,6 @@ ValidateModelConfig(
 
   return Status::Success;
 }
-
-namespace {
-
-struct EnsembleTensor {
-  EnsembleTensor(bool isOutput) : ready(false), isOutput(isOutput) {}
-  bool ready;
-  bool isOutput;
-  std::vector<EnsembleTensor*> prev_nodes;
-  std::vector<EnsembleTensor*> next_nodes;
-};
-
-/// Build a graph that represents the data flow in the ensemble specified in
-/// given model config. the node (ensemble tensor) in the graph can be looked
-/// up using its name as key.
-/// \param ensemble_config The model configuration that specifies
-/// ensemble_scheduling field.
-/// \param keyed_ensemble_graph Returned the ensemble graph.
-/// \return The error status. A non-OK status indicates the build fails because
-/// the ensemble configuration is not valid.
-Status
-BuildEnsembleGraph(
-    const ModelConfig& config,
-    std::unordered_map<std::string, EnsembleTensor>& keyed_ensemble_graph)
-{
-  keyed_ensemble_graph.clear();
-  size_t step_idx = 0;
-  for (const auto& element : config.ensemble_scheduling().step()) {
-    if (element.model_name().empty()) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "must specify 'model_name' in step " + std::to_string(step_idx) +
-              " of ensemble '" + config.name() + "'");
-    }
-    if (element.input_map().size() == 0) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "must specify 'input_map' in step " + std::to_string(step_idx) +
-              " of ensemble '" + config.name() + "'");
-    }
-    if (element.output_map().size() == 0) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "must specify 'output_map' in step " + std::to_string(step_idx) +
-              " of ensemble '" + config.name() + "'");
-    }
-
-    // Link ensemble tensors
-    std::vector<EnsembleTensor*> tensor_as_output;
-    for (const auto& output_map : element.output_map()) {
-      auto it = keyed_ensemble_graph.find(output_map.second);
-      if (it != keyed_ensemble_graph.end()) {
-        if (it->second.isOutput) {
-          return Status(
-              Status::Code::INVALID_ARG,
-              "ensemble tensor '" + it->first +
-                  "' can appear in an output map only once for ensemble '" +
-                  config.name() + "' step " + std::to_string(step_idx));
-        } else {
-          it->second.isOutput = true;
-        }
-      } else {
-        it = keyed_ensemble_graph
-                 .emplace(
-                     std::make_pair(output_map.second, EnsembleTensor(true)))
-                 .first;
-      }
-      tensor_as_output.push_back(&(it->second));
-    }
-
-    std::set<std::string> model_inputs;
-    for (const auto& input_map : element.input_map()) {
-      if (model_inputs.find(input_map.first) != model_inputs.end()) {
-        return Status(
-            Status::Code::INVALID_ARG,
-            "input '" + input_map.first + "' in model '" +
-                element.model_name() +
-                "' is mapped to multiple ensemble tensors for ensemble '" +
-                config.name() + "' step " + std::to_string(step_idx));
-      } else {
-        model_inputs.emplace(input_map.first);
-      }
-      auto it = keyed_ensemble_graph.find(input_map.second);
-      if (it == keyed_ensemble_graph.end()) {
-        it = keyed_ensemble_graph
-                 .emplace(
-                     std::make_pair(input_map.second, EnsembleTensor(false)))
-                 .first;
-      }
-      for (auto output : tensor_as_output) {
-        output->prev_nodes.push_back(&(it->second));
-        it->second.next_nodes.push_back(output);
-      }
-    }
-
-    step_idx++;
-  }
-
-  return Status::Success;
-}
-
-}  // namespace
-
-Status
-ValidateEnsembleSchedulingConfig(const ModelConfig& config)
-{
-  if (config.platform() != kEnsemblePlatform) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "ensemble scheduling cannot be set for model '" + config.name() +
-            "' whose platform is not " + kEnsemblePlatform);
-  }
-  if (config.instance_group().size() != 0) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "instance group should not be specified for ensemble '" +
-            config.name() + "'");
-  }
-  if (config.has_optimization()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "optimization should not be specified for ensemble '" + config.name() +
-            "'");
-  }
-  if (config.model_warmup_size() != 0) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "model_warmup can not be specified for ensemble '" + config.name() +
-            "'");
-  }
-
-  // Make sure step is not empty and all fields are set
-  if (config.ensemble_scheduling().step_size() == 0) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "must specify 'step' for ensemble '" + config.name() + "'");
-  }
-
-  std::unordered_map<std::string, EnsembleTensor> tensors;
-
-  RETURN_IF_ERROR(BuildEnsembleGraph(config, tensors));
-
-  // check data flow
-  std::deque<EnsembleTensor*> ready_queue;
-  for (const auto& input : config.input()) {
-    auto it = tensors.find(input.name());
-    if (it == tensors.end()) {
-      return Status(
-          Status::Code::INVALID_ARG, "ensemble input '" + input.name() +
-                                         "' for ensemble " + config.name() +
-                                         "' is not used");
-    }
-    it->second.ready = true;
-    ready_queue.push_back(&(it->second));
-  }
-  while (!ready_queue.empty()) {
-    auto& ready_node = ready_queue.front();
-    for (auto& next_node : ready_node->next_nodes) {
-      if (next_node->ready) {
-        continue;
-      }
-      bool next_node_ready = true;
-      for (auto& prev_node : next_node->prev_nodes) {
-        if (!prev_node->ready) {
-          next_node_ready = false;
-          break;
-        }
-      }
-      next_node->ready = next_node_ready;
-      if (next_node_ready) {
-        ready_queue.push_back(next_node);
-      }
-    }
-    ready_queue.pop_front();
-  }
-  std::set<std::string> outputs;
-  for (const auto& output : config.output()) {
-    auto it = tensors.find(output.name());
-    if (it == tensors.end()) {
-      return Status(
-          Status::Code::INVALID_ARG, "ensemble output '" + output.name() +
-                                         "' for ensemble " + config.name() +
-                                         "' is not used");
-    }
-    if (!it->second.ready) {
-      return Status(
-          Status::Code::INVALID_ARG, "output '" + output.name() +
-                                         "' for ensemble '" + config.name() +
-                                         "' is not written");
-    } else {
-      outputs.insert(it->first);
-    }
-  }
-  // Check redundant ensemble tensors
-  for (const auto& tensor : tensors) {
-    // skip ensemble outputs as they have been checked and can have no
-    // next nodes
-    if (outputs.find(tensor.first) != outputs.end()) {
-      continue;
-    }
-    if (!tensor.second.ready || (tensor.second.next_nodes.size() == 0)) {
-      return Status(
-          Status::Code::INVALID_ARG, "ensemble tensor '" + tensor.first +
-                                         "' is unused in ensemble '" +
-                                         config.name() + "'");
-    }
-  }
-  return Status::Success;
-}
-
-namespace {
-
-template <class ModelIO>
-Status
-ValidateIOShape(
-    const ModelIO& io, int32_t max_batch_size,
-    const std::string& message_prefix = "")
-{
-  if (io.name().empty()) {
-    return Status(
-        Status::Code::INVALID_ARG, message_prefix + "must specify 'name'");
-  }
-
-  if (io.data_type() == DataType::TYPE_INVALID) {
-    return Status(
-        Status::Code::INVALID_ARG, "model output must specify 'data_type'");
-  }
-
-  if (io.dims_size() == 0) {
-    return Status(
-        Status::Code::INVALID_ARG, message_prefix + "must specify 'dims'");
-  }
-
-  // If the configuration is non-batching, then no input or output
-  // reshape can be empty as that would mean that input or output was
-  // always empty (no data).
-  if (io.has_reshape() && (io.reshape().shape_size() == 0) &&
-      (max_batch_size == 0)) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        message_prefix + "cannot have empty reshape for non-batching model");
-  }
-
-  for (auto dim : io.dims()) {
-    // Dimension cannot be 0.
-    if ((dim < 1) && (dim != WILDCARD_DIM)) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          message_prefix + "dimension must be integer >= 1, or " +
-              std::to_string(WILDCARD_DIM) +
-              " to indicate a variable-size dimension");
-    }
-  }
-
-  if (io.has_reshape()) {
-    // Zeros are not allowed in reshape.
-    for (auto dim : io.reshape().shape()) {
-      if ((dim < 1) && (dim != WILDCARD_DIM)) {
-        return Status(
-            Status::Code::INVALID_ARG,
-            message_prefix + "reshape dimensions must be integer >= 1, or " +
-                std::to_string(WILDCARD_DIM) +
-                " to indicate a variable-size dimension");
-      }
-    }
-
-    const int64_t dims_size = GetElementCount(io.dims());
-    const int64_t reshape_size = GetElementCount(io.reshape().shape());
-
-    // dims and reshape must both have same element count
-    // or both have variable-size dimension.
-    // Special case for empty reshape... expect dims to have element
-    // count of 1.
-    if ((dims_size != reshape_size) &&
-        ((reshape_size != 0) || (dims_size != 1))) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          message_prefix + "has different size for dims and reshape");
-    }
-
-    // shape contains variable-size dimension, in this case we compare if
-    // each pair of the trunks separated by variable-size dimension has
-    // the same element count. For instance, from [2, 4, -1, 6] to [8, -1, 1, 6]
-    // is valid reshape as 2 * 4 = 8 and 6 = 1 * 6.
-    if (dims_size == -1) {
-      std::vector<int64_t> dim_element_cnts;
-      std::vector<int64_t> reshape_element_cnts;
-      int64_t current_cnt = 1;
-      for (const auto& dim : io.dims()) {
-        if (dim != -1) {
-          current_cnt *= dim;
-        } else {
-          dim_element_cnts.push_back(current_cnt);
-          current_cnt = 1;
-        }
-      }
-      dim_element_cnts.push_back(current_cnt);
-
-      current_cnt = 1;
-      for (const auto& dim : io.reshape().shape()) {
-        if (dim != -1) {
-          current_cnt *= dim;
-        } else {
-          reshape_element_cnts.push_back(current_cnt);
-          current_cnt = 1;
-        }
-      }
-      reshape_element_cnts.push_back(current_cnt);
-
-      if (dim_element_cnts.size() != reshape_element_cnts.size()) {
-        return Status(
-            Status::Code::INVALID_ARG,
-            message_prefix +
-                "has different number of variable-size dimensions for dims "
-                "and reshape");
-      }
-      for (size_t idx = 0; idx < dim_element_cnts.size(); idx++) {
-        if (dim_element_cnts[idx] != reshape_element_cnts[idx]) {
-          return Status(
-              Status::Code::INVALID_ARG,
-              message_prefix + "has different size for dims and reshape");
-        }
-      }
-    }
-  }
-
-  return Status::Success;
-}
-
-}  // namespace
 
 Status
 ValidateModelInput(

@@ -24,6 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#ifdef TRTIS_ENABLE_ENSEMBLE
+
 #include "src/core/ensemble_utils.h"
 
 #include <set>
@@ -346,3 +348,5 @@ ValidateEnsembleConfig(
 }
 
 }}  // namespace nvidia::inferenceserver
+
+#endif  // TRTIS_ENABLE_ENSEMBLE
