@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020 NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -56,6 +56,38 @@ GetChannel(const std::string& url)
         url, grpc::InsecureChannelCredentials(), arguments);
     grpc_channel_map_.insert(std::make_pair(url, channel));
     return channel;
+  }
+}
+
+void
+InitModelInferRequest(ModelInferRequest* request, const InferOptions& options)
+{
+  // Populate the request protobuf
+  request->set_model_name(options.model_name_);
+  if (!options.model_version_.empty()) {
+    request->set_model_version(options.model_version_);
+  }
+  if (!options.request_id_.empty()) {
+    request->set_id(options.request_id_);
+  }
+
+  if (options.sequence_id_ != 0) {
+    (*request->mutable_parameters())["sequence_id"].set_int64_param(
+        options.sequence_id_);
+    (*request->mutable_parameters())["sequence_start"].set_bool_param(
+        options.sequence_start_);
+    (*request->mutable_parameters())["sequence_end"].set_bool_param(
+        options.sequence_end_);
+  }
+
+  if (options.priority_ != 0) {
+    (*request->mutable_parameters())["priority"].set_int64_param(
+        options.priority_);
+  }
+
+  if (options.timeout_ != 0) {
+    (*request->mutable_parameters())["timeout"].set_int64_param(
+        options.timeout_);
   }
 }
 
@@ -249,10 +281,53 @@ InferenceServerGrpcClient::GetModelConfig(
   return err;
 }
 
+Error
+InferenceServerGrpcClient::Infer(
+    std::shared_ptr<InferResultGrpc>* result, const InferOptions& options,
+    std::vector<std::shared_ptr<InferInputGrpc>> inputs,
+    std::vector<std::shared_ptr<InferOutputGrpc>> outputs,
+    const Headers& headers)
+{
+  Error err;
+
+  ModelInferRequest request;
+  std::shared_ptr<ModelInferResponse> response_ptr(new ModelInferResponse());
+
+  InitModelInferRequest(&request, options);
+  for (auto& input : inputs) {
+    request.mutable_inputs()->Add(input->GetTensor());
+  }
+  for (auto& output : outputs) {
+    request.mutable_outputs()->Add(output->GetTensor());
+  }
+
+  grpc::ClientContext context;
+  for (const auto& it : headers) {
+    context.AddMetadata(it.first, it.second);
+  }
+
+  grpc::Status grpc_status =
+      stub_->ModelInfer(&context, request, response_ptr.get());
+
+  if (grpc_status.ok()) {
+    if (verbose_) {
+      std::cout << response_ptr->DebugString() << std::endl;
+    }
+  } else {
+    err = Error(grpc_status.error_message());
+  }
+
+  InferResultGrpc::Create(result, response_ptr);
+
+  return err;
+}
+
 InferenceServerGrpcClient::InferenceServerGrpcClient(
     const std::string& url, bool verbose)
     : stub_(GRPCInferenceService::NewStub(GetChannel(url))), verbose_(verbose)
 {
 }
+
+//==============================================================================
 
 }}}  // namespace nvidia::inferenceserver::client

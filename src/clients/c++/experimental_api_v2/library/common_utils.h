@@ -72,4 +72,52 @@ class DECLSPEC Error {
   std::string msg_;
 };
 
+//==============================================================================
+/// Structure to hold options for Inference Request.
+///
+struct InferOptions {
+  explicit InferOptions(const std::string& model_name)
+      : model_name_(model_name), model_version_(""), request_id_(""),
+        sequence_id_(0), sequence_start_(false), sequence_end_(false),
+        priority_(0), timeout_(0)
+  {
+  }
+  /// The name of the model to run inference.
+  std::string model_name_;
+  /// The version of the model to use while running inference. The default
+  /// value is an empty string which means the server will select the
+  /// version of the model based on its internal policy.
+  std::string model_version_;
+  /// An identifier for the request. If specified will be returned
+  /// in the response. Default value is an empty string which means no
+  /// request_id will be used.
+  std::string request_id_;
+  /// The unique identifier for the sequence being represented by the
+  /// object. Default value is 0 which means that the request does not
+  /// belong to a sequence.
+  uint64_t sequence_id_;
+  /// Indicates whether the request being added marks the start of the
+  /// sequence. Default value is False. This argument is ignored if
+  /// 'sequence_id' is 0.
+  bool sequence_start_;
+  /// Indicates whether the request being added marks the end of the
+  /// sequence. Default value is False. This argument is ignored if
+  /// 'sequence_id' is 0.
+  bool sequence_end_;
+  /// Indicates the priority of the request. Priority value zero
+  /// indicates that the default priority level should be used
+  /// (i.e. same behavior as not specifying the priority parameter).
+  /// Lower value priorities indicate higher priority levels. Thus
+  /// the highest priority level is indicated by setting the parameter
+  /// to 1, the next highest is 2, etc. If not provided, the server
+  /// will handle the request using default setting for the model.
+  uint64_t priority_;
+  /// The timeout value for the request, in microseconds. If the request
+  /// cannot be completed within the time the server can take a
+  /// model-specific action such as terminating the request. If not
+  /// provided, the server will handle the request using default setting
+  /// for the model.
+  uint64_t timeout_;
+};
+
 }}}  // namespace nvidia::inferenceserver::client

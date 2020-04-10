@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020 NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,7 +27,8 @@
 
 /// \file
 
-#include "src/clients/c++/experimental_api_v2/library/utils.h"
+#include "src/clients/c++/experimental_api_v2/library/common_utils.h"
+#include "src/clients/c++/experimental_api_v2/library/grpc_utils.h"
 #include "src/core/constants.h"
 #include "src/core/grpc_service_v2.grpc.pb.h"
 #include "src/core/model_config.pb.h"
@@ -131,6 +132,25 @@ class InferenceServerGrpcClient {
       const std::string& model_version = "",
       const Headers& headers = Headers());
 
+  /// Run synchronous inference on server.
+  /// \param result Returns the result of inference.
+  /// \param options The options for inference request.
+  /// \param inputs The vector of InferInputGrpc describing the model inputs.
+  /// \param outputs Optional vector of InferOutputGrpc describing how the
+  /// output must be returned. If not provided then all the outputs in the model
+  /// config will be returned as default settings.
+  /// \param headers Optional map
+  /// specifying additional HTTP headers to include in the metadata of gRPC
+  /// request.
+  /// \return Error object indicating success or failure of the
+  /// request.
+  Error Infer(
+      std::shared_ptr<InferResultGrpc>* result, const InferOptions& options,
+      std::vector<std::shared_ptr<InferInputGrpc>> inputs,
+      std::vector<std::shared_ptr<InferOutputGrpc>> outputs =
+          std::vector<std::shared_ptr<InferOutputGrpc>>(),
+      const Headers& headers = Headers());
+
  private:
   InferenceServerGrpcClient(const std::string& url, bool verbose);
   // GRPC end point.
@@ -139,6 +159,5 @@ class InferenceServerGrpcClient {
   // Enable verbose output
   const bool verbose_;
 };
-
 
 }}}  // namespace nvidia::inferenceserver::client

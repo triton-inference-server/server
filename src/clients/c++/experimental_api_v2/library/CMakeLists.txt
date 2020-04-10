@@ -37,12 +37,12 @@ if(${TRTIS_ENABLE_GRPC_V2})
   # libgrpcclient object build
   set(
     REQUEST_SRCS
-    grpc_client.cc utils.cc
+    grpc_client.cc common_utils.cc grpc_utils.cc
   )
 
   set(
     REQUEST_HDRS
-    grpc_client.h utils.h
+    grpc_client.h common_utils.h grpc_utils.h base_utils.h
   )
 
   add_library(
