@@ -205,7 +205,6 @@ InferResultGrpc::GetDatatype(
 {
   auto it = output_name_to_result_map_.find(output_name);
   if (it != output_name_to_result_map_.end()) {
-    std::cout << it->second->datatype() << std::endl;
     *datatype = it->second->datatype();
   } else {
     return Error(
