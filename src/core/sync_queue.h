@@ -38,7 +38,7 @@ namespace nvidia { namespace inferenceserver {
 template <typename Item>
 class SyncQueue {
  public:
-  SyncQueue(bool busy_wait = true)
+  SyncQueue(bool busy_wait = false)
   {
     if (busy_wait) {
       cv_.reset(new BusyWaitCondVar<std::mutex>());
