@@ -1131,6 +1131,16 @@ class InferInput:
             The name of input
         """
         return self._name
+    
+    def datatype(self):
+        """Get the datatype of input associated with this object.
+
+        Returns
+        -------
+        str
+            The datatype of input
+        """
+        return self._datatype
 
     def shape(self):
         """Get the shape of input associated with this object.
@@ -1141,16 +1151,17 @@ class InferInput:
             The shape of input
         """
         return self._shape
+    
+    def set_shape(self, shape):
+        """Set the shape of input.
 
-    def datatype(self):
-        """Get the datatype of input associated with this object.
-
-        Returns
-        -------
-        str
-            The datatype of input
+        Parameters
+        ----------
+        shape : list
+            The shape of the associated input.
         """
-        return self._datatype
+        self._shape = shape
+
 
     def set_data_from_numpy(self, input_tensor, binary_data=True):
         """Set the tensor data from the specified numpy array for
