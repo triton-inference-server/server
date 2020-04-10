@@ -153,16 +153,14 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   InferenceServerGrpcClient(const std::string& url, bool verbose);
 
   // Initializes the request message for inference request.
-  Error InitModelInferRequest(
+  Error PreRunProcessing(
       const InferOptions& options, const std::vector<InferInput*>& inputs,
       const std::vector<const InferRequestedOutput*>& outputs);
 
   // GRPC end point.
   std::unique_ptr<GRPCInferenceService::Stub> stub_;
-
   // Enable verbose output
   const bool verbose_;
-
   // request for GRPC call, one request object can be used for multiple calls
   // since it can be overwritten as soon as the GRPC send finishes.
   ModelInferRequest infer_request_;
@@ -213,31 +211,9 @@ class InferResultGrpc : public InferResult {
 
  private:
   InferResultGrpc(std::shared_ptr<ModelInferResponse> response);
-
   std::map<std::string, const ModelInferResponse::InferOutputTensor*>
       output_name_to_result_map_;
-
   std::shared_ptr<ModelInferResponse> response_;
-};
-
-
-//==============================================================================
-// An GrpcInferRequest represents an inflght inference request on gRPC.
-//
-class GrpcInferRequest : public InferRequest {
- public:
-  GrpcInferRequest()
-      : grpc_status_(), grpc_response_(std::make_shared<ModelInferResponse>())
-  {
-  }
-
-  friend InferenceServerGrpcClient;
-
- private:
-  // Variables for GRPC call
-  grpc::ClientContext grpc_context_;
-  grpc::Status grpc_status_;
-  std::shared_ptr<ModelInferResponse> grpc_response_;
 };
 
 

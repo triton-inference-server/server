@@ -93,8 +93,6 @@ main(int argc, char** argv)
     }
   }
 
-  nic::Error err;
-
   // We use a simple model that takes 2 input tensors of 16 integers
   // each and returns 2 output tensors of 16 integers each. One output
   // tensor is the element-wise sum of the inputs and one output is
@@ -105,41 +103,28 @@ main(int argc, char** argv)
   // Create a InferenceServerHttpClient instance to communicate with the
   // server using http protocol.
   std::unique_ptr<nic::InferenceServerHttpClient> client;
-  err = nic::InferenceServerHttpClient::Create(&client, url, verbose);
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to create http client: " << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(
+      nic::InferenceServerHttpClient::Create(&client, url, verbose),
+      "unable to create http client");
 
   bool live;
-  err = client->IsServerLive(&live, http_headers);
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to get server liveness: " << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(
+      client->IsServerLive(&live, http_headers),
+      "unable to get server liveness");
   if (!live) {
     std::cerr << "error: server is not live" << std::endl;
     exit(1);
   }
 
   bool ready;
-  err = client->IsServerReady(&ready, http_headers);
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to get server readiness: " << err << std::endl;
-    exit(1);
-  }
-  if (!ready) {
-    std::cerr << "error: server is not live" << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(
+      client->IsServerReady(&ready, http_headers), "server is not live");
 
   bool model_ready;
-  err = client->IsModelReady(
-      &model_ready, model_name, model_version, http_headers);
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to get server readiness: " << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(
+      client->IsModelReady(
+          &model_ready, model_name, model_version, http_headers),
+      "unable to get model readiness");
   if (!model_ready) {
     std::cerr << "error: model " << model_name << " is not live" << std::endl;
     exit(1);
@@ -147,11 +132,9 @@ main(int argc, char** argv)
 
 
   rapidjson::Document server_metadata;
-  err = client->GetServerMetadata(&server_metadata, http_headers);
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to get server metadata: " << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(
+      client->GetServerMetadata(&server_metadata, http_headers),
+      "unable to get server metadata");
   if ((std::string(server_metadata["name"].GetString()))
           .compare("inference:0") != 0) {
     std::cerr << "error: unexpected server metadata: "
@@ -161,12 +144,10 @@ main(int argc, char** argv)
 
 
   rapidjson::Document model_metadata;
-  err = client->GetModelMetadata(
-      &model_metadata, model_name, model_version, http_headers);
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to get model metadata: " << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(
+      client->GetModelMetadata(
+          &model_metadata, model_name, model_version, http_headers),
+      "unable to get model metadata");
   if ((std::string(model_metadata["name"].GetString())).compare(model_name) !=
       0) {
     std::cerr << "error: unexpected model metadata: "
@@ -175,12 +156,10 @@ main(int argc, char** argv)
   }
 
   rapidjson::Document model_config;
-  err = client->GetModelConfig(
-      &model_config, model_name, model_version, http_headers);
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to get model config: " << err << std::endl;
-    exit(1);
-  }
+  FAIL_IF_ERR(
+      client->GetModelConfig(
+          &model_config, model_name, model_version, http_headers),
+      "unable to get model config");
   if ((std::string(model_config["name"].GetString())).compare(model_name) !=
       0) {
     std::cerr << "error: unexpected model config: "
@@ -188,7 +167,7 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  err = client->GetModelMetadata(
+  nic::Error err = client->GetModelMetadata(
       &model_metadata, "wrong_model_name", model_version, http_headers);
   if (err.IsOk()) {
     std::cerr << "error: expected an error but got: " << err << std::endl;

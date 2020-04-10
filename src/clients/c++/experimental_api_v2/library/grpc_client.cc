@@ -58,6 +58,26 @@ GetChannel(const std::string& url)
 }  // namespace
 
 //==============================================================================
+// An GrpcInferRequest represents an inflght inference request on gRPC.
+//
+class GrpcInferRequest : public InferRequest {
+ public:
+  GrpcInferRequest()
+      : grpc_status_(), grpc_response_(std::make_shared<ModelInferResponse>())
+  {
+  }
+
+  friend InferenceServerGrpcClient;
+
+ private:
+  // Variables for GRPC call
+  grpc::ClientContext grpc_context_;
+  grpc::Status grpc_status_;
+  std::shared_ptr<ModelInferResponse> grpc_response_;
+};
+
+
+//==============================================================================
 
 Error
 InferenceServerGrpcClient::Create(
@@ -267,7 +287,7 @@ InferenceServerGrpcClient::Infer(
   }
   // Use send timer to measure time for marshalling infer request
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
-  err = InitModelInferRequest(options, inputs, outputs);
+  err = PreRunProcessing(options, inputs, outputs);
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
   if (!err.IsOk()) {
     return err;
@@ -299,7 +319,7 @@ InferenceServerGrpcClient::Infer(
 }
 
 Error
-InferenceServerGrpcClient::InitModelInferRequest(
+InferenceServerGrpcClient::PreRunProcessing(
     const InferOptions& options, const std::vector<InferInput*>& inputs,
     const std::vector<const InferRequestedOutput*>& outputs)
 {

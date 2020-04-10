@@ -176,7 +176,7 @@ if(${TRTIS_ENABLE_HTTP_V2})
     target_include_directories(http-client-library PUBLIC ${CUDA_INCLUDE_DIRS})
   endif() # TRTIS_ENABLE_GPU
 
-  # libhttpclient.a
+  # libhttpclient_static.a
   add_library(
     httpclient_static STATIC
     $<TARGET_OBJECTS:http-client-library>
