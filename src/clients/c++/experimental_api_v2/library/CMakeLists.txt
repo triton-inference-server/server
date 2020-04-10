@@ -156,12 +156,12 @@ if(${TRTIS_ENABLE_HTTP_V2})
   # libhttpclient object build
   set(
     REQUEST_SRCS
-    http_client.cc utils.cc
+    http_client.cc common_utils.cc
   )
 
   set(
     REQUEST_HDRS
-    http_client.h utils.h
+    http_client.h common_utils.h
   )
 
   add_library(
