@@ -146,7 +146,8 @@ class InferResult {
       const std::string& output_name, std::string* datatype) const = 0;
 
   /// Get access to the buffer holding raw results from the inference
-  /// execution.
+  /// execution. Note the buffer is owned by InferResult instance.
+  /// Users can copy out the data if required to extend the lifetime.
   /// \param output_name The name of the output to get datatype.
   /// \param buf Returns the pointer to the start of the buffer.
   /// \param byte_size Returns the size of buffer in bytes.

@@ -146,8 +146,8 @@ class InferenceServerGrpcClient {
   /// request.
   Error Infer(
       std::shared_ptr<InferResultGrpc>* result, const InferOptions& options,
-      std::vector<std::shared_ptr<InferInputGrpc>> inputs,
-      std::vector<std::shared_ptr<InferOutputGrpc>> outputs =
+      const std::vector<std::shared_ptr<InferInputGrpc>>& inputs,
+      const std::vector<std::shared_ptr<InferOutputGrpc>>& outputs =
           std::vector<std::shared_ptr<InferOutputGrpc>>(),
       const Headers& headers = Headers());
 
