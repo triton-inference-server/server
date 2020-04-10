@@ -27,6 +27,7 @@
 
 #include <condition_variable>
 #include <functional>
+#include <list>
 
 namespace nvidia { namespace inferenceserver {
 
@@ -42,8 +43,15 @@ class CondVar {
   virtual void Wait(
       std::unique_lock<TritonMutex>& lock, std::function<bool()> pred) = 0;
 
+  // Wait until 'rel_time_us' has passed or be notified.
+  virtual void WaitFor(
+      std::unique_lock<TritonMutex>& lock, uint64_t rel_time_us) = 0;
+
   // Notify all waiting threads to re-evaluate their predicates.
   virtual void NotifyAll() = 0;
+
+  // Notify one of the waiting threads to re-evaluate its predicate.
+  virtual void NotifyOne() = 0;
 };
 
 template <class TritonMutex>
@@ -57,7 +65,7 @@ class BusyWaitCondVar : public CondVar<TritonMutex> {
     lock.unlock();
     while (true) {
       while (!pred()) {
-        // busy-loop
+        // busy-loop, which can be considered as always waking up spuriously
       }
       lock.lock();
       // must ensure the predicate still holds after acquiring the lock as
@@ -69,7 +77,41 @@ class BusyWaitCondVar : public CondVar<TritonMutex> {
     }
   }
 
-  void NotifyAll() override { return; }
+  void WaitFor(
+      std::unique_lock<TritonMutex>& lock, uint64_t rel_time_us) override
+  {
+    lock.unlock();
+    bool notified = false;
+    signals_.push_back(&notified);
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    uint64_t now_ns = TIMESPEC_TO_NANOS(now);
+    uint64_t end_time_ns = now_ns + rel_time_us * 1000;
+    while ((now_ns < end_time_ns) && (!notified)) {
+      // busy-loop
+      clock_gettime(CLOCK_MONOTONIC, &now);
+      now_ns = TIMESPEC_TO_NANOS(now);
+    }
+    lock.lock();
+  }
+
+  void NotifyAll() override
+  {
+    while (!signals_.empty()) {
+      *(signals_.front()) = true;
+      signals_.pop_front();
+    }
+  }
+  void NotifyOne() override
+  {
+    if (!signals_.empty()) {
+      *(signals_.front()) = true;
+      signals_.pop_front();
+    }
+  }
+
+ private:
+  std::list<bool*> signals_;
 };
 
 template <class TritonMutex>
@@ -83,7 +125,15 @@ class StdCondVar : public CondVar<TritonMutex> {
     cv_.wait(lock, pred);
   }
 
+  void WaitFor(
+      std::unique_lock<TritonMutex>& lock, uint64_t rel_time_us) override
+  {
+    cv_.wait_for(lock, std::chrono::microseconds(rel_time_us));
+  }
+
   void NotifyAll() override { cv_.notify_all(); }
+
+  void NotifyOne() override { cv_.notify_one(); }
 
  private:
   std::condition_variable cv_;
