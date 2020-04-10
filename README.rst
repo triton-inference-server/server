@@ -262,8 +262,14 @@ and `Support Matrix
 indicate the required versions of the NVIDIA Driver and CUDA, and also
 describe which GPUs are supported by Triton Server.
 
-Other Documentation
-^^^^^^^^^^^^^^^^^^^
+Presentations and Papers
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+* `High-Performance Inferencing at Scale Using the TensorRT Inference Server <https://developer.nvidia.com/gtc/2020/video/s22418>`_.
+
+* `Accelerate and Autoscale Deep Learning Inference on GPUs with KFServing <https://developer.nvidia.com/gtc/2020/video/s22459>`_.
+
+* `Deep into Triton Inference Server: BERT Practical Deployment on NVIDIA GPU <https://developer.nvidia.com/gtc/2020/video/s21736>`_.
 
 * `Maximizing Utilization for Data Center Inference with TensorRT
   Inference Server
