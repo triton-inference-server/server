@@ -58,8 +58,9 @@ def _get_inference_request(model_name, inputs, model_version, request_id,
         request.id = request_id
     for infer_input in inputs:
         request.inputs.extend([infer_input._get_tensor()])
-    for infer_output in outputs:
-        request.outputs.extend([infer_output._get_tensor()])
+    if outputs is not None:
+        for infer_output in outputs:
+            request.outputs.extend([infer_output._get_tensor()])
     if sequence_id != 0:
         request.parameters['sequence_id'].int64_param = sequence_id
         request.parameters['sequence_start'].bool_param = sequence_start

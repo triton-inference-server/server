@@ -491,11 +491,20 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
     priority_ = backend.DefaultPriorityLevel();
   }
 
-  // Validate if the requested output name exists in the model configuration
-  for (const auto& pr : requested_outputs_) {
-    const ModelOutput* output_config;
-    RETURN_IF_ERROR(backend.GetOutput(pr.first, &output_config));
+  // If requested_outputs_ is empty return all outputs specified in model config
+  if (requested_outputs_.size() == 0) {
+    for (const auto& output : model_config.output()) {
+      requested_outputs_.emplace(std::make_pair(
+          output.name(), InferenceRequest::RequestedOutput(output.name(), 0)));
+    }
+  } else {
+    // Validate if the requested output name exists in the model configuration
+    for (const auto& pr : requested_outputs_) {
+      const ModelOutput* output_config;
+      RETURN_IF_ERROR(backend.GetOutput(pr.first, &output_config));
+    }
   }
+
 
   // Make sure that the request is providing the same number of inputs
   // as is expected by the model.

@@ -667,6 +667,24 @@ TRITONSERVER_InferenceRequestOutputShape(
     TRITONSERVER_InferenceRequest* inference_request, const char* name,
     const int64_t** shape, uint64_t* dim_count);
 
+/// Get the number of output tensors in the result.
+/// \param inference_request The request object.
+/// \param output_count Returns the number of outputs from a inference request.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestOutputCount(
+    TRITONSERVER_InferenceRequest* inference_request, uint64_t* output_count);
+
+/// Get the name of the output tensor at a specific index.
+/// \param inference_request The request object.
+/// \param index The index of the output tensor.
+/// \param name The name of the output at 'index'.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestOutputName(
+    TRITONSERVER_InferenceRequest* inference_request, uint64_t index,
+    const char** name);
+
 /// Get the results data for a named output. The result data is
 /// returned as the base pointer to the data and the size, in bytes,
 /// of the data. The caller does not own the returned data and must

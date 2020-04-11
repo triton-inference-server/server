@@ -1614,6 +1614,31 @@ TRITONSERVER_InferenceRequestAddRequestedOutput(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestOutputCount(
+    TRITONSERVER_InferenceRequest* inference_request, uint64_t* output_count)
+{
+  TritonInferenceRequest* lrequest =
+      reinterpret_cast<TritonInferenceRequest*>(inference_request);
+  auto requested_outputs = lrequest->Request()->RequestedOutputs();
+  *output_count = requested_outputs.size();
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestOutputName(
+    TRITONSERVER_InferenceRequest* inference_request, uint64_t index,
+    const char** name)
+{
+  TritonInferenceRequest* lrequest =
+      reinterpret_cast<TritonInferenceRequest*>(inference_request);
+  auto iter = lrequest->Request()->RequestedOutputs().begin();
+  std::advance(iter, index);
+  *name = iter->first.c_str();
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestRemoveRequestedOutput(
     TRITONSERVER_InferenceRequest* inference_request, const char* name)
 {
