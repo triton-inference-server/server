@@ -315,14 +315,7 @@ TEST_F(AllocatedMemoryTest, AllocFallback)
       << ", got: " << actual_type;
 
   // Sanity check on the pointer property
-  cudaPointerAttributes attr;
-  EXPECT_EQ(cudaPointerGetAttributes(&attr, ptr), cudaErrorInvalidValue)
-      << "Expect cudaErrorInvalidValue is returned for non-pinned memory";
-
-  // Note: After CUDA 11.0, we can verify non-pinned memory with the macro,
-  // but before that, only check cudaErrorInvalidValue is returned.
-  //
-  // CHECK_POINTER_ATTRIBUTES(ptr, cudaMemoryTypeUnregistered, expect_id);
+  CHECK_POINTER_ATTRIBUTES(ptr, cudaMemoryTypeUnregistered, expect_id);
 }
 
 TEST_F(AllocatedMemoryTest, AllocFallbackNoCuda)
