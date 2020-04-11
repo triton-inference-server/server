@@ -197,7 +197,6 @@ set(
   autofill.h
   backend.h
   backend_context.h
-  cond_var.h
   constants.h
   cuda_utils.h
   dynamic_batch_scheduler.h
