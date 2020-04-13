@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -50,7 +50,9 @@
 #ifdef TRTIS_ENABLE_CUSTOM
 #include "src/backends/custom/custom_backend_factory.h"
 #endif  // TRTIS_ENABLE_CUSTOM
+#ifdef TRTIS_ENABLE_ENSEMBLE
 #include "src/backends/ensemble/ensemble_backend_factory.h"
+#endif  // TRTIS_ENABLE_ENSEMBLE
 #ifdef TRTIS_ENABLE_ONNXRUNTIME
 #include "src/backends/onnx/onnx_backend_factory.h"
 #endif  // TRTIS_ENABLE_ONNXRUNTIME
@@ -168,11 +170,14 @@ BuildBackendConfigMap(
   }
 #endif  // TRTIS_ENABLE_CUSTOM
 
+#ifdef TRTIS_ENABLE_ENSEMBLE
   //// Ensemble
   {
     auto ensemble_config = std::make_shared<EnsembleBackendFactory::Config>();
     (*backend_configs)[kEnsemblePlatform] = ensemble_config;
   }
+#endif  // TRTIS_ENABLE_ENSEMBLE
+  ;     // Need this semicolon to keep code formatter from freaking out
 }
 
 int64_t
@@ -386,7 +391,9 @@ class ModelRepositoryManager::BackendLifeCycle {
 #ifdef TRTIS_ENABLE_PYTORCH
   std::unique_ptr<LibTorchBackendFactory> libtorch_factory_;
 #endif  // TRTIS_ENABLE_PYTORCH
+#ifdef TRTIS_ENABLE_ENSEMBLE
   std::unique_ptr<EnsembleBackendFactory> ensemble_factory_;
+#endif  // TRTIS_ENABLE_ENSEMBLE
 };
 
 Status
@@ -453,12 +460,14 @@ ModelRepositoryManager::BackendLifeCycle::Create(
         config, &(local_life_cycle->custom_factory_)));
   }
 #endif  // TRTIS_ENABLE_CUSTOM
+#ifdef TRTIS_ENABLE_ENSEMBLE
   {
     const std::shared_ptr<BackendConfig>& config =
         backend_map.find(kEnsemblePlatform)->second;
     RETURN_IF_ERROR(EnsembleBackendFactory::Create(
         server, config, &(local_life_cycle->ensemble_factory_)));
   }
+#endif  // TRTIS_ENABLE_ENSEMBLE
 
   *life_cycle = std::move(local_life_cycle);
   return Status::Success;
@@ -824,10 +833,12 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
           min_compute_capability_, &is);
       break;
 #endif  // TRTIS_ENABLE_CUSTOM
+#ifdef TRTIS_ENABLE_ENSEMBLE
     case Platform::PLATFORM_ENSEMBLE:
       status = ensemble_factory_->CreateBackend(
           version_path, model_config, min_compute_capability_, &is);
       break;
+#endif  // TRTIS_ENABLE_ENSEMBLE
     default:
       break;
   }
@@ -1289,8 +1300,9 @@ ModelRepositoryManager::LoadUnloadModels(
             &polled));
         *all_models_polled &= polled;
 
-        // More models should be polled is the polled models are ensembles
+        // More models should be polled if the polled models are ensembles
         std::set<std::string> next_models;
+#ifdef TRTIS_ENABLE_ENSEMBLE
         for (const auto& model : models) {
           auto it = new_infos.find(model);
           // Some models may be marked as deleted and not in 'new_infos'
@@ -1307,6 +1319,8 @@ ModelRepositoryManager::LoadUnloadModels(
             }
           }
         }
+#endif  // TRTIS_ENABLE_ENSEMBLE
+
         models.swap(next_models);
       }
 
