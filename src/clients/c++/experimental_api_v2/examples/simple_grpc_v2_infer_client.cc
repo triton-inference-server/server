@@ -28,7 +28,6 @@
 #include <iostream>
 #include <string>
 #include "src/clients/c++/experimental_api_v2/library/grpc_client.h"
-#include "src/clients/c++/experimental_api_v2/library/grpc_utils.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
@@ -45,11 +44,11 @@ namespace nic = nvidia::inferenceserver::client;
 namespace {
 
 void
-ValidateShapeAndDatatype(const std::string& name, nic::InferResultGrpc* result)
+ValidateShapeAndDatatype(const std::string& name, nic::InferResult* result)
 {
   std::vector<int64_t> shape;
   FAIL_IF_ERR(
-      result->GetShape(name, &shape), "unable to get shape for " + name);
+      result->Shape(name, &shape), "unable to get shape for " + name);
   // Validate shape
   if ((shape.size() != 2) || (shape[0] != 1) || (shape[1] != 16)) {
     std::cerr << "error: received incorrect shapes for " << name << std::endl;
@@ -57,7 +56,7 @@ ValidateShapeAndDatatype(const std::string& name, nic::InferResultGrpc* result)
   }
   std::string datatype;
   FAIL_IF_ERR(
-      result->GetDatatype(name, &datatype),
+      result->Datatype(name, &datatype),
       "unable to get datatype for " + name);
   // Validate datatype
   if (datatype.compare("INT32") != 0) {
@@ -143,14 +142,14 @@ main(int argc, char** argv)
   std::vector<int64_t> shape{1, 16};
 
   // Initialize the inputs with the data.
-  nic::InferInputGrpc* input0;
-  nic::InferInputGrpc* input1;
+  nic::InferInput* input0;
+  nic::InferInput* input1;
 
   FAIL_IF_ERR(
-      nic::InferInputGrpc::Create(&input0, "INPUT0", shape, "INT32"),
+      nic::InferInput::Create(&input0, "INPUT0", shape, "INT32"),
       "unable to get INPUT0");
   FAIL_IF_ERR(
-      nic::InferInputGrpc::Create(&input1, "INPUT1", shape, "INT32"),
+      nic::InferInput::Create(&input1, "INPUT1", shape, "INT32"),
       "unable to get INPUT1");
 
   FAIL_IF_ERR(
@@ -165,23 +164,23 @@ main(int argc, char** argv)
       "unable to set data for INPUT1");
 
   // Generate the outputs to be requested.
-  nic::InferOutputGrpc* output0;
-  nic::InferOutputGrpc* output1;
+  nic::InferRequestedOutput* output0;
+  nic::InferRequestedOutput* output1;
 
   FAIL_IF_ERR(
-      nic::InferOutputGrpc::Create(&output0, "OUTPUT0"),
+      nic::InferRequestedOutput::Create(&output0, "OUTPUT0"),
       "unable to get OUTPUT0");
   FAIL_IF_ERR(
-      nic::InferOutputGrpc::Create(&output1, "OUTPUT1"),
+      nic::InferRequestedOutput::Create(&output1, "OUTPUT1"),
       "unable to get OUTPUT1");
 
 
   // The inference settings. Will be using default for now.
   nic::InferOptions options(model_name);
   options.model_version_ = model_version;
-  nic::InferResultGrpc* results;
-  std::vector<const nic::InferInputGrpc*> inputs = {input0, input1};
-  std::vector<const nic::InferOutputGrpc*> outputs = {output0, output1};
+  nic::InferResult* results;
+  std::vector<nic::InferInput*> inputs = {input0, input1};
+  std::vector<const nic::InferRequestedOutput*> outputs = {output0, output1};
   FAIL_IF_ERR(
       client->Infer(&results, options, inputs, outputs, http_headers),
       "unable to run model");
@@ -194,7 +193,7 @@ main(int argc, char** argv)
   int32_t* output0_data;
   size_t output0_byte_size;
   FAIL_IF_ERR(
-      results->GetRaw(
+      results->RawData(
           "OUTPUT0", (const uint8_t**)&output0_data, &output0_byte_size),
       "unable to get datatype for OUTPUT0");
   if (output0_byte_size != 64) {
@@ -206,7 +205,7 @@ main(int argc, char** argv)
   int32_t* output1_data;
   size_t output1_byte_size;
   FAIL_IF_ERR(
-      results->GetRaw(
+      results->RawData(
           "OUTPUT1", (const uint8_t**)&output1_data, &output1_byte_size),
       "unable to get datatype for OUTPUT1");
   if (output0_byte_size != 64) {
@@ -232,8 +231,7 @@ main(int argc, char** argv)
   }
 
   // Get full response
-  auto response = results->GetResponse();
-  std::cout << response->DebugString();
+  std::cout << results->DebugString() << std::endl;
 
   std::cout << "PASS : Infer" << std::endl;
 

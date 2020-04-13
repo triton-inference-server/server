@@ -37,8 +37,13 @@
 #define DECLSPEC
 #endif
 
+#include "src/core/constants.h"
 
+#include <chrono>
+#include <cstring>
 #include <iostream>
+#include <list>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -71,6 +76,91 @@ class DECLSPEC Error {
  private:
   friend std::ostream& operator<<(std::ostream&, const Error&);
   std::string msg_;
+};
+
+//==============================================================================
+/// Records timestamps for different stages of request handling.
+///
+class RequestTimers {
+ public:
+  /// Timestamp kinds.
+  enum class Kind {
+    /// The start of request handling.
+    REQUEST_START,
+
+    /// The end of request handling.
+    REQUEST_END,
+
+    /// The start of sending request bytes to the server (i.e. first
+    /// byte).
+    SEND_START,
+
+    /// The end of sending request bytes to the server (i.e. last
+    /// byte).
+    SEND_END,
+
+    /// The start of receiving response bytes from the server
+    /// (i.e. first byte).
+    RECV_START,
+
+    /// The end of receiving response bytes from the server (i.e. last
+    /// byte).
+    RECV_END,
+
+    COUNT__
+  };
+
+  /// Construct a timer with zero-ed timestamps.
+  RequestTimers() : timestamps_((size_t)Kind::COUNT__) { Reset(); }
+
+  /// Reset all timestamp values to zero. Must be called before
+  /// re-using the timer.
+  void Reset()
+  {
+    memset(&timestamps_[0], 0, sizeof(uint64_t) * timestamps_.size());
+  }
+
+  /// Get the timestamp, in nanoseconds, for a kind.
+  /// \param kind The timestamp kind.
+  /// \return The timestamp in nanoseconds.
+  uint64_t Timestamp(Kind kind) const { return timestamps_[(size_t)kind]; }
+
+  /// Set a timestamp to the current time, in nanoseconds.
+  /// \param kind The timestamp kind.
+  /// \return The timestamp in nanoseconds.
+  uint64_t CaptureTimestamp(Kind kind)
+  {
+    uint64_t& ts = timestamps_[(size_t)kind];
+    ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
+             std::chrono::high_resolution_clock::now().time_since_epoch())
+             .count();
+    return ts;
+  }
+
+  /// Return the duration between start time point and end timepoint
+  /// in nanosecond.
+  /// \param start The start time point.
+  /// \param end The end time point.
+  /// \return Duration in nanosecond, or
+  /// std::numeric_limits<uint64_t>::max to indicate that duration
+  /// could not be calculated.
+  uint64_t Duration(Kind start, Kind end) const
+  {
+    const uint64_t stime = timestamps_[(size_t)start];
+    const uint64_t etime = timestamps_[(size_t)end];
+
+    // If the start or end timestamp is 0 then can't calculate the
+    // duration, so return max to indicate error.
+    if ((stime == 0) || (etime == 0)) {
+      return (std::numeric_limits<uint64_t>::max)();
+    }
+
+    return (stime > etime) ? (std::numeric_limits<uint64_t>::max)()
+                           : etime - stime;
+  }
+
+ private:
+  std::vector<uint64_t> timestamps_;
 };
 
 //==============================================================================
@@ -127,77 +217,93 @@ struct InferOptions {
 ///
 class InferInput {
  public:
-  /// Get the name of input associated with this object
-  /// \param name Returns the name of input.
-  /// \return Error object indicating success or failure of the
-  /// request.
-  virtual Error GetName(std::string* name) const = 0;
+  /// Create a InferInput instance that describes a model input.
+  /// \param infer_input Returns a new InferInput object.
+  /// \param name The name of input whose data will be described by this object.
+  /// \param dims The shape of the input.
+  /// \param datatype The datatype of the input.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      InferInput** infer_input, const std::string& name,
+      const std::vector<int64_t>& dims, const std::string& datatype);
 
-  /// Get the datatype of input associated with this object
-  /// \param datatype Returns the datatype of input.
-  /// \return Error object indicating success or failure of the
-  /// request.
-  virtual Error GetDatatype(std::string* datatype) const = 0;
+  const std::string& Name() const { return name_; }
+  int64_t ByteSize() const { return byte_size_; }
+  size_t TotalSendByteSize() const { return total_send_byte_size_; }
+  const std::string& Datatype() const { return datatype_; }
+  const std::vector<int64_t>& Shape() const { return shape_; }
+  bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
 
-  /// Get the shape of input associated with this object.
-  /// \param dims Returns the vector of dims representing the
-  /// shape of input.
-  /// \return Error object indicating success or failure of the
-  /// request.
-  virtual Error GetShape(std::vector<int64_t>* dims) const = 0;
+  Error SetShape(const std::vector<int64_t>& dims);
 
-  /// Set the shape of input associated with this object.
-  /// \param dims the vector of dims representing the new shape
-  /// of input.
-  /// \return Error object indicating success or failure of the
-  /// request.
-  virtual Error SetShape(const std::vector<int64_t>& dims) = 0;
+  Error Reset();
+  Error SetRaw(const std::vector<uint8_t>& input);
+  Error SetRaw(const uint8_t* input, size_t input_byte_size);
+  Error SetSharedMemory(
+      const std::string& name, size_t byte_size, size_t offset = 0);
+  Error SetFromString(const std::vector<std::string>& input);
 
-  /// Set the tensor data from the specified buffer described as
-  /// starting address and buffer size.
-  /// \param input The base pointer of buffer holding the input data.
-  /// \param input_byte_size The size of buffer in bytes.
-  /// \return Error object indicating success or failure of the
-  /// request.
-  virtual Error SetRaw(const uint8_t* input, size_t input_byte_size) = 0;
+  // Copy the shared memory key, offset and batch_byte_size
+  Error SharedMemoryInfo(
+      std::string* name, size_t* batch_byte_size, size_t* offset) const;
 
-  /// Set the tensor data from the specified buffer represented
-  /// as vector.
-  /// \param input The vector holding input data.
-  /// \return Error object indicating success or failure of the
-  /// request.
-  virtual Error SetRaw(const std::vector<uint8_t>& input) = 0;
+  Error PrepareForRequest();
 
-  /// Set the tensor data from the specified vector of strings, where
-  /// each string represents an lement of the "BYTES" tensor ordered
-  /// in row-major format.
-  /// \param input The vector holding strings.
-  /// \return Error object indicating success or failure of the
-  /// request.
-  virtual Error SetFromString(const std::vector<std::string>& input) = 0;
+  // Copy into 'buf' up to 'size' bytes of this input's data. Return
+  // the actual amount copied in 'input_bytes' and if the end of input
+  // is reached in 'end_of_input'
+  Error GetNext(
+      uint8_t* buf, size_t size, size_t* input_bytes, bool* end_of_input);
 
-  /// Set the tensor data to be read from a registered shared memory region.
-  /// \param region_name The name of the shared memory region.
-  /// \param byte_size The size of data in bytes.
-  /// \param offset The offset in shared memory region. Default value is 0.
-  /// \return Error object indicating success or failure of the
-  /// request.
-  virtual Error SetSharedMemory(
-      const std::string& region_name, const size_t byte_size,
-      const size_t offset = 0) = 0;
+  Error GetNext(const uint8_t** buf, size_t* input_bytes, bool* end_of_input);
+
+ private:
+  InferInput(
+      const std::string& name, const std::vector<int64_t>& dims,
+      const std::string& datatype);
+
+  std::string name_;
+  std::vector<int64_t> shape_;
+  std::string datatype_;
+  size_t byte_size_;
+  size_t total_send_byte_size_;
+
+  size_t bufs_idx_, buf_pos_;
+  std::vector<const uint8_t*> bufs_;
+  std::vector<size_t> buf_byte_sizes_;
+
+  // Used only for STRING type tensors set with SetFromString(). Hold
+  // the "raw" serialization of the string values for each index
+  // that are then referenced by 'bufs_'. A std::list is used to avoid
+  // reallocs that could invalidate the pointer references into the
+  // std::string objects.
+  std::list<std::string> str_bufs_;
+
+  // Used only if working with Shared Memory
+  enum IOType { NONE, RAW, SHARED_MEMORY };
+  IOType io_type_;
+  std::string shm_name_;
+  size_t shm_offset_;
 };
 
 //==============================================================================
-/// An interface for InferOutput object to describe the requested model
+/// An InferRequestedOutput object is used to describe the requested model
 /// output for inference.
 ///
-class InferOutput {
+class InferRequestedOutput {
  public:
+  static Error Create(
+      InferRequestedOutput** infer_output, const std::string& name,
+      const size_t class_count = 0);
+
   /// Get the name of output associated with this object
   /// \param name Returns the name of output.
   /// \return Error object indicating success or failure of the
   /// request.
-  virtual Error GetName(std::string* name) const = 0;
+  const std::string& Name() const { return name_; }
+  size_t ClassCount() const { return class_count_; }
+  bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
+
 
   /// Set the output tensor data to be written to specified shared
   /// memory region.
@@ -206,45 +312,49 @@ class InferOutput {
   /// \param offset The offset in shared memory region. Default value is 0.
   /// \return Error object indicating success or failure of the
   /// request.
-  virtual Error SetSharedMemory(
+  Error SetSharedMemory(
       const std::string& region_name, const size_t byte_size,
-      const size_t offset = 0) = 0;
+      const size_t offset = 0);
+
+  // Copy the shared memory key, offset and batch_byte_size
+  Error SharedMemoryInfo(
+      std::string* name, size_t* batch_byte_size, size_t* offset) const;
+
+ private:
+  explicit InferRequestedOutput(
+      const std::string& name, const size_t class_count = 0);
+
+  std::string name_;
+  size_t class_count_;
+
+  // Used only if working with Shared Memory
+  enum IOType { NONE, RAW, SHARED_MEMORY };
+  IOType io_type_;
+  std::string shm_name_;
+  size_t shm_byte_size_;
+  size_t shm_offset_;
 };
 
 //==============================================================================
-/// An interface for InferResult object which allows to access and
-/// interpret the response from inference request.
+/// An interface for InferResult object to interpret the response to an
+/// inference request.
 ///
 class InferResult {
  public:
-  /// Get the shape of output returned in the response.
-  /// \param output_name The name of the output to get shape.
-  /// \param shape Returns the vector of integers representing the
-  /// shape of output.
-  /// \return Error object indicating success or failure of the
-  /// request.
-  virtual Error GetShape(
+  virtual Error ModelName(std::string* name) const = 0;
+  virtual Error ModelVersion(std::string* version) const = 0;
+  virtual Error Id(std::string* id) const = 0;
+  virtual Error Shape(
       const std::string& output_name, std::vector<int64_t>* shape) const = 0;
 
-  /// Get the datatype of output returned in the response.
-  /// \param output_name The name of the output to get datatype.
-  /// \param datatype Returns the datatype string.
-  /// \return Error object indicating success or failure of the
-  /// request.
-  virtual Error GetDatatype(
+  virtual Error Datatype(
       const std::string& output_name, std::string* datatype) const = 0;
 
-  /// Get access to the buffer holding raw results from the inference
-  /// execution. Note the buffer is owned by InferResult instance.
-  /// Users can copy out the data if required to extend the lifetime.
-  /// \param output_name The name of the output to get datatype.
-  /// \param buf Returns the pointer to the start of the buffer.
-  /// \param byte_size Returns the size of buffer in bytes.
-  /// \return Error object indicating success or failure of the
-  /// request.
-  virtual Error GetRaw(
+  virtual Error RawData(
       const std::string& output_name, const uint8_t** buf,
       size_t* byte_size) const = 0;
+
+  virtual std::string DebugString() const = 0;
 };
 
 }}}  // namespace nvidia::inferenceserver::client

@@ -27,7 +27,7 @@
 
 /// \file
 
-#include "src/clients/c++/experimental_api_v2/library/grpc_utils.h"
+#include "src/clients/c++/experimental_api_v2/library/common.h"
 #include "src/core/constants.h"
 #include "src/core/grpc_service_v2.grpc.pb.h"
 #include "src/core/model_config.pb.h"
@@ -134,8 +134,8 @@ class InferenceServerGrpcClient {
   /// Run synchronous inference on server.
   /// \param result Returns the result of inference.
   /// \param options The options for inference request.
-  /// \param inputs The vector of InferInputGrpc describing the model inputs.
-  /// \param outputs Optional vector of InferOutputGrpc describing how the
+  /// \param inputs The vector of InferInput describing the model inputs.
+  /// \param outputs Optional vector of InferRequestedOutput describing how the
   /// output must be returned. If not provided then all the outputs in the model
   /// config will be returned as default settings.
   /// \param headers Optional map
@@ -144,10 +144,10 @@ class InferenceServerGrpcClient {
   /// \return Error object indicating success or failure of the
   /// request.
   Error Infer(
-      InferResultGrpc** result, const InferOptions& options,
-      const std::vector<const InferInputGrpc*>& inputs,
-      const std::vector<const InferOutputGrpc*>& outputs =
-          std::vector<const InferOutputGrpc*>(),
+      InferResult** result, const InferOptions& options,
+      const std::vector<InferInput*>& inputs,
+      const std::vector<const InferRequestedOutput*>& outputs =
+          std::vector<const InferRequestedOutput*>(),
       const Headers& headers = Headers());
 
  private:
@@ -158,5 +158,46 @@ class InferenceServerGrpcClient {
   // Enable verbose output
   const bool verbose_;
 };
+
+//==============================================================================
+/// An InferResultGrpc instance is  used  to access and interpret the
+/// response of an inference request usinf gRPC protocol.
+///
+class InferResultGrpc : public InferResult {
+ public:
+  /// Create a InferResult instance to interpret server response.
+  /// \param infer_result Returns a new InferResult object.
+  /// \param response  The response of server for an inference request.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      InferResult** infer_result, std::shared_ptr<ModelInferResponse> response);
+
+  Error ModelName(std::string* name) const override;
+  Error ModelVersion(std::string* version) const override;
+  Error Id(std::string* id) const override;
+
+  Error Shape(const std::string& output_name, std::vector<int64_t>* shape)
+      const override;
+
+  Error Datatype(
+      const std::string& output_name, std::string* datatype) const override;
+
+  Error RawData(
+      const std::string& output_name, const uint8_t** buf,
+      size_t* byte_size) const override;
+
+  /// Returns the unferlying ModelInferResponse message.
+  /// \return pointer to a ModelInferResponse message.
+  std::string DebugString() const override;
+
+ private:
+  InferResultGrpc(std::shared_ptr<ModelInferResponse> response);
+
+  std::map<std::string, const ModelInferResponse::InferOutputTensor*>
+      output_name_to_result_map_;
+
+  std::shared_ptr<ModelInferResponse> response_;
+};
+
 
 }}}  // namespace nvidia::inferenceserver::client

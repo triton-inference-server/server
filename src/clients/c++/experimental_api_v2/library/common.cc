@@ -45,4 +45,210 @@ operator<<(std::ostream& out, const Error& err)
   return out;
 }
 
+//==============================================================================
+
+Error
+InferInput::Create(
+    InferInput** infer_input, const std::string& name,
+    const std::vector<int64_t>& dims, const std::string& datatype)
+{
+  *infer_input = new InferInput(name, dims, datatype);
+  return Error::Success;
+}
+
+Error
+InferInput::SetShape(const std::vector<int64_t>& shape)
+{
+  shape_ = shape;
+  return Error::Success;
+}
+
+Error
+InferInput::Reset()
+{
+  bufs_.clear();
+  buf_byte_sizes_.clear();
+  str_bufs_.clear();
+  bufs_idx_ = 0;
+  buf_pos_ = 0;
+  byte_size_ = 0;
+  total_send_byte_size_ = 0;
+  io_type_ = NONE;
+  return Error::Success;
+}
+
+Error
+InferInput::SetRaw(const std::vector<uint8_t>& input)
+{
+  return SetRaw(&input[0], input.size());
+}
+
+Error
+InferInput::SetRaw(const uint8_t* input, size_t input_byte_size)
+{
+  byte_size_ += input_byte_size;
+  total_send_byte_size_ += input_byte_size;
+
+  bufs_.push_back(input);
+  buf_byte_sizes_.push_back(input_byte_size);
+  io_type_ = RAW;
+
+  return Error::Success;
+}
+
+Error
+InferInput::SetSharedMemory(
+    const std::string& name, size_t byte_size, size_t offset)
+{
+  shm_name_ = name;
+  shm_offset_ = offset;
+  byte_size_ = byte_size;
+  io_type_ = SHARED_MEMORY;
+
+  return Error::Success;
+}
+
+Error
+InferInput::SetFromString(const std::vector<std::string>& input)
+{
+  // Serialize the strings into a "raw" buffer. The first 4-bytes are
+  // the length of the string length. Next are the actual string
+  // characters. There is *not* a null-terminator on the string.
+  str_bufs_.emplace_back();
+  std::string& sbuf = str_bufs_.back();
+  for (const auto& str : input) {
+    uint32_t len = str.size();
+    sbuf.append(reinterpret_cast<const char*>(&len), sizeof(uint32_t));
+    sbuf.append(str);
+  }
+
+  return SetRaw(reinterpret_cast<const uint8_t*>(&sbuf[0]), sbuf.size());
+}
+
+Error
+InferInput::SharedMemoryInfo(
+    std::string* name, size_t* byte_size, size_t* offset) const
+{
+  if (io_type_ != SHARED_MEMORY) {
+    return Error("The input has not been set with the shared memory.");
+  }
+  *name = shm_name_;
+  *offset = shm_offset_;
+  *byte_size = byte_size_;
+
+  return Error::Success;
+}
+
+Error
+InferInput::PrepareForRequest()
+{
+  // Reset position so request sends entire input.
+  bufs_idx_ = 0;
+  buf_pos_ = 0;
+  return Error::Success;
+}
+
+Error
+InferInput::GetNext(
+    uint8_t* buf, size_t size, size_t* input_bytes, bool* end_of_input)
+{
+  size_t total_size = 0;
+
+  while ((bufs_idx_ < bufs_.size()) && (size > 0)) {
+    const size_t buf_byte_size = buf_byte_sizes_[bufs_idx_];
+    const size_t csz = std::min(buf_byte_size - buf_pos_, size);
+    if (csz > 0) {
+      const uint8_t* input_ptr = bufs_[bufs_idx_] + buf_pos_;
+      std::copy(input_ptr, input_ptr + csz, buf);
+      buf_pos_ += csz;
+      buf += csz;
+      size -= csz;
+      total_size += csz;
+    }
+
+    if (buf_pos_ == buf_byte_size) {
+      bufs_idx_++;
+      buf_pos_ = 0;
+    }
+  }
+
+  *input_bytes = total_size;
+  *end_of_input = (bufs_idx_ >= bufs_.size());
+
+  return Error::Success;
+}
+
+Error
+InferInput::GetNext(
+    const uint8_t** buf, size_t* input_bytes, bool* end_of_input)
+{
+  if (bufs_idx_ < bufs_.size()) {
+    *buf = bufs_[bufs_idx_];
+    *input_bytes = buf_byte_sizes_[bufs_idx_];
+    bufs_idx_++;
+  } else {
+    *buf = nullptr;
+    *input_bytes = 0;
+  }
+  *end_of_input = (bufs_idx_ >= bufs_.size());
+
+  return Error::Success;
+}
+
+InferInput::InferInput(
+    const std::string& name, const std::vector<int64_t>& shape,
+    const std::string& datatype)
+    : name_(name), shape_(shape), datatype_(datatype), byte_size_(0),
+      total_send_byte_size_(0), bufs_idx_(0), buf_pos_(0), io_type_(NONE),
+      shm_name_(""), shm_offset_(0)
+{
+}
+
+//==============================================================================
+
+Error
+InferRequestedOutput::Create(
+    InferRequestedOutput** infer_output, const std::string& name,
+    const size_t class_count)
+{
+  *infer_output = new InferRequestedOutput(name, class_count);
+  return Error::Success;
+}
+
+Error
+InferRequestedOutput::SetSharedMemory(
+    const std::string& region_name, const size_t byte_size, const size_t offset)
+{
+  shm_name_ = region_name;
+  shm_byte_size_ = byte_size;
+  shm_offset_ = offset;
+  io_type_ = SHARED_MEMORY;
+
+  return Error::Success;
+}
+
+Error
+InferRequestedOutput::SharedMemoryInfo(
+    std::string* name, size_t* byte_size, size_t* offset) const
+{
+  if (io_type_ != SHARED_MEMORY) {
+    return Error("The input has not been set with the shared memory.");
+  }
+  *name = shm_name_;
+  *offset = shm_offset_;
+  *byte_size = shm_byte_size_;
+
+  return Error::Success;
+}
+
+
+InferRequestedOutput::InferRequestedOutput(
+    const std::string& name, const size_t class_count)
+    : name_(name), class_count_(class_count)
+{
+}
+
+//==============================================================================
+
+
 }}}  // namespace nvidia::inferenceserver::client
