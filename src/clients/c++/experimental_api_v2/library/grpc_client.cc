@@ -134,6 +134,12 @@ InitModelInferRequest(
 
   for (const auto routput : outputs) {
     auto grpc_output = request->add_outputs();
+    grpc_output->set_name(routput->Name());
+    size_t class_count = routput->ClassCount();
+    if (class_count != 0) {
+      (*grpc_output->mutable_parameters())["classification"].set_int64_param(
+          class_count);
+    }
     if (routput->IsSharedMemory()) {
       std::string region_name;
       size_t offset;
@@ -146,11 +152,6 @@ InitModelInferRequest(
       if (offset != 0) {
         (*grpc_output->mutable_parameters())["shared_memory_offset"]
             .set_int64_param(offset);
-      }
-      size_t class_count = routput->ClassCount();
-      if (class_count != 0) {
-        (*grpc_output->mutable_parameters())["classification"].set_int64_param(
-            class_count);
       }
     }
   }
@@ -398,19 +399,22 @@ InferResultGrpc::Create(
 }
 
 Error
-InferResultGrpc::ModelName(std::string* name) const {
+InferResultGrpc::ModelName(std::string* name) const
+{
   *name = response_->model_name();
   return Error::Success;
 }
 
 Error
-InferResultGrpc::ModelVersion(std::string* version) const {
+InferResultGrpc::ModelVersion(std::string* version) const
+{
   *version = response_->model_version();
   return Error::Success;
 }
 
 Error
-InferResultGrpc::Id(std::string* id) const {
+InferResultGrpc::Id(std::string* id) const
+{
   *id = response_->id();
   return Error::Success;
 }
