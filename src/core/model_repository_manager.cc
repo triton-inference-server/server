@@ -1677,7 +1677,9 @@ ModelRepositoryManager::UpdateDependencyGraph(
     }
   }
 
+#ifdef TRTIS_ENABLE_ENSEMBLE
   ValidateEnsembleConfig(&affected_ensembles);
+#endif  // TRTIS_ENABLE_ENSEMBLE
 
   return Status::Success;
 }
