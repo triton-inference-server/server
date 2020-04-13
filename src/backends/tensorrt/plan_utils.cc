@@ -137,7 +137,8 @@ Status
 CompareDimsSupported(
     const std::string& model_name, const std::string& binding_name,
     const nvinfer1::Dims& model_dims, const DimsList& dims,
-    const bool supports_batching, const bool is_dynamic)
+    const bool supports_batching, const bool is_dynamic,
+    const bool compare_exact)
 {
   // If the model configuration expects batching support in the model,
   // then the first dimension must be -1.
@@ -162,7 +163,7 @@ CompareDimsSupported(
     if (succ) {
       for (int i = 0; i < full_dims.size(); ++i) {
         const int64_t model_dim = model_dims.d[i];
-        if (model_dim != -1) {
+        if (compare_exact || (model_dim != -1)) {
           succ &= (model_dim == full_dims[i]);
         }
       }
@@ -187,7 +188,7 @@ CompareDimsSupported(
     if (succ) {
       for (int i = 0; i < dims.size(); ++i) {
         const int64_t model_dim = model_dims.d[i];
-        if (model_dim != -1) {
+        if (compare_exact || (model_dim != -1)) {
           succ &= (model_dim == dims[i]);
         }
       }

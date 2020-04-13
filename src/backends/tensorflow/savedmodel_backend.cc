@@ -176,7 +176,7 @@ SavedModelBackend::CreateTRTISTFModel(
     if (output->shape_->rank_ != 0) {
       RETURN_IF_ERROR(CompareDims(
           Name(), io.name(), output->shape_, dims,
-          Config().max_batch_size() > 0, false /* compare_exact */));
+          Config().max_batch_size() > 0, true /* compare_exact */));
     } else {
       // The savedmodel doesn't specify a shape for the output so use the shape
       // from the model configuration

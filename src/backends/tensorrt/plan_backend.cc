@@ -898,7 +898,7 @@ PlanBackend::Context::InitializeExecuteInputBinding(
     if (!(is_control && is_dynamic_)) {
       RETURN_IF_ERROR(CompareDimsSupported(
           name_, input_name, engine_dims, model_config_dims, support_batching_,
-          is_dynamic_));
+          is_dynamic_, false /* compare_exact */));
     } else {
       Status status =
           ValidateControlDimsDynamic(engine_dims, support_batching_);
@@ -1257,7 +1257,7 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
 
       RETURN_IF_ERROR(CompareDimsSupported(
           name_, io.name(), engine_dims, model_config_dims, support_batching_,
-          is_dynamic_));
+          is_dynamic_, false /* compare_exact */));
 
       int64_t byte_size;
       if (!is_dynamic_) {
