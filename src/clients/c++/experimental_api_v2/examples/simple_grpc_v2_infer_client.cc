@@ -151,12 +151,12 @@ main(int argc, char** argv)
       "unable to get INPUT1");
 
   FAIL_IF_ERR(
-      input0->SetRaw(
+      input0->AppendRaw(
           reinterpret_cast<uint8_t*>(&input0_data[0]),
           input0_data.size() * sizeof(int32_t)),
       "unable to set data for INPUT0");
   FAIL_IF_ERR(
-      input1->SetRaw(
+      input1->AppendRaw(
           reinterpret_cast<uint8_t*>(&input1_data[0]),
           input1_data.size() * sizeof(int32_t)),
       "unable to set data for INPUT1");

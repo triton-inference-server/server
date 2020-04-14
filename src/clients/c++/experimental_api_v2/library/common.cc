@@ -24,8 +24,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#define DLL_EXPORTING
-
 #include "src/clients/c++/experimental_api_v2/library/common.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
@@ -140,13 +138,13 @@ InferInput::Reset()
 }
 
 Error
-InferInput::SetRaw(const std::vector<uint8_t>& input)
+InferInput::AppendRaw(const std::vector<uint8_t>& input)
 {
-  return SetRaw(&input[0], input.size());
+  return AppendRaw(&input[0], input.size());
 }
 
 Error
-InferInput::SetRaw(const uint8_t* input, size_t input_byte_size)
+InferInput::AppendRaw(const uint8_t* input, size_t input_byte_size)
 {
   byte_size_ += input_byte_size;
   total_send_byte_size_ += input_byte_size;
@@ -171,7 +169,7 @@ InferInput::SetSharedMemory(
 }
 
 Error
-InferInput::SetFromString(const std::vector<std::string>& input)
+InferInput::AppendFromString(const std::vector<std::string>& input)
 {
   // Serialize the strings into a "raw" buffer. The first 4-bytes are
   // the length of the string length. Next are the actual string
@@ -184,7 +182,22 @@ InferInput::SetFromString(const std::vector<std::string>& input)
     sbuf.append(str);
   }
 
-  return SetRaw(reinterpret_cast<const uint8_t*>(&sbuf[0]), sbuf.size());
+  return AppendRaw(reinterpret_cast<const uint8_t*>(&sbuf[0]), sbuf.size());
+}
+
+Error
+InferInput::ByteSize(size_t* byte_size) const {
+  *byte_size = byte_size_;
+  return Error::Success;
+}
+
+InferInput::InferInput(
+    const std::string& name, const std::vector<int64_t>& shape,
+    const std::string& datatype)
+    : name_(name), shape_(shape), datatype_(datatype), byte_size_(0),
+      total_send_byte_size_(0), bufs_idx_(0), buf_pos_(0), io_type_(NONE),
+      shm_name_(""), shm_offset_(0)
+{
 }
 
 Error
@@ -257,15 +270,6 @@ InferInput::GetNext(
   return Error::Success;
 }
 
-InferInput::InferInput(
-    const std::string& name, const std::vector<int64_t>& shape,
-    const std::string& datatype)
-    : name_(name), shape_(shape), datatype_(datatype), byte_size_(0),
-      total_send_byte_size_(0), bufs_idx_(0), buf_pos_(0), io_type_(NONE),
-      shm_name_(""), shm_offset_(0)
-{
-}
-
 //==============================================================================
 
 Error
@@ -289,6 +293,12 @@ InferRequestedOutput::SetSharedMemory(
   return Error::Success;
 }
 
+InferRequestedOutput::InferRequestedOutput(
+    const std::string& name, const size_t class_count)
+    : name_(name), class_count_(class_count)
+{
+}
+
 Error
 InferRequestedOutput::SharedMemoryInfo(
     std::string* name, size_t* byte_size, size_t* offset) const
@@ -301,13 +311,6 @@ InferRequestedOutput::SharedMemoryInfo(
   *byte_size = shm_byte_size_;
 
   return Error::Success;
-}
-
-
-InferRequestedOutput::InferRequestedOutput(
-    const std::string& name, const size_t class_count)
-    : name_(name), class_count_(class_count)
-{
 }
 
 //==============================================================================

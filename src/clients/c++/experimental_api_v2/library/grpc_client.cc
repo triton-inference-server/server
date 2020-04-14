@@ -24,8 +24,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#define DLL_EXPORTING
-
 #include "src/clients/c++/experimental_api_v2/library/grpc_client.h"
 
 #include <grpcpp/grpcpp.h>
@@ -363,7 +361,9 @@ InferenceServerGrpcClient::InitModelInferRequest(
       bool end_of_input = false;
       std::string* contents =
           grpc_input->mutable_contents()->mutable_raw_contents();
-      contents->reserve(input->ByteSize());
+      size_t content_size;
+      input->ByteSize(&content_size);
+      contents->reserve(content_size);
       while (!end_of_input) {
         const uint8_t* buf;
         size_t buf_size;
