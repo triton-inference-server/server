@@ -680,8 +680,7 @@ TRITONSERVER_InferenceRequestOutputCount(
 /// \param index The index of the output tensor.
 /// \param name The name of the output at 'index'.
 /// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestOutputName(
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceRequestOutputName(
     TRITONSERVER_InferenceRequest* inference_request, uint64_t index,
     const char** name);
 
