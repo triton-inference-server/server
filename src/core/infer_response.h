@@ -25,8 +25,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <deque>
 #include <string>
 #include <vector>
+#include "src/core/constants.h"
 #include "src/core/model_config.h"
 #include "src/core/response_allocator.h"
 #include "src/core/status.h"
@@ -133,6 +135,9 @@ class InferenceResponse {
     Status AllocateBuffer(
         void** buffer, const size_t buffer_byte_size,
         TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
+    Status AllocateBuffer(
+        void** buffer, const size_t buffer_byte_size,
+        TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
 
     // Release the buffer that was previously allocated by
     // AllocateBuffer(). Do nothing if AllocateBuffer() has not been
@@ -140,6 +145,7 @@ class InferenceResponse {
     Status ReleaseBuffer();
 
    private:
+    DISALLOW_COPY_AND_ASSIGN(Output);
     friend std::ostream& operator<<(
         std::ostream& out, const InferenceResponse::Output& output);
 
@@ -178,14 +184,22 @@ class InferenceResponse {
   int64_t ActualModelVersion() const;
 
   const Status& ResponseStatus() const { return status_; }
-  const std::vector<Output>& Outputs() const { return outputs_; }
+  void SetResponseStatus(const Status& s) { status_ = s; }
 
-  // Add an output to the response.
+  const std::deque<Output>& Outputs() const { return outputs_; }
+
+  // Add an output to the response. If 'output' is non-null
+  // return a pointer to the newly added output.
   Status AddOutput(
       const std::string& name, const DataType datatype,
-      const std::vector<int64_t>& shape);
+      const std::vector<int64_t>& shape, Output** output = nullptr);
+
+  // Send the response. Calling this function releases ownership of
+  // the response object and gives it to the callback function.
+  static Status Send(std::unique_ptr<InferenceResponse>&& response);
 
  private:
+  DISALLOW_COPY_AND_ASSIGN(InferenceResponse);
   friend std::ostream& operator<<(
       std::ostream& out, const InferenceResponse& response);
 
@@ -201,7 +215,11 @@ class InferenceResponse {
   // every response.
   std::string id_;
 
-  std::vector<Output> outputs_;
+  // The result tensors. Use a deque so that there is no reallocation
+  // with the resulting copies.
+  std::deque<Output> outputs_;
+
+  // Error status for the response.
   Status status_;
 
   // The response allocator and user pointer.

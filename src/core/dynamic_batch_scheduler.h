@@ -81,9 +81,7 @@ class DynamicBatchScheduler : public Scheduler {
   ~DynamicBatchScheduler();
 
   // \see Scheduler::Enqueue()
-  Status Enqueue(
-      const std::shared_ptr<ModelInferStats>& stats,
-      std::unique_ptr<InferenceRequest>& request) override;
+  Status Enqueue(std::unique_ptr<InferenceRequest>& request) override;
 
  private:
   DynamicBatchScheduler(
