@@ -205,7 +205,7 @@ class InferInput {
 
   /// Append tensor values for this input from a byte vector. The vector
   /// is not copied and so it must not be modified or destroyed
-  /// until this input is no longer needed (that is until the Run()
+  /// until this input is no longer needed (that is until the Infer()
   /// call(s) that use the input have completed). Multiple calls can
   /// be made to this API to keep adding tensor data for this input.
   /// The data will be delivered in the order it was added.
@@ -215,7 +215,7 @@ class InferInput {
 
   /// Append tensor values for this input from a byte array. The array
   /// is not copied and so it must not be modified or destroyed
-  /// until this input is no longer needed (that is until the Run()
+  /// until this input is no longer needed (that is until the Infer()
   /// call(s) that use the input have completed). Multiple calls can
   /// be made to this API to keep adding tensor data for this input.
   /// The data will be delivered in the order it was added.
@@ -227,7 +227,7 @@ class InferInput {
   /// Set tensor values for this input by reference into a shared memory
   /// region. The values are not copied and so the shared memory region and
   /// its contents must not be modified or destroyed until this input is no
-  /// longer needed (that is until the Run() call(s) that use the input have
+  /// longer needed (that is until the Infer() call(s) that use the input have
   /// completed. This function must be called a single time for an input that
   /// is using shared memory. The entire tensor data required by this input
   /// must be contiguous in a single shared memory region.
