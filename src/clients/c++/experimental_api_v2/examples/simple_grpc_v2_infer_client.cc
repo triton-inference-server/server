@@ -231,6 +231,17 @@ main(int argc, char** argv)
   // Get full response
   std::cout << results->DebugString() << std::endl;
 
+  nic::Stat infer_stat;
+  client->GetStat(&infer_stat);
+  std::cout << "completed_request_count " << infer_stat.completed_request_count
+            << std::endl;
+  std::cout << "cumulative_total_request_time_ns "
+            << infer_stat.cumulative_total_request_time_ns << std::endl;
+  std::cout << "cumulative_send_time_ns " << infer_stat.cumulative_send_time_ns
+            << std::endl;
+  std::cout << "cumulative_receive_time_ns "
+            << infer_stat.cumulative_receive_time_ns << std::endl;
+
   std::cout << "PASS : Infer" << std::endl;
 
   return 0;

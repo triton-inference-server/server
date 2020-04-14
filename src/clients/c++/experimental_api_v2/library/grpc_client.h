@@ -51,7 +51,7 @@ typedef std::map<std::string, std::string> Headers;
 ///   ...
 /// \endcode
 ///
-class InferenceServerGrpcClient {
+class InferenceServerGrpcClient : public InferenceServerClient {
  public:
   /// Create a client that can be used to communicate with the server.
   /// \param client Returns a new InferenceServerGrpcClient object.
@@ -138,9 +138,8 @@ class InferenceServerGrpcClient {
   /// \param outputs Optional vector of InferRequestedOutput describing how the
   /// output must be returned. If not provided then all the outputs in the model
   /// config will be returned as default settings.
-  /// \param headers Optional map
-  /// specifying additional HTTP headers to include in the metadata of gRPC
-  /// request.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the
   /// request.
   Error Infer(
@@ -152,16 +151,27 @@ class InferenceServerGrpcClient {
 
  private:
   InferenceServerGrpcClient(const std::string& url, bool verbose);
+
+  // Initializes the request message for inference request.
+  Error InitModelInferRequest(
+      const InferOptions& options, const std::vector<InferInput*>& inputs,
+      const std::vector<const InferRequestedOutput*>& outputs);
+
   // GRPC end point.
   std::unique_ptr<GRPCInferenceService::Stub> stub_;
 
   // Enable verbose output
   const bool verbose_;
+
+  // request for GRPC call, one request object can be used for multiple calls
+  // since it can be overwritten as soon as the GRPC send finishes.
+  ModelInferRequest infer_request_;
 };
 
 //==============================================================================
-/// An InferResultGrpc instance is  used  to access and interpret the
-/// response of an inference request usinf gRPC protocol.
+/// An InferResultGrpc instance is used  to access and interpret the
+/// response of an inference request from GRPC endpoint. This object
+/// holds data for all requested outputs.
 ///
 class InferResultGrpc : public InferResult {
  public:
@@ -172,23 +182,34 @@ class InferResultGrpc : public InferResult {
   static Error Create(
       InferResult** infer_result, std::shared_ptr<ModelInferResponse> response);
 
+  /// See InferResult::ModelName(std::string* name)
   Error ModelName(std::string* name) const override;
+
+  /// See InferResult::ModelVersion(std::string* version)
   Error ModelVersion(std::string* version) const override;
+
+  /// See InferResult::Id(std::string* id)
   Error Id(std::string* id) const override;
 
+  /// See InferResult::Shape(const std::string& output_name,
+  ///  std::vector<int64_t>* shape)
   Error Shape(const std::string& output_name, std::vector<int64_t>* shape)
       const override;
 
+  /// See InferResult::Datatype(
+  ///    const std::string& output_name, std::string* datatype)
   Error Datatype(
       const std::string& output_name, std::string* datatype) const override;
 
+  /// See InferResult::RawData(
+  ///    const std::string& output_name, const uint8_t** buf,
+  ///    size_t* byte_size)
   Error RawData(
       const std::string& output_name, const uint8_t** buf,
       size_t* byte_size) const override;
 
-  /// Returns the unferlying ModelInferResponse message.
-  /// \return pointer to a ModelInferResponse message.
-  std::string DebugString() const override;
+  /// See InferResult::DebugString()
+  std::string DebugString() const override { return response_->DebugString(); }
 
  private:
   InferResultGrpc(std::shared_ptr<ModelInferResponse> response);
@@ -197,6 +218,26 @@ class InferResultGrpc : public InferResult {
       output_name_to_result_map_;
 
   std::shared_ptr<ModelInferResponse> response_;
+};
+
+
+//==============================================================================
+// An GrpcInferRequest represents an inflght inference request on gRPC.
+//
+class GrpcInferRequest : public InferRequest {
+ public:
+  GrpcInferRequest()
+      : grpc_status_(), grpc_response_(std::make_shared<ModelInferResponse>())
+  {
+  }
+
+  friend InferenceServerGrpcClient;
+
+ private:
+  // Variables for GRPC call
+  grpc::ClientContext grpc_context_;
+  grpc::Status grpc_status_;
+  std::shared_ptr<ModelInferResponse> grpc_response_;
 };
 
 

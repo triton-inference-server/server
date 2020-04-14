@@ -48,6 +48,68 @@ operator<<(std::ostream& out, const Error& err)
 //==============================================================================
 
 Error
+InferenceServerClient::GetStat(Stat* stat) const
+{
+  *stat = infer_stat_;
+  return Error::Success;
+}
+
+Error
+InferenceServerClient::UpdateStat(const RequestTimers& timer)
+{
+  const uint64_t request_time_ns = timer.Duration(
+      RequestTimers::Kind::REQUEST_START, RequestTimers::Kind::REQUEST_END);
+  const uint64_t send_time_ns = timer.Duration(
+      RequestTimers::Kind::SEND_START, RequestTimers::Kind::SEND_END);
+  const uint64_t recv_time_ns = timer.Duration(
+      RequestTimers::Kind::RECV_START, RequestTimers::Kind::RECV_END);
+
+  if ((request_time_ns == std::numeric_limits<uint64_t>::max()) ||
+      (send_time_ns == std::numeric_limits<uint64_t>::max()) ||
+      (recv_time_ns == std::numeric_limits<uint64_t>::max())) {
+    return Error(
+        "Timer not set correctly." +
+        ((timer.Timestamp(RequestTimers::Kind::REQUEST_START) >
+          timer.Timestamp(RequestTimers::Kind::REQUEST_END))
+             ? (" Request time from " +
+                std::to_string(
+                    timer.Timestamp(RequestTimers::Kind::REQUEST_START)) +
+                " to " +
+                std::to_string(
+                    timer.Timestamp(RequestTimers::Kind::REQUEST_END)) +
+                ".")
+             : "") +
+        ((timer.Timestamp(RequestTimers::Kind::SEND_START) >
+          timer.Timestamp(RequestTimers::Kind::SEND_END))
+             ? (" Send time from " +
+                std::to_string(
+                    timer.Timestamp(RequestTimers::Kind::SEND_START)) +
+                " to " +
+                std::to_string(timer.Timestamp(RequestTimers::Kind::SEND_END)) +
+                ".")
+             : "") +
+        ((timer.Timestamp(RequestTimers::Kind::RECV_START) >
+          timer.Timestamp(RequestTimers::Kind::RECV_END))
+             ? (" Receive time from " +
+                std::to_string(
+                    timer.Timestamp(RequestTimers::Kind::RECV_START)) +
+                " to " +
+                std::to_string(timer.Timestamp(RequestTimers::Kind::RECV_END)) +
+                ".")
+             : ""));
+  }
+
+  infer_stat_.completed_request_count++;
+  infer_stat_.cumulative_total_request_time_ns += request_time_ns;
+  infer_stat_.cumulative_send_time_ns += send_time_ns;
+  infer_stat_.cumulative_receive_time_ns += recv_time_ns;
+
+  return Error::Success;
+}
+
+//==============================================================================
+
+Error
 InferInput::Create(
     InferInput** infer_input, const std::string& name,
     const std::vector<int64_t>& dims, const std::string& datatype)
