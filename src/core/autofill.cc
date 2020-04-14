@@ -237,9 +237,11 @@ AutoFill::Create(
           print_warning = false;
         }
 #endif
+#ifdef TRTIS_ENABLE_ENSEMBLE
         if (platform == Platform::PLATFORM_ENSEMBLE) {
           print_warning = false;
         }
+#endif
 
         if (print_warning) {
           LOG_WARNING << "Autofiller failed to retrieve model. Error Details: "

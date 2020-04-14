@@ -296,6 +296,9 @@ additional requirements for enabling a backend.
   :ref:`section-building-a-custom-backend` for information on how to
   build a custom backend.
 
+* **TRTIS_ENABLE_ENSEMBLE**: Use -DTRTIS_ENABLE_ENSEMBLE=ON to enable
+  support for ensembles.
+
 These additional options may be specified:
 
 * **TRTIS_ENABLE_GRPC**: By default the inference server accepts

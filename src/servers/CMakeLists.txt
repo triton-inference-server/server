@@ -390,7 +390,6 @@ endif() # TRTIS_ENABLE_GPU
 #
 # libtritonserver.so
 #
-set(BACKEND_OBJS $<TARGET_OBJECTS:ensemble-backend-library>)
 if(${TRTIS_ENABLE_TENSORFLOW})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:tensorflow-backend-library>)
 endif() # TRTIS_ENABLE_TENSORFLOW
@@ -409,6 +408,9 @@ endif() # TRTIS_ENABLE_PYTORCH
 if(${TRTIS_ENABLE_CUSTOM})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:custom-backend-library>)
 endif() # TRTIS_ENABLE_CUSTOM
+if(${TRTIS_ENABLE_ENSEMBLE})
+  set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:ensemble-backend-library>)
+endif() # TRTIS_ENABLE_ENSEMBLE
 
 set(CUDA_OBJS "")
 if(${TRTIS_ENABLE_GPU})

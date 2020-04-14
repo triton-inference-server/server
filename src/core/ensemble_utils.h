@@ -25,6 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#ifdef TRTIS_ENABLE_ENSEMBLE
+
 #include <deque>
 #include <unordered_map>
 #include "src/core/model_config.h"
@@ -42,3 +44,5 @@ void ValidateEnsembleConfig(
     std::set<ModelRepositoryManager::DependencyNode*>* affected_ensembles);
 
 }}  // namespace nvidia::inferenceserver
+
+#endif  // TRTIS_ENABLE_ENSEMBLE

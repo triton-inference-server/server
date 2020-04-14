@@ -245,9 +245,11 @@ GetPlatform(const std::string& platform_str)
   }
 #endif  // TRTIS_ENABLE_PYTORCH
 
+#ifdef TRTIS_ENABLE_ENSEMBLE
   if (platform_str == kEnsemblePlatform) {
     return Platform::PLATFORM_ENSEMBLE;
   }
+#endif  // TRTIS_ENABLE_ENSEMBLE
 
   return Platform::PLATFORM_UNKNOWN;
 }

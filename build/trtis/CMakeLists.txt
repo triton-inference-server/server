@@ -132,6 +132,10 @@ if(${TRTIS_ENABLE_CUSTOM})
   add_definitions(-DTRTIS_ENABLE_CUSTOM=1)
 endif() # TRTIS_ENABLE_CUSTOM
 
+if(${TRTIS_ENABLE_ENSEMBLE})
+  add_definitions(-DTRTIS_ENABLE_ENSEMBLE=1)
+endif() # TRTIS_ENABLE_ENSEMBLE
+
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
 
