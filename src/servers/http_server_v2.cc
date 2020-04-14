@@ -1254,11 +1254,34 @@ HTTPAPIServerV2::HandleSystemSharedMemory(
         size_t buffer_len = evbuffer_get_length(req->buffer_in);
         err = EVBufferToJson(&register_request, v, &v_idx, buffer_len, n);
         if (err == nullptr) {
-          const char* shm_key = register_request["key"].GetString();
-          uint64_t offset = register_request["offset"].GetInt();
-          uint64_t byte_size = register_request["byte_size"].GetInt();
-          err = shm_manager_->RegisterSystemSharedMemory(
-              region_name, shm_key, offset, byte_size);
+          const auto& key_itr = register_request.FindMember("key");
+          if (key_itr == register_request.MemberEnd()) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "Shared memory register request has no 'key' field");
+          } else {
+            const char* shm_key = key_itr->value.GetString();
+            uint64_t offset = 0, byte_size = 0;
+            const auto& offset_itr = register_request.FindMember("offset");
+            if (offset_itr == register_request.MemberEnd()) {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  "Shared memory register request has no 'offset' field");
+            } else {
+              offset = offset_itr->value.GetInt();
+              const auto& byte_size_itr =
+                  register_request.FindMember("byte_size");
+              if (byte_size_itr == register_request.MemberEnd()) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "Shared memory register request has no 'byte_size' field");
+              } else {
+                byte_size = offset_itr->value.GetInt();
+                err = shm_manager_->RegisterSystemSharedMemory(
+                    region_name, shm_key, offset, byte_size);
+              }
+            }
+          }
         }
       }
     }
@@ -1332,10 +1355,45 @@ HTTPAPIServerV2::HandleCudaSharedMemory(
         size_t buffer_len = evbuffer_get_length(req->buffer_in);
         err = EVBufferToJson(&register_request, v, &v_idx, buffer_len, n);
         if (err == nullptr) {
-          rapidjson::Value& handle = register_request["raw_handle"];
-          const char* b64_handle = handle["b64"].GetString();
-          uint64_t byte_size = register_request["byte_size"].GetInt();
-          uint64_t device_id = register_request["device_id"].GetInt();
+          const auto& raw_handle_itr =
+              register_request.FindMember("raw_handle");
+          if (raw_handle_itr == register_request.MemberEnd()) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "Shared memory register request has no 'raw_handle' field");
+          } else {
+            rapidjson::Value& handle = raw_handle_itr->value.GetString();
+            const auto& b64_handle_itr = handle.FindMember("b64");
+            if (b64_handle_itr == register_request.MemberEnd()) {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  "raw_handle has no 'b64' field");
+            } else {
+              const char* b64_handle = b64_handle_itr->value.GetString();
+              const auto& byte_size_itr =
+                  register_request.FindMember("byte_size");
+              if (byte_size_itr == register_request.MemberEnd()) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "Shared memory register request has no 'byte_size' field");
+              } else {
+                uint64_t byte_size = byte_size_itr->value.GetInt();
+                const auto& device_id_itr =
+                    register_request.FindMember("device_id");
+                if (device_id_itr == register_request.MemberEnd()) {
+                  err = TRITONSERVER_ErrorNew(
+                      TRITONSERVER_ERROR_INVALID_ARG,
+                      "Shared memory register request has no 'device_id' "
+                      "field");
+                } else {
+                  uint64_t device_id = device_id_itr->value.GetInt();
+                  err = shm_manager_->RegisterSystemSharedMemory(
+                      region_name, shm_key, offset, byte_size);
+                }
+              }
+            }
+          }
+
           base64_decodestate s;
           base64_init_decodestate(&s);
           std::vector<char> raw_handle(sizeof(cudaIpcMemHandle_t));
@@ -1344,7 +1402,7 @@ HTTPAPIServerV2::HandleCudaSharedMemory(
           if (decoed_size != sizeof(cudaIpcMemHandle_t)) {
             err = TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INVALID_ARG,
-                "'raw_handle' must be a valid base64 encode "
+                "'raw_handle' must be a valid base64 encoded "
                 "cudaIpcMemHandle_t");
           } else {
             err = shm_manager_->RegisterCUDASharedMemory(
