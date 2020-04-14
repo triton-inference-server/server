@@ -37,11 +37,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-// FIXMEV2 shouldn't need the conversions
-TRTSERVER_Memory_Type TritonMemTypeToTrt(TRITONSERVER_Memory_Type mem_type);
-
-TRITONSERVER_Memory_Type TrtMemTypeToTriton(TRTSERVER_Memory_Type mem_type);
-
 class InferenceBackend;
 class InferenceServer;
 
@@ -312,6 +307,12 @@ class InferenceRequest {
     return requested_outputs_;
   }
 
+  // Get the response factory.
+  const InferenceResponseFactory& ResponseFactory() const
+  {
+    return response_factory_;
+  }
+
   // Add an original input to the request. If 'input' is non-null
   // return a pointer to the newly added input.
   Status AddOriginalInput(
@@ -381,22 +382,26 @@ class InferenceRequest {
   // Send an error response for this request. If 'status' is Success
   // then no response is sent. If 'release_request' is true then the
   // release callback is called for this request and ownership is
-  // given to the callback. Thus, if 'release_request' is true the
-  // caller no longer has ownership of this object and so should drop
-  // all references not access or destroy this object.
+  // given to the callback. Thus, if 'release_request' is true
+  // 'request' is returned as nullptr.
   static void RespondWithError(
-      const InferenceRequest& request, const Status& status,
-      const bool release_request);
+      std::unique_ptr<InferenceRequest>& request, const Status& status,
+      const bool release_request = true);
 
   // Send an error response to a set of 'requests'. If 'status' is
   // Success then no responses are sent. If 'release_request' is true
-  // then the release callback is called for each request, and the request is
-  // ownership is given to the callback. Thus, if 'release_request' is
-  // true the caller no longer has ownership of this object and so
-  // should drop all references not access or destroy this object.
+  // then the release callback is called for each request, and the
+  // request ownership is given to the callback. Thus, if
+  // 'release_request' is true 'requests' is returned with all
+  // nullptrs.
   static void RespondWithError(
-      std::vector<std::unique_ptr<InferenceRequest>>* requests,
-      const Status& status, const bool release_requests);
+      std::vector<std::unique_ptr<InferenceRequest>>& requests,
+      const Status& status, const bool release_requests = true);
+
+  // Release the request. Call the release callback and transfer
+  // ownership of the request to the callback. On return 'request' is
+  // nullptr.
+  static void Release(std::unique_ptr<InferenceRequest>&& request);
 
   // Create a copy of 'from' suitable for use as a "null" request as
   // required for the direct sequence batcher. The returned copy will
