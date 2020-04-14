@@ -128,93 +128,82 @@ BackendContext::SetInputBuffer(
     const InferenceRequest::Input* rinput;
     Status status = request->ImmutableInput(name, &rinput);
     if (!status.IsOk()) {
-      InferenceRequest::RespondWithError(
-          *request, status, true /* release_request */);
-      request.release();
-    } else {
-      const std::shared_ptr<Memory>& data = rinput->Data();
+      InferenceRequest::RespondWithError(request, status);
+      break;
+    }
 
-      size_t copied_byte_size = 0;
-      size_t data_idx = 0;
-      while (request != nullptr) {
-        auto src_memory_type = input->memory_type_;
-        auto src_memory_type_id = input->memory_type_id_;
-        size_t content_byte_size = expected_byte_size - copied_byte_size;
-        const void* content = data->BufferAt(
-            data_idx, &content_byte_size, &src_memory_type,
-            &src_memory_type_id);
+    const std::shared_ptr<Memory>& data = rinput->Data();
 
-        // No more input content available then done with copying...
-        if (content == nullptr) {
-          break;
-        }
+    size_t copied_byte_size = 0;
+    size_t data_idx = 0;
+    while (request != nullptr) {
+      auto src_memory_type = input->memory_type_;
+      auto src_memory_type_id = input->memory_type_id_;
+      size_t content_byte_size = expected_byte_size - copied_byte_size;
+      const void* content = data->BufferAt(
+          data_idx, &content_byte_size, &src_memory_type, &src_memory_type_id);
 
-        if ((copied_byte_size + content_byte_size) > expected_byte_size) {
-          InferenceRequest::RespondWithError(
-              *request,
-              Status(
-                  Status::Code::INVALID_ARG,
-                  "unexpected size " +
-                      std::to_string(copied_byte_size + content_byte_size) +
-                      " for inference input '" + name + "', expecting " +
-                      std::to_string(expected_byte_size)),
-              true /* release_request */);
-          request.release();
-          break;
-        }
-
-        if (content_byte_size > 0) {
-          // Defer memory copy for the buffer if it's better put into an
-          // intermediate pinned buffer first.
-          if (need_buffer && (src_memory_type == candidate_type)) {
-            std::get<1>(pinned_buffer_info) += content_byte_size;
-            std::get<2>(pinned_buffer_info)
-                .emplace_back(idx, data.get(), data_idx);
-          } else {
-            // If copy should be perform directly, two steps to be done:
-            // 1. Issue copy for the current buffer
-            // 2. Finalize the existing intermediate buffer
-            bool cuda_used = false;
-            Status status = CopyBuffer(
-                name, src_memory_type, src_memory_type_id, input->memory_type_,
-                input->memory_type_id_, content_byte_size, content,
-                input->input_buffer_ + buffer_copy_offset + copied_byte_size,
-                stream, &cuda_used);
-            if (!status.IsOk()) {
-              InferenceRequest::RespondWithError(
-                  *request, status, true /* release_request */);
-              request.release();
-            }
-
-            cuda_copy |= cuda_used;
-
-            if (std::get<1>(pinned_buffer_info) > 0) {
-              cuda_copy |= IssueIndirectInputBufferCopy(
-                  name, pinned_buffer_info, requests, stream, input);
-            }
-            // always reset 'pinned_buffer_info' to maintain proper input offset
-            pinned_buffer_info = BufferInfo{
-                buffer_copy_offset + copied_byte_size + content_byte_size,
-                0,
-                {}};
-          }
-        }
-
-        copied_byte_size += content_byte_size;
-        data_idx++;
+      // No more input content available then done with copying...
+      if (content == nullptr) {
+        break;
       }
 
-      if ((request != nullptr) && (copied_byte_size != expected_byte_size)) {
+      if ((copied_byte_size + content_byte_size) > expected_byte_size) {
         InferenceRequest::RespondWithError(
-            *request,
+            request,
             Status(
-                Status::Code::INTERNAL,
-                "expected " + std::to_string(expected_byte_size) +
-                    " bytes of data for inference input '" + name + "', got " +
-                    std::to_string(copied_byte_size)),
-            true /* release_request */);
-        request.release();
+                Status::Code::INVALID_ARG,
+                "unexpected size " +
+                    std::to_string(copied_byte_size + content_byte_size) +
+                    " for inference input '" + name + "', expecting " +
+                    std::to_string(expected_byte_size)));
+        break;
       }
+
+      if (content_byte_size > 0) {
+        // Defer memory copy for the buffer if it's better put into an
+        // intermediate pinned buffer first.
+        if (need_buffer && (src_memory_type == candidate_type)) {
+          std::get<1>(pinned_buffer_info) += content_byte_size;
+          std::get<2>(pinned_buffer_info)
+              .emplace_back(idx, data.get(), data_idx);
+        } else {
+          // If copy should be perform directly, two steps to be done:
+          // 1. Issue copy for the current buffer
+          // 2. Finalize the existing intermediate buffer
+          bool cuda_used = false;
+          Status status = CopyBuffer(
+              name, src_memory_type, src_memory_type_id, input->memory_type_,
+              input->memory_type_id_, content_byte_size, content,
+              input->input_buffer_ + buffer_copy_offset + copied_byte_size,
+              stream, &cuda_used);
+          if (!status.IsOk()) {
+            InferenceRequest::RespondWithError(request, status);
+          }
+
+          cuda_copy |= cuda_used;
+
+          if (std::get<1>(pinned_buffer_info) > 0) {
+            cuda_copy |= IssueIndirectInputBufferCopy(
+                name, pinned_buffer_info, requests, stream, input);
+          }
+          // always reset 'pinned_buffer_info' to maintain proper input offset
+          pinned_buffer_info = BufferInfo{
+              buffer_copy_offset + copied_byte_size + content_byte_size, 0, {}};
+        }
+      }
+
+      copied_byte_size += content_byte_size;
+      data_idx++;
+    }
+
+    if ((request != nullptr) && (copied_byte_size != expected_byte_size)) {
+      InferenceRequest::RespondWithError(
+          request, Status(
+                       Status::Code::INTERNAL,
+                       "expected " + std::to_string(expected_byte_size) +
+                           " bytes of data for inference input '" + name +
+                           "', got " + std::to_string(copied_byte_size)));
     }
 
     // When the request is nullptr that indicates that an error
@@ -307,9 +296,7 @@ BackendContext::IssueIndirectInputBufferCopy(
         src_data, buffer + buffer_offset, stream, &cuda_used);
     if (!status.IsOk()) {
       auto& request = (*requests)[request_idxs.back()];
-      InferenceRequest::RespondWithError(
-          *request, status, true /* release_request */);
-      request.release();
+      InferenceRequest::RespondWithError(request, status);
     }
 
     buffer_offset += src_byte_size;
@@ -342,9 +329,7 @@ BackendContext::SetShapeInputBuffer(
   const InferenceRequest::Input* rinput;
   Status status = request->ImmutableInput(name, &rinput);
   if (!status.IsOk()) {
-    InferenceRequest::RespondWithError(
-        *request, status, true /* release_request */);
-    request.release();
+    InferenceRequest::RespondWithError(request, status);
     return false;
   }
 
@@ -360,22 +345,17 @@ BackendContext::SetShapeInputBuffer(
       0 /* idx */, &content, &content_byte_size, &src_memory_type,
       &src_memory_type_id);
   if (!status.IsOk()) {
-    InferenceRequest::RespondWithError(
-        *request, status, true /* release_request */);
-    request.release();
+    InferenceRequest::RespondWithError(request, status);
     return false;
   }
 
   if ((expected_byte_size) != (int)content_byte_size) {
     InferenceRequest::RespondWithError(
-        *request,
-        Status(
-            Status::Code::INVALID_ARG,
-            "unexpected size " + std::to_string(content_byte_size) +
-                " for inference input '" + name + "', expecting " +
-                std::to_string(expected_byte_size)),
-        true /* release_request */);
-    request.release();
+        request, Status(
+                     Status::Code::INVALID_ARG,
+                     "unexpected size " + std::to_string(content_byte_size) +
+                         " for inference input '" + name + "', expecting " +
+                         std::to_string(expected_byte_size)));
     return false;
   }
 
@@ -388,9 +368,7 @@ BackendContext::SetShapeInputBuffer(
         dst_memory_type_id, expected_byte_size, content,
         input_buffer + buffer_copy_offset, stream_, &cuda_used);
     if (!status.IsOk()) {
-      InferenceRequest::RespondWithError(
-          *request, status, true /* release_request */);
-      request.release();
+      InferenceRequest::RespondWithError(request, status);
       return cuda_copy;
     }
   }
@@ -402,9 +380,7 @@ BackendContext::SetShapeInputBuffer(
         sizeof(int32_t), (void*)&total_batch_size, input_buffer, stream_,
         &cuda_used);
     if (!status.IsOk()) {
-      InferenceRequest::RespondWithError(
-          *request, status, true /* release_request */);
-      request.release();
+      InferenceRequest::RespondWithError(request, status);
     }
     cuda_copy |= cuda_used;
   }
@@ -436,8 +412,8 @@ BackendContext::SetFixedSizeOutputBuffer(
     bool process_request =
         (request != nullptr) && false /* FIXME request->RequiresOutput(name) */;
     if (process_request) {
-      TRTSERVER_Memory_Type dst_memory_type;
-      int64_t dst_memory_type_id;
+      TRTSERVER_Memory_Type dst_memory_type = TRTSERVER_MEMORY_CPU;
+      int64_t dst_memory_type_id = 0;
       void* buffer = nullptr;
 
       // try to get buffer with the same memory type as the output tensor
@@ -486,9 +462,7 @@ response_provider_->AllocateOutputBuffer(
       }
 
       if (!status.IsOk()) {
-        InferenceRequest::RespondWithError(
-            *request, status, true /* release_request */);
-        request.release();
+        InferenceRequest::RespondWithError(request, status);
         process_request = false;
       }
     }
@@ -567,9 +541,7 @@ BackendContext::IssueIndirectOutputBufferCopy(
           &cuda_used);
       if (!status.IsOk()) {
         auto& request = (*requests)[data_info.first];
-        InferenceRequest::RespondWithError(
-            *request, status, true /* release_request */);
-        request.release();
+        InferenceRequest::RespondWithError(request, status);
       }
 
       buffer_offset += byte_size;
@@ -614,7 +586,7 @@ BackendContext::SetOutputShapeTensorBuffer(
     if ((request != nullptr) &&
         false /* FIXME request->RequiresOutput(name) */) {
       auto dst_memory_type = src_memory_type;
-      int64_t dst_memory_type_id;
+      int64_t dst_memory_type_id = 0;
       char* buffer = nullptr;
 
       Status status(Status::Code::INTERNAL, "NYI...");
@@ -647,9 +619,7 @@ BackendContext::SetOutputShapeTensorBuffer(
       }
 
       if (!status.IsOk()) {
-        InferenceRequest::RespondWithError(
-            *request, status, true /* release_request */);
-        request.release();
+        InferenceRequest::RespondWithError(request, status);
       }
     }
   }
