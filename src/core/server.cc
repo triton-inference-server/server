@@ -387,7 +387,6 @@ InferenceServer::InferAsync(std::unique_ptr<InferenceRequest>& request)
       new ScopedAtomicIncrement(inflight_request_counter_));
 
 // FIXME this needs to move into InferenceRequest and be simplified
-#if 0
 #ifdef TRTIS_ENABLE_STATS
   auto infer_stats = std::make_shared<ni::ModelInferStats>(
       lserver->StatusManager(), lrequest->ModelName());
@@ -401,9 +400,9 @@ InferenceServer::InferAsync(std::unique_ptr<InferenceRequest>& request)
       reinterpret_cast<ni::OpaqueTraceManager*>(trace_manager));
   infer_stats->NewTrace();
 #else
-  auto infer_stats = std::make_shared<ni::ModelInferStats>();
+// FIXME
+//  auto infer_stats = std::make_shared<ni::ModelInferStats>();
 #endif  // TRTIS_ENABLE_STATS
-#endif
 
 #if 0
       [infer_stats, trace_manager, lrequest, server](const ni::Status& status) mutable {

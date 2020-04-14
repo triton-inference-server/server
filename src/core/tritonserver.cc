@@ -1138,8 +1138,7 @@ TRITONSERVER_InferenceResponseOutputCount(
   ni::InferenceResponse* lresponse =
       reinterpret_cast<ni::InferenceResponse*>(inference_response);
 
-  const std::vector<ni::InferenceResponse::Output>& outputs =
-      lresponse->Outputs();
+  const auto& outputs = lresponse->Outputs();
   *count = outputs.size();
 
   return nullptr;  // Success
@@ -1155,8 +1154,7 @@ TRITONSERVER_InferenceResponseOutput(
   ni::InferenceResponse* lresponse =
       reinterpret_cast<ni::InferenceResponse*>(inference_response);
 
-  const std::vector<ni::InferenceResponse::Output>& outputs =
-      lresponse->Outputs();
+  const auto& outputs = lresponse->Outputs();
   if (index >= outputs.size()) {
     return TritonServerError::Create(
         TRITONSERVER_ERROR_INVALID_ARG,
@@ -1167,6 +1165,7 @@ TRITONSERVER_InferenceResponseOutput(
 
   const ni::InferenceResponse::Output& output = outputs[index];
 
+  *name = output.Name().c_str();
   *datatype = ni::DataTypeToProtocolString(output.DType());
 
   const std::vector<int64_t>& oshape = output.Shape();
@@ -1696,8 +1695,8 @@ TRITONSERVER_ServerInferAsync(
     TRITONSERVER_Server* server,
     TRITONSERVER_InferenceRequest* inference_request,
     TRITONSERVER_TraceManager* trace_manager,
-    TRITONSERVER_TraceManagerReleaseFn_t trace_release_fn,
-    void* trace_release_userp)
+    TRITONSERVER_TraceManagerReleaseFn_t trace_manager_release_fn,
+    void* trace_manager_release_userp)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
   ni::InferenceRequest* lrequest =
@@ -1725,7 +1724,7 @@ TRITONSERVER_ServerInferAsync(
   // trace manager is no longer in use by the requests or any
   // response. So this code should be removed eventually.
   if (status.IsOk() && (trace_manager != nullptr)) {
-    trace_release_fn(server, trace_manager, trace_release_userp);
+    trace_manager_release_fn(trace_manager, trace_manager_release_userp);
   }
 
   // If there is error then ureq will still have 'lrequest' and we

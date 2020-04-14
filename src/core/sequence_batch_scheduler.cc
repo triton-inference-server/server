@@ -312,9 +312,7 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
 }
 
 Status
-SequenceBatchScheduler::Enqueue(
-    const std::shared_ptr<ModelInferStats>& stats,
-    std::unique_ptr<InferenceRequest>& irequest)
+SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
 {
 #ifdef TRTIS_ENABLE_STATS
   // Queue timer starts at the beginning of the queueing and
@@ -463,7 +461,7 @@ SequenceBatchScheduler::Enqueue(
                  << batcher_idx << ", sequence slot " << seq_slot << ": "
                  << irequest->ModelName();
 
-  batchers_[batcher_idx]->Enqueue(seq_slot, correlation_id, stats, irequest);
+  batchers_[batcher_idx]->Enqueue(seq_slot, correlation_id, irequest);
 
   return Status::Success;
 }
@@ -641,7 +639,7 @@ SequenceBatchScheduler::ReaperThread(const int nice)
       // otherwise do nothing with the request.
       std::unique_ptr<InferenceRequest> null_request;
       batchers_[batcher_idx]->Enqueue(
-          seq_slot, idle_correlation_id, nullptr, null_request);
+          seq_slot, idle_correlation_id, null_request);
     }
 
     // Wait until the next idle timeout needs to be checked
@@ -866,7 +864,6 @@ DirectSequenceBatch::~DirectSequenceBatch()
 void
 DirectSequenceBatch::Enqueue(
     const uint32_t seq_slot, const CorrelationID correlation_id,
-    const std::shared_ptr<ModelInferStats>& stats,
     std::unique_ptr<InferenceRequest>& request)
 {
   bool wake_runner = false;
@@ -1350,8 +1347,7 @@ OldestSequenceBatch::CompleteAndNext(
 #endif
 
         // FIXME handle error status.
-        // FIXME stats
-        dynamic_batcher_->Enqueue(nullptr /* stats */, irequest);
+        dynamic_batcher_->Enqueue(irequest);
       }
 
       queue.pop_front();
@@ -1394,7 +1390,6 @@ OldestSequenceBatch::CompleteAndNext(
 void
 OldestSequenceBatch::Enqueue(
     const uint32_t seq_slot, const CorrelationID correlation_id,
-    const std::shared_ptr<ModelInferStats>& stats,
     std::unique_ptr<InferenceRequest>& request)
 {
   // Queue the new request... if there isn't already a request in
