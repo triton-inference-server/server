@@ -83,9 +83,7 @@ class InferenceBackend {
   // then the backend has taken ownership of the request object and so
   // 'request' will be nullptr. If non-success is returned then the
   // caller still retains ownership of 'request'.
-  Status Enqueue(
-      const std::shared_ptr<ModelInferStats>& stats,
-      std::unique_ptr<InferenceRequest>& request);
+  Status Enqueue(std::unique_ptr<InferenceRequest>& request);
 
   uint32_t DefaultPriorityLevel() const { return default_priority_level_; }
 

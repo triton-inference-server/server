@@ -177,22 +177,27 @@ DynamicBatchScheduler::~DynamicBatchScheduler()
 }
 
 Status
-DynamicBatchScheduler::Enqueue(
-    const std::shared_ptr<ModelInferStats>& stats,
-    std::unique_ptr<InferenceRequest>& request)
+DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 {
+#ifdef TRTIS_ENABLE_STATS
+  // FIXME this stat is needed for correct batcher functioning so should
+  // not be ifdefed
+  //
   // Queue timer starts at the beginning of the queueing and
   // scheduling process
   stats->CaptureTimestamp(ModelInferStats::TimestampKind::kQueueStart);
+#endif  // TRTIS_ENABLE_STATS
 
   Status enqueue_status;
   bool wake_runner = false;
   {
     std::lock_guard<std::mutex> lock(mu_);
 
-    RETURN_IF_ERROR(queue_.Enqueue(request->Priority(), request));
-
     queued_batch_size_ += request->BatchSize();
+
+    // Assuming no error is returned, this call takes ownership of
+    // 'request' and so we can't use it after this point.
+    RETURN_IF_ERROR(queue_.Enqueue(request->Priority(), request));
 
     // If there are any idle runners and the queued batch size is greater or
     // equal to next preferred batch size, then wake one up to service this
