@@ -186,7 +186,8 @@ InferInput::AppendFromString(const std::vector<std::string>& input)
 }
 
 Error
-InferInput::ByteSize(size_t* byte_size) const {
+InferInput::ByteSize(size_t* byte_size) const
+{
   *byte_size = byte_size_;
   return Error::Success;
 }

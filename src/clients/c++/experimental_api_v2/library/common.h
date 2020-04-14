@@ -59,7 +59,6 @@ class Error {
   /// \return The messsage for the error. Empty if no error.
   const std::string& Message() const { return msg_; }
 
-
   /// Does this error indicate OK status?
   /// \return True if this error indicates "ok"/"success", false if
   /// error indicates a failure.
@@ -265,7 +264,6 @@ class InferInput {
   InferInput(
       const std::string& name, const std::vector<int64_t>& dims,
       const std::string& datatype);
-
 
   const std::string& Name() const { return name_; }
   const std::string& Datatype() const { return datatype_; }
