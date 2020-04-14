@@ -373,8 +373,7 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_TraceParentId(
 /// object. The 'userp' data is the same as what is supplied in the
 /// call to TRITONSERVER_ServerInferAsync.
 typedef void (*TRITONSERVER_TraceManagerReleaseFn_t)(
-    TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
-    void* userp);
+    TRITONSERVER_TraceManager* trace_manager, void* userp);
 
 /// Type for trace creation callback function. This callback function
 /// is used when a model execution is initiated within the request, if the
@@ -438,8 +437,7 @@ typedef enum tritonserver_requestflag_enum {
 /// object. The 'userp' data is the same as what is supplied in the
 /// call to TRITONSERVER_ServerInferAsync.
 typedef void (*TRITONSERVER_InferenceRequestReleaseFn_t)(
-    TRITONSERVER_Server* server, TRITONSERVER_InferenceRequest* request,
-    void* userp);
+    TRITONSERVER_InferenceRequest* request, void* userp);
 
 /// Type for callback function indicating that an inference response
 /// has completed. The callback function takes ownership of the
@@ -447,8 +445,7 @@ typedef void (*TRITONSERVER_InferenceRequestReleaseFn_t)(
 /// same as what is supplied in the call to
 /// TRITONSERVER_ServerInferAsync.
 typedef void (*TRITONSERVER_InferenceResponseCompleteFn_t)(
-    TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* response,
-    void* userp);
+    TRITONSERVER_InferenceResponse* response, void* userp);
 
 /// Create a new inference request object.
 /// \param inference_request Returns the new request object.
@@ -1157,17 +1154,18 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerMetrics(
 /// \param inference_request The request object.
 /// \param trace_manager The trace manager object for this request, or
 /// nullptr if no tracing.
-/// \param trace_release_fn The function called to return ownership of
-/// the 'trace_manager' object. May be nullptr if no trace manager.
-/// \param trace_release_userp User-provided pointer that is delivered
-/// to the 'trace_release_fn' callback.
+/// \param trace_manager_release_fn The function called to return
+/// ownership of the 'trace_manager' object. May be nullptr if no
+/// trace manager.
+/// \param trace_manager_release_userp User-provided pointer that is
+/// delivered to the 'trace_managerrelease_fn' callback.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerInferAsync(
     TRITONSERVER_Server* server,
     TRITONSERVER_InferenceRequest* inference_request,
     TRITONSERVER_TraceManager* trace_manager,
-    TRITONSERVER_TraceManagerReleaseFn_t trace_release_fn,
-    void* trace_release_userp);
+    TRITONSERVER_TraceManagerReleaseFn_t trace_manager_release_fn,
+    void* trace_manager_release_userp);
 
 
 #ifdef __cplusplus

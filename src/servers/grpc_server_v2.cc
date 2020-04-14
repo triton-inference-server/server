@@ -2267,9 +2267,7 @@ SetInferenceRequestMetadata(
 }
 
 void
-TraceManagerComplete(
-    TRITONSERVER_Server* server, TRITONSERVER_TraceManager* trace_manager,
-    void* userp)
+TraceManagerComplete(TRITONSERVER_TraceManager* trace_manager, void* userp)
 {
   LOG_VERBOSE(1) << "ModelInferHandler::TraceManagerComplete";
 
@@ -2277,9 +2275,7 @@ TraceManagerComplete(
 }
 
 void
-InferRequestComplete(
-    TRITONSERVER_Server* server, TRITONSERVER_InferenceRequest* request,
-    void* userp)
+InferRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
 {
   LOG_VERBOSE(1) << "ModelInferHandler::InferRequestComplete";
 
@@ -2321,8 +2317,7 @@ class ModelInferHandler
 
  private:
   static void InferResponseComplete(
-      TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* response,
-      void* userp);
+      TRITONSERVER_InferenceResponse* response, void* userp);
 
   std::shared_ptr<TraceManager> trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
@@ -2499,8 +2494,7 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
 
 void
 ModelInferHandler::InferResponseComplete(
-    TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* iresponse,
-    void* userp)
+    TRITONSERVER_InferenceResponse* iresponse, void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
 
@@ -2630,8 +2624,7 @@ class ModelStreamInferHandler
 
  private:
   static void StreamInferResponseComplete(
-      TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* response,
-      void* userp);
+      TRITONSERVER_InferenceResponse* response, void* userp);
 
   std::shared_ptr<TraceManager> trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
@@ -2904,8 +2897,7 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
 void
 ModelStreamInferHandler::StreamInferResponseComplete(
-    TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* iresponse,
-    void* userp)
+    TRITONSERVER_InferenceResponse* iresponse, void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
 
