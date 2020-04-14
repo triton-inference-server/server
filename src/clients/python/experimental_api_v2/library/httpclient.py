@@ -887,7 +887,7 @@ class InferenceServerClient:
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
         outputs : list
-            A list of InferOutput objects, each describing how the output
+            A list of InferRequestedOutput objects, each describing how the output
             data must be returned. If not specified all outputs produced
             by the model will be returned using default settings.
         request_id: str
@@ -1012,7 +1012,7 @@ class InferenceServerClient:
             is an empty string which means then the server will choose
             a version based on the model and internal policy.
         outputs : list
-            A list of InferOutput objects, each describing how the output
+            A list of InferRequestedOutput objects, each describing how the output
             data must be returned. If not specified all outputs produced
             by the model will be returned using default settings.
         request_id: str
@@ -1268,8 +1268,8 @@ class InferInput:
             }
 
 
-class InferOutput:
-    """An object of InferOutput class is used to describe a
+class InferRequestedOutput:
+    """An object of InferRequestedOutput class is used to describe a
     requested output tensor for an inference request.
 
     Parameters

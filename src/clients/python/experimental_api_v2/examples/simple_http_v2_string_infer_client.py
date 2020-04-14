@@ -40,7 +40,7 @@ def TestIdentityInference(np_array, binary_data):
     inputs.append(httpclient.InferInput('INPUT0', np_array.shape, "BYTES"))
     inputs[0].set_data_from_numpy(np_array, binary_data=binary_data)
 
-    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=binary_data))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=binary_data))
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
@@ -102,8 +102,8 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data, binary_data=True)
     inputs[1].set_data_from_numpy(input1_data, binary_data=False)
 
-    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=True))
-    outputs.append(httpclient.InferOutput('OUTPUT1', binary_data=False))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
