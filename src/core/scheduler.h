@@ -33,8 +33,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class ModelInferStats;
-
 // Scheduler interface.
 class Scheduler {
  public:
@@ -81,9 +79,7 @@ class Scheduler {
   // then the backend has taken ownership of the request object and so
   // 'request' will be nullptr. If non-success is returned then the
   // caller still retains ownership of 'request'.
-  virtual Status Enqueue(
-      const std::shared_ptr<ModelInferStats>& stats,
-      std::unique_ptr<InferenceRequest>& request) = 0;
+  virtual Status Enqueue(std::unique_ptr<InferenceRequest>& request) = 0;
 };
 
 }}  // namespace nvidia::inferenceserver
