@@ -227,11 +227,9 @@ InferenceBackend::Init(
 }
 
 Status
-InferenceBackend::Enqueue(
-    const std::shared_ptr<ModelInferStats>& stats,
-    std::unique_ptr<InferenceRequest>& request)
+InferenceBackend::Enqueue(std::unique_ptr<InferenceRequest>& request)
 {
-  scheduler_->Enqueue(stats, request);
+  scheduler_->Enqueue(request);
   return Status::Success;
 }
 
@@ -243,12 +241,10 @@ InferenceBackend::Run(
   // Each runner executes using the corresponding context...
   if (runner_idx >= contexts_.size()) {
     InferenceRequest::RespondWithError(
-        &requests,
-        Status(
-            Status::Code::INTERNAL,
-            "unexpected runner index" + std::to_string(runner_idx) +
-                ", max allowed " + std::to_string(contexts_.size())),
-        true /* release_requests */);
+        requests, Status(
+                      Status::Code::INTERNAL,
+                      "unexpected runner index" + std::to_string(runner_idx) +
+                          ", max allowed " + std::to_string(contexts_.size())));
     return;
   }
 
