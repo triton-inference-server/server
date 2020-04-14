@@ -964,8 +964,8 @@ class InferenceServerClient:
                 headers = {}
             headers["Inference-Header-Content-Length"] = json_size
             request_body = struct.pack(
-                '{}s{}s'.format(len(request_body), len(raw_data)),
-                request_body.encode(), raw_data)
+                '{}s{}s'.format(len(request_body), len(binary_data)),
+                request_body.encode(), binary_data)
 
         if model_version != "":
             request_uri = "v2/models/{}/versions/{}/infer".format(
