@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -323,6 +323,7 @@ class EnsembleContext {
   std::string request_id_;
   uint64_t correlation_id_;
   uint32_t priority_;
+  uint64_t timeout_;
 
   // Objects related to the ensemble infer request
   Status ensemble_status_;
@@ -433,6 +434,7 @@ EnsembleContext::EnsembleContext(
     correlation_id_ = lrequest->CorrelationId();
     flags_ = lrequest->Flags();
     priority_ = lrequest->Priority();
+    timeout_ = lrequest->TimeoutMicroseconds();
 
     for (const auto& pr : lrequest->ImmutableInputs()) {
       const InferenceRequest::Input* input = pr.second;
@@ -534,13 +536,13 @@ EnsembleContext::RequestComplete(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestDelete(request),
+        "deleting ensemble inference request");
     auto request_tracker = reinterpret_cast<RequestTracker*>(userp);
     if (request_tracker->DecrementCounter()) {
       delete request_tracker;
     }
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestDelete(request),
-        "deleting ensemble inference request");
   }
 }
 
@@ -818,11 +820,6 @@ EnsembleContext::InitStep(
   auto irequest = std::unique_ptr<InferenceRequest>(
       new InferenceRequest(backend, istep.model_version_));
 
-  // Request for ensemble model cannot override the timeout values for the
-  // composing models. Thus currently the timeout field in request has no
-  // effect until we support an overall ensemble timeout.
-  irequest->SetTimeoutMicroseconds(0);
-
   // Store the pointers to tensors used so that we can prune them afterward.
   // Can't prune the tensor in the input loop below as it may be used by
   // multiple inputs in the same step.
@@ -884,6 +881,7 @@ EnsembleContext::InitStep(
   irequest->SetCorrelationId(correlation_id);
   irequest->SetFlags(flags);
   irequest->SetPriority(priority_);
+  irequest->SetTimeoutMicroseconds(timeout_);
 #ifdef TRITON_ENABLE_STATS
   irequest->SetSecondaryStatsAggregator(
       &request_tracker_->ContextStatsAggregator());
@@ -894,6 +892,15 @@ EnsembleContext::InitStep(
   irequest->SetReleaseCallback(RequestComplete, request_tracker_);
 
   RETURN_IF_ERROR(irequest->PrepareForInference());
+
+#ifdef TRITON_ENABLE_TRACING
+  auto& parent_trace = request_tracker_->Request()->Trace();
+  if (parent_trace != nullptr) {
+    irequest->SetTrace(std::move(parent_trace->SpawnChildTrace()));
+    irequest->Trace()->SetModelName(irequest->ModelName());
+    irequest->Trace()->SetModelVersion(irequest->ActualModelVersion());
+  }
+#endif
 
   // Record the batch size of output in advance as
   // there is no other way to access it later on.
@@ -1207,8 +1214,8 @@ EnsembleScheduler::EnsembleScheduler(
 
 #ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
-    metric_reporter_.reset(
-        new MetricModelReporter(config.name(), 1, -1, config.metric_tags()));
+    MetricModelReporter::Create(
+        config.name(), 1, -1, config.metric_tags(), &metric_reporter_);
   }
 #endif  // TRITON_ENABLE_METRICS
 

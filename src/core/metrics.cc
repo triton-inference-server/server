@@ -30,6 +30,7 @@
 #include "src/core/metrics.h"
 
 #include <thread>
+#include "prometheus/detail/utils.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 
@@ -117,6 +118,12 @@ Metrics::Metrics()
 #endif  // TRITON_ENABLE_METRICS_GPU
       metrics_enabled_(false), gpu_metrics_enabled_(false)
 {
+}
+
+size_t
+Metrics::HashLabels(const std::map<std::string, std::string>& labels)
+{
+  return prometheus::detail::hash_labels(labels);
 }
 
 Metrics::~Metrics()

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -48,11 +48,15 @@ RET=0
 # Fix to allow global stubs import
 sed -i 's/.\/nvidia_inferenceserver/nvidia_inferenceserver/g' $SIMPLE_GO_CLIENT
 
-PACKAGE_PATH="${GOPATH}/src/nvidia_inferenceserver"
-
+PACKAGE_PATH="${GOPATH}/src"
 mkdir -p ${PACKAGE_PATH}
+
 # Requires protoc and protoc-gen-go plugin: https://github.com/golang/protobuf#installation
-protoc -I core --go_out=plugins=grpc:${PACKAGE_PATH} core/*.proto
+# Use "M" arguements since go_package is not specified in .proto files.
+# As mentioned here: https://developers.google.com/protocol-buffers/docs/reference/go-generated#package
+GO_PACKAGE="nvidia_inferenceserver"
+protoc -I core --go_out=plugins=grpc:${PACKAGE_PATH} --go_opt=Mgrpc_service.proto=./${GO_PACKAGE} \
+    --go_opt=Mmodel_config.proto=./${GO_PACKAGE} core/*.proto
 
 set +e
 

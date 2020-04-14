@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -52,7 +52,7 @@ for SIMPLE_CLIENT in simple ; do
     CLIENT_LOG=$SIMPLE_CLIENT
     SIMPLE_CLIENT=./$SIMPLE_CLIENT
 
-    for trial in graphdef savedmodel onnx libtorch plan ; do
+    for trial in graphdef savedmodel onnx libtorch plan; do
         full=${trial}_float32_float32_float32
         rm -rf $MODELSDIR
         mkdir -p $MODELSDIR/simple/1 && \
@@ -85,37 +85,13 @@ for SIMPLE_CLIENT in simple ; do
         set -e
     done
 
-    # custom model needs to be obtained elsewhere
-    rm -rf $MODELSDIR
+    # Use savedmodel for addsub ensemble
     mkdir -p $MODELSDIR/simple/1
-    cp -r ../custom_models/custom_float32_float32_float32/1/* $MODELSDIR/simple/1/.
-    cp ../custom_models/custom_float32_float32_float32/config.pbtxt $MODELSDIR/simple/.
+    cp -r $DATADIR/savedmodel_float32_float32_float32/1/* $MODELSDIR/simple/1/.
+    cp $DATADIR/savedmodel_float32_float32_float32/config.pbtxt $MODELSDIR/simple/.
     (cd $MODELSDIR/simple && \
             sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
             sed -i "s/label_filename:.*//" config.pbtxt)
-    full=custom_float32_float32_float32
-
-    set +e
-
-    # No memory type enforcement
-    $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.$full.log 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.$full.log
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-
-    # Enforce I/O to be in specific memory type
-    for MEM_TYPE in system pinned gpu ; do
-        $SIMPLE_CLIENT -r $MODELSDIR -m $MEM_TYPE >>$CLIENT_LOG.$full.$MEM_TYPE.log 2>&1
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG.$full.$MEM_TYPE.log
-            echo -e "\n***\n*** Test Failed\n***"
-            RET=1
-        fi
-    done
-
-    set -e
 
     # set up "addsub" ensemble
     ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
@@ -127,8 +103,7 @@ for SIMPLE_CLIENT in simple ; do
                 sed -i "s/label_filename:.*//" config.pbtxt)
 
     cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
-        mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1 && \
-        cp libidentity.so $MODELSDIR/nop_TYPE_FP32_-1/1/.
+        mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1
 
     cp -r $DATADIR/plan_float32_float32_float32 $MODELSDIR/. && \
         # make sure version 1 is used (no swap)

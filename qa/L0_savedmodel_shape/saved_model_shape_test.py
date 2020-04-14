@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -63,20 +63,40 @@ class SavedModelShapeTest(tu.TestResultCollector):
             for bs in (1, batch_size):
                 # model that does not support batching
                 if bs == 1:
-                    iu.infer_exact(tester, "savedmodel_nobatch", tensor_shape,
-                                   bs, input_dtype, output0_dtype,
+                    iu.infer_exact(tester,
+                                   "savedmodel_nobatch",
+                                   tensor_shape,
+                                   bs,
+                                   input_dtype,
+                                   output0_dtype,
                                    output1_dtype,
-                                   output0_raw=output0_raw, output1_raw=output1_raw,
-                                   model_version=model_version, swap=swap, outputs=outputs, use_http=use_http,
-                                   use_grpc=use_grpc, skip_request_id_check=skip_request_id_check,
-                                   use_streaming=use_streaming, correlation_id=correlation_id)
+                                   output0_raw=output0_raw,
+                                   output1_raw=output1_raw,
+                                   model_version=model_version,
+                                   swap=swap,
+                                   outputs=outputs,
+                                   use_http=use_http,
+                                   use_grpc=use_grpc,
+                                   skip_request_id_check=skip_request_id_check,
+                                   use_streaming=use_streaming,
+                                   correlation_id=correlation_id)
                 # model that supports batching
-                iu.infer_exact(tester, "savedmodel", (bs,) + tensor_shape, bs,
-                               input_dtype, output0_dtype, output1_dtype,
-                                   output0_raw=output0_raw, output1_raw=output1_raw,
-                                   model_version=model_version, swap=swap, outputs=outputs, use_http=use_http,
-                                   use_grpc=use_grpc, skip_request_id_check=skip_request_id_check,
-                                   use_streaming=use_streaming, correlation_id=correlation_id)
+                iu.infer_exact(tester,
+                               "savedmodel", (bs,) + tensor_shape,
+                               bs,
+                               input_dtype,
+                               output0_dtype,
+                               output1_dtype,
+                               output0_raw=output0_raw,
+                               output1_raw=output1_raw,
+                               model_version=model_version,
+                               swap=swap,
+                               outputs=outputs,
+                               use_http=use_http,
+                               use_grpc=use_grpc,
+                               skip_request_id_check=skip_request_id_check,
+                               use_streaming=use_streaming,
+                               correlation_id=correlation_id)
 
         input_size = 16
 

@@ -45,9 +45,6 @@
 #endif
 
 #include "src/backends/backend/backend_factory.h"
-#ifdef TRITON_ENABLE_CUSTOM
-#include "src/backends/custom/custom_backend_factory.h"
-#endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
 #include "src/backends/ensemble/ensemble_backend_factory.h"
 #endif  // TRITON_ENABLE_ENSEMBLE
@@ -256,15 +253,6 @@ BuildBackendConfigMap(
   }
 #endif  // TRITON_ENABLE_TENSORRT
 
-#ifdef TRITON_ENABLE_CUSTOM
-  //// Custom
-  {
-    auto custom_config = std::make_shared<CustomBackendFactory::Config>();
-    custom_config->inference_server_version = version;
-    (*backend_configs)[kCustomPlatform] = custom_config;
-  }
-#endif  // TRITON_ENABLE_CUSTOM
-
 #ifdef TRITON_ENABLE_ENSEMBLE
   //// Ensemble
   {
@@ -365,12 +353,14 @@ struct BackendDeleter {
 }  // namespace
 
 struct ModelRepositoryManager::ModelInfo {
-  // [TODO] split modification time into versions' and model's
-  // so that we have more information on whether the model reload
-  // is necessary
+  ModelInfo(const int64_t mtime_nsec, const std::string& model_repository_path)
+      : mtime_nsec_(mtime_nsec), explicitly_load_(true),
+        model_repository_path_(model_repository_path)
+  {
+  }
   int64_t mtime_nsec_;
+  bool explicitly_load_;
   inference::ModelConfig model_config_;
-  Platform platform_;
   std::string model_repository_path_;
   // Temporary location to hold agent model list before creating the model
   // backend, the ownership must transfer to BackendLifeCycle to ensure
@@ -492,9 +482,6 @@ class ModelRepositoryManager::BackendLifeCycle {
   std::recursive_mutex map_mtx_;
 
   std::unique_ptr<TritonBackendFactory> triton_backend_factory_;
-#ifdef TRITON_ENABLE_CUSTOM
-  std::unique_ptr<CustomBackendFactory> custom_factory_;
-#endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_TENSORRT
   std::unique_ptr<PlanBackendFactory> plan_factory_;
 #endif  // TRITON_ENABLE_TENSORRT
@@ -525,14 +512,6 @@ ModelRepositoryManager::BackendLifeCycle::Create(
         PlanBackendFactory::Create(config, &(local_life_cycle->plan_factory_)));
   }
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_CUSTOM
-  {
-    const std::shared_ptr<BackendConfig>& config =
-        backend_config_map.find(kCustomPlatform)->second;
-    RETURN_IF_ERROR(CustomBackendFactory::Create(
-        config, &(local_life_cycle->custom_factory_)));
-  }
-#endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
   {
     const std::shared_ptr<BackendConfig>& config =
@@ -799,11 +778,9 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
       // If the version backend is being served, the re-load of the version
       // should be performed in background to avoid version down-time
       if (serving_backend->state_ == ModelReadyState::READY) {
-        if (res.first->second.second != nullptr) {
-          res.first->second.second.reset(new BackendInfo(
-              repository_path, ModelReadyState::UNKNOWN, ActionType::NO_ACTION,
-              model_config));
-        }
+        res.first->second.second.reset(new BackendInfo(
+            repository_path, ModelReadyState::UNKNOWN, ActionType::NO_ACTION,
+            model_config));
       }
     }
   }
@@ -1152,13 +1129,6 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
             version_path, model_config, min_compute_capability_, &is);
         break;
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_CUSTOM
-      case Platform::PLATFORM_CUSTOM:
-        status = custom_factory_->CreateBackend(
-            backend_info->repository_path_, model_name, version, model_config,
-            min_compute_capability_, &is);
-        break;
-#endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
       case Platform::PLATFORM_ENSEMBLE: {
         status = ensemble_factory_->CreateBackend(
@@ -1321,7 +1291,7 @@ ModelRepositoryManager::Create(
     RETURN_IF_ERROR(local_manager->PollAndUpdateInternal(&all_models_polled));
   } else {
     RETURN_IF_ERROR(local_manager->LoadUnloadModels(
-        startup_models, ActionType::LOAD, &all_models_polled));
+        startup_models, ActionType::LOAD, false, &all_models_polled));
   }
 
   *model_repository_manager = std::move(local_manager);
@@ -1476,7 +1446,8 @@ ModelRepositoryManager::LoadModelByDependency()
 
 Status
 ModelRepositoryManager::LoadUnloadModel(
-    const std::string& model_name, ActionType type)
+    const std::string& model_name, const ActionType type,
+    const bool unload_dependents)
 {
   if (!model_control_enabled_) {
     return Status(
@@ -1488,7 +1459,8 @@ ModelRepositoryManager::LoadUnloadModel(
   std::lock_guard<std::mutex> lock(poll_mu_);
 
   bool polled = true;
-  RETURN_IF_ERROR(LoadUnloadModels({model_name}, type, &polled));
+  RETURN_IF_ERROR(
+      LoadUnloadModels({model_name}, type, unload_dependents, &polled));
 
   // Check if model is loaded / unloaded properly
   const auto version_states = backend_life_cycle_->VersionStates(model_name);
@@ -1527,8 +1499,8 @@ ModelRepositoryManager::LoadUnloadModel(
 
 Status
 ModelRepositoryManager::LoadUnloadModels(
-    const std::set<std::string>& model_names, ActionType type,
-    bool* all_models_polled)
+    const std::set<std::string>& model_names, const ActionType type,
+    const bool unload_dependents, bool* all_models_polled)
 {
   auto status = Status::Success;
   *all_models_polled = true;
@@ -1544,6 +1516,9 @@ ModelRepositoryManager::LoadUnloadModels(
       std::set<std::string> models = model_names;
 
       ModelInfoMap new_infos;
+#ifdef TRITON_ENABLE_ENSEMBLE
+      bool first_iteration = true;
+#endif  // TRITON_ENABLE_ENSEMBLE
       while (!models.empty()) {
         bool polled = true;
         RETURN_IF_ERROR(Poll(
@@ -1558,6 +1533,7 @@ ModelRepositoryManager::LoadUnloadModels(
           auto it = new_infos.find(model);
           // Some models may be marked as deleted and not in 'new_infos'
           if (it != new_infos.end()) {
+            it->second->explicitly_load_ = first_iteration;
             const auto& config = it->second->model_config_;
             if (config.has_ensemble_scheduling()) {
               for (const auto& step : config.ensemble_scheduling().step()) {
@@ -1570,8 +1546,8 @@ ModelRepositoryManager::LoadUnloadModels(
             }
           }
         }
+        first_iteration = false;
 #endif  // TRITON_ENABLE_ENSEMBLE
-
         models.swap(next_models);
       }
 
@@ -1587,16 +1563,20 @@ ModelRepositoryManager::LoadUnloadModels(
       }
     }
   }
+  std::set<std::string> deleted_dependents;
+
+  // Update dependency graph and load
+  UpdateDependencyGraph(
+      added, deleted, modified,
+      unload_dependents ? &deleted_dependents : nullptr);
+
   // The models are in 'deleted' either when they are asked to be unloaded or
   // they are not found / are duplicated across all model repositories.
   // In all cases, should unload them and remove from 'infos_' explicitly.
-  for (const auto& name : deleted) {
+  for (const auto& name : (unload_dependents ? deleted_dependents : deleted)) {
     infos_.erase(name);
     backend_life_cycle_->AsyncUnload(name);
   }
-
-  // Update dependency graph and load
-  UpdateDependencyGraph(added, deleted, modified);
 
   // load / unload the models affected, and check the load status of
   // the requested models
@@ -1833,10 +1813,8 @@ ModelRepositoryManager::Poll(
 
     Status status = Status::Success;
     if (model_poll_state != STATE_UNMODIFIED) {
-      model_info.reset(new ModelInfo());
+      model_info.reset(new ModelInfo(mtime_ns, repository));
       inference::ModelConfig& model_config = model_info->model_config_;
-      model_info->mtime_nsec_ = mtime_ns;
-      model_info->model_repository_path_ = repository;
 
       // Create the associated repo agent models when a model is to be loaded,
       // this must be done before normalizing model config as agents might
@@ -1890,8 +1868,6 @@ ModelRepositoryManager::Poll(
         }
       }
       if (status.IsOk()) {
-        model_info->platform_ = GetPlatform(model_config.platform());
-
         // Make sure the name of the model matches the name of the
         // directory. This is a somewhat arbitrary requirement but seems
         // like good practice to require it of the user. It also acts as a
@@ -1949,7 +1925,8 @@ ModelRepositoryManager::Poll(
 Status
 ModelRepositoryManager::UpdateDependencyGraph(
     const std::set<std::string>& added, const std::set<std::string>& deleted,
-    const std::set<std::string>& modified)
+    const std::set<std::string>& modified,
+    std::set<std::string>* deleted_dependents)
 {
   // update dependency graph, if the state of a node is changed, all its
   // downstreams will be affected
@@ -1959,29 +1936,43 @@ ModelRepositoryManager::UpdateDependencyGraph(
   // on other models
   std::set<DependencyNode*> affected_nodes;
   std::set<DependencyNode*> updated_nodes;
-  for (const auto& model_name : deleted) {
-    auto it = dependency_graph_.find(model_name);
-    if (it != dependency_graph_.end()) {
-      // remove this node from its upstreams
-      for (auto& upstream : it->second->upstreams_) {
-        upstream.first->downstreams_.erase(it->second.get());
-      }
-      it->second->upstreams_.clear();
-
-      if (!it->second->downstreams_.empty()) {
-        UncheckDownstream(&it->second->downstreams_, &affected_nodes);
-        // mark this node as missing upstream in its downstreams
-        for (auto& downstream : it->second->downstreams_) {
-          downstream->missing_upstreams_.emplace(it->second.get());
+  std::set<std::string> current_deleted = deleted;
+  while (!current_deleted.empty()) {
+    std::set<std::string> next_deleted;
+    for (const auto& model_name : current_deleted) {
+      auto it = dependency_graph_.find(model_name);
+      if (it != dependency_graph_.end()) {
+        // remove this node from its upstreams
+        for (auto& upstream : it->second->upstreams_) {
+          upstream.first->downstreams_.erase(it->second.get());
+          // Check if the upstream should be removed aas well
+          if ((deleted_dependents != nullptr) &&
+              (upstream.first->downstreams_.empty()) &&
+              (!upstream.first->explicitly_load_)) {
+            next_deleted.emplace(upstream.first->model_name_);
+          }
         }
-        missing_nodes_.emplace(
-            std::make_pair(model_name, std::move(it->second)));
-      }
+        it->second->upstreams_.clear();
 
-      // Make sure deleted node will not be in affected nodes
-      affected_nodes.erase(it->second.get());
-      dependency_graph_.erase(it);
+        if (!it->second->downstreams_.empty()) {
+          UncheckDownstream(&it->second->downstreams_, &affected_nodes);
+          // mark this node as missing upstream in its downstreams
+          for (auto& downstream : it->second->downstreams_) {
+            downstream->missing_upstreams_.emplace(it->second.get());
+          }
+          missing_nodes_.emplace(
+              std::make_pair(model_name, std::move(it->second)));
+        }
+
+        // Make sure deleted node will not be in affected nodes
+        affected_nodes.erase(it->second.get());
+        dependency_graph_.erase(it);
+      }
+      if (deleted_dependents != nullptr) {
+        deleted_dependents->emplace(model_name);
+      }
     }
+    current_deleted.swap(next_deleted);
   }
 
   // modified, invalidate (uncheck) all downstreams
@@ -1989,7 +1980,10 @@ ModelRepositoryManager::UpdateDependencyGraph(
     auto it = dependency_graph_.find(model_name);
     if (it != dependency_graph_.end()) {
       UncheckDownstream(&it->second->downstreams_, &affected_nodes);
-      GetModelConfig(model_name, &it->second->model_config_);
+      ModelInfo* info = nullptr;
+      GetModelInfo(model_name, &info);
+      it->second->model_config_ = info->model_config_;
+      it->second->explicitly_load_ = info->explicitly_load_;
       // remove this node from its upstream node
       for (auto& upstream : it->second->upstreams_) {
         upstream.first->downstreams_.erase(it->second.get());
@@ -2020,7 +2014,10 @@ ModelRepositoryManager::UpdateDependencyGraph(
       // Right now, nothing is going to be filled until validation
       added_node.reset(new DependencyNode(model_name));
     }
-    GetModelConfig(model_name, &added_node->model_config_);
+    ModelInfo* info = nullptr;
+    GetModelInfo(model_name, &info);
+    added_node->model_config_ = info->model_config_;
+    added_node->explicitly_load_ = info->explicitly_load_;
     updated_nodes.emplace(added_node.get());
     dependency_graph_.emplace(
         std::make_pair(model_name, std::move(added_node)));
@@ -2139,8 +2136,8 @@ ModelRepositoryManager::ConnectDependencyGraph(DependencyNode* updated_node)
 }
 
 Status
-ModelRepositoryManager::GetModelConfig(
-    const std::string& name, inference::ModelConfig* model_config)
+ModelRepositoryManager::GetModelInfo(
+    const std::string& name, ModelInfo** model_info)
 {
   const auto itr = infos_.find(name);
   if (itr == infos_.end()) {
@@ -2148,7 +2145,7 @@ ModelRepositoryManager::GetModelConfig(
         Status::Code::NOT_FOUND, "no configuration for model '" + name + "'");
   }
 
-  *model_config = itr->second->model_config_;
+  *model_info = itr->second.get();
   return Status::Success;
 }
 

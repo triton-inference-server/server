@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -61,6 +61,10 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
                     test_backlog_sequence_timeout \
                     test_ragged_batch"
     QUEUE_DELAY_TESTS="test_queue_delay_full_min_util"
+fi
+
+if [ -z "$TEST_JETSON" ]; then
+    TEST_JETSON="0"
 fi
 
 # Shortened tests due to jetson slowdown
@@ -200,6 +204,15 @@ for MODEL in $MODELS; do
       (cd queue_delay_models/$(basename $MODEL)_full && \
         sed -i "s/$(basename $MODEL)/$(basename $MODEL)_full/" config.pbtxt && \
         sed -i "s/minimum_slot_utilization: 0/minimum_slot_utilization: 1/" config.pbtxt)
+  else
+    cp -r $MODEL queue_delay_models/$(basename $MODEL)_full && \
+      (cd queue_delay_models/$(basename $MODEL)_full && \
+        sed -i "s/$(basename $MODEL)/$(basename $MODEL)_full/" config.pbtxt && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt && \
+        sed -i "s/sequence_batching {/sequence_batching {\\ndirect {\\nmax_queue_delay_microseconds: 3000000\\nminimum_slot_utilization: 0\\n}/" config.pbtxt && \
+        sed -i "s/minimum_slot_utilization: 0/minimum_slot_utilization: 1/" config.pbtxt)
   fi
 done
 
@@ -270,7 +283,7 @@ for model_trial in $MODEL_TRIALS; do
 
     if [ "$ENSEMBLES" == "1" ]; then
       cp -r $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/nop_* `pwd`/$MODEL_PATH/.
-      create_nop_modelfile `pwd`/libidentity.so `pwd`/$MODEL_PATH
+        create_nop_version_dir `pwd`/$MODEL_PATH
     fi
 
     # Need to launch the server for each test so that the model status
@@ -325,7 +338,7 @@ for model_trial in $MODEL_TRIALS; do
 
         set +e
         if [ "$TEST_VALGRIND" -eq 1 ]; then
-            check_valgrind_log $LEAKCHECK_LOG
+            python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
             if [ $? -ne 0 ]; then
                 RET=1
             fi
@@ -392,7 +405,7 @@ for model_trial in $MODEL_TRIALS; do
 
         set +e
         if [ "$TEST_VALGRIND" -eq 1 ]; then
-            check_valgrind_log $LEAKCHECK_LOG
+            python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
             if [ $? -ne 0 ]; then
                 RET=1
             fi
@@ -418,61 +431,61 @@ if [[ $BACKENDS == *"custom"* ]]; then
   # used for execution). Test everything with fixed-tensor-size
   # models and variable-tensor-size models.
   for i in test_ragged_batch_allowed ; do
-      export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
-      export TRITONSERVER_DELAY_SCHEDULER=12
+    export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
+    export TRITONSERVER_DELAY_SCHEDULER=12
 
-      SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-      SERVER_LOG="./$i.$MODEL_PATH.serverlog"
+    SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+    SERVER_LOG="./$i.$MODEL_PATH.serverlog"
 
-      if [ "$TEST_VALGRIND" -eq 1 ]; then
-          LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
-          LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
-          run_server_leakcheck
-      elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-          # We rely on HTTP endpoint in run_server so until HTTP is
-          # implemented for win we do this hack...
-          run_server_nowait
-          sleep 15
-      else
-          run_server
-      fi
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+      LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
+      LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+      run_server_leakcheck
+    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+      # We rely on HTTP endpoint in run_server so until HTTP is
+      # implemented for win we do this hack...
+      run_server_nowait
+      sleep 15
+    else
+        run_server
+    fi
 
-      if [ "$SERVER_PID" == "0" ]; then
-          echo -e "\n***\n*** Failed to start $SERVER\n***"
-          cat $SERVER_LOG
-          exit 1
-      fi
+    if [ "$SERVER_PID" == "0" ]; then
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      cat $SERVER_LOG
+      exit 1
+    fi
 
-      echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
+    echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
 
-      set +e
-      python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+    set +e
+    python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+      echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+      echo -e "\n***\n*** Test $i Failed\n***"
+      RET=1
+    else
+      check_test_results $CLIENT_LOG 1
       if [ $? -ne 0 ]; then
-          echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-          echo -e "\n***\n*** Test $i Failed\n***"
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+      fi
+    fi
+    set -e
+
+    unset TRITONSERVER_DELAY_SCHEDULER
+    unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
+    kill_server
+
+    set +e
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+      python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+      if [ $? -ne 0 ]; then
           RET=1
-      else
-          check_test_results $CLIENT_LOG 1
-          if [ $? -ne 0 ]; then
-              cat $CLIENT_LOG
-              echo -e "\n***\n*** Test Result Verification Failed\n***"
-              RET=1
-          fi
       fi
-      set -e
-
-      unset TRITONSERVER_DELAY_SCHEDULER
-      unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
-      kill_server
-
-      set +e
-      if [ "$TEST_VALGRIND" -eq 1 ]; then
-          check_valgrind_log $LEAKCHECK_LOG
-          if [ $? -ne 0 ]; then
-              RET=1
-          fi
-      fi
-      set -e
+    fi
+    set -e
   done
 fi
 
@@ -530,7 +543,7 @@ for i in $QUEUE_DELAY_TESTS ; do
 
     set +e
     if [ "$TEST_VALGRIND" -eq 1 ]; then
-        check_valgrind_log $LEAKCHECK_LOG
+        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
         if [ $? -ne 0 ]; then
             RET=1
         fi

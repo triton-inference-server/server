@@ -1555,8 +1555,33 @@ CommonHandler::SetUpAllRequests()
           grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
         if (request.repository_name().empty()) {
-          err = TRITONSERVER_ServerUnloadModel(
-              tritonserver_.get(), request.model_name().c_str());
+          // Check if the dependent models should be removed
+          bool unload_dependents = false;
+          for (auto param : request.parameters()) {
+            if (param.first.compare("unload_dependents") == 0) {
+              const auto& unload_param = param.second;
+              if (unload_param.parameter_choice_case() !=
+                  inference::ModelRepositoryParameter::ParameterChoiceCase::
+                      kBoolParam) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "invalid value type for 'unload_dependents' parameter, "
+                    "expected "
+                    "bool_param.");
+              }
+              unload_dependents = unload_param.bool_param();
+              break;
+            }
+          }
+          if (err == nullptr) {
+            if (unload_dependents) {
+              err = TRITONSERVER_ServerUnloadModelAndDependents(
+                  tritonserver_.get(), request.model_name().c_str());
+            } else {
+              err = TRITONSERVER_ServerUnloadModel(
+                  tritonserver_.get(), request.model_name().c_str());
+            }
+          }
         } else {
           err = TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_UNSUPPORTED,
@@ -1784,6 +1809,11 @@ class InferHandlerState {
     {
       ctx_.reset(new grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
+    }
+
+    void SetCompressionLevel(grpc_compression_level compression_level)
+    {
+      ctx_->set_compression_level(compression_level);
     }
 
     // Increments the ongoing request counter
@@ -3019,9 +3049,11 @@ class ModelInferHandler
       TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       inference::GRPCInferenceService::AsyncService* service,
-      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
+      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count,
+      grpc_compression_level compression_level)
       : InferHandler(name, tritonserver, service, cq, max_state_bucket_count),
-        trace_manager_(trace_manager), shm_manager_(shm_manager)
+        trace_manager_(trace_manager), shm_manager_(shm_manager),
+        compression_level_(compression_level)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
@@ -3051,12 +3083,15 @@ class ModelInferHandler
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
   TRITONSERVER_ResponseAllocator* allocator_;
+
+  grpc_compression_level compression_level_;
 };
 
 void
 ModelInferHandler::StartNewRequest()
 {
   auto context = std::make_shared<State::Context>(cq_);
+  context->SetCompressionLevel(compression_level_);
   State* state = StateNew(tritonserver_.get(), context);
 
 #ifdef TRITON_ENABLE_TRACING
@@ -3363,9 +3398,11 @@ class ModelStreamInferHandler
       TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       inference::GRPCInferenceService::AsyncService* service,
-      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
+      grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count,
+      grpc_compression_level compression_level)
       : InferHandler(name, tritonserver, service, cq, max_state_bucket_count),
-        trace_manager_(trace_manager), shm_manager_(shm_manager)
+        trace_manager_(trace_manager), shm_manager_(shm_manager),
+        compression_level_(compression_level)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
@@ -3396,12 +3433,15 @@ class ModelStreamInferHandler
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
   TRITONSERVER_ResponseAllocator* allocator_;
+
+  grpc_compression_level compression_level_;
 };
 
 void
 ModelStreamInferHandler::StartNewRequest()
 {
   auto context = std::make_shared<State::Context>(cq_, NEXT_UNIQUE_ID);
+  context->SetCompressionLevel(compression_level_);
   State* state = StateNew(tritonserver_.get(), context);
 
 #ifdef TRITON_ENABLE_TRACING
@@ -3892,10 +3932,12 @@ GRPCServer::GRPCServer(
     nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const std::string& server_addr, bool use_ssl, const SslOptions& ssl_options,
-    const int infer_allocation_pool_size)
+    const int infer_allocation_pool_size,
+    grpc_compression_level compression_level)
     : server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
       server_addr_(server_addr), use_ssl_(use_ssl), ssl_options_(ssl_options),
-      infer_allocation_pool_size_(infer_allocation_pool_size), running_(false)
+      infer_allocation_pool_size_(infer_allocation_pool_size),
+      compression_level_(compression_level), running_(false)
 {
 }
 
@@ -3910,12 +3952,13 @@ GRPCServer::Create(
     nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
     bool use_ssl, const SslOptions& ssl_options, int infer_allocation_pool_size,
+    grpc_compression_level compression_level,
     std::unique_ptr<GRPCServer>* grpc_server)
 {
   const std::string addr = "0.0.0.0:" + std::to_string(port);
   grpc_server->reset(new GRPCServer(
       server, trace_manager, shm_manager, addr, use_ssl, ssl_options,
-      infer_allocation_pool_size));
+      infer_allocation_pool_size, compression_level));
 
   return nullptr;  // success
 }
@@ -3967,7 +4010,8 @@ GRPCServer::Start()
   ModelInferHandler* hmodelinfer = new ModelInferHandler(
       "ModelInferHandler", server_, trace_manager_, shm_manager_, &service_,
       model_infer_cq_.get(),
-      infer_allocation_pool_size_ /* max_state_bucket_count */);
+      infer_allocation_pool_size_ /* max_state_bucket_count */,
+      compression_level_);
   hmodelinfer->Start();
   model_infer_handler_.reset(hmodelinfer);
 
@@ -3975,7 +4019,8 @@ GRPCServer::Start()
   ModelStreamInferHandler* hmodelstreaminfer = new ModelStreamInferHandler(
       "ModelStreamInferHandler", server_, trace_manager_, shm_manager_,
       &service_, model_stream_infer_cq_.get(),
-      infer_allocation_pool_size_ /* max_state_bucket_count */);
+      infer_allocation_pool_size_ /* max_state_bucket_count */,
+      compression_level_);
   hmodelstreaminfer->Start();
   model_stream_infer_handler_.reset(hmodelstreaminfer);
 

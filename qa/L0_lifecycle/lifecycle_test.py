@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -320,7 +320,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
                 # one model uses sequence batcher while the other uses dynamic batcher
                 model_names = [
-                    "custom_sequence_int32", "custom_int32_int32_int32"
+                    "onnx_sequence_int32", "onnx_int32_int32_int32"
                 ]
                 for model_name in model_names:
                     self.assertFalse(triton_client.is_model_ready(model_name))
@@ -1500,6 +1500,104 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
+
+    def test_model_control_ensemble(self):
+        model_shape = (1, 16)
+        onnx_name = tu.get_model_name('onnx', np.float32, np.float32,
+                                      np.float32)
+
+        ensemble_prefix = "simple_"
+        ensemble_name = ensemble_prefix + onnx_name
+
+        # Make sure no models are loaded
+        for model_name in (onnx_name, ensemble_name):
+            try:
+                for triton_client in (httpclient.InferenceServerClient(
+                        "localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient(
+                                          "localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Load ensemble model, the dependent model should be polled and loaded
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                             verbose=True)
+            triton_client.load_model(ensemble_name)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        self._infer_success_models([
+            "onnx",
+        ], (1, 3), model_shape)
+        self._infer_success_models([
+            "simple_onnx",
+        ], (1, 3),
+                                   model_shape,
+                                   swap=True)
+
+
+        # Unload the ensemble with unload_dependents flag. all models should be unloaded
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                             verbose=True)
+            triton_client.unload_model(ensemble_name, unload_dependents=True)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        for model_name in (onnx_name, ensemble_name):
+            try:
+                for triton_client in (httpclient.InferenceServerClient(
+                        "localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient(
+                                          "localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Load ensemble model, and unload it without unload_dependents flag (default).
+        # The dependent model should still be available
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                             verbose=True)
+            triton_client.load_model(ensemble_name)
+            triton_client.unload_model(ensemble_name)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        self._infer_success_models([
+            "onnx",
+        ], (1, 3), model_shape)
+
+        try:
+            for triton_client in (httpclient.InferenceServerClient(
+                    "localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient(
+                                      "localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(
+                    triton_client.is_model_ready(ensemble_name, "1"))
+                self.assertFalse(
+                    triton_client.is_model_ready(ensemble_name, "3"))
+                self.assertTrue(
+                    triton_client.is_model_ready(onnx_name, "1"))
+                self.assertTrue(
+                    triton_client.is_model_ready(onnx_name, "3"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+
     def test_load_same_model_different_platform(self):
         model_shape = (1, 16)
         model_name = tu.get_model_name('simple', np.float32, np.float32,
@@ -1679,6 +1777,62 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         self._infer_success_identity(model_base, (2,), np.int32, model_shape)
+
+    def test_model_availability_on_reload_3(self):
+        model_name = "identity_zero_1_int32"
+        model_base = "identity"
+        model_shape = (16,)
+
+        # Check whether or not to use grpc protocol
+        use_grpc = "TRITONSERVER_USE_GRPC" in os.environ
+
+        # Make sure version 1 of the model is loaded
+        try:
+            triton_client = self._get_client(use_grpc)
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_identity(model_base, (1,), np.int32, model_shape)
+
+        # Overwrite config.pbtxt to load v2 only
+        shutil.copyfile("config.pbtxt.new",
+                        "models/" + model_name + "/config.pbtxt")
+
+        # Reload models, v1 will be reloaded but it should  be available
+        # during the whole reload
+        thread = threading.Thread(target=self._async_load,
+                                  args=(model_name, use_grpc))
+        thread.start()
+        # wait for time < model creation delay to ensure load request is sent
+        time.sleep(3)
+        load_start = time.time()
+
+        # Make sure version 1 of the model is still available
+        try:
+            triton_client = self._get_client(use_grpc)
+            self.assertTrue(triton_client.is_server_live())
+            load_end = time.time()
+            self.assertTrue((load_end - load_start) < 5,
+                            "server was waiting unexpectly, waited {}".format(
+                                (load_end - load_start)))
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_identity(model_base, (1,), np.int32, model_shape)
+
+        thread.join()
+        # Make sure version 1 of the model is still available after reload
+        try:
+            triton_client = self._get_client(use_grpc)
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_identity(model_base, (1,), np.int32, model_shape)
 
     def test_model_reload_fail(self):
         model_name = "identity_zero_1_int32"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -48,10 +48,10 @@
 ##
 ############################################################################
 
-TRITON_VERSION=21.02
+TRITON_VERSION=21.04
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
-ONNX_VERSION=1.6.0
+ONNX_VERSION=1.7.0
 ONNX_OPSET=0
 
 ONNX_IMAGE=${ONNX_IMAGE:=ubuntu:20.04}
@@ -65,6 +65,7 @@ HOST_SRCDIR=/tmp/gen_srcdir
 HOST_DESTDIR=/tmp/$TRITON_VERSION/qa_model_repository
 HOST_VARDESTDIR=/tmp/$TRITON_VERSION/qa_variable_model_repository
 HOST_IDENTITYDESTDIR=/tmp/$TRITON_VERSION/qa_identity_model_repository
+HOST_SIGDEFDESTDIR=/tmp/$TRITON_VERSION/qa_tf_tag_sigdef_repository 
 HOST_IDENTITYBIGDESTDIR=/tmp/$TRITON_VERSION/qa_identity_big_model_repository
 HOST_SHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_shapetensor_model_repository
 HOST_RESHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_reshape_model_repository
@@ -78,7 +79,7 @@ HOST_RAGGEDDESTDIR=/tmp/$TRITON_VERSION/qa_ragged_model_repository
 HOST_FORMATDESTDIR=/tmp/$TRITON_VERSION/qa_trt_format_model_repository
 
 rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR
-rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR
+rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR $HOST_SIGDEFDESTDIR
 rm -fr $HOST_SEQDESTDIR $HOST_DYNASEQDESTDIR $HOST_VARSEQDESTDIR
 rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR $HOST_RESHAPEDESTDIR
 rm -fr $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_FORMATDESTDIR
@@ -86,6 +87,7 @@ mkdir -p $HOST_SRCDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
 mkdir -p $HOST_IDENTITYDESTDIR
+mkdir -p $HOST_SIGDEFDESTDIR
 mkdir -p $HOST_IDENTITYBIGDESTDIR
 mkdir -p $HOST_SHAPEDESTDIR
 mkdir -p $HOST_RESHAPEDESTDIR
@@ -122,6 +124,7 @@ cp ./gen_qa_trt_plugin_models.py $HOST_SRCDIR/.
 cp ./gen_qa_trt_format_models.py $HOST_SRCDIR/.
 cp ./gen_qa_ragged_models.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
+cp ./gen_tag_sigdef.py $HOST_SRCDIR/.
 
 ONNXSCRIPT=onnx_gen.cmds
 TORCHSCRIPT=torch_gen.cmds
@@ -132,6 +135,7 @@ SRCDIR=/tmp/src
 DESTDIR=/tmp/models
 VARDESTDIR=/tmp/varmodels
 IDENTITYDESTDIR=/tmp/zeromodels
+SIGDEFDESTDIR=/tmp/sigdefmodels
 IDENTITYBIGDESTDIR=/tmp/zerobigmodels
 SHAPEDESTDIR=/tmp/shapetensormodels
 RESHAPEDESTDIR=/tmp/reshapemodels
@@ -169,6 +173,8 @@ python3 $SRCDIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --vari
 chmod -R 777 $VARSEQDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$DYNASEQDESTDIR
 chmod -R 777 $DYNASEQDESTDIR
+python3 $SRCDIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$RAGGEDDESTDIR
+chmod -R 777 $RAGGEDDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$ONNXSCRIPT
@@ -187,6 +193,7 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$ONNXSCRIPT \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
+       --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
        $ONNX_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -255,12 +262,15 @@ python3 $SRCDIR/gen_qa_dyna_sequence_models.py --graphdef --savedmodel --models_
 chmod -R 777 $DYNASEQDESTDIR
 python3 $SRCDIR/gen_qa_noshape_models.py --savedmodel --models_dir=$NOSHAPEDESTDIR
 chmod -R 777 $NOSHAPEDESTDIR
+python3 $SRCDIR/gen_qa_ragged_models.py --savedmodel --models_dir=$RAGGEDDESTDIR
+chmod -R 777 $RAGGEDDESTDIR
 python3 $SRCDIR/gen_qa_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_model_repository
 python3 $SRCDIR/gen_qa_models.py --ensemble --variable --models_dir=$ENSEMBLEDESTDIR/qa_variable_model_repository
 python3 $SRCDIR/gen_qa_reshape_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_reshape_model_repository
 python3 $SRCDIR/gen_qa_identity_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_identity_model_repository
 python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_sequence_model_repository
 python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
+python3 $SRCDIR/gen_tag_sigdef.py --dir $SIGDEFDESTDIR
 chmod -R 777 $ENSEMBLEDESTDIR
 EOF
 
@@ -276,12 +286,14 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
        --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
+       --mount type=bind,source=$HOST_SIGDEFDESTDIR,target=$SIGDEFDESTDIR \
        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_NOSHAPEDESTDIR,target=$NOSHAPEDESTDIR \
        --mount type=bind,source=$HOST_ENSEMBLEDESTDIR,target=$ENSEMBLEDESTDIR \
+       --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
        $TENSORFLOW_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"

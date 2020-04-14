@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -31,6 +31,8 @@ namespace nvidia { namespace inferenceserver {
 
 constexpr char kInferHeaderContentLengthHTTPHeader[] =
     "Inference-Header-Content-Length";
+constexpr char kAcceptEncodingHTTPHeader[] = "Accept-Encoding";
+constexpr char kContentEncodingHTTPHeader[] = "Content-Encoding";
 
 #ifdef TRITON_ENABLE_TENSORFLOW
 constexpr char kTensorFlowGraphDefPlatform[] = "tensorflow_graphdef";
@@ -57,11 +59,6 @@ constexpr char kPyTorchLibTorchPlatform[] = "pytorch_libtorch";
 constexpr char kPyTorchLibTorchFilename[] = "model.pt";
 constexpr char kPyTorchBackend[] = "pytorch";
 #endif  // TRITON_ENABLE_PYTORCH
-
-#ifdef TRITON_ENABLE_CUSTOM
-constexpr char kCustomPlatform[] = "custom";
-constexpr char kCustomFilename[] = "libcustom.so";
-#endif  // TRITON_ENABLE_CUSTOM
 
 #ifdef TRITON_ENABLE_ENSEMBLE
 constexpr char kEnsemblePlatform[] = "ensemble";

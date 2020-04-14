@@ -83,7 +83,8 @@ TritonServerError::Create(const ni::Status& status)
   }
 
   return Create(
-      StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+      ni::StatusCodeToTritonCode(status.StatusCode()),
+      status.Message().c_str());
 }
 
 class MockSharedLibraryHandle {

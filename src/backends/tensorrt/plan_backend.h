@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,7 +34,7 @@
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
-#include "src/core/sync_queue.h"
+#include "triton/common/sync_queue.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -62,7 +62,7 @@ class PlanBackend : public InferenceBackend {
       const std::string& instance_name, const int gpu_device,
       const std::vector<char>& models,
       const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
-      const std::shared_ptr<SyncQueue<size_t>>& context_queue);
+      const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(PlanBackend);
@@ -95,7 +95,7 @@ class PlanBackend : public InferenceBackend {
         const bool enable_pinned_input, const bool enable_pinned_output,
         const size_t gather_kernel_buffer_threshold,
         const bool separate_output_copy_stream,
-        std::unique_ptr<MetricModelReporter>&& metric_reporter);
+        std::shared_ptr<MetricModelReporter>&& metric_reporter);
     ~Context();
 
     DISALLOW_MOVE(Context);
@@ -174,7 +174,8 @@ class PlanBackend : public InferenceBackend {
         std::vector<std::unique_ptr<InferenceRequest>>&& requests) override;
 
     void ProcessResponse(
-        size_t context_idx, std::shared_ptr<SyncQueue<size_t>> context_queue);
+        size_t context_idx,
+        std::shared_ptr<triton::common::SyncQueue<size_t>> context_queue);
 
     // A struct to hold TensorRT execution context and its meta data, a backend
     // context can have multiple of this struct if multiple optimization
@@ -354,7 +355,7 @@ class PlanBackend : public InferenceBackend {
 
     // Assume that the lifetime of composing completion data to extend till
     // the responses are returned.
-    SyncQueue<std::unique_ptr<Payload>> completion_queue_;
+    triton::common::SyncQueue<std::unique_ptr<Payload>> completion_queue_;
 
     // Map from profile index to the corresponding TensorRT context. Use map
     // to ensure each profile index is mapped to exactly one TensorRT context.
@@ -434,7 +435,8 @@ class PlanBackend : public InferenceBackend {
       device_engines_;
 
   // vector for storing available context queue associated with a runner
-  std::vector<std::shared_ptr<SyncQueue<size_t>>> available_context_queue_;
+  std::vector<std::shared_ptr<triton::common::SyncQueue<size_t>>>
+      available_context_queue_;
 
   // Next context to be used for the runner.
   std::vector<size_t> next_context_;

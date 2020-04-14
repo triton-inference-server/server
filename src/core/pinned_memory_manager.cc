@@ -199,8 +199,9 @@ PinnedMemoryManager::Create(const Options& options)
       &buffer, options.pinned_memory_pool_byte_size_, cudaHostAllocPortable);
   if (err != cudaSuccess) {
     buffer = nullptr;
-    LOG_ERROR << "failed to allocate pinned system memory: "
-              << std::string(cudaGetErrorString(err));
+    LOG_WARNING << "Unable to allocate pinned system memory, pinned memory "
+                   "pool will not be available: "
+                << std::string(cudaGetErrorString(err));
   } else {
     LOG_INFO << "Pinned memory pool is created at '" << PointerToString(buffer)
              << "' with size " << options.pinned_memory_pool_byte_size_;

@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 name: "custom_zero_1_float32"
-platform: "custom"
+backend: "identity"
 max_batch_size: 1
 input [
   {

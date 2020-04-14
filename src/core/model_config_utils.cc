@@ -703,11 +703,6 @@ GetNormalizedModelConfig(
       config->set_default_model_filename(kPyTorchLibTorchFilename);
     } else
 #endif  // TRITON_ENABLE_PYTORCH
-#ifdef TRITON_ENABLE_CUSTOM
-        if (config->platform() == kCustomPlatform) {
-      config->set_default_model_filename(kCustomFilename);
-    } else
-#endif  // TRITON_ENABLE_CUSTOM
 #ifdef TRITON_ENABLE_ENSEMBLE
         if (config->platform() == kEnsemblePlatform) {
       // No actual model file is needed to be loaded for ensemble.
@@ -873,20 +868,6 @@ ValidateModelIOConfig(const inference::ModelConfig& config)
 Status
 ValidateBatchIO(const inference::ModelConfig& config)
 {
-  if (
-#ifdef TRITON_ENABLE_CUSTOM
-      (config.platform() != kCustomPlatform) &&
-#endif  // TRITON_ENABLE_CUSTOM
-#ifdef TRITON_ENABLE_TENSORRT
-      (config.platform() != kTensorRTPlanPlatform) &&
-#endif  // TRITON_ENABLE_TENSORRT
-      ((config.batch_input_size() != 0) || (config.batch_output_size() != 0))) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "batch inputs and batch outputs are only supported for custom "
-        "platform and TensorRT platform");
-  }
-
   std::set<std::string> input_names;
   std::set<std::string> output_names;
   for (const auto& io : config.input()) {
@@ -916,6 +897,12 @@ ValidateBatchIO(const inference::ModelConfig& config)
             Status::Code::INVALID_ARG,
             "unknown batch input kind '" +
                 inference::BatchInput::Kind_Name(batch_io.kind()) + "'");
+    }
+    if ((batch_io.data_type() != inference::DataType::TYPE_INT32) &&
+        (batch_io.data_type() != inference::DataType::TYPE_FP32)) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "batch input data type must be TYPE_INT32 or TYPE_FP32");
     }
     for (const auto& source_name : batch_io.source_input()) {
       if (input_names.find(source_name) == input_names.end()) {
@@ -993,12 +980,6 @@ ValidateModelConfig(
 #ifdef TRITON_ENABLE_TENSORRT
       case BackendType::BACKEND_TYPE_TENSORRT:
 #endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-      case BackendType::BACKEND_TYPE_ONNXRUNTIME:
-#endif  // TRITON_ENABLE_ONNXRUNTIME
-#ifdef TRITON_ENABLE_PYTORCH
-      case BackendType::BACKEND_TYPE_PYTORCH:
-#endif  // TRITON_ENABLE_PYTORCH
         // FIXME: Do nothing for above type until they are ported with backend
         // API
         break;
@@ -1238,25 +1219,12 @@ ValidateModelConfig(
 #endif  // TRITON_ENABLE_GPU
 
     for (const auto& group : config.instance_group()) {
-      // KIND_MODEL is supported only on TensorFlow.
       if (group.kind() == inference::ModelInstanceGroup::KIND_MODEL) {
         if (group.gpus().size() > 0) {
           return Status(
               Status::Code::INVALID_ARG,
               "instance group " + group.name() + " of model " + config.name() +
                   " has kind KIND_MODEL but specifies one or more GPUs");
-        }
-#ifdef TRITON_ENABLE_TENSORFLOW
-        if (!(config.platform() == kTensorFlowGraphDefPlatform ||
-              config.platform() == kTensorFlowSavedModelPlatform))
-#endif  // TRITON_ENABLE_TENSORFLOW
-        {
-          return Status(
-              Status::Code::INVALID_ARG,
-              "instance group " + group.name() + " of model " + config.name() +
-                  "on platform " + config.platform() +
-                  " has kind KIND_MODEL which is supported only on TensorFlow "
-                  "models");
         }
       } else if (group.kind() == inference::ModelInstanceGroup::KIND_GPU) {
 #ifndef TRITON_ENABLE_GPU
@@ -1370,20 +1338,6 @@ ValidateModelInput(
     return Status(
         Status::Code::INVALID_ARG,
         "shape tensors are only supported for TensorRT platform");
-  }
-
-  if (
-#ifdef TRITON_ENABLE_CUSTOM
-      (platform != kCustomPlatform) &&
-#endif  // TRITON_ENABLE_CUSTOM
-#ifdef TRITON_ENABLE_TENSORRT
-      (platform != kTensorRTPlanPlatform) &&
-#endif  // TRITON_ENABLE_TENSORRT
-      io.allow_ragged_batch()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "ragged-batch input tensors are only supported for custom platform"
-        " and TensorRT platform");
   }
 
   return Status::Success;

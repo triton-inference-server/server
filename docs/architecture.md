@@ -55,7 +55,7 @@ available by HTTP/REST or GRPC protocol, or by the C API.
 
 Readiness and liveness health endpoints and utilization, throughput
 and latency metrics ease the integration of Triton into deployment
-framework such as Kubernetes,
+framework such as Kubernetes.
 
 ![Triton Architecture Diagram](images/arch.jpg)
 
@@ -246,7 +246,7 @@ sequence_batching {
   the corresponding batch slot has an inference request ready for
   inference. In the example configuration, fp32_false_true indicates
   that a sequence ready is indicated by tensor element equal to 1, and
-  non-start is indicated by tensor element equal to 0.
+  non-ready is indicated by tensor element equal to 0.
 
 * **Correlation ID**: The correlation ID input tensor is specified
   using CONTROL_SEQUENCE_CORRID in the configuration. The example
@@ -429,7 +429,7 @@ configuration:
 
 ```
 name: "oldest_stateful_model"
-platform: "custom"
+platform: "tensorflow_savedmodel"
 max_batch_size: 2
 sequence_batching {
   max_sequence_idle_microseconds: 5000000

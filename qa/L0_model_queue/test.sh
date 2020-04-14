@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,7 +37,6 @@ fi
 
 CLIENT_LOG="./client.log"
 MODEL_QUEUE_TEST=model_queue_test.py
-VERIFY_TIMESTAMPS=verify_timestamps.py
 
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
@@ -57,7 +56,7 @@ export CUDA_VISIBLE_DEVICES=0
 rm -fr *.log *.serverlog models custom_zero_1_float32
 cp -r ../custom_models/custom_zero_1_float32 . && \
     mkdir -p ./custom_zero_1_float32/1 && \
-    cp ./libidentity.so ./custom_zero_1_float32/1/libcustom.so
+    mkdir -p ./ensemble_zero_1_float32/1
 
 (cd custom_zero_1_float32 && \
         sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
@@ -69,6 +68,7 @@ cp -r ../custom_models/custom_zero_1_float32 . && \
 # create backlogs, "TRITONSERVER_DELAY_SCHEDULER" is not desired as queue size
 # is capped by max queue size.
 rm -fr models && mkdir models && \
+    cp -r ensemble_zero_1_float32 models/. && \
     cp -r custom_zero_1_float32 models/. && \
     (cd models/custom_zero_1_float32 && \
         echo "dynamic_batching { " >> config.pbtxt && \
@@ -112,6 +112,7 @@ wait $SERVER_PID
 
 # test_policy_delay
 rm -fr models && mkdir models && \
+    cp -r ensemble_zero_1_float32 models/. && \
     cp -r custom_zero_1_float32 models/. && \
     (cd models/custom_zero_1_float32 && \
         echo "dynamic_batching { " >> config.pbtxt && \
@@ -154,6 +155,7 @@ wait $SERVER_PID
 
 # test_policy_reject
 rm -fr models && mkdir models && \
+    cp -r ensemble_zero_1_float32 models/. && \
     cp -r custom_zero_1_float32 models/. && \
     (cd models/custom_zero_1_float32 && \
         echo "dynamic_batching { " >> config.pbtxt && \
@@ -195,6 +197,7 @@ wait $SERVER_PID
 
 # test_timeout_override
 rm -fr models && mkdir models && \
+    cp -r ensemble_zero_1_float32 models/. && \
     cp -r custom_zero_1_float32 models/. && \
     (cd models/custom_zero_1_float32 && \
         echo "dynamic_batching { " >> config.pbtxt && \
@@ -237,6 +240,7 @@ wait $SERVER_PID
 
 # test_priority_levels
 rm -fr models && mkdir models && \
+    cp -r ensemble_zero_1_float32 models/. && \
     cp -r custom_zero_1_float32 models/. && \
     (cd models/custom_zero_1_float32 && \
         echo "dynamic_batching { " >> config.pbtxt && \
@@ -280,6 +284,7 @@ wait $SERVER_PID
 #     priority 1: delay
 #     priority 2: reject
 rm -fr models && mkdir models && \
+    cp -r ensemble_zero_1_float32 models/. && \
     cp -r custom_zero_1_float32 models/. && \
     (cd models/custom_zero_1_float32 && \
         echo "dynamic_batching { " >> config.pbtxt && \

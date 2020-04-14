@@ -165,23 +165,6 @@ class InferVariableTest(tu.TestResultCollector):
                                         output1_raw=output1_raw,
                                         swap=swap)
 
-        # the custom model is src/custom/addsub... it does not swap
-        # the inputs so always set to False
-        if tu.validate_for_custom_model(input_dtype, output0_dtype,
-                                        output1_dtype, input_shape,
-                                        output0_shape, output1_shape):
-            # No basic ensemble models are created against custom models
-            _infer_exact_helper(self,
-                                'custom',
-                                input_shape,
-                                8,
-                                input_dtype,
-                                output0_dtype,
-                                output1_dtype,
-                                output0_raw=output0_raw,
-                                output1_raw=output1_raw,
-                                swap=False)
-
         if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
                                       input_shape, output0_shape,
                                       output1_shape):

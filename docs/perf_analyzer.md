@@ -34,7 +34,7 @@ different optimization strategies. The perf_analyzer application
 (previously known as perf_client) performs this task for the Triton
 Inference Server. The perf_analyzer is included with the client
 examples which are [available from several
-sources](client_examples.md#getting-the-client-examples).
+sources](https://github.com/triton-inference-server/client#getting-the-client-libraries-and-examples).
 
 The perf_analyzer application generates inference requests to your
 model and measures the throughput and latency of those requests. To
@@ -206,9 +206,9 @@ the --input-data option:
 - directory path: A path to a directory containing a binary file for each input, named the same as the input. Each binary file must contain the data required for that input for a batch-1 request. Each file should contain the raw binary representation of the input in row-major order.
 - file path: A path to a JSON file containing data to be used with every inference request. See the "Real Input Data" section for further details. --input-data can be provided multiple times with different file paths to specific multiple JSON files.
 
-For tensors with with STRING datatype there are additional options
---string-length and --string-data that may be used in some cases
-(see --help for full documentation).
+For tensors with with STRING/BYTES datatype there are additional
+options --string-length and --string-data that may be used in some
+cases (see --help for full documentation).
 
 For models that support batching you can use the -b option to indicate
 the batch-size of the requests that perf_analyzer should send. For

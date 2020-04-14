@@ -162,6 +162,10 @@ InferenceBackend::SetModelConfig(
     default_priority_level_ =
         config_.dynamic_batching().default_priority_level();
     max_priority_level_ = config_.dynamic_batching().priority_levels();
+  } else if (config_.has_ensemble_scheduling()) {
+    // For ensemble, allow any priority level to pass through
+    default_priority_level_ = 0;
+    max_priority_level_ = UINT32_MAX;
   } else {
     default_priority_level_ = 0;
     max_priority_level_ = 0;

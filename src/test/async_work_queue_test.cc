@@ -33,14 +33,14 @@
 #include <random>
 #include <thread>
 #include <vector>
-#include "src/core/async_work_queue.h"
+#include "triton/common/async_work_queue.h"
 
-namespace ni = nvidia::inferenceserver;
+namespace tc = triton::common;
 
 namespace {
 
 // Wrapper of AsyncWorkQueue class to expose Reset() for unit testing
-class TestingAsyncWorkQueue : public ni::AsyncWorkQueue {
+class TestingAsyncWorkQueue : public tc::AsyncWorkQueue {
  public:
   static void Reset() { AsyncWorkQueue::Reset(); }
 };
@@ -52,41 +52,41 @@ class AsyncWorkQueueTest : public ::testing::Test {
 
 TEST_F(AsyncWorkQueueTest, InitZeroWorker)
 {
-  auto status = ni::AsyncWorkQueue::Initialize(0);
-  EXPECT_FALSE(status.IsOk()) << "Expect error when initialized with 0 worker";
+  auto error = tc::AsyncWorkQueue::Initialize(0);
+  EXPECT_FALSE(error.IsOk()) << "Expect error when initialized with 0 worker";
 }
 
 TEST_F(AsyncWorkQueueTest, InitOneWorker)
 {
-  auto status = ni::AsyncWorkQueue::Initialize(1);
-  EXPECT_TRUE(status.IsOk()) << status.Message();
+  auto error = tc::AsyncWorkQueue::Initialize(1);
+  EXPECT_TRUE(error.IsOk()) << error.Message();
 }
 
 TEST_F(AsyncWorkQueueTest, InitFourWorker)
 {
-  auto status = ni::AsyncWorkQueue::Initialize(1);
-  EXPECT_TRUE(status.IsOk()) << status.Message();
+  auto error = tc::AsyncWorkQueue::Initialize(1);
+  EXPECT_TRUE(error.IsOk()) << error.Message();
 }
 
 TEST_F(AsyncWorkQueueTest, InitTwice)
 {
-  auto status = ni::AsyncWorkQueue::Initialize(4);
-  EXPECT_TRUE(status.IsOk()) << status.Message();
-  status = ni::AsyncWorkQueue::Initialize(2);
-  EXPECT_FALSE(status.IsOk()) << "Expect error from initializing twice";
+  auto error = tc::AsyncWorkQueue::Initialize(4);
+  EXPECT_TRUE(error.IsOk()) << error.Message();
+  error = tc::AsyncWorkQueue::Initialize(2);
+  EXPECT_FALSE(error.IsOk()) << "Expect error from initializing twice";
 }
 
 TEST_F(AsyncWorkQueueTest, WorkerCountUninitialized)
 {
-  EXPECT_EQ(ni::AsyncWorkQueue::WorkerCount(), (size_t)0)
+  EXPECT_EQ(tc::AsyncWorkQueue::WorkerCount(), (size_t)0)
       << "Expect 0 worker count for uninitialized queue";
 }
 
 TEST_F(AsyncWorkQueueTest, WorkerCountInitialized)
 {
-  auto status = ni::AsyncWorkQueue::Initialize(4);
-  EXPECT_TRUE(status.IsOk()) << status.Message();
-  EXPECT_EQ(ni::AsyncWorkQueue::WorkerCount(), (size_t)4)
+  auto error = tc::AsyncWorkQueue::Initialize(4);
+  EXPECT_TRUE(error.IsOk()) << error.Message();
+  EXPECT_EQ(tc::AsyncWorkQueue::WorkerCount(), (size_t)4)
       << "Expect 4 worker count for initialized queue";
 }
 
@@ -148,8 +148,8 @@ TEST_F(AsyncWorkQueueTest, RunTasksInParallel)
     serialized_duration = end_ts - start_ts;
   }
 
-  auto status = ni::AsyncWorkQueue::Initialize(4);
-  ASSERT_TRUE(status.IsOk()) << status.Message();
+  auto error = tc::AsyncWorkQueue::Initialize(4);
+  ASSERT_TRUE(error.IsOk()) << error.Message();
 
   uint64_t parallelized_duration = 0;
   {
@@ -165,7 +165,7 @@ TEST_F(AsyncWorkQueueTest, RunTasksInParallel)
             .count();
 
     for (size_t count = 0; count < task_count; count++) {
-      ni::AsyncWorkQueue::AddTask([&AddTwoFn, &operands, &ps, count]() mutable {
+      tc::AsyncWorkQueue::AddTask([&AddTwoFn, &operands, &ps, count]() mutable {
         AddTwoFn(operands[count], operands[count + 1], &ps[count]);
       });
     }
@@ -205,20 +205,20 @@ TEST_F(AsyncWorkQueueTest, RunTasksFIFO)
   size_t task_count = 8;
   std::vector<std::promise<uint64_t>> ps(task_count);
 
-  auto status = ni::AsyncWorkQueue::Initialize(2);
-  ASSERT_TRUE(status.IsOk()) << status.Message();
+  auto error = tc::AsyncWorkQueue::Initialize(2);
+  ASSERT_TRUE(error.IsOk()) << error.Message();
 
   std::vector<std::promise<void>> barrier(2);
-  ni::AsyncWorkQueue::AddTask([&barrier]() mutable {
+  tc::AsyncWorkQueue::AddTask([&barrier]() mutable {
     barrier[0].get_future().get();
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
   });
-  ni::AsyncWorkQueue::AddTask([&barrier]() mutable {
+  tc::AsyncWorkQueue::AddTask([&barrier]() mutable {
     barrier[1].get_future().get();
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
   });
   for (size_t count = 0; count < task_count; count++) {
-    ni::AsyncWorkQueue::AddTask([count, &CaptureTimestampFn, &ps]() mutable {
+    tc::AsyncWorkQueue::AddTask([count, &CaptureTimestampFn, &ps]() mutable {
       CaptureTimestampFn(&ps[count]);
     });
   }

@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -137,7 +137,7 @@ PlanBackend::Context::Context(
     const bool enable_pinned_input, const bool enable_pinned_output,
     const size_t gather_kernel_buffer_threshold,
     const bool separate_output_stream,
-    std::unique_ptr<MetricModelReporter>&& metric_reporter)
+    std::shared_ptr<MetricModelReporter>&& metric_reporter)
     : BackendContext(
           name, gpu_device, max_batch_size, enable_pinned_input,
           enable_pinned_output, gather_kernel_buffer_threshold,
@@ -297,7 +297,8 @@ PlanBackend::CreateExecutionContexts(
           // For sequence batcher, there must be one runner per instance
           // instead of one runner per device
           runner_idx = available_context_queue_.size();
-          available_context_queue_.emplace_back(new SyncQueue<size_t>());
+          available_context_queue_.emplace_back(
+              new triton::common::SyncQueue<size_t>());
           next_context_.emplace_back(-1);
         } else {
           auto it = device_to_runner_map.find(gpu_device);
@@ -305,7 +306,8 @@ PlanBackend::CreateExecutionContexts(
             it = device_to_runner_map
                      .emplace(gpu_device, available_context_queue_.size())
                      .first;
-            available_context_queue_.emplace_back(new SyncQueue<size_t>());
+            available_context_queue_.emplace_back(
+                new triton::common::SyncQueue<size_t>());
             next_context_.emplace_back(-1);
           }
           runner_idx = it->second;
@@ -551,7 +553,7 @@ PlanBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     const std::vector<char>& model,
     const ::google::protobuf::RepeatedPtrField<std::string>& profile_names,
-    const std::shared_ptr<SyncQueue<size_t>>& context_queue)
+    const std::shared_ptr<triton::common::SyncQueue<size_t>>& context_queue)
 {
   // Max batch size. A value of 0 in the config becomes NO_BATCHING.
   const int mbs = (Config().max_batch_size() <= 0) ? Context::NO_BATCHING
@@ -563,11 +565,12 @@ PlanBackend::CreateExecutionContext(
   const size_t gather_kernel_buffer_threshold =
       Config().optimization().gather_kernel_buffer_threshold();
 
-  std::unique_ptr<MetricModelReporter> metric_reporter;
+  std::shared_ptr<MetricModelReporter> metric_reporter;
 #ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
-    metric_reporter.reset(new MetricModelReporter(
-        Name(), Version(), gpu_device, Config().metric_tags()));
+    MetricModelReporter::Create(
+        Name(), Version(), gpu_device, Config().metric_tags(),
+        &metric_reporter);
   }
 #endif  // TRITON_ENABLE_METRICS
 
@@ -3134,7 +3137,8 @@ PlanBackend::Context::SetBindingDimensions(
 
 void
 PlanBackend::Context::ProcessResponse(
-    size_t context_idx, std::shared_ptr<SyncQueue<size_t>> context_queue)
+    size_t context_idx,
+    std::shared_ptr<triton::common::SyncQueue<size_t>> context_queue)
 {
   while (true) {
     NVTX_RANGE(nvtx_, "ProcessResponse " + context_idx);
@@ -3171,21 +3175,6 @@ PlanBackend::Context::ProcessResponse(
           metric_reporter_.get(), (payload->responses_[i] != nullptr),
           payload->compute_start_ns_, payload->compute_input_end_ns_,
           payload->compute_output_start_ns_, compute_end_ns);
-
-#ifdef TRITON_ENABLE_TRACING
-      if (request->Trace() != nullptr) {
-        auto& trace = request->Trace();
-        trace->Report(
-            TRITONSERVER_TRACE_COMPUTE_START, payload->compute_start_ns_);
-        trace->Report(
-            TRITONSERVER_TRACE_COMPUTE_INPUT_END,
-            payload->compute_input_end_ns_);
-        trace->Report(
-            TRITONSERVER_TRACE_COMPUTE_OUTPUT_START,
-            payload->compute_output_start_ns_);
-        trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
-      }
-#endif  // TRITON_ENABLE_TRACING
     }
 
     // Also reporting batch stats

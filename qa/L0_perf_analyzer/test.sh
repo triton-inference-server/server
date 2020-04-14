@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,7 +41,6 @@ CLIENT_LOG="./perf_analyzer.log"
 PERF_ANALYZER=../clients/perf_analyzer
 
 DATADIR=`pwd`/models
-ENSEMBLE_DATADIR=`pwd`/ensemble_model_repository
 TESTDATADIR=`pwd`/test_data
 
 INT_JSONDATAFILE=`pwd`/json_input_data_files/int_data.json
@@ -54,7 +53,7 @@ SHAPETENSORADTAFILE=`pwd`/json_input_data_files/shape_tensor_data.json
 IMAGE_JSONDATAFILE=`pwd`/json_input_data_files/image_data.json
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=${DATADIR} --model-repository=${ENSEMBLE_DATADIR}"
+SERVER_ARGS="--model-repository=${DATADIR}"
 SERVER_LOG="./inference_server.log"
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
@@ -87,16 +86,12 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_sequ
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_sequence_model_repository/graphdef_sequence_float32 $DATADIR
 
 mkdir $DATADIR/nop_TYPE_FP32_-1/1
-cp libidentity.so $DATADIR/nop_TYPE_FP32_-1/1/
 
 # Copy inception model to the model repository
 cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/inception_v1_graphdef $DATADIR
 
 # Copy resnet50v1.5_fp16
 cp -r /data/inferenceserver/${REPO_VERSION}/perf_model_store/resnet50v1.5_fp16_savedmodel $DATADIR
-
-# Set up the ensemble model repository
-cp -r ../ensemble_models/image_preprocess_ensemble_example ensemble_model_repository
 
 # Generating test data
 mkdir -p $TESTDATADIR
@@ -192,21 +187,7 @@ for PROTOCOL in grpc http; do
         set -e
     done
 
-    set +e
-    # Testing with preprocess_inception_ensemble model
-    $PERF_ANALYZER -v -i $PROTOCOL -m preprocess_inception_ensemble --input-data=$IMAGE_JSONDATAFILE \
-    -p2000 >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
+    # TODO Add back testing with preprocess_inception_ensemble model
 
     # Testing with inception model
     for SHARED_MEMORY_TYPE in none system cuda; do

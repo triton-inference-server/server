@@ -54,7 +54,7 @@ output [
 ensemble_scheduling {
   step [
     {
-      model_name: "custom_nobatch_float32_float32_float32"
+      model_name: "savedmodel_nobatch_float32_float32_float32"
       model_version: 1
       input_map [
         {
@@ -78,7 +78,7 @@ ensemble_scheduling {
       ]
     },
     {
-      model_name: "custom_nobatch_float32_float32_float32"
+      model_name: "savedmodel_nobatch_float32_float32_float32"
       model_version: -1
       input_map [
         {

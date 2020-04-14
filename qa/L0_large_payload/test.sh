@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -58,9 +58,7 @@ for TARGET in graphdef savedmodel onnx libtorch plan; do
 done
 cp -r ../custom_models/custom_zero_1_float32 models/. && \
     mkdir -p models/custom_zero_1_float32/1 && \
-    cp `pwd`/libidentity.so models/custom_zero_1_float32/1/. && \
     (cd models/custom_zero_1_float32 && \
-            echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
             echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt && \
             sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
             sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt)
@@ -75,7 +73,7 @@ cp ../python_models/identity_fp32/model.py models/python_$MODEL_SUFFIX/1/model.p
 
 # Restart server before every test to make sure server state
 # is invariant to previous test
-for TARGET in graphdef savedmodel onnx libtorch custom plan python; do
+for TARGET in graphdef savedmodel onnx libtorch plan python; do
     SERVER_LOG=$SERVER_LOG_BASE.$TARGET
     CLIENT_LOG=$CLIENT_LOG_BASE.$TARGET
 

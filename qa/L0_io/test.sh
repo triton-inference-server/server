@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -56,8 +56,27 @@ RET=0
 
 # Prepare float32 models with basic config
 rm -rf $MODELSDIR
-for trial in graphdef savedmodel onnx libtorch plan ; do
+for trial in graphdef savedmodel onnx libtorch plan python; do
     full=${trial}_float32_float32_float32
+    if [ "$trial" == "python" ]; then
+        mkdir -p $MODELSDIR/${full}/1 && \
+            cp ../python_models/add_sub/model.py $MODELSDIR/${full}/1/. && \
+            cp ../python_models/add_sub/config.pbtxt $MODELSDIR/${full}/. && \
+            (cd $MODELSDIR/${full} && \
+                    sed -i "s/label_filename:.*//" config.pbtxt && \
+                    sed -i "0,/name:.*/{s/name:.*/name: \"${full}\"/}" config.pbtxt && \
+                    echo "max_batch_size: 64" >> config.pbtxt)
+
+        # ensemble version of the model.
+        mkdir -p $MODELSDIR/fan_${full}/1 && \
+            cp ../python_models/add_sub/model.py $MODELSDIR/fan_${full}/1/. && \
+            cp ../python_models/fan_add_sub/config.pbtxt $MODELSDIR/fan_${full}/. && \
+            (cd $MODELSDIR/fan_${full} && \
+                    sed -i "s/label_filename:.*//" config.pbtxt && \
+                    sed -i "0,/name:.*/{s/name:.*/name: \"fan_${full}\"/}" config.pbtxt && \
+                    echo "max_batch_size: 64" >> config.pbtxt)
+        continue
+    fi
     mkdir -p $MODELSDIR/${full}/1 && \
         cp -r $DATADIR/${full}/1/* $MODELSDIR/${full}/1/. && \
         cp $DATADIR/${full}/config.pbtxt $MODELSDIR/${full}/. && \
@@ -95,16 +114,6 @@ for trial in graphdef savedmodel onnx ; do
                 echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
 done
 
-# custom float32 model needs to be obtained elsewhere
-full=custom_float32_float32_float32
-rm -rf $MODELSDIR/${full}/1/*
-mkdir -p $MODELSDIR/${full}/1 && \
-    cp -r ../custom_models/${full}/1/* $MODELSDIR/${full}/1/. && \
-    cp ../custom_models/${full}/config.pbtxt $MODELSDIR/${full}/.
-        (cd $MODELSDIR/${full} && \
-                sed -i "s/label_filename:.*//" config.pbtxt && \
-                echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
-
 # set up "addsub" ensemble for custom float32 model
 cp -r $MODELSDIR/fan_graphdef_float32_float32_float32 $MODELSDIR/fan_${full} && \
     (cd $MODELSDIR/fan_${full} && \
@@ -112,12 +121,11 @@ cp -r $MODELSDIR/fan_graphdef_float32_float32_float32 $MODELSDIR/fan_${full} && 
 
 # custom float32 component of ensemble
 cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
-    mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1 && \
-    cp libidentity.so $MODELSDIR/nop_TYPE_FP32_-1/1/.
+    mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1
 
 for input_device in -1 0 1; do
     for output_device in -1 0 1; do
-        for trial in graphdef savedmodel onnx libtorch plan custom; do
+        for trial in graphdef savedmodel onnx libtorch plan python; do
             # TensorRT Plan should only be deployed on GPU device
             model_devices="-1 0 1" && [[ "$trial" == "plan" ]] && model_devices="0 1"
             for model_device in $model_devices; do

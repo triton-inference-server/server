@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -36,7 +36,6 @@
 #include <vector>
 
 #include "src/backends/backend/triton_backend_manager.h"
-#include "src/core/async_work_queue.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"
@@ -84,6 +83,7 @@ InferenceServer::InferenceServer()
   extensions_.push_back("classification");
   extensions_.push_back("sequence");
   extensions_.push_back("model_repository");
+  extensions_.push_back("model_repository(unload_dependents)");
   extensions_.push_back("schedule_policy");
   extensions_.push_back("model_configuration");
   extensions_.push_back("system_shared_memory");
@@ -146,7 +146,8 @@ InferenceServer::Init()
   status = PersistentBackendManager::Create(
       backend_cmdline_config_map_, &persist_backend_manager_);
   if (status.IsOk() && (buffer_manager_thread_count_ > 0)) {
-    status = AsyncWorkQueue::Initialize(buffer_manager_thread_count_);
+    status = CommonErrorToStatus(triton::common::AsyncWorkQueue::Initialize(
+        buffer_manager_thread_count_));
   }
   if (!status.IsOk()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
@@ -461,11 +462,13 @@ InferenceServer::LoadModel(const std::string& model_name)
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
   auto action_type = ModelRepositoryManager::ActionType::LOAD;
-  return model_repository_manager_->LoadUnloadModel(model_name, action_type);
+  return model_repository_manager_->LoadUnloadModel(
+      model_name, action_type, false /* unload_dependents */);
 }
 
 Status
-InferenceServer::UnloadModel(const std::string& model_name)
+InferenceServer::UnloadModel(
+    const std::string& model_name, const bool unload_dependents)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
     return Status(Status::Code::UNAVAILABLE, "Server not ready");
@@ -474,7 +477,8 @@ InferenceServer::UnloadModel(const std::string& model_name)
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
   auto action_type = ModelRepositoryManager::ActionType::UNLOAD;
-  return model_repository_manager_->LoadUnloadModel(model_name, action_type);
+  return model_repository_manager_->LoadUnloadModel(
+      model_name, action_type, unload_dependents);
 }
 
 Status
@@ -506,6 +510,18 @@ InferenceServer::PrintBackendAndModelSummary()
   backend_headers.emplace_back("Config");
 
   triton::common::TablePrinter backends_table(backend_headers);
+
+  // TensorRT is built-in to core Triton (for now), so explicitly add
+  // a row for it.
+#ifdef TRITON_ENABLE_TENSORRT
+  {
+    std::vector<std::string> backend_record;
+    backend_record.emplace_back("tensorrt");
+    backend_record.emplace_back("<built-in>");
+    backend_record.emplace_back("{}");
+    backends_table.InsertRow(backend_record);
+  }
+#endif  // TRITON_ENABLE_TENSORRT
 
   std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
       backend_state;

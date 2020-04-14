@@ -64,11 +64,11 @@ from distutils.dir_util import copy_tree
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.8.0dev': ('21.03dev', '21.02', '1.6.0', '2021.1.110', '2021.1.110')
+    '2.10.0dev': ('21.05dev', '21.04', '1.7.1', '2021.2.200', '2021.2.200')
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
-CORE_BACKENDS = ['tensorrt', 'custom', 'ensemble']
+CORE_BACKENDS = ['tensorrt', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
     'openvino', 'armnn'
@@ -262,8 +262,6 @@ def core_cmake_args(components, backends, install_dir):
         if (be in CORE_BACKENDS) and (be in backends):
             if be == 'tensorrt':
                 cargs += tensorrt_cmake_args()
-            elif be == 'custom':
-                pass
             elif be == 'ensemble':
                 pass
             else:
@@ -317,7 +315,7 @@ def backend_repo(be):
 
 def backend_cmake_args(images, components, be, install_dir, library_paths):
     if be == 'onnxruntime':
-        args = onnxruntime_cmake_args(images)
+        args = onnxruntime_cmake_args(images, library_paths)
     elif be == 'openvino':
         args = openvino_cmake_args()
     elif be == 'tensorflow1':
@@ -369,27 +367,40 @@ def pytorch_cmake_args(images):
     ]
 
 
-def onnxruntime_cmake_args(images):
+def onnxruntime_cmake_args(images, library_paths):
     cargs = [
         '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
         '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
             TRITON_VERSION_MAP[FLAGS.version][2])
     ]
 
-    if target_platform() == 'windows':
-        if 'base' in images:
-            cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+    # If platform is jetpack do not use docker based build
+    if target_platform() == 'jetpack':
+        ort_lib_path = library_paths['onnxruntime'] + "/lib"
+        ort_include_path = library_paths['onnxruntime'] + "/include"
+        cargs += [
+            '-DTRITON_ONNXRUNTIME_INCLUDE_PATHS={}'.format(ort_include_path),
+            '-DTRITON_ONNXRUNTIME_LIB_PATHS={}'.format(ort_lib_path),
+            '-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=OFF'
+        ]
     else:
-        if 'base' in images:
-            cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
+        if target_platform() == 'windows':
+            if 'base' in images:
+                cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(
+                    images['base']))
         else:
-            cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
-                TRITON_VERSION_MAP[FLAGS.version][1]))
+            if 'base' in images:
+                cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(
+                    images['base']))
+            else:
+                cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
+                    TRITON_VERSION_MAP[FLAGS.version][1]))
 
-        if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
-            cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
-            cargs.append('-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
-                TRITON_VERSION_MAP[FLAGS.version][3]))
+            if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
+                cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
+                cargs.append(
+                    '-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
+                        TRITON_VERSION_MAP[FLAGS.version][3]))
 
     return cargs
 
@@ -674,6 +685,11 @@ COPY --chown=1000:1000 LICENSE .
 COPY --chown=1000:1000 TRITON_VERSION .
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/lib/libtritonserver.so lib/
+COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/include/triton/core include/triton/core
+
+# Top-level include/core not copied so --chown does not set it correctly,
+# so explicit set on all of include
+RUN chown -R triton-server:triton-server include
 '''
 
     for noncore in NONCORE_BACKENDS:
@@ -1085,21 +1101,21 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build, default is "main".'
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.04 -> branch r21.04); otherwise the default <repo-tag> is "main" (e.g. version 21.04dev -> branch main).'
     )
     parser.add_argument(
         '--repo-tag',
         action='append',
         required=False,
         help=
-        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", or "backend". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. Default is "main".'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.04 -> branch r21.04); otherwise the default <repo-tag> is "main" (e.g. version 21.04dev -> branch main).'
     )
     parser.add_argument(
         '--repoagent',
         action='append',
         required=False,
         help=
-        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build, default is "main".'
+        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.04 -> branch r21.04); otherwise the default <repo-tag> is "main" (e.g. version 21.04dev -> branch main).'
     )
 
     FLAGS = parser.parse_args()
@@ -1131,24 +1147,38 @@ if __name__ == '__main__':
     if FLAGS.version is None:
         with open('TRITON_VERSION', "r") as vfile:
             FLAGS.version = vfile.readline().strip()
+
+    log('version {}'.format(FLAGS.version))
+    default_repo_tag = 'main'
+
     # For other versions use the TRITON_VERSION_MAP unless explicitly
     # given.
-    if FLAGS.container_version is None:
-        if FLAGS.version not in TRITON_VERSION_MAP:
-            fail('container version not known for {}'.format(FLAGS.version))
+    if not FLAGS.no_container_build:
+        if FLAGS.container_version is None:
+            if FLAGS.version not in TRITON_VERSION_MAP:
+                fail('container version not known for {}'.format(FLAGS.version))
         FLAGS.container_version = TRITON_VERSION_MAP[FLAGS.version][0]
-    if FLAGS.upstream_container_version is None:
-        if FLAGS.version not in TRITON_VERSION_MAP:
-            fail('upstream container version not known for {}'.format(
-                FLAGS.version))
-        FLAGS.upstream_container_version = TRITON_VERSION_MAP[FLAGS.version][1]
+        if FLAGS.upstream_container_version is None:
+            if FLAGS.version not in TRITON_VERSION_MAP:
+                fail('upstream container version not known for {}'.format(
+                    FLAGS.version))
+            FLAGS.upstream_container_version = TRITON_VERSION_MAP[
+                FLAGS.version][1]
+
+        log('container version {}'.format(FLAGS.container_version))
+        log('upstream container version {}'.format(
+            FLAGS.upstream_container_version))
+
+        # Determine the default <repo-tag> based on container version.
+        if not FLAGS.container_version.endswith('dev'):
+            default_repo_tag = 'r' + FLAGS.container_version
 
     # Initialize map of backends to build and repo-tag for each.
     backends = {}
     for be in FLAGS.backend:
         parts = be.split(':')
         if len(parts) == 1:
-            parts.append('main')
+            parts.append(default_repo_tag)
         log('backend "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
         backends[parts[0]] = parts[1]
 
@@ -1157,7 +1187,7 @@ if __name__ == '__main__':
     for be in FLAGS.repoagent:
         parts = be.split(':')
         if len(parts) == 1:
-            parts.append('main')
+            parts.append(default_repo_tag)
         log('repoagent "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
         repoagents[parts[0]] = parts[1]
 
@@ -1205,10 +1235,10 @@ if __name__ == '__main__':
 
     # Initialize map of common components and repo-tag for each.
     components = {
-        'common': 'main',
-        'core': 'main',
-        'backend': 'main',
-        'thirdparty': 'main'
+        'common': default_repo_tag,
+        'core': default_repo_tag,
+        'backend': default_repo_tag,
+        'thirdparty': default_repo_tag
     }
     for be in FLAGS.repo_tag:
         parts = be.split(':')

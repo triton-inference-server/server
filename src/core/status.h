@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,53 +27,27 @@
 
 #include <string>
 #include "src/core/tritonserver_apis.h"
+#include "triton/common/error.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class Status {
- public:
-  // The status codes
-  enum class Code {
-    SUCCESS,
-    UNKNOWN,
-    INTERNAL,
-    NOT_FOUND,
-    INVALID_ARG,
-    UNAVAILABLE,
-    UNSUPPORTED,
-    ALREADY_EXISTS
-  };
-
+class Status : public triton::common::Error {
  public:
   // Construct a status from a code with no message.
-  explicit Status(Code code = Code::SUCCESS) : code_(code) {}
+  explicit Status(Code code = Code::SUCCESS) : Error(code) {}
 
   // Construct a status from a code and message.
-  explicit Status(Code code, const std::string& msg) : code_(code), msg_(msg) {}
+  explicit Status(Code code, const std::string& msg) : Error(code, msg) {}
 
-  // Convenience "success" value. Can be used as Status::Success to
+  // Construct a status from a code and message.
+  explicit Status(const Error& error) : Error(error) {}
+
+  // Convenience "success" value. Can be used as Error::Success to
   // indicate no error.
   static const Status Success;
 
   // Return the code for this status.
   Code StatusCode() const { return code_; }
-
-  // Return the message for this status.
-  const std::string& Message() const { return msg_; }
-
-  // Return true if this status indicates "ok"/"success", false if
-  // status indicates some kind of failure.
-  bool IsOk() const { return code_ == Code::SUCCESS; }
-
-  // Return the status as a string.
-  std::string AsString() const;
-
-  // Return the constant string name for a code.
-  static const char* CodeString(const Code code);
-
- private:
-  Code code_;
-  std::string msg_;
 };
 
 // Return the Status::Code corresponding to a
@@ -83,6 +57,9 @@ Status::Code TritonCodeToStatusCode(TRITONSERVER_Error_Code code);
 // Return the TRITONSERVER_Error_Code corresponding to a
 // Status::Code.
 TRITONSERVER_Error_Code StatusCodeToTritonCode(Status::Code status_code);
+
+// Converts the common Error to Status object
+Status CommonErrorToStatus(const triton::common::Error& error);
 
 // If status is non-OK, return the Status.
 #define RETURN_IF_ERROR(S)        \

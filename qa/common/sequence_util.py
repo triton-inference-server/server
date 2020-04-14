@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -316,8 +316,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                         [serialized_byte_size(i0) for i0 in input_list_tmp])
                 else:
                     input_list_tmp = input_list
-                    input_byte_size = sum(
-                        [i0.nbytes for i0 in input_list_tmp])
+                    input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
 
                 dummy_input_byte_size = sum(
                     [i0.nbytes for i0 in dummy_input_list])

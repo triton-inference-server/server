@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -173,9 +173,14 @@ InferenceRequest::Release(
   request->release_callbacks_.clear();
 
 #ifdef TRITON_ENABLE_TRACING
-  // Take ownership of trace object so it is not lost when we release
-  // the request below.
-  std::unique_ptr<InferenceTrace> trace = std::move(request->trace_);
+  // If tracing then record request end and release the trace.
+  // This must be before the request callback to ensure the trace
+  // is properly layered, as the request may be nested in an ensemble
+  // and the callback may interact with upper level trace.
+  if (request->trace_ != nullptr) {
+    request->trace_->ReportNow(TRITONSERVER_TRACE_REQUEST_END);
+    InferenceTrace::Release(std::move(request->trace_));
+  }
 #endif  // TRITON_ENABLE_TRACING
 
   void* userp = request->release_userp_;
@@ -183,16 +188,6 @@ InferenceRequest::Release(
   release_fn(
       reinterpret_cast<TRITONSERVER_InferenceRequest*>(request.release()),
       release_flags, userp);
-
-#ifdef TRITON_ENABLE_TRACING
-  // If tracing then record request end (after the callback completes
-  // so that any callback overhead is included in the request time)
-  // and release the trace.
-  if (trace != nullptr) {
-    trace->ReportNow(TRITONSERVER_TRACE_REQUEST_END);
-    InferenceTrace::Release(std::move(trace));
-  }
-#endif  // TRITON_ENABLE_TRACING
 }
 
 InferenceRequest*
@@ -680,6 +675,16 @@ InferenceRequest::ReportStatistics(
   if (!collect_stats_) {
     return;
   }
+
+#ifdef TRITON_ENABLE_TRACING
+  if (trace_ != nullptr) {
+    trace_->Report(TRITONSERVER_TRACE_COMPUTE_START, compute_start_ns);
+    trace_->Report(TRITONSERVER_TRACE_COMPUTE_INPUT_END, compute_input_end_ns);
+    trace_->Report(
+        TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
+    trace_->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
+  }
+#endif  // TRITON_ENABLE_TRACING
 
   INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 

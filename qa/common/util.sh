@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -350,14 +350,12 @@ function run_gpu_monitor () {
     fi
 }
 
-# Put libidentity.so model file into nop models in the model repository
-function create_nop_modelfile () {
-    local model_file=$1
-    local dest_dir=$2
+# Create a model version directory for nop models in the model repository
+function create_nop_version_dir () {
+    local dest_dir=$1
     for nop_model in `ls $dest_dir | grep "nop_"`; do
         local path=$dest_dir/$nop_model
         mkdir -p $path/1
-        cp $model_file $path/1/.
     done
 }
 
@@ -387,33 +385,6 @@ function check_test_results () {
     if [[ $num_errors != "0" ]] || [[ $num_failures != "0" ]] || [[ $num_tests -ne $expected_num_tests ]]; then
         cat $log_file
         echo -e "\n***\n*** Test Failed: Expected $expected_num_tests test(s), $num_tests test(s) executed, $num_errors test(s) had error, and $num_failures test(s) failed. \n***" >> $log_file
-        return 1
-    fi
-
-    return 0
-}
-
-# Check the valgrind logs for memory leaks, ignoring known memory leaks
-#   * cnmem https://github.com/NVIDIA/cnmem/issues/12
-#   * Tensorflow::NewSession
-#   * dl-open leak could be due to https://bugs.kde.org/show_bug.cgi?id=358980
-#   * dlerror leak in tensorflow::HadoopFileSystem::HadoopFileSystem()
-#     -> tensorflow::LibHDFS::LoadAndBind()::{lambda(char const*, void**)#1}::operator()(char const*, void**)
-#     -> tensorflow::internal::LoadLibrary
-#     -> dlerror
-function check_valgrind_log () {
-    local valgrind_log=$1
-
-    leak_records=$(grep "are definitely lost" -A 12 $valgrind_log | awk \
-    'BEGIN{RS="--";acc=0} !(/cnmem/||/tensorflow::NewSession/||/dl-init/|| \
-    /dl-open/||/dlerror/||/libtorch/) \
-    {print;acc+=1} END{print acc}')
-
-    num_leaks=$(echo -e "$leak_records" | tail -n1)
-
-    if [ "$num_leaks" != "0" ]; then
-        echo -e "$leak_records" | sed '$d'
-        echo -e "\n***\n*** Test Failed: $num_leaks memory leaks detected.\n***"
         return 1
     fi
 

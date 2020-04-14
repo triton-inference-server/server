@@ -104,37 +104,6 @@ class InferReshapeTest(tu.TestResultCollector):
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-        if tu.validate_for_custom_model(dtype, dtype, dtype, input_shapes[0],
-                                        input_shapes[0], input_shapes[0]):
-            # model that supports batching
-            for bs in (1, 8):
-                full_shapes = [[
-                    bs,
-                ] + input_shape for input_shape in input_shapes]
-                full_output_shapes = [[
-                    bs,
-                ] + output_shape for output_shape in output_shapes]
-                iu.infer_zero(
-                    self,
-                    'custom',
-                    bs,
-                    dtype,
-                    full_shapes,
-                    full_output_shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            # model that does not support batching
-            if no_batch:
-                iu.infer_zero(
-                    self,
-                    'custom_nobatch',
-                    1,
-                    dtype,
-                    input_shapes,
-                    output_shapes,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-
         if tu.validate_for_onnx_model(dtype, dtype, dtype, input_shapes[0],
                                       input_shapes[0], input_shapes[0]):
             # model that supports batching

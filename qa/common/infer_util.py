@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -600,7 +600,7 @@ def infer_shape_tensor(tester,
                        batch_size=1):
     # Lazy shm imports...
     if use_system_shared_memory:
-            import tritonclient.utils.shared_memory as shm
+        import tritonclient.utils.shared_memory as shm
 
     tester.assertTrue(use_http or use_grpc or use_streaming)
     tester.assertTrue(pf == "plan" or pf == "plan_nobatch")

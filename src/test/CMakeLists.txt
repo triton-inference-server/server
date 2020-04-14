@@ -130,7 +130,9 @@ target_include_directories(
 )
 target_link_libraries(
   memory_test
-  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE triton-common-error        # from repo-common
+  PRIVATE triton-common-sync-queue   # from repo-common
+  PRIVATE triton-core-serverapi      # from repo-core
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
@@ -176,7 +178,9 @@ target_include_directories(
 )
 target_link_libraries(
   pinned_memory_manager_test
-  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE triton-common-error        # from repo-common
+  PRIVATE triton-common-sync-queue   # from repo-common
+  PRIVATE triton-core-serverapi      # from repo-core
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE ${CUDA_LIBRARIES}
@@ -192,13 +196,11 @@ install(
 #
 set(
   ASYNC_WORK_QUEUE_SRCS
-  ../core/async_work_queue.cc
   ../core/status.cc
 )
 
 set(
   ASYNC_WORK_QUEUE_HDRS
-  ../core/async_work_queue.h
   ../core/status.h
 )
 
@@ -233,13 +235,69 @@ target_include_directories(
 )
 target_link_libraries(
   async_work_queue_test
-  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE triton-core-serverapi            # from repo-core
+  PRIVATE triton-common-sync-queue         # from repo-common
+  PRIVATE triton-common-async-work-queue   # from repo-common
+  PRIVATE triton-common-error              # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE -lpthread
 )
 install(
   TARGETS async_work_queue_test
+  RUNTIME DESTINATION bin
+)
+
+#
+# Unit test for DataCompressor
+#
+set(
+  DATA_COMPRESSOR_HDRS
+  ../servers/data_compressor.h
+  ../servers/common.h
+)
+
+set(
+  DATA_COMPRESSOR_TEST_SRCS
+  data_compressor_test.cc
+)
+
+set(
+  DATA_COMPRESSOR_TEST_HDRS
+  ${DATA_COMPRESSOR_HDRS}
+)
+
+find_package(GTest REQUIRED)
+find_package(Libevent CONFIG REQUIRED)
+include_directories(${LIBEVENT_INCLUDE_DIRS})
+add_executable(
+  data_compressor_test
+  ${DATA_COMPRESSOR_TEST_SRCS}
+  ${DATA_COMPRESSOR_TEST_HDRS}
+)
+set_target_properties(
+  data_compressor_test
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH ""
+)
+target_include_directories(
+  data_compressor_test
+  PRIVATE ${GTEST_INCLUDE_DIR}
+)
+target_link_libraries(
+  data_compressor_test
+  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE ${GTEST_LIBRARY}
+  PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE -lpthread
+  PRIVATE -lz
+  PRIVATE ${LIBEVENT_LIBRARIES}
+)
+install(
+  TARGETS data_compressor_test
   RUNTIME DESTINATION bin
 )
 
@@ -303,8 +361,9 @@ target_include_directories(
 )
 target_link_libraries(
   triton_repo_agent_test
-  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE triton-core-serverapi     # from repo-core
   PRIVATE triton-core-repoagentapi  # from repo-core
+  PRIVATE triton-common-error       # from repo-common
   PRIVATE triton-common-json        # from repo-common
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
@@ -328,7 +387,6 @@ target_compile_options(triton_repo_agent_test PRIVATE
 -UTRITON_ENABLE_ONNXRUNTIME_TENSORRT
 -UTRITON_ENABLE_ONNXRUNTIME_OPENVINO
 -UTRITON_ENABLE_PYTORCH
--UTRITON_ENABLE_CUSTOM
 -UTRITON_ENABLE_ENSEMBLE
 -UTRITON_ENABLE_CUDA_GRAPH
 -UTRITON_ENABLE_GCS
@@ -390,7 +448,8 @@ if(${TRITON_ENABLE_GPU})
 endif() # TRITON_ENABLE_GPU
 target_link_libraries(
   rate_limiter_test
-  PRIVATE triton-core-serverapi  # from repo-core
+  PRIVATE triton-common-error     # from repo-common
+  PRIVATE triton-core-serverapi   # from repo-core
   PRIVATE ${GTEST_LIBRARY}
   PRIVATE ${GTEST_MAIN_LIBRARY}
   PRIVATE protobuf::libprotobuf
@@ -400,11 +459,6 @@ install(
   RUNTIME DESTINATION bin
 )
 
-add_subdirectory(custom/sdk custom/sdk)
-add_subdirectory(custom/addsub custom/addsub)
-add_subdirectory(custom/identity custom/identity)
-add_subdirectory(custom/image_preprocess custom/image_preprocess)
-add_subdirectory(custom/param custom/param)
-add_subdirectory(custom/sequence custom/sequence)
-add_subdirectory(custom/dyna_sequence custom/dyna_sequence)
+add_subdirectory(sequence sequence)
+add_subdirectory(dyna_sequence dyna_sequence)
 add_subdirectory(repoagent/relocation_repoagent repoagent/relocation_repoagent)

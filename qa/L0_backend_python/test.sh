@@ -27,18 +27,22 @@
 
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="9"
+EXPECTED_NUM_TESTS="10"
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_ARGS=$BASE_SERVER_ARGS
 SERVER_LOG="./inference_server.log"
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 source ../common/util.sh
 
-rm -fr *.log ./models
+get_shm_pages() {
+  shm_pages=(`ls /dev/shm`)
+  echo ${#shm_pages[@]}
+}
 
-cp /opt/tritonserver/backends/python/triton_python_backend_utils.py .
+rm -fr *.log ./models
 
 mkdir -p models/identity_fp32/1/
 cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
@@ -50,6 +54,12 @@ cp -r ./models/identity_fp32 ./models/identity_uint8
           sed -i "s/TYPE_FP32/TYPE_UINT8/g" config.pbtxt && \
           sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
           echo "dynamic_batching { preferred_batch_size: [8], max_queue_delay_microseconds: 12000000 }" >> config.pbtxt)
+
+cp -r ./models/identity_fp32 ./models/identity_uint8_nobatch
+(cd models/identity_uint8_nobatch && \
+          sed -i "s/^name:.*/name: \"identity_uint8_nobatch\"/" config.pbtxt && \
+          sed -i "s/TYPE_FP32/TYPE_UINT8/g" config.pbtxt && \
+          sed -i "s/^max_batch_size:.*//" config.pbtxt >> config.pbtxt)
 
 cp -r ./models/identity_fp32 ./models/identity_uint32
 (cd models/identity_uint32 && \
@@ -77,6 +87,10 @@ cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
 mkdir -p models/execute_error/1/
 cp ../python_models/execute_error/model.py ./models/execute_error/1/
 cp ../python_models/execute_error/config.pbtxt ./models/execute_error/
+(cd models/execute_error && \
+          sed -i "s/^name:.*/name: \"execute_error\"/" config.pbtxt && \
+          sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+          echo "dynamic_batching { preferred_batch_size: [8], max_queue_delay_microseconds: 12000000 }" >> config.pbtxt)
 
 mkdir -p models/init_args/1/
 cp ../python_models/init_args/model.py ./models/init_args/1/
@@ -123,6 +137,7 @@ cp ../python_models/string_fixed/config.pbtxt ./models/string_fixed
 
 pip3 install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 
+prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -149,8 +164,18 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Triton non-graceful exit
+current_num_pages=`get_shm_pages`
+if [ $current_num_pages -ne $prev_num_pages ]; then
+    ls /dev/shm
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+Shared memory pages before starting triton equals to $prev_num_pages
+and shared memory pages after starting triton equals to $current_num_pages \n***"
+    RET=1
+fi
 
+prev_num_pages=`get_shm_pages`
+# Triton non-graceful exit
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -163,10 +188,11 @@ sleep 5
 triton_procs=`pgrep --parent $SERVER_PID`
 
 set +e
+
 # Trigger non-graceful termination of Triton
 kill -9 $SERVER_PID
 
-# Wait 10 seconds so that Python gRPC server can detect non-graceful exit
+# Wait 10 seconds so that Python stub can detect non-graceful exit
 sleep 10
 
 for triton_proc in $triton_procs; do
@@ -180,6 +206,16 @@ for triton_proc in $triton_procs; do
 done
 set -e
 
+current_num_pages=`get_shm_pages`
+if [ $current_num_pages -ne $prev_num_pages ]; then
+    cat $CLIENT_LOG
+    ls /dev/shm
+    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+Shared memory pages before starting triton equals to $prev_num_pages
+and shared memory pages after starting triton equals to $current_num_pages \n***"
+    RET=1
+fi
+
 # These models have errors in the initialization and finalization
 # steps and we want to ensure that correct error is being returned
 
@@ -189,8 +225,19 @@ cp ../python_models/init_error/model.py ./models/init_error/1/
 cp ../python_models/init_error/config.pbtxt ./models/init_error/
 
 set +e
+prev_num_pages=`get_shm_pages`
 run_server_nowait
+
 wait $SERVER_PID
+current_num_pages=`get_shm_pages`
+if [ $current_num_pages -ne $prev_num_pages ]; then
+    cat $CLIENT_LOG
+    ls /dev/shm
+    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+Shared memory pages before starting triton equals to $prev_num_pages
+and shared memory pages after starting triton equals to $current_num_pages \n***"
+    RET=1
+fi
 
 grep "name 'lorem_ipsum' is not defined" $SERVER_LOG
 
@@ -207,6 +254,7 @@ cp ../python_models/fini_error/model.py ./models/fini_error/1/
 cp ../python_models/fini_error/config.pbtxt ./models/fini_error/
 
 set +e
+prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -216,6 +264,16 @@ fi
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+current_num_pages=`get_shm_pages`
+if [ $current_num_pages -ne $prev_num_pages ]; then
+    cat $CLIENT_LOG
+    ls /dev/shm
+    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+Shared memory pages before starting triton equals to $prev_num_pages
+and shared memory pages after starting triton equals to $current_num_pages \n***"
+    RET=1
+fi
 
 grep "name 'undefined_variable' is not defined" $SERVER_LOG
 
@@ -232,6 +290,7 @@ mkdir -p models/add_sub_gpu/1/
 cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
 cp ../python_models/add_sub_gpu/config.pbtxt ./models/add_sub_gpu/
 
+prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -248,6 +307,16 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
+current_num_pages=`get_shm_pages`
+if [ $current_num_pages -ne $prev_num_pages ]; then
+    cat $CLIENT_LOG
+    ls /dev/shm
+    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+Shared memory pages before starting triton equals to $prev_num_pages
+and shared memory pages after starting triton equals to $current_num_pages \n***"
+    RET=1
+fi
+
 # Test Multi file models
 rm -rf models/
 mkdir -p models/multi_file/1/
@@ -256,6 +325,7 @@ cp ../python_models/identity_fp32/config.pbtxt ./models/multi_file/
 (cd models/multi_file && \
           sed -i "s/^name:.*/name: \"multi_file\"/" config.pbtxt)
 
+prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -272,6 +342,16 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
+current_num_pages=`get_shm_pages`
+if [ $current_num_pages -ne $prev_num_pages ]; then
+    cat $CLIENT_LOG
+    ls /dev/shm
+    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+Shared memory pages before starting triton equals to $prev_num_pages
+and shared memory pages after starting triton equals to $current_num_pages \n***"
+    RET=1
+fi
+
 # Test environment variable propagation
 rm -rf models/
 mkdir -p models/model_env/1/
@@ -279,6 +359,7 @@ cp ../python_models/model_env/model.py ./models/model_env/1/
 cp ../python_models/model_env/config.pbtxt ./models/model_env/
 
 export MY_ENV="MY_ENV"
+prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -286,6 +367,44 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+current_num_pages=`get_shm_pages`
+if [ $current_num_pages -ne $prev_num_pages ]; then
+    cat $CLIENT_LOG
+    ls /dev/shm
+    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+Shared memory pages before starting triton equals to $prev_num_pages
+and shared memory pages after starting triton equals to $current_num_pages \n***"
+    RET=1
+fi
+
+rm -fr ./models
+mkdir -p models/identity_fp32/1/
+cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
+cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
+
+shm_default_byte_size=$((1024*1024*4))
+SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=$shm_default_byte_size"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+for shm_page in `ls /dev/shm/`; do
+    page_size=`ls -l /dev/shm/$shm_page 2>&1 | awk '{print $5}'`
+    if [ $page_size -ne $shm_default_byte_size ]; then
+        echo -e "Shared memory region size is not equal to
+$shm_default_byte_size for page $shm_page. Region size is
+$page_size."
+        RET=1
+    fi
+done
 
 kill $SERVER_PID
 wait $SERVER_PID

@@ -223,12 +223,6 @@ GetPlatform(const std::string& platform_str)
   }
 #endif  // TRITON_ENABLE_TENSORRT
 
-#ifdef TRITON_ENABLE_CUSTOM
-  if (platform_str == kCustomPlatform) {
-    return Platform::PLATFORM_CUSTOM;
-  }
-#endif  // TRITON_ENABLE_CUSTOM
-
 #ifdef TRITON_ENABLE_ONNXRUNTIME
   if (platform_str == kOnnxRuntimeOnnxPlatform) {
     return Platform::PLATFORM_ONNXRUNTIME_ONNX;

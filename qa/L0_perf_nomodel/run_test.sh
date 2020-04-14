@@ -86,7 +86,7 @@ for BACKEND in $BACKENDS; do
 
     # set input name (special case for libtorch model)
     INPUT_NAME="INPUT0" && [ $BACKEND == "libtorch" ] && INPUT_NAME="INPUT__0"
-    
+
     MAX_LATENCY=300
     MAX_BATCH=${STATIC_BATCH} && [ $DYNAMIC_BATCH > $STATIC_BATCH ] && MAX_BATCH=${DYNAMIC_BATCH}
 
@@ -110,9 +110,9 @@ for BACKEND in $BACKENDS; do
     MODEL_NAME=${BACKEND}_zero_1_float32 && [ $BACKEND == "openvino" ] && MODEL_NAME=${BACKEND}_nobatch_zero_1_float32
 
     if [ $BACKEND == "custom" ]; then
-        REPO_DIR=./custom_models 
+        REPO_DIR=./custom_models
     elif [ $BACKEND == "python" ]; then
-        REPO_DIR=./python_models 
+        REPO_DIR=./python_models
     else
         REPO_DIR=$DATADIR/qa_identity_model_repository
     fi

@@ -143,6 +143,7 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
     PRIVATE protobuf::libprotobuf
     PRIVATE ${RE2_LIBRARY}
     PRIVATE b64
+    PRIVATE z
   )
 endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS
 
@@ -232,7 +233,8 @@ target_link_libraries(
   ${GRPC_ENDPOINT_LIBRARIES}
   ${TRACING_LIBRARIES}
   PRIVATE protobuf::libprotobuf
-  PRIVATE triton-common-json
+  PRIVATE triton-common-async-work-queue
+  PRIVATE triton-common-error
   PRIVATE triton-core-serverapi
   PRIVATE tritonserver
 )
@@ -283,7 +285,9 @@ set_target_properties(
 )
 target_link_libraries(
   simple
-  PRIVATE triton-core-serverapi   # from repo-core
+  PRIVATE triton-common-async-work-queue  # from repo-common
+  PRIVATE triton-common-error             # from repo-common
+  PRIVATE triton-core-serverapi           # from repo-core
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
   )
@@ -325,7 +329,9 @@ set_target_properties(
 )
 target_link_libraries(
   multi_server
-  PRIVATE triton-core-serverapi   # from repo-core
+  PRIVATE triton-common-async-work-queue # from repo-common
+  PRIVATE triton-common-error             # from repo-common
+  PRIVATE triton-core-serverapi          # from repo-core
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
   )
@@ -402,9 +408,6 @@ endif() # TRITON_ENABLE_ONNXRUNTIME
 if(${TRITON_ENABLE_PYTORCH})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:libtorch-backend-library>)
 endif() # TRITON_ENABLE_PYTORCH
-if(${TRITON_ENABLE_CUSTOM})
-  set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:custom-backend-library>)
-endif() # TRITON_ENABLE_CUSTOM
 if(${TRITON_ENABLE_ENSEMBLE})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:ensemble-backend-library>)
 endif() # TRITON_ENABLE_ENSEMBLE
@@ -459,6 +462,8 @@ target_link_libraries(
   PRIVATE triton-core-backendapi
   PRIVATE triton-core-repoagentapi
   PRIVATE triton-core-serverapi
+  PRIVATE triton-common-async-work-queue
+  PRIVATE triton-common-error
   PRIVATE triton-common-json
   PRIVATE triton-common-table-printer
   PRIVATE ${TRITON_EXTRA_LDFLAGS}

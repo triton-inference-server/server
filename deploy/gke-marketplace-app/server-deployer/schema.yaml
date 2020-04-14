@@ -1,0 +1,123 @@
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+x-google-marketplace:
+  schemaVersion: v2
+  applicationApiVersion: v1beta1
+  publishedVersion: '2.8.7'
+  publishedVersionMetadata:
+    releaseNote: >-
+      Initial release.
+    releaseTypes:
+    - Feature
+    recommended: true
+
+  clusterConstraints:
+    k8sVersion: ">=1.18.7"
+    assistedClusterCreation:
+      type: DISABLED
+      creationGuidance: GKE currently doesn't support auto-create GPU clusters, please refer to <a href="https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app">Triton GKE Marketplace Deployer</a> to manually create the GKE cluster >= 1.18.7 and add GPU node pools
+    resources:
+    - requests:
+        gpu:
+          nvidia.com/gpu: {}
+    istio:
+      type: REQUIRED
+
+  images:
+    '':
+      properties:
+        triton.image.registry:
+          type: REGISTRY
+        triton.image.repository:
+            type: REPO_WITHOUT_REGISTRY
+        triton.image.tag:
+            type: TAG
+
+properties:
+  name:
+    type: string
+    x-google-marketplace:
+      type: NAME
+  namespace:
+    type: string
+    x-google-marketplace:
+      type: NAMESPACE
+  initReplicaCount: 
+    title: Initial number of Triton pod instances to deploy.
+    type: integer
+    default: 1
+  minReplicaCount: 
+    title: Minimum number of Triton pod instances in the deployment for autoscaling.
+    type: integer
+    default: 1
+  maxReplicaCount: 
+    title: Maximum number of Triton pod instances in the deployment for autoscaling.
+    type: integer
+    default: 3
+  tritonProtocol: 
+    title: Request protocol to send data to Triton, choose from gRPC and HTTP.
+    type: string
+    default: HTTP
+  HPATargetAverageValue: 
+    title: HPA autoscaling target, GKE currently support Duty Cycle which is GPU utilization, when target is reached, Triton Server service will create another pod instance. We ask user to analyze model inference to associate appropriate GPU metric target based on latency requirement. We also recommend to leave some room to mitigate transient load effect. For user interested in customizing autoscaling metrics, we recommends GPU Power (Percentage of Power), Queue time or SLA measurements such as latency. 
+    type: integer
+    default: 85      
+  modelRepositoryPath:
+    type: string
+    title: Bucket where models are stored. Please make sure the user/service account to create the GKE app has permission to this GCS bucket. Read Triton documentation on configs and formatting details, supporting TensorRT, TensorFlow, Pytorch, Onnx ... etc.
+    default: gs://triton_sample_models/21_03
+  image.ldPreloadPath:
+    type: string
+    title: Leave this empty by default. Triton allows users to create custom layers for backend such as TensorRT plugin or Tensorflow custom ops, the compiled shared library must be provided via LD_PRELOAD environment variable.
+    default: ''
+  image.logVerboseLevel:
+    type: integer
+    title: Set verbose logging level. Zero (0) disables verbose logging and values >= 1 enable verbose logging, this is helpful when user unsure if the model is compatible with Triton or for general debug.
+    default: 0 
+  image.strictModelConfig:
+    type: boolean
+    title: Leave this unchecked by default. When strictModelConfig is not checked(False), Triton will try to infer the config file from model file, when checked(True), user need to provide config.pbtxt in model repository.
+    default: False
+  image.allowGPUMetrics:
+    type: boolean
+    title: Select by default. When use A100 MIG, unselect to disable GPU Memory metrics reported by Triton, as current GPU metrics not support on A100 MIG.
+    default: True  
+  istioEnabled:
+    type: boolean
+    x-google-marketplace:
+      type: ISTIO_ENABLED
+    default: True
+
+  
+required:
+- name
+- namespace
+- modelRepositoryPath
+
+form:
+- widget: help
+  description: GKE currently doesn't support autocreate GPU clusters, please refer to <a href="https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app">Triton GKE Marketplace Deployer</a> to manually create the GKE cluster >= 1.18.7 and add GPU node pools. Also, please refer to the <a href="https://github.com/triton-inference-server/server">Triton GITHUB page</a> for product information.

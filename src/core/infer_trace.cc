@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -33,6 +33,14 @@ namespace nvidia { namespace inferenceserver {
 // Start the trace id at 1, because id 0 is reserved to indicate no
 // parent.
 std::atomic<uint64_t> InferenceTrace::next_id_(1);
+
+std::unique_ptr<InferenceTrace>
+InferenceTrace::SpawnChildTrace()
+{
+  std::unique_ptr<InferenceTrace> ltrace(
+      new InferenceTrace(level_, id_, activity_fn_, release_fn_, userp_));
+  return ltrace;
+}
 
 void
 InferenceTrace::Release(std::unique_ptr<InferenceTrace>&& trace)

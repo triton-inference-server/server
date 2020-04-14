@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,8 +25,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
 export CUDA_VISIBLE_DEVICES=0
 
+DATADIR="/data/inferenceserver/${REPO_VERSION}"
 CLIENT_LOG="./client.log"
 SERVER_LOG="./inference_server.log"
 
@@ -38,12 +49,10 @@ RET=0
 rm -fr *.log
 
 rm -fr models && mkdir models
-cp -r ../custom_models/custom_nobatch_float32_float32_float32 models/.
-cp models/custom_nobatch_float32_float32_float32/config.pbtxt .
+cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
 
 # Test input and output dims are shown as numbers
 TRIAL=ios
-cp ./config.pbtxt models/custom_nobatch_float32_float32_float32/.
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -53,7 +62,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/custom_nobatch_float32_float32_float32/config`
+code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/savedmodel_nobatch_float32_float32_float32/config`
 set -e
 if [ "$code" != "200" ]; then
     cat $TRIAL.out
@@ -74,8 +83,9 @@ wait $SERVER_PID
 # Test input and output reshape are shown as numbers
 TRIAL=reshape
 
-cp ./config.pbtxt models/custom_nobatch_float32_float32_float32/.
-(cd models/custom_nobatch_float32_float32_float32 && \
+rm -fr models && mkdir models
+cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
+(cd models/savedmodel_nobatch_float32_float32_float32 && \
      sed -i "s/data_type:.*TYPE_FP32/data_type: TYPE_FP32\nreshape: { shape: [ 16 ]}/g" config.pbtxt)
 
 run_server
@@ -86,7 +96,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/custom_nobatch_float32_float32_float32/config`
+code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/savedmodel_nobatch_float32_float32_float32/config`
 set -e
 if [ "$code" != "200" ]; then
     cat $TRIAL.out
@@ -107,9 +117,10 @@ wait $SERVER_PID
 # Test version_policy::specific
 TRIAL=specific
 
-cp ./config.pbtxt models/custom_nobatch_float32_float32_float32/.
-(cd models/custom_nobatch_float32_float32_float32 && \
-     echo "version_policy: { specific: { versions: [ 1 ] } }" >> config.pbtxt)
+rm -fr models && mkdir models
+cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
+(cd models/savedmodel_nobatch_float32_float32_float32 && \
+    sed -i "s/^version_policy:.*/version_policy: { specific: { versions: [1] }}/" config.pbtxt)
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -119,7 +130,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/custom_nobatch_float32_float32_float32/config`
+code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/savedmodel_nobatch_float32_float32_float32/config`
 set -e
 if [ "$code" != "200" ]; then
     cat $TRIAL.out
@@ -142,8 +153,9 @@ wait $SERVER_PID
 # dynamic_batching::priority_queue_policy::value::default_timeout_microseconds
 TRIAL=dbatch
 
-cp ./config.pbtxt models/custom_nobatch_float32_float32_float32/.
-(cd models/custom_nobatch_float32_float32_float32 && \
+rm -fr models && mkdir models
+cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
+(cd models/savedmodel_nobatch_float32_float32_float32 && \
      echo "dynamic_batching: { max_queue_delay_microseconds: 42 \
           default_queue_policy: { default_timeout_microseconds: 123 } \
           priority_queue_policy: { key: 1  value: { default_timeout_microseconds: 123 }} \
@@ -157,7 +169,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/custom_nobatch_float32_float32_float32/config`
+code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/savedmodel_nobatch_float32_float32_float32/config`
 set -e
 if [ "$code" != "200" ]; then
     cat $TRIAL.out
@@ -193,8 +205,9 @@ wait $SERVER_PID
 # sequence_batching::max_sequence_idle_microseconds
 TRIAL=sbatch
 
-cp ./config.pbtxt models/custom_nobatch_float32_float32_float32/.
-(cd models/custom_nobatch_float32_float32_float32 && \
+rm -fr models && mkdir models
+cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
+(cd models/savedmodel_nobatch_float32_float32_float32 && \
      echo "sequence_batching: { max_sequence_idle_microseconds: 42 \
           oldest: { max_queue_delay_microseconds: 987 }}" >> config.pbtxt)
 
@@ -206,7 +219,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/custom_nobatch_float32_float32_float32/config`
+code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/savedmodel_nobatch_float32_float32_float32/config`
 set -e
 if [ "$code" != "200" ]; then
     cat $TRIAL.out
@@ -248,7 +261,8 @@ wait $SERVER_PID
 # Test ensemble_scheduling::step::model_version
 TRIAL=ensemble
 
-cp ./config.pbtxt models/custom_nobatch_float32_float32_float32/.
+rm -fr models && mkdir models
+cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
 mkdir -p models/simple_ensemble/1 && cp ensemble_config.pbtxt models/simple_ensemble/config.pbtxt
 
 run_server
@@ -289,8 +303,9 @@ rm -fr models/simple_ensemble
 # Test model_warmup::inputs::value::dims
 TRIAL=warmup
 
-cp ./config.pbtxt models/custom_nobatch_float32_float32_float32/.
-(cd models/custom_nobatch_float32_float32_float32 && \
+rm -fr models && mkdir models
+cp -r $DATADIR/qa_model_repository/savedmodel_nobatch_float32_float32_float32 models/.
+(cd models/savedmodel_nobatch_float32_float32_float32 && \
      echo "model_warmup [{" >> config.pbtxt && \
      echo "    name : \"warmup 1\"" >> config.pbtxt && \
      echo "    batch_size: 1" >> config.pbtxt && \
@@ -337,7 +352,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/custom_nobatch_float32_float32_float32/config`
+code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/savedmodel_nobatch_float32_float32_float32/config`
 set -e
 if [ "$code" != "200" ]; then
     cat $TRIAL.out

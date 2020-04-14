@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -39,6 +39,7 @@
 #include "src/core/model_config.h"
 #include "src/servers/classification.h"
 #include "src/servers/common.h"
+#include "src/servers/data_compressor.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \
@@ -893,6 +894,51 @@ EVBufferToJson(
   return nullptr;  // success
 }
 
+std::string
+CompressionTypeUsed(const std::string accept_encoding)
+{
+  std::vector<std::string> encodings;
+  size_t offset = 0;
+  size_t delimeter_pos = accept_encoding.find(',');
+  while (delimeter_pos != std::string::npos) {
+    encodings.emplace_back(
+        accept_encoding.substr(offset, delimeter_pos - offset));
+    offset = delimeter_pos + 1;
+    delimeter_pos = accept_encoding.find(',', offset);
+  }
+  std::string res = "identity";
+  double weight = 0;
+  encodings.emplace_back(accept_encoding.substr(offset));
+  for (const auto& encoding : encodings) {
+    auto start_pos = encoding.find_first_not_of(' ');
+    auto weight_pos = encoding.find(";q=");
+    // Skip if the encoding is malformed
+    if ((start_pos == std::string::npos) ||
+        ((weight_pos != std::string::npos) && (start_pos >= weight_pos))) {
+      continue;
+    }
+    const std::string type =
+        (weight_pos == std::string::npos)
+            ? encoding.substr(start_pos)
+            : encoding.substr(start_pos, weight_pos - start_pos);
+    double type_weight = 1;
+    if (weight_pos != std::string::npos) {
+      try {
+        type_weight = std::stod(encoding.substr(weight_pos + 3));
+      }
+      catch (const std::invalid_argument& ia) {
+        continue;
+      }
+    }
+    if (((type == "identity") || (type == "deflate") || (type == "gzip")) &&
+        (type_weight > weight)) {
+      res = type;
+      weight = type_weight;
+    }
+  }
+  return res;
+}
+
 }  // namespace
 
 // Handle HTTP requests to inference server APIs
@@ -1422,7 +1468,51 @@ HTTPAPIServer::HandleRepositoryControl(
     if (action == "load") {
       err = TRITONSERVER_ServerLoadModel(server_.get(), model_name.c_str());
     } else if (action == "unload") {
-      err = TRITONSERVER_ServerUnloadModel(server_.get(), model_name.c_str());
+      // Check if the dependent models should be removed
+      bool unload_dependents = false;
+      {
+        struct evbuffer_iovec* v = nullptr;
+        int v_idx = 0;
+        int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+        if (n > 0) {
+          v = static_cast<struct evbuffer_iovec*>(
+              alloca(sizeof(struct evbuffer_iovec) * n));
+          if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                "unexpected error getting model control request body");
+          }
+        }
+
+        size_t buffer_len = evbuffer_get_length(req->buffer_in);
+        if (buffer_len > 0) {
+          triton::common::TritonJson::Value control_request;
+          err = EVBufferToJson(&control_request, v, &v_idx, buffer_len, n);
+          if (err == nullptr) {
+            triton::common::TritonJson::Value params_json;
+            if (control_request.Find("parameters", &params_json)) {
+              triton::common::TritonJson::Value ud_json;
+              if (params_json.Find("unload_dependents", &ud_json)) {
+                auto parse_err = ud_json.AsBool(&unload_dependents);
+                if (parse_err != nullptr) {
+                  err = TRITONSERVER_ErrorNew(
+                      TRITONSERVER_ErrorCode(parse_err),
+                      (std::string("Unable to parse 'unload_dependents': ") +
+                       TRITONSERVER_ErrorMessage(parse_err))
+                          .c_str());
+                  TRITONSERVER_ErrorDelete(parse_err);
+                }
+              }
+            }
+          }
+        }
+      }
+      if (unload_dependents) {
+        err = TRITONSERVER_ServerUnloadModelAndDependents(
+            server_.get(), model_name.c_str());
+      } else {
+        err = TRITONSERVER_ServerUnloadModel(server_.get(), model_name.c_str());
+      }
     }
   }
 
@@ -2300,13 +2390,41 @@ HTTPAPIServer::HandleInfer(
       header_length = std::atoi(header_length_c_str);
     }
 
-    err = EVBufferToInput(
-        model_name, irequest, req->buffer_in, infer_request.get(),
-        header_length);
+    // Find Content-Encoding in header. Decompress if not empty
+    evbuffer* decompressed_buffer = nullptr;
+    const char* content_encoding_c_str =
+        evhtp_kv_find(req->headers_in, kContentEncodingHTTPHeader);
+    if (content_encoding_c_str != NULL) {
+      std::string content_encoding(content_encoding_c_str);
+      if (content_encoding == "deflate") {
+        decompressed_buffer = evbuffer_new();
+        err = DataCompressor::DecompressData(
+            DataCompressor::Type::DEFLATE, req->buffer_in, decompressed_buffer);
+      } else if (content_encoding == "gzip") {
+        decompressed_buffer = evbuffer_new();
+        err = DataCompressor::DecompressData(
+            DataCompressor::Type::GZIP, req->buffer_in, decompressed_buffer);
+      } else if (!content_encoding.empty()) {
+        // Encounter unsupported compressed type,
+        // send 415 error with supported types in Accept-Encoding
+        evhtp_headers_add_header(
+            req->headers_out,
+            evhtp_header_new(kAcceptEncodingHTTPHeader, "gzip, deflate", 1, 1));
+        evhtp_send_reply(req, EVHTP_RES_UNSUPPORTED);
+        return;
+      }
+    }
+    if (err == nullptr) {
+      err = EVBufferToInput(
+          model_name, irequest,
+          (decompressed_buffer == nullptr) ? req->buffer_in
+                                           : decompressed_buffer,
+          infer_request.get(), header_length);
+    }
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestClass::InferRequestComplete,
-          nullptr /* request_release_userp */);
+          decompressed_buffer);
       if (err == nullptr) {
         err = TRITONSERVER_InferenceRequestSetResponseCallback(
             irequest, allocator_,
@@ -2405,6 +2523,9 @@ HTTPAPIServer::InferRequestClass::InferRequestComplete(
   // delete it here.
 
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    if (userp != nullptr) {
+      evbuffer_free(reinterpret_cast<evbuffer*>(userp));
+    }
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(request),
         "deleting HTTP/REST inference request");
@@ -2676,16 +2797,17 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
 
   RETURN_IF_ERR(response_json.Add("outputs", std::move(response_outputs)));
 
+  evbuffer* response_placeholder = evbuffer_new();
   // Write json metadata into response evbuffer
   triton::common::TritonJson::WriteBuffer buffer;
   RETURN_IF_ERR(response_json.Write(&buffer));
-  evbuffer_add(req_->buffer_out, buffer.Base(), buffer.Size());
+  evbuffer_add(response_placeholder, buffer.Base(), buffer.Size());
 
   // If there is binary data write it next in the appropriate
   // order... also need the HTTP header when returning binary data.
   if (!ordered_buffers.empty()) {
     for (evbuffer* b : ordered_buffers) {
-      evbuffer_add_buffer(req_->buffer_out, b);
+      evbuffer_add_buffer(response_placeholder, b);
     }
 
     evhtp_headers_add_header(
@@ -2693,6 +2815,54 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
                                kInferHeaderContentLengthHTTPHeader,
                                std::to_string(buffer.Size()).c_str(), 1, 1));
   }
+
+  evbuffer* response_body = response_placeholder;
+  // Find Accept-Encoding in header. Try to compress if found
+  const char* accept_encoding_c_str =
+      evhtp_kv_find(req_->headers_in, kAcceptEncodingHTTPHeader);
+  if (accept_encoding_c_str != NULL) {
+    std::string accept_encoding = CompressionTypeUsed(accept_encoding_c_str);
+    if (accept_encoding == "deflate") {
+      auto compressed_buffer = evbuffer_new();
+      auto err = DataCompressor::CompressData(
+          DataCompressor::Type::DEFLATE, response_placeholder,
+          compressed_buffer);
+      if (err == nullptr) {
+        evhtp_headers_add_header(
+            req_->headers_out,
+            evhtp_header_new(kContentEncodingHTTPHeader, "deflate", 1, 1));
+        response_body = compressed_buffer;
+        evbuffer_free(response_placeholder);
+      } else {
+        // just log the compression error and return the uncompressed data
+        LOG_VERBOSE(1) << "unable to compress response: "
+                       << TRITONSERVER_ErrorMessage(err);
+        TRITONSERVER_ErrorDelete(err);
+        evbuffer_free(compressed_buffer);
+      }
+    } else if (accept_encoding == "gzip") {
+      auto compressed_buffer = evbuffer_new();
+      auto err = DataCompressor::CompressData(
+          DataCompressor::Type::GZIP, response_placeholder, compressed_buffer);
+      if (err == nullptr) {
+        evhtp_headers_add_header(
+            req_->headers_out,
+            evhtp_header_new(kContentEncodingHTTPHeader, "gzip", 1, 1));
+        response_body = compressed_buffer;
+        evbuffer_free(response_placeholder);
+      } else {
+        // just log the compression error and return the uncompressed data
+        LOG_VERBOSE(1) << "unable to compress response: "
+                       << TRITONSERVER_ErrorMessage(err);
+        TRITONSERVER_ErrorDelete(err);
+        evbuffer_free(compressed_buffer);
+      }
+    }
+  }
+  evbuffer_add_buffer(req_->buffer_out, response_body);
+  // Destroy the evbuffer object as the data has been moved
+  // to HTTP response buffer
+  evbuffer_free(response_body);
 
   return nullptr;  // success
 }
