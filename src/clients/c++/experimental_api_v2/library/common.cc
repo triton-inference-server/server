@@ -48,14 +48,14 @@ operator<<(std::ostream& out, const Error& err)
 //==============================================================================
 
 Error
-InferenceServerClient::GetStat(Stat* stat) const
+InferenceServerClient::GetInferStat(InferStat* infer_stat) const
 {
-  *stat = infer_stat_;
+  *infer_stat = infer_stat_;
   return Error::Success;
 }
 
 Error
-InferenceServerClient::UpdateStat(const RequestTimers& timer)
+InferenceServerClient::UpdateInferStat(const RequestTimers& timer)
 {
   const uint64_t request_time_ns = timer.Duration(
       RequestTimers::Kind::REQUEST_START, RequestTimers::Kind::REQUEST_END);

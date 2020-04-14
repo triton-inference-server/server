@@ -172,7 +172,7 @@ class RequestTimers {
 ///   time for marshaling infer request.
 ///   'cumulative_receive_time_ns' represents the time for
 ///   unmarshaling infer response.
-struct Stat {
+struct InferStat {
   /// Total number of requests completed.
   size_t completed_request_count;
 
@@ -187,8 +187,8 @@ struct Stat {
   /// response is completely received.
   uint64_t cumulative_receive_time_ns;
 
-  /// Create a new Stat object with zero-ed statistics.
-  Stat()
+  /// Create a new InferStat object with zero-ed statistics.
+  InferStat()
       : completed_request_count(0), cumulative_total_request_time_ns(0),
         cumulative_send_time_ns(0), cumulative_receive_time_ns(0)
   {
@@ -217,17 +217,17 @@ class InferRequest {
 class InferenceServerClient {
  public:
   /// Obtain the cumulative inference statistics of the client.
-  Error GetStat(Stat* stat) const;
+  Error GetInferStat(InferStat* infer_stat) const;
 
  protected:
   // Update the infer stat with the given timer
-  Error UpdateStat(const RequestTimers& timer);
+  Error UpdateInferStat(const RequestTimers& timer);
 
   // Standalone request context used for synchronous request
   std::shared_ptr<InferRequest> sync_request_;
 
   // The inference statistic of the current client
-  Stat infer_stat_;
+  InferStat infer_stat_;
 };
 
 //==============================================================================

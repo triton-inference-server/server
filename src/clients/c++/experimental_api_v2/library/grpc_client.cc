@@ -284,7 +284,7 @@ InferenceServerGrpcClient::Infer(
 
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
 
-  err = UpdateStat(sync_request->Timer());
+  err = UpdateInferStat(sync_request->Timer());
   if (!err.IsOk()) {
     std::cerr << "Failed to update context stat: " << err << std::endl;
   }
