@@ -142,6 +142,14 @@ extern Logger gLogger_;
       nvidia::inferenceserver::LogMessage::Level::kINFO) \
       .stream()
 
+#define LOG_STATUS_ERROR(X, MSG)                         \
+  do {                                                   \
+    const Status& status__ = (X);                        \
+    if (!status__.IsOk()) {                              \
+      LOG_ERROR << (MSG) << ": " << status__.AsString(); \
+    }                                                    \
+  } while (false)
+
 #define LOG_TRTSERVER_ERROR(X, MSG)                                           \
   do {                                                                        \
     TRTSERVER_Error* err__ = (X);                                             \

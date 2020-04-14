@@ -64,9 +64,7 @@ class SequenceBatchScheduler : public Scheduler {
       std::unique_ptr<Scheduler>* scheduler);
 
   // \see Scheduler::Enqueue()
-  Status Enqueue(
-      const std::shared_ptr<ModelInferStats>& stats,
-      std::unique_ptr<InferenceRequest>& request) override;
+  Status Enqueue(std::unique_ptr<InferenceRequest>& request) override;
 
   // A batcher-sequence_slot combination. The batcher is represented
   // by the index into 'batchers_'.
@@ -183,7 +181,6 @@ class SequenceBatch {
   // request 'request' will be nullptr.
   virtual void Enqueue(
       const uint32_t seq_slot, const CorrelationID correlation_id,
-      const std::shared_ptr<ModelInferStats>& stats,
       std::unique_ptr<InferenceRequest>& request) = 0;
 
  protected:
@@ -256,7 +253,6 @@ class DirectSequenceBatch : public SequenceBatch {
 
   void Enqueue(
       const uint32_t seq_slot, const CorrelationID correlation_id,
-      const std::shared_ptr<ModelInferStats>& stats,
       std::unique_ptr<InferenceRequest>& request) override;
 
  private:
@@ -327,7 +323,6 @@ class OldestSequenceBatch : public SequenceBatch {
 
   void Enqueue(
       const uint32_t seq_slot, const CorrelationID correlation_id,
-      const std::shared_ptr<ModelInferStats>& stats,
       std::unique_ptr<InferenceRequest>& request) override;
 
  private:

@@ -241,17 +241,13 @@ ResponseRelease(
 }
 
 void
-InferRequestComplete(
-    TRITONSERVER_Server* server, TRITONSERVER_InferenceRequest* request,
-    void* userp)
+InferRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
 {
   // We reuse the request so we don't delete it here...
 }
 
 void
-InferResponseComplete(
-    TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* response,
-    void* userp)
+InferResponseComplete(TRITONSERVER_InferenceResponse* response, void* userp)
 {
   // Send 'response' to the future.
   std::promise<TRITONSERVER_InferenceResponse*>* p =

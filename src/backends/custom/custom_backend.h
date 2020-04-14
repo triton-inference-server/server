@@ -87,18 +87,19 @@ class CustomBackend : public InferenceBackend {
     std::string LibraryErrorString(const int err);
 
     // See BackendContext::Run()
-    Status Run(
+    void Run(
         const InferenceBackend* base,
-        std::vector<Scheduler::Payload>* payloads) override;
+        std::vector<std::unique_ptr<InferenceRequest>>&& requests) override;
 
     struct GetInputOutputContext {
       GetInputOutputContext(
-          CustomBackend::Context* context, Scheduler::Payload* payload)
-          : context_(context), payload_(payload)
+          CustomBackend::Context* context, InferenceRequest* request)
+          : context_(context), request_(request)
       {
       }
       CustomBackend::Context* context_;
-      Scheduler::Payload* payload_;
+      InferenceRequest* request_;
+      std::unique_ptr<InferenceResponse> response_;
 
       // Map from input to the buffer index for the tensor data for
       // that input.
@@ -164,6 +165,12 @@ class CustomBackend : public InferenceBackend {
     // each inference request and so are not included here.
     std::unordered_map<std::string, std::unique_ptr<std::vector<int64_t>>>
         fixed_input_shapes_;
+
+    // Map from each output to the datatype for the output. The custom
+    // V1/V2 API doesn't require the backend to indicate an output
+    // datatype so we need to use the datatype from the model
+    // configuration.
+    std::unordered_map<std::string, DataType> output_datatypes_;
   };
 
   std::vector<std::string> server_params_;

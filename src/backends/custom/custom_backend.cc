@@ -145,13 +145,13 @@ CustomBackend::CreateExecutionContexts(
       total_context_cnt,
       [this](uint32_t runner_idx) -> Status { return InitBackend(runner_idx); },
       [this](
-          uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-          std::function<void(Status)> func) {
-        Run(runner_idx, payloads, func);
+          uint32_t runner_idx,
+          std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
+        Run(runner_idx, std::move(requests));
       },
       [this](
           uint32_t runner_idx, const InferenceRequest::Input& input,
-          const Scheduler::Payload& payload,
+          const std::unique_ptr<InferenceRequest>& request,
           std::vector<int64_t>* shape) -> Status { return Status::Success; }));
 
   LOG_VERBOSE(1) << "custom backend for " << Name() << std::endl << *this;
@@ -248,6 +248,12 @@ CustomBackend::CreateExecutionContext(
     }
   }
 
+  // Collect datatype for each output
+  for (const auto& io : Config().output()) {
+    context->output_datatypes_.emplace(
+        std::make_pair(io.name(), io.data_type()));
+  }
+
   return Status::Success;
 }
 
@@ -304,56 +310,58 @@ CustomBackend::InitBackend(uint32_t runner_idx)
   return Status::Success;
 }
 
-Status
+void
 CustomBackend::Context::Run(
-    const InferenceBackend* base, std::vector<Scheduler::Payload>* payloads)
+    const InferenceBackend* base,
+    std::vector<std::unique_ptr<InferenceRequest>>&& requests)
 {
-  LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
-                 << " request payloads";
+  LOG_VERBOSE(1) << "Running " << name_ << " with " << requests.size()
+                 << " requests";
 
-  // For each request in 'payloads' collect the total batch size for
-  // this inference execution. The batch-size, number of inputs, and
-  // size of each input has already been checked by each payload's
-  // request provider so don't need to do that here.
+  // For each request collect the total batch size for this inference
+  // execution. The batch-size, number of inputs, and size of each
+  // input has already been checked so don't need to do that here.
   uint32_t total_batch_size = 0;
   uint32_t total_inputs = 0;
   uint32_t total_requested_outputs = 0;
-  for (auto& payload : *payloads) {
-    if (!payload.status_.IsOk()) {
-      return Status(
-          Status::Code::INTERNAL,
-          "unexpected payload with non-OK status given to custom runner for '" +
-              name_ + "'");
+  for (auto& request : requests) {
+    if (request == nullptr) {
+      InferenceRequest::RespondWithError(
+          requests,
+          Status(
+              Status::Code::INTERNAL,
+              "null request given to custom runner for '" + name_ + "'"));
+      return;
     }
 
-    const auto& irequest = payload.request_;
-
-    total_batch_size += irequest->BatchSize();
-    total_inputs += irequest->ImmutableInputs().size();
-    total_requested_outputs += irequest->RequestedOutputs().size();
+    total_batch_size += request->BatchSize();
+    total_inputs += request->ImmutableInputs().size();
+    total_requested_outputs += request->RequestedOutputs().size();
   }
 
-  // If there are no valid payloads then no need to run the
-  // inference. The payloads will have their error status set so can
-  // just return.
+  // If there are no valid requests then no need to run the
+  // inference.
   if (total_batch_size == 0) {
-    return Status::Success;
+    return;
   }
 
   // total_batch_size can be 1 for models that don't support batching
   // (i.e. max_batch_size_ == 0).
   if ((total_batch_size != 1) &&
       (total_batch_size > (uint32_t)max_batch_size_)) {
-    return Status(
-        Status::Code::INTERNAL,
-        "dynamic batch size " + std::to_string(total_batch_size) + " for '" +
-            name_ + "', max allowed is " + std::to_string(max_batch_size_));
+    InferenceRequest::RespondWithError(
+        requests, Status(
+                      Status::Code::INTERNAL,
+                      "dynamic batch size " + std::to_string(total_batch_size) +
+                          " for '" + name_ + "', max allowed is " +
+                          std::to_string(max_batch_size_)));
+    return;
   }
 
   // We use the following to hold pointers to all the input and output
-  // names of the payloads. We don't want this to resize as that will
+  // names of the requests. We don't want this to resize as that will
   // invalidate the pointers so set the capacity big enough to hold
-  // all the pointers for all the payloads.
+  // all the pointers for all the requests.
   std::vector<const char*> work_input_name_ptrs;
   work_input_name_ptrs.reserve(total_inputs);
   std::vector<const char*> work_output_name_ptrs;
@@ -373,18 +381,16 @@ CustomBackend::Context::Run(
   // We use the following to hold contexts needed for the input and
   // output callbacks. We don't want this to resize as that will
   // invalidate the pointers so set the capacity big enough to hold
-  // the contexts for all the payloads.
+  // the contexts for all the requests.
   std::vector<GetInputOutputContext> work_io_contexts;
-  work_io_contexts.reserve(payloads->size());
+  work_io_contexts.reserve(requests.size());
 
-  // Collect the payload information into a array of custom::Payload
-  // structs that can be passed to the backend. Every payload must
+  // Collect the request information into a array of custom::Payload
+  // structs that can be passed to the backend. Every request must
   // have an OK status (checked above) so we don't bother to check
   // that here.
   std::vector<CustomPayload> custom_payloads;
-  for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_;
-
+  for (auto& irequest : requests) {
     custom_payloads.emplace_back();
     CustomPayload& custom_payload = custom_payloads.back();
     custom_payload.batch_size = irequest->BatchSize();
@@ -407,9 +413,6 @@ CustomBackend::Context::Run(
         work_input_dims_ptrs.push_back(
             (shape->size() == 0) ? nullptr : &(shape->at(0)));
       } else {
-        // FIXMEV2 should be able to point directly to the shape
-        // vectors in InferenceRequest::Input instead of using the
-        // intermediate variable_input_shapes.
         variable_input_shapes.emplace_back(input->Shape());
         const std::vector<int64_t>& vshape = variable_input_shapes.back();
         work_input_dim_cnts.push_back(vshape.size());
@@ -436,14 +439,14 @@ CustomBackend::Context::Run(
       }
     }
 
-    work_io_contexts.emplace_back(this, &payload);
+    work_io_contexts.emplace_back(this, irequest.get());
     custom_payload.input_context = &work_io_contexts.back();
     custom_payload.output_context = custom_payload.input_context;
     custom_payload.error_code = 0;
   }
 
 #ifdef TRTIS_ENABLE_STATS
-  for (auto& payload : *payloads) {
+  for (auto& request : requests) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeInputEnd);
@@ -492,25 +495,39 @@ CustomBackend::Context::Run(
   }
 #endif  // TRTIS_ENABLE_STATS
 
+  // If the custom execute function returns an error then send any
+  // responses and so send an error response for each request.
   if (err != 0) {
-    return Status(
-        Status::Code::INTERNAL, "execute error for '" + name_ + "': (" +
-                                    std::to_string(err) + ") " +
-                                    LibraryErrorString(err));
+    InferenceRequest::RespondWithError(
+        requests,
+        Status(
+            Status::Code::INTERNAL, "execute error for '" + name_ + "': (" +
+                                        std::to_string(err) + ") " +
+                                        LibraryErrorString(err)));
+    return;
   }
 
-  // Transfer payload errors back to the Payload objects.
+  // Send the response for each custom payload and release the request
+  // as we are done with it. If a payload has an error then send error
+  // response.
   for (size_t i = 0; i < custom_payloads.size(); ++i) {
-    if (custom_payloads[i].error_code != 0) {
-      (*payloads)[i].status_ = Status(
-          Status::Code::INTERNAL,
-          "payload error for '" + name_ + "': (" +
-              std::to_string(custom_payloads[i].error_code) + ") " +
-              LibraryErrorString(custom_payloads[i].error_code));
+    if (custom_payloads[i].error_code == 0) {
+      GetInputOutputContext* ocontext = static_cast<GetInputOutputContext*>(
+          custom_payloads[i].output_context);
+      LOG_STATUS_ERROR(
+          InferenceResponse::Send(std::move(ocontext->response_)),
+          "failed to send custom backend response");
+      InferenceRequest::Release(std::move(requests[i]));
+    } else {
+      InferenceRequest::RespondWithError(
+          requests[i],
+          Status(
+              Status::Code::INTERNAL,
+              "payload error for '" + name_ + "': (" +
+                  std::to_string(custom_payloads[i].error_code) + ") " +
+                  LibraryErrorString(custom_payloads[i].error_code)));
     }
   }
-
-  return Status::Success;
 }
 
 bool
@@ -556,10 +573,10 @@ CustomBackend::Context::GetNextInput(
     CustomMemoryType* memory_type, int64_t* memory_type_id)
 {
   const std::string name(cname);
-  Scheduler::Payload* payload = input_context->payload_;
+  InferenceRequest* request = input_context->request_;
 
   const InferenceRequest::Input* rinput;
-  Status status = payload->request_->ImmutableInput(name, &rinput);
+  Status status = request->ImmutableInput(name, &rinput);
   if (status.IsOk()) {
     size_t idx = 0;
 
@@ -622,25 +639,53 @@ CustomBackend::Context::GetOutput(
     void** content, CustomMemoryType* memory_type, int64_t* memory_type_id)
 {
   const std::string name(cname);
-  Scheduler::Payload* payload = output_context->payload_;
+  InferenceRequest* request = output_context->request_;
+
+  // If there is not yet a response for the request, then create it.
+  std::unique_ptr<InferenceResponse>& response = output_context->response_;
+  if (response == nullptr) {
+    Status status = request->ResponseFactory().CreateResponse(&response);
+    if (!status.IsOk()) {
+      LOG_VERBOSE(1) << "failed to create response: " << status.AsString();
+      return false;
+    }
+  }
 
   *content = nullptr;
 
-  // If there is no response provider return content == nullptr with
-  // OK status as an indication that the output should not be written.
-  if ((payload->response_provider_ != nullptr) &&
-      payload->response_provider_->RequiresOutput(std::string(cname))) {
+  // If the output is not requested, return content == nullptr with OK
+  // status as an indication that the output should not be written.
+  const auto& itr = request->RequestedOutputs().find(name);
+  if (itr != request->RequestedOutputs().end()) {
     std::vector<int64_t> shape;
     if (shape_dim_cnt > 0) {
       shape.assign(shape_dims, shape_dims + shape_dim_cnt);
     }
 
-    TRTSERVER_Memory_Type actual_memory_type;
-    int64_t actual_memory_type_id;
-    Status status = payload->response_provider_->AllocateOutputBuffer(
-        name, content, content_byte_size, shape,
-        ToTRTServerMemoryType(*memory_type), *memory_type_id,
-        &actual_memory_type, &actual_memory_type_id);
+    // Custom backend V1/V2 API does not require the backend to
+    // provide the datatype of the output so we need to get it from
+    // the model configuration.
+    const auto& datatype_map = output_context->context_->output_datatypes_;
+    const auto& dtitr = datatype_map.find(name);
+    if (dtitr == datatype_map.end()) {
+      LOG_VERBOSE(1) << "failed to find datatype for output '" << name << "'";
+      return false;
+    }
+
+    InferenceResponse::Output* output;
+    Status status = response->AddOutput(name, dtitr->second, shape, &output);
+    if (!status.IsOk()) {
+      LOG_VERBOSE(1) << status.AsString();
+      return false;
+    }
+
+    TRTSERVER_Memory_Type actual_memory_type =
+        ToTRTServerMemoryType(*memory_type);
+    int64_t actual_memory_type_id = *memory_type_id;
+
+    status = output->AllocateBuffer(
+        content, content_byte_size, &actual_memory_type,
+        &actual_memory_type_id);
     if (!status.IsOk()) {
       LOG_VERBOSE(1) << status.AsString();
       return false;
@@ -649,7 +694,6 @@ CustomBackend::Context::GetOutput(
     // Update memory type with actual memory type
     *memory_type = ToCustomMemoryType(actual_memory_type);
     *memory_type_id = actual_memory_type_id;
-
     return status.IsOk();
   }
 
