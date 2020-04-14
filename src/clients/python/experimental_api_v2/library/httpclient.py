@@ -31,6 +31,7 @@ from urllib.parse import quote, quote_plus
 import rapidjson as json
 import numpy as np
 import gevent.pool
+import struct
 
 from tritonhttpclient.utils import *
 
@@ -591,7 +592,6 @@ class InferenceServerClient:
 
         return statistics
 
-
     def get_system_shared_memory_status(self,
                                         region_name="",
                                         headers=None,
@@ -950,17 +950,22 @@ class InferenceServerClient:
 
         request_body = json.dumps(infer_request)
         json_size = len(request_body)
-        has_binary_data = False
+        binary_data = None
         for input_tensor in inputs:
             raw_data = input_tensor._get_binary_data()
             if raw_data is not None:
-                request_body = request_body + raw_data.decode()
-                has_binary_data = True
+                if binary_data is not None:
+                    binary_data += raw_data
+                else:
+                    binary_data = raw_data
 
-        if has_binary_data:
+        if binary_data is not None:
             if headers is None:
                 headers = {}
             headers["Inference-Header-Content-Length"] = json_size
+            request_body = struct.pack(
+                '{}s{}s'.format(len(request_body), len(raw_data)),
+                request_body.encode(), raw_data)
 
         if model_version != "":
             request_uri = "v2/models/{}/versions/{}/infer".format(
@@ -1131,7 +1136,7 @@ class InferInput:
             The name of input
         """
         return self._name
-    
+
     def datatype(self):
         """Get the datatype of input associated with this object.
 
@@ -1151,7 +1156,7 @@ class InferInput:
             The shape of input
         """
         return self._shape
-    
+
     def set_shape(self, shape):
         """Set the shape of input.
 
@@ -1161,7 +1166,6 @@ class InferInput:
             The shape of the associated input.
         """
         self._shape = shape
-
 
     def set_data_from_numpy(self, input_tensor, binary_data=True):
         """Set the tensor data from the specified numpy array for
