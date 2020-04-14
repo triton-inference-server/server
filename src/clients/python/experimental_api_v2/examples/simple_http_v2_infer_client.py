@@ -97,7 +97,7 @@ if __name__ == '__main__':
     # to unique integers and the second to all ones.
     input0_data = np.arange(start=0, stop=16, dtype=np.int32)
     input0_data = np.expand_dims(input0_data, axis=0)
-    input1_data = np.ones(shape=(1, 16), dtype=np.int32) * -1
+    input1_data = np.full(shape=(1, 16), fill_value= -1, dtype=np.int32)
 
     # Infer with simple (With requested Outputs)
     results = test_infer("simple", input0_data, input1_data)
