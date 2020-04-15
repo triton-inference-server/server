@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.11.4" />
+    <PackageReference Include="Grpc" Version="2.28.1" />
+    <PackageReference Include="Grpc.Tools" Version="2.28.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="../../core/api.proto" Link="api.proto" />
+    <Protobuf Include="../../core/model_config.proto" Link="model_config.proto" />
+    <Protobuf Include="../../core/grpc_service.proto" Link="grpc_service.proto" />
+    <Protobuf Include="../../core/server_status.proto" Link="server_status.proto" />
+    <Protobuf Include="../../core/request_status.proto" Link="request_status.proto" />
+    <Protobuf Include="../../core/grpc_service_v2.proto" Link="grpc_service_v2.proto" />
+  </ItemGroup>
+</Project>
