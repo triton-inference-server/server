@@ -1274,7 +1274,7 @@ HTTPAPIServerV2::HandleSystemSharedMemory(
                   TRITONSERVER_ERROR_INVALID_ARG,
                   "Shared memory register request has no 'byte_size' field");
             } else {
-              uint64_t byte_size = offset_itr->value.GetInt();
+              uint64_t byte_size = byte_size_itr->value.GetInt();
               err = shm_manager_->RegisterSystemSharedMemory(
                   region_name, shm_key, offset, byte_size);
             }
