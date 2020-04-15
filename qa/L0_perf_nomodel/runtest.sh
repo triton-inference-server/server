@@ -105,7 +105,8 @@ for BACKEND in $BACKENDS; do
         cp -r $REPO_DIR/$MODEL_NAME models/. && \
         (cd models/$MODEL_NAME && \
                 sed -i "s/^max_batch_size:.*/max_batch_size: ${MAX_BATCH}/" config.pbtxt && \
-                echo "instance_group [ { kind: ${KIND}, count: ${INSTANCE_CNT} }]" >> config.pbtxt)
+                echo "instance_group [ { kind: ${KIND}, count: ${INSTANCE_CNT} }]" >> config.pbtxt && \
+                [ $BACKEND == "custom" ] && sed -i "s/dims:.*\[.*\]/dims: \[ ${SHAPE} \]/g" config.pbtxt)
     if (( $DYNAMIC_BATCH > 1 )); then
         (cd models/$MODEL_NAME && \
                 echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
