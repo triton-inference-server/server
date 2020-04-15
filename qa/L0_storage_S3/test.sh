@@ -41,8 +41,10 @@ CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 
 # S3 bucket path (Point to bucket when testing cloud storage)
+BUCKET_URL="s3://triton-bucket-${CI_PIPELINE_ID}"
 
-BUCKET_URL="s3://bucket"
+# Make test bucket
+aws s3 mb "${BUCKET_URL}"
 
 # Remove Slash in BUCKET_URL
 BUCKET_URL=${BUCKET_URL%/}
@@ -178,9 +180,10 @@ for MAYBE_SLASH in "" "/"; do
 
         # Clean up bucket
         aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
-
     done
 done 
+
+aws s3 rb "${BUCKET_URL}"
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
