@@ -1254,11 +1254,31 @@ HTTPAPIServerV2::HandleSystemSharedMemory(
         size_t buffer_len = evbuffer_get_length(req->buffer_in);
         err = EVBufferToJson(&register_request, v, &v_idx, buffer_len, n);
         if (err == nullptr) {
-          const char* shm_key = register_request["key"].GetString();
-          uint64_t offset = register_request["offset"].GetInt();
-          uint64_t byte_size = register_request["byte_size"].GetInt();
-          err = shm_manager_->RegisterSystemSharedMemory(
-              region_name, shm_key, offset, byte_size);
+          const auto& key_itr = register_request.FindMember("key");
+          if (key_itr == register_request.MemberEnd()) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "Shared memory register request has no 'key' field");
+          } else {
+            const char* shm_key = key_itr->value.GetString();
+            uint64_t offset = 0;
+            const auto& offset_itr = register_request.FindMember("offset");
+            if (offset_itr != register_request.MemberEnd()) {
+              offset = offset_itr->value.GetInt();
+            }
+
+            const auto& byte_size_itr =
+                register_request.FindMember("byte_size");
+            if (byte_size_itr == register_request.MemberEnd()) {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  "Shared memory register request has no 'byte_size' field");
+            } else {
+              uint64_t byte_size = byte_size_itr->value.GetInt();
+              err = shm_manager_->RegisterSystemSharedMemory(
+                  region_name, shm_key, offset, byte_size);
+            }
+          }
         }
       }
     }
@@ -1332,25 +1352,58 @@ HTTPAPIServerV2::HandleCudaSharedMemory(
         size_t buffer_len = evbuffer_get_length(req->buffer_in);
         err = EVBufferToJson(&register_request, v, &v_idx, buffer_len, n);
         if (err == nullptr) {
-          rapidjson::Value& handle = register_request["raw_handle"];
-          const char* b64_handle = handle["b64"].GetString();
-          uint64_t byte_size = register_request["byte_size"].GetInt();
-          uint64_t device_id = register_request["device_id"].GetInt();
-          base64_decodestate s;
-          base64_init_decodestate(&s);
-          std::vector<char> raw_handle(sizeof(cudaIpcMemHandle_t));
-          size_t decoed_size = base64_decode_block(
-              b64_handle, strlen(b64_handle), raw_handle.data(), &s);
-          if (decoed_size != sizeof(cudaIpcMemHandle_t)) {
+          const auto& raw_handle_itr =
+              register_request.FindMember("raw_handle");
+          if (raw_handle_itr == register_request.MemberEnd()) {
             err = TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INVALID_ARG,
-                "'raw_handle' must be a valid base64 encode "
-                "cudaIpcMemHandle_t");
+                "Shared memory register request has no 'raw_handle' field");
           } else {
-            err = shm_manager_->RegisterCUDASharedMemory(
-                region_name.c_str(),
-                reinterpret_cast<const cudaIpcMemHandle_t*>(raw_handle.data()),
-                byte_size, device_id);
+            rapidjson::Value& handle = raw_handle_itr->value;
+            const auto& b64_handle_itr = handle.FindMember("b64");
+            if (b64_handle_itr == register_request.MemberEnd()) {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  "raw_handle has no 'b64' field");
+            } else {
+              const char* b64_handle = b64_handle_itr->value.GetString();
+              const auto& byte_size_itr =
+                  register_request.FindMember("byte_size");
+              if (byte_size_itr == register_request.MemberEnd()) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "Shared memory register request has no 'byte_size' field");
+              } else {
+                uint64_t byte_size = byte_size_itr->value.GetInt();
+                const auto& device_id_itr =
+                    register_request.FindMember("device_id");
+                if (device_id_itr == register_request.MemberEnd()) {
+                  err = TRITONSERVER_ErrorNew(
+                      TRITONSERVER_ERROR_INVALID_ARG,
+                      "Shared memory register request has no 'device_id' "
+                      "field");
+                } else {
+                  uint64_t device_id = device_id_itr->value.GetInt();
+                  base64_decodestate s;
+                  base64_init_decodestate(&s);
+                  std::vector<char> raw_handle(sizeof(cudaIpcMemHandle_t));
+                  size_t decoed_size = base64_decode_block(
+                      b64_handle, strlen(b64_handle), raw_handle.data(), &s);
+                  if (decoed_size != sizeof(cudaIpcMemHandle_t)) {
+                    err = TRITONSERVER_ErrorNew(
+                        TRITONSERVER_ERROR_INVALID_ARG,
+                        "'raw_handle' must be a valid base64 encoded "
+                        "cudaIpcMemHandle_t");
+                  } else {
+                    err = shm_manager_->RegisterCUDASharedMemory(
+                        region_name.c_str(),
+                        reinterpret_cast<const cudaIpcMemHandle_t*>(
+                            raw_handle.data()),
+                        byte_size, device_id);
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -1608,14 +1661,46 @@ HTTPAPIServerV2::EVBufferToInput(
 
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
-  const rapidjson::Value& inputs = request_json["inputs"];
+  itr = request_json.FindMember("inputs");
+  if (itr == request_json.MemberEnd()) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        "Inference request header has no 'inputs' field");
+  }
+  const rapidjson::Value& inputs = itr->value;
+
   infer_req->response_meta_data_.request_buffer_.resize(inputs.Size());
   for (size_t i = 0; i < inputs.Size(); i++) {
     const rapidjson::Value& request_input = inputs[i];
-    const char* input_name = request_input["name"].GetString();
-    const char* datatype = request_input["datatype"].GetString();
-    const rapidjson::Value& shape = request_input["shape"];
+    const auto& name_itr = request_input.FindMember("name");
+    if (name_itr == request_input.MemberEnd()) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG, "Input found with no 'name' field");
+    }
+    const char* input_name = name_itr->value.GetString();
 
+    const auto& datatype_itr = request_input.FindMember("datatype");
+    if (datatype_itr == request_input.MemberEnd()) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "Input tensor '" + std::string(input_name) +
+              "' has no 'datatype' field")
+              .c_str());
+    }
+    const char* datatype = datatype_itr->value.GetString();
+
+    const auto& shape_itr = request_input.FindMember("shape");
+    if (shape_itr == request_input.MemberEnd()) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "Input tensor '" + std::string(input_name) +
+              "' has no 'shape' field")
+              .c_str());
+    }
+
+    const rapidjson::Value& shape = shape_itr->value;
     std::vector<int64_t> shape_vec;
     for (rapidjson::SizeType i = 0; i < shape.Size(); i++) {
       shape_vec.push_back(shape[i].GetInt());
@@ -1691,10 +1776,8 @@ HTTPAPIServerV2::EVBufferToInput(
             irequest, input_name, base, byte_size, memory_type,
             memory_type_id));
       } else {
-        const rapidjson::Value& shape = request_input["shape"];
-        const char* dtype_str = request_input["datatype"].GetString();
         const DataType dtype =
-            ProtocolStringToDataType(dtype_str, strlen(dtype_str));
+            ProtocolStringToDataType(datatype, strlen(datatype));
         int element_cnt = 0;
         for (rapidjson::SizeType i = 0; i < shape.Size(); i++) {
           if (element_cnt == 0) {
@@ -1709,9 +1792,19 @@ HTTPAPIServerV2::EVBufferToInput(
               irequest, input_name, nullptr, 0 /* byte_size */,
               TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
         } else {
+          const auto& itr = request_input.FindMember("data");
+          if (itr == request_input.MemberEnd()) {
+            return TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                std::string(
+                    "Input tensor '" + std::string(input_name) +
+                    "' has no 'data' field")
+                    .c_str());
+          }
+          const rapidjson::Value& tensor_data = itr->value;
+
           size_t dtype_size = GetDataTypeByteSize(dtype);
           if (dtype_size == 0) {
-            const rapidjson::Value& tensor_data = request_input["data"];
             GetDataByteSizeFromJson(tensor_data, &byte_size);
           } else {
             byte_size = element_cnt * dtype_size;
@@ -1744,7 +1837,13 @@ HTTPAPIServerV2::EVBufferToInput(
     rapidjson::Value& outputs_array = itr->value;
     for (size_t i = 0; i < outputs_array.Size(); i++) {
       rapidjson::Value& output = outputs_array[i];
-      const char* output_name = output["name"].GetString();
+      const auto& name_itr = output.FindMember("name");
+      if (name_itr == output.MemberEnd()) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG, "Input found with no 'name' field");
+      }
+
+      const char* output_name = name_itr->value.GetString();
       TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output_name);
 
       uint64_t class_size = 0;
