@@ -74,8 +74,8 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data)
     inputs[1].set_data_from_numpy(input1_data)
 
-    outputs.append(grpcclient.InferOutput('OUTPUT0'))
-    outputs.append(grpcclient.InferOutput('OUTPUT1'))
+    outputs.append(grpcclient.InferRequestedOutput('OUTPUT0'))
+    outputs.append(grpcclient.InferRequestedOutput('OUTPUT1'))
 
     # Define the callback function. Note the last two parameters should be
     # result and error. InferenceServerClient would povide the results of an

@@ -34,7 +34,7 @@
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/rapidjson.h"
 #include "rapidjson/stringbuffer.h"
-#include "src/clients/c++/experimental_api_v2/library/utils.h"
+#include "src/clients/c++/experimental_api_v2/library/common.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
 

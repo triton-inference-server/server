@@ -42,8 +42,8 @@ def test_infer(model_name, input0_data, input1_data):
     inputs[0].set_data_from_numpy(input0_data, binary_data=False)
     inputs[1].set_data_from_numpy(input1_data, binary_data=True)
 
-    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=True))
-    outputs.append(httpclient.InferOutput('OUTPUT1', binary_data=False))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
     query_params = {'test_1': 1, 'test_2': 2}
     results = triton_client.infer(model_name,
                                   inputs,
