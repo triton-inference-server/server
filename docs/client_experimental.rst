@@ -30,31 +30,35 @@
 Experimental Client
 ===================
 
-A beta version of the Python client library is available that uses the
-new GRPC protocol based on the `community standard inference protocols
+Alpha versions of two Python client libraries is available that use
+the new HTTP/REST and GRPC protocol based on the `community standard
+inference protocols
 <https://github.com/kubeflow/kfserving/docs/predict-api/v2>`_ that
 have been proposed by the `KFServing project
-<https://github.com/kubeflow/kfserving>`_. This Python library does
-not yet expose all capabilities of Triton Server but will be enhanced
-over time. A version of the library that uses the HTTP/REST protocol
-will also be provided in the future.
+<https://github.com/kubeflow/kfserving>`_. These Python libraries also
+expose all the functionality expressed in the Triton `protocol
+extensions
+<https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/protocol>`_.
 
-To try the new client, first get the Python client library that uses
-the new protocol following directions in
+To try the new client libraries, first get the Python client library
+that uses the new protocol following directions in
 :ref:`section-getting-the-client-libraries`.
 
 The Python GRPC client interface documentation is available at
 `src/clients/python/experimental\_api\_v2/library/grpcclient.py
-<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/experimental_api_v2/library/grpcclient.py>`_
+<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/experimental_api_v2/library/grpcclient.py>`_,
+`src/clients/python/experimental\_api\_v2/library/httpclient.py
+<https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/experimental_api_v2/library/httpclient.py>`_
 and in the API Reference.
 
 Examples are available in
 `src/clients/python/experimental\_api\_v2/examples
 <https://github.com/NVIDIA/triton-inference-server/blob/master/src/clients/python/experimental_api_v2/examples>`_. The
 examples that start with **grpc_** use the `protoc compiler to
-generate the GRPC client stub <https://grpc.io/docs/guides/>`_. The
-examples that start with **simple_** use the Python GRPC client
-library.
+generate the GRPC client stub <https://grpc.io/docs/guides/>`_, the
+examples that start with **simple_grpc_** use the Python GRPC client
+library, and the examples that start with **simple_http_** use the
+Python HTTP/REST client library.
 
-For Triton Server to support the new GRPC protocol it must be run with
-the -\\-api-version=2 flag.
+For Triton to support the new HTTP/REST and GRPC protocols the server
+must be run with the -\\-api-version=2 flag.

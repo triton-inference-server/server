@@ -190,48 +190,66 @@ already understood. The primary reasons for the name change are to :
 Transitioning from the current protocols (version 1) to the new
 protocols (version 2) will take place over several releases.
 
-* 20.03
+* **Current master**
 
-  * Change name to Triton Inference Server.
-  * Beta release of server support for KFServing community standard
-    GRPC inference protocol.
-  * Beta release of Python client library that uses KFServing
-    community standard GRPC inference protocol.
+  * Alpha release of server support for KFServing community standard
+    GRPC and HTTP/REST inference protocol.
+  * Alpha release of Python client library that uses KFServing
+    community standard GRPC and HTTP/REST inference protocol.
   * See `client documentation
-    <https://docs.nvidia.com/deeplearning/sdk/triton-inference-server-master-branch-guide/docs/client_experimental.html>`_
+    <https://github.com/NVIDIA/triton-inference-server/tree/master/docs/client_experimental.rst>`_
     for description and examples showing how to enable and use the new
-    GRPC inference protocol and Python client library.
+    GRPC and HTTP/REST inference protocol and Python client library.
   * Existing HTTP/REST and GRPC protocols, and existing client APIs
     continue to be supported and remain the default protocols.
 
 * 20.05
 
-  * Full release of KFServing community standard HTTP/REST and GRPC
+  * Beta release of KFServing community standard HTTP/REST and GRPC
     inference protocol support in server, Python client, and C++
     client.
+  * Beta release of the `HTTP/REST and GRPC extensions
+    <https://github.com/NVIDIA/triton-inference-server/tree/master/docs/protocol>`_
+    to the KFServing inference protocol.
   * Existing HTTP/REST and GRPC protocols are deprecated but remain
     the default.
   * Existing shared library inferface defined in trtserver.h continues
     to be supported but is deprecated.
-  * New shared library interface is defined in tritonserver.h.
+  * Beta release of new shared library interface is defined in
+    tritonserver.h.
 
 * 20.06
 
   * Triton Server version 2.0.0.
   * KFserving community standard HTTP/REST and GRPC inference
-    protocols become the default and only supported protocols for the
-    server.
+    protocols plus all Triton `extensions
+    <https://github.com/NVIDIA/triton-inference-server/tree/master/docs/protocol>`_
+    become the default and only supported protocols for the server.
   * C++ and Python client libraries based on the KFServing standard
     inference protocols become the default and only supported client
-    libraries, replacing the original C++ and Python client libraries.
+    libraries.
   * The new shared library interface defined in tritonserver.h becomes
-    the default and only supported shared library interface, replacing
-    the original trtserver.h inferface.
+    the default and only supported shared library interface.
+  * Original C++ and Python client libraries are removed. Release
+    20.05 is the last release to support these libraries.
+  * Original shared library interface defined in trtserver.h is
+    removed. Release 20.05 is the last release to support the
+    trtserver.h shared library interface.
 
-Throughout the transition the model configuration schema, model
-repository struture, and custom backend APIs will remain unchanged so
-that any existing models, model repository, and custom backends will
-continue to work with Triton Server.
+Throughout the transition the model repository struture and custom
+backend APIs will remain unchanged so that any existing model
+repository and custom backends will continue to work with Triton
+Server.
+
+In the 20.06 release there will be some minor changes to the
+tritonserver command-line executable arguments. It will be necessary
+to revisit and possible adjust invocations of tritonserver executable.
+
+In the 20.06 release there will be some minor changes to the model
+configuration schema. It is expected that these changes will not
+impact the vast majority of model configurations. For impacted models
+the model configuration will need minor edits to become compatible
+with Triton Server version 2.0.0.
 
 Documentation
 -------------
