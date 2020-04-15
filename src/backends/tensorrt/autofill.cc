@@ -73,8 +73,8 @@ class AutoFillPlanImpl : public AutoFill {
 
   void InitIOLists();
 
-  void InitIODims(
-      nvinfer1::Dims& dims, bool is_shape_binding, DimsList* config_dims);
+  template <class IO>
+  void InitIODims(nvinfer1::Dims& dims, bool is_shape_binding, IO* config_io);
 
   template <class IO>
   Status FixIO(const IOList<IO>& reference_list, IOList<IO>* mutable_list);
@@ -145,7 +145,7 @@ AutoFillPlanImpl::Init(ModelConfig* config)
       }
     }
     if (!engine_->isShapeBinding(i)) {
-      if (dims.d[0] != -1 || dims.nbDims == 1) {
+      if (dims.d[0] != -1) {
         first_dim_variable = false;
         break;
       }
@@ -406,7 +406,7 @@ AutoFillPlanImpl::InitIOLists()
       config_input->set_name(input_name.substr(0, input_name.find(" ")));
       config_input->set_data_type(
           ConvertTrtTypeToDataType(engine_->getBindingDataType(i)));
-      InitIODims(dims, is_shape_binding, config_input->mutable_dims());
+      InitIODims(dims, is_shape_binding, config_input);
       config_input->set_is_shape_tensor(is_shape_binding);
     } else {
       ModelOutput* config_output = config_.add_output();
@@ -414,20 +414,28 @@ AutoFillPlanImpl::InitIOLists()
       config_output->set_name(output_name.substr(0, output_name.find(" ")));
       config_output->set_data_type(
           ConvertTrtTypeToDataType(engine_->getBindingDataType(i)));
-      InitIODims(dims, is_shape_binding, config_output->mutable_dims());
+      InitIODims(dims, is_shape_binding, config_output);
       config_output->set_is_shape_tensor(is_shape_binding);
     }
   }
 }
 
+template <class IO>
 void
 AutoFillPlanImpl::InitIODims(
-    nvinfer1::Dims& dims, bool is_shape_binding, DimsList* config_dims)
+    nvinfer1::Dims& dims, bool is_shape_binding, IO* config_io)
 {
   bool skip_first = (max_batch_size_ != 0) && is_dynamic_;
+  auto config_dims = config_io->mutable_dims();
   if (!is_shape_binding) {
     for (int didx = (skip_first ? 1 : 0); didx < dims.nbDims; ++didx) {
       config_dims->Add(dims.d[didx]);
+    }
+    // If tensor dims are empty then must use a reshape for the
+    // tensor, since 'dims' is not allowed to be empty.
+    if (config_io->dims_size() == 0) {
+      config_io->mutable_dims()->Add(1);
+      config_io->mutable_reshape();
     }
   } else {
     if (dims.nbDims != 0) {
