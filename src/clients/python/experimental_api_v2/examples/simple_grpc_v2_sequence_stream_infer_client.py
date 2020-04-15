@@ -69,7 +69,7 @@ def async_send(triton_client, stream, values, batch_size, sequence_id,
         # Initialize the data
         inputs[0].set_data_from_numpy(value_data)
         outputs = []
-        outputs.append(grpcclient.InferOutput('OUTPUT'))
+        outputs.append(grpcclient.InferRequestedOutput('OUTPUT'))
         # Issue the asynchronous sequence inference.
         triton_client.async_stream_infer(model_name=model_name,
                                          inputs=inputs,

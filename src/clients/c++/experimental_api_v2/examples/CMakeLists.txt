@@ -51,6 +51,19 @@ else()
       TARGETS simple_grpc_v2_health_metadata
       RUNTIME DESTINATION bin
     )
+
+    #
+    # simple_grpc_v2_infer_client
+    #
+    add_executable(simple_grpc_v2_infer_client simple_grpc_v2_infer_client.cc)
+    target_link_libraries(
+      simple_grpc_v2_infer_client
+      PRIVATE TRTIS::grpcclient_static
+    )
+    install(
+      TARGETS simple_grpc_v2_infer_client
+      RUNTIME DESTINATION bin
+    )
   
   endif()  # TRTIS_ENABLE_GRPC_V2
 

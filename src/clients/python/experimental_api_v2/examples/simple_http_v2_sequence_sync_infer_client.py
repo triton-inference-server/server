@@ -58,7 +58,7 @@ def sync_send(triton_client, result_list, values, batch_size, sequence_id,
         # which causes the library to raise decode exception.
         inputs[0].set_data_from_numpy(value_data, binary_data=False)
         outputs = []
-        outputs.append(httpclient.InferOutput('OUTPUT'))
+        outputs.append(httpclient.InferRequestedOutput('OUTPUT'))
         # Issue the synchronous sequence inference.
         result = triton_client.infer(model_name=model_name,
                                      inputs=inputs,

@@ -76,8 +76,8 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data)
     inputs[1].set_data_from_numpy(input1_data)
 
-    outputs.append(grpcclient.InferOutput('OUTPUT0'))
-    outputs.append(grpcclient.InferOutput('OUTPUT1'))
+    outputs.append(grpcclient.InferRequestedOutput('OUTPUT0'))
+    outputs.append(grpcclient.InferRequestedOutput('OUTPUT1'))
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,

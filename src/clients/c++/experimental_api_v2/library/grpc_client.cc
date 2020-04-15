@@ -24,8 +24,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#define DLL_EXPORTING
-
 #include "src/clients/c++/experimental_api_v2/library/grpc_client.h"
 
 #include <grpcpp/grpcpp.h>
@@ -34,7 +32,6 @@
 #include <iostream>
 
 namespace nvidia { namespace inferenceserver { namespace client {
-
 namespace {
 
 //==============================================================================
@@ -58,11 +55,9 @@ GetChannel(const std::string& url)
     return channel;
   }
 }
-
 }  // namespace
 
 //==============================================================================
-
 
 Error
 InferenceServerGrpcClient::Create(
@@ -70,6 +65,8 @@ InferenceServerGrpcClient::Create(
     const std::string& server_url, bool verbose)
 {
   client->reset(new InferenceServerGrpcClient(server_url, verbose));
+  client->get()->sync_request_.reset(
+      static_cast<InferRequest*>(new GrpcInferRequest()));
   return Error::Success;
 }
 
@@ -249,10 +246,265 @@ InferenceServerGrpcClient::GetModelConfig(
   return err;
 }
 
+Error
+InferenceServerGrpcClient::Infer(
+    InferResult** result, const InferOptions& options,
+    const std::vector<InferInput*>& inputs,
+    const std::vector<const InferRequestedOutput*>& outputs,
+    const Headers& headers)
+{
+  Error err;
+
+  grpc::ClientContext context;
+
+  std::shared_ptr<GrpcInferRequest> sync_request =
+      std::static_pointer_cast<GrpcInferRequest>(sync_request_);
+
+  sync_request->Timer().Reset();
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
+  for (const auto& it : headers) {
+    context.AddMetadata(it.first, it.second);
+  }
+  // Use send timer to measure time for marshalling infer request
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
+  err = InitModelInferRequest(options, inputs, outputs);
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
+  if (!err.IsOk()) {
+    return err;
+  }
+  sync_request->grpc_response_->Clear();
+  sync_request->grpc_status_ = stub_->ModelInfer(
+      &context, infer_request_, sync_request->grpc_response_.get());
+
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_START);
+  InferResultGrpc::Create(result, sync_request->grpc_response_);
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
+
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
+
+  err = UpdateInferStat(sync_request->Timer());
+  if (!err.IsOk()) {
+    std::cerr << "Failed to update context stat: " << err << std::endl;
+  }
+
+  if (sync_request->grpc_status_.ok()) {
+    if (verbose_) {
+      std::cout << sync_request->grpc_response_->DebugString() << std::endl;
+    }
+  } else {
+    err = Error(sync_request->grpc_status_.error_message());
+  }
+
+  return err;
+}
+
+Error
+InferenceServerGrpcClient::InitModelInferRequest(
+    const InferOptions& options, const std::vector<InferInput*>& inputs,
+    const std::vector<const InferRequestedOutput*>& outputs)
+{
+  infer_request_.Clear();
+
+  // Populate the request protobuf
+  infer_request_.set_model_name(options.model_name_);
+  if (!options.model_version_.empty()) {
+    infer_request_.set_model_version(options.model_version_);
+  }
+  if (!options.request_id_.empty()) {
+    infer_request_.set_id(options.request_id_);
+  }
+
+  if (options.sequence_id_ != 0) {
+    (*infer_request_.mutable_parameters())["sequence_id"].set_int64_param(
+        options.sequence_id_);
+    (*infer_request_.mutable_parameters())["sequence_start"].set_bool_param(
+        options.sequence_start_);
+    (*infer_request_.mutable_parameters())["sequence_end"].set_bool_param(
+        options.sequence_end_);
+  }
+
+  if (options.priority_ != 0) {
+    (*infer_request_.mutable_parameters())["priority"].set_int64_param(
+        options.priority_);
+  }
+
+  if (options.timeout_ != 0) {
+    (*infer_request_.mutable_parameters())["timeout"].set_int64_param(
+        options.timeout_);
+  }
+
+  for (const auto input : inputs) {
+    auto grpc_input = infer_request_.add_inputs();
+    grpc_input->set_name(input->Name());
+    grpc_input->mutable_shape()->Clear();
+    for (const auto dim : input->Shape()) {
+      grpc_input->mutable_shape()->Add(dim);
+    }
+    grpc_input->set_datatype(input->Datatype());
+
+    input->PrepareForRequest();
+    if (input->IsSharedMemory()) {
+      std::string region_name;
+      size_t offset;
+      size_t byte_size;
+      input->SharedMemoryInfo(&region_name, &byte_size, &offset);
+
+      (*grpc_input->mutable_parameters())["shared_memory_region"]
+          .set_string_param(region_name);
+      (*grpc_input->mutable_parameters())["shared_memory_byte_size"]
+          .set_int64_param(byte_size);
+      if (offset != 0) {
+        (*grpc_input->mutable_parameters())["shared_memory_offset"]
+            .set_int64_param(offset);
+      }
+    } else {
+      bool end_of_input = false;
+      std::string* contents =
+          grpc_input->mutable_contents()->mutable_raw_contents();
+      size_t content_size;
+      input->ByteSize(&content_size);
+      contents->reserve(content_size);
+      while (!end_of_input) {
+        const uint8_t* buf;
+        size_t buf_size;
+        input->GetNext(&buf, &buf_size, &end_of_input);
+        if (buf != nullptr) {
+          contents->append(reinterpret_cast<const char*>(buf), buf_size);
+        }
+      }
+    }
+  }
+
+  for (const auto routput : outputs) {
+    auto grpc_output = infer_request_.add_outputs();
+    grpc_output->set_name(routput->Name());
+    size_t class_count = routput->ClassCount();
+    if (class_count != 0) {
+      (*grpc_output->mutable_parameters())["classification"].set_int64_param(
+          class_count);
+    }
+    if (routput->IsSharedMemory()) {
+      std::string region_name;
+      size_t offset;
+      size_t byte_size;
+      routput->SharedMemoryInfo(&region_name, &byte_size, &offset);
+      (*grpc_output->mutable_parameters())["shared_memory_region"]
+          .set_string_param(region_name);
+      (*grpc_output->mutable_parameters())["shared_memory_byte_size"]
+          .set_int64_param(byte_size);
+      if (offset != 0) {
+        (*grpc_output->mutable_parameters())["shared_memory_offset"]
+            .set_int64_param(offset);
+      }
+    }
+  }
+
+  if (infer_request_.ByteSizeLong() > INT_MAX) {
+    size_t request_size = infer_request_.ByteSizeLong();
+    infer_request_.Clear();
+    return Error(
+        "Request has byte size " + std::to_string(request_size) +
+        " which exceed gRPC's byte size limit " + std::to_string(INT_MAX) +
+        ".");
+  }
+
+  return Error::Success;
+}
+
 InferenceServerGrpcClient::InferenceServerGrpcClient(
     const std::string& url, bool verbose)
     : stub_(GRPCInferenceService::NewStub(GetChannel(url))), verbose_(verbose)
 {
 }
+
+//==============================================================================
+
+Error
+InferResultGrpc::Create(
+    InferResult** infer_result, std::shared_ptr<ModelInferResponse> response)
+{
+  *infer_result = reinterpret_cast<InferResult*>(new InferResultGrpc(response));
+  return Error::Success;
+}
+
+Error
+InferResultGrpc::ModelName(std::string* name) const
+{
+  *name = response_->model_name();
+  return Error::Success;
+}
+
+Error
+InferResultGrpc::ModelVersion(std::string* version) const
+{
+  *version = response_->model_version();
+  return Error::Success;
+}
+
+Error
+InferResultGrpc::Id(std::string* id) const
+{
+  *id = response_->id();
+  return Error::Success;
+}
+
+Error
+InferResultGrpc::Shape(
+    const std::string& output_name, std::vector<int64_t>* shape) const
+{
+  shape->clear();
+  auto it = output_name_to_result_map_.find(output_name);
+  if (it != output_name_to_result_map_.end()) {
+    for (const auto dim : it->second->shape()) {
+      shape->push_back(dim);
+    }
+  } else {
+    return Error(
+        "The response does not contain results or output name " + output_name);
+  }
+  return Error::Success;
+}
+
+Error
+InferResultGrpc::Datatype(
+    const std::string& output_name, std::string* datatype) const
+{
+  auto it = output_name_to_result_map_.find(output_name);
+  if (it != output_name_to_result_map_.end()) {
+    *datatype = it->second->datatype();
+  } else {
+    return Error(
+        "The response does not contain results or output name " + output_name);
+  }
+  return Error::Success;
+}
+
+
+Error
+InferResultGrpc::RawData(
+    const std::string& output_name, const uint8_t** buf,
+    size_t* byte_size) const
+{
+  auto it = output_name_to_result_map_.find(output_name);
+  if (it != output_name_to_result_map_.end()) {
+    *buf = (uint8_t*)&(it->second->contents().raw_contents()[0]);
+    *byte_size = it->second->contents().raw_contents().size();
+  } else {
+    return Error(
+        "The response does not contain results or output name " + output_name);
+  }
+
+  return Error::Success;
+}
+
+InferResultGrpc::InferResultGrpc(std::shared_ptr<ModelInferResponse> response)
+{
+  response_ = response;
+  for (const auto& output : response_->outputs()) {
+    output_name_to_result_map_[output.name()] = &output;
+  }
+}
+
+//==============================================================================
 
 }}}  // namespace nvidia::inferenceserver::client

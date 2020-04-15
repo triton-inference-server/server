@@ -75,8 +75,8 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data, binary_data=False)
     inputs[1].set_data_from_numpy(input1_data, binary_data=False)
 
-    outputs.append(httpclient.InferOutput('OUTPUT0', binary_data=False))
-    outputs.append(httpclient.InferOutput('OUTPUT1', binary_data=False))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=False))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
 
     # Define the callback function. Note the last two parameters should be
     # result and error. InferenceServerClient would povide the results of an

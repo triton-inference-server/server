@@ -56,6 +56,7 @@ GRPC_V2_CLIENT_PY=../clients/grpc_v2_client.py
 GRPC_IMAGE_CLIENT_PY=../clients/grpc_v2_image_client.py
 
 SIMPLE_HEALTH_CLIENT=../clients/simple_grpc_v2_health_metadata
+SIMPLE_INFER_CLIENT=../clients/simple_grpc_v2_infer_client
 
 rm -f *.log
 rm -f *.log.*
@@ -83,13 +84,6 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-
-# Test health
-$SIMPLE_HEALTH_CLIENT -v -H test:1 >> ${CLIENT_LOG}.c++.health 2>&1
-if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.c++.health
-    RET=1
-fi
 
 python $SIMPLE_HEALTH_CLIENT_PY -v >> ${CLIENT_LOG}.health 2>&1
 if [ $? -ne 0 ]; then
@@ -140,6 +134,20 @@ for i in \
 
     if [ $(cat "${CLIENT_LOG}.${SUFFIX}" | grep "PASS" | wc -l) -ne 1 ]; then
         cat "${CLIENT_LOG}.${SUFFIX}"
+        RET=1
+    fi
+done
+
+for i in \
+   $SIMPLE_INFER_CLIENT \
+   $SIMPLE_HEALTH_CLIENT \
+   ; do
+   BASE=$(basename -- $i)
+   SUFFIX="${BASE%.*}"
+
+    $i -v -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.c++.${SUFFIX}
         RET=1
     fi
 done
