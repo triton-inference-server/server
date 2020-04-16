@@ -53,6 +53,8 @@ typedef std::map<std::string, std::string> Headers;
 ///
 class InferenceServerGrpcClient : public InferenceServerClient {
  public:
+  ~InferenceServerGrpcClient();
+
   /// Create a client that can be used to communicate with the server.
   /// \param client Returns a new InferenceServerGrpcClient object.
   /// \param server_url The inference server name and port.
@@ -149,14 +151,43 @@ class InferenceServerGrpcClient : public InferenceServerClient {
           std::vector<const InferRequestedOutput*>(),
       const Headers& headers = Headers());
 
+  /// Run asynchronous inference on server.
+  /// Once the request is completed, the InferResult pointer and the Error
+  /// pointer will be passed to the provided 'callback' function. Upon the
+  /// invocation of callback function, the ownership of InferResult and Error
+  /// objects is transfered to the function caller. It is then the caller's
+  /// choice on either retrieving the results inside the callback function or
+  /// deferring it to a different thread so that the client is unblocked.
+  /// In order to prevent memory leak, user must ensure these objects get
+  /// deleted.
+  /// \param callback The callback function to be invoked on request
+  /// completion.
+  /// \param options The options for inference request.
+  /// \param inputs The vector of InferInput describing the model inputs.
+  /// \param outputs Optional vector of InferRequestedOutput describing how the
+  /// output must be returned. If not provided then all the outputs in the model
+  /// config will be returned as default settings.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
+  /// \return Error object indicating success or failure of the request.
+  Error AsyncInfer(
+      OnCompleteFn callback, const InferOptions& options,
+      const std::vector<InferInput*>& inputs,
+      const std::vector<const InferRequestedOutput*>& outputs =
+          std::vector<const InferRequestedOutput*>(),
+      const Headers& headers = Headers());
+
  private:
   InferenceServerGrpcClient(const std::string& url, bool verbose);
 
-  // Initializes the request message for inference request.
   Error PreRunProcessing(
       const InferOptions& options, const std::vector<InferInput*>& inputs,
       const std::vector<const InferRequestedOutput*>& outputs);
+  void AsyncTransfer();
 
+  // The producer-consumer queue used to communicate asynchronously with
+  // the GRPC runtime.
+  grpc::CompletionQueue async_request_completion_queue_;
   // GRPC end point.
   std::unique_ptr<GRPCInferenceService::Stub> stub_;
   // Enable verbose output

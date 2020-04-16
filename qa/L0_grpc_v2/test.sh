@@ -57,6 +57,7 @@ GRPC_IMAGE_CLIENT_PY=../clients/grpc_v2_image_client.py
 
 SIMPLE_HEALTH_CLIENT=../clients/simple_grpc_v2_health_metadata
 SIMPLE_INFER_CLIENT=../clients/simple_grpc_v2_infer_client
+SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_grpc_v2_async_infer_client
 
 rm -f *.log
 rm -f *.log.*
@@ -140,6 +141,7 @@ done
 
 for i in \
    $SIMPLE_INFER_CLIENT \
+   $SIMPLE_ASYNC_INFER_CLIENT \
    $SIMPLE_HEALTH_CLIENT \
    ; do
    BASE=$(basename -- $i)
