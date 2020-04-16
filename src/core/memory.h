@@ -46,7 +46,7 @@ class Memory {
   // Return the pointer to the data block. Returns nullptr if 'idx' is
   // out of range
   virtual const char* BufferAt(
-      size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
+      size_t idx, size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
       int64_t* memory_type_id) const = 0;
 
   // Get the number of contiguous buffers composing the memory.
@@ -71,27 +71,27 @@ class MemoryReference : public Memory {
 
   //\see Memory::BufferAt()
   const char* BufferAt(
-      size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
+      size_t idx, size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
       int64_t* memory_type_id) const override;
 
   // Add a 'buffer' with 'byte_size' as part of this data buffer
   // Return the index of the buffer
   size_t AddBuffer(
-      const char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+      const char* buffer, size_t byte_size, TRITONSERVER_MemoryType memory_type,
       int64_t memory_type_id);
 
  private:
   struct Block {
     Block(
-        const char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
-        int64_t memory_type_id)
+        const char* buffer, size_t byte_size,
+        TRITONSERVER_MemoryType memory_type, int64_t memory_type_id)
         : buffer_(buffer), byte_size_(byte_size), memory_type_(memory_type),
           memory_type_id_(memory_type_id)
     {
     }
     const char* buffer_;
     size_t byte_size_;
-    TRTSERVER_Memory_Type memory_type_;
+    TRITONSERVER_MemoryType memory_type_;
     int64_t memory_type_id_;
   };
   std::vector<Block> buffer_;
@@ -104,14 +104,14 @@ class MutableMemory : public Memory {
  public:
   // Create a mutable data buffer referencing to other data buffer.
   MutableMemory(
-      char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+      char* buffer, size_t byte_size, TRITONSERVER_MemoryType memory_type,
       int64_t memory_type_id);
 
   virtual ~MutableMemory() {}
 
   //\see Memory::BufferAt()
   const char* BufferAt(
-      size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
+      size_t idx, size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
       int64_t* memory_type_id) const override;
 
   // Return a pointer to the base address of the mutable buffer. If
@@ -119,7 +119,7 @@ class MutableMemory : public Memory {
   // bytes. If non-null 'memory_type_id' returns the memory type id of
   // the chunk of bytes.
   char* MutableBuffer(
-      TRTSERVER_Memory_Type* memory_type = nullptr,
+      TRITONSERVER_MemoryType* memory_type = nullptr,
       int64_t* memory_type_id = nullptr);
 
   DISALLOW_COPY_AND_ASSIGN(MutableMemory);
@@ -128,7 +128,7 @@ class MutableMemory : public Memory {
   MutableMemory() : Memory() {}
 
   char* buffer_;
-  TRTSERVER_Memory_Type memory_type_;
+  TRITONSERVER_MemoryType memory_type_;
   int64_t memory_type_id_;
 };
 
@@ -143,7 +143,7 @@ class AllocatedMemory : public MutableMemory {
   // satisfied, thus the function caller should always check the actual memory
   // type and memory type id before use.
   AllocatedMemory(
-      size_t byte_size, TRTSERVER_Memory_Type memory_type,
+      size_t byte_size, TRITONSERVER_MemoryType memory_type,
       int64_t memory_type_id);
 
   ~AllocatedMemory() override;

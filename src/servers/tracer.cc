@@ -114,31 +114,11 @@ TraceManager::SampleTrace()
   trace_meta_data->manager_ = this;
   trace_meta_data->trace_set_ = false;
 
-  // An outermost tracer object that also in charge of collecting timestamps
-  // in server frontend, it will not bind to a particular TRITONSERVER_Trace as
-  // it lives longer than the trace.
+  // An outermost tracer object that also in charge of collecting
+  // timestamps in server frontend, it will not bind to a particular
+  // TRITONSERVER_Trace as it lives longer than the trace.
   trace_meta_data->tracer_.reset(new Tracer(shared_from_this(), level_));
   return trace_meta_data;
-}
-
-void
-TraceManager::CreateTrace(
-    TRTSERVER_Trace** trace, const char* model_name, int64_t version,
-    void* userp)
-{
-  // Hack, knowing that the underlying object is the same
-  CreateTrace(
-      reinterpret_cast<TRITONSERVER_Trace**>(trace), model_name, version,
-      userp);
-}
-
-void
-TraceManager::ReleaseTrace(
-    TRTSERVER_Trace* trace, void* activity_userp, void* userp)
-{
-  // Hack, knowing that the underlying object is the same
-  ReleaseTrace(
-      reinterpret_cast<TRITONSERVER_Trace*>(trace), activity_userp, userp);
 }
 
 void

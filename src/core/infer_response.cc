@@ -32,39 +32,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-namespace {
-// FIXMEV2 shouldn't need the conversions
-TRTSERVER_Memory_Type
-TritonMemTypeToTrt(TRITONSERVER_MemoryType mem_type)
-{
-  switch (mem_type) {
-    case TRITONSERVER_MEMORY_CPU:
-      return TRTSERVER_MEMORY_CPU;
-      break;
-    case TRITONSERVER_MEMORY_CPU_PINNED:
-      return TRTSERVER_MEMORY_CPU_PINNED;
-    default:
-      return TRTSERVER_MEMORY_GPU;
-      break;
-  }
-}
-
-TRITONSERVER_MemoryType
-TrtMemTypeToTriton(TRTSERVER_Memory_Type mem_type)
-{
-  switch (mem_type) {
-    case TRTSERVER_MEMORY_CPU:
-      return TRITONSERVER_MEMORY_CPU;
-      break;
-    case TRTSERVER_MEMORY_CPU_PINNED:
-      return TRITONSERVER_MEMORY_CPU_PINNED;
-    default:
-      return TRITONSERVER_MEMORY_GPU;
-      break;
-  }
-}
-}  // namespace
-
 //
 // InferenceResponseFactory
 //
@@ -125,7 +92,7 @@ InferenceResponse::Send(std::unique_ptr<InferenceResponse>&& response)
 //
 InferenceResponse::Output::~Output()
 {
-  Status status = ReleaseBuffer();
+  Status status = ReleaseDataBuffer();
   if (!status.IsOk()) {
     LOG_ERROR << "failed to release buffer for output '" << name_
               << "': " << status.AsString();
@@ -133,7 +100,7 @@ InferenceResponse::Output::~Output()
 }
 
 Status
-InferenceResponse::Output::Buffer(
+InferenceResponse::Output::DataBuffer(
     const void** buffer, size_t* buffer_byte_size,
     TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const
 {
@@ -145,7 +112,7 @@ InferenceResponse::Output::Buffer(
 }
 
 Status
-InferenceResponse::Output::AllocateBuffer(
+InferenceResponse::Output::AllocateDataBuffer(
     void** buffer, size_t buffer_byte_size,
     TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
 {
@@ -179,18 +146,7 @@ InferenceResponse::Output::AllocateBuffer(
 }
 
 Status
-InferenceResponse::Output::AllocateBuffer(
-    void** buffer, size_t buffer_byte_size, TRTSERVER_Memory_Type* memory_type,
-    int64_t* memory_type_id)
-{
-  TRITONSERVER_MemoryType mt = TrtMemTypeToTriton(*memory_type);
-  Status status = AllocateBuffer(buffer, buffer_byte_size, &mt, memory_type_id);
-  *memory_type = TritonMemTypeToTrt(mt);
-  return status;
-}
-
-Status
-InferenceResponse::Output::ReleaseBuffer()
+InferenceResponse::Output::ReleaseDataBuffer()
 {
   TRITONSERVER_Error* err = nullptr;
 

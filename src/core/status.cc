@@ -66,59 +66,7 @@ Status::CodeString(const Code code)
 }
 
 Status::Code
-TrtServerCodeToStatusCode(TRTSERVER_Error_Code code)
-{
-  switch (code) {
-    case TRTSERVER_ERROR_UNKNOWN:
-      return Status::Code::UNKNOWN;
-    case TRTSERVER_ERROR_INTERNAL:
-      return Status::Code::INTERNAL;
-    case TRTSERVER_ERROR_NOT_FOUND:
-      return Status::Code::NOT_FOUND;
-    case TRTSERVER_ERROR_INVALID_ARG:
-      return Status::Code::INVALID_ARG;
-    case TRTSERVER_ERROR_UNAVAILABLE:
-      return Status::Code::UNAVAILABLE;
-    case TRTSERVER_ERROR_UNSUPPORTED:
-      return Status::Code::UNSUPPORTED;
-    case TRTSERVER_ERROR_ALREADY_EXISTS:
-      return Status::Code::ALREADY_EXISTS;
-
-    default:
-      break;
-  }
-
-  return Status::Code::UNKNOWN;
-}
-
-TRTSERVER_Error_Code
-StatusCodeToTrtServerCode(Status::Code status_code)
-{
-  switch (status_code) {
-    case Status::Code::UNKNOWN:
-      return TRTSERVER_ERROR_UNKNOWN;
-    case Status::Code::INTERNAL:
-      return TRTSERVER_ERROR_INTERNAL;
-    case Status::Code::NOT_FOUND:
-      return TRTSERVER_ERROR_NOT_FOUND;
-    case Status::Code::INVALID_ARG:
-      return TRTSERVER_ERROR_INVALID_ARG;
-    case Status::Code::UNAVAILABLE:
-      return TRTSERVER_ERROR_UNAVAILABLE;
-    case Status::Code::UNSUPPORTED:
-      return TRTSERVER_ERROR_UNSUPPORTED;
-    case Status::Code::ALREADY_EXISTS:
-      return TRTSERVER_ERROR_ALREADY_EXISTS;
-
-    default:
-      break;
-  }
-
-  return TRTSERVER_ERROR_UNKNOWN;
-}
-
-Status::Code
-TritonServerCodeToStatusCode(TRITONSERVER_Error_Code code)
+TritonCodeToStatusCode(TRITONSERVER_Error_Code code)
 {
   switch (code) {
     case TRITONSERVER_ERROR_UNKNOWN:
@@ -144,7 +92,7 @@ TritonServerCodeToStatusCode(TRITONSERVER_Error_Code code)
 }
 
 TRITONSERVER_Error_Code
-StatusCodeToTritonServerCode(Status::Code status_code)
+StatusCodeToTritonCode(Status::Code status_code)
 {
   switch (status_code) {
     case Status::Code::UNKNOWN:

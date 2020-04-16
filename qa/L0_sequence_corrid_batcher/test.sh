@@ -45,7 +45,7 @@ source ../common/util.sh
 
 RET=0
 
-# Must run on a single device or else the TRTSERVER_DELAY_SCHEDULER
+# Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
 # can fail when the requests are distributed to multiple devices.
 export CUDA_VISIBLE_DEVICES=0
 
@@ -78,11 +78,11 @@ for model_trial in 4; do
 
     MODEL_DIR=models${model_trial}
 
-    # Tests that require TRTSERVER_DELAY_SCHEDULER so that the
+    # Tests that require TRITONSERVER_DELAY_SCHEDULER so that the
     # scheduler is delayed and requests can collect in the queue.
     for i in test_skip_batch ; do
-        export TRTSERVER_BACKLOG_DELAY_SCHEDULER=0
-        export TRTSERVER_DELAY_SCHEDULER=12
+        export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
+        export TRITONSERVER_DELAY_SCHEDULER=12
         SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
         SERVER_LOG="./$i.$MODEL_DIR.serverlog"
         run_server
@@ -103,8 +103,8 @@ for model_trial in 4; do
         fi
         set -e
 
-        unset TRTSERVER_DELAY_SCHEDULER
-        unset TRTSERVER_BACKLOG_DELAY_SCHEDULER
+        unset TRITONSERVER_DELAY_SCHEDULER
+        unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
         kill $SERVER_PID
         wait $SERVER_PID
     done

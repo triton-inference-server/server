@@ -35,7 +35,6 @@
 #include "src/core/logging.h"
 #include "src/core/server.h"
 #include "src/core/server_status.h"
-#include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -77,15 +76,15 @@ class EnsembleContext {
       const std::shared_ptr<Step>& completed_step = nullptr);
 
  private:
-  static TRTSERVER_Error* ResponseAlloc(
-      TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
-      size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
+  static TRITONSERVER_Error* ResponseAlloc(
+      TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+      size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
       int64_t preferred_memory_type_id, void* userp, void** buffer,
-      void** buffer_userp, TRTSERVER_Memory_Type* allocated_memory_type,
+      void** buffer_userp, TRITONSERVER_MemoryType* allocated_memory_type,
       int64_t* allocated_memory_type_id);
-  static TRTSERVER_Error* ResponseRelease(
-      TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
-      size_t byte_size, TRTSERVER_Memory_Type memory_type,
+  static TRITONSERVER_Error* ResponseRelease(
+      TRITONSERVER_ResponseAllocator* allocator, void* buffer,
+      void* buffer_userp, size_t byte_size, TRITONSERVER_MemoryType memory_type,
       int64_t memory_type_id);
 
   using StepList = std::vector<std::shared_ptr<Step>>;
@@ -180,7 +179,8 @@ class EnsembleContext {
   // The allocator that will be used to allocate buffers for the
   // inference result tensors.
   std::unique_ptr<
-      TRTSERVER_ResponseAllocator, decltype(&TRTSERVER_ResponseAllocatorDelete)>
+      TRITONSERVER_ResponseAllocator,
+      decltype(&TRITONSERVER_ResponseAllocatorDelete)>
       allocator_;
 };
 
@@ -190,7 +190,7 @@ EnsembleContext::EnsembleContext(
     const std::shared_ptr<InferenceRequest>& request, cudaStream_t stream)
     : is_(is), info_(info), stream_(stream), inflight_step_counter_(0),
       stats_(stats), request_(request),
-      allocator_(nullptr, TRTSERVER_ResponseAllocatorDelete)
+      allocator_(nullptr, TRITONSERVER_ResponseAllocatorDelete)
 {
   // Obtain backend handles of all models in ensemble request such that
   // they have the same lifetime as the ensemble request to avoid unloading
@@ -296,25 +296,25 @@ EnsembleContext::EnsembleContext(
     }
   }
 
-  TRTSERVER_ResponseAllocator* allocator;
-  TRTSERVER_Error* err = TRTSERVER_ResponseAllocatorNew(
+  TRITONSERVER_ResponseAllocator* allocator;
+  TRITONSERVER_Error* err = TRITONSERVER_ResponseAllocatorNew(
       &allocator, ResponseAlloc, ResponseRelease);
   if (err != nullptr) {
     ensemble_status_ = Status(
-        TrtServerCodeToStatusCode(TRTSERVER_ErrorCode(err)),
-        TRTSERVER_ErrorMessage(err));
-    TRTSERVER_ErrorDelete(err);
+        TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
+        TRITONSERVER_ErrorMessage(err));
+    TRITONSERVER_ErrorDelete(err);
   } else {
     allocator_.reset(allocator);
   }
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 EnsembleContext::ResponseAlloc(
-    TRTSERVER_ResponseAllocator* allocator, const char* tensor_name,
-    size_t byte_size, TRTSERVER_Memory_Type preferred_memory_type,
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
     int64_t preferred_memory_type_id, void* userp, void** buffer,
-    void** buffer_userp, TRTSERVER_Memory_Type* allocated_memory_type,
+    void** buffer_userp, TRITONSERVER_MemoryType* allocated_memory_type,
     int64_t* allocated_memory_type_id)
 {
   auto tensor_data_map = reinterpret_cast<
@@ -343,10 +343,11 @@ EnsembleContext::ResponseAlloc(
   return nullptr;  // Success
 }
 
-TRTSERVER_Error*
+TRITONSERVER_Error*
 EnsembleContext::ResponseRelease(
-    TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
-    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
+    TRITONSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+    size_t byte_size, TRITONSERVER_MemoryType memory_type,
+    int64_t memory_type_id)
 {
   LOG_VERBOSE(1) << "Internal response release: "
                  << "size " << byte_size << ", addr " << buffer;
@@ -528,8 +529,8 @@ EnsembleContext::InitStep(const size_t step_idx, std::shared_ptr<Step>* step)
   // FIXMEV2 once protocol_version 2 is the only one remove
   // SetBatchSize and adjust the input/output tensors to have
   // appropriate shape
-  auto irequest = std::make_shared<InferenceRequest>(
-      backend, istep.model_version_, 1 /* protocol_version */);
+  auto irequest =
+      std::make_shared<InferenceRequest>(backend, istep.model_version_);
 
   // Request for ensemble model cannot override the timeout values for the
   // composing models. Thus currently the timeout field in request has no
@@ -552,7 +553,7 @@ EnsembleContext::InitStep(const size_t step_idx, std::shared_ptr<Step>* step)
 
     InferenceRequest::Input* input;
     RETURN_IF_ERROR(irequest->AddOriginalInput(
-        pair.first, shape, other.BatchByteSize(), &input));
+        pair.first, other.DataType(), shape, &input));
     RETURN_IF_ERROR(input->SetData(std::get<2>(tensor_data_[pair.second])));
   }
 
@@ -672,7 +673,7 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     }
 
     // Use the memory type of the memory block as preferred memory type
-    TRTSERVER_Memory_Type dst_memory_type, allocated_memory_type;
+    TRITONSERVER_MemoryType dst_memory_type, allocated_memory_type;
     int64_t dst_memory_type_id;
     size_t content_size;
     memory_block->BufferAt(
@@ -695,7 +696,7 @@ EnsembleContext::CheckAndSetEnsembleOutput()
 
     size_t content_offset = 0;
     size_t content_idx = 0;
-    TRTSERVER_Memory_Type src_memory_type;
+    TRITONSERVER_MemoryType src_memory_type;
     int64_t src_memory_type_id;
 
     const char* content = memory_block->BufferAt(

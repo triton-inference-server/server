@@ -55,6 +55,11 @@ extern "C" {
 #include "src/servers/tracer.h"
 #endif  // TRTIS_ENABLE_TRACING
 
+// FIXMEV2
+// Shouldn't be using DataType in this file. This should live
+// completely outside of TRITONSERVER and so should use
+// TRITONSERVER_DataType.
+
 namespace nvidia { namespace inferenceserver {
 
 // Generic HTTP server using evhtp
@@ -1626,13 +1631,13 @@ HTTPAPIServerV2::EVBufferToInput(
   } else {
     buffer_len = header_length;
   }
-  RETURN_IF_TRITON_ERR(EVBufferToJson(&request_json, v, &v_idx, buffer_len, n));
+  RETURN_IF_ERR(EVBufferToJson(&request_json, v, &v_idx, buffer_len, n));
 
   // Set InferenceRequest request_id
   auto itr = request_json.FindMember("id");
   if (itr != request_json.MemberEnd()) {
     const char* id = itr->value.GetString();
-    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestSetId(irequest, id));
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetId(irequest, id));
   }
 
   // Set sequence correlation ID and flags if any
@@ -1642,7 +1647,7 @@ HTTPAPIServerV2::EVBufferToInput(
     {
       const auto& itr = params.FindMember("sequence_id");
       if (itr != params.MemberEnd()) {
-        RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestSetCorrelationId(
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetCorrelationId(
             irequest, itr->value.GetInt()));
       }
     }
@@ -1661,8 +1666,7 @@ HTTPAPIServerV2::EVBufferToInput(
         flags |= itr->value.GetBool() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
       }
     }
-    RETURN_IF_TRITON_ERR(
-        TRITONSERVER_InferenceRequestSetFlags(irequest, flags));
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetFlags(irequest, flags));
   }
 
   // Get the byte-size for each input and from that get the blocks
@@ -1714,11 +1718,11 @@ HTTPAPIServerV2::EVBufferToInput(
 
     size_t byte_size = 0;
     bool binary_input = CheckBinaryInputData(request_input, &byte_size);
-    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestAddInput(
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(
         irequest, input_name, datatype, &shape_vec[0], shape_vec.size()));
 
     if (byte_size == 0 && binary_input) {
-      RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestAppendInputData(
+      RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
           irequest, input_name, nullptr, 0 /* byte_size */,
           TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
     } else if (binary_input) {
@@ -1745,7 +1749,7 @@ HTTPAPIServerV2::EVBufferToInput(
           v_idx++;
         }
 
-        RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestAppendInputData(
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
             irequest, input_name, base, base_size, TRITONSERVER_MEMORY_CPU,
             0 /* memory_type_id */));
       }
@@ -1776,9 +1780,9 @@ HTTPAPIServerV2::EVBufferToInput(
         void* base;
         TRITONSERVER_Memory_Type memory_type;
         int64_t memory_type_id;
-        RETURN_IF_TRITON_ERR(shm_manager_->GetMemoryInfo(
+        RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
             shm_region, offset, &base, &memory_type, &memory_type_id));
-        RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestAppendInputData(
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
             irequest, input_name, base, byte_size, memory_type,
             memory_type_id));
       } else {
@@ -1794,7 +1798,7 @@ HTTPAPIServerV2::EVBufferToInput(
         }
 
         if (element_cnt == 0) {
-          RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestAppendInputData(
+          RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
               irequest, input_name, nullptr, 0 /* byte_size */,
               TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
         } else {
@@ -1817,10 +1821,10 @@ HTTPAPIServerV2::EVBufferToInput(
           }
 
           infer_req->response_meta_data_.request_buffer_[i].resize(byte_size);
-          RETURN_IF_TRITON_ERR(ReadDataFromJson(
+          RETURN_IF_ERR(ReadDataFromJson(
               request_input, &infer_req->response_meta_data_.request_buffer_[i],
               dtype));
-          RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestAppendInputData(
+          RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
               irequest, input_name,
               infer_req->response_meta_data_.request_buffer_[i].data(),
               byte_size, TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
@@ -1861,7 +1865,7 @@ HTTPAPIServerV2::EVBufferToInput(
           void* base;
           TRITONSERVER_Memory_Type memory_type;
           int64_t memory_type_id;
-          RETURN_IF_TRITON_ERR(shm_manager_->GetMemoryInfo(
+          RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
               shm_region, offset, &base, &memory_type, &memory_type_id));
 
           // if shm_map_ does not exist, then create an empty shm_map

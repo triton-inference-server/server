@@ -33,25 +33,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-namespace {
-// FIXMEV2 shouldn't need the conversions
-TRTSERVER_Memory_Type
-TritonMemTypeToTrt(TRITONSERVER_MemoryType mem_type)
-{
-  switch (mem_type) {
-    case TRITONSERVER_MEMORY_CPU:
-      return TRTSERVER_MEMORY_CPU;
-      break;
-    case TRITONSERVER_MEMORY_CPU_PINNED:
-      return TRTSERVER_MEMORY_CPU_PINNED;
-    default:
-      return TRTSERVER_MEMORY_GPU;
-      break;
-  }
-}
-
-}  // namespace
-
 const std::string&
 InferenceRequest::ModelName() const
 {
@@ -142,9 +123,8 @@ InferenceRequest::MutableOriginalInput(
   }
 
   *input = &(itr->second);
-  // FIXMEV2. Hack based on knowledge that this function is only called
-  // for modifying input data, and NormalizeV2 doesn't depend on input data
-  needs_normalization_ |= (protocol_version_ == 1);
+  // FIXME remove and refine
+  // needs_normalization_ = true;
   return Status::Success;
 }
 
@@ -182,43 +162,6 @@ InferenceRequest::MutableRequestedOutput(
 
 Status
 InferenceRequest::AddOriginalInput(
-    const std::string& name, const DimsList& shape,
-    const uint64_t batch_byte_size, InferenceRequest::Input** input)
-{
-  std::vector<int64_t> lshape;
-  for (const auto d : shape) {
-    lshape.push_back(d);
-  }
-
-  return AddOriginalInput(name, lshape, batch_byte_size, input);
-}
-
-Status
-InferenceRequest::AddOriginalInput(
-    const std::string& name, const std::vector<int64_t>& shape,
-    const uint64_t batch_byte_size, InferenceRequest::Input** input)
-{
-  const auto& pr = original_inputs_.emplace(
-      std::piecewise_construct, std::forward_as_tuple(name),
-      std::forward_as_tuple(name, shape, batch_byte_size));
-  if (!pr.second) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "input '" + name + "' already exists in request");
-  }
-
-  LOG_VERBOSE(1) << "add original input: " << *this;
-
-  if (input != nullptr) {
-    *input = std::addressof(pr.first->second);
-  }
-
-  needs_normalization_ = true;
-  return Status::Success;
-}
-
-Status
-InferenceRequest::AddOriginalInput(
     const std::string& name, const DataType datatype, const int64_t* shape,
     const uint64_t dim_count, InferenceRequest::Input** input)
 {
@@ -239,6 +182,14 @@ InferenceRequest::AddOriginalInput(
 
   needs_normalization_ = true;
   return Status::Success;
+}
+
+Status
+InferenceRequest::AddOriginalInput(
+    const std::string& name, const DataType datatype,
+    const std::vector<int64_t>& shape, InferenceRequest::Input** input)
+{
+  return AddOriginalInput(name, datatype, &shape[0], shape.size(), input);
 }
 
 Status
@@ -265,11 +216,10 @@ InferenceRequest::RemoveAllOriginalInputs()
 Status
 InferenceRequest::AddOverrideInput(
     const std::string& name, const DataType datatype,
-    const std::vector<int64_t>& shape, const uint64_t batch_byte_size,
+    const std::vector<int64_t>& shape,
     std::shared_ptr<InferenceRequest::Input>* input)
 {
-  std::shared_ptr<Input> i =
-      std::make_shared<Input>(name, datatype, shape, batch_byte_size);
+  std::shared_ptr<Input> i = std::make_shared<Input>(name, datatype, shape);
   *(i->MutableShape()) = i->OriginalShape();
 
   RETURN_IF_ERROR(AddOverrideInput(i));
@@ -354,12 +304,7 @@ InferenceRequest::PrepareForInference()
   // If anything has potentially changed in the inference request then
   // need to renormalize.
   if (needs_normalization_) {
-    if (protocol_version_ == 1) {
-      RETURN_IF_ERROR(NormalizeV1());
-    } else {
-      RETURN_IF_ERROR(NormalizeV2());
-    }
-
+    RETURN_IF_ERROR(Normalize());
     needs_normalization_ = false;
   }
 
@@ -376,7 +321,7 @@ InferenceRequest::PrepareForInference()
 }
 
 Status
-InferenceRequest::NormalizeV1()
+InferenceRequest::Normalize()
 {
   const ModelConfig& model_config = backend_raw_->Config();
 
@@ -384,175 +329,7 @@ InferenceRequest::NormalizeV1()
     priority_ = backend_raw_->DefaultPriorityLevel();
   }
 
-  // Make sure the request has a batch-size > 0. Even for models that
-  // don't support batching the requested batch size must be 1.
-  if (batch_size_ < 1) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "inference request batch-size must be >= 1 for '" + ModelName() + "'");
-  }
-
-  // Make sure request batch-size doesn't exceed what is supported by
-  // the model. For models that don't support batching the request
-  // batch-size will still be 1.
-  if ((batch_size_ != 1) &&
-      ((int)batch_size_ > model_config.max_batch_size())) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "inference request batch-size must be <= " +
-            std::to_string(model_config.max_batch_size()) + " for '" +
-            ModelName() + "'");
-  }
-
-  // Validate if the requested output name exists in the model configuration
-  for (const auto& pr : requested_outputs_) {
-    const ModelOutput* output_config;
-    RETURN_IF_ERROR(backend_raw_->GetOutput(pr.first, &output_config));
-  }
-
-  // Make sure that the request is providing the same number of inputs
-  // as is expected by the model.
-  if (original_inputs_.size() != (size_t)model_config.input_size()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "expected " + std::to_string(model_config.input_size()) +
-            " inputs but got " + std::to_string(original_inputs_.size()) +
-            " inputs for model '" + ModelName() + "'");
-  }
-
-  // Update each input to have shape, datatype and batch-byte-size.
-  for (auto& pr : original_inputs_) {
-    const ModelInput* input_config;
-    RETURN_IF_ERROR(backend_raw_->GetInput(pr.first, &input_config));
-    auto& input = pr.second;
-
-    input.SetDType(input_config->data_type());
-
-    auto new_shape = input.MutableShape();
-    *new_shape = input.OriginalShape();
-
-    // If the inference request specifies a shape for an input, make
-    // sure it matches what the model expects.
-    if (new_shape->size() > 0) {
-      if (!CompareDimsWithWildcard(input_config->dims(), *new_shape)) {
-        return Status(
-            Status::Code::INVALID_ARG,
-            "unexpected shape for input '" + pr.first + "' for model '" +
-                ModelName() + "'. Expected " +
-                DimsListToString(input_config->dims()) + ", got " +
-                DimsListToString(*new_shape));
-      }
-
-      // If there is a reshape for this input then set the shape to
-      // match the reshape. As reshape may have variable-size
-      // dimensions, we need to record corresponding value so that we
-      // can set the value correctly for reshape.
-      if (input_config->has_reshape()) {
-        std::deque<int64_t> variable_size_values;
-        for (int64_t idx = 0; idx < input_config->dims_size(); idx++) {
-          if (input_config->dims(idx) == -1) {
-            variable_size_values.push_back((*new_shape)[idx]);
-          }
-        }
-
-        new_shape->clear();
-        for (const auto& dim : input_config->reshape().shape()) {
-          if (dim == -1) {
-            new_shape->push_back(variable_size_values.front());
-            variable_size_values.pop_front();
-          } else {
-            new_shape->push_back(dim);
-          }
-        }
-      }
-    }
-
-    // If we don't have shape for the input at this point then the
-    // request didn't specify it, or it has a reshape that we must use
-    // instead.
-    if (new_shape->size() == 0) {
-      const DimsList& dims = (input_config->has_reshape())
-                                 ? input_config->reshape().shape()
-                                 : input_config->dims();
-
-      // Inference request doesn't specify shape, make sure input
-      // shape is fully specified in the model and calculate expected
-      // size from the model configuration.
-      for (auto dim : dims) {
-        if (dim < 0) {
-          return Status(
-              Status::Code::INVALID_ARG,
-              "model supports variable-size for input '" + pr.first +
-                  "', request must specify input shape for model '" +
-                  ModelName() + "'");
-        }
-
-        new_shape->push_back(dim);
-      }
-    }
-
-    // For fixed-size datatype the tensor used to calculate byte-size
-    // is:
-    //
-    //   [ batch-size, tensor-shape ] : for batching model and
-    //   non-zero-rank tensor. For example, batch-size 4 and dims [ 1,
-    //   2 ] the full tensor shape is [ 4, 1, 2 ].
-    //
-    //   [ tensor-shape ] : for non-batching model and non-zero-rank
-    //   tensor. For example, dims [ 1, 2 ] the full tensor shape is [
-    //   1, 2 ].
-    //
-    //   [ batch-size ] : for batching model and zero-rank tensor. For
-    //   example, batch-size 4 with dims [ 1 ] and reshape [ ], the
-    //   full tensor shape is [ 4 ].
-    //
-    // Note that non-batching zero-rank tensor is not allowed since
-    // that will always be shape [], i.e. a tensor with no contents.
-    //
-    uint64_t bs = 0;
-    if (IsFixedSizeDataType(input_config->data_type())) {
-      bs = GetByteSize(input_config->data_type(), *new_shape);
-      int multiplier = (input_config->is_shape_tensor() ? 1 : batch_size_);
-      if (model_config.max_batch_size() > 0) {
-        if (new_shape->size() == 0) {
-          bs = GetDataTypeByteSize(input_config->data_type()) * multiplier;
-        } else {
-          bs *= multiplier;
-        }
-      }
-
-      // If batch-byte-size is given check to make sure that the
-      // calculated batch size matches
-      if ((input.BatchByteSize() != 0) && (input.BatchByteSize() != bs)) {
-        return Status(
-            Status::Code::INVALID_ARG,
-            "specific batch-byte-size for input '" + pr.first +
-                "' does not match expected byte-size calculated from shape and "
-                "datatype for model '" +
-                ModelName() + "'");
-      }
-    } else {
-      // The input's datatype is not fixed-sized (like TYPE_STRING),
-      // use the full-batch size specified by the request.
-      bs = input.BatchByteSize();
-    }
-
-    input.SetBatchByteSize(bs);
-  }
-
-  return Status::Success;
-}
-
-Status
-InferenceRequest::NormalizeV2()
-{
-  const ModelConfig& model_config = backend_raw_->Config();
-
-  if ((priority_ == 0) || (priority_ > backend_raw_->MaxPriorityLevel())) {
-    priority_ = backend_raw_->DefaultPriorityLevel();
-  }
-
-  // FIXME need original requested
+  // FIXMEV2 need original requested
   // If requested_outputs_ is empty return all outputs specified in model config
   if (requested_outputs_.size() == 0) {
     for (const auto& output : model_config.output()) {
@@ -565,7 +342,6 @@ InferenceRequest::NormalizeV2()
       RETURN_IF_ERROR(backend_raw_->GetOutput(pr.first, &output_config));
     }
   }
-
 
   // Make sure that the request is providing the same number of inputs
   // as is expected by the model.
@@ -646,10 +422,6 @@ InferenceRequest::NormalizeV2()
     auto& input = pr.second;
     auto shape = input.MutableShape();
 
-    // FIXMEV2 Can't have this check until the GRPCV2 and HTTPV2
-    // endpoints switch to new TRITONSERVER APIs where they always
-    // specify datatype.
-#if 0
     if (input.DType() != input_config->data_type()) {
       return Status(
           Status::Code::INVALID_ARG,
@@ -659,9 +431,6 @@ InferenceRequest::NormalizeV2()
               std::string(DataTypeToProtocolString(input_config->data_type())) +
               "' for '" + ModelName() + "'");
     }
-#else
-    input.SetDType(input_config->data_type());
-#endif
 
     if (!CompareDimsWithWildcard(input_config->dims(), *shape)) {
       return Status(
@@ -703,15 +472,7 @@ InferenceRequest::NormalizeV2()
 // Input
 //
 InferenceRequest::Input::Input()
-    : batch_byte_size_(0), data_byte_size_(0), data_(new MemoryReference)
-{
-}
-
-InferenceRequest::Input::Input(
-    const std::string& name, const std::vector<int64_t>& shape,
-    const uint64_t batch_byte_size)
-    : name_(name), original_shape_(shape), batch_byte_size_(batch_byte_size),
-      data_byte_size_(0), data_(new MemoryReference)
+    : data_byte_size_(0), data_(new MemoryReference)
 {
 }
 
@@ -719,24 +480,22 @@ InferenceRequest::Input::Input(
     const std::string& name, const DataType datatype, const int64_t* shape,
     const uint64_t dim_count)
     : name_(name), datatype_(datatype),
-      original_shape_(shape, shape + dim_count), batch_byte_size_(0),
-      data_byte_size_(0), data_(new MemoryReference)
+      original_shape_(shape, shape + dim_count), data_byte_size_(0),
+      data_(new MemoryReference)
 {
 }
 
 InferenceRequest::Input::Input(
     const std::string& name, const DataType datatype,
-    const std::vector<int64_t>& shape, const uint64_t batch_byte_size)
+    const std::vector<int64_t>& shape)
     : name_(name), datatype_(datatype), original_shape_(shape),
-      batch_byte_size_(batch_byte_size), data_byte_size_(0),
-      data_(new MemoryReference)
+      data_byte_size_(0), data_(new MemoryReference)
 {
 }
 
-
 Status
 InferenceRequest::Input::AppendData(
-    const void* base, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+    const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
 {
   if (byte_size > 0) {
@@ -746,15 +505,6 @@ InferenceRequest::Input::AppendData(
   }
 
   return Status::Success;
-}
-
-Status
-InferenceRequest::Input::AppendData(
-    const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
-    int64_t memory_type_id)
-{
-  return AppendData(
-      base, byte_size, TritonMemTypeToTrt(memory_type), memory_type_id);
 }
 
 Status
@@ -781,17 +531,11 @@ InferenceRequest::Input::RemoveAllData()
 }
 
 Status
-InferenceRequest::Input::Content(
-    const size_t idx, const void** content, size_t* content_byte_size,
-    TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const
+InferenceRequest::Input::DataBuffer(
+    const size_t idx, const void** base, size_t* byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const
 {
-  if (*content_byte_size == 0) {
-    *content = nullptr;
-    return Status::Success;
-  }
-
-  *content =
-      data_->BufferAt(idx, content_byte_size, memory_type, memory_type_id);
+  *base = data_->BufferAt(idx, byte_size, memory_type, memory_type_id);
 
   return Status::Success;
 }
@@ -809,7 +553,7 @@ std::ostream&
 operator<<(std::ostream& out, const InferenceRequest& request)
 {
   out << "[0x" << std::addressof(request) << "] "
-      << "request id: " << request.IdStr() << ", model: " << request.ModelName()
+      << "request id: " << request.Id() << ", model: " << request.ModelName()
       << ", requested version: " << request.RequestedModelVersion()
       << ", actual version: " << request.ActualModelVersion() << ", flags: 0x"
       << std::hex << request.Flags() << std::dec
