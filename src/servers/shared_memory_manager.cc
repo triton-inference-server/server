@@ -244,7 +244,7 @@ SharedMemoryManager::RegisterCUDASharedMemory(
 TRITONSERVER_Error*
 SharedMemoryManager::GetMemoryInfo(
     const std::string& name, size_t offset, void** shm_mapped_addr,
-    TRITONSERVER_Memory_Type* memory_type, int64_t* device_id)
+    TRITONSERVER_MemoryType* memory_type, int64_t* device_id)
 {
   auto it = shared_memory_map_.find(name);
   if (it == shared_memory_map_.end()) {
@@ -473,7 +473,7 @@ SharedMemoryManager::GetStatus(
 
 TRITONSERVER_Error*
 SharedMemoryManager::GetStatus(
-    const std::string& name, TRITONSERVER_Memory_Type memory_type,
+    const std::string& name, TRITONSERVER_MemoryType memory_type,
     rapidjson::Document* shm_status)
 {
   shm_status->SetArray();
@@ -565,7 +565,7 @@ SharedMemoryManager::GetStatus(
 
 TRITONSERVER_Error*
 SharedMemoryManager::Unregister(
-    const std::string& name, TRITONSERVER_Memory_Type memory_type)
+    const std::string& name, TRITONSERVER_MemoryType memory_type)
 {
   // Serialize all operations that write/read current shared memory regions
   std::lock_guard<std::mutex> lock(mu_);
@@ -574,7 +574,7 @@ SharedMemoryManager::Unregister(
 }
 
 TRITONSERVER_Error*
-SharedMemoryManager::UnregisterAll(TRITONSERVER_Memory_Type memory_type)
+SharedMemoryManager::UnregisterAll(TRITONSERVER_MemoryType memory_type)
 {
   std::lock_guard<std::mutex> lock(mu_);
   std::string error_message = "Failed to unregister the following ";
@@ -616,7 +616,7 @@ SharedMemoryManager::UnregisterAll(TRITONSERVER_Memory_Type memory_type)
 
 TRITONSERVER_Error*
 SharedMemoryManager::UnregisterHelper(
-    const std::string& name, TRITONSERVER_Memory_Type memory_type)
+    const std::string& name, TRITONSERVER_MemoryType memory_type)
 {
   // Must hold the lock on register_mu_ while calling this function.
   auto it = shared_memory_map_.find(name);
