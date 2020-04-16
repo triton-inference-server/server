@@ -62,8 +62,9 @@ GetChannel(const std::string& url)
 //
 class GrpcInferRequest : public InferRequest {
  public:
-  GrpcInferRequest()
-      : grpc_status_(), grpc_response_(std::make_shared<ModelInferResponse>())
+  GrpcInferRequest(InferenceServerClient::OnCompleteFn callback_ = nullptr)
+      : InferRequest(callback_), grpc_status_(),
+        grpc_response_(std::make_shared<ModelInferResponse>())
   {
   }
 
@@ -282,11 +283,11 @@ InferenceServerGrpcClient::Infer(
 
   sync_request->Timer().Reset();
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
+  // Use send timer to measure time for marshalling infer request
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
   for (const auto& it : headers) {
     context.AddMetadata(it.first, it.second);
   }
-  // Use send timer to measure time for marshalling infer request
-  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
   err = PreRunProcessing(options, inputs, outputs);
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
   if (!err.IsOk()) {
@@ -316,6 +317,51 @@ InferenceServerGrpcClient::Infer(
   }
 
   return err;
+}
+
+Error
+InferenceServerGrpcClient::AsyncInfer(
+    OnCompleteFn callback, const InferOptions& options,
+    const std::vector<InferInput*>& inputs,
+    const std::vector<const InferRequestedOutput*>& outputs,
+    const Headers& headers)
+{
+  if (callback == nullptr) {
+    return Error(
+        "Callback function must be provided along with AsyncInfer() call.");
+  }
+  if (!worker_.joinable()) {
+    worker_ = std::thread(&InferenceServerGrpcClient::AsyncTransfer, this);
+  }
+
+  GrpcInferRequest* async_request;
+  async_request = new GrpcInferRequest(std::move(callback));
+
+  async_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
+  async_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
+  for (const auto& it : headers) {
+    async_request->grpc_context_.AddMetadata(it.first, it.second);
+  }
+  Error err = PreRunProcessing(options, inputs, outputs);
+  if (!err.IsOk()) {
+    delete async_request;
+    return err;
+  }
+
+  async_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
+
+  std::unique_ptr<grpc::ClientAsyncResponseReader<ModelInferResponse>> rpc(
+      stub_->PrepareAsyncModelInfer(
+          &async_request->grpc_context_, infer_request_,
+          &async_request_completion_queue_));
+
+  rpc->StartCall();
+
+  rpc->Finish(
+      async_request->grpc_response_.get(), &async_request->grpc_status_,
+      (void*)async_request);
+
+  return Error::Success;
 }
 
 Error
@@ -431,10 +477,75 @@ InferenceServerGrpcClient::PreRunProcessing(
   return Error::Success;
 }
 
+void
+InferenceServerGrpcClient::AsyncTransfer()
+{
+  while (!exiting_) {
+    // GRPC async APIs are thread-safe https://github.com/grpc/grpc/issues/4486
+    GrpcInferRequest* raw_async_request;
+    bool ok = true;
+    bool status =
+        async_request_completion_queue_.Next((void**)(&raw_async_request), &ok);
+    std::shared_ptr<GrpcInferRequest> async_request;
+    if (!ok) {
+      fprintf(stderr, "Unexpected not ok on client side.\n");
+    }
+    if (!status) {
+      if (!exiting_) {
+        fprintf(stderr, "Completion queue is closed.\n");
+      }
+    } else if (raw_async_request == nullptr) {
+      fprintf(stderr, "Unexpected null tag received at client.\n");
+    } else {
+      async_request.reset(raw_async_request);
+      InferResult* async_result;
+      async_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_START);
+      InferResultGrpc::Create(&async_result, async_request->grpc_response_);
+      async_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
+      async_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
+      Error* err;
+      if (async_request->grpc_status_.ok()) {
+        if (verbose_) {
+          std::cout << async_request->grpc_response_->DebugString()
+                    << std::endl;
+        }
+        err = new Error();
+      } else {
+        err = new Error(async_request->grpc_status_.error_message());
+      }
+      async_request->callback_(async_result, err);
+    }
+  }
+}
+
 InferenceServerGrpcClient::InferenceServerGrpcClient(
     const std::string& url, bool verbose)
     : stub_(GRPCInferenceService::NewStub(GetChannel(url))), verbose_(verbose)
 {
+}
+
+InferenceServerGrpcClient::~InferenceServerGrpcClient()
+{
+  exiting_ = true;
+  // Close complete queue and wait for the worker thread to return
+  async_request_completion_queue_.Shutdown();
+
+  // thread not joinable if AsyncInfer() is not called
+  // (it is default constructed thread before the first AsyncInfer() call)
+  if (worker_.joinable()) {
+    worker_.join();
+  }
+
+  bool has_next = true;
+  GrpcInferRequest* async_request;
+  bool ok;
+  do {
+    has_next =
+        async_request_completion_queue_.Next((void**)&async_request, &ok);
+    if (has_next && async_request != nullptr) {
+      delete async_request;
+    }
+  } while (has_next);
 }
 
 //==============================================================================

@@ -31,10 +31,12 @@
 
 #include <chrono>
 #include <cstring>
+#include <functional>
 #include <iostream>
 #include <list>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 
@@ -46,6 +48,7 @@ class InferenceServerGrpcClient;
 #ifdef TRTIS_ENABLE_HTTP_V2
 class InferenceServerHttpClient;
 #endif  // TRTIS_ENABLE_HTTP_V2
+class InferResult;
 class InferRequest;
 class RequestTimers;
 
@@ -112,6 +115,10 @@ struct InferStat {
 ///
 class InferenceServerClient {
  public:
+  using OnCompleteFn = std::function<void(InferResult*, Error*)>;
+
+  InferenceServerClient() : exiting_(false) {}
+
   /// Obtain the cumulative inference statistics of the client.
   /// \param Returns the InferStat object holding current statistics.
   /// \return Error object indicating success or failure.
@@ -120,6 +127,11 @@ class InferenceServerClient {
  protected:
   // Update the infer stat with the given timer
   Error UpdateInferStat(const RequestTimers& timer);
+
+  // worker thread that will perform the asynchronous transfer
+  std::thread worker_;
+  // signal for worker thread to stop
+  bool exiting_;
 
   // Standalone request context used for synchronous request
   std::shared_ptr<InferRequest> sync_request_;
@@ -368,6 +380,8 @@ class InferRequestedOutput {
 ///
 class InferResult {
  public:
+  virtual ~InferResult() = default;
+
   /// Get the name of the model which generated this response.
   /// \param name Returns the name of the model.
   /// \return Error object indicating success or failure.
@@ -506,10 +520,16 @@ class RequestTimers {
 ///
 class InferRequest {
  public:
-  InferRequest() {}
+  InferRequest(InferenceServerClient::OnCompleteFn callback = nullptr)
+      : callback_(callback)
+  {
+  }
   virtual ~InferRequest() = default;
 
   RequestTimers& Timer() { return timer_; }
+
+ protected:
+  InferenceServerClient::OnCompleteFn callback_;
 
  private:
   // The timers for infer request.
