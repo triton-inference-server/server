@@ -51,7 +51,7 @@ extern "C" {
 /// enum values.
 #define CUSTOM_SERVER_PARAMETER_CNT 2
 
-/// Types of memory recognized by TRTSERVER and custom backend.
+/// Types of memory recognized by Triton and custom backend.
 typedef enum custom_memorytype_enum {
   CUSTOM_MEMORY_CPU,
   CUSTOM_MEMORY_GPU,

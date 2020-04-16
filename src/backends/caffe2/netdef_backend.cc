@@ -390,9 +390,9 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
   // [TODO] use the following statement. Right now we always create
   // netdef workspace with inputs / outputs on CPU node
   // auto content_memory_type = (gpu_device_ == NO_GPU_DEVICE)
-  //                                ? TRTSERVER_MEMORY_CPU
-  //                                : TRTSERVER_MEMORY_GPU;
-  output->memory_type_ = TRTSERVER_MEMORY_CPU;
+  //                                ? TRITONSERVER_MEMORY_CPU
+  //                                : TRITONSERVER_MEMORY_GPU;
+  output->memory_type_ = TRITONSERVER_MEMORY_CPU;
   output->memory_type_id_ = 0;
   size_t byte_size = 0;
   Caffe2Workspace::Error err = workspace_->GetOutputTensor(
@@ -459,7 +459,7 @@ NetDefBackend::Context::SetInput(
   // contiguous chunk so create a buffer large enough to hold the
   // entire dynamic batched input.
   input_buffers->emplace_back(
-      new AllocatedMemory(total_byte_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
+      new AllocatedMemory(total_byte_size, TRITONSERVER_MEMORY_CPU_PINNED, 0));
   inputs->emplace_back();
   auto& input = inputs->back();
   input.input_buffer_ = input_buffers->back()->MutableBuffer(
@@ -545,7 +545,7 @@ NetDefBackend::Context::Run(
   for (auto& input : inputs) {
     for (auto& indirect_buffer : input.indirect_buffers_) {
       bool cuda_used;
-      TRTSERVER_Memory_Type buffer_memory_type;
+      TRITONSERVER_MemoryType buffer_memory_type;
       int64_t buffer_memory_id;
       size_t buffer_byte_size;
       auto buffer =
@@ -627,13 +627,13 @@ NetDefBackend::Context::Run(
   for (auto& output : outputs) {
     for (auto& indirect_buffer : output.indirect_buffers_) {
       bool cuda_used;
-      TRTSERVER_Memory_Type src_memory_type;
+      TRITONSERVER_MemoryType src_memory_type;
       int64_t src_memory_type_id;
       // placeholder, copy byte size is determined by dst_byte_size
       size_t src_byte_size;
       auto src = indirect_buffer.first->BufferAt(
           0, &src_byte_size, &src_memory_type, &src_memory_type_id);
-      TRTSERVER_Memory_Type dst_memory_type;
+      TRITONSERVER_MemoryType dst_memory_type;
       int64_t dst_memory_type_id;
       for (auto& payload_output : indirect_buffer.second) {
         char* dst = payload_output.second->MutableBuffer(

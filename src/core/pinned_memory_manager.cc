@@ -78,14 +78,14 @@ PinnedMemoryManager::~PinnedMemoryManager()
 
 Status
 PinnedMemoryManager::AllocInternal(
-    void** ptr, uint64_t size, TRTSERVER_Memory_Type* allocated_type,
+    void** ptr, uint64_t size, TRITONSERVER_MemoryType* allocated_type,
     bool allow_nonpinned_fallback)
 {
   auto status = Status::Success;
   if (pinned_memory_buffer_ != nullptr) {
     std::lock_guard<std::mutex> lk(buffer_mtx_);
     *ptr = managed_pinned_memory_.allocate(size, std::nothrow_t{});
-    *allocated_type = TRTSERVER_MEMORY_CPU_PINNED;
+    *allocated_type = TRITONSERVER_MEMORY_CPU_PINNED;
     if (*ptr == nullptr) {
       status = Status(
           Status::Code::INTERNAL, "failed to allocate pinned system memory");
@@ -105,7 +105,7 @@ PinnedMemoryManager::AllocInternal(
       warning_logged = true;
     }
     *ptr = malloc(size);
-    *allocated_type = TRTSERVER_MEMORY_CPU;
+    *allocated_type = TRITONSERVER_MEMORY_CPU;
     is_pinned = false;
     if (*ptr == nullptr) {
       status = Status(
@@ -204,7 +204,7 @@ PinnedMemoryManager::Create(const Options& options)
 
 Status
 PinnedMemoryManager::Alloc(
-    void** ptr, uint64_t size, TRTSERVER_Memory_Type* allocated_type,
+    void** ptr, uint64_t size, TRITONSERVER_MemoryType* allocated_type,
     bool allow_nonpinned_fallback)
 {
   if (instance_ == nullptr) {

@@ -85,7 +85,6 @@ InferenceServer::InferenceServer()
   start_time_ns_ = TIMESPEC_TO_NANOS(ts);
 
   id_ = "inference:0";
-  protocol_version_ = 1;
   extensions_.push_back("classification");
   extensions_.push_back("sequence");
   extensions_.push_back("model_repository");
@@ -425,13 +424,13 @@ InferenceServer::InferAsync(std::unique_ptr<InferenceRequest>& request)
 
         // FIXMEV2 status should live in InferenceRequest instead of
         // being a callback arg.
-        ltrtrequest->SetRequestStatus(status);
+        lrequest->SetRequestStatus(status);
 
-        ltrtrequest->SetResponse(infer_response_provider);
+        lrequest->SetResponse(infer_response_provider);
 
         complete_fn(
             server, trace_manager,
-            reinterpret_cast<TRITONSERVER_InferenceRequest*>(ltrtrequest),
+            reinterpret_cast<TRITONSERVER_InferenceRequest*>(lrequest),
             complete_userp);
       });
 #endif

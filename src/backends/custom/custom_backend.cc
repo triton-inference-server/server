@@ -41,12 +41,12 @@
 namespace {
 
 CustomMemoryType
-ToCustomMemoryType(TRTSERVER_Memory_Type memory_type)
+TritonToCustomMemoryType(TRITONSERVER_MemoryType memory_type)
 {
   switch (memory_type) {
-    case TRTSERVER_MEMORY_GPU:
+    case TRITONSERVER_MEMORY_GPU:
       return CUSTOM_MEMORY_GPU;
-    case TRTSERVER_MEMORY_CPU_PINNED:
+    case TRITONSERVER_MEMORY_CPU_PINNED:
       return CUSTOM_MEMORY_CPU_PINNED;
     default:
       break;
@@ -54,18 +54,18 @@ ToCustomMemoryType(TRTSERVER_Memory_Type memory_type)
   return CUSTOM_MEMORY_CPU;
 }
 
-TRTSERVER_Memory_Type
-ToTRTServerMemoryType(CustomMemoryType memory_type)
+TRITONSERVER_MemoryType
+CustomToTritonMemoryType(CustomMemoryType memory_type)
 {
   switch (memory_type) {
     case CUSTOM_MEMORY_GPU:
-      return TRTSERVER_MEMORY_GPU;
+      return TRITONSERVER_MEMORY_GPU;
     case CUSTOM_MEMORY_CPU_PINNED:
-      return TRTSERVER_MEMORY_CPU_PINNED;
+      return TRITONSERVER_MEMORY_CPU_PINNED;
     default:
       break;
   }
-  return TRTSERVER_MEMORY_CPU;
+  return TRITONSERVER_MEMORY_CPU;
 }
 
 }  // namespace
@@ -617,14 +617,14 @@ CustomBackend::Context::GetNextInput(
       pr.first->second = idx;
     }
 
-    if (idx >= rinput->ContentBufferCount()) {
+    if (idx >= rinput->DataBufferCount()) {
       *content = nullptr;
       *content_byte_size = 0;
     } else {
-      auto src_memory_type = ToTRTServerMemoryType(*memory_type);
-      status = rinput->Content(
+      auto src_memory_type = CustomToTritonMemoryType(*memory_type);
+      status = rinput->DataBuffer(
           idx, content, content_byte_size, &src_memory_type, memory_type_id);
-      *memory_type = ToCustomMemoryType(src_memory_type);
+      *memory_type = TritonToCustomMemoryType(src_memory_type);
     }
   }
 
@@ -725,11 +725,11 @@ CustomBackend::Context::GetOutput(
     }
 #endif  // TRTIS_ENABLE_GPU
 
-    TRTSERVER_Memory_Type actual_memory_type =
-        ToTRTServerMemoryType(*memory_type);
+    TRITONSERVER_MemoryType actual_memory_type =
+        CustomToTritonMemoryType(*memory_type);
     int64_t actual_memory_type_id = *memory_type_id;
 
-    status = output->AllocateBuffer(
+    status = output->AllocateDataBuffer(
         content, content_byte_size, &actual_memory_type,
         &actual_memory_type_id);
 
@@ -749,7 +749,7 @@ CustomBackend::Context::GetOutput(
     }
 
     // Update memory type with actual memory type
-    *memory_type = ToCustomMemoryType(actual_memory_type);
+    *memory_type = TritonToCustomMemoryType(actual_memory_type);
     *memory_type_id = actual_memory_type_id;
     return status.IsOk();
   }

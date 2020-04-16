@@ -66,9 +66,9 @@ Status EnablePeerAccess(const double min_compute_capability);
 /// is completed.
 /// \return The error status.
 Status CopyBuffer(
-    const std::string& msg, const TRTSERVER_Memory_Type src_memory_type,
+    const std::string& msg, const TRITONSERVER_MemoryType src_memory_type,
     const int64_t src_memory_type_id,
-    const TRTSERVER_Memory_Type dst_memory_type,
+    const TRITONSERVER_MemoryType dst_memory_type,
     const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
     void* dst, cudaStream_t cuda_stream, bool* cuda_used);
 
