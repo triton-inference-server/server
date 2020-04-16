@@ -354,14 +354,14 @@ Status
 LibTorchBackend::Context::SetInputTensor(
     const InputMetaData& meta_data, torch::jit::IValue* tensor)
 {
-  TRTSERVER_Memory_Type memory_type;
+  TRITONSERVER_MemoryType memory_type;
   int64_t memory_type_id;
   size_t total_byte_size = meta_data.input_buffer_->TotalByteSize();
   char* buffer =
       meta_data.input_buffer_->MutableBuffer(&memory_type, &memory_type_id);
 
   torch::TensorOptions options{meta_data.torch_type_};
-  auto updated_options = (memory_type == TRTSERVER_MEMORY_GPU)
+  auto updated_options = (memory_type == TRITONSERVER_MEMORY_GPU)
                              ? options.device(torch::kCUDA, memory_type_id)
                              : options.device(torch::kCPU);
   torch::Tensor input_tensor =
@@ -410,8 +410,8 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
             std::to_string(batch1_byte_size));
   }
 
-  output->memory_type_ =
-      (device_ == torch::kCPU) ? TRTSERVER_MEMORY_CPU : TRTSERVER_MEMORY_GPU;
+  output->memory_type_ = (device_ == torch::kCPU) ? TRITONSERVER_MEMORY_CPU
+                                                  : TRITONSERVER_MEMORY_GPU;
   output->memory_type_id_ = (device_ == torch::kCPU) ? 0 : gpu_device_;
   *cuda_copy |=
       SetFixedSizeOutputBuffer(name, batch1_byte_size, output, payloads);
@@ -511,8 +511,8 @@ LibTorchBackend::Context::SetFixedSizedInputBuffer(
   // contiguous chunk so create a buffer large enough to hold the
   // entire dynamic batched input.
   auto memory_type = (gpu_device_ == NO_GPU_DEVICE)
-                         ? TRTSERVER_MEMORY_CPU_PINNED
-                         : TRTSERVER_MEMORY_GPU;
+                         ? TRITONSERVER_MEMORY_CPU_PINNED
+                         : TRITONSERVER_MEMORY_GPU;
   int64_t memory_type_id = (gpu_device_ == NO_GPU_DEVICE) ? 0 : gpu_device_;
   meta_data->input_buffer_.reset(
       new AllocatedMemory(total_byte_size, memory_type, memory_type_id));
@@ -638,7 +638,7 @@ LibTorchBackend::Context::Run(
   for (auto& input : inputs) {
     for (auto& indirect_buffer : input.indirect_buffers_) {
       bool cuda_used;
-      TRTSERVER_Memory_Type buffer_memory_type;
+      TRITONSERVER_MemoryType buffer_memory_type;
       int64_t buffer_memory_id;
       size_t buffer_byte_size;
       auto buffer =
@@ -745,13 +745,13 @@ LibTorchBackend::Context::Run(
   for (auto& output : outputs) {
     for (auto& indirect_buffer : output.indirect_buffers_) {
       bool cuda_used;
-      TRTSERVER_Memory_Type src_memory_type;
+      TRITONSERVER_MemoryType src_memory_type;
       int64_t src_memory_type_id;
       // placeholder, copy byte size is determined by dst_byte_size
       size_t src_byte_size;
       auto src = indirect_buffer.first->BufferAt(
           0, &src_byte_size, &src_memory_type, &src_memory_type_id);
-      TRTSERVER_Memory_Type dst_memory_type;
+      TRITONSERVER_MemoryType dst_memory_type;
       int64_t dst_memory_type_id;
       for (auto& payload_output : indirect_buffer.second) {
         char* dst = payload_output.second->MutableBuffer(

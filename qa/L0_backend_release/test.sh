@@ -52,7 +52,7 @@ rm -fr *.log
 # their own backend so don't need to test across all frameworks.  Set
 # the delay, in milliseconds, that will cause the scheduler to be the
 # last holding the backend handle.
-export TRTSERVER_DELAY_SCHEDULER_BACKEND_RELEASE=5000
+export TRITONSERVER_DELAY_SCHEDULER_BACKEND_RELEASE=5000
 
 # dynamic batcher - 1 instance
 rm -fr models && cp -r simple_models models

@@ -49,7 +49,7 @@ source ../common/util.sh
 
 RET=0
 
-# Must run on a single device or else the TRTSERVER_DELAY_SCHEDULER
+# Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
 # can fail when the requests are distributed to multiple devices.
 export CUDA_VISIBLE_DEVICES=0
 
@@ -66,7 +66,7 @@ cp -r ../custom_models/custom_zero_1_float32 . && \
 
 # test_max_queue_size
 # For testing max queue size, we use delay in the custom model to
-# create backlogs, "TRTSERVER_DELAY_SCHEDULER" is not desired as queue size
+# create backlogs, "TRITONSERVER_DELAY_SCHEDULER" is not desired as queue size
 # is capped by max queue size.
 rm -fr models && mkdir models && \
     cp -r custom_zero_1_float32 models/. && \

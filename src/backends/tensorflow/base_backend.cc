@@ -448,8 +448,8 @@ BaseBackend::Context::SetFixedSizedInputTensor(
   }
 
   input->memory_type_ = (TRTISTF_TensorIsGPUTensor(tensor))
-                            ? TRTSERVER_MEMORY_GPU
-                            : TRTSERVER_MEMORY_CPU;
+                            ? TRITONSERVER_MEMORY_GPU
+                            : TRITONSERVER_MEMORY_CPU;
   input->memory_type_id_ =
       (TRTISTF_TensorIsGPUTensor(tensor)) ? gpu_device_ : 0;
   LOG_VERBOSE(1) << "input '" << input_name
@@ -476,7 +476,7 @@ BaseBackend::Context::SetStringInputTensor(
 
     // For string data type, we always need to copy the data to CPU so that
     // we can read string length and construct the string properly.
-    auto buffer_memory_type = TRTSERVER_MEMORY_CPU_PINNED;
+    auto buffer_memory_type = TRITONSERVER_MEMORY_CPU_PINNED;
     int64_t buffer_memory_type_id = 0;
     const char* content;
     size_t content_byte_size = expected_element_cnt * sizeof(uint32_t);
@@ -566,8 +566,8 @@ BaseBackend::Context::ReadFixedSizedOutputTensor(
 {
   output->output_buffer_ = TRTISTF_TensorData(tensor);
   output->memory_type_ = (TRTISTF_TensorIsGPUTensor(tensor))
-                             ? TRTSERVER_MEMORY_GPU
-                             : TRTSERVER_MEMORY_CPU;
+                             ? TRITONSERVER_MEMORY_GPU
+                             : TRITONSERVER_MEMORY_CPU;
   output->memory_type_id_ =
       (TRTISTF_TensorIsGPUTensor(tensor)) ? gpu_device_ : 0;
   LOG_VERBOSE(1) << "output '" << output_name
@@ -611,17 +611,17 @@ BaseBackend::Context::ReadStringOutputTensor(
       }
 
       void* content;
-      TRTSERVER_Memory_Type actual_memory_type;
+      TRITONSERVER_MemoryType actual_memory_type;
       int64_t actual_memory_type_id;
       Status status = payload.response_provider_->AllocateOutputBuffer(
           output_name, &content, serialized.size(), shape,
-          TRTSERVER_MEMORY_CPU_PINNED /* preferred_memory_type */,
+          TRITONSERVER_MEMORY_CPU_PINNED /* preferred_memory_type */,
           0 /* preferred_memory_type_id */, &actual_memory_type,
           &actual_memory_type_id);
       if (status.IsOk()) {
         bool cuda_used = false;
         status = CopyBuffer(
-            output_name, TRTSERVER_MEMORY_CPU /* src_memory_type */,
+            output_name, TRITONSERVER_MEMORY_CPU /* src_memory_type */,
             0 /* src_memory_type_id */, actual_memory_type,
             actual_memory_type_id, serialized.size(),
             reinterpret_cast<const void*>(serialized.c_str()), content, stream_,
@@ -744,7 +744,7 @@ BaseBackend::Context::Run(
   for (auto& input : inputs) {
     for (auto& indirect_buffer : input.indirect_buffers_) {
       bool cuda_used;
-      TRTSERVER_Memory_Type buffer_memory_type;
+      TRITONSERVER_MemoryType buffer_memory_type;
       int64_t buffer_memory_id;
       size_t buffer_byte_size;
       auto buffer =
@@ -879,13 +879,13 @@ BaseBackend::Context::Run(
   for (auto& output : outputs) {
     for (auto& indirect_buffer : output.indirect_buffers_) {
       bool cuda_used;
-      TRTSERVER_Memory_Type src_memory_type;
+      TRITONSERVER_MemoryType src_memory_type;
       int64_t src_memory_type_id;
       // placeholder, copy byte size is determined by dst_byte_size
       size_t src_byte_size;
       auto src = indirect_buffer.first->BufferAt(
           0, &src_byte_size, &src_memory_type, &src_memory_type_id);
-      TRTSERVER_Memory_Type dst_memory_type;
+      TRITONSERVER_MemoryType dst_memory_type;
       int64_t dst_memory_type_id;
       for (auto& payload_output : indirect_buffer.second) {
         char* dst = payload_output.second->MutableBuffer(

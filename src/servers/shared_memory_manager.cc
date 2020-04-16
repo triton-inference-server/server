@@ -167,7 +167,7 @@ SharedMemoryManager::RegisterSystemSharedMemory(
 
   // open and set new shm_fd if new shared memory key
   if (shm_fd == -1) {
-    RETURN_IF_TRITON_ERR(OpenSharedMemoryRegion(shm_key, &shm_fd));
+    RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_fd));
   }
 
   // Mmap and then close the shared memory descriptor
@@ -336,7 +336,7 @@ SharedMemoryManager::UnregisterHelper(const std::string& name)
   auto it = shared_memory_map_.find(name);
   if (it != shared_memory_map_.end()) {
     if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
-      RETURN_IF_TRITON_ERR(
+      RETURN_IF_ERR(
           UnmapSharedMemory(it->second->mapped_addr_, it->second->byte_size_));
     } else {
 #ifdef TRTIS_ENABLE_GPU
@@ -622,7 +622,7 @@ SharedMemoryManager::UnregisterHelper(
   auto it = shared_memory_map_.find(name);
   if (it != shared_memory_map_.end() && it->second->kind_ == memory_type) {
     if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
-      RETURN_IF_TRITON_ERR(
+      RETURN_IF_ERR(
           UnmapSharedMemory(it->second->mapped_addr_, it->second->byte_size_));
     } else {
 #ifdef TRTIS_ENABLE_GPU
