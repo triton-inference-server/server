@@ -188,7 +188,6 @@ set(
   server_status.cc
   status.cc
   tracing.cc
-  trtserver.cc
   tritonserver.cc
 )
 
@@ -223,7 +222,6 @@ set(
   server_status.h
   status.h
   tracing.h
-  trtserver.h
   tritonserver.h
 )
 

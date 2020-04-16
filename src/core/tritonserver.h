@@ -89,6 +89,24 @@ typedef enum TRITONSERVER_datatype_enum {
 TRITONSERVER_EXPORT const char* TRITONSERVER_DataTypeString(
     TRITONSERVER_DataType datatype);
 
+/// Get the Triton datatype corresponding to a string representation
+/// of a datatype.
+///
+/// \param dtype The datatype string representation.
+/// \return The Triton data type or TRITONSERVER_TYPE_INVALID if the
+/// string does not represent a data type.
+TRITONSERVER_EXPORT TRITONSERVER_DataType
+TRITONSERVER_StringToDataType(const char* dtype);
+
+/// Get the size of a Triton datatype in bytes. Zero is returned for
+/// TRITONSERVER_TYPE_BYTES because it have variable size. Zero is
+/// returned for TRITONSERVER_TYPE_INVALID.
+///
+/// \param dtype The datatype.
+/// \return The size of the datatype.
+TRITONSERVER_EXPORT uint32_t
+TRITONSERVER_DataTypeByteSize(TRITONSERVER_DataType datatype);
+
 /// TRITONSERVER_MemoryType
 ///
 /// Types of memory recognized by TRITONSERVER.

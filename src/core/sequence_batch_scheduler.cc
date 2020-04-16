@@ -50,7 +50,7 @@ SequenceBatchScheduler::Create(
   std::unique_ptr<SequenceBatchScheduler> sched(new SequenceBatchScheduler());
 
   // For debugging and testing,
-  const char* dstr = getenv("TRTSERVER_BACKLOG_DELAY_SCHEDULER");
+  const char* dstr = getenv("TRITONSERVER_BACKLOG_DELAY_SCHEDULER");
   sched->backlog_delay_cnt_ = 0;
   if (dstr != nullptr) {
     sched->backlog_delay_cnt_ = atoi(dstr);
@@ -158,18 +158,18 @@ GetBooleanOverrideInputs(
     std::shared_ptr<InferenceRequest::Input>* true_override,
     std::shared_ptr<InferenceRequest::Input>* false_override)
 {
-  TRTSERVER_Memory_Type memory_type;
+  TRITONSERVER_MemoryType memory_type;
   int64_t memory_type_id;
 
   const std::vector<int64_t> tensor_shape{1};
   const size_t size_p = GetDataTypeByteSize(tensor_datatype);
 
   auto true_p =
-      std::make_shared<AllocatedMemory>(size_p, TRTSERVER_MEMORY_CPU, 0);
+      std::make_shared<AllocatedMemory>(size_p, TRITONSERVER_MEMORY_CPU, 0);
   char* true_p_ptr = true_p->MutableBuffer(&memory_type, &memory_type_id);
   if ((true_p_ptr == nullptr) ||
-      ((memory_type != TRTSERVER_MEMORY_CPU) &&
-       (memory_type != TRTSERVER_MEMORY_CPU_PINNED)) ||
+      ((memory_type != TRITONSERVER_MEMORY_CPU) &&
+       (memory_type != TRITONSERVER_MEMORY_CPU_PINNED)) ||
       (memory_type_id != 0)) {
     return Status(
         Status::Code::INTERNAL,
@@ -177,11 +177,11 @@ GetBooleanOverrideInputs(
   }
 
   auto false_p =
-      std::make_shared<AllocatedMemory>(size_p, TRTSERVER_MEMORY_CPU, 0);
+      std::make_shared<AllocatedMemory>(size_p, TRITONSERVER_MEMORY_CPU, 0);
   char* false_p_ptr = false_p->MutableBuffer(&memory_type, &memory_type_id);
   if ((false_p_ptr == nullptr) ||
-      ((memory_type != TRTSERVER_MEMORY_CPU) &&
-       (memory_type != TRTSERVER_MEMORY_CPU_PINNED)) ||
+      ((memory_type != TRITONSERVER_MEMORY_CPU) &&
+       (memory_type != TRITONSERVER_MEMORY_CPU_PINNED)) ||
       (memory_type_id != 0)) {
     return Status(
         Status::Code::INTERNAL,
@@ -197,12 +197,12 @@ GetBooleanOverrideInputs(
   }
 
   auto ltrue_override = std::make_shared<InferenceRequest::Input>(
-      tensor_name, tensor_datatype, tensor_shape, size_p);
+      tensor_name, tensor_datatype, tensor_shape);
   *ltrue_override->MutableShape() = ltrue_override->OriginalShape();
   RETURN_IF_ERROR(ltrue_override->SetData(true_p));
 
   auto lfalse_override = std::make_shared<InferenceRequest::Input>(
-      tensor_name, tensor_datatype, tensor_shape, size_p);
+      tensor_name, tensor_datatype, tensor_shape);
   *lfalse_override->MutableShape() = lfalse_override->OriginalShape();
   RETURN_IF_ERROR(lfalse_override->SetData(false_p));
 
@@ -715,16 +715,16 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
     const size_t size_p = GetDataTypeByteSize(correlation_id_datatype);
 
     for (size_t b = 0; b < seq_slot_cnt_; ++b) {
-      TRTSERVER_Memory_Type memory_type;
+      TRITONSERVER_MemoryType memory_type;
       int64_t memory_type_id;
 
       auto corrid_p =
-          std::make_shared<AllocatedMemory>(size_p, TRTSERVER_MEMORY_CPU, 0);
+          std::make_shared<AllocatedMemory>(size_p, TRITONSERVER_MEMORY_CPU, 0);
       char* corrid_p_ptr =
           corrid_p->MutableBuffer(&memory_type, &memory_type_id);
       if ((corrid_p_ptr == nullptr) ||
-          ((memory_type != TRTSERVER_MEMORY_CPU) &&
-           (memory_type != TRTSERVER_MEMORY_CPU_PINNED)) ||
+          ((memory_type != TRITONSERVER_MEMORY_CPU) &&
+           (memory_type != TRITONSERVER_MEMORY_CPU_PINNED)) ||
           (memory_type_id != 0)) {
         LOG_ERROR << "failed to allocate sequence CORRID control signal in CPU "
                      "memory";
@@ -732,8 +732,7 @@ SequenceBatch::CreateCorrelationIDControl(const ModelConfig& config)
       }
 
       auto override = std::make_shared<InferenceRequest::Input>(
-          correlation_id_tensor_name, correlation_id_datatype, tensor_shape,
-          size_p);
+          correlation_id_tensor_name, correlation_id_datatype, tensor_shape);
       *override->MutableShape() = override->OriginalShape();
       corrid_status = override->SetData(corrid_p);
       if (!corrid_status.IsOk()) {
@@ -923,7 +922,7 @@ DirectSequenceBatch::SchedulerThread(
   // For debugging and testing, delay start of thread until queues
   // contain the specified number of entries (across all
   // SequenceBatchs in the scheduler).
-  const char* dstr = getenv("TRTSERVER_DELAY_SCHEDULER");
+  const char* dstr = getenv("TRITONSERVER_DELAY_SCHEDULER");
   size_t delay_cnt = 0;
   if (dstr != nullptr) {
     delay_cnt = atoi(dstr);
@@ -935,7 +934,7 @@ DirectSequenceBatch::SchedulerThread(
   // backend object.
   uint64_t backend_release_wait_milliseconds = 0;
   {
-    const char* dstr = getenv("TRTSERVER_DELAY_SCHEDULER_BACKEND_RELEASE");
+    const char* dstr = getenv("TRITONSERVER_DELAY_SCHEDULER_BACKEND_RELEASE");
     if (dstr != nullptr) {
       backend_release_wait_milliseconds = atoi(dstr);
       LOG_INFO << "Delaying scheduler backend release for " << batcher_idx_

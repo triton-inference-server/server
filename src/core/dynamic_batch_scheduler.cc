@@ -257,7 +257,7 @@ DynamicBatchScheduler::SchedulerThread(
   // backend object.
   uint64_t backend_release_wait_milliseconds = 0;
   {
-    const char* dstr = getenv("TRTSERVER_DELAY_SCHEDULER_BACKEND_RELEASE");
+    const char* dstr = getenv("TRITONSERVER_DELAY_SCHEDULER_BACKEND_RELEASE");
     if (dstr != nullptr) {
       backend_release_wait_milliseconds = atoi(dstr);
       LOG_INFO << "Delaying scheduler backend release for " << runner_id << ": "
@@ -269,7 +269,7 @@ DynamicBatchScheduler::SchedulerThread(
   // contains the specified number of entries.
   size_t delay_cnt = 0;
   {
-    const char* dstr = getenv("TRTSERVER_DELAY_SCHEDULER");
+    const char* dstr = getenv("TRITONSERVER_DELAY_SCHEDULER");
     if (dstr != nullptr) {
       delay_cnt = atoi(dstr);
       LOG_INFO << "Delaying scheduler thread " << runner_id << " until "

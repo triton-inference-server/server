@@ -431,7 +431,7 @@ ModelInferStats::NewTrace(Trace* parent)
           requested_model_version_, ltrace_manager->userp_);
     } else {
       ltrace_manager->create_fn_(
-          reinterpret_cast<TRTSERVER_Trace**>(&trace_), model_name_.c_str(),
+          reinterpret_cast<TRITONSERVER_Trace**>(&trace_), model_name_.c_str(),
           requested_model_version_, ltrace_manager->userp_);
     }
     if (trace_ != nullptr) {
@@ -458,8 +458,8 @@ ModelInferStats::Report()
           trace_->ActivityUserp(), trace_manager_->userp_);
     } else {
       trace_manager_->release_fn_(
-          reinterpret_cast<TRTSERVER_Trace*>(trace_), trace_->ActivityUserp(),
-          trace_manager_->userp_);
+          reinterpret_cast<TRITONSERVER_Trace*>(trace_),
+          trace_->ActivityUserp(), trace_manager_->userp_);
     }
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -494,31 +494,22 @@ ModelInferStats::Report()
         extra_compute_duration_ +
         Duration(TimestampKind::kComputeStart, TimestampKind::kComputeEnd);
 
-    if (status_manager_->GetProtocolVersion() == 2) {
-      uint64_t compute_input_duration_ns =
-          extra_compute_input_duration_ +
-          Duration(
-              TimestampKind::kComputeStart, TimestampKind::kComputeInputEnd);
-      uint64_t compute_infer_duration_ns =
-          extra_compute_infer_duration_ +
-          Duration(
-              TimestampKind::kComputeInputEnd,
-              TimestampKind::kComputeOutputStart);
-      uint64_t compute_output_duration_ns =
-          extra_compute_output_duration_ +
-          Duration(
-              TimestampKind::kComputeOutputStart, TimestampKind::kComputeEnd);
+    uint64_t compute_input_duration_ns =
+        extra_compute_input_duration_ +
+        Duration(TimestampKind::kComputeStart, TimestampKind::kComputeInputEnd);
+    uint64_t compute_infer_duration_ns =
+        extra_compute_infer_duration_ + Duration(
+                                            TimestampKind::kComputeInputEnd,
+                                            TimestampKind::kComputeOutputStart);
+    uint64_t compute_output_duration_ns =
+        extra_compute_output_duration_ +
+        Duration(
+            TimestampKind::kComputeOutputStart, TimestampKind::kComputeEnd);
 
-      status_manager_->UpdateSuccessInferStats(
-          model_name_, model_version, execution_count_, last_timestamp_ms,
-          request_duration_ns, queue_duration_ns, compute_input_duration_ns,
-          compute_infer_duration_ns, compute_output_duration_ns);
-    } else {
-      status_manager_->UpdateSuccessInferStats(
-          model_name_, model_version, batch_size_, execution_count_,
-          last_timestamp_ms, request_duration_ns, queue_duration_ns,
-          compute_duration_ns);
-    }
+    status_manager_->UpdateSuccessInferStats(
+        model_name_, model_version, execution_count_, last_timestamp_ms,
+        request_duration_ns, queue_duration_ns, compute_input_duration_ns,
+        compute_infer_duration_ns, compute_output_duration_ns);
 
 #ifdef TRTIS_ENABLE_METRICS
     if (metric_reporter_ != nullptr) {

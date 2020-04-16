@@ -51,9 +51,26 @@
 #include "src/servers/tracer.h"
 #endif  // TRTIS_ENABLE_TRACING
 
+// FIXMEV2
+// Clean-up datatype usage to use TRITONSERVER_DataType.
+
 namespace nvidia { namespace inferenceserver {
 
 namespace {
+
+// Unique IDs are only needed when debugging. They only appear in
+// verbose logging.
+#ifndef NDEBUG
+uint64_t
+NextUniqueId()
+{
+  static std::atomic<uint64_t> id(0);
+  return ++id;
+}
+#define NEXT_UNIQUE_ID NextUniqueId()
+#else
+#define NEXT_UNIQUE_ID (0)
+#endif
 
 //
 // C++11 doesn't have a barrier so we implement our own.
@@ -298,7 +315,8 @@ class HandlerState {
       return ((step_ == Steps::WRITEREADY) && states_.empty());
     }
 
-    // Unique ID for the context.
+    // Unique ID for the context. Used only for debugging so will
+    // always be 0 in non-debug builds.
     const uint64_t unique_id_;
 
     // Context for the rpc, allowing to tweak aspects of it such as
@@ -331,8 +349,8 @@ class HandlerState {
   void Reset(
       const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
   {
+    unique_id_ = NEXT_UNIQUE_ID;
     context_ = context;
-    unique_id_ = RequestStatusUtil::NextUniqueRequestId();
     step_ = start_step;
     request_.Clear();
     response_.Clear();
@@ -340,9 +358,11 @@ class HandlerState {
 
   void Release() { context_ = nullptr; }
 
-  std::shared_ptr<Context> context_;
-
+  // Unique ID for the state. Used only for debugging so will
+  // always be 0 in non-debug builds.
   uint64_t unique_id_;
+
+  std::shared_ptr<Context> context_;
   Steps step_;
 
 #ifdef TRTIS_ENABLE_TRACING
@@ -1904,7 +1924,7 @@ InferAllocatorPayload(
     size_t byte_size;
     bool has_shared_memory;
 
-    RETURN_IF_TRITON_ERR(
+    RETURN_IF_ERR(
         ParseSharedMemoryParams<ModelInferRequest::InferRequestedOutputTensor>(
             io, &has_shared_memory, &region_name, &offset, &byte_size));
 
@@ -1912,7 +1932,7 @@ InferAllocatorPayload(
       void* base;
       TRITONSERVER_Memory_Type memory_type;
       int64_t memory_type_id;
-      RETURN_IF_TRITON_ERR(shm_manager->GetMemoryInfo(
+      RETURN_IF_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, &base, &memory_type, &memory_type_id));
 
       // if shm_map_ does not exist, then create an empty shm_map
@@ -1975,13 +1995,12 @@ InferGRPCToInput(
     std::string region_name;
     int64_t offset;
     bool has_shared_memory;
-    RETURN_IF_TRITON_ERR(
-        ParseSharedMemoryParams<ModelInferRequest::InferInputTensor>(
-            io, &has_shared_memory, &region_name, &offset, &byte_size));
+    RETURN_IF_ERR(ParseSharedMemoryParams<ModelInferRequest::InferInputTensor>(
+        io, &has_shared_memory, &region_name, &offset, &byte_size));
 
     if (has_shared_memory) {
       void* tmp;
-      RETURN_IF_TRITON_ERR(shm_manager->GetMemoryInfo(
+      RETURN_IF_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, &tmp, &memory_type, &memory_type_id));
       base = tmp;
     } else {
@@ -2002,7 +2021,7 @@ InferGRPCToInput(
       // Check the presence of explicit tensors
       const size_t elem_byte_size = GetDataTypeByteSize(io.datatype());
       if (io.contents().bool_contents_size() != 0) {
-        RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
+        RETURN_IF_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "BOOL", io.datatype(), byte_size));
         base = (const void*)io.contents().bool_contents().data();
         byte_size = io.contents().bool_contents_size() * elem_byte_size;
@@ -2010,7 +2029,7 @@ InferGRPCToInput(
 
       if (io.contents().int_contents_size() != 0) {
         if (io.datatype().compare("INT8") == 0) {
-          RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
+          RETURN_IF_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), "INT8", io.datatype(),
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
@@ -2027,7 +2046,7 @@ InferGRPCToInput(
           base = serialized->c_str();
           byte_size = serialized->size();
         } else if (io.datatype().compare("INT16") == 0) {
-          RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
+          RETURN_IF_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), "INT16", io.datatype(),
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
@@ -2044,7 +2063,7 @@ InferGRPCToInput(
           base = serialized->c_str();
           byte_size = serialized->size();
         } else {
-          RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
+          RETURN_IF_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), "INT32", io.datatype(),
               byte_size));
           base = (const void*)io.contents().int_contents().data();
@@ -2053,7 +2072,7 @@ InferGRPCToInput(
       }
 
       if (io.contents().int64_contents_size() != 0) {
-        RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
+        RETURN_IF_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "INT64", io.datatype(),
             byte_size));
         base = (const void*)io.contents().int64_contents().data();
@@ -2062,7 +2081,7 @@ InferGRPCToInput(
 
       if (io.contents().uint_contents_size() != 0) {
         if (io.datatype().compare("UINT8") == 0) {
-          RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
+          RETURN_IF_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), "UINT8", io.datatype(),
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
@@ -2079,7 +2098,7 @@ InferGRPCToInput(
           base = serialized->c_str();
           byte_size = serialized->size();
         } else if (io.datatype().compare("UINT16") == 0) {
-          RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
+          RETURN_IF_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), "UINT16", io.datatype(),
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
@@ -2096,7 +2115,7 @@ InferGRPCToInput(
           base = serialized->c_str();
           byte_size = serialized->size();
         } else {
-          RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
+          RETURN_IF_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), "UINT32", io.datatype(),
               byte_size));
           base = (const void*)io.contents().int_contents().data();
@@ -2105,7 +2124,7 @@ InferGRPCToInput(
       }
 
       if (io.contents().uint64_contents_size() != 0) {
-        RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
+        RETURN_IF_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "UINT64", io.datatype(),
             byte_size));
         base = (const void*)io.contents().uint64_contents().data();
@@ -2113,21 +2132,21 @@ InferGRPCToInput(
       }
 
       if (io.contents().fp32_contents_size() != 0) {
-        RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
+        RETURN_IF_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "FP32", io.datatype(), byte_size));
         base = (const void*)io.contents().fp32_contents().data();
         byte_size = io.contents().fp32_contents_size() * elem_byte_size;
       }
 
       if (io.contents().fp64_contents_size() != 0) {
-        RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
+        RETURN_IF_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "FP64", io.datatype(), byte_size));
         base = (const void*)io.contents().fp64_contents().data();
         byte_size = io.contents().fp64_contents_size() * elem_byte_size;
       }
 
       if (io.contents().byte_contents_size() != 0) {
-        RETURN_IF_TRITON_ERR(InferGRPCToInputHelper(
+        RETURN_IF_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), "BYTES", io.datatype(),
             byte_size));
         std::shared_ptr<std::string> serialized(new std::string());
@@ -2149,7 +2168,7 @@ InferGRPCToInput(
       }
     }
 
-    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestAppendInputData(
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
         inference_request, io.name().c_str(), base, byte_size, memory_type,
         memory_type_id));
   }
@@ -2162,7 +2181,7 @@ SetInferenceRequestMetadata(
     TRITONSERVER_InferenceRequest* inference_request,
     const ModelInferRequest& request)
 {
-  RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestSetId(
+  RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetId(
       inference_request, request.id().c_str()));
 
   const auto& sequence_id_it = request.parameters().find("sequence_id");
@@ -2175,7 +2194,7 @@ SetInferenceRequestMetadata(
           "invalid value type for 'sequence_id' parameter, expected "
           "int64_param.");
     }
-    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestSetCorrelationId(
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetCorrelationId(
         inference_request, infer_param.int64_param()));
     uint32_t flags = TRITONSERVER_REQUEST_FLAG_NONE;
     const auto& sequence_start_it = request.parameters().find("sequence_start");
@@ -2204,7 +2223,7 @@ SetInferenceRequestMetadata(
       flags |=
           infer_param.bool_param() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
     }
-    RETURN_IF_TRITON_ERR(
+    RETURN_IF_ERR(
         TRITONSERVER_InferenceRequestSetFlags(inference_request, flags));
   }
 
@@ -2218,7 +2237,7 @@ SetInferenceRequestMetadata(
           "invalid value type for 'sequence_id' parameter, expected "
           "int64_param.");
     }
-    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestSetPriority(
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriority(
         inference_request, infer_param.int64_param()));
   }
 
@@ -2232,18 +2251,18 @@ SetInferenceRequestMetadata(
           "invalid value type for 'sequence_id' parameter, expected "
           "int64_param.");
     }
-    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
         inference_request, infer_param.int64_param()));
   }
 
   for (const auto& input : request.inputs()) {
-    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestAddInput(
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(
         inference_request, input.name().c_str(), input.datatype().c_str(),
         input.shape().data(), input.shape_size()));
   }
 
   for (const auto& output : request.outputs()) {
-    RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestAddRequestedOutput(
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddRequestedOutput(
         inference_request, output.name().c_str()));
 
     const auto& class_it = output.parameters().find("classification");
@@ -2256,7 +2275,7 @@ SetInferenceRequestMetadata(
             "invalid value type for 'classification' parameter, expected "
             "int64_param.");
       }
-      RETURN_IF_TRITON_ERR(
+      RETURN_IF_ERR(
           TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
               inference_request, output.name().c_str(),
               infer_param.int64_param()));
@@ -2634,8 +2653,7 @@ class ModelStreamInferHandler
 void
 ModelStreamInferHandler::StartNewRequest()
 {
-  const uint64_t unique_id = RequestStatusUtil::NextUniqueRequestId();
-  auto context = std::make_shared<State::Context>(unique_id);
+  auto context = std::make_shared<State::Context>(NEXT_UNIQUE_ID);
   State* state = StateNew(context);
 
 #ifdef TRTIS_ENABLE_TRACING
