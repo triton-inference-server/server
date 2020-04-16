@@ -146,17 +146,21 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       nic::InferInput::Create(&input0, "INPUT0", shape, "INT32"),
       "unable to get INPUT0");
+  std::shared_ptr<nic::InferInput> input0_ptr;
+  input0_ptr.reset(input0);
   FAIL_IF_ERR(
       nic::InferInput::Create(&input1, "INPUT1", shape, "INT32"),
       "unable to get INPUT1");
+  std::shared_ptr<nic::InferInput> input1_ptr;
+  input1_ptr.reset(input1);
 
   FAIL_IF_ERR(
-      input0->AppendRaw(
+      input0_ptr->AppendRaw(
           reinterpret_cast<uint8_t*>(&input0_data[0]),
           input0_data.size() * sizeof(int32_t)),
       "unable to set data for INPUT0");
   FAIL_IF_ERR(
-      input1->AppendRaw(
+      input1_ptr->AppendRaw(
           reinterpret_cast<uint8_t*>(&input1_data[0]),
           input1_data.size() * sizeof(int32_t)),
       "unable to set data for INPUT1");
@@ -168,20 +172,29 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       nic::InferRequestedOutput::Create(&output0, "OUTPUT0"),
       "unable to get OUTPUT0");
+  std::shared_ptr<nic::InferRequestedOutput> output0_ptr;
+  output0_ptr.reset(output0);
   FAIL_IF_ERR(
       nic::InferRequestedOutput::Create(&output1, "OUTPUT1"),
       "unable to get OUTPUT1");
+  std::shared_ptr<nic::InferRequestedOutput> output1_ptr;
+  output1_ptr.reset(output1);
 
 
   // The inference settings. Will be using default for now.
   nic::InferOptions options(model_name);
   options.model_version_ = model_version;
+
+  std::vector<nic::InferInput*> inputs = {input0_ptr.get(), input1_ptr.get()};
+  std::vector<const nic::InferRequestedOutput*> outputs = {output0_ptr.get(),
+                                                           output1_ptr.get()};
+
   nic::InferResult* results;
-  std::vector<nic::InferInput*> inputs = {input0, input1};
-  std::vector<const nic::InferRequestedOutput*> outputs = {output0, output1};
   FAIL_IF_ERR(
       client->Infer(&results, options, inputs, outputs, http_headers),
       "unable to run model");
+  std::shared_ptr<nic::InferResult> results_ptr;
+  results_ptr.reset(results);
 
   // Validate the results...
   ValidateShapeAndDatatype("OUTPUT0", results);

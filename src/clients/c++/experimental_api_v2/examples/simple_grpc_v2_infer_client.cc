@@ -44,7 +44,8 @@ namespace nic = nvidia::inferenceserver::client;
 namespace {
 
 void
-ValidateShapeAndDatatype(const std::string& name, nic::InferResult* result)
+ValidateShapeAndDatatype(
+    const std::string& name, std::shared_ptr<nic::InferResult> result)
 {
   std::vector<int64_t> shape;
   FAIL_IF_ERR(result->Shape(name, &shape), "unable to get shape for " + name);
@@ -146,17 +147,21 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       nic::InferInput::Create(&input0, "INPUT0", shape, "INT32"),
       "unable to get INPUT0");
+  std::shared_ptr<nic::InferInput> input0_ptr;
+  input0_ptr.reset(input0);
   FAIL_IF_ERR(
       nic::InferInput::Create(&input1, "INPUT1", shape, "INT32"),
       "unable to get INPUT1");
+  std::shared_ptr<nic::InferInput> input1_ptr;
+  input1_ptr.reset(input1);
 
   FAIL_IF_ERR(
-      input0->AppendRaw(
+      input0_ptr->AppendRaw(
           reinterpret_cast<uint8_t*>(&input0_data[0]),
           input0_data.size() * sizeof(int32_t)),
       "unable to set data for INPUT0");
   FAIL_IF_ERR(
-      input1->AppendRaw(
+      input1_ptr->AppendRaw(
           reinterpret_cast<uint8_t*>(&input1_data[0]),
           input1_data.size() * sizeof(int32_t)),
       "unable to set data for INPUT1");
@@ -168,30 +173,39 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       nic::InferRequestedOutput::Create(&output0, "OUTPUT0"),
       "unable to get OUTPUT0");
+  std::shared_ptr<nic::InferRequestedOutput> output0_ptr;
+  output0_ptr.reset(output0);
   FAIL_IF_ERR(
       nic::InferRequestedOutput::Create(&output1, "OUTPUT1"),
       "unable to get OUTPUT1");
+  std::shared_ptr<nic::InferRequestedOutput> output1_ptr;
+  output1_ptr.reset(output1);
 
 
   // The inference settings. Will be using default for now.
   nic::InferOptions options(model_name);
   options.model_version_ = model_version;
+
+  std::vector<nic::InferInput*> inputs = {input0_ptr.get(), input1_ptr.get()};
+  std::vector<const nic::InferRequestedOutput*> outputs = {output0_ptr.get(),
+                                                           output1_ptr.get()};
+
   nic::InferResult* results;
-  std::vector<nic::InferInput*> inputs = {input0, input1};
-  std::vector<const nic::InferRequestedOutput*> outputs = {output0, output1};
   FAIL_IF_ERR(
       client->Infer(&results, options, inputs, outputs, http_headers),
       "unable to run model");
+  std::shared_ptr<nic::InferResult> results_ptr;
+  results_ptr.reset(results);
 
   // Validate the results...
-  ValidateShapeAndDatatype("OUTPUT0", results);
-  ValidateShapeAndDatatype("OUTPUT1", results);
+  ValidateShapeAndDatatype("OUTPUT0", results_ptr);
+  ValidateShapeAndDatatype("OUTPUT1", results_ptr);
 
   // Get pointers to the result returned...
   int32_t* output0_data;
   size_t output0_byte_size;
   FAIL_IF_ERR(
-      results->RawData(
+      results_ptr->RawData(
           "OUTPUT0", (const uint8_t**)&output0_data, &output0_byte_size),
       "unable to get datatype for OUTPUT0");
   if (output0_byte_size != 64) {
@@ -203,7 +217,7 @@ main(int argc, char** argv)
   int32_t* output1_data;
   size_t output1_byte_size;
   FAIL_IF_ERR(
-      results->RawData(
+      results_ptr->RawData(
           "OUTPUT1", (const uint8_t**)&output1_data, &output1_byte_size),
       "unable to get datatype for OUTPUT1");
   if (output0_byte_size != 64) {
@@ -229,7 +243,7 @@ main(int argc, char** argv)
   }
 
   // Get full response
-  std::cout << results->DebugString() << std::endl;
+  std::cout << results_ptr->DebugString() << std::endl;
 
   nic::InferStat infer_stat;
   client->GetInferStat(&infer_stat);
