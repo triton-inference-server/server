@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -31,7 +31,6 @@
 #include "src/core/server_status.h"
 #include "src/core/status.h"
 #include "src/core/tritonserver.h"
-#include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -41,16 +40,11 @@ class ModelInferStats;
 // A light-weight structure to store user-provided trace manager.
 //
 struct OpaqueTraceManager {
-  OpaqueTraceManager() : using_triton_(false) {}
+  OpaqueTraceManager() {}
 
-  TRTSERVER_TraceManagerCreateTraceFn_t create_fn_;
-  TRTSERVER_TraceManagerReleaseTraceFn_t release_fn_;
+  TRITONSERVER_TraceManagerCreateTraceFn_t create_fn_;
+  TRITONSERVER_TraceManagerReleaseTraceFn_t release_fn_;
   void* userp_;
-
-  // FIXMEV2 Default to TRITONSERVER_XXX. Then drop TRTSERVER_XXX
-  bool using_triton_;
-  TRITONSERVER_TraceManagerCreateTraceFn_t triton_create_fn_;
-  TRITONSERVER_TraceManagerReleaseTraceFn_t triton_release_fn_;
 };
 
 //
@@ -58,14 +52,6 @@ struct OpaqueTraceManager {
 //
 class Trace {
  public:
-  static Status Create(
-      TRTSERVER_Trace_Level level, TRTSERVER_TraceActivityFn_t activity_fn,
-      void* activity_userp, std::unique_ptr<Trace>* trace)
-  {
-    trace->reset(new Trace(level, activity_fn, activity_userp));
-    return Status::Success;
-  }
-
   static Status Create(
       TRITONSERVER_Trace_Level level,
       TRITONSERVER_TraceActivityFn_t activity_fn, void* activity_userp,
@@ -89,22 +75,15 @@ class Trace {
 
  private:
   Trace(
-      TRTSERVER_Trace_Level level, TRTSERVER_TraceActivityFn_t activity_fn,
-      void* activity_userp)
-      : using_triton_(false), level_(level), activity_fn_(activity_fn),
-        triton_activity_fn_(nullptr), activity_userp_(activity_userp),
-        id_(next_id_++), parent_id_(-1)
+      TRITONSERVER_Trace_Level level,
+      TRITONSERVER_TraceActivityFn_t activity_fn, void* activity_userp)
+      : level_(level), activity_fn_(activity_fn),
+        activity_userp_(activity_userp), id_(next_id_++), parent_id_(-1)
   {
   }
 
-  Trace(
-      TRITONSERVER_Trace_Level level,
-      TRITONSERVER_TraceActivityFn_t activity_fn, void* activity_userp);
-
-  bool using_triton_;
-  const TRTSERVER_Trace_Level level_;
-  TRTSERVER_TraceActivityFn_t activity_fn_;
-  TRITONSERVER_TraceActivityFn_t triton_activity_fn_;
+  const TRITONSERVER_Trace_Level level_;
+  TRITONSERVER_TraceActivityFn_t activity_fn_;
   void* activity_userp_;
 
   std::string model_name_;

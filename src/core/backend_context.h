@@ -32,7 +32,6 @@
 #include "src/core/memory.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
-#include "src/core/trtserver.h"
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -45,7 +44,7 @@ class InferenceRequest;
 
 struct InputInfo {
   char* input_buffer_;
-  TRTSERVER_Memory_Type memory_type_;
+  TRITONSERVER_MemoryType memory_type_;
   int64_t memory_type_id_;
   // indirect pinned memory buffers, their locations in 'input_buffer_',
   // and the requests that are associated with this buffer (for reporting error)
@@ -57,7 +56,7 @@ struct InputInfo {
 struct OutputInfo {
   const char* output_buffer_;
   std::vector<int64_t> output_shape_;
-  TRTSERVER_Memory_Type memory_type_;
+  TRITONSERVER_MemoryType memory_type_;
   int64_t memory_type_id_;
   // indirect pinned memory buffers, the memory references appointing to
   // the destinations in requests and the request's index
@@ -140,7 +139,7 @@ struct BackendContext {
       const std::string& name, const int32_t total_batch_size,
       const int expected_byte_size, const bool support_batching,
       std::unique_ptr<InferenceRequest>& request,
-      TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
+      TRITONSERVER_MemoryType dst_memory_type, int64_t dst_memory_type_id,
       char* input_buffer);
 
   // Helper function to set output buffer of fixed size data
@@ -160,7 +159,7 @@ struct BackendContext {
   bool SetOutputShapeTensorBuffer(
       const std::string& name, const int32_t* content,
       std::vector<int64_t>& content_shape, const bool support_batching,
-      TRTSERVER_Memory_Type src_memory_type, int64_t src_memory_type_id,
+      TRITONSERVER_MemoryType src_memory_type, int64_t src_memory_type_id,
       std::vector<std::unique_ptr<InferenceRequest>>* requests);
 
   // This function will return a tensor's contents as a contiguous
@@ -171,7 +170,7 @@ struct BackendContext {
   // already in a contiguous chunk and the input is located in memory
   // type and id specified.
   Status GetContiguousInputContent(
-      const std::string& name, TRTSERVER_Memory_Type memory_type,
+      const std::string& name, TRITONSERVER_MemoryType memory_type,
       int64_t memory_type_id, const std::unique_ptr<InferenceRequest>& request,
       const char** content, size_t* content_byte_size,
       std::unique_ptr<AllocatedMemory>* contiguous_buffer, bool* cuda_copy);
@@ -224,8 +223,8 @@ struct BackendContext {
   // 'need_indirect_buffer', and the memory type that should utilize the
   // indirect buffer in 'candiate_type'.
   void GetIndirectBufferRequirement(
-      TRTSERVER_Memory_Type ref_buffer_type, bool is_input,
-      TRTSERVER_Memory_Type* candidate_type, bool* need_indirect_buffer);
+      TRITONSERVER_MemoryType ref_buffer_type, bool is_input,
+      TRITONSERVER_MemoryType* candidate_type, bool* need_indirect_buffer);
 
   // Name of the model instance
   std::string name_;
