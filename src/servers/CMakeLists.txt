@@ -202,7 +202,6 @@ endif() # TRTIS_ENABLE_TRACING
 set(
   TRITONSERVER_SRCS
   main.cc
-  common.cc
   shared_memory_manager.cc
   ../core/logging.cc
 )
@@ -256,56 +255,11 @@ install(
 )
 
 #
-# simple
-#
-set(
-  SIMPLE_SRCS
-  simple.cc common.cc
-)
-
-set(
-  SIMPLE_HDRS
-)
-
-add_executable(
-  simple
-  ${SIMPLE_SRCS}
-  ${SIMPLE_HDRS}
-  $<TARGET_OBJECTS:proto-library>
-)
-set_target_properties(
-  simple
-  PROPERTIES
-    SKIP_BUILD_RPATH TRUE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH ""
-)
-target_link_libraries(
-  simple
-  PRIVATE tritonserver
-  PRIVATE protobuf::libprotobuf
-)
-if(${TRTIS_ENABLE_GPU})
-target_include_directories(simple PRIVATE ${CUDA_INCLUDE_DIRS})
-target_link_libraries(
-  simple
-  PUBLIC -L/usr/local/cuda/lib64/stubs
-  PUBLIC -lnvidia-ml
-  PRIVATE ${CUDA_LIBRARIES}
-)
-endif() # TRTIS_ENABLE_GPU
-install(
-  TARGETS simple
-  RUNTIME DESTINATION bin
-)
-
-#
 # simplev2
 #
 set(
   SIMPLEV2_SRCS
-  simplev2.cc common.cc
+  simplev2.cc
 )
 
 set(
@@ -351,7 +305,7 @@ install(
 if(${TRTIS_ENABLE_GPU})
 set(
   MEMORY_ALLOC_SRCS
-  memory_alloc.cc common.cc
+  memory_alloc.cc
 )
 
 set(
@@ -542,6 +496,6 @@ install(
 )
 
 install(
-  FILES ../core/trtserver.h ../core/tritonserver.h
+  FILES ../core/tritonserver.h
   DESTINATION include
 )

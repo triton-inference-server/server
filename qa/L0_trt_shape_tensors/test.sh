@@ -51,7 +51,7 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_shapetensor_model_repository/* mo
 
 RET=0
 
-# Must run on a single device or else the TRTSERVER_DELAY_SCHEDULER
+# Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
 # can fail when the requests are distributed to multiple devices.
 export CUDA_VISIBLE_DEVICES=0
 
@@ -136,8 +136,8 @@ for i in \
 for i in \
             test_sequence_different_shape_values \
             test_sequence_identical_shape_values ; do
-        export TRTSERVER_BACKLOG_DELAY_SCHEDULER=0
-        export TRTSERVER_DELAY_SCHEDULER=12
+        export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
+        export TRITONSERVER_DELAY_SCHEDULER=12
         SERVER_LOG="./$i.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -157,8 +157,8 @@ for i in \
         fi
         set -e
 
-        unset TRTSERVER_DELAY_SCHEDULER
-        unset TRTSERVER_BACKLOG_DELAY_SCHEDULER
+        unset TRITONSERVER_DELAY_SCHEDULER
+        unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
         kill $SERVER_PID
         wait $SERVER_PID
     done

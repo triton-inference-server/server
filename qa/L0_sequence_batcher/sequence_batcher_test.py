@@ -125,8 +125,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 5,
                                         (4000, None),
@@ -161,8 +161,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 99,
                                         (4000, None),
@@ -195,8 +195,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 27,
                                         (4000, None),
@@ -239,8 +239,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 0, # correlation_id = 0
                                         (4000, None),
@@ -281,8 +281,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 37469245,
                                         (4000, None),
@@ -328,8 +328,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 3,
                                         (4000, None),
@@ -376,8 +376,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 4566,
                                         (4000, None),
@@ -413,10 +413,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 8)
-                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 8)
+                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
                 threads.append(threading.Thread(
@@ -477,10 +477,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
                 threads.append(threading.Thread(
@@ -571,10 +571,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
                 threads.append(threading.Thread(
@@ -668,10 +668,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
                 threads.append(threading.Thread(
@@ -769,10 +769,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
                 threads.append(threading.Thread(
@@ -861,10 +861,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
                 threads.append(threading.Thread(
@@ -969,10 +969,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 10)
-                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 2)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 10)
+                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 2)
 
                 threads = []
                 threads.append(threading.Thread(
@@ -1089,10 +1089,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 10)
-                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 3)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 10)
+                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 3)
 
                 threads = []
                 threads.append(threading.Thread(
@@ -1202,10 +1202,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 2)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 2)
 
                 threads = []
                 threads.append(threading.Thread(
@@ -1316,10 +1316,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 16)
-                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 16)
+                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
                 threads.append(threading.Thread(
@@ -1431,10 +1431,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for all sequences.
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 4)
-                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 4)
+                self.assertTrue("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
                 threads = []
                 threads.append(threading.Thread(

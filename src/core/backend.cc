@@ -36,7 +36,6 @@
 #include "src/core/metric_model_reporter.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/sequence_batch_scheduler.h"
-#include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -351,16 +350,16 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
     samples->emplace_back(warmup_setting.name(), warmup_setting.batch_size());
     auto& warmup_data = samples->back();
     // Create buffers for synthetic data
-    TRTSERVER_Memory_Type type;
+    TRITONSERVER_MemoryType type;
     int64_t type_id;
     warmup_data.zero_data_.reset(new AllocatedMemory(
-        max_zero_byte_size, TRTSERVER_MEMORY_CPU_PINNED /* memory_type */,
+        max_zero_byte_size, TRITONSERVER_MEMORY_CPU_PINNED /* memory_type */,
         0 /* memory_type_id */));
     char* zero_buffer = warmup_data.zero_data_->MutableBuffer(&type, &type_id);
     memset(zero_buffer, 0, max_zero_byte_size);
 
     warmup_data.random_data_.reset(new AllocatedMemory(
-        max_random_byte_size, TRTSERVER_MEMORY_CPU_PINNED /* memory_type */,
+        max_random_byte_size, TRITONSERVER_MEMORY_CPU_PINNED /* memory_type */,
         0 /* memory_type_id */));
     char* random_buffer =
         warmup_data.random_data_->MutableBuffer(&type, &type_id);
@@ -372,8 +371,8 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
     // populating requests for single run. FIXMEV2 once
     // protocol_version 2 is the only one remove SetBatchSize and
     // adjust the input/output tensors to have appropriate shape.
-    warmup_data.request_.reset(new InferenceRequest(this, Version(), 1));
-    warmup_data.request_->SetBatchSize(1);
+    warmup_data.request_.reset(new InferenceRequest(this, Version()));
+    // warmup_data.request_->SetBatchSize(1);
 
     // Request all outputs
     for (const auto& io : Config().output()) {
@@ -441,10 +440,11 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
 
         InferenceRequest::Input* input = nullptr;
         RETURN_IF_ERROR(warmup_data.request_->AddOriginalInput(
-            input_meta.first, input_meta_shape, batch_byte_size, &input));
+            input_meta.first, input_meta.second.data_type(), input_meta_shape,
+            &input));
         RETURN_IF_ERROR(input->AppendData(
             allocated_ptr, batch_byte_size,
-            TRTSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */));
+            TRITONSERVER_MEMORY_CPU /* memory_type */, 0 /* memory_type_id */));
       }
     }
 
@@ -499,7 +499,7 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
             }
 
             content.assign(
-                input_data.data(), input_data.data() + input_data.size());
+                input_data.data(), input_data.data() + batch_byte_size);
             break;
           }
           default:
@@ -512,9 +512,9 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
         std::shared_ptr<InferenceRequest::Input> input;
         RETURN_IF_ERROR(warmup_data.request_->AddOverrideInput(
             input_meta.first, input_meta.second.data_type(), input_meta_shape,
-            content.size(), &input));
+            &input));
         RETURN_IF_ERROR(input->AppendData(
-            &content[0], content.size(), TRTSERVER_MEMORY_CPU, 0));
+            &content[0], content.size(), TRITONSERVER_MEMORY_CPU, 0));
       }
     }
   }
