@@ -416,7 +416,7 @@ DataTypeToProtocolString(const DataType dtype)
       break;
   }
 
-  return "";
+  return "<invalid>";
 }
 
 DataType
