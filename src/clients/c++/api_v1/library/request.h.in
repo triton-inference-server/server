@@ -846,7 +846,7 @@ class SharedMemoryControlContext {
 
   /// Register a system shared memory region on the inference server. If the
   /// shared memory region is already registered, it will return error
-  /// 'TRTSERVER_ERROR_ALEADY_EXISTS'.
+  /// 'TRITONSERVER_ERROR_ALEADY_EXISTS'.
   /// \param name The user-given name for the shared memory region to be
   /// registered.
   /// \param shm_key The unique name of the location in shared memory being
@@ -860,7 +860,7 @@ class SharedMemoryControlContext {
 
   /// Register a CUDA shared memory region on the inference server. If the
   /// shared memory region is already registered, it will return error
-  /// 'TRTSERVER_ERROR_ALEADY_EXISTS'.
+  /// 'TRITONSERVER_ERROR_ALEADY_EXISTS'.
   /// \param name The user-given name for the shared memory region to be
   /// registered.
   /// \param cuda_shm_handle The CUDA memory handle representing the location

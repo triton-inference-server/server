@@ -113,7 +113,7 @@ BackendContext::SetInputBuffer(
   bool cuda_copy = false;
 
   bool need_buffer;
-  TRTSERVER_Memory_Type candidate_type;
+  TRITONSERVER_MemoryType candidate_type;
   GetIndirectBufferRequirement(
       input->memory_type_, true, &candidate_type, &need_buffer);
   BufferInfo pinned_buffer_info{0, 0, {}};
@@ -234,8 +234,8 @@ BackendContext::SetInputBuffer(
 
 void
 BackendContext::GetIndirectBufferRequirement(
-    TRTSERVER_Memory_Type ref_buffer_type, bool is_input,
-    TRTSERVER_Memory_Type* candidate_type, bool* need_indirect_buffer)
+    TRITONSERVER_MemoryType ref_buffer_type, bool is_input,
+    TRITONSERVER_MemoryType* candidate_type, bool* need_indirect_buffer)
 {
   // The following matrix is used for both input and output.
   // src   \ dest | non-pinned    | pinned     | device
@@ -243,12 +243,12 @@ BackendContext::GetIndirectBufferRequirement(
   // pinned       | memcpy        | memcpy     | cudaMemcpy
   // device       | buffer needed | cudaMemcpy | cudaMemcpy
   *need_indirect_buffer =
-      (ref_buffer_type != TRTSERVER_MEMORY_CPU_PINNED) &&
+      (ref_buffer_type != TRITONSERVER_MEMORY_CPU_PINNED) &&
       (is_input ? enable_pinned_input_ : enable_pinned_output_);
   if (*need_indirect_buffer) {
-    *candidate_type = ref_buffer_type == TRTSERVER_MEMORY_CPU
-                          ? TRTSERVER_MEMORY_GPU
-                          : TRTSERVER_MEMORY_CPU;
+    *candidate_type = ref_buffer_type == TRITONSERVER_MEMORY_CPU
+                          ? TRITONSERVER_MEMORY_GPU
+                          : TRITONSERVER_MEMORY_CPU;
   }
   return;
 }
@@ -264,7 +264,7 @@ BackendContext::IssueIndirectInputBufferCopy(
 
   bool cuda_copy = false;
   bool cuda_used = false;
-  auto mem_type = TRTSERVER_MEMORY_CPU_PINNED;
+  auto mem_type = TRITONSERVER_MEMORY_CPU_PINNED;
   int64_t mem_id = 0;
   const auto input_offset = std::get<0>(pinned_buffer_info);
   const auto pinned_buffer_size = std::get<1>(pinned_buffer_info);
@@ -275,7 +275,7 @@ BackendContext::IssueIndirectInputBufferCopy(
 
   // If can't reserve the intermediate buffer, the copy should be
   // perform directly to input buffer
-  bool direct_copy = (mem_type != TRTSERVER_MEMORY_CPU_PINNED);
+  bool direct_copy = (mem_type != TRITONSERVER_MEMORY_CPU_PINNED);
   if (direct_copy) {
     buffer = input->input_buffer_ + input_offset;
     mem_type = input->memory_type_;
@@ -317,7 +317,7 @@ BackendContext::SetShapeInputBuffer(
     const std::string& name, const int32_t total_batch_size,
     const int expected_byte_size, const bool support_batching,
     std::unique_ptr<InferenceRequest>& request,
-    TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
+    TRITONSERVER_MemoryType dst_memory_type, int64_t dst_memory_type_id,
     char* input_buffer)
 {
   if (request == nullptr) {
@@ -341,7 +341,7 @@ BackendContext::SetShapeInputBuffer(
   // This code assumes that the entire tensor data is in a single
   // buffer... but the expected_byte_size check below will fail if
   // that is not the case.
-  status = rinput->Content(
+  status = rinput->DataBuffer(
       0 /* idx */, &content, &content_byte_size, &src_memory_type,
       &src_memory_type_id);
   if (!status.IsOk()) {
@@ -376,7 +376,7 @@ BackendContext::SetShapeInputBuffer(
   if (support_batching) {
     bool cuda_used = false;
     status = CopyBuffer(
-        name, TRTSERVER_MEMORY_CPU, 0, dst_memory_type, dst_memory_type_id,
+        name, TRITONSERVER_MEMORY_CPU, 0, dst_memory_type, dst_memory_type_id,
         sizeof(int32_t), (void*)&total_batch_size, input_buffer, stream_,
         &cuda_used);
     if (!status.IsOk()) {
@@ -396,7 +396,7 @@ BackendContext::SetFixedSizeOutputBuffer(
   bool cuda_copy = false;
   size_t output_offset = 0;
   bool need_buffer;
-  TRTSERVER_Memory_Type candidate_type;
+  TRITONSERVER_MemoryType candidate_type;
   GetIndirectBufferRequirement(
       output->memory_type_, false, &candidate_type, &need_buffer);
   OutputBufferInfo pinned_buffer_info{0, 0, {}};
@@ -412,7 +412,7 @@ BackendContext::SetFixedSizeOutputBuffer(
     bool process_request =
         (request != nullptr) && false /* FIXME request->RequiresOutput(name) */;
     if (process_request) {
-      TRTSERVER_Memory_Type dst_memory_type = TRTSERVER_MEMORY_CPU;
+      TRITONSERVER_MemoryType dst_memory_type = TRITONSERVER_MEMORY_CPU;
       int64_t dst_memory_type_id = 0;
       void* buffer = nullptr;
 
@@ -507,7 +507,7 @@ BackendContext::IssueIndirectOutputBufferCopy(
 {
   bool cuda_copy = false;
   bool cuda_used = false;
-  auto mem_type = TRTSERVER_MEMORY_CPU_PINNED;
+  auto mem_type = TRITONSERVER_MEMORY_CPU_PINNED;
   int64_t mem_id = 0;
   const auto output_offset = std::get<0>(pinned_buffer_info);
   const auto pinned_buffer_size = std::get<1>(pinned_buffer_info);
@@ -516,7 +516,7 @@ BackendContext::IssueIndirectOutputBufferCopy(
   char* buffer = local_indirect_buffer->MutableBuffer(&mem_type, &mem_id);
   // If can't reserve the intermediate buffer, the copy should be
   // perform directly to output buffer
-  bool direct_copy = (mem_type != TRTSERVER_MEMORY_CPU_PINNED);
+  bool direct_copy = (mem_type != TRITONSERVER_MEMORY_CPU_PINNED);
   auto output_buffer = output->output_buffer_ + output_offset;
   if (!direct_copy) {
     auto indirect_copy_status = CopyBuffer(
@@ -559,7 +559,7 @@ bool
 BackendContext::SetOutputShapeTensorBuffer(
     const std::string& name, const int32_t* content,
     std::vector<int64_t>& content_shape, const bool support_batching,
-    TRTSERVER_Memory_Type src_memory_type, int64_t src_memory_type_id,
+    TRITONSERVER_MemoryType src_memory_type, int64_t src_memory_type_id,
     std::vector<std::unique_ptr<InferenceRequest>>* requests)
 {
   if (content_shape.empty()) {
@@ -630,7 +630,7 @@ BackendContext::SetOutputShapeTensorBuffer(
 
 Status
 BackendContext::GetContiguousInputContent(
-    const std::string& name, TRTSERVER_Memory_Type memory_type,
+    const std::string& name, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id, const std::unique_ptr<InferenceRequest>& request,
     const char** content, size_t* content_byte_size,
     std::unique_ptr<AllocatedMemory>* contiguous_buffer, bool* cuda_copy)
@@ -644,13 +644,13 @@ BackendContext::GetContiguousInputContent(
   MemoryReference input_buffers;
   size_t chunk_count = 0;
   bool type_mismatch = false;
-  for (size_t idx = 0; idx < rinput->ContentBufferCount(); ++idx) {
-    TRTSERVER_Memory_Type src_memory_type = memory_type;
+  for (size_t idx = 0; idx < rinput->DataBufferCount(); ++idx) {
+    TRITONSERVER_MemoryType src_memory_type = memory_type;
     int64_t src_memory_type_id = memory_type_id;
     size_t src_byte_size = *content_byte_size;
     const void* src_ptr;
 
-    RETURN_IF_ERROR(rinput->Content(
+    RETURN_IF_ERROR(rinput->DataBuffer(
         idx, &src_ptr, &src_byte_size, &src_memory_type, &src_memory_type_id));
 
     if (src_ptr != nullptr) {
@@ -683,7 +683,7 @@ BackendContext::GetContiguousInputContent(
     size_t offset = 0;
     for (size_t i = 0; i < chunk_count; i++) {
       bool cuda_used;
-      TRTSERVER_Memory_Type src_memory_type;
+      TRITONSERVER_MemoryType src_memory_type;
       int64_t src_memory_type_id;
       auto src_ptr = input_buffers.BufferAt(
           i, content_byte_size, &src_memory_type, &src_memory_type_id);
