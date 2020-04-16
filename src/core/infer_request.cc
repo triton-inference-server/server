@@ -36,7 +36,7 @@ namespace nvidia { namespace inferenceserver {
 namespace {
 // FIXMEV2 shouldn't need the conversions
 TRTSERVER_Memory_Type
-TritonMemTypeToTrt(TRITONSERVER_Memory_Type mem_type)
+TritonMemTypeToTrt(TRITONSERVER_MemoryType mem_type)
 {
   switch (mem_type) {
     case TRITONSERVER_MEMORY_CPU:
@@ -759,7 +759,7 @@ InferenceRequest::Input::AppendData(
 
 Status
 InferenceRequest::Input::AppendData(
-    const void* base, size_t byte_size, TRITONSERVER_Memory_Type memory_type,
+    const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
 {
   return AppendData(

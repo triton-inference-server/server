@@ -119,7 +119,7 @@ class InferenceResponse {
     // nullptr and the other returned values will be undefined.
     Status Buffer(
         const void** buffer, size_t* buffer_byte_size,
-        TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const;
+        TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const;
 
     // Allocate the buffer that should be used for this output
     // tensor's data. 'buffer' must return a buffer of size
@@ -134,7 +134,7 @@ class InferenceResponse {
     // ReleaseBuffer call will result in an error.
     Status AllocateBuffer(
         void** buffer, const size_t buffer_byte_size,
-        TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
+        TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id);
     Status AllocateBuffer(
         void** buffer, const size_t buffer_byte_size,
         TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
@@ -162,7 +162,7 @@ class InferenceResponse {
     // ReleaseBuffer().
     void* allocated_buffer_;
     size_t allocated_buffer_byte_size_;
-    TRITONSERVER_Memory_Type allocated_memory_type_;
+    TRITONSERVER_MemoryType allocated_memory_type_;
     int64_t allocated_memory_type_id_;
     void* allocated_userp_;
   };

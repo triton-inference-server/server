@@ -35,7 +35,7 @@ namespace nvidia { namespace inferenceserver {
 namespace {
 // FIXMEV2 shouldn't need the conversions
 TRTSERVER_Memory_Type
-TritonMemTypeToTrt(TRITONSERVER_Memory_Type mem_type)
+TritonMemTypeToTrt(TRITONSERVER_MemoryType mem_type)
 {
   switch (mem_type) {
     case TRITONSERVER_MEMORY_CPU:
@@ -49,7 +49,7 @@ TritonMemTypeToTrt(TRITONSERVER_Memory_Type mem_type)
   }
 }
 
-TRITONSERVER_Memory_Type
+TRITONSERVER_MemoryType
 TrtMemTypeToTriton(TRTSERVER_Memory_Type mem_type)
 {
   switch (mem_type) {
@@ -135,7 +135,7 @@ InferenceResponse::Output::~Output()
 Status
 InferenceResponse::Output::Buffer(
     const void** buffer, size_t* buffer_byte_size,
-    TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const
 {
   *buffer = allocated_buffer_;
   *buffer_byte_size = allocated_buffer_byte_size_;
@@ -147,7 +147,7 @@ InferenceResponse::Output::Buffer(
 Status
 InferenceResponse::Output::AllocateBuffer(
     void** buffer, size_t buffer_byte_size,
-    TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id)
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
 {
   if (allocated_buffer_ != nullptr) {
     return Status(
@@ -155,7 +155,7 @@ InferenceResponse::Output::AllocateBuffer(
         "allocated buffer for output '" + name_ + "' already exists");
   }
 
-  TRITONSERVER_Memory_Type actual_memory_type = *memory_type;
+  TRITONSERVER_MemoryType actual_memory_type = *memory_type;
   int64_t actual_memory_type_id = *memory_type_id;
   void* alloc_buffer_userp = nullptr;
 
@@ -183,7 +183,7 @@ InferenceResponse::Output::AllocateBuffer(
     void** buffer, size_t buffer_byte_size, TRTSERVER_Memory_Type* memory_type,
     int64_t* memory_type_id)
 {
-  TRITONSERVER_Memory_Type mt = TrtMemTypeToTriton(*memory_type);
+  TRITONSERVER_MemoryType mt = TrtMemTypeToTriton(*memory_type);
   Status status = AllocateBuffer(buffer, buffer_byte_size, &mt, memory_type_id);
   *memory_type = TritonMemTypeToTrt(mt);
   return status;
