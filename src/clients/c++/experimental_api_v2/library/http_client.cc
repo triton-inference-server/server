@@ -491,30 +491,31 @@ InferenceServerHttpClient::PrepareRequestJson(
   rapidjson::Document::AllocatorType& allocator = request_json->GetAllocator();
   request_json->SetObject();
   {
-    rapidjson::Value request_id(options.request_id_.c_str(), allocator);
-    request_json->AddMember("id", request_id, allocator);
-    rapidjson::Value parameters(rapidjson::kObjectType);
+    rapidjson::Value request_id_json(options.request_id_.c_str(), allocator);
+    request_json->AddMember("id", request_id_json, allocator);
+    rapidjson::Value parameters_json(rapidjson::kObjectType);
     {
       if (options.sequence_id_ != 0) {
-        rapidjson::Value sequence_id(options.sequence_id_);
-        parameters.AddMember("sequence_id", sequence_id, allocator);
-        rapidjson::Value sequence_start(options.sequence_start_);
-        parameters.AddMember("sequence_start", sequence_start, allocator);
-        rapidjson::Value sequence_end(options.sequence_end_);
-        parameters.AddMember("sequence_end", sequence_end, allocator);
+        rapidjson::Value sequence_id_json(options.sequence_id_);
+        parameters_json.AddMember("sequence_id", sequence_id_json, allocator);
+        rapidjson::Value sequence_start_json(options.sequence_start_);
+        parameters_json.AddMember(
+            "sequence_start", sequence_start_json, allocator);
+        rapidjson::Value sequence_end_json(options.sequence_end_);
+        parameters_json.AddMember("sequence_end", sequence_end_json, allocator);
       }
 
       if (options.priority_ != 0) {
-        rapidjson::Value priority(options.priority_);
-        parameters.AddMember("priority", priority, allocator);
+        rapidjson::Value priority_json(options.priority_);
+        parameters_json.AddMember("priority", priority_json, allocator);
       }
 
       if (options.timeout_ != 0) {
-        rapidjson::Value timeout(options.timeout_);
-        parameters.AddMember("timeout", timeout, allocator);
+        rapidjson::Value timeout_json(options.timeout_);
+        parameters_json.AddMember("timeout", timeout_json, allocator);
       }
     }
-    request_json->AddMember("parameters", parameters, allocator);
+    request_json->AddMember("parameters", parameters_json, allocator);
   }
 
   rapidjson::Value inputs_json(rapidjson::kArrayType);
@@ -522,45 +523,48 @@ InferenceServerHttpClient::PrepareRequestJson(
     for (const auto this_input : inputs) {
       rapidjson::Value this_input_json(rapidjson::kObjectType);
       {
-        rapidjson::Value name(this_input->Name().c_str(), allocator);
-        this_input_json.AddMember("name", name, allocator);
-        rapidjson::Value shape(rapidjson::kArrayType);
+        rapidjson::Value name_json(this_input->Name().c_str(), allocator);
+        this_input_json.AddMember("name", name_json, allocator);
+        rapidjson::Value shape_json(rapidjson::kArrayType);
         {
           for (const auto dim : this_input->Shape()) {
             rapidjson::Value dim_json(dim);
-            shape.PushBack(dim_json, allocator);
+            shape_json.PushBack(dim_json, allocator);
           }
         }
-        this_input_json.AddMember("shape", shape, allocator);
-        rapidjson::Value datatype(this_input->Datatype().c_str(), allocator);
-        this_input_json.AddMember("datatype", datatype, allocator);
-        rapidjson::Value parameters(rapidjson::kObjectType);
+        this_input_json.AddMember("shape", shape_json, allocator);
+        rapidjson::Value datatype_json(
+            this_input->Datatype().c_str(), allocator);
+        this_input_json.AddMember("datatype", datatype_json, allocator);
+        rapidjson::Value parameters_json(rapidjson::kObjectType);
         if (this_input->IsSharedMemory()) {
           std::string region_name;
           size_t offset;
           size_t byte_size;
           this_input->SharedMemoryInfo(&region_name, &byte_size, &offset);
           {
-            rapidjson::Value shared_memory_region(
+            rapidjson::Value shared_memory_region_json(
                 region_name.c_str(), allocator);
-            parameters.AddMember(
-                "shared_memory_region", shared_memory_region, allocator);
-            rapidjson::Value shared_memory_byte_size(byte_size);
-            parameters.AddMember(
-                "shared_memory_byte_size", shared_memory_byte_size, allocator);
+            parameters_json.AddMember(
+                "shared_memory_region", shared_memory_region_json, allocator);
+            rapidjson::Value shared_memory_byte_size_json(byte_size);
+            parameters_json.AddMember(
+                "shared_memory_byte_size", shared_memory_byte_size_json,
+                allocator);
             if (offset != 0) {
-              rapidjson::Value shared_memory_offset(offset);
-              parameters.AddMember(
-                  "shared_memory_offset", shared_memory_offset, allocator);
+              rapidjson::Value shared_memory_offset_json(offset);
+              parameters_json.AddMember(
+                  "shared_memory_offset", shared_memory_offset_json, allocator);
             }
           }
         } else {
           size_t byte_size;
           this_input->ByteSize(&byte_size);
-          rapidjson::Value binary_data_size(byte_size);
-          parameters.AddMember("binary_data_size", binary_data_size, allocator);
+          rapidjson::Value binary_data_size_json(byte_size);
+          parameters_json.AddMember(
+              "binary_data_size", binary_data_size_json, allocator);
         }
-        this_input_json.AddMember("parameters", parameters, allocator);
+        this_input_json.AddMember("parameters", parameters_json, allocator);
       }
       inputs_json.PushBack(this_input_json, allocator);
     }
@@ -572,13 +576,14 @@ InferenceServerHttpClient::PrepareRequestJson(
     for (const auto this_output : outputs) {
       rapidjson::Value this_output_json(rapidjson::kObjectType);
       {
-        rapidjson::Value name(this_output->Name().c_str(), allocator);
-        this_output_json.AddMember("name", name, allocator);
-        rapidjson::Value parameters(rapidjson::kObjectType);
+        rapidjson::Value name_json(this_output->Name().c_str(), allocator);
+        this_output_json.AddMember("name", name_json, allocator);
+        rapidjson::Value parameters_json(rapidjson::kObjectType);
         size_t class_count = this_output->ClassCount();
         if (class_count != 0) {
-          rapidjson::Value classification(class_count);
-          parameters.AddMember("classification", classification, allocator);
+          rapidjson::Value classification_json(class_count);
+          parameters_json.AddMember(
+              "classification", classification_json, allocator);
         }
         if (this_output->IsSharedMemory()) {
           std::string region_name;
@@ -586,24 +591,25 @@ InferenceServerHttpClient::PrepareRequestJson(
           size_t byte_size;
           this_output->SharedMemoryInfo(&region_name, &byte_size, &offset);
           {
-            rapidjson::Value shared_memory_region(
+            rapidjson::Value shared_memory_region_json(
                 region_name.c_str(), allocator);
-            parameters.AddMember(
-                "shared_memory_region", shared_memory_region, allocator);
-            rapidjson::Value shared_memory_byte_size(byte_size);
-            parameters.AddMember(
-                "shared_memory_byte_size", shared_memory_byte_size, allocator);
+            parameters_json.AddMember(
+                "shared_memory_region", shared_memory_region_json, allocator);
+            rapidjson::Value shared_memory_byte_size_json(byte_size);
+            parameters_json.AddMember(
+                "shared_memory_byte_size", shared_memory_byte_size_json,
+                allocator);
             if (offset != 0) {
-              rapidjson::Value shared_memory_offset(offset);
-              parameters.AddMember(
-                  "shared_memory_offset", shared_memory_offset, allocator);
+              rapidjson::Value shared_memory_offset_json(offset);
+              parameters_json.AddMember(
+                  "shared_memory_offset", shared_memory_offset_json, allocator);
             }
           }
         } else {
-          rapidjson::Value binary_data(true);
-          parameters.AddMember("binary_data", binary_data, allocator);
+          rapidjson::Value binary_data_json(true);
+          parameters_json.AddMember("binary_data", binary_data_json, allocator);
         }
-        this_output_json.AddMember("parameters", parameters, allocator);
+        this_output_json.AddMember("parameters", parameters_json, allocator);
       }
       ouputs_json.PushBack(this_output_json, allocator);
     }
