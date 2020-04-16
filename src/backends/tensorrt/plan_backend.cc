@@ -1321,8 +1321,8 @@ PlanBackend::Context::PeekShapeTensor(
   std::unique_ptr<AllocatedMemory> contiguous_buffer;
   bool cuda_copy = false;
   RETURN_IF_ERROR(GetContiguousInputContent(
-      input.Name(), TRTSERVER_MEMORY_CPU, 0 /* src_memory_type_id */, payload,
-      &content, &content_byte_size, &contiguous_buffer, &cuda_copy));
+      input.Name(), TRITONSERVER_MEMORY_CPU, 0 /* src_memory_type_id */,
+      payload, &content, &content_byte_size, &contiguous_buffer, &cuda_copy));
   if (expected_byte_size != content_byte_size) {
     return Status(
         Status::Code::INTERNAL,
@@ -1361,7 +1361,7 @@ PlanBackend::Context::PeekShapeTensor(
       RETURN_IF_ERROR(override->SetData(buf));
     } else {
       RETURN_IF_ERROR(override->AppendData(
-          content, content_byte_size, TRTSERVER_MEMORY_CPU, 0));
+          content, content_byte_size, TRITONSERVER_MEMORY_CPU, 0));
     }
   }
 
@@ -1761,7 +1761,7 @@ PlanBackend::Context::Run(
       inputs_.emplace_back();
       auto& input = inputs_.back();
       input.input_buffer_ = static_cast<char*>(buffers_[bindex]);
-      input.memory_type_ = TRTSERVER_MEMORY_GPU;
+      input.memory_type_ = TRITONSERVER_MEMORY_GPU;
       input.memory_type_id_ = gpu_device_;
       SetInputBuffer(
           name, expected_byte_sizes, payloads, input_copy_stream_, &input);
@@ -1770,7 +1770,7 @@ PlanBackend::Context::Run(
       // of the copy
       SetShapeInputBuffer(
           name, total_batch_size, batch1_byte_size, support_batching_,
-          &(*payloads)[0], TRTSERVER_MEMORY_GPU, gpu_device_,
+          &(*payloads)[0], TRITONSERVER_MEMORY_GPU, gpu_device_,
           static_cast<char*>(buffers_[bindex]));
     }
   }
@@ -1782,7 +1782,7 @@ PlanBackend::Context::Run(
   for (auto& input : inputs_) {
     for (auto& indirect_buffer : input.indirect_buffers_) {
       bool cuda_used;
-      TRTSERVER_Memory_Type buffer_memory_type;
+      TRITONSERVER_MemoryType buffer_memory_type;
       int64_t buffer_memory_id;
       size_t buffer_byte_size;
       auto buffer =
@@ -1916,13 +1916,13 @@ PlanBackend::Context::Run(
 
         cuda_copy |= SetOutputShapeTensorBuffer(
             name, shape_value_ptr, content_shape, support_batching_,
-            TRTSERVER_MEMORY_CPU, 0, payloads);
+            TRITONSERVER_MEMORY_CPU, 0, payloads);
 
         free(shape_value_ptr);
       }
     } else {
       output.output_buffer_ = static_cast<const char*>(buffers_[bindex]);
-      output.memory_type_ = TRTSERVER_MEMORY_GPU;
+      output.memory_type_ = TRITONSERVER_MEMORY_GPU;
       output.memory_type_id_ = gpu_device_;
 
       if (!is_dynamic_ && support_batching_) {
@@ -2010,13 +2010,13 @@ PlanBackend::Context::ProcessResponse(
       NVTX_RANGE(nvtx_, "IndirectOutputBufferCopy");
       for (auto& indirect_buffer : output.indirect_buffers_) {
         bool cuda_used;
-        TRTSERVER_Memory_Type src_memory_type;
+        TRITONSERVER_MemoryType src_memory_type;
         int64_t src_memory_type_id;
         // placeholder, copy byte size is determined by dst_byte_size
         size_t src_byte_size;
         auto src = indirect_buffer.first->BufferAt(
             0, &src_byte_size, &src_memory_type, &src_memory_type_id);
-        TRTSERVER_Memory_Type dst_memory_type;
+        TRITONSERVER_MemoryType dst_memory_type;
         int64_t dst_memory_type_id;
         for (auto& payload_output : indirect_buffer.second) {
           char* dst = payload_output.second->MutableBuffer(

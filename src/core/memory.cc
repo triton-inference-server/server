@@ -43,12 +43,12 @@ MemoryReference::MemoryReference() : Memory() {}
 
 const char*
 MemoryReference::BufferAt(
-    size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
+    size_t idx, size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
     int64_t* memory_type_id) const
 {
   if (idx >= buffer_.size()) {
     *byte_size = 0;
-    *memory_type = TRTSERVER_MEMORY_CPU;
+    *memory_type = TRITONSERVER_MEMORY_CPU;
     *memory_type_id = 0;
     return nullptr;
   }
@@ -60,7 +60,7 @@ MemoryReference::BufferAt(
 
 size_t
 MemoryReference::AddBuffer(
-    const char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+    const char* buffer, size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
 {
   total_byte_size_ += byte_size;
@@ -73,7 +73,7 @@ MemoryReference::AddBuffer(
 // MutableMemory
 //
 MutableMemory::MutableMemory(
-    char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+    char* buffer, size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
     : Memory(), buffer_(buffer), memory_type_(memory_type),
       memory_type_id_(memory_type_id)
@@ -84,12 +84,12 @@ MutableMemory::MutableMemory(
 
 const char*
 MutableMemory::BufferAt(
-    size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
+    size_t idx, size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
     int64_t* memory_type_id) const
 {
   if (idx != 0) {
     *byte_size = 0;
-    *memory_type = TRTSERVER_MEMORY_CPU;
+    *memory_type = TRITONSERVER_MEMORY_CPU;
     *memory_type_id = 0;
     return nullptr;
   }
@@ -101,7 +101,7 @@ MutableMemory::BufferAt(
 
 char*
 MutableMemory::MutableBuffer(
-    TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id)
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
 {
   if (memory_type != nullptr) {
     *memory_type = memory_type_;
@@ -117,7 +117,8 @@ MutableMemory::MutableBuffer(
 // AllocatedMemory
 //
 AllocatedMemory::AllocatedMemory(
-    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
+    size_t byte_size, TRITONSERVER_MemoryType memory_type,
+    int64_t memory_type_id)
     : MutableMemory(nullptr, byte_size, memory_type, memory_type_id)
 {
   if (total_byte_size_ != 0) {
@@ -125,7 +126,7 @@ AllocatedMemory::AllocatedMemory(
     // CUDA memory -> pinned system memory -> non-pinned system memory
     switch (memory_type_) {
 #ifdef TRTIS_ENABLE_GPU
-      case TRTSERVER_MEMORY_GPU: {
+      case TRITONSERVER_MEMORY_GPU: {
         auto status = CudaMemoryManager::Alloc(
             (void**)&buffer_, total_byte_size_, memory_type_id_);
         if (!status.IsOk()) {
@@ -154,7 +155,7 @@ AllocatedMemory::~AllocatedMemory()
 {
   if (buffer_ != nullptr) {
     switch (memory_type_) {
-      case TRTSERVER_MEMORY_GPU: {
+      case TRITONSERVER_MEMORY_GPU: {
 #ifdef TRTIS_ENABLE_GPU
         auto status = CudaMemoryManager::Free(buffer_, memory_type_id_);
         if (!status.IsOk()) {

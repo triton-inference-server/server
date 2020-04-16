@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -32,7 +32,6 @@
 #include <sstream>
 #include <string>
 #include "src/core/tritonserver.h"
-#include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -67,17 +66,9 @@ class TraceManager : public std::enable_shared_from_this<TraceManager> {
   // should occur.
   TraceMetaData* SampleTrace();
 
-  // FIXMEV2 remove the static functions with TRTSERVER_Trace
   // Create a trace object that should be used to collected trace
   // activities for the model execution. Return nullptr if no tracing
   // should occur.
-  static void CreateTrace(
-      TRTSERVER_Trace** trace, const char* model_name, int64_t version,
-      void* userp);
-
-  static void ReleaseTrace(
-      TRTSERVER_Trace* trace, void* activity_userp, void* userp);
-
   static void CreateTrace(
       TRITONSERVER_Trace** trace, const char* model_name, int64_t version,
       void* userp);

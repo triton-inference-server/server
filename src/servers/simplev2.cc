@@ -31,6 +31,7 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
@@ -177,7 +178,7 @@ ResponseAlloc(
       *buffer = allocated_ptr;
       *buffer_userp = new std::string(tensor_name);
       std::cout << "allocated " << byte_size << " bytes in "
-                << ni::MemoryTypeString(*actual_memory_type)
+                << TRITONSERVER_MemoryTypeString(*actual_memory_type)
                 << " for result tensor " << tensor_name << std::endl;
     }
   }
@@ -199,8 +200,8 @@ ResponseRelease(
   }
 
   std::cout << "Releasing buffer " << buffer << " of size " << byte_size
-            << " in " << ni::MemoryTypeString(memory_type) << " for result '"
-            << *name << "'" << std::endl;
+            << " in " << TRITONSERVER_MemoryTypeString(memory_type)
+            << " for result '" << *name << "'" << std::endl;
   switch (memory_type) {
     case TRITONSERVER_MEMORY_CPU:
       free(buffer);
@@ -344,7 +345,7 @@ Check(
   std::unordered_map<std::string, std::vector<char>> output_data;
 
   uint32_t output_count;
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_InferenceResponseOutputCount(response, &output_count),
       "getting number of response outputs");
   if (output_count != 2) {
@@ -361,7 +362,7 @@ Check(
     TRITONSERVER_MemoryType memory_type;
     int64_t memory_type_id;
 
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseOutput(
             response, idx, &cname, &datatype, &shape, &dim_count, &base,
             &byte_size, &memory_type, &memory_type_id),
@@ -396,11 +397,10 @@ Check(
 
     if (enforce_memory_type && (memory_type != requested_memory_type)) {
       FAIL(
-          "unexpected memory type, expected to be allocated "
-          "in " +
-          ni::MemoryTypeString(requested_memory_type) + ", got " +
-          ni::MemoryTypeString(memory_type) + ", id " +
-          std::to_string(memory_type_id) + " for " + name);
+          "unexpected memory type, expected to be allocated in " +
+          std::string(TRITONSERVER_MemoryTypeString(requested_memory_type)) +
+          ", got " + std::string(TRITONSERVER_MemoryTypeString(memory_type)) +
+          ", id " + std::to_string(memory_type_id) + " for " + name);
     }
 
     // We make a copy of the data here... which we could avoid for
@@ -499,21 +499,21 @@ main(int argc, char** argv)
 
   // Create the server...
   TRITONSERVER_ServerOptions* server_options = nullptr;
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsNew(&server_options),
       "creating server options");
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetModelRepositoryPath(
           server_options, model_repository_path.c_str()),
       "setting model repository path");
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetLogVerbose(server_options, verbose_level),
       "setting verbose logging level");
 
   TRITONSERVER_Server* server_ptr = nullptr;
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_ServerNew(&server_ptr, server_options), "creating server");
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsDelete(server_options),
       "deleting server options");
 
@@ -524,10 +524,10 @@ main(int argc, char** argv)
   size_t health_iters = 0;
   while (true) {
     bool live, ready;
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_ServerIsLive(server.get(), &live),
         "unable to get server liveness");
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_ServerIsReady(server.get(), &ready),
         "unable to get server readiness");
     std::cout << "Server Health: live " << live << ", ready " << ready
@@ -546,12 +546,12 @@ main(int argc, char** argv)
   // Print status of the server.
   {
     TRITONSERVER_Message* server_metadata_message;
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_ServerMetadata(server.get(), &server_metadata_message),
         "unable to get server metadata message");
     const char* buffer;
     size_t byte_size;
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_MessageSerializeToJson(
             server_metadata_message, &buffer, &byte_size),
         "unable to serialize server metadata message");
@@ -559,7 +559,7 @@ main(int argc, char** argv)
     std::cout << "Server Status:" << std::endl;
     std::cout << std::string(buffer, byte_size) << std::endl;
 
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_MessageDelete(server_metadata_message),
         "deleting status metadata");
   }
@@ -572,7 +572,7 @@ main(int argc, char** argv)
   bool is_ready = false;
   health_iters = 0;
   while (!is_ready) {
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_ServerModelIsReady(
             server.get(), model_name.c_str(), "1", &is_ready),
         "unable to get model readiness");
@@ -585,13 +585,13 @@ main(int argc, char** argv)
     }
 
     TRITONSERVER_Message* model_metadata_message;
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_ServerModelMetadata(
             server.get(), model_name.c_str(), "1", &model_metadata_message),
         "unable to get model metadata message");
     const char* buffer;
     size_t byte_size;
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_MessageSerializeToJson(
             model_metadata_message, &buffer, &byte_size),
         "unable to serialize model status protobuf");
@@ -605,7 +605,7 @@ main(int argc, char** argv)
           " at " + std::to_string(model_metadata.GetErrorOffset()));
     }
 
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_MessageDelete(model_metadata_message),
         "deleting status protobuf");
 
@@ -626,7 +626,7 @@ main(int argc, char** argv)
       FAIL("unable to find version 1 status for model");
     }
 
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         ParseModelMetadata(model_metadata, &is_int, &is_torch_model),
         "parsing model metadata");
   }
@@ -634,24 +634,24 @@ main(int argc, char** argv)
   // Create the allocator that will be used to allocate buffers for
   // the result tensors.
   TRITONSERVER_ResponseAllocator* allocator = nullptr;
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_ResponseAllocatorNew(
           &allocator, ResponseAlloc, ResponseRelease),
       "creating response allocator");
 
   // Inference
   TRITONSERVER_InferenceRequest* irequest = nullptr;
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestNew(
           &irequest, server.get(), model_name.c_str(),
           nullptr /* model_version */),
       "creating inference request");
 
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestSetId(irequest, "my_request_id"),
       "setting ID for the request");
 
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestComplete, nullptr /* request_release_userp */),
       "setting request release callback");
@@ -666,21 +666,22 @@ main(int argc, char** argv)
   const TRITONSERVER_DataType datatype =
       (is_int) ? TRITONSERVER_TYPE_INT32 : TRITONSERVER_TYPE_FP32;
 
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestAddInput(
           irequest, input0, datatype, &input0_shape[0], input0_shape.size()),
       "setting input 0 meta-data for the request");
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestAddInput(
           irequest, input1, datatype, &input1_shape[0], input1_shape.size()),
       "setting input 1 meta-data for the request");
 
   auto output0 = is_torch_model ? "OUTPUT__0" : "OUTPUT0";
   auto output1 = is_torch_model ? "OUTPUT__1" : "OUTPUT1";
-  FAIL_IF_TRITON_ERR(
+
+  FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output0),
       "requesting output 0 for the request");
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output1),
       "requesting output 1 for the request");
 
@@ -748,12 +749,12 @@ main(int argc, char** argv)
   input1_base = use_cuda_memory ? input1_gpu.get() : &input1_data[0];
 #endif  // TRTIS_ENABLE_GPU
 
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestAppendInputData(
           irequest, input0, input0_base, input0_size, requested_memory_type,
           0 /* memory_type_id */),
       "assigning INPUT0 data");
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestAppendInputData(
           irequest, input1, input1_base, input1_size, requested_memory_type,
           0 /* memory_type_id */),
@@ -764,13 +765,13 @@ main(int argc, char** argv)
     auto p = new std::promise<TRITONSERVER_InferenceResponse*>();
     std::future<TRITONSERVER_InferenceResponse*> completed = p->get_future();
 
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestSetResponseCallback(
             irequest, allocator, nullptr /* response_allocator_userp */,
             InferResponseComplete, reinterpret_cast<void*>(p)),
         "setting response callback");
 
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_ServerInferAsync(
             server.get(), irequest, nullptr /* trace_manager */,
             nullptr /* trace_release_fn */, nullptr /* trace_release_userp */),
@@ -779,7 +780,7 @@ main(int argc, char** argv)
     // Wait for the inference to complete.
     TRITONSERVER_InferenceResponse* completed_response = completed.get();
 
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseError(completed_response),
         "response status");
 
@@ -787,7 +788,7 @@ main(int argc, char** argv)
         completed_response, input0_data, input1_data, output0, output1,
         input0_size, datatype, is_int);
 
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseDelete(completed_response),
         "deleting inference response");
   }
@@ -810,13 +811,13 @@ main(int argc, char** argv)
 
     // Using a new promise so have to re-register the callback to set
     // the promise as the userp.
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestSetResponseCallback(
             irequest, allocator, nullptr /* response_allocator_userp */,
             InferResponseComplete, reinterpret_cast<void*>(p)),
         "setting response callback");
 
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_ServerInferAsync(
             server.get(), irequest, nullptr /* trace_manager */,
             nullptr /* trace_release_fn */, nullptr /* trace_release_userp */),
@@ -824,7 +825,7 @@ main(int argc, char** argv)
 
     // Wait for the inference to complete.
     TRITONSERVER_InferenceResponse* completed_response = completed.get();
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseError(completed_response),
         "response status");
 
@@ -832,17 +833,17 @@ main(int argc, char** argv)
         completed_response, input0_data, input1_data, output0, output1,
         input0_size, datatype, is_int);
 
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseDelete(completed_response),
         "deleting inference response");
   }
 
   // Remove input data and then add back different data.
   {
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestRemoveAllInputData(irequest, input0),
         "removing INPUT0 data");
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestAppendInputData(
             irequest, input0, input1_base, input1_size, requested_memory_type,
             0 /* memory_type_id */),
@@ -853,13 +854,13 @@ main(int argc, char** argv)
 
     // Using a new promise so have to re-register the callback to set
     // the promise as the userp.
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestSetResponseCallback(
             irequest, allocator, nullptr /* response_allocator_userp */,
             InferResponseComplete, reinterpret_cast<void*>(p)),
         "setting response callback");
 
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_ServerInferAsync(
             server.get(), irequest, nullptr /* trace_manager */,
             nullptr /* trace_release_fn */, nullptr /* trace_release_userp */),
@@ -867,7 +868,7 @@ main(int argc, char** argv)
 
     // Wait for the inference to complete.
     TRITONSERVER_InferenceResponse* completed_response = completed.get();
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseError(completed_response),
         "response status");
 
@@ -876,16 +877,16 @@ main(int argc, char** argv)
         completed_response, input1_data, input1_data, output0, output1,
         input0_size, datatype, is_int);
 
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseDelete(completed_response),
         "deleting inference response");
   }
 
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestDelete(irequest),
       "deleting inference request");
 
-  FAIL_IF_TRITON_ERR(
+  FAIL_IF_ERR(
       TRITONSERVER_ResponseAllocatorDelete(allocator),
       "deleting response allocator");
 

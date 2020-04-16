@@ -49,19 +49,6 @@ namespace ni = nvidia::inferenceserver;
 
 namespace {
 
-void
-SetDurationStats(
-    const nvidia::inferenceserver::StatDuration& stat,
-    rapidjson::MemoryPoolAllocator<>& allocator,
-    rapidjson::Value* duration_stat)
-{
-  duration_stat->SetObject();
-  duration_stat->AddMember(
-      "count", rapidjson::Value(stat.count()).Move(), allocator);
-  duration_stat->AddMember(
-      "ns", rapidjson::Value(stat.total_time_ns()).Move(), allocator);
-}
-
 //
 // TritonServerError
 //
@@ -115,8 +102,7 @@ TritonServerError::Create(const ni::Status& status)
     return nullptr;
   }
 
-  return Create(
-      StatusCodeToTritonServerCode(status.StatusCode()), status.Message());
+  return Create(StatusCodeToTritonCode(status.StatusCode()), status.Message());
 }
 
 #define RETURN_IF_STATUS_ERROR(S)                 \
@@ -269,7 +255,6 @@ class TritonServerOptions {
 
  private:
   std::string server_id_;
-  uint32_t server_protocol_version_;
   std::set<std::string> repo_paths_;
   ni::ModelControlMode model_control_mode_;
   std::set<std::string> models_;
@@ -289,10 +274,10 @@ class TritonServerOptions {
 };
 
 TritonServerOptions::TritonServerOptions()
-    : server_id_("inference:0"), server_protocol_version_(1),
-      model_control_mode_(ni::MODE_POLL), exit_on_error_(true),
-      strict_model_config_(true), strict_readiness_(true), metrics_(true),
-      gpu_metrics_(true), exit_timeout_(30), pinned_memory_pool_size_(1 << 28),
+    : server_id_("inference:0"), model_control_mode_(ni::MODE_POLL),
+      exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
+      metrics_(true), gpu_metrics_(true), exit_timeout_(30),
+      pinned_memory_pool_size_(1 << 28),
 #ifdef TRTIS_ENABLE_GPU
       min_compute_capability_(TRTIS_MIN_COMPUTE_CAPABILITY),
 #else
@@ -311,7 +296,7 @@ TritonServerOptions::TritonServerOptions()
 }
 
 TRITONSERVER_DataType
-DataTypeToTRITONSERVER(const ni::DataType dtype)
+DataTypeToTriton(const ni::DataType dtype)
 {
   switch (dtype) {
     case ni::DataType::TYPE_BOOL:
@@ -348,7 +333,7 @@ DataTypeToTRITONSERVER(const ni::DataType dtype)
 }
 
 ni::DataType
-TRITONSERVERToDataType(const TRITONSERVER_DataType dtype)
+TritonToDataType(const TRITONSERVER_DataType dtype)
 {
   switch (dtype) {
     case TRITONSERVER_TYPE_BOOL:
@@ -382,6 +367,19 @@ TRITONSERVERToDataType(const TRITONSERVER_DataType dtype)
   }
 
   return ni::DataType::TYPE_INVALID;
+}
+
+void
+SetDurationStats(
+    const nvidia::inferenceserver::StatDuration& stat,
+    rapidjson::MemoryPoolAllocator<>& allocator,
+    rapidjson::Value* duration_stat)
+{
+  duration_stat->SetObject();
+  duration_stat->AddMember(
+      "count", rapidjson::Value(stat.count()).Move(), allocator);
+  duration_stat->AddMember(
+      "ns", rapidjson::Value(stat.total_time_ns()).Move(), allocator);
 }
 
 }  // namespace
@@ -428,6 +426,42 @@ TRITONSERVER_DataTypeString(TRITONSERVER_DataType datatype)
   }
 
   return "<invalid>";
+}
+
+TRITONSERVER_DataType
+TRITONSERVER_StringToDataType(const char* dtype)
+{
+  const size_t len = strlen(dtype);
+  return DataTypeToTriton(ni::ProtocolStringToDataType(dtype, len));
+}
+
+uint32_t
+TRITONSERVER_DataTypeByteSize(TRITONSERVER_DataType datatype)
+{
+  switch (datatype) {
+    case TRITONSERVER_TYPE_BOOL:
+    case TRITONSERVER_TYPE_INT8:
+    case TRITONSERVER_TYPE_UINT8:
+      return 1;
+    case TRITONSERVER_TYPE_INT16:
+    case TRITONSERVER_TYPE_UINT16:
+    case TRITONSERVER_TYPE_FP16:
+      return 2;
+    case TRITONSERVER_TYPE_INT32:
+    case TRITONSERVER_TYPE_UINT32:
+    case TRITONSERVER_TYPE_FP32:
+      return 4;
+    case TRITONSERVER_TYPE_INT64:
+    case TRITONSERVER_TYPE_UINT64:
+    case TRITONSERVER_TYPE_FP64:
+      return 8;
+    case TRITONSERVER_TYPE_BYTES:
+      return 0;
+    default:
+      break;
+  }
+
+  return 0;
 }
 
 //
@@ -478,8 +512,7 @@ const char*
 TRITONSERVER_ErrorCodeString(TRITONSERVER_Error* error)
 {
   TritonServerError* lerror = reinterpret_cast<TritonServerError*>(error);
-  return ni::Status::CodeString(
-      ni::TritonServerCodeToStatusCode(lerror->Code()));
+  return ni::Status::CodeString(ni::TritonCodeToStatusCode(lerror->Code()));
 }
 
 const char*
@@ -987,9 +1020,8 @@ TRITONSERVER_InferenceRequestNew(
   RETURN_IF_STATUS_ERROR(
       lserver->GetInferenceBackend(model_name, model_int_version, &backend));
 
-  *inference_request =
-      reinterpret_cast<TRITONSERVER_InferenceRequest*>(new ni::InferenceRequest(
-          backend, model_int_version, 2 /* protocol_version */));
+  *inference_request = reinterpret_cast<TRITONSERVER_InferenceRequest*>(
+      new ni::InferenceRequest(backend, model_int_version));
 
   return nullptr;  // Success
 }
@@ -1010,7 +1042,7 @@ TRITONSERVER_InferenceRequestId(
 {
   ni::InferenceRequest* lrequest =
       reinterpret_cast<ni::InferenceRequest*>(inference_request);
-  *id = lrequest->IdStr().c_str();
+  *id = lrequest->Id().c_str();
   return nullptr;  // Success
 }
 
@@ -1020,7 +1052,7 @@ TRITONSERVER_InferenceRequestSetId(
 {
   ni::InferenceRequest* lrequest =
       reinterpret_cast<ni::InferenceRequest*>(inference_request);
-  lrequest->SetIdStr(id);
+  lrequest->SetId(id);
   return nullptr;  // Success
 }
 
@@ -1113,7 +1145,7 @@ TRITONSERVER_InferenceRequestAddInput(
   ni::InferenceRequest* lrequest =
       reinterpret_cast<ni::InferenceRequest*>(inference_request);
   RETURN_IF_STATUS_ERROR(lrequest->AddOriginalInput(
-      name, TRITONSERVERToDataType(datatype), shape, dim_count));
+      name, TritonToDataType(datatype), shape, dim_count));
   return nullptr;  // Success
 }
 
@@ -1301,14 +1333,14 @@ TRITONSERVER_InferenceResponseOutput(
   const ni::InferenceResponse::Output& output = outputs[index];
 
   *name = output.Name().c_str();
-  *datatype = DataTypeToTRITONSERVER(output.DType());
+  *datatype = DataTypeToTriton(output.DType());
 
   const std::vector<int64_t>& oshape = output.Shape();
   *shape = &oshape[0];
   *dim_count = oshape.size();
 
   RETURN_IF_STATUS_ERROR(
-      output.Buffer(base, byte_size, memory_type, memory_type_id));
+      output.DataBuffer(base, byte_size, memory_type, memory_type_id));
 
   return nullptr;  // Success
 }
@@ -1334,7 +1366,6 @@ TRITONSERVER_ServerNew(
 #endif  // TRTIS_ENABLE_METRICS_GPU
 
   lserver->SetId(loptions->ServerId());
-  lserver->SetProtocolVersion(2 /* protocol_version */);
   lserver->SetModelRepositoryPaths(loptions->ModelRepositoryPaths());
   lserver->SetModelControlMode(loptions->ModelControlMode());
   lserver->SetStartupModels(loptions->StartupModels());
