@@ -89,7 +89,7 @@ class SharedMemoryManager {
   /// \return a TRITONSERVER_Error indicating success or failure.
   TRITONSERVER_Error* GetMemoryInfo(
       const std::string& name, size_t offset, void** shm_mapped_addr,
-      TRITONSERVER_Memory_Type* memory_type, int64_t* device_id);
+      TRITONSERVER_MemoryType* memory_type, int64_t* device_id);
 
   /// FIXMEV2 remove the Unregister/GetStatus that don't require mem type arg
 
@@ -138,7 +138,7 @@ class SharedMemoryManager {
   /// \param shm_status Returns status of active shared memory blocks in JSON.
   /// \return a TRITONSERVER_Error indicating success or failure.
   TRITONSERVER_Error* GetStatus(
-      const std::string& name, TRITONSERVER_Memory_Type memory_type,
+      const std::string& name, TRITONSERVER_MemoryType memory_type,
       rapidjson::Document* shm_status);
 
   /// Removes the named shared memory block of the specified type from
@@ -149,12 +149,12 @@ class SharedMemoryManager {
   /// \param memory_type The type of memory to unregister.
   /// \return a TRITONSERVER_Error indicating success or failure.
   TRITONSERVER_Error* Unregister(
-      const std::string& name, TRITONSERVER_Memory_Type memory_type);
+      const std::string& name, TRITONSERVER_MemoryType memory_type);
 
   /// Unregister all shared memory blocks of specified type from the manager.
   /// \param memory_type The type of memory to unregister.
   /// \return a TRITONSERVER_Error indicating success or failure.
-  TRITONSERVER_Error* UnregisterAll(TRITONSERVER_Memory_Type memory_type);
+  TRITONSERVER_Error* UnregisterAll(TRITONSERVER_MemoryType memory_type);
 
  private:
   /// A helper function to remove the named shared memory blocks.
@@ -163,7 +163,7 @@ class SharedMemoryManager {
   /// A helper function to remove the named shared memory blocks of
   /// specified type
   TRITONSERVER_Error* UnregisterHelper(
-      const std::string& name, TRITONSERVER_Memory_Type memory_type);
+      const std::string& name, TRITONSERVER_MemoryType memory_type);
 
   /// A struct that records the shared memory regions registered by the shared
   /// memory manager.
@@ -171,7 +171,7 @@ class SharedMemoryManager {
     SharedMemoryInfo(
         const std::string& name, const std::string& shm_key,
         const size_t offset, const size_t byte_size, int shm_fd,
-        void* mapped_addr, const TRITONSERVER_Memory_Type kind,
+        void* mapped_addr, const TRITONSERVER_MemoryType kind,
         const int64_t device_id)
         : name_(name), shm_key_(shm_key), offset_(offset),
           byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr),
@@ -185,7 +185,7 @@ class SharedMemoryManager {
     size_t byte_size_;
     int shm_fd_;
     void* mapped_addr_;
-    TRITONSERVER_Memory_Type kind_;
+    TRITONSERVER_MemoryType kind_;
     int64_t device_id_;
   };
 
