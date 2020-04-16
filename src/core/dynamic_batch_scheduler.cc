@@ -320,6 +320,7 @@ DynamicBatchScheduler::SchedulerThread(
         auto pending_batch_queue_cnt = queue_.PendingBatchCount();
         if ((wait_microseconds == 0) && (pending_batch_queue_cnt != 0)) {
           payloads = std::make_shared<std::vector<Scheduler::Payload>>();
+          payloads->reserve(pending_batch_queue_cnt);
           for (size_t idx = 0; idx < pending_batch_queue_cnt; ++idx) {
             Scheduler::Payload payload;
             auto status = queue_.Dequeue(&payload);

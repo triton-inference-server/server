@@ -51,7 +51,7 @@ class Scheduler {
           request_(std::move(payload.request_)),
           response_provider_(std::move(payload.response_provider_)),
           complete_function_(std::move(payload.complete_function_)),
-          status_(payload.status_)
+          status_(std::move(payload.status_))
     {
     }
     Payload(
@@ -71,7 +71,7 @@ class Scheduler {
       request_ = std::move(payload.request_);
       response_provider_ = std::move(payload.response_provider_);
       complete_function_ = std::move(payload.complete_function_);
-      status_ = payload.status_;
+      status_ = std::move(payload.status_);
       return *this;
     }
 
