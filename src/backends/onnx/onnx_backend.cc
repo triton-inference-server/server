@@ -496,7 +496,8 @@ OnnxBackend::Context::ValidateInputs(
     const DimsList& dims =
         (io.has_reshape()) ? io.reshape().shape() : io.dims();
     RETURN_IF_ERROR(CompareDimsSupported(
-        model_name, io.name(), iit->second.dims_, dims, max_batch_size_));
+        model_name, io.name(), iit->second.dims_, dims, max_batch_size_,
+        false /* compare_exact */));
   }
 
   return Status::Success;
@@ -539,7 +540,8 @@ OnnxBackend::Context::ValidateOutputs(
     const DimsList& dims =
         (io.has_reshape()) ? io.reshape().shape() : io.dims();
     RETURN_IF_ERROR(CompareDimsSupported(
-        model_name, io.name(), iit->second.dims_, dims, max_batch_size_));
+        model_name, io.name(), iit->second.dims_, dims, max_batch_size_,
+        true /* compare_exact */));
   }
 
   return Status::Success;
