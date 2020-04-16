@@ -43,6 +43,9 @@ namespace nvidia { namespace inferenceserver { namespace client {
 #ifdef TRTIS_ENABLE_GRPC_V2
 class InferenceServerGrpcClient;
 #endif  // TRTIS_ENABLE_GRPC_V2
+#ifdef TRTIS_ENABLE_HTTP_V2
+class InferenceServerHttpClient;
+#endif  // TRTIS_ENABLE_HTTP_V2
 class InferRequest;
 class RequestTimers;
 
@@ -259,6 +262,9 @@ class InferInput {
 #ifdef TRTIS_ENABLE_GRPC_V2
   friend InferenceServerGrpcClient;
 #endif  // TRTIS_ENABLE_GRPC_V2
+#ifdef TRTIS_ENABLE_HTTP_V2
+  friend InferenceServerHttpClient;
+#endif  // TRTIS_ENABLE_HTTP_V2
 
  private:
   InferInput(
@@ -280,7 +286,6 @@ class InferInput {
   std::vector<int64_t> shape_;
   std::string datatype_;
   size_t byte_size_;
-  size_t total_send_byte_size_;
 
   size_t bufs_idx_, buf_pos_;
   std::vector<const uint8_t*> bufs_;
@@ -332,6 +337,9 @@ class InferRequestedOutput {
 #ifdef TRTIS_ENABLE_GRPC_V2
   friend InferenceServerGrpcClient;
 #endif  // TRTIS_ENABLE_GRPC_V2
+#ifdef TRTIS_ENABLE_HTTP_V2
+  friend InferenceServerHttpClient;
+#endif  // TRTIS_ENABLE_HTTP_V2
 
  private:
   explicit InferRequestedOutput(

@@ -24,13 +24,12 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#define DLL_EXPORTING
-
 #include "src/clients/c++/experimental_api_v2/library/http_client.h"
 
 #include <curl/curl.h>
 #include <cstdint>
 #include <iostream>
+#include <queue>
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
@@ -88,7 +87,7 @@ GetQueryString(const Headers& query_params)
 //==============================================================================
 
 std::string
-GetJsonText(rapidjson::Document& json_dom)
+GetJsonText(const rapidjson::Document& json_dom)
 {
   rapidjson::StringBuffer buffer;
   rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
@@ -96,12 +95,141 @@ GetJsonText(rapidjson::Document& json_dom)
   return buffer.GetString();
 }
 
+//==============================================================================
+
+class HttpInferRequest : public InferRequest {
+ public:
+  HttpInferRequest();
+  ~HttpInferRequest();
+
+  // Initialize the request for HTTP transfer. */
+  Error InitializeRequest(rapidjson::Document& response_json);
+
+  // Adds the input data to be delivered to the server
+  Error AddInput(uint8_t* buf, size_t byte_size);
+
+  // Copy into 'buf' up to 'size' bytes of input data. Return the
+  // actual amount copied in 'input_bytes'.
+  Error GetNextInput(uint8_t* buf, size_t size, size_t* input_bytes);
+
+ private:
+  friend class InferenceServerHttpClient;
+
+  // Pointer to easy handle that is processing the request
+  CURL* easy_handle_;
+
+  // Pointer to the list of the HTTP request header, keep it such that it will
+  // be valid during the transfer and can be freed once transfer is completed.
+  struct curl_slist* header_list_;
+
+  // Status code for the HTTP request.
+  CURLcode http_status_;
+
+  size_t total_input_byte_size_;
+
+  rapidjson::StringBuffer request_json_;
+
+  // Buffer that accumulates the serialized response at the
+  // end of the body.
+  std::unique_ptr<std::string> infer_response_buffer_;
+
+  // The pointers to the input data.
+  std::queue<std::pair<uint8_t*, size_t>> data_buffers_;
+
+  size_t response_json_size_;
+};
+
+
+HttpInferRequest::HttpInferRequest()
+    : easy_handle_(curl_easy_init()), header_list_(nullptr),
+      total_input_byte_size_(0), response_json_size_(0)
+{
+}
+
+HttpInferRequest::~HttpInferRequest()
+{
+  if (header_list_ != nullptr) {
+    curl_slist_free_all(header_list_);
+    header_list_ = nullptr;
+  }
+
+  if (easy_handle_ != nullptr) {
+    curl_easy_cleanup(easy_handle_);
+  }
+}
+
+Error
+HttpInferRequest::InitializeRequest(rapidjson::Document& request_json)
+{
+  data_buffers_ = {};
+  total_input_byte_size_ = 0;
+
+  request_json_.Clear();
+  rapidjson::Writer<rapidjson::StringBuffer> writer(request_json_);
+  request_json.Accept(writer);
+
+  // Add the buffer holding the json to be delivered first
+  AddInput((uint8_t*)request_json_.GetString(), request_json_.GetSize());
+
+  // Prepare buffer to record the response
+  infer_response_buffer_.reset(new std::string());
+
+  return Error::Success;
+}
+
+Error
+HttpInferRequest::AddInput(uint8_t* buf, size_t byte_size)
+{
+  data_buffers_.push(std::pair<uint8_t*, size_t>(buf, byte_size));
+  total_input_byte_size_ += byte_size;
+  return Error::Success;
+}
+
+Error
+HttpInferRequest::GetNextInput(uint8_t* buf, size_t size, size_t* input_bytes)
+{
+  *input_bytes = 0;
+
+  if (data_buffers_.empty()) {
+    return Error::Success;
+  }
+
+  while (!data_buffers_.empty() && size > 0) {
+    const size_t csz = std::min(data_buffers_.front().second, size);
+    if (csz > 0) {
+      const uint8_t* input_ptr = data_buffers_.front().first;
+      std::copy(input_ptr, input_ptr + csz, buf);
+      size -= csz;
+      buf += csz;
+      *input_bytes += csz;
+
+
+      data_buffers_.front().first += csz;
+      data_buffers_.front().second -= csz;
+      if (data_buffers_.front().second == 0) {
+        data_buffers_.pop();
+      }
+    }
+  }
+
+  // Set end timestamp if all inputs have been sent.
+  if (data_buffers_.empty()) {
+    Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
+  }
+
+  return Error::Success;
+}
+
+//==============================================================================
+
 Error
 InferenceServerHttpClient::Create(
     std::unique_ptr<InferenceServerHttpClient>* client,
     const std::string& server_url, bool verbose)
 {
   client->reset(new InferenceServerHttpClient(server_url, verbose));
+  client->get()->sync_request_.reset(
+      static_cast<InferRequest*>(new HttpInferRequest()));
   return Error::Success;
 }
 
@@ -228,10 +356,355 @@ InferenceServerHttpClient::GetModelConfig(
   return err;
 }
 
+Error
+InferenceServerHttpClient::Infer(
+    InferResult** result, const InferOptions& options,
+    const std::vector<InferInput*>& inputs,
+    const std::vector<const InferRequestedOutput*>& outputs,
+    const Headers& headers, const Parameters& query_params)
+{
+  Error err;
+
+  std::string request_uri(url_ + "/v2/models/" + options.model_name_);
+  if (!options.model_version_.empty()) {
+    request_uri = request_uri + "/versions/" + options.model_version_;
+  }
+  request_uri = request_uri + "/infer";
+
+  std::shared_ptr<HttpInferRequest> sync_request =
+      std::static_pointer_cast<HttpInferRequest>(sync_request_);
+
+  sync_request->Timer().Reset();
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
+
+  if (!curl_global.Status().IsOk()) {
+    return curl_global.Status();
+  }
+
+  err = PreRunProcessing(
+      request_uri, options, inputs, outputs, headers, query_params,
+      sync_request_);
+  if (!err.IsOk()) {
+    return err;
+  }
+
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
+
+  // During this call SEND_END, RECV_START and RECV_END will be set.
+  sync_request->http_status_ = curl_easy_perform(sync_request->easy_handle_);
+
+  InferResultHttp::Create(
+      result, std::move(sync_request->infer_response_buffer_),
+      sync_request->response_json_size_);
+
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
+
+  err = UpdateInferStat(sync_request->Timer());
+  if (!err.IsOk()) {
+    std::cerr << "Failed to update context stat: " << err << std::endl;
+  }
+
+  err = reinterpret_cast<InferResultHttp*>(*result)->RequestStatus();
+
+  return err;
+}
+
 InferenceServerHttpClient::InferenceServerHttpClient(
     const std::string& url, bool verbose)
     : url_(url), verbose_(verbose)
 {
+}
+
+
+size_t
+InferenceServerHttpClient::InferRequestProvider(
+    void* contents, size_t size, size_t nmemb, void* userp)
+{
+  HttpInferRequest* request = reinterpret_cast<HttpInferRequest*>(userp);
+
+  size_t input_bytes = 0;
+  Error err = request->GetNextInput(
+      reinterpret_cast<uint8_t*>(contents), size * nmemb, &input_bytes);
+  if (!err.IsOk()) {
+    std::cerr << "RequestProvider: " << err << std::endl;
+    return CURL_READFUNC_ABORT;
+  }
+
+  return input_bytes;
+}
+
+size_t
+InferenceServerHttpClient::InferResponseHeaderHandler(
+    void* contents, size_t size, size_t nmemb, void* userp)
+{
+  HttpInferRequest* request = reinterpret_cast<HttpInferRequest*>(userp);
+
+  char* buf = reinterpret_cast<char*>(contents);
+  size_t byte_size = size * nmemb;
+
+  size_t idx = strlen(kInferHeaderContentLengthHTTPHeader);
+  if ((idx < byte_size) &&
+      !strncasecmp(buf, kInferHeaderContentLengthHTTPHeader, idx)) {
+    while ((idx < byte_size) && (buf[idx] != ':')) {
+      ++idx;
+    }
+
+    if (idx < byte_size) {
+      std::string hdr(buf + idx + 1, byte_size - idx - 1);
+      request->response_json_size_ = std::stoi(hdr);
+    }
+  }
+
+  return byte_size;
+}
+
+size_t
+InferenceServerHttpClient::InferResponseHandler(
+    void* contents, size_t size, size_t nmemb, void* userp)
+{
+  HttpInferRequest* request = reinterpret_cast<HttpInferRequest*>(userp);
+
+  if (request->Timer().Timestamp(RequestTimers::Kind::RECV_START) == 0) {
+    request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_START);
+  }
+
+  uint8_t* buf = reinterpret_cast<uint8_t*>(contents);
+  size_t result_bytes = size * nmemb;
+  std::copy(
+      buf, buf + result_bytes,
+      std::back_inserter(*request->infer_response_buffer_));
+
+  // ResponseHandler may be called multiple times so we overwrite
+  // RECV_END so that we always have the time of the last.
+  request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
+
+  return result_bytes;
+}
+
+void
+InferenceServerHttpClient::PrepareRequestJson(
+    const InferOptions& options, const std::vector<InferInput*>& inputs,
+    const std::vector<const InferRequestedOutput*>& outputs,
+    rapidjson::Document* request_json)
+{
+  // Populate the request JSON.
+  rapidjson::Document::AllocatorType& allocator = request_json->GetAllocator();
+  request_json->SetObject();
+  {
+    rapidjson::Value request_id_json(options.request_id_.c_str(), allocator);
+    request_json->AddMember("id", request_id_json, allocator);
+    rapidjson::Value parameters_json(rapidjson::kObjectType);
+    {
+      if (options.sequence_id_ != 0) {
+        rapidjson::Value sequence_id_json(options.sequence_id_);
+        parameters_json.AddMember("sequence_id", sequence_id_json, allocator);
+        rapidjson::Value sequence_start_json(options.sequence_start_);
+        parameters_json.AddMember(
+            "sequence_start", sequence_start_json, allocator);
+        rapidjson::Value sequence_end_json(options.sequence_end_);
+        parameters_json.AddMember("sequence_end", sequence_end_json, allocator);
+      }
+
+      if (options.priority_ != 0) {
+        rapidjson::Value priority_json(options.priority_);
+        parameters_json.AddMember("priority", priority_json, allocator);
+      }
+
+      if (options.timeout_ != 0) {
+        rapidjson::Value timeout_json(options.timeout_);
+        parameters_json.AddMember("timeout", timeout_json, allocator);
+      }
+    }
+    request_json->AddMember("parameters", parameters_json, allocator);
+  }
+
+  rapidjson::Value inputs_json(rapidjson::kArrayType);
+  {
+    for (const auto this_input : inputs) {
+      rapidjson::Value this_input_json(rapidjson::kObjectType);
+      {
+        rapidjson::Value name_json(this_input->Name().c_str(), allocator);
+        this_input_json.AddMember("name", name_json, allocator);
+        rapidjson::Value shape_json(rapidjson::kArrayType);
+        {
+          for (const auto dim : this_input->Shape()) {
+            rapidjson::Value dim_json(dim);
+            shape_json.PushBack(dim_json, allocator);
+          }
+        }
+        this_input_json.AddMember("shape", shape_json, allocator);
+        rapidjson::Value datatype_json(
+            this_input->Datatype().c_str(), allocator);
+        this_input_json.AddMember("datatype", datatype_json, allocator);
+        rapidjson::Value parameters_json(rapidjson::kObjectType);
+        if (this_input->IsSharedMemory()) {
+          std::string region_name;
+          size_t offset;
+          size_t byte_size;
+          this_input->SharedMemoryInfo(&region_name, &byte_size, &offset);
+          {
+            rapidjson::Value shared_memory_region_json(
+                region_name.c_str(), allocator);
+            parameters_json.AddMember(
+                "shared_memory_region", shared_memory_region_json, allocator);
+            rapidjson::Value shared_memory_byte_size_json(byte_size);
+            parameters_json.AddMember(
+                "shared_memory_byte_size", shared_memory_byte_size_json,
+                allocator);
+            if (offset != 0) {
+              rapidjson::Value shared_memory_offset_json(offset);
+              parameters_json.AddMember(
+                  "shared_memory_offset", shared_memory_offset_json, allocator);
+            }
+          }
+        } else {
+          size_t byte_size;
+          this_input->ByteSize(&byte_size);
+          rapidjson::Value binary_data_size_json(byte_size);
+          parameters_json.AddMember(
+              "binary_data_size", binary_data_size_json, allocator);
+        }
+        this_input_json.AddMember("parameters", parameters_json, allocator);
+      }
+      inputs_json.PushBack(this_input_json, allocator);
+    }
+  }
+  request_json->AddMember("inputs", inputs_json, allocator);
+
+  rapidjson::Value ouputs_json(rapidjson::kArrayType);
+  {
+    for (const auto this_output : outputs) {
+      rapidjson::Value this_output_json(rapidjson::kObjectType);
+      {
+        rapidjson::Value name_json(this_output->Name().c_str(), allocator);
+        this_output_json.AddMember("name", name_json, allocator);
+        rapidjson::Value parameters_json(rapidjson::kObjectType);
+        size_t class_count = this_output->ClassCount();
+        if (class_count != 0) {
+          rapidjson::Value classification_json(class_count);
+          parameters_json.AddMember(
+              "classification", classification_json, allocator);
+        }
+        if (this_output->IsSharedMemory()) {
+          std::string region_name;
+          size_t offset;
+          size_t byte_size;
+          this_output->SharedMemoryInfo(&region_name, &byte_size, &offset);
+          {
+            rapidjson::Value shared_memory_region_json(
+                region_name.c_str(), allocator);
+            parameters_json.AddMember(
+                "shared_memory_region", shared_memory_region_json, allocator);
+            rapidjson::Value shared_memory_byte_size_json(byte_size);
+            parameters_json.AddMember(
+                "shared_memory_byte_size", shared_memory_byte_size_json,
+                allocator);
+            if (offset != 0) {
+              rapidjson::Value shared_memory_offset_json(offset);
+              parameters_json.AddMember(
+                  "shared_memory_offset", shared_memory_offset_json, allocator);
+            }
+          }
+        } else {
+          rapidjson::Value binary_data_json(true);
+          parameters_json.AddMember("binary_data", binary_data_json, allocator);
+        }
+        this_output_json.AddMember("parameters", parameters_json, allocator);
+      }
+      ouputs_json.PushBack(this_output_json, allocator);
+    }
+  }
+  request_json->AddMember("outputs", ouputs_json, allocator);
+}
+
+Error
+InferenceServerHttpClient::PreRunProcessing(
+    std::string& request_uri, const InferOptions& options,
+    const std::vector<InferInput*>& inputs,
+    const std::vector<const InferRequestedOutput*>& outputs,
+    const Headers& headers, const Parameters& query_params,
+    std::shared_ptr<InferRequest>& request)
+{
+  rapidjson::Document request_json;
+  PrepareRequestJson(options, inputs, outputs, &request_json);
+
+  // Prepare the request object to provide the data for inference.
+  std::shared_ptr<HttpInferRequest> http_request =
+      std::static_pointer_cast<HttpInferRequest>(request);
+  http_request->InitializeRequest(request_json);
+
+  // Add the buffers holding input tensor data
+  for (const auto this_input : inputs) {
+    if (!this_input->IsSharedMemory()) {
+      this_input->PrepareForRequest();
+      bool end_of_input = false;
+      while (!end_of_input) {
+        const uint8_t* buf;
+        size_t buf_size;
+        this_input->GetNext(&buf, &buf_size, &end_of_input);
+        if (buf != nullptr) {
+          http_request->AddInput(const_cast<uint8_t*>(buf), buf_size);
+        }
+      }
+    }
+  }
+
+  // Prepare curl
+  CURL* curl = http_request->easy_handle_;
+  if (!curl) {
+    return Error("failed to initialize HTTP client");
+  }
+
+  if (!query_params.empty()) {
+    request_uri = request_uri + "?" + GetQueryString(query_params);
+  }
+
+  curl_easy_setopt(curl, CURLOPT_URL, request_uri.c_str());
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+  curl_easy_setopt(curl, CURLOPT_POST, 1L);
+  curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1L);
+  if (verbose_) {
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  }
+
+  const long buffer_byte_size = 16 * 1024 * 1024;
+  curl_easy_setopt(curl, CURLOPT_UPLOAD_BUFFERSIZE, buffer_byte_size);
+  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, buffer_byte_size);
+
+  // request data provided by InferRequestProvider()
+  curl_easy_setopt(curl, CURLOPT_READFUNCTION, InferRequestProvider);
+  curl_easy_setopt(curl, CURLOPT_READDATA, http_request.get());
+
+  // response headers handled by InferResponseHeaderHandler()
+  curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, InferResponseHeaderHandler);
+  curl_easy_setopt(curl, CURLOPT_HEADERDATA, http_request.get());
+
+  // response data handled by InferResponseHandler()
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, InferResponseHandler);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, http_request.get());
+
+  const curl_off_t post_byte_size = http_request->total_input_byte_size_;
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, post_byte_size);
+
+  struct curl_slist* list = nullptr;
+
+  std::string infer_hdr{std::string(kInferHeaderContentLengthHTTPHeader) +
+                        ": " +
+                        std::to_string(http_request->request_json_.GetSize())};
+  list = curl_slist_append(list, infer_hdr.c_str());
+  list = curl_slist_append(list, "Expect:");
+  list = curl_slist_append(list, "Content-Type: application/octet-stream");
+  for (const auto& pr : headers) {
+    std::string hdr = pr.first + ": " + pr.second;
+    list = curl_slist_append(list, hdr.c_str());
+  }
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+
+
+  // The list will be freed when the request is destructed
+  http_request->header_list_ = list;
+
+  return Error::Success;
 }
 
 Error
@@ -319,5 +792,169 @@ InferenceServerHttpClient::ResponseHandler(
   std::copy(buf, buf + result_bytes, std::back_inserter(*response_string));
   return result_bytes;
 }
+
+//==============================================================================
+
+Error
+InferResultHttp::Create(
+    InferResult** infer_result, std::unique_ptr<std::string> response,
+    size_t json_response_size)
+{
+  *infer_result = reinterpret_cast<InferResult*>(
+      new InferResultHttp(std::move(response), json_response_size));
+  return Error::Success;
+}
+
+Error
+InferResultHttp::ModelName(std::string* name) const
+{
+  const auto& itr = response_json_.FindMember("model_name");
+  if (itr != response_json_.MemberEnd()) {
+    *name = std::string(itr->value.GetString(), itr->value.GetStringLength());
+  } else {
+    return Error("model name was not returned in the response");
+  }
+  return Error::Success;
+}
+
+Error
+InferResultHttp::ModelVersion(std::string* version) const
+{
+  const auto& itr = response_json_.FindMember("model_version");
+  if (itr != response_json_.MemberEnd()) {
+    *version =
+        std::string(itr->value.GetString(), itr->value.GetStringLength());
+  } else {
+    return Error("model version was not returned in the response");
+  }
+  return Error::Success;
+}
+
+Error
+InferResultHttp::Id(std::string* id) const
+{
+  const auto& itr = response_json_.FindMember("id");
+  if (itr != response_json_.MemberEnd()) {
+    *id = std::string(itr->value.GetString(), itr->value.GetStringLength());
+  } else {
+    return Error("model version was not returned in the response");
+  }
+  return Error::Success;
+}
+
+Error
+InferResultHttp::Shape(
+    const std::string& output_name, std::vector<int64_t>* shape) const
+{
+  shape->clear();
+  auto itr = output_name_to_result_map_.find(output_name);
+  if (itr != output_name_to_result_map_.end()) {
+    const auto shape_itr = itr->second->FindMember("shape");
+    if (shape_itr != itr->second->MemberEnd()) {
+      const rapidjson::Value& shape_json = shape_itr->value;
+      for (rapidjson::SizeType i = 0; i < shape_json.Size(); i++) {
+        shape->push_back(shape_json[i].GetInt());
+      }
+    } else {
+      return Error(
+          "The response does not contain shape for output name " + output_name);
+    }
+  } else {
+    return Error(
+        "The response does not contain results or output name " + output_name);
+  }
+  return Error::Success;
+}
+
+Error
+InferResultHttp::Datatype(
+    const std::string& output_name, std::string* datatype) const
+{
+  auto itr = output_name_to_result_map_.find(output_name);
+  if (itr != output_name_to_result_map_.end()) {
+    const auto datatype_itr = itr->second->FindMember("datatype");
+    if (datatype_itr != itr->second->MemberEnd()) {
+      const rapidjson::Value& datatype_json = datatype_itr->value;
+      *datatype = std::string(
+          datatype_json.GetString(), datatype_json.GetStringLength());
+    } else {
+      return Error(
+          "The response does not contain datatype for output name " +
+          output_name);
+    }
+  } else {
+    return Error(
+        "The response does not contain datatype or output name " + output_name);
+  }
+  return Error::Success;
+}
+
+
+Error
+InferResultHttp::RawData(
+    const std::string& output_name, const uint8_t** buf,
+    size_t* byte_size) const
+{
+  auto itr = output_name_to_buffer_map_.find(output_name);
+  if (itr != output_name_to_buffer_map_.end()) {
+    *buf = itr->second.first;
+    *byte_size = itr->second.second;
+  } else {
+    return Error(
+        "The response does not contain results or output name " + output_name);
+  }
+
+  return Error::Success;
+}
+
+InferResultHttp::InferResultHttp(
+    std::unique_ptr<std::string> response, size_t json_response_size)
+    : response_(std::move(response))
+{
+  size_t offset = json_response_size;
+  response_json_.Parse((char*)response_.get()->c_str(), json_response_size);
+  const auto& itr = response_json_.FindMember("outputs");
+  if (itr != response_json_.MemberEnd()) {
+    const rapidjson::Value& outputs = itr->value;
+    for (size_t i = 0; i < outputs.Size(); i++) {
+      const rapidjson::Value& output = outputs[i];
+      const char* output_name = output["name"].GetString();
+      output_name_to_result_map_[output_name] = &output;
+      const auto& pitr = output.FindMember("parameters");
+      if (pitr != output.MemberEnd()) {
+        const rapidjson::Value& param = pitr->value;
+        const auto& bitr = param.FindMember("binary_data_size");
+        if (bitr != param.MemberEnd()) {
+          size_t byte_size = bitr->value.GetInt();
+          output_name_to_buffer_map_.emplace(
+              output_name,
+              std::pair<const uint8_t*, const size_t>(
+                  (uint8_t*)(response_.get()->c_str()) + offset, byte_size));
+          offset += byte_size;
+        }
+      }
+    }
+  }
+}
+
+std::string
+InferResultHttp::DebugString() const
+{
+  return GetJsonText(response_json_);
+}
+
+Error
+InferResultHttp::RequestStatus() const
+{
+  const auto& itr = response_json_.FindMember("error");
+  if (itr != response_json_.MemberEnd()) {
+    return Error(
+        std::string(itr->value.GetString(), itr->value.GetStringLength()));
+  }
+
+  return Error::Success;
+}
+
+//==============================================================================
 
 }}}  // namespace nvidia::inferenceserver::client

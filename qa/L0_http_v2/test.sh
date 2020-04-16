@@ -50,6 +50,7 @@ SIMPLE_MODEL_CONTROL_PY=../clients/simple_http_v2_model_control.py
 SIMPLE_SEQUENCE_INFER_CLIENT_PY=../clients/simple_http_v2_sequence_sync_infer_client.py
 
 SIMPLE_HEALTH_CLIENT=../clients/simple_http_v2_health_metadata
+SIMPLE_INFER_CLIENT=../clients/simple_http_v2_infer_client
 
 rm -f *.log
 rm -f *.log.*
@@ -85,12 +86,6 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-$SIMPLE_HEALTH_CLIENT -v -H test1:1 >> ${CLIENT_LOG}.c++.health 2>&1
-if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.c++.health
-    RET=1
-fi
-
 IMAGE=../images/vulture.jpeg
 for i in \
         $SIMPLE_INFER_CLIENT_PY \
@@ -116,6 +111,20 @@ for i in \
 
     if [ $? -ne 0 ]; then
         cat "${CLIENT_LOG}.${SUFFIX}"
+        RET=1
+    fi
+done
+
+for i in \
+   $SIMPLE_INFER_CLIENT \
+   $SIMPLE_HEALTH_CLIENT \
+   ; do
+   BASE=$(basename -- $i)
+   SUFFIX="${BASE%.*}"
+
+    $i -v -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.c++.${SUFFIX}
         RET=1
     fi
 done

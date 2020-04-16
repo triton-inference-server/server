@@ -27,7 +27,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <string>
-#include "src/clients/c++/experimental_api_v2/library/grpc_client.h"
+#include "src/clients/c++/experimental_api_v2/library/http_client.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
@@ -44,8 +44,7 @@ namespace nic = nvidia::inferenceserver::client;
 namespace {
 
 void
-ValidateShapeAndDatatype(
-    const std::string& name, std::shared_ptr<nic::InferResult> result)
+ValidateShapeAndDatatype(const std::string& name, nic::InferResult* result)
 {
   std::vector<int64_t> shape;
   FAIL_IF_ERR(result->Shape(name, &shape), "unable to get shape for " + name);
@@ -90,7 +89,7 @@ int
 main(int argc, char** argv)
 {
   bool verbose = false;
-  std::string url("localhost:8001");
+  std::string url("localhost:8000");
   nic::Headers http_headers;
 
   // Parse commandline...
@@ -122,12 +121,12 @@ main(int argc, char** argv)
   std::string model_name = "simple";
   std::string model_version = "";
 
-  // Create a InferenceServerGrpcClient instance to communicate with the
-  // server using gRPC protocol.
-  std::unique_ptr<nic::InferenceServerGrpcClient> client;
+  // Create a InferenceServerHttpClient instance to communicate with the
+  // server using HTTP protocol.
+  std::unique_ptr<nic::InferenceServerHttpClient> client;
   FAIL_IF_ERR(
-      nic::InferenceServerGrpcClient::Create(&client, url, verbose),
-      "unable to create grpc client");
+      nic::InferenceServerHttpClient::Create(&client, url, verbose),
+      "unable to create http client");
 
   // Create the data for the two input tensors. Initialize the first
   // to unique integers and the second to all ones.
@@ -198,14 +197,14 @@ main(int argc, char** argv)
   results_ptr.reset(results);
 
   // Validate the results...
-  ValidateShapeAndDatatype("OUTPUT0", results_ptr);
-  ValidateShapeAndDatatype("OUTPUT1", results_ptr);
+  ValidateShapeAndDatatype("OUTPUT0", results);
+  ValidateShapeAndDatatype("OUTPUT1", results);
 
   // Get pointers to the result returned...
   int32_t* output0_data;
   size_t output0_byte_size;
   FAIL_IF_ERR(
-      results_ptr->RawData(
+      results->RawData(
           "OUTPUT0", (const uint8_t**)&output0_data, &output0_byte_size),
       "unable to get datatype for OUTPUT0");
   if (output0_byte_size != 64) {
@@ -217,7 +216,7 @@ main(int argc, char** argv)
   int32_t* output1_data;
   size_t output1_byte_size;
   FAIL_IF_ERR(
-      results_ptr->RawData(
+      results->RawData(
           "OUTPUT1", (const uint8_t**)&output1_data, &output1_byte_size),
       "unable to get datatype for OUTPUT1");
   if (output0_byte_size != 64) {
@@ -243,7 +242,7 @@ main(int argc, char** argv)
   }
 
   // Get full response
-  std::cout << results_ptr->DebugString() << std::endl;
+  std::cout << results->DebugString() << std::endl;
 
   nic::InferStat infer_stat;
   client->GetInferStat(&infer_stat);
