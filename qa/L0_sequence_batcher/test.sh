@@ -52,7 +52,7 @@ BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx plan custom"}
 # If ENSEMBLES not specified, set to 1
 ENSEMBLES=${ENSEMBLES:="1"}
 
-# Must run on a single device or else the TRTSERVER_DELAY_SCHEDULER
+# Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
 # can fail when the requests are distributed to multiple devices.
 export CUDA_VISIBLE_DEVICES=0
 
@@ -220,7 +220,7 @@ for model_trial in v 0 1 2 4; do
         wait $SERVER_PID
     done
 
-    # Tests that require TRTSERVER_DELAY_SCHEDULER so that the
+    # Tests that require TRITONSERVER_DELAY_SCHEDULER so that the
     # scheduler is delayed and requests can collect in the queue.
     for i in \
             test_backlog_fill \
@@ -233,16 +233,16 @@ for model_trial in v 0 1 2 4; do
             test_full_batch \
             test_ragged_batch \
             test_backlog ; do
-        export TRTSERVER_BACKLOG_DELAY_SCHEDULER=3 &&
-            [[ "$i" != "test_backlog_fill_no_end" ]] && export TRTSERVER_BACKLOG_DELAY_SCHEDULER=2 &&
+        export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=3 &&
+            [[ "$i" != "test_backlog_fill_no_end" ]] && export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=2 &&
             [[ "$i" != "test_backlog_fill" ]] &&
-            [[ "$i" != "test_backlog_same_correlation_id" ]] && export TRTSERVER_BACKLOG_DELAY_SCHEDULER=0
-        export TRTSERVER_DELAY_SCHEDULER=10 &&
+            [[ "$i" != "test_backlog_same_correlation_id" ]] && export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
+        export TRITONSERVER_DELAY_SCHEDULER=10 &&
             [[ "$i" != "test_backlog_fill_no_end" ]] &&
-            [[ "$i" != "test_backlog_fill" ]] && export TRTSERVER_DELAY_SCHEDULER=16 &&
-            [[ "$i" != "test_backlog_same_correlation_id_no_end" ]] && export TRTSERVER_DELAY_SCHEDULER=8 &&
-            [[ "$i" != "test_half_batch" ]] && export TRTSERVER_DELAY_SCHEDULER=4 &&
-            [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRTSERVER_DELAY_SCHEDULER=12
+            [[ "$i" != "test_backlog_fill" ]] && export TRITONSERVER_DELAY_SCHEDULER=16 &&
+            [[ "$i" != "test_backlog_same_correlation_id_no_end" ]] && export TRITONSERVER_DELAY_SCHEDULER=8 &&
+            [[ "$i" != "test_half_batch" ]] && export TRITONSERVER_DELAY_SCHEDULER=4 &&
+            [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRITONSERVER_DELAY_SCHEDULER=12
         SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR --api-version=2"
         SERVER_LOG="./$i.$MODEL_DIR.serverlog"
         run_server
@@ -263,8 +263,8 @@ for model_trial in v 0 1 2 4; do
         fi
         set -e
 
-        unset TRTSERVER_DELAY_SCHEDULER
-        unset TRTSERVER_BACKLOG_DELAY_SCHEDULER
+        unset TRITONSERVER_DELAY_SCHEDULER
+        unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
         kill $SERVER_PID
         wait $SERVER_PID
     done
@@ -287,8 +287,8 @@ if [[ $BACKENDS == *"custom"* ]]; then
   # used for execution). Test everything with fixed-tensor-size
   # models and variable-tensor-size models.
   for i in test_ragged_batch_allowed ; do
-      export TRTSERVER_BACKLOG_DELAY_SCHEDULER=3
-      export TRTSERVER_DELAY_SCHEDULER=12
+      export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=3
+      export TRITONSERVER_DELAY_SCHEDULER=12
 
       SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR --api-version=2"
       SERVER_LOG="./$i.$MODEL_DIR.serverlog"
@@ -310,8 +310,8 @@ if [[ $BACKENDS == *"custom"* ]]; then
       fi
       set -e
 
-      unset TRTSERVER_DELAY_SCHEDULER
-      unset TRTSERVER_BACKLOG_DELAY_SCHEDULER
+      unset TRITONSERVER_DELAY_SCHEDULER
+      unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
       kill $SERVER_PID
       wait $SERVER_PID
   done

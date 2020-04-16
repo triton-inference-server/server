@@ -89,8 +89,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     corrid = 52
                     self.check_sequence(trial, model_name, dtype, corrid,
@@ -126,8 +126,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     corrid = 99
                     self.check_sequence(trial, model_name, dtype, corrid,
@@ -160,8 +160,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                 corrids = [ 1001, 1002, 1003, 1004 ]
                 threads = []
@@ -279,8 +279,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                 corrids = [ 1001, 1002, 1003, 1004, 1005 ]
                 threads = []
@@ -375,8 +375,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                 corrids = [ 1001, 1002, 1003, 1004, 1005, 1006 ]
                 threads = []
@@ -483,8 +483,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                 corrids = [ 1001, 1002, 1003, 1004, 1005, 1006 ]
                 threads = []
@@ -597,8 +597,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                 corrids = [ 1001, 1002, 1003, 1004, 1005 ]
                 threads = []

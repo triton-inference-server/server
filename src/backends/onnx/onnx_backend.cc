@@ -634,7 +634,7 @@ OnnxBackend::Context::Run(
   for (auto& input : inputs) {
     for (auto& indirect_buffer : input.indirect_buffers_) {
       bool cuda_used;
-      TRTSERVER_Memory_Type buffer_memory_type;
+      TRITONSERVER_MemoryType buffer_memory_type;
       int64_t buffer_memory_id;
       size_t buffer_byte_size;
       auto buffer =
@@ -743,7 +743,7 @@ OnnxBackend::Context::SetInputTensor(
   const size_t buffer_size =
       total_byte_size + ((data_type != TYPE_STRING) ? 0 : 1);
   input_buffers->emplace_back(
-      new AllocatedMemory(buffer_size, TRTSERVER_MEMORY_CPU_PINNED, 0));
+      new AllocatedMemory(buffer_size, TRITONSERVER_MEMORY_CPU_PINNED, 0));
   inputs->emplace_back();
   auto& input = inputs->back();
   input.input_buffer_ = input_buffers->back()->MutableBuffer(
@@ -942,7 +942,7 @@ OnnxBackend::Context::ReadOutputTensors(
 
       // [TODO] currently ONNX output data are always on CPU
       // https://github.com/microsoft/onnxruntime/issues/1621
-      output.memory_type_ = TRTSERVER_MEMORY_CPU;
+      output.memory_type_ = TRITONSERVER_MEMORY_CPU;
       output.memory_type_id_ = 0;
       cuda_copy |=
           SetFixedSizeOutputBuffer(name, batch1_byte_size, &output, payloads);
@@ -957,13 +957,13 @@ OnnxBackend::Context::ReadOutputTensors(
   for (auto& output : outputs) {
     for (auto& indirect_buffer : output.indirect_buffers_) {
       bool cuda_used;
-      TRTSERVER_Memory_Type src_memory_type;
+      TRITONSERVER_MemoryType src_memory_type;
       int64_t src_memory_type_id;
       // placeholder, copy byte size is determined by dst_byte_size
       size_t src_byte_size;
       auto src = indirect_buffer.first->BufferAt(
           0, &src_byte_size, &src_memory_type, &src_memory_type_id);
-      TRTSERVER_Memory_Type dst_memory_type;
+      TRITONSERVER_MemoryType dst_memory_type;
       int64_t dst_memory_type_id;
       for (auto& payload_output : indirect_buffer.second) {
         char* dst = payload_output.second->MutableBuffer(
@@ -1011,8 +1011,9 @@ OnnxBackend::Context::SetStringOutputBuffer(
           data_byte_size + sizeof(uint32_t) * expected_element_cnt;
 
       void* buffer;
-      TRTSERVER_Memory_Type preferred_memory_type = TRTSERVER_MEMORY_CPU_PINNED;
-      TRTSERVER_Memory_Type actual_memory_type;
+      TRITONSERVER_MemoryType preferred_memory_type =
+          TRITONSERVER_MEMORY_CPU_PINNED;
+      TRITONSERVER_MemoryType actual_memory_type;
       int64_t actual_memory_type_id;
       Status status = payload.response_provider_->AllocateOutputBuffer(
           name, &buffer, expected_byte_size, content_shape,
@@ -1026,7 +1027,7 @@ OnnxBackend::Context::SetStringOutputBuffer(
               offsets[element_idx + e + 1] - offsets[element_idx + e];
           // Prepend size of the string
           payload.status_ = CopyBuffer(
-              name, TRTSERVER_MEMORY_CPU /* src_memory_type */,
+              name, TRITONSERVER_MEMORY_CPU /* src_memory_type */,
               0 /* src_memory_type_id */, actual_memory_type,
               actual_memory_type_id, sizeof(uint32_t),
               static_cast<const void*>(&len),
@@ -1038,7 +1039,7 @@ OnnxBackend::Context::SetStringOutputBuffer(
 
           // Copy raw string content
           payload.status_ = CopyBuffer(
-              name, TRTSERVER_MEMORY_CPU /* src_memory_type */,
+              name, TRITONSERVER_MEMORY_CPU /* src_memory_type */,
               0 /* src_memory_type_id */, actual_memory_type,
               actual_memory_type_id, len, content + offsets[element_idx + e],
               static_cast<char*>(buffer) + copied_byte_size, stream_,

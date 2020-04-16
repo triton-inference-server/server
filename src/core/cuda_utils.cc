@@ -72,9 +72,9 @@ EnablePeerAccess(const double min_compute_capability)
 
 Status
 CopyBuffer(
-    const std::string& msg, const TRTSERVER_Memory_Type src_memory_type,
+    const std::string& msg, const TRITONSERVER_MemoryType src_memory_type,
     const int64_t src_memory_type_id,
-    const TRTSERVER_Memory_Type dst_memory_type,
+    const TRITONSERVER_MemoryType dst_memory_type,
     const int64_t dst_memory_type_id, const size_t byte_size, const void* src,
     void* dst, cudaStream_t cuda_stream, bool* cuda_used)
 {
@@ -85,16 +85,16 @@ CopyBuffer(
   // For CUDA memcpy, all host to host copy will be blocked in respect to the
   // host, so use memcpy() directly. In this case, need to be careful on whether
   // the src buffer is valid.
-  if ((src_memory_type != TRTSERVER_MEMORY_GPU) &&
-      (dst_memory_type != TRTSERVER_MEMORY_GPU)) {
+  if ((src_memory_type != TRITONSERVER_MEMORY_GPU) &&
+      (dst_memory_type != TRITONSERVER_MEMORY_GPU)) {
     memcpy(dst, src, byte_size);
   } else {
 #ifdef TRTIS_ENABLE_GPU
     // [TODO] use cudaMemcpyDefault if UVM is supported for the device
     auto copy_kind = cudaMemcpyDeviceToDevice;
-    if (src_memory_type != TRTSERVER_MEMORY_GPU) {
+    if (src_memory_type != TRITONSERVER_MEMORY_GPU) {
       copy_kind = cudaMemcpyHostToDevice;
-    } else if (dst_memory_type != TRTSERVER_MEMORY_GPU) {
+    } else if (dst_memory_type != TRITONSERVER_MEMORY_GPU) {
       copy_kind = cudaMemcpyDeviceToHost;
     }
 

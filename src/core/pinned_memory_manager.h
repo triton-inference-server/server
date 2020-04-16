@@ -57,7 +57,7 @@ class PinnedMemoryManager {
   // be allocated.
   // Return Status object indicating success or failure.
   static Status Alloc(
-      void** ptr, uint64_t size, TRTSERVER_Memory_Type* allocated_type,
+      void** ptr, uint64_t size, TRITONSERVER_MemoryType* allocated_type,
       bool allow_nonpinned_fallback = false);
 
   // Free the memory allocated by the pinned memory manager.
@@ -68,7 +68,7 @@ class PinnedMemoryManager {
   PinnedMemoryManager(void* pinned_memory_buffer, uint64_t size);
 
   Status AllocInternal(
-      void** ptr, uint64_t size, TRTSERVER_Memory_Type* allocated_type,
+      void** ptr, uint64_t size, TRITONSERVER_MemoryType* allocated_type,
       bool allow_nonpinned_fallback = false);
   Status FreeInternal(void* ptr);
 

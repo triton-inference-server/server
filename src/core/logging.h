@@ -150,14 +150,14 @@ extern Logger gLogger_;
     }                                                    \
   } while (false)
 
-#define LOG_TRTSERVER_ERROR(X, MSG)                                           \
-  do {                                                                        \
-    TRTSERVER_Error* err__ = (X);                                             \
-    if (err__ != nullptr) {                                                   \
-      LOG_ERROR << (MSG) << ": " << TRTSERVER_ErrorCodeString(err__) << " - " \
-                << TRTSERVER_ErrorMessage(err__);                             \
-      TRTSERVER_ErrorDelete(err__);                                           \
-    }                                                                         \
+#define LOG_TRITONSERVER_ERROR(X, MSG)                                  \
+  do {                                                                  \
+    TRITONSERVER_Error* err__ = (X);                                    \
+    if (err__ != nullptr) {                                             \
+      LOG_ERROR << (MSG) << ": " << TRITONSERVER_ErrorCodeString(err__) \
+                << " - " << TRITONSERVER_ErrorMessage(err__);           \
+      TRITONSERVER_ErrorDelete(err__);                                  \
+    }                                                                   \
   } while (false)
 
 #define LOG_TRITONSERVER_ERROR(X, MSG)                                  \
