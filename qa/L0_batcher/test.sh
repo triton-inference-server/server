@@ -50,7 +50,7 @@ RET=0
 # If BACKENDS not specified, set to all
 BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
 
-# Must run on a single device or else the TRTSERVER_DELAY_SCHEDULER
+# Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
 # can fail when the requests are distributed to multiple devices.
 export CUDA_VISIBLE_DEVICES=0
 
@@ -144,15 +144,15 @@ for model_type in FIXED VARIABLE; do
         wait $SERVER_PID
     done
 
-    # Tests that require TRTSERVER_DELAY_SCHEDULER so that the
+    # Tests that require TRITONSERVER_DELAY_SCHEDULER so that the
     # scheduler is delayed and requests can collect in the queue.
     for i in \
             test_multi_batch_delayed_sum_gt_max_preferred \
             test_multi_batch_use_biggest_preferred \
             test_multi_batch_use_best_preferred ; do
-        export TRTSERVER_DELAY_SCHEDULER=6 &&
-            [[ "$i" != "test_multi_batch_use_biggest_preferred" ]] && export TRTSERVER_DELAY_SCHEDULER=3 &&
-            [[ "$i" != "test_multi_batch_use_best_preferred" ]] && export TRTSERVER_DELAY_SCHEDULER=2
+        export TRITONSERVER_DELAY_SCHEDULER=6 &&
+            [[ "$i" != "test_multi_batch_use_biggest_preferred" ]] && export TRITONSERVER_DELAY_SCHEDULER=3 &&
+            [[ "$i" != "test_multi_batch_use_best_preferred" ]] && export TRITONSERVER_DELAY_SCHEDULER=2
         SERVER_ARGS="--model-repository=`pwd`/$MODEL_PATH --api-version=2"
         SERVER_LOG="./$i.$model_type.serverlog"
         run_server
@@ -172,7 +172,7 @@ for model_type in FIXED VARIABLE; do
         fi
         set -e
 
-        unset TRTSERVER_DELAY_SCHEDULER
+        unset TRITONSERVER_DELAY_SCHEDULER
         kill $SERVER_PID
         wait $SERVER_PID
     done
@@ -208,12 +208,12 @@ for i in \
 done
 
 # Tests that run only on the variable-size tensor models and that
-# require TRTSERVER_DELAY_SCHEDULER so that the scheduler is delayed
+# require TRITONSERVER_DELAY_SCHEDULER so that the scheduler is delayed
 # and requests can collect in the queue.
 export BATCHER_TYPE=VARIABLE
 for i in \
         test_multi_batch_delayed_preferred_different_shape ; do
-    export TRTSERVER_DELAY_SCHEDULER=4
+    export TRITONSERVER_DELAY_SCHEDULER=4
     SERVER_ARGS="--model-repository=`pwd`/var_models --api-version=2"
     SERVER_LOG="./$i.VARIABLE.serverlog"
     run_server
@@ -233,7 +233,7 @@ for i in \
     fi
     set -e
 
-    unset TRTSERVER_DELAY_SCHEDULER
+    unset TRITONSERVER_DELAY_SCHEDULER
     kill $SERVER_PID
     wait $SERVER_PID
 done
@@ -268,7 +268,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
     # [1:small 2:large 3:small] or [1:large 2:small 3:*] (* depends on whether order
     # is preserved), and we only interested in the timestamps where the large delay
     # batch is followed by small delay batch
-    export TRTSERVER_DELAY_SCHEDULER=12
+    export TRITONSERVER_DELAY_SCHEDULER=12
 
     # not preserve
     SERVER_ARGS="--trace-file=not_preserve.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/custom_models --api-version=2"
@@ -334,7 +334,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
         RET=1
     fi
     set -e
-    unset TRTSERVER_DELAY_SCHEDULER
+    unset TRITONSERVER_DELAY_SCHEDULER
 fi
 
 # python unittest seems to swallow ImportError and still return 0 exit

@@ -55,11 +55,8 @@ class InferenceRequest {
    public:
     Input();
     Input(
-        const std::string& name, const std::vector<int64_t>& shape,
-        const uint64_t batch_byte_size);
-    Input(
         const std::string& name, const DataType datatype,
-        const std::vector<int64_t>& shape, const uint64_t batch_byte_size);
+        const std::vector<int64_t>& shape);
     Input(
         const std::string& name, const DataType datatype, const int64_t* shape,
         const uint64_t dim_count);
@@ -71,9 +68,6 @@ class InferenceRequest {
 
     // Data type of the input tensor.
     DataType DType() const { return datatype_; }
-
-    // FIXMEV2 Datatype should always be set by constructor for V2
-    void SetDType(const DataType t) { datatype_ = t; }
 
     // The original shape of the input tensor.
     const std::vector<int64_t>& OriginalShape() const
@@ -87,54 +81,42 @@ class InferenceRequest {
     const std::vector<int64_t>& Shape() const { return shape_; }
     std::vector<int64_t>* MutableShape() { return &shape_; }
 
-    // The size, in bytes, of the entire input tensor. We should
-    // ultimately be able to remove this "batch_byte_size" parameter
-    // since the same information is in the Memory object.
-    uint64_t BatchByteSize() const
-    {
-      return batch_byte_size_ == 0 ? data_byte_size_ : batch_byte_size_;
-    }
-    void SetBatchByteSize(uint64_t b) { batch_byte_size_ = b; }
+    // The size, in bytes, of the entire input tensor.
+    uint64_t DataByteSize() const { return data_byte_size_; }
 
     // The data for this input.
     const std::shared_ptr<Memory>& Data() const { return data_; }
 
-    // Append a new buffer of data to this input.
-    Status AppendData(
-        const void* base, size_t byte_size, TRTSERVER_Memory_Type memory_type,
-        int64_t memory_type_id);
+    // Set the data for this input. Error if input already has some
+    // data.
+    Status SetData(const std::shared_ptr<Memory>& data);
 
     // Append a new buffer of data to this input.
     Status AppendData(
         const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
         int64_t memory_type_id);
 
-    // Set the data for this input. Error if input already has some
-    // data.
-    Status SetData(const std::shared_ptr<Memory>& data);
-
     // Remove all existing data for the input.
     Status RemoveAllData();
 
-    // Get the number of buffers that containing the input tensor
-    // data.
-    size_t ContentBufferCount() const { return data_->BufferCount(); }
+    // Get the number of buffers containing the input tensor data.
+    size_t DataBufferCount() const { return data_->BufferCount(); }
 
     // Get the 'idx' buffer containing a contiguous chunk of bytes for
     // the input. Return error is 'idx' refers to a buffer that does
-    // not exist. Return a pointer to the chunk in 'content' and the
-    // size of the chunk in 'content_byte_size'. 'memory_type' acts as
+    // not exist. Return a pointer to the chunk in 'base' and the
+    // size of the chunk in 'byte_size'. 'memory_type' acts as
     // both input and output. On input 'memory_type' is the buffer
     // memory type preferred by the function caller. On return
     // 'memory_type' gives the actual memory type of the chunk pointed
-    // to by 'content'.  'memory_type_id' acts as both input and
+    // to by 'base'.  'memory_type_id' acts as both input and
     // output. On input 'memory_type_id' is the buffer memory type id
     // preferred by the function caller.  On return 'memory_type_id'
     // gives the actual memory type id of the chunk pointed to by
-    // 'content'.
-    Status Content(
-        const size_t idx, const void** content, size_t* content_byte_size,
-        TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const;
+    // 'base'.
+    Status DataBuffer(
+        const size_t idx, const void** base, size_t* byte_size,
+        TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const;
 
    private:
     DISALLOW_COPY_AND_ASSIGN(Input);
@@ -146,13 +128,7 @@ class InferenceRequest {
     std::vector<int64_t> original_shape_;
     std::vector<int64_t> shape_;
 
-    // FIXMEV2 why needed? Should get total data size from data_.
-    uint64_t batch_byte_size_;
-
-    // FIXMEV2 workaround so that adding / removing data will not cause
-    // re-normalized for inference request in V2
     uint64_t data_byte_size_;
-
     std::shared_ptr<Memory> data_;
   };
 
@@ -197,35 +173,26 @@ class InferenceRequest {
   // (because we aren't using shared_from_this).
   InferenceRequest(
       const std::shared_ptr<InferenceBackend>& backend,
-      const int64_t requested_model_version, const uint32_t protocol_version)
-      : InferenceRequest(
-            backend.get(), requested_model_version, protocol_version)
+      const int64_t requested_model_version)
+      : InferenceRequest(backend.get(), requested_model_version)
   {
     backend_shared_ = backend;
   }
 
   InferenceRequest(
-      InferenceBackend* backend, const int64_t requested_model_version,
-      const uint32_t protocol_version)
+      InferenceBackend* backend, const int64_t requested_model_version)
       : needs_normalization_(true), backend_raw_(backend),
-        requested_model_version_(requested_model_version),
-        protocol_version_(protocol_version), flags_(0), correlation_id_(0),
-        batch_size_(0), priority_(0), timeout_us_(0)
+        requested_model_version_(requested_model_version), flags_(0),
+        correlation_id_(0), batch_size_(0), priority_(0), timeout_us_(0)
   {
   }
-
-  uint32_t ProtocolVersion() const { return protocol_version_; }
 
   const std::string& ModelName() const;
   int64_t RequestedModelVersion() const { return requested_model_version_; }
   int64_t ActualModelVersion() const;
 
-  uint64_t Id() const { return id_; }
-  void SetId(uint64_t i) { id_ = i; }
-
-  // FIXMEV2 this replaces "Id" once V2 is only option.
-  const std::string& IdStr() const { return id_str_; }
-  void SetIdStr(const std::string& i) { id_str_ = i; }
+  const std::string& Id() const { return id_; }
+  void SetId(const std::string& i) { id_ = i; }
 
   uint32_t Flags() const { return flags_; }
   void SetFlags(uint32_t f) { flags_ = f; }
@@ -233,14 +200,9 @@ class InferenceRequest {
   uint64_t CorrelationId() const { return correlation_id_; }
   void SetCorrelationId(uint64_t c) { correlation_id_ = c; }
 
-  // FIXMEV2 remove setter as batch size will only be set during
-  // normalization
+  // Batch size is not set explicitly so there is no setter for it. It
+  // is set when the request is normalized.
   uint32_t BatchSize() const { return batch_size_; }
-  void SetBatchSize(uint32_t b)
-  {
-    needs_normalization_ = true;
-    batch_size_ = b;
-  }
 
   uint32_t Priority() const { return priority_; }
   void SetPriority(uint32_t p) { priority_ = p; }
@@ -316,14 +278,11 @@ class InferenceRequest {
   // Add an original input to the request. If 'input' is non-null
   // return a pointer to the newly added input.
   Status AddOriginalInput(
-      const std::string& name, const DimsList& shape,
-      const uint64_t batch_byte_size, Input** input = nullptr);
-  Status AddOriginalInput(
-      const std::string& name, const std::vector<int64_t>& shape,
-      const uint64_t batch_byte_size, Input** input = nullptr);
-  Status AddOriginalInput(
       const std::string& name, const DataType datatype, const int64_t* shape,
       const uint64_t dim_count, Input** input = nullptr);
+  Status AddOriginalInput(
+      const std::string& name, const DataType datatype,
+      const std::vector<int64_t>& shape, Input** input = nullptr);
 
   // Remove a single original input or all inputs.
   Status RemoveOriginalInput(const std::string& name);
@@ -333,7 +292,7 @@ class InferenceRequest {
   // return a pointer to the newly added input.
   Status AddOverrideInput(
       const std::string& name, const DataType datatype,
-      const std::vector<int64_t>& shape, const uint64_t batch_byte_size,
+      const std::vector<int64_t>& shape,
       std::shared_ptr<Input>* input = nullptr);
 
   // Add an override input to the request.
@@ -364,7 +323,7 @@ class InferenceRequest {
       void* response_userp)
   {
     response_factory_ = InferenceResponseFactory(
-        backend_shared_, id_str_, allocator, alloc_userp, response_fn,
+        backend_shared_, id_, allocator, alloc_userp, response_fn,
         response_userp);
     return Status::Success;
   }
@@ -413,8 +372,7 @@ class InferenceRequest {
   friend std::ostream& operator<<(
       std::ostream& out, const InferenceRequest& request);
 
-  Status NormalizeV1();
-  Status NormalizeV2();
+  Status Normalize();
 
   // Has anything in the request potentially changed in a way that
   // causes normalization to be required when preparing the request
@@ -437,12 +395,7 @@ class InferenceRequest {
   int64_t requested_model_version_;
   int64_t actual_model_version_;
 
-  // FIXMEV2 remove
-  uint32_t protocol_version_;
-
-  // For V1 id is an int, for V2 it is a string.
-  uint64_t id_;
-  std::string id_str_;
+  std::string id_;
 
   uint32_t flags_;
   uint64_t correlation_id_;

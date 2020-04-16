@@ -244,12 +244,6 @@ class ServerStatusManager {
   // Create a manager for server status
   explicit ServerStatusManager(const std::string& server_version);
 
-  // Set the protocol version.
-  void SetProtocolVersion(const uint32_t v) { protocol_version_ = v; }
-  // Get the protocol version.
-  uint32_t GetProtocolVersion() { return protocol_version_; }
-
-
   // Initialize status for a model.
   Status InitForModel(
       const std::string& model_name, const ModelConfig& model_config);
@@ -301,6 +295,5 @@ class ServerStatusManager {
  private:
   mutable std::mutex mu_;
   ServerStatus server_status_;
-  uint32_t protocol_version_;
 };
 }}  // namespace nvidia::inferenceserver

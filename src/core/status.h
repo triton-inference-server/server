@@ -27,7 +27,6 @@
 
 #include <string>
 #include "src/core/tritonserver.h"
-#include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -78,20 +77,12 @@ class Status {
 };
 
 // Return the Status::Code corresponding to a
-// TRTSERVER_Error_Code. FIXMEV2 remove.
-Status::Code TrtServerCodeToStatusCode(TRTSERVER_Error_Code code);
-
-// Return the TRTSERVER_Error_Code corresponding to a
-// Status::Code. FIXMEV2 remove.
-TRTSERVER_Error_Code StatusCodeToTrtServerCode(Status::Code code);
-
-// Return the Status::Code corresponding to a
 // TRITONSERVER_Error_Code.
-Status::Code TritonServerCodeToStatusCode(TRITONSERVER_Error_Code code);
+Status::Code TritonCodeToStatusCode(TRITONSERVER_Error_Code code);
 
 // Return the TRITONSERVER_Error_Code corresponding to a
 // Status::Code.
-TRITONSERVER_Error_Code StatusCodeToTritonServerCode(Status::Code status_code);
+TRITONSERVER_Error_Code StatusCodeToTritonCode(Status::Code status_code);
 
 // If status is non-OK, return the Status.
 #define RETURN_IF_ERROR(S)        \
@@ -103,16 +94,16 @@ TRITONSERVER_Error_Code StatusCodeToTritonServerCode(Status::Code status_code);
   } while (false)
 
 // If TRITONSERVER error is non-OK, return the corresponding status.
-#define RETURN_IF_TRITONSERVER_ERROR(E)                                \
-  do {                                                                 \
-    TRITONSERVER_Error* err__ = (E);                                   \
-    if (err__ != nullptr) {                                            \
-      Status status__ = Status(                                        \
-          TritonServerCodeToStatusCode(TRITONSERVER_ErrorCode(err__)), \
-          TRITONSERVER_ErrorMessage(err__));                           \
-      TRITONSERVER_ErrorDelete(err__);                                 \
-      return status__;                                                 \
-    }                                                                  \
+#define RETURN_IF_TRITONSERVER_ERROR(E)                          \
+  do {                                                           \
+    TRITONSERVER_Error* err__ = (E);                             \
+    if (err__ != nullptr) {                                      \
+      Status status__ = Status(                                  \
+          TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err__)), \
+          TRITONSERVER_ErrorMessage(err__));                     \
+      TRITONSERVER_ErrorDelete(err__);                           \
+      return status__;                                           \
+    }                                                            \
   } while (false)
 
 }}  // namespace nvidia::inferenceserver

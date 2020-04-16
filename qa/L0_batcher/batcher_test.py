@@ -196,7 +196,7 @@ class BatcherTest(unittest.TestCase):
                 model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 self.check_response(trial, 2, (3000, None), precreated_shm_regions=precreated_shm_regions)
                 self.check_response(trial, 6, (3000, None), precreated_shm_regions=precreated_shm_regions)
@@ -215,7 +215,7 @@ class BatcherTest(unittest.TestCase):
                 model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 self.check_response(trial, 1, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
                                     precreated_shm_regions=precreated_shm_regions)
@@ -234,7 +234,7 @@ class BatcherTest(unittest.TestCase):
                 model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 self.check_response(trial, 3, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
                                     precreated_shm_regions=precreated_shm_regions)
@@ -253,7 +253,7 @@ class BatcherTest(unittest.TestCase):
                 model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 self.check_response(trial, 7, (3000, None), precreated_shm_regions=precreated_shm_regions)
                 self.check_deferred_exception()
@@ -272,7 +272,7 @@ class BatcherTest(unittest.TestCase):
                 model_name = tu.get_zero_model_name(trial, 1, dtype)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
                 threads.append(threading.Thread(target=iu.infer_zero,
@@ -314,7 +314,7 @@ class BatcherTest(unittest.TestCase):
                 model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
@@ -357,7 +357,7 @@ class BatcherTest(unittest.TestCase):
                 model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
@@ -402,7 +402,7 @@ class BatcherTest(unittest.TestCase):
                 model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
@@ -460,7 +460,7 @@ class BatcherTest(unittest.TestCase):
                 model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
@@ -512,7 +512,7 @@ class BatcherTest(unittest.TestCase):
                 model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
@@ -555,7 +555,7 @@ class BatcherTest(unittest.TestCase):
                 model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
@@ -595,7 +595,7 @@ class BatcherTest(unittest.TestCase):
 
                 self.check_setup(model_name)
 
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
@@ -635,7 +635,7 @@ class BatcherTest(unittest.TestCase):
 
                 self.check_setup(model_name)
 
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
@@ -676,7 +676,7 @@ class BatcherTest(unittest.TestCase):
 
                 self.check_setup(model_name)
 
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
@@ -714,7 +714,7 @@ class BatcherTest(unittest.TestCase):
 
                 self.check_setup(model_name)
 
-                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
@@ -738,7 +738,7 @@ class BatcherTest(unittest.TestCase):
         # Send two requests with first not having preferred size and
         # second being smaller than max preferred size but the sum of
         # the requests being larger than max preferred size. Use
-        # TRTSERVER_DELAY_SCHEDULER in the environment so that
+        # TRITONSERVER_DELAY_SCHEDULER in the environment so that
         # requests can be queued up before scheduler starts
         # servicing. This should cause first response to be returned
         # immediately but the second response, since it alone is not
@@ -758,8 +758,8 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain 2 requests
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 2)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
@@ -785,7 +785,7 @@ class BatcherTest(unittest.TestCase):
         # Send two requests with total static batch size in between
         # preferred sizes. Then send a request with a different shape
         # and a non-preferred batch size. Use
-        # TRTSERVER_DELAY_SCHEDULER in the environment so that
+        # TRITONSERVER_DELAY_SCHEDULER in the environment so that
         # requests can be queued up before scheduler starts
         # servicing. This should cause the first two requests to be
         # immediately responded to. Send a forth request with the same
@@ -812,8 +812,8 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain 4 requests
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 4)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 4)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
@@ -849,7 +849,7 @@ class BatcherTest(unittest.TestCase):
     def test_multi_batch_use_biggest_preferred(self):
         # Send multiple requests that sum to multiple preferred sizes
         # and make sure the largest preferred size if used for the
-        # batch. Use TRTSERVER_DELAY_SCHEDULER in the environment so
+        # batch. Use TRITONSERVER_DELAY_SCHEDULER in the environment so
         # that requests can be queued up before scheduler starts
         # servicing.
         if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -879,8 +879,8 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain 6 request
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 6)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 6)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
@@ -921,7 +921,7 @@ class BatcherTest(unittest.TestCase):
         # preferred size and then extra request goes beyond that. The
         # initial requests should be handled immediately at the
         # preferred batch size and then the other one after
-        # timeout. Use TRTSERVER_DELAY_SCHEDULER in the environment so
+        # timeout. Use TRITONSERVER_DELAY_SCHEDULER in the environment so
         # that requests can be queued up before scheduler starts
         # servicing.
         if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -942,8 +942,8 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain 3 requests
-                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 3)
+                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 3)
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,

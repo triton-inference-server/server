@@ -209,7 +209,7 @@ class AllocatedMemoryTest : public ::testing::Test {
 TEST_F(AllocatedMemoryTest, AllocGPU)
 {
   size_t expect_size = 512, actual_size;
-  TRTSERVER_Memory_Type expect_type = TRTSERVER_MEMORY_GPU, actual_type;
+  TRITONSERVER_MemoryType expect_type = TRITONSERVER_MEMORY_GPU, actual_type;
   int64_t expect_id = 0, actual_id;
   ni::AllocatedMemory memory(expect_size, expect_type, expect_id);
 
@@ -228,7 +228,8 @@ TEST_F(AllocatedMemoryTest, AllocGPU)
 TEST_F(AllocatedMemoryTest, AllocPinned)
 {
   size_t expect_size = 512, actual_size;
-  TRTSERVER_Memory_Type expect_type = TRTSERVER_MEMORY_CPU_PINNED, actual_type;
+  TRITONSERVER_MemoryType expect_type = TRITONSERVER_MEMORY_CPU_PINNED,
+                          actual_type;
   int64_t expect_id = 0, actual_id;
   ni::AllocatedMemory memory(expect_size, expect_type, expect_id);
 
@@ -248,7 +249,7 @@ TEST_F(AllocatedMemoryTest, AllocFallback)
 {
   // Each allocation uses half of the target reserved memory
   size_t expect_size = 600, actual_size;
-  TRTSERVER_Memory_Type expect_type = TRTSERVER_MEMORY_GPU, actual_type;
+  TRITONSERVER_MemoryType expect_type = TRITONSERVER_MEMORY_GPU, actual_type;
   int64_t expect_id = 0, actual_id;
 
   // First allocation
@@ -271,8 +272,8 @@ TEST_F(AllocatedMemoryTest, AllocFallback)
   ptr = pinned_memory.BufferAt(0, &actual_size, &actual_type, &actual_id);
   EXPECT_EQ(expect_size, actual_size)
       << "Expect size: " << expect_size << ", got: " << actual_size;
-  EXPECT_EQ(TRTSERVER_MEMORY_CPU_PINNED, actual_type)
-      << "Expect type: " << TRTSERVER_MEMORY_CPU_PINNED
+  EXPECT_EQ(TRITONSERVER_MEMORY_CPU_PINNED, actual_type)
+      << "Expect type: " << TRITONSERVER_MEMORY_CPU_PINNED
       << ", got: " << actual_type;
 
   // Sanity check on the pointer property
@@ -284,8 +285,8 @@ TEST_F(AllocatedMemoryTest, AllocFallback)
   ptr = system_memory.BufferAt(0, &actual_size, &actual_type, &actual_id);
   EXPECT_EQ(expect_size, actual_size)
       << "Expect size: " << expect_size << ", got: " << actual_size;
-  EXPECT_EQ(TRTSERVER_MEMORY_CPU, actual_type)
-      << "Expect type: " << TRTSERVER_MEMORY_CPU_PINNED
+  EXPECT_EQ(TRITONSERVER_MEMORY_CPU, actual_type)
+      << "Expect type: " << TRITONSERVER_MEMORY_CPU_PINNED
       << ", got: " << actual_type;
 
   // Sanity check on the pointer property
@@ -305,7 +306,7 @@ TEST_F(AllocatedMemoryTest, AllocFallbackNoCuda)
   TestingCudaMemoryManager::Reset();
 
   size_t expect_size = 600, actual_size;
-  TRTSERVER_Memory_Type expect_type = TRTSERVER_MEMORY_GPU, actual_type;
+  TRITONSERVER_MemoryType expect_type = TRITONSERVER_MEMORY_GPU, actual_type;
   int64_t expect_id = 0, actual_id;
 
   // CUDA memory allocation should trigger fallback to allocate pinned memory
@@ -314,8 +315,8 @@ TEST_F(AllocatedMemoryTest, AllocFallbackNoCuda)
   auto ptr = pinned_memory.BufferAt(0, &actual_size, &actual_type, &actual_id);
   EXPECT_EQ(expect_size, actual_size)
       << "Expect size: " << expect_size << ", got: " << actual_size;
-  EXPECT_EQ(TRTSERVER_MEMORY_CPU_PINNED, actual_type)
-      << "Expect type: " << TRTSERVER_MEMORY_CPU_PINNED
+  EXPECT_EQ(TRITONSERVER_MEMORY_CPU_PINNED, actual_type)
+      << "Expect type: " << TRITONSERVER_MEMORY_CPU_PINNED
       << ", got: " << actual_type;
 
   // Sanity check on the pointer property
@@ -328,7 +329,7 @@ TEST_F(AllocatedMemoryTest, Release)
   // out of scope
   // Each allocation uses half of the target reserved memory
   size_t expect_size = 600, actual_size;
-  TRTSERVER_Memory_Type expect_type = TRTSERVER_MEMORY_GPU, actual_type;
+  TRITONSERVER_MemoryType expect_type = TRITONSERVER_MEMORY_GPU, actual_type;
   int64_t expect_id = 0, actual_id;
 
   {
@@ -352,8 +353,8 @@ TEST_F(AllocatedMemoryTest, Release)
     ptr = pinned_memory.BufferAt(0, &actual_size, &actual_type, &actual_id);
     EXPECT_EQ(expect_size, actual_size)
         << "Expect size: " << expect_size << ", got: " << actual_size;
-    EXPECT_EQ(TRTSERVER_MEMORY_CPU_PINNED, actual_type)
-        << "Expect type: " << TRTSERVER_MEMORY_CPU_PINNED
+    EXPECT_EQ(TRITONSERVER_MEMORY_CPU_PINNED, actual_type)
+        << "Expect type: " << TRITONSERVER_MEMORY_CPU_PINNED
         << ", got: " << actual_type;
 
     // Sanity check on the pointer property
