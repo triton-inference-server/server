@@ -247,6 +247,19 @@ LocalFileSystem::WriteTextFile(
   return Status::Success;
 }
 
+#if defined(TRTIS_ENABLE_GCS) || defined(TRTIS_ENABLE_S3)
+// Helper function to take care of lack of trailing slashes
+std::string
+AppendSlash(const std::string& name)
+{
+  if (name.empty() || (name.back() == '/')) {
+    return name;
+  }
+
+  return (name + "/");
+}
+#endif  // TRTIS_ENABLE_GCS || TRTIS_ENABLE_S3
+
 #ifdef TRTIS_ENABLE_GCS
 
 namespace gcs = google::cloud::storage;
@@ -323,17 +336,6 @@ GCSFileSystem::ParsePath(
   }
 
   return Status::Success;
-}
-
-// Helper function to take care of lack of trailing slashes
-std::string
-AppendSlash(const std::string& name)
-{
-  if (name.empty() || (name.back() == '/')) {
-    return name;
-  }
-
-  return (name + "/");
 }
 
 Status
