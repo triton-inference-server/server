@@ -66,29 +66,14 @@
 
 - Make sure that you can contribute your work to open source (no
   license and/or patent conflict is introduced by your code). You need
-  to [`sign`](#Sign) your commit.
+  to complete the CLA described below before your PR can be merged.
 
 - Thanks in advance for your patience as we review your contributions;
   we do appreciate them!
 
-<a name="CLA"></a>Contributor License Agreement (CLA)
---------------
+# Contributor License Agreement (CLA)
 
-We require that all contributors (or their corporate entity) send a signed 
-copy of the [Contributor License Agreement](https://https://github.com/NVIDIA/triton-inference-server/Triton-CCLA-v1.pdf) (CLA) 
+Triton requires that all contributors (or their corporate entity) send
+a signed copy of the [Contributor License
+Agreement](https://github.com/NVIDIA/triton-inference-server/blob/master/Triton-CCLA-v1.pdf)
 to triton-cla@nvidia.com.
-
-Once the CLA is received, follow the procedure for making a change:
-
-- Check out a branch
-
-- Make your changes
-
-- Add any new files
-
-- Commit your changes with a comment
-
-- Push the branch
-
-- Follow the [instructions](https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request)
-to create a pull request 
