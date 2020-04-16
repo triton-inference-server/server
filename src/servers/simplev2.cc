@@ -46,7 +46,7 @@ namespace ni = nvidia::inferenceserver;
 namespace {
 
 bool enforce_memory_type = false;
-TRITONSERVER_Memory_Type requested_memory_type;
+TRITONSERVER_MemoryType requested_memory_type;
 
 #ifdef TRTIS_ENABLE_GPU
 static auto cuda_data_deleter = [](void* data) {
@@ -91,9 +91,9 @@ Usage(char** argv, const std::string& msg = std::string())
 TRITONSERVER_Error*
 ResponseAlloc(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
-    size_t byte_size, TRITONSERVER_Memory_Type preferred_memory_type,
+    size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
     int64_t preferred_memory_type_id, void* userp, void** buffer,
-    void** buffer_userp, TRITONSERVER_Memory_Type* actual_memory_type,
+    void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
   // Pass the tensor name with buffer_userp so we can show it when
@@ -188,7 +188,7 @@ ResponseAlloc(
 TRITONSERVER_Error*
 ResponseRelease(
     TRITONSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
-    size_t byte_size, TRITONSERVER_Memory_Type memory_type,
+    size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
 {
   std::string* name = nullptr;
@@ -338,8 +338,8 @@ Check(
     TRITONSERVER_InferenceResponse* response,
     const std::vector<char>& input0_data, const std::vector<char>& input1_data,
     const std::string& output0, const std::string& output1,
-    const size_t expected_byte_size, const std::string& expected_datatype,
-    const bool is_int)
+    const size_t expected_byte_size,
+    const TRITONSERVER_DataType expected_datatype, const bool is_int)
 {
   std::unordered_map<std::string, std::vector<char>> output_data;
 
@@ -353,12 +353,12 @@ Check(
 
   for (uint32_t idx = 0; idx < output_count; ++idx) {
     const char* cname;
-    const char* datatype;
+    TRITONSERVER_DataType datatype;
     const int64_t* shape;
     uint64_t dim_count;
     const void* base;
     size_t byte_size;
-    TRITONSERVER_Memory_Type memory_type;
+    TRITONSERVER_MemoryType memory_type;
     int64_t memory_type_id;
 
     FAIL_IF_TRITON_ERR(
@@ -382,8 +382,9 @@ Check(
 
     if (datatype != expected_datatype) {
       FAIL(
-          "unexpected datatype '" + std::string(datatype) + "' for '" + name +
-          "'");
+          "unexpected datatype '" +
+          std::string(TRITONSERVER_DataTypeString(datatype)) + "' for '" +
+          name + "'");
     }
 
     if (byte_size != expected_byte_size) {
@@ -662,17 +663,16 @@ main(int argc, char** argv)
   std::vector<int64_t> input0_shape({1, 16});
   std::vector<int64_t> input1_shape({1, 16});
 
-  const std::string datatype = (is_int) ? "INT32" : "FP32";
+  const TRITONSERVER_DataType datatype =
+      (is_int) ? TRITONSERVER_TYPE_INT32 : TRITONSERVER_TYPE_FP32;
 
   FAIL_IF_TRITON_ERR(
       TRITONSERVER_InferenceRequestAddInput(
-          irequest, input0, datatype.c_str(), &input0_shape[0],
-          input0_shape.size()),
+          irequest, input0, datatype, &input0_shape[0], input0_shape.size()),
       "setting input 0 meta-data for the request");
   FAIL_IF_TRITON_ERR(
       TRITONSERVER_InferenceRequestAddInput(
-          irequest, input1, datatype.c_str(), &input1_shape[0],
-          input1_shape.size()),
+          irequest, input1, datatype, &input1_shape[0], input1_shape.size()),
       "setting input 1 meta-data for the request");
 
   auto output0 = is_torch_model ? "OUTPUT__0" : "OUTPUT0";

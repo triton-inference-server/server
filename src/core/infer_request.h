@@ -106,8 +106,8 @@ class InferenceRequest {
 
     // Append a new buffer of data to this input.
     Status AppendData(
-        const void* base, size_t byte_size,
-        TRITONSERVER_Memory_Type memory_type, int64_t memory_type_id);
+        const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
+        int64_t memory_type_id);
 
     // Set the data for this input. Error if input already has some
     // data.

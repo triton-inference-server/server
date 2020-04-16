@@ -60,12 +60,53 @@ struct TRITONSERVER_ServerOptions;
 struct TRITONSERVER_Trace;
 struct TRITONSERVER_TraceManager;
 
+/// TRITONSERVER_DataType
+///
+/// Tensor data types recognized by TRITONSERVER.
+///
+typedef enum TRITONSERVER_datatype_enum {
+  TRITONSERVER_TYPE_INVALID,
+  TRITONSERVER_TYPE_BOOL,
+  TRITONSERVER_TYPE_UINT8,
+  TRITONSERVER_TYPE_UINT16,
+  TRITONSERVER_TYPE_UINT32,
+  TRITONSERVER_TYPE_UINT64,
+  TRITONSERVER_TYPE_INT8,
+  TRITONSERVER_TYPE_INT16,
+  TRITONSERVER_TYPE_INT32,
+  TRITONSERVER_TYPE_INT64,
+  TRITONSERVER_TYPE_FP16,
+  TRITONSERVER_TYPE_FP32,
+  TRITONSERVER_TYPE_FP64,
+  TRITONSERVER_TYPE_BYTES
+} TRITONSERVER_DataType;
+
+/// Get the string representation of a data type. The returned string
+/// is not owned by the caller and so should not be modified or freed.
+///
+/// \param datatype The data type.
+/// \return The string representation of the data type.
+TRITONSERVER_EXPORT const char* TRITONSERVER_DataTypeString(
+    TRITONSERVER_DataType datatype);
+
+/// TRITONSERVER_MemoryType
+///
 /// Types of memory recognized by TRITONSERVER.
+///
 typedef enum TRITONSERVER_memorytype_enum {
   TRITONSERVER_MEMORY_CPU,
   TRITONSERVER_MEMORY_CPU_PINNED,
   TRITONSERVER_MEMORY_GPU
-} TRITONSERVER_Memory_Type;
+} TRITONSERVER_MemoryType;
+
+/// Get the string representation of a memory type. The returned
+/// string is not owned by the caller and so should not be modified or
+/// freed.
+///
+/// \param memtype The memory type.
+/// \return The string representation of the memory type.
+TRITONSERVER_EXPORT const char* TRITONSERVER_MemoryTypeString(
+    TRITONSERVER_MemoryType memtype);
 
 /// TRITONSERVER_Error
 ///
@@ -162,9 +203,9 @@ TRITONSERVER_EXPORT const char* TRITONSERVER_ErrorMessage(
 /// values will be ignored.
 typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorAllocFn_t)(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
-    size_t byte_size, TRITONSERVER_Memory_Type memory_type,
+    size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id, void* userp, void** buffer, void** buffer_userp,
-    TRITONSERVER_Memory_Type* actual_memory_type,
+    TRITONSERVER_MemoryType* actual_memory_type,
     int64_t* actual_memory_type_id);
 
 /// Type for function that is called when the server no longer holds
@@ -186,7 +227,7 @@ typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorAllocFn_t)(
 /// attempt to release the buffer again.
 typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorReleaseFn_t)(
     TRITONSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
-    size_t byte_size, TRITONSERVER_Memory_Type memory_type,
+    size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id);
 
 /// Create a new response allocator object.
@@ -573,7 +614,8 @@ TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceRequestAddInput(
     TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    const char* datatype, const int64_t* shape, uint64_t dim_count);
+    const TRITONSERVER_DataType datatype, const int64_t* shape,
+    uint64_t dim_count);
 
 /// Remove an input from a request.
 /// \param inference_request The request object.
@@ -606,7 +648,7 @@ TRITONSERVER_InferenceRequestRemoveAllInputs(
 TRITONSERVER_EXPORT TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestAppendInputData(
     TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    const void* base, size_t byte_size, TRITONSERVER_Memory_Type memory_type,
+    const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id);
 
 /// Clear all input data from an input, releasing ownership of the
@@ -750,9 +792,9 @@ TRITONSERVER_InferenceResponseOutputCount(
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceResponseOutput(
     TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
-    const char** name, const char** datatype, const int64_t** shape,
+    const char** name, TRITONSERVER_DataType* datatype, const int64_t** shape,
     uint64_t* dim_count, const void** base, size_t* byte_size,
-    TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id);
 
 
 /// TRITONSERVER_ServerOptions
