@@ -310,11 +310,145 @@ TritonServerOptions::TritonServerOptions()
 #endif  // TRTIS_ENABLE_METRICS_GPU
 }
 
+TRITONSERVER_DataType
+DataTypeToTRITONSERVER(const ni::DataType dtype)
+{
+  switch (dtype) {
+    case ni::DataType::TYPE_BOOL:
+      return TRITONSERVER_TYPE_BOOL;
+    case ni::DataType::TYPE_UINT8:
+      return TRITONSERVER_TYPE_UINT8;
+    case ni::DataType::TYPE_UINT16:
+      return TRITONSERVER_TYPE_UINT16;
+    case ni::DataType::TYPE_UINT32:
+      return TRITONSERVER_TYPE_UINT32;
+    case ni::DataType::TYPE_UINT64:
+      return TRITONSERVER_TYPE_UINT64;
+    case ni::DataType::TYPE_INT8:
+      return TRITONSERVER_TYPE_INT8;
+    case ni::DataType::TYPE_INT16:
+      return TRITONSERVER_TYPE_INT16;
+    case ni::DataType::TYPE_INT32:
+      return TRITONSERVER_TYPE_INT32;
+    case ni::DataType::TYPE_INT64:
+      return TRITONSERVER_TYPE_INT64;
+    case ni::DataType::TYPE_FP16:
+      return TRITONSERVER_TYPE_FP16;
+    case ni::DataType::TYPE_FP32:
+      return TRITONSERVER_TYPE_FP32;
+    case ni::DataType::TYPE_FP64:
+      return TRITONSERVER_TYPE_FP64;
+    case ni::DataType::TYPE_STRING:
+      return TRITONSERVER_TYPE_BYTES;
+    default:
+      break;
+  }
+
+  return TRITONSERVER_TYPE_INVALID;
+}
+
+ni::DataType
+TRITONSERVERToDataType(const TRITONSERVER_DataType dtype)
+{
+  switch (dtype) {
+    case TRITONSERVER_TYPE_BOOL:
+      return ni::DataType::TYPE_BOOL;
+    case TRITONSERVER_TYPE_UINT8:
+      return ni::DataType::TYPE_UINT8;
+    case TRITONSERVER_TYPE_UINT16:
+      return ni::DataType::TYPE_UINT16;
+    case TRITONSERVER_TYPE_UINT32:
+      return ni::DataType::TYPE_UINT32;
+    case TRITONSERVER_TYPE_UINT64:
+      return ni::DataType::TYPE_UINT64;
+    case TRITONSERVER_TYPE_INT8:
+      return ni::DataType::TYPE_INT8;
+    case TRITONSERVER_TYPE_INT16:
+      return ni::DataType::TYPE_INT16;
+    case TRITONSERVER_TYPE_INT32:
+      return ni::DataType::TYPE_INT32;
+    case TRITONSERVER_TYPE_INT64:
+      return ni::DataType::TYPE_INT64;
+    case TRITONSERVER_TYPE_FP16:
+      return ni::DataType::TYPE_FP16;
+    case TRITONSERVER_TYPE_FP32:
+      return ni::DataType::TYPE_FP32;
+    case TRITONSERVER_TYPE_FP64:
+      return ni::DataType::TYPE_FP64;
+    case TRITONSERVER_TYPE_BYTES:
+      return ni::DataType::TYPE_STRING;
+    default:
+      break;
+  }
+
+  return ni::DataType::TYPE_INVALID;
+}
+
 }  // namespace
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+//
+// TRITONSERVER_DataType
+//
+const char*
+TRITONSERVER_DataTypeString(TRITONSERVER_DataType datatype)
+{
+  switch (datatype) {
+    case TRITONSERVER_TYPE_BOOL:
+      return "BOOL";
+    case TRITONSERVER_TYPE_UINT8:
+      return "UINT8";
+    case TRITONSERVER_TYPE_UINT16:
+      return "UINT16";
+    case TRITONSERVER_TYPE_UINT32:
+      return "UINT32";
+    case TRITONSERVER_TYPE_UINT64:
+      return "UINT64";
+    case TRITONSERVER_TYPE_INT8:
+      return "INT8";
+    case TRITONSERVER_TYPE_INT16:
+      return "INT16";
+    case TRITONSERVER_TYPE_INT32:
+      return "INT32";
+    case TRITONSERVER_TYPE_INT64:
+      return "INT64";
+    case TRITONSERVER_TYPE_FP16:
+      return "FP16";
+    case TRITONSERVER_TYPE_FP32:
+      return "FP32";
+    case TRITONSERVER_TYPE_FP64:
+      return "FP64";
+    case TRITONSERVER_TYPE_BYTES:
+      return "BYTES";
+    default:
+      break;
+  }
+
+  return "<invalid>";
+}
+
+//
+// TRITONSERVER_MemoryType
+//
+const char*
+TRITONSERVER_MemoryTypeString(TRITONSERVER_MemoryType memtype)
+{
+  switch (memtype) {
+    case TRITONSERVER_MEMORY_CPU:
+      return "CPU";
+    case TRITONSERVER_MEMORY_CPU_PINNED:
+      return "CPU_PINNED";
+    case TRITONSERVER_MEMORY_GPU:
+      return "GPU";
+    default:
+      break;
+  }
+
+  return "<invalid>";
+}
 
 //
 // TRITONSERVER_Error
@@ -973,12 +1107,13 @@ TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
 TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestAddInput(
     TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    const char* datatype, const int64_t* shape, uint64_t dim_count)
+    const TRITONSERVER_DataType datatype, const int64_t* shape,
+    uint64_t dim_count)
 {
   ni::InferenceRequest* lrequest =
       reinterpret_cast<ni::InferenceRequest*>(inference_request);
   RETURN_IF_STATUS_ERROR(lrequest->AddOriginalInput(
-      name, ni::ProtocolStringToDataType(datatype), shape, dim_count));
+      name, TRITONSERVERToDataType(datatype), shape, dim_count));
   return nullptr;  // Success
 }
 
@@ -1005,7 +1140,7 @@ TRITONSERVER_InferenceRequestRemoveAllInputs(
 TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestAppendInputData(
     TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    const void* base, size_t byte_size, TRITONSERVER_Memory_Type memory_type,
+    const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
 {
   ni::InferenceRequest* lrequest =
@@ -1147,9 +1282,9 @@ TRITONSERVER_InferenceResponseOutputCount(
 TRITONSERVER_Error*
 TRITONSERVER_InferenceResponseOutput(
     TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
-    const char** name, const char** datatype, const int64_t** shape,
+    const char** name, TRITONSERVER_DataType* datatype, const int64_t** shape,
     uint64_t* dim_count, const void** base, size_t* byte_size,
-    TRITONSERVER_Memory_Type* memory_type, int64_t* memory_type_id)
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
 {
   ni::InferenceResponse* lresponse =
       reinterpret_cast<ni::InferenceResponse*>(inference_response);
@@ -1166,7 +1301,7 @@ TRITONSERVER_InferenceResponseOutput(
   const ni::InferenceResponse::Output& output = outputs[index];
 
   *name = output.Name().c_str();
-  *datatype = ni::DataTypeToProtocolString(output.DType());
+  *datatype = DataTypeToTRITONSERVER(output.DType());
 
   const std::vector<int64_t>& oshape = output.Shape();
   *shape = &oshape[0];
