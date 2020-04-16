@@ -48,11 +48,11 @@ typedef std::map<std::string, std::string> Parameters;
 /// the DOM object.
 /// \param json_dom The json DOM object.
 /// \return Formatted string representation of passed JSON.
-std::string GetJsonText(rapidjson::Document& json_dom);
+std::string GetJsonText(const rapidjson::Document& json_dom);
 
 //==============================================================================
 /// An InferenceServerHttpClient object is used to perform any kind of
-/// communication with the InferenceServer using gRPC protocol.
+/// communication with the InferenceServer using HTTP protocol.
 ///
 /// \code
 ///   std::unique_ptr<InferenceServerHttpClient> client;
@@ -63,7 +63,7 @@ std::string GetJsonText(rapidjson::Document& json_dom);
 ///   ...
 /// \endcode
 ///
-class InferenceServerHttpClient {
+class InferenceServerHttpClient : public InferenceServerClient {
  public:
   /// Create a client that can be used to communicate with the server.
   /// \param client Returns a new InferenceServerHttpClient object.
@@ -78,7 +78,7 @@ class InferenceServerHttpClient {
   /// Contact the inference server and get its liveness.
   /// \param live Returns whether the server is live or not.
   /// \param headers Optional map specifying additional HTTP headers to include
-  /// in the metadata of gRPC request.
+  /// in request.
   /// \return Error object indicating success or failure of the request.
   Error IsServerLive(
       bool* live, const Headers& headers = Headers(),
@@ -87,7 +87,7 @@ class InferenceServerHttpClient {
   /// Contact the inference server and get its readiness.
   /// \param ready Returns whether the server is ready or not.
   /// \param headers Optional map specifying additional HTTP headers to include
-  /// in the metadata of gRPC request.
+  /// in request.
   /// \param query_params Optional map specifying parameters that must be
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
@@ -102,7 +102,7 @@ class InferenceServerHttpClient {
   /// The default value is an empty string which means then the server will
   /// choose a version based on the model and internal policy.
   /// \param headers Optional map specifying additional HTTP headers to include
-  /// in the metadata of gRPC request.
+  /// in request.
   /// \param query_params Optional map specifying parameters that must be
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
@@ -114,7 +114,7 @@ class InferenceServerHttpClient {
   /// Contact the inference server and get its metadata.
   /// \param server_metadata Returns the server metadata as JSON DOM object.
   /// \param headers Optional map specifying additional HTTP headers to include
-  /// in the metadata of gRPC request.
+  /// in request.
   /// \param query_params Optional map specifying parameters that must be
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
@@ -129,7 +129,7 @@ class InferenceServerHttpClient {
   /// The default value is an empty string which means then the server will
   /// choose a version based on the model and internal policy.
   /// \param headers Optional map specifying additional HTTP headers to include
-  /// in the metadata of gRPC request.
+  /// in request.
   /// \param query_params Optional map specifying parameters that must be
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
@@ -145,7 +145,7 @@ class InferenceServerHttpClient {
   /// The default value is an empty string which means then the server will
   /// choose a version based on the model and internal policy.
   /// \param headers Optional map specifying additional HTTP headers to include
-  /// in the metadata of gRPC request.
+  /// in request.
   /// \param query_params Optional map specifying parameters that must be
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
@@ -154,15 +154,52 @@ class InferenceServerHttpClient {
       const std::string& model_version = "", const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 
+  /// Run synchronous inference on server.
+  /// \param result Returns the result of inference.
+  /// \param options The options for inference request.
+  /// \param inputs The vector of InferInput describing the model inputs.
+  /// \param outputs Optional vector of InferRequestedOutput describing how the
+  /// output must be returned. If not provided then all the outputs in the model
+  /// config will be returned as default settings.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in request.
+  /// \param query_params Optional map specifying parameters that must be
+  /// included with URL query.
+  /// \return Error object indicating success or failure of the
+  /// request.
+  Error Infer(
+      InferResult** result, const InferOptions& options,
+      const std::vector<InferInput*>& inputs,
+      const std::vector<const InferRequestedOutput*>& outputs =
+          std::vector<const InferRequestedOutput*>(),
+      const Headers& headers = Headers(),
+      const Parameters& query_params = Parameters());
+
  private:
   InferenceServerHttpClient(const std::string& url, bool verbose);
 
+  void PrepareRequestJson(
+      const InferOptions& options, const std::vector<InferInput*>& inputs,
+      const std::vector<const InferRequestedOutput*>& outputs,
+      rapidjson::Document* request_json);
+  Error PreRunProcessing(
+      std::string& request_uri, const InferOptions& options,
+      const std::vector<InferInput*>& inputs,
+      const std::vector<const InferRequestedOutput*>& outputs,
+      const Headers& headers, const Parameters& query_params,
+      std::shared_ptr<InferRequest>& request);
   Error Get(
       std::string& request_uri, const Headers& headers,
       const Parameters& query_params, rapidjson::Document* response,
       long* http_code);
 
   static size_t ResponseHandler(
+      void* contents, size_t size, size_t nmemb, void* userp);
+  static size_t InferRequestProvider(
+      void* contents, size_t size, size_t nmemb, void* userp);
+  static size_t InferResponseHeaderHandler(
+      void* contents, size_t size, size_t nmemb, void* userp);
+  static size_t InferResponseHandler(
       void* contents, size_t size, size_t nmemb, void* userp);
 
   // The server url
@@ -171,5 +208,65 @@ class InferenceServerHttpClient {
   const bool verbose_;
 };
 
+//==============================================================================
+/// An InferResultHttp instance is used  to access and interpret the
+/// response of an inference request from HTTP endpoint. This object
+/// holds data for all requested outputs.
+///
+class InferResultHttp : public InferResult {
+ public:
+  /// Create a InferResult instance to interpret server response.
+  /// \param infer_result Returns a new InferResult object.
+  /// \param response  The response of server for an inference request.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      InferResult** infer_result, std::unique_ptr<std::string> response,
+      size_t json_response_size);
+
+  /// See InferResult::ModelName(std::string* name)
+  Error ModelName(std::string* name) const override;
+
+  /// See InferResult::ModelVersion(std::string* version)
+  Error ModelVersion(std::string* version) const override;
+
+  /// See InferResult::Id(std::string* id)
+  Error Id(std::string* id) const override;
+
+  /// See InferResult::Shape(const std::string& output_name,
+  ///  std::vector<int64_t>* shape)
+  Error Shape(const std::string& output_name, std::vector<int64_t>* shape)
+      const override;
+
+  /// See InferResult::Datatype(
+  ///    const std::string& output_name, std::string* datatype)
+  Error Datatype(
+      const std::string& output_name, std::string* datatype) const override;
+
+  /// See InferResult::RawData(
+  ///    const std::string& output_name, const uint8_t** buf,
+  ///    size_t* byte_size)
+  Error RawData(
+      const std::string& output_name, const uint8_t** buf,
+      size_t* byte_size) const override;
+
+  /// See InferResult::DebugString()
+  std::string DebugString() const override;
+
+  /// Returns the status of this request.
+  /// \return Error object indicating success or failure of the
+  /// request.
+  Error RequestStatus() const;
+
+ private:
+  InferResultHttp(
+      std::unique_ptr<std::string> response, size_t json_response_size);
+
+  std::map<std::string, const rapidjson::Value*> output_name_to_result_map_;
+  std::map<std::string, std::pair<const uint8_t*, const size_t>>
+      output_name_to_buffer_map_;
+
+  rapidjson::Document response_json_;
+  std::unique_ptr<std::string> response_;
+};
 
 }}}  // namespace nvidia::inferenceserver::client

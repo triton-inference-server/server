@@ -130,9 +130,7 @@ InferInput::Reset()
   buf_byte_sizes_.clear();
   str_bufs_.clear();
   bufs_idx_ = 0;
-  buf_pos_ = 0;
   byte_size_ = 0;
-  total_send_byte_size_ = 0;
   io_type_ = NONE;
   return Error::Success;
 }
@@ -147,7 +145,6 @@ Error
 InferInput::AppendRaw(const uint8_t* input, size_t input_byte_size)
 {
   byte_size_ += input_byte_size;
-  total_send_byte_size_ += input_byte_size;
 
   bufs_.push_back(input);
   buf_byte_sizes_.push_back(input_byte_size);
@@ -196,8 +193,7 @@ InferInput::InferInput(
     const std::string& name, const std::vector<int64_t>& shape,
     const std::string& datatype)
     : name_(name), shape_(shape), datatype_(datatype), byte_size_(0),
-      total_send_byte_size_(0), bufs_idx_(0), buf_pos_(0), io_type_(NONE),
-      shm_name_(""), shm_offset_(0)
+      bufs_idx_(0), buf_pos_(0), io_type_(NONE), shm_name_(""), shm_offset_(0)
 {
 }
 
