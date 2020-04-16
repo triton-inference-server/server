@@ -5,7 +5,7 @@
 	"image": "mcr.microsoft.com/dotnet/core/sdk:3.0-bionic",
 	"runArgs": [
 		"--name",
-		"luxon-triton",
+		"triton-developer",
 		"-v",
 		"${env:HOME}${env:USERPROFILE}/.ssh:/root/.ssh-localhost:ro",
 		"--network",
