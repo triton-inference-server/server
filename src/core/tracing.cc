@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -32,47 +32,17 @@ namespace nvidia { namespace inferenceserver {
 
 namespace {
 
-TRTSERVER_Trace_Level
-TritonTraceLevelToTrt(TRITONSERVER_Trace_Level level)
-{
-  switch (level) {
-    case TRITONSERVER_TRACE_LEVEL_DISABLED:
-      return TRTSERVER_TRACE_LEVEL_DISABLED;
-      break;
-    case TRITONSERVER_TRACE_LEVEL_MIN:
-      return TRTSERVER_TRACE_LEVEL_MIN;
-      break;
-    default:
-      return TRTSERVER_TRACE_LEVEL_MAX;
-      break;
-  }
-}
-
-#define REPORT_TIMESTAMP(ACTIVITY_TYPE)                                    \
-  do {                                                                     \
-    if (using_triton_) {                                                   \
-      triton_activity_fn_(                                                 \
-          reinterpret_cast<TRITONSERVER_Trace*>(this),                     \
-          TRITONSERVER_TRACE_##ACTIVITY_TYPE, timestamp, activity_userp_); \
-    } else {                                                               \
-      activity_fn_(                                                        \
-          reinterpret_cast<TRTSERVER_Trace*>(this),                        \
-          TRTSERVER_TRACE_##ACTIVITY_TYPE, timestamp, activity_userp_);    \
-    }                                                                      \
+#define REPORT_TIMESTAMP(ACTIVITY_TYPE)                                  \
+  do {                                                                   \
+    activity_fn_(                                                        \
+        reinterpret_cast<TRITONSERVER_Trace*>(this),                     \
+        TRITONSERVER_TRACE_##ACTIVITY_TYPE, timestamp, activity_userp_); \
   } while (false)
 
 
 }  // namespace
-std::atomic<int64_t> Trace::next_id_(0);
 
-Trace::Trace(
-    TRITONSERVER_Trace_Level level, TRITONSERVER_TraceActivityFn_t activity_fn,
-    void* activity_userp)
-    : using_triton_(true), level_(TritonTraceLevelToTrt(level)),
-      activity_fn_(nullptr), triton_activity_fn_(activity_fn),
-      activity_userp_(activity_userp), id_(next_id_++), parent_id_(-1)
-{
-}
+std::atomic<int64_t> Trace::next_id_(0);
 
 void
 Trace::Report(const ModelInferStats* infer_stats)
@@ -80,7 +50,7 @@ Trace::Report(const ModelInferStats* infer_stats)
   // InferStats that is not captured should not be reported (i.e. ensemble
   // only have valid timestamp for request start and end)
   uint64_t timestamp = 0;
-  if (level_ != TRTSERVER_TRACE_LEVEL_DISABLED) {
+  if (level_ != TRITONSERVER_TRACE_LEVEL_DISABLED) {
     timestamp = TIMESPEC_TO_NANOS(
         infer_stats->Timestamp(ModelInferStats::TimestampKind::kRequestStart));
     if (timestamp != 0) {
@@ -108,7 +78,7 @@ Trace::Report(const ModelInferStats* infer_stats)
     }
   }
 
-  if (level_ == TRTSERVER_TRACE_LEVEL_MAX) {
+  if (level_ == TRITONSERVER_TRACE_LEVEL_MAX) {
     timestamp = TIMESPEC_TO_NANOS(infer_stats->Timestamp(
         ModelInferStats::TimestampKind::kComputeInputEnd));
     if (timestamp != 0) {

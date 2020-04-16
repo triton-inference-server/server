@@ -117,7 +117,7 @@ class InferenceResponse {
     // Get information about the buffer allocated for this output
     // tensor's data. If no buffer is allocated 'buffer' will return
     // nullptr and the other returned values will be undefined.
-    Status Buffer(
+    Status DataBuffer(
         const void** buffer, size_t* buffer_byte_size,
         TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const;
 
@@ -130,19 +130,16 @@ class InferenceResponse {
     // input gives the buffer memory type id preferred by the caller
     // and returns the actual memory type id of 'buffer'. Only a
     // single buffer may be allocated for the output at any time, so
-    // multiple calls to AllocateBuffer without intervening
-    // ReleaseBuffer call will result in an error.
-    Status AllocateBuffer(
+    // multiple calls to AllocateDataBuffer without intervening
+    // ReleaseDataBuffer call will result in an error.
+    Status AllocateDataBuffer(
         void** buffer, const size_t buffer_byte_size,
         TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id);
-    Status AllocateBuffer(
-        void** buffer, const size_t buffer_byte_size,
-        TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
 
     // Release the buffer that was previously allocated by
-    // AllocateBuffer(). Do nothing if AllocateBuffer() has not been
-    // called.
-    Status ReleaseBuffer();
+    // AllocateDataBuffer(). Do nothing if AllocateDataBuffer() has
+    // not been called.
+    Status ReleaseDataBuffer();
 
    private:
     DISALLOW_COPY_AND_ASSIGN(Output);
@@ -158,8 +155,8 @@ class InferenceResponse {
     void* alloc_userp_;
 
     // Information about the buffer allocated by
-    // AllocateBuffer(). This information is needed by
-    // ReleaseBuffer().
+    // AllocateDataBuffer(). This information is needed by
+    // ReleaseDataBuffer().
     void* allocated_buffer_;
     size_t allocated_buffer_byte_size_;
     TRITONSERVER_MemoryType allocated_memory_type_;
