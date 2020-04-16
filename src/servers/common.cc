@@ -259,7 +259,7 @@ TritonErrorToTrt(TRITONSERVER_Error* err)
 }
 
 TRTSERVER_Memory_Type
-TritonMemTypeToTrt(TRITONSERVER_Memory_Type mem_type)
+TritonMemTypeToTrt(TRITONSERVER_MemoryType mem_type)
 {
   switch (mem_type) {
     case TRITONSERVER_MEMORY_CPU:
@@ -273,7 +273,7 @@ TritonMemTypeToTrt(TRITONSERVER_Memory_Type mem_type)
   }
 }
 
-TRITONSERVER_Memory_Type
+TRITONSERVER_MemoryType
 TrtMemTypeToTriton(TRTSERVER_Memory_Type mem_type)
 {
   switch (mem_type) {
@@ -288,8 +288,9 @@ TrtMemTypeToTriton(TRTSERVER_Memory_Type mem_type)
   }
 }
 
+// FIXMEV2 remove this and use TRITONSERVER_MemoryTypeString
 std::string
-MemoryTypeString(TRITONSERVER_Memory_Type memory_type)
+MemoryTypeString(TRITONSERVER_MemoryType memory_type)
 {
   switch (memory_type) {
     case TRITONSERVER_MEMORY_CPU:

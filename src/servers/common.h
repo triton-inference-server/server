@@ -146,9 +146,9 @@ TRITONSERVER_Error* GetModelVersionFromString(
 // the TRITONSERVER_Error object will be released by this function,
 // and the caller takes ownership of the TRTSERVER_Error object.
 TRTSERVER_Error* TritonErrorToTrt(TRITONSERVER_Error* err);
-TRTSERVER_Memory_Type TritonMemTypeToTrt(TRITONSERVER_Memory_Type mem_type);
-TRITONSERVER_Memory_Type TrtMemTypeToTriton(TRTSERVER_Memory_Type mem_type);
+TRTSERVER_Memory_Type TritonMemTypeToTrt(TRITONSERVER_MemoryType mem_type);
+TRITONSERVER_MemoryType TrtMemTypeToTriton(TRTSERVER_Memory_Type mem_type);
 
-std::string MemoryTypeString(TRITONSERVER_Memory_Type memory_type);
+std::string MemoryTypeString(TRITONSERVER_MemoryType memory_type);
 
 }}  // namespace nvidia::inferenceserver
