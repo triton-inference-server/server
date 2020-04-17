@@ -376,7 +376,8 @@ InferenceBackend::GenerateWarmupData(std::vector<WarmupData>* samples)
 
     // Request all outputs
     for (const auto& io : Config().output()) {
-      RETURN_IF_ERROR(warmup_data.request_->AddRequestedOutput(io.name()));
+      RETURN_IF_ERROR(
+          warmup_data.request_->AddOriginalRequestedOutput(io.name()));
     }
 
     // Second pass to prepare original inputs.
