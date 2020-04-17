@@ -31,6 +31,10 @@
 #include <iostream>
 #include <queue>
 
+extern "C" {
+#include <b64/cencode.h>
+}
+
 namespace nvidia { namespace inferenceserver { namespace client {
 
 namespace {
@@ -80,6 +84,17 @@ GetQueryString(const Headers& query_params)
     query_string += pr.first + "=" + pr.second;
   }
   return query_string;
+}
+
+void
+Base64Encode(char* raw_ptr, size_t raw_size, char** encoded_ptr)
+{
+  // Encode the handle object to base64
+  base64_encodestate es;
+  base64_init_encodestate(&es);
+  *encoded_ptr = (char*)malloc(raw_size * 2); /* ~4/3 x raw_size */
+  int offset = base64_encode_block(raw_ptr, raw_size, *encoded_ptr, &es);
+  base64_encode_blockend(*encoded_ptr + offset, &es);
 }
 
 }  // namespace
@@ -580,8 +595,7 @@ InferenceServerHttpClient::GetModelRepositoryIndex(
     const Parameters& query_params)
 {
   Error err;
-
-  std::string request_uri("/v2/repository/index");
+  std::string request_uri(url_ + "/v2/repository/index");
 
   long http_code;
   err = Get(request_uri, headers, query_params, repository_index, &http_code);
@@ -599,12 +613,14 @@ InferenceServerHttpClient::LoadModel(
 {
   Error err;
 
-  std::string request_uri("/v2/repository/model/" + model_name + "/load");
+  std::string request_uri(
+      url_ + "/v2/repository/model/" + model_name + "/load");
 
   rapidjson::Document request(rapidjson::kObjectType);
   rapidjson::Document response(rapidjson::kObjectType);
   long http_code;
-  err = Post(request_uri, request, headers, query_params, &response, &http_code);
+  err =
+      Post(request_uri, request, headers, query_params, &response, &http_code);
   if ((http_code != 200) && err.IsOk()) {
     return Error(
         "[INTERNAL] Request failed with missing error message in response");
@@ -619,12 +635,14 @@ InferenceServerHttpClient::UnloadModel(
 {
   Error err;
 
-  std::string request_uri("/v2/repository/model/" + model_name + "/unload");
+  std::string request_uri(
+      url_ + "/v2/repository/model/" + model_name + "/unload");
 
   rapidjson::Document request(rapidjson::kObjectType);
   rapidjson::Document response(rapidjson::kObjectType);
   long http_code;
-  err = Post(request_uri, request, headers, query_params, &response, &http_code);
+  err =
+      Post(request_uri, request, headers, query_params, &response, &http_code);
   if ((http_code != 200) && err.IsOk()) {
     return Error(
         "[INTERNAL] Request failed with missing error message in response");
@@ -685,7 +703,8 @@ InferenceServerHttpClient::RegisterSystemSharedMemory(
 {
   Error err;
 
-  std::string request_uri("/v2/systemsharedmemory/region/" + name + "/register");
+  std::string request_uri(
+      url_ + "/v2/systemsharedmemory/region/" + name + "/register");
 
   rapidjson::Document request(rapidjson::kObjectType);
   rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
@@ -700,7 +719,8 @@ InferenceServerHttpClient::RegisterSystemSharedMemory(
   rapidjson::Document response(rapidjson::kObjectType);
 
   long http_code;
-  err = Post(request_uri, request, headers, query_params, &response, &http_code);
+  err =
+      Post(request_uri, request, headers, query_params, &response, &http_code);
   if ((http_code != 200) && err.IsOk()) {
     return Error(
         "[INTERNAL] Request failed with missing error message in response");
@@ -724,7 +744,8 @@ InferenceServerHttpClient::UnregisterSystemSharedMemory(
   rapidjson::Document request(rapidjson::kObjectType);
   rapidjson::Document response(rapidjson::kObjectType);
   long http_code;
-  err = Post(request_uri, request, headers, query_params, &response, &http_code);
+  err =
+      Post(request_uri, request, headers, query_params, &response, &http_code);
   if ((http_code != 200) && err.IsOk()) {
     return Error(
         "[INTERNAL] Request failed with missing error message in response");
@@ -756,20 +777,29 @@ InferenceServerHttpClient::CudaSharedMemoryStatus(
 
 Error
 InferenceServerHttpClient::RegisterCudaSharedMemory(
-    const std::string& name, const cudaIpcMemHandle_t raw_handle,
-      const size_t device_id, const size_t byte_size, const Headers& headers,
+    const std::string& name, const cudaIpcMemHandle_t& raw_handle,
+    const size_t device_id, const size_t byte_size, const Headers& headers,
     const Parameters& query_params)
 {
   Error err;
 
-  std::string request_uri("/v2/cudasharedmemory/region/" + name + "/register");
+  std::string request_uri(
+      url_ + "/v2/cudasharedmemory/region/" + name + "/register");
 
   rapidjson::Document request(rapidjson::kObjectType);
   rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
   {
     rapidjson::Value raw_handle_json(rapidjson::kObjectType);
     {
-      rapidjson::Value b64_json((char*)&raw_handle, allocator);
+      char* encoded_handle = nullptr;
+      Base64Encode(
+          (char*)((void*)&raw_handle), sizeof(cudaIpcMemHandle_t),
+          &encoded_handle);
+      if (encoded_handle == nullptr) {
+        return Error("Failed to base64 encode the cudaIpcMemHandle_t");
+      }
+      rapidjson::Value b64_json(encoded_handle, allocator);
+      delete encoded_handle;
       raw_handle_json.AddMember("b64", b64_json, allocator);
     }
     request.AddMember("raw_handle", raw_handle_json, allocator);
@@ -780,7 +810,8 @@ InferenceServerHttpClient::RegisterCudaSharedMemory(
   }
   rapidjson::Document response(rapidjson::kObjectType);
   long http_code;
-  err = Post(request_uri, request, headers, query_params, &response, &http_code);
+  err =
+      Post(request_uri, request, headers, query_params, &response, &http_code);
   if ((http_code != 200) && err.IsOk()) {
     return Error(
         "[INTERNAL] Request failed with missing error message in response");
@@ -804,7 +835,8 @@ InferenceServerHttpClient::UnregisterCudaSharedMemory(
   rapidjson::Document request(rapidjson::kObjectType);
   rapidjson::Document response(rapidjson::kObjectType);
   long http_code;
-  err = Post(request_uri, request, headers, query_params, &response, &http_code);
+  err =
+      Post(request_uri, request, headers, query_params, &response, &http_code);
   if ((http_code != 200) && err.IsOk()) {
     return Error(
         "[INTERNAL] Request failed with missing error message in response");
@@ -1372,13 +1404,16 @@ InferenceServerHttpClient::Get(
           std::string(GetParseError_En(response->GetParseError())) + " at " +
           std::to_string(response->GetErrorOffset()));
     }
+
     if (verbose_) {
       std::cout << GetJsonText(*response) << std::endl;
     }
 
-    const auto& itr = response->FindMember("error");
-    if (itr != response->MemberEnd()) {
-      return Error(itr->value.GetString());
+    if (response->IsObject()) {
+      const auto& itr = response->FindMember("error");
+      if (itr != response->MemberEnd()) {
+        return Error(itr->value.GetString());
+      }
     }
   }
 
@@ -1458,9 +1493,11 @@ InferenceServerHttpClient::Post(
       std::cout << GetJsonText(*response) << std::endl;
     }
 
-    const auto& itr = response->FindMember("error");
-    if (itr != response->MemberEnd()) {
-      return Error(itr->value.GetString());
+    if (response->IsObject()) {
+      const auto& itr = response->FindMember("error");
+      if (itr != response->MemberEnd()) {
+        return Error(itr->value.GetString());
+      }
     }
   }
 

@@ -279,8 +279,8 @@ class InferenceServerHttpClient : public InferenceServerClient {
 
   /// Request the server to register a CUDA shared memory with the provided
   /// details.
- /// \param name The name of the region to register.
-  /// \param raw_handle The cudaIPC handle for the memory object.
+  /// \param name The name of the region to register.
+  /// \param cuda_shm_handle The cudaIPC handle for the memory object.
   /// \param device_id The GPU device ID on which the cudaIPC handle was
   /// created.
   /// \param byte_size The size of the CUDA shared memory region, in
@@ -291,7 +291,7 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// included with URL query.
   /// \return Error object indicating success or failure of the request
   Error RegisterCudaSharedMemory(
-      const std::string& name, const cudaIpcMemHandle_t raw_handle,
+      const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
       const size_t device_id, const size_t byte_size,
       const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
@@ -382,9 +382,9 @@ class InferenceServerHttpClient : public InferenceServerClient {
       const Parameters& query_params, rapidjson::Document* response,
       long* http_code);
   Error Post(
-    std::string& request_uri, const rapidjson::Document& request,
-    const Headers& headers, const Parameters& query_params,
-    rapidjson::Document* response, long* http_code);
+      std::string& request_uri, const rapidjson::Document& request,
+      const Headers& headers, const Parameters& query_params,
+      rapidjson::Document* response, long* http_code);
 
   static size_t ResponseHandler(
       void* contents, size_t size, size_t nmemb, void* userp);
