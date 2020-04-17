@@ -336,7 +336,7 @@ CustomBackend::Context::Run(
 
     total_batch_size += request->BatchSize();
     total_inputs += request->ImmutableInputs().size();
-    total_requested_outputs += request->RequestedOutputs().size();
+    total_requested_outputs += request->ImmutableRequestedOutputs().size();
   }
 
   // If there are no valid requests then no need to run the
@@ -429,9 +429,9 @@ CustomBackend::Context::Run(
     }
 
     // Outputs
-    custom_payload.output_cnt = irequest->RequestedOutputs().size();
+    custom_payload.output_cnt = irequest->ImmutableRequestedOutputs().size();
     custom_payload.required_output_names = nullptr;
-    for (const auto& pr : irequest->RequestedOutputs()) {
+    for (const auto& pr : irequest->ImmutableRequestedOutputs()) {
       const auto& output = pr.second;
       work_output_name_ptrs.push_back(output.Name().c_str());
       if (custom_payload.required_output_names == nullptr) {
@@ -655,8 +655,8 @@ CustomBackend::Context::GetOutput(
 
   // If the output is not requested, return content == nullptr with OK
   // status as an indication that the output should not be written.
-  const auto& itr = request->RequestedOutputs().find(name);
-  if (itr != request->RequestedOutputs().end()) {
+  const auto& itr = request->ImmutableRequestedOutputs().find(name);
+  if (itr != request->ImmutableRequestedOutputs().end()) {
     std::vector<int64_t> shape;
     if (shape_dim_cnt > 0) {
       shape.assign(shape_dims, shape_dims + shape_dim_cnt);

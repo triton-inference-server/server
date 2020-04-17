@@ -219,7 +219,7 @@ EnsembleContext::EnsembleContext(
   for (const auto& ensemble_output : info_->ensemble_output_shape_) {
     ignored_tensor.insert(ensemble_output.first);
   }
-  for (const auto& pr : request_->RequestedOutputs()) {
+  for (const auto& pr : request_->ImmutableRequestedOutputs()) {
     ignored_tensor.erase(pr.first);
   }
   if (ignored_tensor.empty()) {
@@ -559,7 +559,7 @@ EnsembleContext::InitStep(const size_t step_idx, std::shared_ptr<Step>* step)
 
   // Set requested outputs in request header
   for (const auto& pair : istep.output_to_tensor_) {
-    irequest->AddRequestedOutput(pair.first);
+    irequest->AddOriginalRequestedOutput(pair.first);
   }
 
   irequest->SetCorrelationId(correlation_id_);
