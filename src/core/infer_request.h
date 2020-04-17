@@ -81,9 +81,6 @@ class InferenceRequest {
     const std::vector<int64_t>& Shape() const { return shape_; }
     std::vector<int64_t>* MutableShape() { return &shape_; }
 
-    // The size, in bytes, of the entire input tensor.
-    uint64_t DataByteSize() const { return data_byte_size_; }
-
     // The data for this input.
     const std::shared_ptr<Memory>& Data() const { return data_; }
 
@@ -127,8 +124,6 @@ class InferenceRequest {
     DataType datatype_;
     std::vector<int64_t> original_shape_;
     std::vector<int64_t> shape_;
-
-    uint64_t data_byte_size_;
     std::shared_ptr<Memory> data_;
   };
 
@@ -205,7 +200,7 @@ class InferenceRequest {
   uint32_t BatchSize() const { return batch_size_; }
 
   uint32_t Priority() const { return priority_; }
-  void SetPriority(uint32_t p) { priority_ = p; }
+  void SetPriority(uint32_t p);
 
   uint64_t TimeoutMicroseconds() const { return timeout_us_; }
   void SetTimeoutMicroseconds(uint64_t t) { timeout_us_ = t; }
@@ -219,7 +214,6 @@ class InferenceRequest {
   Status MutableOriginalInput(const std::string& name, Input** input);
   std::unordered_map<std::string, Input>* MutableOriginalInputs()
   {
-    needs_normalization_ = true;
     return &original_inputs_;
   }
   const std::unordered_map<std::string, Input>& OriginalInputs() const
