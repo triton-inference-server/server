@@ -45,6 +45,16 @@ InferenceRequest::ActualModelVersion() const
   return backend_raw_->Version();
 }
 
+void
+InferenceRequest::SetPriority(uint32_t p)
+{
+  if ((p == 0) || (p > backend_raw_->MaxPriorityLevel())) {
+    priority_ = backend_raw_->DefaultPriorityLevel();
+  } else {
+    priority_ = p;
+  }
+}
+
 Status
 InferenceRequest::Run(std::unique_ptr<InferenceRequest>& request)
 {
@@ -123,8 +133,7 @@ InferenceRequest::MutableOriginalInput(
   }
 
   *input = &(itr->second);
-  // FIXME remove and refine
-  // needs_normalization_ = true;
+
   return Status::Success;
 }
 
@@ -155,7 +164,7 @@ InferenceRequest::MutableRequestedOutput(
   }
 
   *output = &(itr->second);
-  needs_normalization_ = true;
+
   return Status::Success;
 }
 
@@ -301,8 +310,8 @@ InferenceRequest::PrepareForInference()
   inputs_.clear();
   override_inputs_.clear();
 
-  // If anything has potentially changed in the inference request then
-  // need to renormalize.
+  // Renormalize if anything has changed in the inference request in a
+  // way that could impact renormalization.
   if (needs_normalization_) {
     RETURN_IF_ERROR(Normalize());
     needs_normalization_ = false;
@@ -324,10 +333,6 @@ Status
 InferenceRequest::Normalize()
 {
   const ModelConfig& model_config = backend_raw_->Config();
-
-  if ((priority_ == 0) || (priority_ > backend_raw_->MaxPriorityLevel())) {
-    priority_ = backend_raw_->DefaultPriorityLevel();
-  }
 
   // FIXMEV2 need original requested
   // If requested_outputs_ is empty return all outputs specified in model config
@@ -471,17 +476,13 @@ InferenceRequest::Normalize()
 //
 // Input
 //
-InferenceRequest::Input::Input()
-    : data_byte_size_(0), data_(new MemoryReference)
-{
-}
+InferenceRequest::Input::Input() : data_(new MemoryReference) {}
 
 InferenceRequest::Input::Input(
     const std::string& name, const DataType datatype, const int64_t* shape,
     const uint64_t dim_count)
     : name_(name), datatype_(datatype),
-      original_shape_(shape, shape + dim_count), data_byte_size_(0),
-      data_(new MemoryReference)
+      original_shape_(shape, shape + dim_count), data_(new MemoryReference)
 {
 }
 
@@ -489,7 +490,7 @@ InferenceRequest::Input::Input(
     const std::string& name, const DataType datatype,
     const std::vector<int64_t>& shape)
     : name_(name), datatype_(datatype), original_shape_(shape),
-      data_byte_size_(0), data_(new MemoryReference)
+      data_(new MemoryReference)
 {
 }
 
@@ -501,7 +502,6 @@ InferenceRequest::Input::AppendData(
   if (byte_size > 0) {
     std::static_pointer_cast<MemoryReference>(data_)->AddBuffer(
         static_cast<const char*>(base), byte_size, memory_type, memory_type_id);
-    data_byte_size_ = data_->TotalByteSize();
   }
 
   return Status::Success;
@@ -510,14 +510,13 @@ InferenceRequest::Input::AppendData(
 Status
 InferenceRequest::Input::SetData(const std::shared_ptr<Memory>& data)
 {
-  if (data_byte_size_ != 0) {
+  if (data_->TotalByteSize() != 0) {
     return Status(
         Status::Code::INVALID_ARG,
         "input '" + name_ + "' already has data, can't overwrite");
   }
 
   data_ = data;
-  data_byte_size_ = data_->TotalByteSize();
 
   return Status::Success;
 }
@@ -526,7 +525,6 @@ Status
 InferenceRequest::Input::RemoveAllData()
 {
   data_ = std::make_shared<MemoryReference>();
-  data_byte_size_ = 0;
   return Status::Success;
 }
 
