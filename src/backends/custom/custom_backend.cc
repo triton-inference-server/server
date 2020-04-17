@@ -636,12 +636,35 @@ CustomBackend::Context::GetOutput(
       shape.assign(shape_dims, shape_dims + shape_dim_cnt);
     }
 
+    Status status = Status::Success;
+#ifdef TRTIS_ENABLE_GPU
+    int current_device;
+    auto cuerr = cudaGetDevice(&current_device);
+    // Ignore error caused by CPU-only system.
+    if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
+        (cuerr != cudaErrorInsufficientDriver)) {
+      status = Status(
+          Status::Code::INTERNAL, "unable to get current CUDA device: " +
+                                      std::string(cudaGetErrorString(cuerr)));
+    }
+#endif  // TRTIS_ENABLE_GPU
     TRTSERVER_Memory_Type actual_memory_type;
     int64_t actual_memory_type_id;
-    Status status = payload->response_provider_->AllocateOutputBuffer(
-        name, content, content_byte_size, shape,
-        ToTRTServerMemoryType(*memory_type), *memory_type_id,
-        &actual_memory_type, &actual_memory_type_id);
+    if (status.IsOk()) {
+      status = payload->response_provider_->AllocateOutputBuffer(
+          name, content, content_byte_size, shape,
+          ToTRTServerMemoryType(*memory_type), *memory_type_id,
+          &actual_memory_type, &actual_memory_type_id);
+#ifdef TRTIS_ENABLE_GPU
+      cuerr = cudaSetDevice(current_device);
+      if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
+          (cuerr != cudaErrorInsufficientDriver)) {
+        status = Status(
+            Status::Code::INTERNAL, "unable to recover current CUDA device: " +
+                                        std::string(cudaGetErrorString(cuerr)));
+      }
+#endif  // TRTIS_ENABLE_GPU
+    }
     if (!status.IsOk()) {
       LOG_VERBOSE(1) << status.AsString();
       return false;
