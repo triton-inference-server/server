@@ -30,6 +30,7 @@ import grpc
 import rapidjson as json
 import threading
 import queue
+
 from google.protobuf.json_format import MessageToJson
 
 from tritongrpcclient import grpc_service_v2_pb2
@@ -98,6 +99,7 @@ class InferenceServerClient:
         self._client_stub = grpc_service_v2_pb2_grpc.GRPCInferenceServiceStub(
             self._channel)
         self._verbose = verbose
+        self._stream = None
 
     def __enter__(self):
         return self
@@ -113,6 +115,7 @@ class InferenceServerClient:
         will result in an Error.
 
         """
+        self.stop_stream()
         self._channel.close()
 
     def is_server_live(self, headers=None):
@@ -954,10 +957,55 @@ class InferenceServerClient:
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
+    def start_stream(self, callback, headers=None):
+        """Starts a grpc bi-directional stream to send streaming inferences.
+        Note: When using stream, user must ensure the InferenceServerClient.close()
+        gets called at exit.
+
+        Parameters
+        ----------
+        callback : function
+            Python function that is invoked upon receiving response from
+            the underlying stream. The function must reserve the last two
+            arguments (result, error) to hold InferResult and
+            InferenceServerException objects respectively which will be
+            provided to the function when executing the callback. The
+            ownership of these objects will be given to the user. The
+            'error' would be None for a successful inference.
+        headers: dict
+            Optional dictionary specifying additional HTTP
+            headers to include in the request.
+        
+        Raises
+        ------
+        InferenceServerException
+            If unable to start a stream.
+
+        """
+        if headers is not None:
+            metadata = headers.items()
+        else:
+            metadata = ()
+
+        self._stream = _InferStream(callback)
+
+        try:
+            response_iterator = self._client_stub.ModelStreamInfer(
+                _RequestIterator(self._stream), metadata=metadata)
+            self._stream._init_handler(response_iterator)
+        except grpc.RpcError as rpc_error:
+            raise_error_grpc(rpc_error)
+
+    def stop_stream(self):
+        """Stops a stream if one available.
+        """
+        if self._stream is not None:
+            self._stream.close()
+        self._stream = None
+
     def async_stream_infer(self,
                            model_name,
                            inputs,
-                           stream,
                            model_version="",
                            outputs=None,
                            request_id="",
@@ -967,7 +1015,9 @@ class InferenceServerClient:
                            priority=0,
                            timeout=None):
         """Runs an asynchronous inference over gRPC bi-directional streaming
-        API.
+        API. A stream should be established with a call to start_stream()
+        before calling this function. All the results will be provided to the
+        callback function associated with the stream.
 
         Parameters
         ----------
@@ -976,8 +1026,6 @@ class InferenceServerClient:
         inputs : list
             A list of InferInput objects, each describing data for a input
             tensor required by the model.
-        stream : InferStream
-            The stream to use for sending/receiving inference requests/response.
         model_version: str
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
@@ -1023,19 +1071,10 @@ class InferenceServerClient:
             If server fails to issue inference.
         """
 
-        if not stream._is_initialized():
-            # Inititate the response stream handler if required.
-            if stream._headers is not None:
-                metadata = stream._headers.items()
-            else:
-                metadata = ()
-
-            try:
-                stream._init_handler(
-                    self._client_stub.ModelStreamInfer(_RequestIterator(stream),
-                                                       metadata=metadata))
-            except grpc.RpcError as rpc_error:
-                raise_error_grpc(rpc_error)
+        if self._stream is None:
+            raise_error(
+                "stream not available, use start_stream() to make one available."
+            )
 
         request = _get_inference_request(model_name=model_name,
                                          inputs=inputs,
@@ -1048,7 +1087,7 @@ class InferenceServerClient:
                                          priority=priority,
                                          timeout=timeout)
         # Enqueues the request to the stream
-        stream._enqueue_request(request)
+        self._stream._enqueue_request(request)
 
 
 class InferInput:
@@ -1352,7 +1391,7 @@ class InferResult:
             return self._result
 
 
-class InferStream:
+class _InferStream:
     """Supports sending inference requests and receiving corresponding
     requests on a gRPC bi-directional stream.
 
@@ -1366,22 +1405,12 @@ class InferStream:
         provided to the function when executing the callback. The
         ownership of these objects will be given to the user. The
         'error' would be None for a successful inference.
-    headers: dict
-            Optional dictionary specifying additional HTTP
-            headers to include while establising gRPC stream.
     """
 
-    def __init__(self, callback, headers=None):
+    def __init__(self, callback):
         self._callback = callback
         self._request_queue = queue.Queue()
-        self._headers = headers
         self._handler = None
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.close()
 
     def __del__(self):
         self.close()
@@ -1391,17 +1420,11 @@ class InferStream:
         blocks till response of all currently enqueued requests are not
         received.
         """
-        if self._is_initialized():
+        if self._handler is not None:
             self._request_queue.put(None)
             if self._handler.is_alive():
                 self._handler.join()
             self._handler = None
-
-    def _is_initialized(self):
-        """Returns whether the handler to this stream object
-        is initialized.
-        """
-        return (self._handler is not None)
 
     def _init_handler(self, response_iterator):
         """Initializes the handler to process the response from
@@ -1413,7 +1436,7 @@ class InferStream:
             The iterator over the gRPC response stream.
 
         """
-        if self._is_initialized():
+        if self._handler is not None:
             raise_error(
                 'Attempted to initialize already initialized InferStream')
         # Create a new thread to handle the gRPC response stream
@@ -1473,7 +1496,7 @@ class InferStream:
 
 
 class _RequestIterator:
-    """An iterator class to provide data tp gRPC request stream.
+    """An iterator class to provide data to gRPC request stream.
 
     Parameters
     ----------
