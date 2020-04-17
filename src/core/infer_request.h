@@ -206,11 +206,11 @@ class InferenceRequest {
   void SetTimeoutMicroseconds(uint64_t t) { timeout_us_ = t; }
 
   // The original inputs are the inputs added to the request before
-  // the inference executed (that is before
-  // TRITONSERVER_ServerInferAsync or equivalent is called). Once
-  // execution has started the original inputs should not be modified
-  // until execution completes (and those modifications will apply to
-  // the next inference execution).
+  // the inference execution (that is before
+  // TRITONSERVER_ServerInferAsync is called). Once execution has
+  // started the original inputs should not be modified until
+  // execution completes (and those modifications will apply to the
+  // next inference execution).
   Status MutableOriginalInput(const std::string& name, Input** input);
   std::unordered_map<std::string, Input>* MutableOriginalInputs()
   {
@@ -255,12 +255,26 @@ class InferenceRequest {
     return inputs_;
   }
 
-  Status MutableRequestedOutput(
-      const std::string& name, RequestedOutput** output);
-  const std::unordered_map<std::string, RequestedOutput>& RequestedOutputs()
-      const
+  // The original requested outputs are the requested outputs added to
+  // the request before the inference execution (that is before
+  // TRITONSERVER_ServerInferAsync is called). Once execution has
+  // started the original requested outputs should not be modified
+  // until execution completes (and those modifications will apply to
+  // the next inference execution).
+  const std::unordered_map<std::string, RequestedOutput>&
+  OriginalRequestedOutputs() const
   {
-    return requested_outputs_;
+    return original_requested_outputs_;
+  }
+
+  // Get the requested outputs that should be used during
+  // inference. Accessing outputs via this method is not valid until
+  // after PrepareForInference is called.
+  const std::unordered_map<std::string, RequestedOutput>&
+  ImmutableRequestedOutputs() const
+  {
+    return (requested_outputs_.empty()) ? original_requested_outputs_
+                                        : requested_outputs_;
   }
 
   // Get the response factory.
@@ -292,13 +306,14 @@ class InferenceRequest {
   // Add an override input to the request.
   Status AddOverrideInput(const std::shared_ptr<Input>& input);
 
-  // Request an output.
-  Status AddRequestedOutput(
+  // Request an original requested output.
+  Status AddOriginalRequestedOutput(
       const std::string& name, const uint32_t classification_cnt = 0);
 
-  // Remove a single requested output or all requested outputs.
-  Status RemoveRequestedOutput(const std::string& name);
-  Status RemoveAllRequestedOutputs();
+  // Remove a single original requested output or all requested
+  // outputs.
+  Status RemoveOriginalRequestedOutput(const std::string& name);
+  Status RemoveAllOriginalRequestedOutputs();
 
   // Initialize the release callback for the request.
   Status SetReleaseCallback(
@@ -400,6 +415,11 @@ class InferenceRequest {
   std::unordered_map<std::string, Input> original_inputs_;
   std::unordered_map<std::string, std::shared_ptr<Input>> override_inputs_;
   std::unordered_map<std::string, Input*> inputs_;
+  std::unordered_map<std::string, RequestedOutput> original_requested_outputs_;
+
+  // requested_outputs_ is to be used post-normalization. It will be
+  // empty unless it differs from original_requested_outputs_, so
+  // typically should access it through ImmutableRequestedOutputs.
   std::unordered_map<std::string, RequestedOutput> requested_outputs_;
 
   // The release function and user pointer for this request.
