@@ -153,23 +153,6 @@ InferenceRequest::ImmutableInput(
 }
 
 Status
-InferenceRequest::MutableRequestedOutput(
-    const std::string& name, RequestedOutput** output)
-{
-  auto itr = requested_outputs_.find(name);
-  if (itr == requested_outputs_.end()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "output '" + name + "' does not exist in request");
-  }
-
-  *output = &(itr->second);
-
-  return Status::Success;
-}
-
-
-Status
 InferenceRequest::AddOriginalInput(
     const std::string& name, const DataType datatype, const int64_t* shape,
     const uint64_t dim_count, InferenceRequest::Input** input)
@@ -265,10 +248,10 @@ InferenceRequest::AddOverrideInput(
 }
 
 Status
-InferenceRequest::AddRequestedOutput(
+InferenceRequest::AddOriginalRequestedOutput(
     const std::string& name, const uint32_t classification_cnt)
 {
-  const auto& pr = requested_outputs_.emplace(
+  const auto& pr = original_requested_outputs_.emplace(
       std::piecewise_construct, std::forward_as_tuple(name),
       std::forward_as_tuple(name, classification_cnt));
 
@@ -282,9 +265,9 @@ InferenceRequest::AddRequestedOutput(
 }
 
 Status
-InferenceRequest::RemoveRequestedOutput(const std::string& name)
+InferenceRequest::RemoveOriginalRequestedOutput(const std::string& name)
 {
-  if (requested_outputs_.erase(name) != 1) {
+  if (original_requested_outputs_.erase(name) != 1) {
     return Status(
         Status::Code::INVALID_ARG,
         "output '" + name + "' does not exist in request");
@@ -295,9 +278,9 @@ InferenceRequest::RemoveRequestedOutput(const std::string& name)
 }
 
 Status
-InferenceRequest::RemoveAllRequestedOutputs()
+InferenceRequest::RemoveAllOriginalRequestedOutputs()
 {
-  requested_outputs_.clear();
+  original_requested_outputs_.clear();
   needs_normalization_ = true;
   return Status::Success;
 }
@@ -334,15 +317,20 @@ InferenceRequest::Normalize()
 {
   const ModelConfig& model_config = backend_raw_->Config();
 
-  // FIXMEV2 need original requested
-  // If requested_outputs_ is empty return all outputs specified in model config
-  if (requested_outputs_.size() == 0) {
+  // Initialize the requested outputs to be used during inference. If
+  // original_requested_outputs_ is empty assume all outputs specified
+  // in model config are being requested.
+  requested_outputs_.clear();
+  if (original_requested_outputs_.size() == 0) {
     for (const auto& output : model_config.output()) {
-      AddRequestedOutput(output.name(), 0 /* classification_count */);
+      requested_outputs_.emplace(
+          std::piecewise_construct, std::forward_as_tuple(output.name()),
+          std::forward_as_tuple(output.name(), 0));
     }
   } else {
-    // Validate if the requested output name exists in the model configuration
-    for (const auto& pr : requested_outputs_) {
+    // Validate if the original requested output name exists in the
+    // model configuration.
+    for (const auto& pr : original_requested_outputs_) {
       const ModelOutput* output_config;
       RETURN_IF_ERROR(backend_raw_->GetOutput(pr.first, &output_config));
     }
@@ -585,8 +573,13 @@ operator<<(std::ostream& out, const InferenceRequest& request)
     out << "[0x" << itr.second << "] " << *itr.second << std::endl;
   }
 
+  out << "original requested outputs:" << std::endl;
+  for (const auto& itr : request.OriginalRequestedOutputs()) {
+    out << itr.second << std::endl;
+  }
+
   out << "requested outputs:" << std::endl;
-  for (const auto& itr : request.RequestedOutputs()) {
+  for (const auto& itr : request.ImmutableRequestedOutputs()) {
     out << itr.second << std::endl;
   }
 
