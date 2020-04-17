@@ -29,7 +29,7 @@
 #include <iostream>
 #include <mutex>
 #include <string>
-#include "src/clients/c++/experimental_api_v2/library/grpc_client.h"
+#include "src/clients/c++/experimental_api_v2/library/http_client.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
@@ -146,7 +146,7 @@ int
 main(int argc, char** argv)
 {
   bool verbose = false;
-  std::string url("localhost:8001");
+  std::string url("localhost:8000");
   nic::Headers http_headers;
 
   // Parse commandline...
@@ -178,12 +178,12 @@ main(int argc, char** argv)
   std::string model_name = "simple";
   std::string model_version = "";
 
-  // Create a InferenceServerGrpcClient instance to communicate with the
-  // server using gRPC protocol.
-  std::unique_ptr<nic::InferenceServerGrpcClient> client;
+  // Create a InferenceServerHttpClient instance to communicate with the
+  // server using HTTP protocol.
+  std::unique_ptr<nic::InferenceServerHttpClient> client;
   FAIL_IF_ERR(
-      nic::InferenceServerGrpcClient::Create(&client, url, verbose),
-      "unable to create grpc client");
+      nic::InferenceServerHttpClient::Create(&client, url, verbose),
+      "unable to create http client");
 
   // Create the data for the two input tensors. Initialize the first
   // to unique integers and the second to all ones.

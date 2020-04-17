@@ -38,6 +38,8 @@
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
+class HttpInferRequest;
+
 /// The key-value map type to be included in the request
 /// as custom headers.
 typedef std::map<std::string, std::string> Headers;
@@ -65,6 +67,8 @@ std::string GetJsonText(const rapidjson::Document& json_dom);
 ///
 class InferenceServerHttpClient : public InferenceServerClient {
  public:
+  ~InferenceServerHttpClient();
+
   /// Create a client that can be used to communicate with the server.
   /// \param client Returns a new InferenceServerHttpClient object.
   /// \param server_url The inference server name and port.
@@ -175,6 +179,38 @@ class InferenceServerHttpClient : public InferenceServerClient {
       const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 
+  /// Run asynchronous inference on server.
+  /// Once the request is completed, the InferResult pointer will be passed to
+  /// the provided 'callback' function. Upon the invocation of callback
+  /// function, the ownership of InferResult object is transfered to the
+  /// function caller. It is then the caller's choice on either retrieving the
+  /// results inside the callback function or deferring it to a different thread
+  /// so that the client is unblocked. In order to prevent memory leak, user
+  /// must ensure this object gets deleted.
+  /// Note: InferInput::AppendRaw() or InferInput::SetSharedMemory() calls do
+  /// not copy the data buffers but hold the pointers to the data directly.
+  /// It is advisable to not to disturb the buffer contents until the respective
+  /// callback is invoked.
+  /// \param callback The callback function to be invoked on request completion.
+  /// \param options The options for inference request.
+  /// \param inputs The vector of InferInput describing the model inputs.
+  /// \param outputs Optional vector of InferRequestedOutput describing how the
+  /// output must be returned. If not provided then all the outputs in the model
+  /// config will be returned as default settings.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in request.
+  /// \param query_params Optional map specifying parameters that must be
+  /// included with URL query.
+  /// \return Error object indicating success
+  /// or failure of the request.
+  Error AsyncInfer(
+      OnCompleteFn callback, const InferOptions& options,
+      const std::vector<InferInput*>& inputs,
+      const std::vector<const InferRequestedOutput*>& outputs =
+          std::vector<const InferRequestedOutput*>(),
+      const Headers& headers = Headers(),
+      const Parameters& query_params = Parameters());
+
  private:
   InferenceServerHttpClient(const std::string& url, bool verbose);
 
@@ -187,7 +223,8 @@ class InferenceServerHttpClient : public InferenceServerClient {
       const std::vector<InferInput*>& inputs,
       const std::vector<const InferRequestedOutput*>& outputs,
       const Headers& headers, const Parameters& query_params,
-      std::shared_ptr<InferRequest>& request);
+      std::shared_ptr<HttpInferRequest>& request);
+  void AsyncTransfer();
   Error Get(
       std::string& request_uri, const Headers& headers,
       const Parameters& query_params, rapidjson::Document* response,
@@ -206,67 +243,13 @@ class InferenceServerHttpClient : public InferenceServerClient {
   const std::string url_;
   // Enable verbose output
   const bool verbose_;
-};
 
-//==============================================================================
-/// An InferResultHttp instance is used  to access and interpret the
-/// response of an inference request from HTTP endpoint. This object
-/// holds data for all requested outputs.
-///
-class InferResultHttp : public InferResult {
- public:
-  /// Create a InferResult instance to interpret server response.
-  /// \param infer_result Returns a new InferResult object.
-  /// \param response  The response of server for an inference request.
-  /// \return Error object indicating success or failure.
-  static Error Create(
-      InferResult** infer_result, std::unique_ptr<std::string> response,
-      size_t json_response_size);
-
-  /// See InferResult::ModelName(std::string* name)
-  Error ModelName(std::string* name) const override;
-
-  /// See InferResult::ModelVersion(std::string* version)
-  Error ModelVersion(std::string* version) const override;
-
-  /// See InferResult::Id(std::string* id)
-  Error Id(std::string* id) const override;
-
-  /// See InferResult::Shape(const std::string& output_name,
-  ///  std::vector<int64_t>* shape)
-  Error Shape(const std::string& output_name, std::vector<int64_t>* shape)
-      const override;
-
-  /// See InferResult::Datatype(
-  ///    const std::string& output_name, std::string* datatype)
-  Error Datatype(
-      const std::string& output_name, std::string* datatype) const override;
-
-  /// See InferResult::RawData(
-  ///    const std::string& output_name, const uint8_t** buf,
-  ///    size_t* byte_size)
-  Error RawData(
-      const std::string& output_name, const uint8_t** buf,
-      size_t* byte_size) const override;
-
-  /// See InferResult::DebugString()
-  std::string DebugString() const override;
-
-  /// Returns the status of this request.
-  /// \return Error object indicating success or failure of the
-  /// request.
-  Error RequestStatus() const;
-
- private:
-  InferResultHttp(
-      std::unique_ptr<std::string> response, size_t json_response_size);
-
-  std::map<std::string, const rapidjson::Value*> output_name_to_result_map_;
-  std::map<std::string, std::pair<const uint8_t*, const size_t>>
-      output_name_to_buffer_map_;
-
-  rapidjson::Document response_json_;
-  std::unique_ptr<std::string> response_;
+  using AsyncReqMap = std::map<uintptr_t, std::shared_ptr<HttpInferRequest>>;
+  // curl multi handle for processing asynchronous requests
+  void* multi_handle_;
+  // map to record ongoing asynchronous requests with pointer to easy handle
+  // or tag id as key
+  AsyncReqMap ongoing_async_requests_;
 };
 
 }}}  // namespace nvidia::inferenceserver::client
