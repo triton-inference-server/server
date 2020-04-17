@@ -46,7 +46,7 @@ operator<<(std::ostream& out, const Error& err)
 //==============================================================================
 
 Error
-InferenceServerClient::GetInferStat(InferStat* infer_stat) const
+InferenceServerClient::ClientInferStat(InferStat* infer_stat) const
 {
   *infer_stat = infer_stat_;
   return Error::Success;

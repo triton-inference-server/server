@@ -26,6 +26,7 @@
 
 #include "src/clients/c++/experimental_api_v2/library/grpc_client.h"
 
+#include <b64/decode.h>
 #include <grpcpp/grpcpp.h>
 #include <cstdint>
 #include <future>
@@ -387,6 +388,278 @@ InferenceServerGrpcClient::GetModelConfig(
       std::cout << model_config->DebugString() << std::endl;
     }
   } else {
+    err = Error(grpc_status.error_message());
+  }
+
+  return err;
+}
+
+Error
+InferenceServerGrpcClient::GetModelRepositoryIndex(
+    RepositoryIndexResponse* repository_index, const Headers& headers)
+{
+  repository_index->Clear();
+  Error err;
+
+  RepositoryIndexRequest request;
+  grpc::ClientContext context;
+
+  for (const auto& it : headers) {
+    context.AddMetadata(it.first, it.second);
+  }
+
+  grpc::Status grpc_status =
+      stub_->RepositoryIndex(&context, request, repository_index);
+  if (grpc_status.ok()) {
+    if (verbose_) {
+      std::cout << repository_index->DebugString() << std::endl;
+    }
+  } else {
+    err = Error(grpc_status.error_message());
+  }
+
+  return err;
+}
+
+Error
+InferenceServerGrpcClient::LoadModel(
+    const std::string& model_name, const Headers& headers)
+{
+  Error err;
+
+  RepositoryModelLoadRequest request;
+  RepositoryModelLoadResponse response;
+  grpc::ClientContext context;
+
+  for (const auto& it : headers) {
+    context.AddMetadata(it.first, it.second);
+  }
+
+  request.set_model_name(model_name);
+  grpc::Status grpc_status =
+      stub_->RepositoryModelLoad(&context, request, &response);
+  if (!grpc_status.ok()) {
+    err = Error(grpc_status.error_message());
+  }
+
+  return err;
+}
+
+Error
+InferenceServerGrpcClient::UnloadModel(
+    const std::string& model_name, const Headers& headers)
+{
+  Error err;
+
+  RepositoryModelUnloadRequest request;
+  RepositoryModelUnloadResponse response;
+  grpc::ClientContext context;
+
+  for (const auto& it : headers) {
+    context.AddMetadata(it.first, it.second);
+  }
+
+  request.set_model_name(model_name);
+  grpc::Status grpc_status =
+      stub_->RepositoryModelUnload(&context, request, &response);
+  if (!grpc_status.ok()) {
+    err = Error(grpc_status.error_message());
+  }
+
+  return err;
+}
+
+Error
+InferenceServerGrpcClient::ModelInferenceStatistics(
+    ModelStatisticsResponse* infer_stat, const std::string& model_name,
+    const std::string& model_version, const Headers& headers)
+{
+  infer_stat->Clear();
+  Error err;
+
+  ModelStatisticsRequest request;
+  grpc::ClientContext context;
+
+  for (const auto& it : headers) {
+    context.AddMetadata(it.first, it.second);
+  }
+
+  request.set_name(model_name);
+  request.set_version(model_version);
+  grpc::Status grpc_status =
+      stub_->ModelStatistics(&context, request, infer_stat);
+  if (grpc_status.ok()) {
+    if (verbose_) {
+      std::cout << infer_stat->DebugString() << std::endl;
+    }
+  } else {
+    err = Error(grpc_status.error_message());
+  }
+
+  return err;
+}
+
+Error
+InferenceServerGrpcClient::SystemSharedMemoryStatus(
+    SystemSharedMemoryStatusResponse* status, const std::string& region_name,
+    const Headers& headers)
+{
+  status->Clear();
+  Error err;
+
+  SystemSharedMemoryStatusRequest request;
+  grpc::ClientContext context;
+
+  for (const auto& it : headers) {
+    context.AddMetadata(it.first, it.second);
+  }
+
+  request.set_name(region_name);
+  grpc::Status grpc_status =
+      stub_->SystemSharedMemoryStatus(&context, request, status);
+  if (grpc_status.ok()) {
+    if (verbose_) {
+      std::cout << status->DebugString() << std::endl;
+    }
+  } else {
+    err = Error(grpc_status.error_message());
+  }
+
+  return err;
+}
+
+Error
+InferenceServerGrpcClient::RegisterSystemSharedMemory(
+    const std::string& name, const std::string key, const size_t byte_size,
+    const size_t offset, const Headers& headers)
+{
+  Error err;
+
+  SystemSharedMemoryRegisterRequest request;
+  SystemSharedMemoryRegisterResponse response;
+  grpc::ClientContext context;
+
+  for (const auto& it : headers) {
+    context.AddMetadata(it.first, it.second);
+  }
+
+  request.set_name(name);
+  request.set_key(key);
+  request.set_offset(offset);
+  request.set_byte_size(byte_size);
+  grpc::Status grpc_status =
+      stub_->SystemSharedMemoryRegister(&context, request, &response);
+  if (!grpc_status.ok()) {
+    err = Error(grpc_status.error_message());
+  }
+
+  return err;
+}
+
+Error
+InferenceServerGrpcClient::UnregisterSystemSharedMemory(
+    const std::string& name, const Headers& headers)
+{
+  Error err;
+
+  SystemSharedMemoryUnregisterRequest request;
+  SystemSharedMemoryUnregisterResponse response;
+  grpc::ClientContext context;
+
+  for (const auto& it : headers) {
+    context.AddMetadata(it.first, it.second);
+  }
+
+  request.set_name(name);
+  grpc::Status grpc_status =
+      stub_->SystemSharedMemoryUnregister(&context, request, &response);
+  if (!grpc_status.ok()) {
+    err = Error(grpc_status.error_message());
+  }
+
+  return err;
+}
+
+Error
+InferenceServerGrpcClient::CudaSharedMemoryStatus(
+    CudaSharedMemoryStatusResponse* status, const std::string& region_name,
+    const Headers& headers)
+{
+  status->Clear();
+  Error err;
+
+  CudaSharedMemoryStatusRequest request;
+  grpc::ClientContext context;
+
+  for (const auto& it : headers) {
+    context.AddMetadata(it.first, it.second);
+  }
+
+  request.set_name(region_name);
+  grpc::Status grpc_status =
+      stub_->CudaSharedMemoryStatus(&context, request, status);
+  if (grpc_status.ok()) {
+    if (verbose_) {
+      std::cout << status->DebugString() << std::endl;
+    }
+  } else {
+    err = Error(grpc_status.error_message());
+  }
+
+  return err;
+}
+
+Error
+InferenceServerGrpcClient::RegisterCudaSharedMemory(
+    const std::string& name, const std::string raw_handle,
+    const size_t device_id, const size_t byte_size, const Headers& headers)
+{
+  Error err;
+
+  CudaSharedMemoryRegisterRequest request;
+  CudaSharedMemoryRegisterResponse response;
+  grpc::ClientContext context;
+
+  for (const auto& it : headers) {
+    context.AddMetadata(it.first, it.second);
+  }
+
+  request.set_name(name);
+  std::vector<char> decoded_raw_handle;
+  decoded_raw_handle.resize(raw_handle.length());
+  base64::decoder D;
+  int size =
+      D.decode(raw_handle.c_str(), raw_handle.length(), &decoded_raw_handle[0]);
+  request.set_raw_handle(&decoded_raw_handle[0], size + 1);
+  request.set_device_id(device_id);
+  request.set_byte_size(byte_size);
+  grpc::Status grpc_status =
+      stub_->CudaSharedMemoryRegister(&context, request, &response);
+  if (!grpc_status.ok()) {
+    err = Error(grpc_status.error_message());
+  }
+
+  return err;
+}
+
+Error
+InferenceServerGrpcClient::UnregisterCudaSharedMemory(
+    const std::string& name, const Headers& headers)
+{
+  Error err;
+
+  CudaSharedMemoryUnregisterRequest request;
+  CudaSharedMemoryUnregisterResponse response;
+  grpc::ClientContext context;
+
+  for (const auto& it : headers) {
+    context.AddMetadata(it.first, it.second);
+  }
+
+  request.set_name(name);
+  grpc::Status grpc_status =
+      stub_->CudaSharedMemoryUnregister(&context, request, &response);
+  if (!grpc_status.ok()) {
     err = Error(grpc_status.error_message());
   }
 

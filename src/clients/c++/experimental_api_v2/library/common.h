@@ -124,7 +124,7 @@ class InferenceServerClient {
   /// Obtain the cumulative inference statistics of the client.
   /// \param Returns the InferStat object holding current statistics.
   /// \return Error object indicating success or failure.
-  Error GetInferStat(InferStat* infer_stat) const;
+  Error ClientInferStat(InferStat* infer_stat) const;
 
  protected:
   // Update the infer stat with the given timer
