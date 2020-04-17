@@ -82,7 +82,6 @@ if(${TRTIS_ENABLE_GRPC_V2})
     grpcclient_static
     PRIVATE gRPC::grpc++
     PRIVATE gRPC::grpc
-    PRIVATE -lb64
     PUBLIC protobuf::libprotobuf
     PUBLIC Threads::Threads
   )
@@ -120,7 +119,6 @@ if(${TRTIS_ENABLE_GRPC_V2})
     grpcclient
     PRIVATE gRPC::grpc++
     PRIVATE gRPC::grpc
-    PRIVATE -lb64
     PUBLIC protobuf::libprotobuf
     PUBLIC Threads::Threads
   )

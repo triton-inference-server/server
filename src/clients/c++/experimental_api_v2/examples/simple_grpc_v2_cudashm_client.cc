@@ -24,7 +24,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <b64/encode.h>
 #include <unistd.h>
 #include <iostream>
 #include <string>
@@ -110,18 +109,6 @@ CreateCUDAIPCHandle(
 
   //  Create IPC handle for data on the gpu
   FAIL_IF_CUDA_ERR(cudaIpcGetMemHandle(cuda_handle, input_d_ptr));
-}
-
-std::string
-Base64Encoder(void* ptr, size_t size)
-{
-  base64::encoder E;
-  std::cout << "Debug1 " << size << std::endl;
-  char* encoded_ptr = (char*)malloc(2 * size);
-  int encoded_size = E.encode((char*)ptr, size, encoded_ptr);
-  E.encode_end((char*)ptr + encoded_size);
-  auto yo = std::string(encoded_ptr);
-  return yo;
 }
 
 int
@@ -216,7 +203,7 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       client->RegisterCudaSharedMemory(
           "input_data",
-          Base64Encoder((void*)&input_cuda_handle, sizeof(cudaIpcMemHandle_t)),
+          input_cuda_handle,
           0 /* device_id */, input_byte_size * 2),
       "failed to register input shared memory region");
 
@@ -255,7 +242,7 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       client->RegisterCudaSharedMemory(
           "output_data",
-          Base64Encoder((void*)&output_cuda_handle, sizeof(cudaIpcMemHandle_t)),
+          output_cuda_handle,
           0 /* device_id */, output_byte_size * 2),
       "failed to register output shared memory region");
 

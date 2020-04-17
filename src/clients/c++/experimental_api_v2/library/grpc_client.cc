@@ -26,7 +26,6 @@
 
 #include "src/clients/c++/experimental_api_v2/library/grpc_client.h"
 
-#include <b64/decode.h>
 #include <grpcpp/grpcpp.h>
 #include <cstdint>
 #include <future>
@@ -611,7 +610,7 @@ InferenceServerGrpcClient::CudaSharedMemoryStatus(
 
 Error
 InferenceServerGrpcClient::RegisterCudaSharedMemory(
-    const std::string& name, const std::string raw_handle,
+    const std::string& name, const cudaIpcMemHandle_t raw_handle,
     const size_t device_id, const size_t byte_size, const Headers& headers)
 {
   Error err;
@@ -626,11 +625,7 @@ InferenceServerGrpcClient::RegisterCudaSharedMemory(
 
   request.set_name(name);
   std::vector<char> decoded_raw_handle;
-  decoded_raw_handle.resize(raw_handle.length());
-  base64::decoder D;
-  int size =
-      D.decode(raw_handle.c_str(), raw_handle.length(), &decoded_raw_handle[0]);
-  request.set_raw_handle(&decoded_raw_handle[0], size + 1);
+  request.set_raw_handle((char*)&raw_handle, sizeof(cudaIpcMemHandle_t));
   request.set_device_id(device_id);
   request.set_byte_size(byte_size);
   grpc::Status grpc_status =
