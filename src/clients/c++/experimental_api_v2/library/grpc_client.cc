@@ -62,8 +62,8 @@ GetChannel(const std::string& url)
 //
 class GrpcInferRequest : public InferRequest {
  public:
-  GrpcInferRequest(InferenceServerClient::OnCompleteFn callback_ = nullptr)
-      : InferRequest(callback_), grpc_status_(),
+  GrpcInferRequest(InferenceServerClient::OnCompleteFn callback = nullptr)
+      : InferRequest(callback), grpc_status_(),
         grpc_response_(std::make_shared<ModelInferResponse>())
   {
   }
@@ -76,6 +76,132 @@ class GrpcInferRequest : public InferRequest {
   grpc::Status grpc_status_;
   std::shared_ptr<ModelInferResponse> grpc_response_;
 };
+
+//==============================================================================
+
+class InferResultGrpc : public InferResult {
+ public:
+  static Error Create(
+      InferResult** infer_result, std::shared_ptr<ModelInferResponse> response,
+      Error& request_status);
+
+  Error RequestStatus() const override;
+  Error ModelName(std::string* name) const override;
+  Error ModelVersion(std::string* version) const override;
+  Error Id(std::string* id) const override;
+  Error Shape(const std::string& output_name, std::vector<int64_t>* shape)
+      const override;
+  Error Datatype(
+      const std::string& output_name, std::string* datatype) const override;
+  Error RawData(
+      const std::string& output_name, const uint8_t** buf,
+      size_t* byte_size) const override;
+  std::string DebugString() const override { return response_->DebugString(); }
+
+ private:
+  InferResultGrpc(
+      std::shared_ptr<ModelInferResponse> response, Error& request_status);
+  std::map<std::string, const ModelInferResponse::InferOutputTensor*>
+      output_name_to_result_map_;
+
+  std::shared_ptr<ModelInferResponse> response_;
+  Error request_status_;
+};
+
+Error
+InferResultGrpc::Create(
+    InferResult** infer_result, std::shared_ptr<ModelInferResponse> response,
+    Error& request_status)
+{
+  *infer_result = reinterpret_cast<InferResult*>(
+      new InferResultGrpc(response, request_status));
+  return Error::Success;
+}
+
+Error
+InferResultGrpc::RequestStatus() const
+{
+  return request_status_;
+}
+
+Error
+InferResultGrpc::ModelName(std::string* name) const
+{
+  *name = response_->model_name();
+  return Error::Success;
+}
+
+Error
+InferResultGrpc::ModelVersion(std::string* version) const
+{
+  *version = response_->model_version();
+  return Error::Success;
+}
+
+Error
+InferResultGrpc::Id(std::string* id) const
+{
+  *id = response_->id();
+  return Error::Success;
+}
+
+Error
+InferResultGrpc::Shape(
+    const std::string& output_name, std::vector<int64_t>* shape) const
+{
+  shape->clear();
+  auto it = output_name_to_result_map_.find(output_name);
+  if (it != output_name_to_result_map_.end()) {
+    for (const auto dim : it->second->shape()) {
+      shape->push_back(dim);
+    }
+  } else {
+    return Error(
+        "The response does not contain results or output name " + output_name);
+  }
+  return Error::Success;
+}
+
+Error
+InferResultGrpc::Datatype(
+    const std::string& output_name, std::string* datatype) const
+{
+  auto it = output_name_to_result_map_.find(output_name);
+  if (it != output_name_to_result_map_.end()) {
+    *datatype = it->second->datatype();
+  } else {
+    return Error(
+        "The response does not contain results or output name " + output_name);
+  }
+  return Error::Success;
+}
+
+
+Error
+InferResultGrpc::RawData(
+    const std::string& output_name, const uint8_t** buf,
+    size_t* byte_size) const
+{
+  auto it = output_name_to_result_map_.find(output_name);
+  if (it != output_name_to_result_map_.end()) {
+    *buf = (uint8_t*)&(it->second->contents().raw_contents()[0]);
+    *byte_size = it->second->contents().raw_contents().size();
+  } else {
+    return Error(
+        "The response does not contain results or output name " + output_name);
+  }
+
+  return Error::Success;
+}
+
+InferResultGrpc::InferResultGrpc(
+    std::shared_ptr<ModelInferResponse> response, Error& request_status)
+    : response_(response), request_status_(request_status)
+{
+  for (const auto& output : response_->outputs()) {
+    output_name_to_result_map_[output.name()] = &output;
+  }
+}
 
 
 //==============================================================================
@@ -297,8 +423,12 @@ InferenceServerGrpcClient::Infer(
   sync_request->grpc_status_ = stub_->ModelInfer(
       &context, infer_request_, sync_request->grpc_response_.get());
 
+  if (!sync_request->grpc_status_.ok()) {
+    err = Error(sync_request->grpc_status_.error_message());
+  }
+
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_START);
-  InferResultGrpc::Create(result, sync_request->grpc_response_);
+  InferResultGrpc::Create(result, sync_request->grpc_response_, err);
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
 
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
@@ -312,11 +442,9 @@ InferenceServerGrpcClient::Infer(
     if (verbose_) {
       std::cout << sync_request->grpc_response_->DebugString() << std::endl;
     }
-  } else {
-    err = Error(sync_request->grpc_status_.error_message());
   }
 
-  return err;
+  return (*result)->RequestStatus();
 }
 
 Error
@@ -499,21 +627,22 @@ InferenceServerGrpcClient::AsyncTransfer()
     } else {
       async_request.reset(raw_async_request);
       InferResult* async_result;
+      Error err;
+      if (!async_request->grpc_status_.ok()) {
+        err = Error(async_request->grpc_status_.error_message());
+      }
       async_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_START);
-      InferResultGrpc::Create(&async_result, async_request->grpc_response_);
+      InferResultGrpc::Create(
+          &async_result, async_request->grpc_response_, err);
       async_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
       async_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
-      Error* err;
       if (async_request->grpc_status_.ok()) {
         if (verbose_) {
           std::cout << async_request->grpc_response_->DebugString()
                     << std::endl;
         }
-        err = new Error();
-      } else {
-        err = new Error(async_request->grpc_status_.error_message());
       }
-      async_request->callback_(async_result, err);
+      async_request->callback_(async_result);
     }
   }
 }
@@ -546,94 +675,6 @@ InferenceServerGrpcClient::~InferenceServerGrpcClient()
       delete async_request;
     }
   } while (has_next);
-}
-
-//==============================================================================
-
-Error
-InferResultGrpc::Create(
-    InferResult** infer_result, std::shared_ptr<ModelInferResponse> response)
-{
-  *infer_result = reinterpret_cast<InferResult*>(new InferResultGrpc(response));
-  return Error::Success;
-}
-
-Error
-InferResultGrpc::ModelName(std::string* name) const
-{
-  *name = response_->model_name();
-  return Error::Success;
-}
-
-Error
-InferResultGrpc::ModelVersion(std::string* version) const
-{
-  *version = response_->model_version();
-  return Error::Success;
-}
-
-Error
-InferResultGrpc::Id(std::string* id) const
-{
-  *id = response_->id();
-  return Error::Success;
-}
-
-Error
-InferResultGrpc::Shape(
-    const std::string& output_name, std::vector<int64_t>* shape) const
-{
-  shape->clear();
-  auto it = output_name_to_result_map_.find(output_name);
-  if (it != output_name_to_result_map_.end()) {
-    for (const auto dim : it->second->shape()) {
-      shape->push_back(dim);
-    }
-  } else {
-    return Error(
-        "The response does not contain results or output name " + output_name);
-  }
-  return Error::Success;
-}
-
-Error
-InferResultGrpc::Datatype(
-    const std::string& output_name, std::string* datatype) const
-{
-  auto it = output_name_to_result_map_.find(output_name);
-  if (it != output_name_to_result_map_.end()) {
-    *datatype = it->second->datatype();
-  } else {
-    return Error(
-        "The response does not contain results or output name " + output_name);
-  }
-  return Error::Success;
-}
-
-
-Error
-InferResultGrpc::RawData(
-    const std::string& output_name, const uint8_t** buf,
-    size_t* byte_size) const
-{
-  auto it = output_name_to_result_map_.find(output_name);
-  if (it != output_name_to_result_map_.end()) {
-    *buf = (uint8_t*)&(it->second->contents().raw_contents()[0]);
-    *byte_size = it->second->contents().raw_contents().size();
-  } else {
-    return Error(
-        "The response does not contain results or output name " + output_name);
-  }
-
-  return Error::Success;
-}
-
-InferResultGrpc::InferResultGrpc(std::shared_ptr<ModelInferResponse> response)
-{
-  response_ = response;
-  for (const auto& output : response_->outputs()) {
-    output_name_to_result_map_[output.name()] = &output;
-  }
 }
 
 //==============================================================================

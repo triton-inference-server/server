@@ -152,16 +152,14 @@ class InferenceServerGrpcClient : public InferenceServerClient {
       const Headers& headers = Headers());
 
   /// Run asynchronous inference on server.
-  /// Once the request is completed, the InferResult pointer and the Error
-  /// pointer will be passed to the provided 'callback' function. Upon the
-  /// invocation of callback function, the ownership of InferResult and Error
-  /// objects is transfered to the function caller. It is then the caller's
-  /// choice on either retrieving the results inside the callback function or
-  /// deferring it to a different thread so that the client is unblocked.
-  /// In order to prevent memory leak, user must ensure these objects get
-  /// deleted.
-  /// \param callback The callback function to be invoked on request
-  /// completion.
+  /// Once the request is completed, the InferResult pointer will be passed to
+  /// the provided 'callback' function. Upon the invocation of callback
+  /// function, the ownership of InferResult object is transfered to the
+  /// function caller. It is then the caller's choice on either retrieving the
+  /// results inside the callback function or deferring it to a different thread
+  /// so that the client is unblocked. In order to prevent memory leak, user
+  /// must ensure this object gets deleted.
+  /// \param callback The callback function to be invoked on request completion.
   /// \param options The options for inference request.
   /// \param inputs The vector of InferInput describing the model inputs.
   /// \param outputs Optional vector of InferRequestedOutput describing how the
@@ -195,56 +193,6 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   // request for GRPC call, one request object can be used for multiple calls
   // since it can be overwritten as soon as the GRPC send finishes.
   ModelInferRequest infer_request_;
-};
-
-//==============================================================================
-/// An InferResultGrpc instance is used  to access and interpret the
-/// response of an inference request from GRPC endpoint. This object
-/// holds data for all requested outputs.
-///
-class InferResultGrpc : public InferResult {
- public:
-  /// Create a InferResult instance to interpret server response.
-  /// \param infer_result Returns a new InferResult object.
-  /// \param response  The response of server for an inference request.
-  /// \return Error object indicating success or failure.
-  static Error Create(
-      InferResult** infer_result, std::shared_ptr<ModelInferResponse> response);
-
-  /// See InferResult::ModelName(std::string* name)
-  Error ModelName(std::string* name) const override;
-
-  /// See InferResult::ModelVersion(std::string* version)
-  Error ModelVersion(std::string* version) const override;
-
-  /// See InferResult::Id(std::string* id)
-  Error Id(std::string* id) const override;
-
-  /// See InferResult::Shape(const std::string& output_name,
-  ///  std::vector<int64_t>* shape)
-  Error Shape(const std::string& output_name, std::vector<int64_t>* shape)
-      const override;
-
-  /// See InferResult::Datatype(
-  ///    const std::string& output_name, std::string* datatype)
-  Error Datatype(
-      const std::string& output_name, std::string* datatype) const override;
-
-  /// See InferResult::RawData(
-  ///    const std::string& output_name, const uint8_t** buf,
-  ///    size_t* byte_size)
-  Error RawData(
-      const std::string& output_name, const uint8_t** buf,
-      size_t* byte_size) const override;
-
-  /// See InferResult::DebugString()
-  std::string DebugString() const override { return response_->DebugString(); }
-
- private:
-  InferResultGrpc(std::shared_ptr<ModelInferResponse> response);
-  std::map<std::string, const ModelInferResponse::InferOutputTensor*>
-      output_name_to_result_map_;
-  std::shared_ptr<ModelInferResponse> response_;
 };
 
 

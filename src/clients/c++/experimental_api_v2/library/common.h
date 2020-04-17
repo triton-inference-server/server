@@ -30,11 +30,13 @@
 #include "src/core/constants.h"
 
 #include <chrono>
+#include <condition_variable>
 #include <cstring>
 #include <functional>
 #include <iostream>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -115,7 +117,7 @@ struct InferStat {
 ///
 class InferenceServerClient {
  public:
-  using OnCompleteFn = std::function<void(InferResult*, Error*)>;
+  using OnCompleteFn = std::function<void(InferResult*)>;
 
   InferenceServerClient() : exiting_(false) {}
 
@@ -130,6 +132,10 @@ class InferenceServerClient {
 
   // worker thread that will perform the asynchronous transfer
   std::thread worker_;
+  // Avoid race condition between main thread and worker thread
+  std::mutex mutex_;
+  // Condition variable used for waiting on asynchronous request
+  std::condition_variable cv_;
   // signal for worker thread to stop
   bool exiting_;
 
@@ -427,6 +433,11 @@ class InferResult {
   /// Returns the complete response as a user friendly string.
   /// \return The string describing the complete response.
   virtual std::string DebugString() const = 0;
+
+  /// Returns the status of the request.
+  /// \return Error object indicating the success or failure of the
+  /// request.
+  virtual Error RequestStatus() const = 0;
 };
 
 //==============================================================================
