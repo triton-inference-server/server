@@ -511,13 +511,13 @@ typedef void (*TRITONSERVER_InferenceResponseCompleteFn_t)(
 /// \param server the inference server object.
 /// \param model_name The name of the model to use for the request.
 /// \param model_version The version of the model to use for the
-/// request. If nullptr or empty then the server will choose a version
-/// based on the model's policy.
+/// request. If -1 then the server will choose a version based on the
+/// model's policy.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceRequestNew(
     TRITONSERVER_InferenceRequest** inference_request,
     TRITONSERVER_Server* server, const char* model_name,
-    const char* model_version);
+    const int64_t model_version);
 
 /// Delete an inference request object.
 /// \param inference_request The request object.
@@ -778,6 +778,33 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceResponseDelete(
 /// status of the response.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceResponseError(
     TRITONSERVER_InferenceResponse* inference_response);
+
+/// Get model used to produce a response. The caller does not own the
+/// returned model name value and must not modify or delete it. The
+/// lifetime of all returned values extends until 'inference_response'
+/// is deleted.
+///
+/// \param inference_response The response object.
+/// \param model_name Returns the name of the model.
+/// \param model_version Returns the version of the model.
+/// this response.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceResponseModel(
+    TRITONSERVER_InferenceResponse* inference_response, const char** model_name,
+    int64_t* model_version);
+
+/// Get the ID of the request corresponding to a response. The caller
+/// does not own the returned ID and must not modify or delete it. The
+/// lifetime of all returned values extends until 'inference_response'
+/// is deleted.
+///
+/// \param inference_response The response object.
+/// \param request_id Returns the ID of the request corresponding to
+/// this response.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceResponseId(
+    TRITONSERVER_InferenceResponse* inference_response,
+    const char** request_id);
 
 /// Get the number of outputs available in the response.
 ///
@@ -1093,14 +1120,14 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerIsReady(
 /// Is the model ready?
 /// \param server The inference server object.
 /// \param model_name The name of the model to get readiness for.
-/// \param model_version The version of the model to get readiness for.
-/// If nullptr or empty then the server will choose a version based on
-/// the model's policy.
+/// \param model_version The version of the model to get readiness
+/// for.  If -1 then the server will choose a version based on the
+/// model's policy.
 /// \param ready Returns true if server is ready, false otherwise.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelIsReady(
     TRITONSERVER_Server* server, const char* model_name,
-    const char* model_version, bool* ready);
+    const int64_t model_version, bool* ready);
 
 /// Get the metadata of the server as a TRITONSERVER_Message object.
 /// The caller takes ownership of the object and must call
@@ -1117,27 +1144,27 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerMetadata(
 /// \param server The inference server object.
 /// \param model_name The name of the model to get metadata for.
 /// \param model_version The version of the model to get metadata for.
-/// If nullptr or empty then the server will choose a version based on
-/// the model's policy.
+/// If -1 then the server will choose a version based on the model's
+/// policy.
 /// \param model_metadata Returns the model metadata message.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelMetadata(
     TRITONSERVER_Server* server, const char* model_name,
-    const char* model_version, TRITONSERVER_Message** model_metadata);
+    const int64_t model_version, TRITONSERVER_Message** model_metadata);
 
 /// Get the statistics of the model being served as a TRITONSERVER_Message
 /// object. The caller takes ownership of the object and must call
 /// TRITONSERVER_MessageDelete to release the object.
 /// \param server The inference server object.
 /// \param model_name The name of the model to get statistics for.
-/// \param model_version The version of the model to get statistics for.
-/// If nullptr or empty then the server will choose a version based on
-/// the model's policy.
+/// \param model_version The version of the model to get statistics
+/// for.  If -1 then the server will choose a version based on the
+/// model's policy.
 /// \param model_stats Returns the model statistics message.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelStatistics(
     TRITONSERVER_Server* server, const char* model_name,
-    const char* model_version, TRITONSERVER_Message** model_stats);
+    const int64_t model_version, TRITONSERVER_Message** model_stats);
 
 /// Get the configuration of the model being served as a
 /// TRITONSERVER_Message object.
@@ -1145,14 +1172,14 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelStatistics(
 /// TRITONSERVER_MessageDelete to release the object.
 /// \param server The inference server object.
 /// \param model_name The name of the model to get configuration for.
-/// \param model_version The version of the model to get configuration for.
-/// If nullptr or empty then the server will choose a version based on
-/// the model's policy.
+/// \param model_version The version of the model to get configuration
+/// for.  If -1 then the server will choose a version based on the
+/// model's policy.
 /// \param model_config Returns the model config message.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelConfig(
     TRITONSERVER_Server* server, const char* model_name,
-    const char* model_version, TRITONSERVER_Message** model_config);
+    const int64_t model_version, TRITONSERVER_Message** model_config);
 
 /// Get the index of all unique models in the model repositories as a
 /// TRITONSERVER_Message object. The caller takes ownership of the object

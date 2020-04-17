@@ -31,15 +31,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-/// Get the integral version from a string, or fail if string does not
-/// represent a valid version.
-/// \param version_string The string version.
-/// \param version Returns the integral version.
-/// \return The error status. Failure if 'version_string' doesn't
-/// convert to valid version.
-Status GetModelVersionFromString(
-    const std::string& version_string, int64_t* version);
-
 /// Get version of a model from the path containing the model
 /// definition file.
 /// \param path The path to the model definition file.
