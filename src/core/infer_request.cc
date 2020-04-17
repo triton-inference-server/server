@@ -87,7 +87,9 @@ InferenceRequest::MutableOriginalInput(
   }
 
   *input = &(itr->second);
-  needs_normalization_ = true;
+  // FIXMEV2. Hack based on knowledge that this function is only called
+  // for modifying input data, and NormalizeV2 doesn't depend on input data
+  needs_normalization_ |= (protocol_version_ == 1);
   return Status::Success;
 }
 
@@ -633,17 +635,6 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
         }
       }
     }
-
-    // If no data was given for an input just add an empty memory
-    // reference.
-    if (input.Data() == nullptr) {
-      input.SetData(std::make_shared<MemoryReference>());
-    }
-
-    // Get the full size of the data from the input's data. We should
-    // ultimately be able to remove this "batch_byte_size" parameter
-    // since the same information is in the Memory object.
-    input.SetBatchByteSize(input.Data()->TotalByteSize());
   }
 
   return Status::Success;
@@ -652,12 +643,16 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
 //
 // Input
 //
-InferenceRequest::Input::Input() : batch_byte_size_(0) {}
+InferenceRequest::Input::Input()
+    : batch_byte_size_(0), data_byte_size_(0), data_(new MemoryReference)
+{
+}
 
 InferenceRequest::Input::Input(
     const std::string& name, const std::vector<int64_t>& shape,
     const uint64_t batch_byte_size)
-    : name_(name), original_shape_(shape), batch_byte_size_(batch_byte_size)
+    : name_(name), original_shape_(shape), batch_byte_size_(batch_byte_size),
+      data_byte_size_(0), data_(new MemoryReference)
 {
 }
 
@@ -665,7 +660,8 @@ InferenceRequest::Input::Input(
     const std::string& name, const DataType datatype, const int64_t* shape,
     const uint64_t dim_count)
     : name_(name), datatype_(datatype),
-      original_shape_(shape, shape + dim_count), batch_byte_size_(0)
+      original_shape_(shape, shape + dim_count), batch_byte_size_(0),
+      data_byte_size_(0), data_(new MemoryReference)
 {
 }
 
@@ -673,7 +669,8 @@ InferenceRequest::Input::Input(
     const std::string& name, const DataType datatype,
     const std::vector<int64_t>& shape, const uint64_t batch_byte_size)
     : name_(name), datatype_(datatype), original_shape_(shape),
-      batch_byte_size_(batch_byte_size)
+      batch_byte_size_(batch_byte_size), data_byte_size_(0),
+      data_(new MemoryReference)
 {
 }
 
@@ -683,13 +680,10 @@ InferenceRequest::Input::AppendData(
     const void* base, size_t byte_size, TRTSERVER_Memory_Type memory_type,
     int64_t memory_type_id)
 {
-  if (data_ == nullptr) {
-    data_ = std::make_shared<MemoryReference>();
-  }
-
   if (byte_size > 0) {
     std::static_pointer_cast<MemoryReference>(data_)->AddBuffer(
         static_cast<const char*>(base), byte_size, memory_type, memory_type_id);
+    data_byte_size_ = data_->TotalByteSize();
   }
 
   return Status::Success;
@@ -707,13 +701,14 @@ InferenceRequest::Input::AppendData(
 Status
 InferenceRequest::Input::SetData(const std::shared_ptr<Memory>& data)
 {
-  if (data_ != nullptr) {
+  if (data_byte_size_ != 0) {
     return Status(
         Status::Code::INVALID_ARG,
         "input '" + name_ + "' already has data, can't overwrite");
   }
 
   data_ = data;
+  data_byte_size_ = data_->TotalByteSize();
 
   return Status::Success;
 }
@@ -721,7 +716,8 @@ InferenceRequest::Input::SetData(const std::shared_ptr<Memory>& data)
 Status
 InferenceRequest::Input::RemoveAllData()
 {
-  data_.reset();
+  data_ = std::make_shared<MemoryReference>();
+  data_byte_size_ = 0;
   return Status::Success;
 }
 
