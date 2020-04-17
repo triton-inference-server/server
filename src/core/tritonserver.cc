@@ -1206,7 +1206,7 @@ TRITONSERVER_InferenceRequestAddRequestedOutput(
 {
   ni::InferenceRequest* lrequest =
       reinterpret_cast<ni::InferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(lrequest->AddRequestedOutput(name));
+  RETURN_IF_STATUS_ERROR(lrequest->AddOriginalRequestedOutput(name));
   return nullptr;  // Success
 }
 
@@ -1216,7 +1216,7 @@ TRITONSERVER_InferenceRequestRemoveRequestedOutput(
 {
   ni::InferenceRequest* lrequest =
       reinterpret_cast<ni::InferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(lrequest->RemoveRequestedOutput(name));
+  RETURN_IF_STATUS_ERROR(lrequest->RemoveOriginalRequestedOutput(name));
   return nullptr;  // Success
 }
 
@@ -1226,7 +1226,7 @@ TRITONSERVER_InferenceRequestRemoveAllRequestedOutputs(
 {
   ni::InferenceRequest* lrequest =
       reinterpret_cast<ni::InferenceRequest*>(inference_request);
-  RETURN_IF_STATUS_ERROR(lrequest->RemoveAllRequestedOutputs());
+  RETURN_IF_STATUS_ERROR(lrequest->RemoveAllOriginalRequestedOutputs());
   return nullptr;  // Success
 }
 
@@ -1235,12 +1235,13 @@ TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
     TRITONSERVER_InferenceRequest* inference_request, const char* name,
     uint32_t count)
 {
-  ni::InferenceRequest* lrequest =
-      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  //  ni::InferenceRequest* lrequest =
+  //      reinterpret_cast<ni::InferenceRequest*>(inference_request);
 
-  ni::InferenceRequest::RequestedOutput* requested;
-  RETURN_IF_STATUS_ERROR(lrequest->MutableRequestedOutput(name, &requested));
-  requested->SetClassificationCount(count);
+  // FIXMEV2 this entire function should be removed
+  //  ni::InferenceRequest::RequestedOutput* requested;
+  //  RETURN_IF_STATUS_ERROR(lrequest->MutableRequestedOutput(name,
+  //  &requested)); requested->SetClassificationCount(count);
 
   return nullptr;  // Success
 }
