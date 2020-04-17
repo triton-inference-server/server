@@ -496,16 +496,6 @@ InferResponseProvider::~InferResponseProvider()
 {
   for (const auto& output : outputs_) {
     if (output.release_buffer_ != nullptr) {
-#ifdef TRTIS_ENABLE_GPU
-      int current_device;
-      auto cuerr = cudaGetDevice(&current_device);
-      // Ignore error caused by CPU-only system.
-      if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
-          (cuerr != cudaErrorInsufficientDriver)) {
-        LOG_ERROR << "unable to get current CUDA device: "
-                  << cudaGetErrorString(cuerr);
-      }
-#endif  // TRTIS_ENABLE_GPU
       if (!using_triton_) {
         auto err = release_fn_(
             allocator_, output.release_buffer_, output.release_userp_,
@@ -526,14 +516,6 @@ InferResponseProvider::~InferResponseProvider()
           TRITONSERVER_ErrorDelete(err);
         }
       }
-#ifdef TRTIS_ENABLE_GPU
-      cuerr = cudaSetDevice(current_device);
-      if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
-          (cuerr != cudaErrorInsufficientDriver)) {
-        LOG_ERROR << "unable to recover current CUDA device: "
-                  << cudaGetErrorString(cuerr);
-      }
-#endif  // TRTIS_ENABLE_GPU
     }
   }
 }

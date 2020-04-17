@@ -302,6 +302,17 @@ CustomBackend::InitBackend(uint32_t runner_idx)
                                     context->LibraryErrorString(err));
   }
 
+#ifdef TRTIS_ENABLE_GPU
+  auto cuerr = cudaGetDevice(&(context->current_execute_device_));
+  // Ignore error caused by CPU-only system.
+  if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
+      (cuerr != cudaErrorInsufficientDriver)) {
+    LOG_ERROR << "unable to get current CUDA device: "
+              << cudaGetErrorString(cuerr);
+    context->current_execute_device_ = context->gpu_device_;
+  }
+#endif  // TRTIS_ENABLE_GPU
+
   return Status::Success;
 }
 
@@ -452,6 +463,12 @@ CustomBackend::Context::Run(
   }
 #endif  // TRTIS_ENABLE_STATS
 
+#ifdef TRTIS_ENABLE_GPU
+  if (current_execute_device_ != CUSTOM_NO_GPU_DEVICE) {
+    cudaSetDevice(current_execute_device_);
+  }
+#endif  // TRTIS_ENABLE_GPU
+
   // Execute the custom backend which will use CustomGetOutput to get
   // the output buffers into which it will write the results for the
   // requested outputs.
@@ -468,6 +485,19 @@ CustomBackend::Context::Run(
           CustomGetNextInput, CustomGetOutput);
       break;
   }
+
+#ifdef TRTIS_ENABLE_GPU
+  // Record the current device after execution in case other Triton components
+  // modify it (i.e. when releasing output buffer)
+  auto cuerr = cudaGetDevice(&current_execute_device_);
+  // Ignore error caused by CPU-only system.
+  if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
+      (cuerr != cudaErrorInsufficientDriver)) {
+    LOG_ERROR << "unable to get current CUDA device: "
+              << cudaGetErrorString(cuerr);
+    current_execute_device_ = gpu_device_;
+  }
+#endif  // TRTIS_ENABLE_GPU
 
 #ifdef TRTIS_ENABLE_GPU
   // Transfer data to actual buffer if internal buffer is created.
