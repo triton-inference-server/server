@@ -55,8 +55,8 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
-def async_send(triton_client, stream, values, batch_size, sequence_id,
-               model_name, model_version):
+def async_stream_send(triton_client, values, batch_size, sequence_id,
+                      model_name, model_version):
 
     count = 1
     for value in values:
@@ -73,7 +73,6 @@ def async_send(triton_client, stream, values, batch_size, sequence_id,
         # Issue the asynchronous sequence inference.
         triton_client.async_stream_infer(model_name=model_name,
                                          inputs=inputs,
-                                         stream=stream,
                                          outputs=outputs,
                                          request_id='{}_{}'.format(
                                              sequence_id, count),
@@ -114,12 +113,6 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
 
-    try:
-        triton_client = grpcclient.InferenceServerClient(FLAGS.url)
-    except Exception as e:
-        print("context creation failed: " + str(e))
-        sys.exit()
-
     # We use the custom "sequence" model which takes 1 input
     # value. The output is the accumulated value of the inputs. See
     # src/custom/sequence.
@@ -140,18 +133,19 @@ if __name__ == '__main__':
 
     user_data = UserData()
 
-    # It is advisable to use InferStream object within with..as clause
-    # when sending streaming requests. This ensures the InferStream object
+    # It is advisable to use client object within with..as clause
+    # when sending streaming requests. This ensures the client
     # is closed when the block inside with exits.
-    with grpcclient.InferStream(
-            callback=partial(callback, user_data)) as stream:
-        # Now send the inference sequences...
+    with grpcclient.InferenceServerClient(FLAGS.url) as triton_client:
         try:
-            async_send(triton_client, stream, [0] + values, batch_size,
-                       sequence_id0, model_name, model_version)
-            async_send(triton_client, stream,
-                       [100] + [-1 * val for val in values], batch_size,
-                       sequence_id1, model_name, model_version)
+            # Establish stream
+            triton_client.start_stream(callback=partial(callback, user_data))
+            # Now send the inference sequences...
+            async_stream_send(triton_client, [0] + values, batch_size,
+                              sequence_id0, model_name, model_version)
+            async_stream_send(triton_client,
+                              [100] + [-1 * val for val in values], batch_size,
+                              sequence_id1, model_name, model_version)
         except InferenceServerException as error:
             print(error)
             sys.exit(1)
