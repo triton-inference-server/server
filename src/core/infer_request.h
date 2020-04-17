@@ -91,8 +91,13 @@ class InferenceRequest {
     const std::vector<int64_t>& Shape() const { return shape_; }
     std::vector<int64_t>* MutableShape() { return &shape_; }
 
-    // The size, in bytes, of the entire input tensor.
-    uint64_t BatchByteSize() const { return batch_byte_size_; }
+    // The size, in bytes, of the entire input tensor. We should
+    // ultimately be able to remove this "batch_byte_size" parameter
+    // since the same information is in the Memory object.
+    uint64_t BatchByteSize() const
+    {
+      return batch_byte_size_ == 0 ? data_byte_size_ : batch_byte_size_;
+    }
     void SetBatchByteSize(uint64_t b) { batch_byte_size_ = b; }
 
     // The data for this input.
@@ -117,10 +122,7 @@ class InferenceRequest {
 
     // Get the number of buffers that containing the input tensor
     // data.
-    size_t ContentBufferCount() const
-    {
-      return (data_ == nullptr) ? 0 : data_->BufferCount();
-    }
+    size_t ContentBufferCount() const { return data_->BufferCount(); }
 
     // Get the 'idx' buffer containing a contiguous chunk of bytes for
     // the input. Return error is 'idx' refers to a buffer that does
@@ -149,6 +151,10 @@ class InferenceRequest {
 
     // FIXMEV2 why needed? Should get total data size from data_.
     uint64_t batch_byte_size_;
+
+    // FIXMEV2 workaround so that adding / removing data will not cause
+    // re-normalized for inference request in V2
+    uint64_t data_byte_size_;
 
     std::shared_ptr<Memory> data_;
   };
