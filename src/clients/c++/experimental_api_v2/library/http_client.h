@@ -279,19 +279,20 @@ class InferenceServerHttpClient : public InferenceServerClient {
 
   /// Request the server to register a CUDA shared memory with the provided
   /// details.
-  /// \param name The name of the region to register.
-  /// \param raw_handle The raw serialized cudaIPC handle in base64 encoding.
-  /// \param byte_size The size of the CUDA shared memory region, in bytes.
-  /// \param offset Offset, in bytes, within the underlying memory object to
-  /// the start of the CUDA shared memory region. The default value is zero.
+ /// \param name The name of the region to register.
+  /// \param raw_handle The cudaIPC handle for the memory object.
+  /// \param device_id The GPU device ID on which the cudaIPC handle was
+  /// created.
+  /// \param byte_size The size of the CUDA shared memory region, in
+  /// bytes.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in request.
   /// \param query_params Optional map specifying parameters that must be
   /// included with URL query.
   /// \return Error object indicating success or failure of the request
   Error RegisterCudaSharedMemory(
-      const std::string& name, const std::string& raw_handle,
-      const size_t byte_size, const size_t offset = 0,
+      const std::string& name, const cudaIpcMemHandle_t raw_handle,
+      const size_t device_id, const size_t byte_size,
       const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 
@@ -306,7 +307,7 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// included with URL query.
   /// \return Error object indicating success or failure of the request
   Error UnregisterCudaSharedMemory(
-      const std::string& name = 0, const Headers& headers = Headers(),
+      const std::string& name = "", const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 
   /// Run synchronous inference on server.
@@ -380,6 +381,10 @@ class InferenceServerHttpClient : public InferenceServerClient {
       std::string& request_uri, const Headers& headers,
       const Parameters& query_params, rapidjson::Document* response,
       long* http_code);
+  Error Post(
+    std::string& request_uri, const rapidjson::Document& request,
+    const Headers& headers, const Parameters& query_params,
+    rapidjson::Document* response, long* http_code);
 
   static size_t ResponseHandler(
       void* contents, size_t size, size_t nmemb, void* userp);
