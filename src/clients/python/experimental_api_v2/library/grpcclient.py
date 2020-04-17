@@ -1015,7 +1015,7 @@ class InferenceServerClient:
                            priority=0,
                            timeout=None):
         """Runs an asynchronous inference over gRPC bi-directional streaming
-        API. A stream should be established with a call to start_stream()
+        API. A stream must be established with a call to start_stream()
         before calling this function. All the results will be provided to the
         callback function associated with the stream.
 
