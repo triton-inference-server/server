@@ -1060,6 +1060,17 @@ InferenceServerHttpClient::AsyncTransfer()
   } while (!exiting_);
 }
 
+size_t
+InferenceServerHttpClient::ResponseHandler(
+    void* contents, size_t size, size_t nmemb, void* userp)
+{
+  std::string* response_string = reinterpret_cast<std::string*>(userp);
+  uint8_t* buf = reinterpret_cast<uint8_t*>(contents);
+  size_t result_bytes = size * nmemb;
+  std::copy(buf, buf + result_bytes, std::back_inserter(*response_string));
+  return result_bytes;
+}
+
 Error
 InferenceServerHttpClient::Get(
     std::string& request_uri, const Headers& headers,
@@ -1135,15 +1146,12 @@ InferenceServerHttpClient::Get(
   return Error::Success;
 }
 
-size_t
-InferenceServerHttpClient::ResponseHandler(
-    void* contents, size_t size, size_t nmemb, void* userp)
-{
-  std::string* response_string = reinterpret_cast<std::string*>(userp);
-  uint8_t* buf = reinterpret_cast<uint8_t*>(contents);
-  size_t result_bytes = size * nmemb;
-  std::copy(buf, buf + result_bytes, std::back_inserter(*response_string));
-  return result_bytes;
+Error
+InferenceServerHttpClient::Post(
+    std::string& request_uri, const Headers& headers,
+    const Parameters& query_params, rapidjson::Document* response,
+    long* http_code) {
+
 }
 
 //==============================================================================
