@@ -27,7 +27,10 @@
 #include <unistd.h>
 #include <iostream>
 #include <string>
+#include "src/clients/c++/experimental_api_v2/examples/shm_utils.h"
 #include "src/clients/c++/experimental_api_v2/library/http_client.h"
+
+#include <cuda_runtime_api.h>
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
@@ -44,7 +47,8 @@ namespace nic = nvidia::inferenceserver::client;
 namespace {
 
 void
-ValidateShapeAndDatatype(const std::string& name, nic::InferResult* result)
+ValidateShapeAndDatatype(
+    const std::string& name, std::shared_ptr<nic::InferResult> result)
 {
   std::vector<int64_t> shape;
   FAIL_IF_ERR(result->Shape(name, &shape), "unable to get shape for " + name);
@@ -85,6 +89,28 @@ Usage(char** argv, const std::string& msg = std::string())
 
 }  // namespace
 
+#define FAIL_IF_CUDA_ERR(FUNC)                                     \
+  {                                                                \
+    const cudaError_t result = FUNC;                               \
+    if (result != cudaSuccess) {                                   \
+      std::cerr << "CUDA exception (line " << __LINE__             \
+                << "): " << cudaGetErrorName(result) << " ("       \
+                << cudaGetErrorString(result) << ")" << std::endl; \
+      exit(1);                                                     \
+    }                                                              \
+  }
+
+void
+CreateCUDAIPCHandle(
+    cudaIpcMemHandle_t* cuda_handle, void* input_d_ptr, int device_id = 0)
+{
+  // Set the GPU device to the desired GPU
+  FAIL_IF_CUDA_ERR(cudaSetDevice(device_id));
+
+  //  Create IPC handle for data on the gpu
+  FAIL_IF_CUDA_ERR(cudaIpcGetMemHandle(cuda_handle, input_d_ptr));
+}
+
 int
 main(int argc, char** argv)
 {
@@ -122,22 +148,24 @@ main(int argc, char** argv)
   std::string model_version = "";
 
   // Create a InferenceServerHttpClient instance to communicate with the
-  // server using HTTP protocol.
+  // server using http protocol.
   std::unique_ptr<nic::InferenceServerHttpClient> client;
   FAIL_IF_ERR(
       nic::InferenceServerHttpClient::Create(&client, url, verbose),
       "unable to create http client");
 
-  // Create the data for the two input tensors. Initialize the first
-  // to unique integers and the second to all ones.
-  std::vector<int32_t> input0_data(16);
-  std::vector<int32_t> input1_data(16);
-  for (size_t i = 0; i < 16; ++i) {
-    input0_data[i] = i;
-    input1_data[i] = 1;
-  }
+  // Unregistering all shared memory regions for a clean
+  // start.
+  FAIL_IF_ERR(
+      client->UnregisterSystemSharedMemory(),
+      "unable to unregister all system shared memory regions");
+  FAIL_IF_ERR(
+      client->UnregisterCudaSharedMemory(),
+      "unable to unregister all cuda shared memory regions");
 
   std::vector<int64_t> shape{1, 16};
+  size_t input_byte_size = 64;
+  size_t output_byte_size = 64;
 
   // Initialize the inputs with the data.
   nic::InferInput* input0;
@@ -154,16 +182,38 @@ main(int argc, char** argv)
   std::shared_ptr<nic::InferInput> input1_ptr;
   input1_ptr.reset(input1);
 
+  // Create Input0 and Input1 in CUDA Shared Memory. Initialize Input0 to
+  // unique integers and Input1 to all ones.
+  int input_data[32];
+  for (size_t i = 0; i < 16; ++i) {
+    input_data[i] = i;
+    input_data[16 + i] = 1;
+  }
+
+  // copy INPUT0 and INPUT1 data in GPU shared memory
+  int* input_d_ptr;
+  cudaMalloc((void**)&input_d_ptr, input_byte_size * 2);
+  cudaMemcpy(
+      (void*)input_d_ptr, (void*)input_data, input_byte_size * 2,
+      cudaMemcpyHostToDevice);
+
+  cudaIpcMemHandle_t input_cuda_handle;
+  CreateCUDAIPCHandle(&input_cuda_handle, (void*)input_d_ptr);
+
   FAIL_IF_ERR(
-      input0_ptr->AppendRaw(
-          reinterpret_cast<uint8_t*>(&input0_data[0]),
-          input0_data.size() * sizeof(int32_t)),
-      "unable to set data for INPUT0");
+      client->RegisterCudaSharedMemory(
+          "input_data", input_cuda_handle, 0 /* device_id */,
+          input_byte_size * 2),
+      "failed to register input shared memory region");
+
   FAIL_IF_ERR(
-      input1_ptr->AppendRaw(
-          reinterpret_cast<uint8_t*>(&input1_data[0]),
-          input1_data.size() * sizeof(int32_t)),
-      "unable to set data for INPUT1");
+      input0_ptr->SetSharedMemory(
+          "input_data", input_byte_size, 0 /* offset */),
+      "unable to set shared memory for INPUT0");
+  FAIL_IF_ERR(
+      input1_ptr->SetSharedMemory(
+          "input_data", input_byte_size, input_byte_size /* offset */),
+      "unable to set shared memory for INPUT1");
 
   // Generate the outputs to be requested.
   nic::InferRequestedOutput* output0;
@@ -179,6 +229,29 @@ main(int argc, char** argv)
       "unable to get OUTPUT1");
   std::shared_ptr<nic::InferRequestedOutput> output1_ptr;
   output1_ptr.reset(output1);
+
+  // Create Output0 and Output1 in CUDA Shared Memory
+  int *output0_d_ptr, *output1_d_ptr;
+  cudaMalloc((void**)&output0_d_ptr, output_byte_size * 2);
+  output1_d_ptr = (int*)output0_d_ptr + 16;
+
+  cudaIpcMemHandle_t output_cuda_handle;
+  CreateCUDAIPCHandle(&output_cuda_handle, (void*)output0_d_ptr);
+
+  FAIL_IF_ERR(
+      client->RegisterCudaSharedMemory(
+          "output_data", output_cuda_handle, 0 /* device_id */,
+          output_byte_size * 2),
+      "failed to register output shared memory region");
+
+  FAIL_IF_ERR(
+      output0_ptr->SetSharedMemory(
+          "output_data", output_byte_size, 0 /* offset */),
+      "unable to set shared memory for OUTPUT0");
+  FAIL_IF_ERR(
+      output1_ptr->SetSharedMemory(
+          "output_data", output_byte_size, output_byte_size /* offset */),
+      "unable to set shared memory for OUTPUT1");
 
 
   // The inference settings. Will be using default for now.
@@ -197,71 +270,52 @@ main(int argc, char** argv)
   results_ptr.reset(results);
 
   // Validate the results...
-  ValidateShapeAndDatatype("OUTPUT0", results);
-  ValidateShapeAndDatatype("OUTPUT1", results);
+  ValidateShapeAndDatatype("OUTPUT0", results_ptr);
+  ValidateShapeAndDatatype("OUTPUT1", results_ptr);
 
-  // Get pointers to the result returned...
-  int32_t* output0_data;
-  size_t output0_byte_size;
-  FAIL_IF_ERR(
-      results_ptr->RawData(
-          "OUTPUT0", (const uint8_t**)&output0_data, &output0_byte_size),
-      "unable to get datatype for OUTPUT0");
-  if (output0_byte_size != 64) {
-    std::cerr << "error: received incorrect byte size for OUTPUT0: "
-              << output0_byte_size << std::endl;
-    exit(1);
-  }
-
-  int32_t* output1_data;
-  size_t output1_byte_size;
-  FAIL_IF_ERR(
-      results_ptr->RawData(
-          "OUTPUT1", (const uint8_t**)&output1_data, &output1_byte_size),
-      "unable to get datatype for OUTPUT1");
-  if (output0_byte_size != 64) {
-    std::cerr << "error: received incorrect byte size for OUTPUT1: "
-              << output0_byte_size << std::endl;
-    exit(1);
-  }
+  // Copy input and output data back to the CPU
+  int output0_data[16], output1_data[16];
+  cudaMemcpy(
+      output0_data, output0_d_ptr, output_byte_size, cudaMemcpyDeviceToHost);
+  cudaMemcpy(
+      output1_data, output1_d_ptr, output_byte_size, cudaMemcpyDeviceToHost);
 
   for (size_t i = 0; i < 16; ++i) {
-    std::cout << input0_data[i] << " + " << input1_data[i] << " = "
-              << *(output0_data + i) << std::endl;
-    std::cout << input0_data[i] << " - " << input1_data[i] << " = "
-              << *(output1_data + i) << std::endl;
+    std::cout << input_data[i] << " + " << input_data[16 + i] << " = "
+              << output0_data[i] << std::endl;
+    std::cout << input_data[i] << " + " << input_data[16 + i] << " = "
+              << output1_data[i] << std::endl;
 
-    if ((input0_data[i] + input1_data[i]) != *(output0_data + i)) {
+    if ((input_data[i] + input_data[16 + i]) != output0_data[i]) {
       std::cerr << "error: incorrect sum" << std::endl;
       exit(1);
     }
-    if ((input0_data[i] - input1_data[i]) != *(output1_data + i)) {
+    if ((input_data[i] - input_data[16 + i]) != output1_data[i]) {
       std::cerr << "error: incorrect difference" << std::endl;
       exit(1);
     }
   }
 
-  // Get full response
-  std::cout << results_ptr->DebugString() << std::endl;
+  // Get shared memory regions all active/registered within TRTIS
+  rapidjson::Document status;
+  FAIL_IF_ERR(
+      client->CudaSharedMemoryStatus(&status),
+      "failed to get shared memory status");
+  std::cout << "Shared Memory Status:\n" << nic::GetJsonText(status) << "\n";
 
-  nic::InferStat infer_stat;
-  client->ClientInferStat(&infer_stat);
-  std::cout << "======Client Statistics======" << std::endl;
-  std::cout << "completed_request_count " << infer_stat.completed_request_count
-            << std::endl;
-  std::cout << "cumulative_total_request_time_ns "
-            << infer_stat.cumulative_total_request_time_ns << std::endl;
-  std::cout << "cumulative_send_time_ns " << infer_stat.cumulative_send_time_ns
-            << std::endl;
-  std::cout << "cumulative_receive_time_ns "
-            << infer_stat.cumulative_receive_time_ns << std::endl;
+  // Unregister shared memory (One by one or all at a time) from TRTIS
+  FAIL_IF_ERR(
+      client->UnregisterCudaSharedMemory("input_data"),
+      "unable to unregister shared memory input region");
+  FAIL_IF_ERR(
+      client->UnregisterCudaSharedMemory("output_data"),
+      "unable to unregister shared memory output region");
 
-  rapidjson::Document model_stat;
-  client->ModelInferenceStatistics(&model_stat, model_name);
-  std::cout << "======Model Statistics======" << std::endl;
-  std::cout << nic::GetJsonText(model_stat) << std::endl;
+  // Free GPU memory
+  FAIL_IF_CUDA_ERR(cudaFree(input_d_ptr));
+  FAIL_IF_CUDA_ERR(cudaFree(output0_d_ptr));
 
-  std::cout << "PASS : Infer" << std::endl;
+  std::cout << "PASS : Cuda Shared Memory " << std::endl;
 
   return 0;
 }

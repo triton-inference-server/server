@@ -52,6 +52,9 @@ SIMPLE_SEQUENCE_INFER_CLIENT_PY=../clients/simple_http_v2_sequence_sync_infer_cl
 SIMPLE_HEALTH_CLIENT=../clients/simple_http_v2_health_metadata
 SIMPLE_INFER_CLIENT=../clients/simple_http_v2_infer_client
 SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_http_v2_async_infer_client
+SIMPLE_MODEL_CONTROL=../clients/simple_http_v2_model_control
+SIMPLE_SHM_CLIENT=../clients/simple_http_v2_shm_client
+SIMPLE_CUDASHM_CLIENT=../clients/simple_http_v2_cudashm_client
 
 rm -f *.log
 rm -f *.log.*
@@ -120,6 +123,8 @@ for i in \
    $SIMPLE_INFER_CLIENT \
    $SIMPLE_ASYNC_INFER_CLIENT \
    $SIMPLE_HEALTH_CLIENT \
+   $SIMPLE_SHM_CLIENT \
+   $SIMPLE_CUDASHM_CLIENT \
    ; do
    BASE=$(basename -- $i)
    SUFFIX="${BASE%.*}"
@@ -155,6 +160,28 @@ fi
 
 if [ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]; then
     cat ${CLIENT_LOG}.model_control
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit --api-version 2"
+run_server_v2
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+# Test Model Control API
+$SIMPLE_MODEL_CONTROL -v >> ${CLIENT_LOG}.c++.model_control 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.model_control
     RET=1
 fi
 
