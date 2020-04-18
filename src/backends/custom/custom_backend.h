@@ -164,6 +164,10 @@ class CustomBackend : public InferenceBackend {
     // each inference request and so are not included here.
     std::unordered_map<std::string, std::unique_ptr<std::vector<int64_t>>>
         fixed_input_shapes_;
+
+    // The current device from last model execution. Use to ensure invariant
+    // from custom backend's point of view.
+    int current_execute_device_;
   };
 
   std::vector<std::string> server_params_;

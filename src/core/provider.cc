@@ -496,16 +496,6 @@ InferResponseProvider::~InferResponseProvider()
 {
   for (const auto& output : outputs_) {
     if (output.release_buffer_ != nullptr) {
-#ifdef TRTIS_ENABLE_GPU
-      int current_device;
-      auto cuerr = cudaGetDevice(&current_device);
-      // Ignore error caused by CPU-only system.
-      if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
-          (cuerr != cudaErrorInsufficientDriver)) {
-        LOG_ERROR << "unable to get current CUDA device: "
-                  << cudaGetErrorString(cuerr);
-      }
-#endif  // TRTIS_ENABLE_GPU
       if (!using_triton_) {
         auto err = release_fn_(
             allocator_, output.release_buffer_, output.release_userp_,
@@ -526,14 +516,6 @@ InferResponseProvider::~InferResponseProvider()
           TRITONSERVER_ErrorDelete(err);
         }
       }
-#ifdef TRTIS_ENABLE_GPU
-      cuerr = cudaSetDevice(current_device);
-      if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
-          (cuerr != cudaErrorInsufficientDriver)) {
-        LOG_ERROR << "unable to recover current CUDA device: "
-                  << cudaGetErrorString(cuerr);
-      }
-#endif  // TRTIS_ENABLE_GPU
     }
   }
 }
@@ -606,17 +588,6 @@ InferResponseProvider::AllocateOutputBuffer(
   void* buffer_userp = nullptr;
   TRTSERVER_Memory_Type raw_actual_memory_type;
   int64_t raw_actual_memory_type_id;
-#ifdef TRTIS_ENABLE_GPU
-  int current_device;
-  auto cuerr = cudaGetDevice(&current_device);
-  // Ignore error caused by CPU-only system.
-  if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
-      (cuerr != cudaErrorInsufficientDriver)) {
-    return Status(
-        Status::Code::INTERNAL, "unable to get current CUDA device: " +
-                                    std::string(cudaGetErrorString(cuerr)));
-  }
-#endif  // TRTIS_ENABLE_GPU
   Status status;
   if (!using_triton_) {
     auto err = alloc_fn_(
@@ -655,15 +626,6 @@ InferResponseProvider::AllocateOutputBuffer(
     loutput->memory_type_id_ = 0;
   }
 
-#ifdef TRTIS_ENABLE_GPU
-  cuerr = cudaSetDevice(current_device);
-  if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
-      (cuerr != cudaErrorInsufficientDriver)) {
-    status = Status(
-        Status::Code::INTERNAL, "unable to recover current CUDA device: " +
-                                    std::string(cudaGetErrorString(cuerr)));
-  }
-#endif  // TRTIS_ENABLE_GPU
   if (!status.IsOk()) {
     return status;
   }
