@@ -34,7 +34,7 @@ FLAGS = None
 SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png',
              'log', 'serverlog',
              'preprocessed', 'jmx', 'gz',
-             'caffemodel', 'json')
+             'caffemodel', 'json', 'pdf')
 SKIP_PATHS = ('builddir',
               'build/libevhtp',
               'build/onnxruntime',

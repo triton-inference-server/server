@@ -41,6 +41,12 @@
 #include <thread>
 #include <vector>
 
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#else
+struct cudaIpcMemHandle_t {
+};
+#endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
@@ -124,7 +130,7 @@ class InferenceServerClient {
   /// Obtain the cumulative inference statistics of the client.
   /// \param Returns the InferStat object holding current statistics.
   /// \return Error object indicating success or failure.
-  Error GetInferStat(InferStat* infer_stat) const;
+  Error ClientInferStat(InferStat* infer_stat) const;
 
  protected:
   // Update the infer stat with the given timer
