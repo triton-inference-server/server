@@ -137,7 +137,7 @@ main(int argc, char** argv)
 
   ni::ServerMetadataResponse server_metadata;
   FAIL_IF_ERR(
-      client->GetServerMetadata(&server_metadata, http_headers),
+      client->ServerMetadata(&server_metadata, http_headers),
       "unable to get server metadata");
   if (server_metadata.name().compare("inference:0") != 0) {
     std::cerr << "error: unexpected server metadata: "
@@ -147,7 +147,7 @@ main(int argc, char** argv)
 
   ni::ModelMetadataResponse model_metadata;
   FAIL_IF_ERR(
-      client->GetModelMetadata(
+      client->ModelMetadata(
           &model_metadata, model_name, model_version, http_headers),
       "unable to get model metadata");
   if (model_metadata.name().compare(model_name) != 0) {
@@ -158,7 +158,7 @@ main(int argc, char** argv)
 
   ni::ModelConfigResponse model_config;
   FAIL_IF_ERR(
-      client->GetModelConfig(
+      client->ModelConfig(
           &model_config, model_name, model_version, http_headers),
       "unable to get model config");
   if (model_config.config().name().compare(model_name) != 0) {
@@ -167,7 +167,7 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  nic::Error err = client->GetModelMetadata(
+  nic::Error err = client->ModelMetadata(
       &model_metadata, "wrong_model_name", model_version, http_headers);
   if (err.IsOk()) {
     std::cerr << "error: expected an error but got: " << err << std::endl;

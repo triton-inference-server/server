@@ -261,7 +261,7 @@ main(int argc, char** argv)
   client->ModelInferenceStatistics(&model_stat, model_name);
   std::cout << "======Model Statistics======" << std::endl;
   std::cout << model_stat.DebugString() << std::endl;
-        
+
 
   std::cout << "PASS : Infer" << std::endl;
 

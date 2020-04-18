@@ -104,7 +104,7 @@ main(int argc, char** argv)
 
   ni::RepositoryIndexResponse repository_index;
   FAIL_IF_ERR(
-      client->GetModelRepositoryIndex(&repository_index, http_headers),
+      client->ModelRepositoryIndex(&repository_index, http_headers),
       "Failed to get repository index");
   if (repository_index.models().size() != 6) {
     std::cerr << "expected number of models 6, got "

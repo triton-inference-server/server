@@ -305,7 +305,7 @@ InferenceServerGrpcClient::IsModelReady(
 
 
 Error
-InferenceServerGrpcClient::GetServerMetadata(
+InferenceServerGrpcClient::ServerMetadata(
     ServerMetadataResponse* server_metadata, const Headers& headers)
 {
   server_metadata->Clear();
@@ -333,7 +333,7 @@ InferenceServerGrpcClient::GetServerMetadata(
 
 
 Error
-InferenceServerGrpcClient::GetModelMetadata(
+InferenceServerGrpcClient::ModelMetadata(
     ModelMetadataResponse* model_metadata, const std::string& model_name,
     const std::string& model_version, const Headers& headers)
 {
@@ -364,7 +364,7 @@ InferenceServerGrpcClient::GetModelMetadata(
 
 
 Error
-InferenceServerGrpcClient::GetModelConfig(
+InferenceServerGrpcClient::ModelConfig(
     ModelConfigResponse* model_config, const std::string& model_name,
     const std::string& model_version, const Headers& headers)
 {
@@ -394,7 +394,7 @@ InferenceServerGrpcClient::GetModelConfig(
 }
 
 Error
-InferenceServerGrpcClient::GetModelRepositoryIndex(
+InferenceServerGrpcClient::ModelRepositoryIndex(
     RepositoryIndexResponse* repository_index, const Headers& headers)
 {
   repository_index->Clear();
@@ -529,7 +529,7 @@ InferenceServerGrpcClient::SystemSharedMemoryStatus(
 
 Error
 InferenceServerGrpcClient::RegisterSystemSharedMemory(
-    const std::string& name, const std::string key, const size_t byte_size,
+    const std::string& name, const std::string& key, const size_t byte_size,
     const size_t offset, const Headers& headers)
 {
   Error err;

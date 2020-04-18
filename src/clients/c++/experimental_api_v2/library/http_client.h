@@ -122,7 +122,7 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// \param query_params Optional map specifying parameters that must be
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
-  Error GetServerMetadata(
+  Error ServerMetadata(
       rapidjson::Document* server_metadata, const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 
@@ -137,7 +137,7 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// \param query_params Optional map specifying parameters that must be
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
-  Error GetModelMetadata(
+  Error ModelMetadata(
       rapidjson::Document* model_metadata, const std::string& model_name,
       const std::string& model_version = "", const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
@@ -153,7 +153,7 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// \param query_params Optional map specifying parameters that must be
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
-  Error GetModelConfig(
+  Error ModelConfig(
       rapidjson::Document* model_config, const std::string& model_name,
       const std::string& model_version = "", const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());

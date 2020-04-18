@@ -99,7 +99,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
-  Error GetServerMetadata(
+  Error ServerMetadata(
       ServerMetadataResponse* server_metadata,
       const Headers& headers = Headers());
 
@@ -113,7 +113,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
-  Error GetModelMetadata(
+  Error ModelMetadata(
       ModelMetadataResponse* model_metadata, const std::string& model_name,
       const std::string& model_version = "",
       const Headers& headers = Headers());
@@ -128,7 +128,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
-  Error GetModelConfig(
+  Error ModelConfig(
       ModelConfigResponse* model_config, const std::string& model_name,
       const std::string& model_version = "",
       const Headers& headers = Headers());
@@ -140,7 +140,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
-  Error GetModelRepositoryIndex(
+  Error ModelRepositoryIndex(
       RepositoryIndexResponse* repository_index,
       const Headers& headers = Headers());
 
@@ -202,7 +202,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request
   Error RegisterSystemSharedMemory(
-      const std::string& name, const std::string key, const size_t byte_size,
+      const std::string& name, const std::string& key, const size_t byte_size,
       const size_t offset = 0, const Headers& headers = Headers());
 
   /// Request the server to unregister a system shared memory with the

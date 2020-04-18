@@ -509,7 +509,7 @@ InferenceServerHttpClient::IsModelReady(
 
 
 Error
-InferenceServerHttpClient::GetServerMetadata(
+InferenceServerHttpClient::ServerMetadata(
     rapidjson::Document* server_metadata, const Headers& headers,
     const Parameters& query_params)
 {
@@ -528,7 +528,7 @@ InferenceServerHttpClient::GetServerMetadata(
 
 
 Error
-InferenceServerHttpClient::GetModelMetadata(
+InferenceServerHttpClient::ModelMetadata(
     rapidjson::Document* model_metadata, const std::string& model_name,
     const std::string& model_version, const Headers& headers,
     const Parameters& query_params)
@@ -551,7 +551,7 @@ InferenceServerHttpClient::GetModelMetadata(
 
 
 Error
-InferenceServerHttpClient::GetModelConfig(
+InferenceServerHttpClient::ModelConfig(
     rapidjson::Document* model_config, const std::string& model_name,
     const std::string& model_version, const Headers& headers,
     const Parameters& query_params)

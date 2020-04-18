@@ -202,9 +202,8 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       client->RegisterCudaSharedMemory(
-          "input_data",
-          input_cuda_handle,
-          0 /* device_id */, input_byte_size * 2),
+          "input_data", input_cuda_handle, 0 /* device_id */,
+          input_byte_size * 2),
       "failed to register input shared memory region");
 
   FAIL_IF_ERR(
@@ -241,9 +240,8 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       client->RegisterCudaSharedMemory(
-          "output_data",
-          output_cuda_handle,
-          0 /* device_id */, output_byte_size * 2),
+          "output_data", output_cuda_handle, 0 /* device_id */,
+          output_byte_size * 2),
       "failed to register output shared memory region");
 
   FAIL_IF_ERR(
