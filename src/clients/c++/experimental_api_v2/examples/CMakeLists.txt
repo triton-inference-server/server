@@ -53,6 +53,19 @@ else()
     )
 
     #
+    # simple_grpc_v2_model_control
+    #
+    add_executable(simple_grpc_v2_model_control simple_grpc_v2_model_control.cc)
+    target_link_libraries(
+      simple_grpc_v2_model_control
+      PRIVATE TRTIS::grpcclient_static
+    )
+    install(
+      TARGETS simple_grpc_v2_model_control
+      RUNTIME DESTINATION bin
+    )
+
+    #
     # simple_grpc_v2_infer_client
     #
     add_executable(simple_grpc_v2_infer_client simple_grpc_v2_infer_client.cc)
@@ -77,6 +90,53 @@ else()
       TARGETS simple_grpc_v2_async_infer_client
       RUNTIME DESTINATION bin
     )
+
+    #
+    # simple_grpc_v2_shm_client
+    #
+    set(
+      SIMPLE_GRPC_SHM_SRCS
+      simple_grpc_v2_shm_client.cc
+      shm_utils.cc
+    )
+    set(
+      SIMPLE_GRPC_SHM_HDRS
+      shm_utils.h
+    )
+    add_executable(simple_grpc_v2_shm_client ${SIMPLE_GRPC_SHM_SRCS} ${SIMPLE_GRPC_SHM_HDRS})
+    target_link_libraries(
+      simple_grpc_v2_shm_client
+      PRIVATE TRTIS::grpcclient_static
+    )
+    install(
+      TARGETS simple_grpc_v2_shm_client
+      RUNTIME DESTINATION bin
+    )
+
+    if(${TRTIS_ENABLE_GPU})
+      #
+      # simple_grpc_v2_cudashm_client
+      #
+      set(
+        SIMPLE_GRPC_CUDA_SHM_SRCS
+        simple_grpc_v2_cudashm_client.cc
+      )
+      set(
+        SIMPLE_GRPC_CUDA_SHM_HDRS
+      )
+      add_executable(simple_grpc_v2_cudashm_client ${SIMPLE_GRPC_CUDA_SHM_SRCS} ${SIMPLE_GRPC_CUDA_SHM_HDRS})
+      target_include_directories(simple_grpc_v2_cudashm_client PRIVATE ${CUDA_INCLUDE_DIRS})
+      target_link_libraries(
+        simple_grpc_v2_cudashm_client
+        PRIVATE TRTIS::grpcclient_static
+        PRIVATE ${CUDA_LIBRARIES}
+        PRIVATE -lb64
+      )
+      install(
+        TARGETS simple_grpc_v2_cudashm_client
+        RUNTIME DESTINATION bin
+      )
+    endif() # TRTIS_ENABLE_GPU
   
   endif()  # TRTIS_ENABLE_GRPC_V2
 

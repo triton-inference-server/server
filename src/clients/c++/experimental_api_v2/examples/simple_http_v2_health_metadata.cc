@@ -133,7 +133,7 @@ main(int argc, char** argv)
 
   rapidjson::Document server_metadata;
   FAIL_IF_ERR(
-      client->GetServerMetadata(&server_metadata, http_headers),
+      client->ServerMetadata(&server_metadata, http_headers),
       "unable to get server metadata");
   if ((std::string(server_metadata["name"].GetString()))
           .compare("inference:0") != 0) {
@@ -145,7 +145,7 @@ main(int argc, char** argv)
 
   rapidjson::Document model_metadata;
   FAIL_IF_ERR(
-      client->GetModelMetadata(
+      client->ModelMetadata(
           &model_metadata, model_name, model_version, http_headers),
       "unable to get model metadata");
   if ((std::string(model_metadata["name"].GetString())).compare(model_name) !=
@@ -157,7 +157,7 @@ main(int argc, char** argv)
 
   rapidjson::Document model_config;
   FAIL_IF_ERR(
-      client->GetModelConfig(
+      client->ModelConfig(
           &model_config, model_name, model_version, http_headers),
       "unable to get model config");
   if ((std::string(model_config["name"].GetString())).compare(model_name) !=
@@ -167,7 +167,7 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  nic::Error err = client->GetModelMetadata(
+  nic::Error err = client->ModelMetadata(
       &model_metadata, "wrong_model_name", model_version, http_headers);
   if (err.IsOk()) {
     std::cerr << "error: expected an error but got: " << err << std::endl;

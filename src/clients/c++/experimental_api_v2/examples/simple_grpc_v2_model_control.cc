@@ -93,12 +93,7 @@ main(int argc, char** argv)
     }
   }
 
-  // We use a simple model that takes 2 input tensors of 16 integers
-  // each and returns 2 output tensors of 16 integers each. One output
-  // tensor is the element-wise sum of the inputs and one output is
-  // the element-wise difference.
   std::string model_name = "simple";
-  std::string model_version = "";
 
   // Create a InferenceServerGrpcClient instance to communicate with the
   // server using gRPC protocol.
@@ -107,74 +102,41 @@ main(int argc, char** argv)
       nic::InferenceServerGrpcClient::Create(&client, url, verbose),
       "unable to create grpc client");
 
-  bool live;
+  ni::RepositoryIndexResponse repository_index;
   FAIL_IF_ERR(
-      client->IsServerLive(&live, http_headers),
-      "unable to get server liveness");
-  if (!live) {
-    std::cerr << "error: server is not live" << std::endl;
+      client->ModelRepositoryIndex(&repository_index, http_headers),
+      "Failed to get repository index");
+  if (repository_index.models().size() != 6) {
+    std::cerr << "expected number of models 6, got "
+              << repository_index.models().size() << std::endl;
     exit(1);
   }
 
-  bool ready;
   FAIL_IF_ERR(
-      client->IsServerReady(&ready, http_headers),
-      "unable to get server readiness");
-  if (!ready) {
-    std::cerr << "error: server is not live" << std::endl;
-    exit(1);
-  }
-
+      client->LoadModel(model_name, http_headers), "Failed to load model");
   bool model_ready;
   FAIL_IF_ERR(
-      client->IsModelReady(
-          &model_ready, model_name, model_version, http_headers),
+      client->IsModelReady(&model_ready, model_name),
       "unable to get model readiness");
   if (!model_ready) {
     std::cerr << "error: model " << model_name << " is not live" << std::endl;
     exit(1);
   }
 
-  ni::ServerMetadataResponse server_metadata;
   FAIL_IF_ERR(
-      client->ServerMetadata(&server_metadata, http_headers),
-      "unable to get server metadata");
-  if (server_metadata.name().compare("inference:0") != 0) {
-    std::cerr << "error: unexpected server metadata: "
-              << server_metadata.DebugString() << std::endl;
+      client->UnloadModel(model_name, http_headers), "Failed to unload model");
+  FAIL_IF_ERR(
+      client->IsModelReady(&model_ready, model_name),
+      "unable to get model readiness");
+  if (model_ready) {
+    std::cerr << "error: model " << model_name << " is live after unloading"
+              << std::endl;
     exit(1);
   }
 
-  ni::ModelMetadataResponse model_metadata;
-  FAIL_IF_ERR(
-      client->ModelMetadata(
-          &model_metadata, model_name, model_version, http_headers),
-      "unable to get model metadata");
-  if (model_metadata.name().compare(model_name) != 0) {
-    std::cerr << "error: unexpected model metadata: "
-              << model_metadata.DebugString() << std::endl;
-    exit(1);
-  }
-
-  ni::ModelConfigResponse model_config;
-  FAIL_IF_ERR(
-      client->ModelConfig(
-          &model_config, model_name, model_version, http_headers),
-      "unable to get model config");
-  if (model_config.config().name().compare(model_name) != 0) {
-    std::cerr << "error: unexpected model config: "
-              << model_config.DebugString() << std::endl;
-    exit(1);
-  }
-
-  nic::Error err = client->ModelMetadata(
-      &model_metadata, "wrong_model_name", model_version, http_headers);
+  nic::Error err = client->LoadModel("wrong_model_name", http_headers);
   if (err.IsOk()) {
-    std::cerr << "error: expected an error but got: " << err << std::endl;
-    exit(1);
+    std::cerr << "error: wrong model name was successfully loaded" << std::endl;
   }
-
-  std::cout << err << std::endl;
-
   return 0;
 }

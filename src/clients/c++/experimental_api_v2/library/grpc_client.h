@@ -99,7 +99,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
-  Error GetServerMetadata(
+  Error ServerMetadata(
       ServerMetadataResponse* server_metadata,
       const Headers& headers = Headers());
 
@@ -113,7 +113,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
-  Error GetModelMetadata(
+  Error ModelMetadata(
       ModelMetadataResponse* model_metadata, const std::string& model_name,
       const std::string& model_version = "",
       const Headers& headers = Headers());
@@ -128,10 +128,134 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
-  Error GetModelConfig(
+  Error ModelConfig(
       ModelConfigResponse* model_config, const std::string& model_name,
       const std::string& model_version = "",
       const Headers& headers = Headers());
+
+  /// Contact the inference server and get the index of model repository
+  /// contents.
+  /// \param repository_index Returns the repository index as
+  /// RepositoryIndexRequestResponse
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
+  /// \return Error object indicating success or failure of the request.
+  Error ModelRepositoryIndex(
+      RepositoryIndexResponse* repository_index,
+      const Headers& headers = Headers());
+
+  /// Request the inference server to load or reload specified model.
+  /// \param model_name The name of the model to be loaded or reloaded.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
+  /// \return Error object indicating success or failure of the request.
+  Error LoadModel(
+      const std::string& model_name, const Headers& headers = Headers());
+
+  /// Request the inference server to unload specified model.
+  /// \param model_name The name of the model to be unloaded.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
+  /// \return Error object indicating success or failure of the request.
+  Error UnloadModel(
+      const std::string& model_name, const Headers& headers = Headers());
+
+  /// Contact the inference server and get the inference statistics for the
+  /// specified model name and version.
+  /// \param infer_stat The inference statistics of requested model name and
+  /// version.
+  /// \param model_name The name of the model to get inference statistics.
+  /// \param model_version The version of the model to get inference statistics.
+  /// The default value is an empty string which means then the server will
+  /// choose a version based on the model and internal policy.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
+  /// \return Error object indicating success or failure of the request.
+  Error ModelInferenceStatistics(
+      ModelStatisticsResponse* infer_stat, const std::string& model_name,
+      const std::string& model_version = "",
+      const Headers& headers = Headers());
+
+  /// Contact the inference server and get the status for requested system
+  /// shared memory.
+  /// \param status The system shared memory status as
+  /// SystemSharedMemoryStatusResponse
+  /// \param region_name The name of the region to query status. The default
+  /// value is an empty string, which means that the status of all active system
+  /// shared memory will be returned.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
+  /// \return Error object indicating success or failure of the request.
+  Error SystemSharedMemoryStatus(
+      SystemSharedMemoryStatusResponse* status,
+      const std::string& region_name = "", const Headers& headers = Headers());
+
+  /// Request the server to register a system shared memory with the provided
+  /// details.
+  /// \param name The name of the region to register.
+  /// \param key The key of the underlying memory object that contains the
+  /// system shared memory region.
+  /// \param byte_size The size of the system shared memory region, in bytes.
+  /// \param offset Offset, in bytes, within the underlying memory object to
+  /// the start of the system shared memory region. The default value is zero.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
+  /// \return Error object indicating success or failure of the request
+  Error RegisterSystemSharedMemory(
+      const std::string& name, const std::string& key, const size_t byte_size,
+      const size_t offset = 0, const Headers& headers = Headers());
+
+  /// Request the server to unregister a system shared memory with the
+  /// specified name.
+  /// \param name The name of the region to unregister. The default value is
+  /// empty string which means all the system shared memory regions will be
+  /// unregistered.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
+  /// \return Error object indicating success or failure of the request
+  Error UnregisterSystemSharedMemory(
+      const std::string& name = "", const Headers& headers = Headers());
+
+  /// Contact the inference server and get the status for requested CUDA
+  /// shared memory.
+  /// \param status The CUDA shared memory status as
+  /// CudaSharedMemoryStatusResponse
+  /// \param region_name The name of the region to query status. The default
+  /// value is an empty string, which means that the status of all active CUDA
+  /// shared memory will be returned.
+  /// \param headers Optional map specifying additional HTTP headers to include
+  /// in the metadata of gRPC request.
+  /// \return Error object indicating success or failure of the request.
+  Error CudaSharedMemoryStatus(
+      CudaSharedMemoryStatusResponse* status,
+      const std::string& region_name = "", const Headers& headers = Headers());
+
+  /// Request the server to register a CUDA shared memory with the provided
+  /// details.
+  /// \param name The name of the region to register.
+  /// \param cuda_shm_handle The cudaIPC handle for the memory object.
+  /// \param device_id The GPU device ID on which the cudaIPC handle was
+  /// created.
+  /// \param byte_size The size of the CUDA shared memory region, in
+  /// bytes.
+  /// \param headers Optional map specifying additional HTTP headers to
+  /// include in the metadata of gRPC request.
+  /// \return Error object indicating success or failure of the request
+  Error RegisterCudaSharedMemory(
+      const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
+      const size_t device_id, const size_t byte_size,
+      const Headers& headers = Headers());
+
+  /// Request the server to unregister a CUDA shared memory with the
+  /// specified name.
+  /// \param name The name of the region to unregister. The default value is
+  /// empty string which means all the CUDA shared memory regions will be
+  /// unregistered.
+  /// \param headers Optional map specifying additional HTTP headers to
+  /// include in the metadata of gRPC request.
+  /// \return Error object indicating success or failure of the request
+  Error UnregisterCudaSharedMemory(
+      const std::string& name = "", const Headers& headers = Headers());
 
   /// Run synchronous inference on server.
   /// \param result Returns the result of inference.
