@@ -167,7 +167,7 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// \param query_params Optional map specifying parameters that must be
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
-  Error GetModelRepositoryIndex(
+  Error ModelRepositoryIndex(
       rapidjson::Document* repository_index, const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 

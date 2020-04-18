@@ -104,7 +104,7 @@ main(int argc, char** argv)
 
   rapidjson::Document repository_index;
   FAIL_IF_ERR(
-      client->GetModelRepositoryIndex(&repository_index, http_headers),
+      client->ModelRepositoryIndex(&repository_index, http_headers),
       "Failed to get repository index");
   if (repository_index.Size() != 5) {
     std::cerr << "expected number of models 5, got " << repository_index.Size()

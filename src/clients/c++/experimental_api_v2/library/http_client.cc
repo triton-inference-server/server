@@ -590,7 +590,7 @@ InferenceServerHttpClient::ModelConfig(
 
 
 Error
-InferenceServerHttpClient::GetModelRepositoryIndex(
+InferenceServerHttpClient::ModelRepositoryIndex(
     rapidjson::Document* repository_index, const Headers& headers,
     const Parameters& query_params)
 {
