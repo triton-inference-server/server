@@ -51,7 +51,8 @@ RUN apt-get update && \
             python3-pip \
             python3-dev \
             rapidjson-dev && \
-    pip3 install --upgrade wheel setuptools grpcio-tools
+    pip3 install --upgrade wheel setuptools && \
+    pip3 install --upgrade grpcio-tools
 
 # Build expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \
