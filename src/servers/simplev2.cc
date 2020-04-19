@@ -574,7 +574,7 @@ main(int argc, char** argv)
   while (!is_ready) {
     FAIL_IF_ERR(
         TRITONSERVER_ServerModelIsReady(
-            server.get(), model_name.c_str(), "1", &is_ready),
+            server.get(), model_name.c_str(), 1, &is_ready),
         "unable to get model readiness");
     if (!is_ready) {
       if (++health_iters >= 10) {
@@ -587,7 +587,7 @@ main(int argc, char** argv)
     TRITONSERVER_Message* model_metadata_message;
     FAIL_IF_ERR(
         TRITONSERVER_ServerModelMetadata(
-            server.get(), model_name.c_str(), "1", &model_metadata_message),
+            server.get(), model_name.c_str(), 1, &model_metadata_message),
         "unable to get model metadata message");
     const char* buffer;
     size_t byte_size;
@@ -643,8 +643,7 @@ main(int argc, char** argv)
   TRITONSERVER_InferenceRequest* irequest = nullptr;
   FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestNew(
-          &irequest, server.get(), model_name.c_str(),
-          nullptr /* model_version */),
+          &irequest, server.get(), model_name.c_str(), -1 /* model_version */),
       "creating inference request");
 
   FAIL_IF_ERR(

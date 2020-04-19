@@ -645,7 +645,7 @@ SequenceBatchScheduler::ReaperThread(const int nice)
     // Wait until the next idle timeout needs to be checked
     if (wait_microseconds > 0) {
       std::unique_lock<std::mutex> lock(mu_);
-      LOG_VERBOSE(1) << "Reaper: sleeping for " << wait_microseconds << "us...";
+      LOG_VERBOSE(2) << "Reaper: sleeping for " << wait_microseconds << "us...";
       std::chrono::microseconds wait_timeout(wait_microseconds);
       reaper_cv_.wait_for(lock, wait_timeout);
     }
