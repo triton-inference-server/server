@@ -201,6 +201,7 @@ endif() # TRTIS_ENABLE_TRACING
 #
 set(
   TRITONSERVER_SRCS
+  common.cc
   main.cc
   shared_memory_manager.cc
   ../core/logging.cc
