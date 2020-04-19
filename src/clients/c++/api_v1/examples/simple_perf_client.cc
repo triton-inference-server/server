@@ -464,7 +464,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-a" << std::endl;
   std::cerr << std::endl;
   std::cerr
-      << "For -i, available protocols are 'grpc' and 'http'. Default is 'http."
+      << "For -i, available protocols are 'grpc' and 'http'. Default is 'http'."
       << std::endl;
   std::cerr
       << "For -s, specify the input size in fp32 elements. So a value of 8 "

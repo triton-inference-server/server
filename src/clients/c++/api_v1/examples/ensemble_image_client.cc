@@ -106,7 +106,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "For -c, the <topk> classes will be returned, default is 1."
             << std::endl;
   std::cerr
-      << "For -i, available protocols are 'grpc' and 'http'. Default is 'http."
+      << "For -i, available protocols are 'grpc' and 'http'. Default is 'http'."
       << std::endl;
 
   exit(1);
