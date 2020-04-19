@@ -1006,22 +1006,16 @@ TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestNew(
     TRITONSERVER_InferenceRequest** inference_request,
     TRITONSERVER_Server* server, const char* model_name,
-    const char* model_version)
+    const int64_t model_version)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
-  int64_t model_int_version = -1;
-  if (model_version != nullptr) {
-    RETURN_IF_STATUS_ERROR(
-        ni::GetModelVersionFromString(model_version, &model_int_version));
-  }
-
   std::shared_ptr<ni::InferenceBackend> backend;
   RETURN_IF_STATUS_ERROR(
-      lserver->GetInferenceBackend(model_name, model_int_version, &backend));
+      lserver->GetInferenceBackend(model_name, model_version, &backend));
 
   *inference_request = reinterpret_cast<TRITONSERVER_InferenceRequest*>(
-      new ni::InferenceRequest(backend, model_int_version));
+      new ni::InferenceRequest(backend, model_version));
 
   return nullptr;  // Success
 }
@@ -1300,6 +1294,32 @@ TRITONSERVER_InferenceResponseError(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_InferenceResponseModel(
+    TRITONSERVER_InferenceResponse* inference_response, const char** model_name,
+    int64_t* model_version)
+{
+  ni::InferenceResponse* lresponse =
+      reinterpret_cast<ni::InferenceResponse*>(inference_response);
+
+  *model_name = lresponse->ModelName().c_str();
+  *model_version = lresponse->ActualModelVersion();
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_InferenceResponseId(
+    TRITONSERVER_InferenceResponse* inference_response, const char** request_id)
+{
+  ni::InferenceResponse* lresponse =
+      reinterpret_cast<ni::InferenceResponse*>(inference_response);
+
+  *request_id = lresponse->Id().c_str();
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_InferenceResponseOutputCount(
     TRITONSERVER_InferenceResponse* inference_response, uint32_t* count)
 {
@@ -1458,7 +1478,7 @@ TRITONSERVER_ServerIsReady(TRITONSERVER_Server* server, bool* ready)
 TRITONSERVER_Error*
 TRITONSERVER_ServerModelIsReady(
     TRITONSERVER_Server* server, const char* model_name,
-    const char* model_version, bool* ready)
+    const int64_t model_version, bool* ready)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
@@ -1467,14 +1487,8 @@ TRITONSERVER_ServerModelIsReady(
       lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::HEALTH);
 #endif  // TRTIS_ENABLE_STATS
 
-  int64_t model_int_version = -1;
-  if (model_version != nullptr) {
-    RETURN_IF_STATUS_ERROR(
-        ni::GetModelVersionFromString(model_version, &model_int_version));
-  }
-
   RETURN_IF_STATUS_ERROR(
-      lserver->ModelIsReady(model_name, model_int_version, ready));
+      lserver->ModelIsReady(model_name, model_version, ready));
   return nullptr;  // Success
 }
 
@@ -1514,7 +1528,7 @@ TRITONSERVER_ServerMetadata(
 TRITONSERVER_Error*
 TRITONSERVER_ServerModelMetadata(
     TRITONSERVER_Server* server, const char* model_name,
-    const char* model_version, TRITONSERVER_Message** model_metadata)
+    const int64_t model_version, TRITONSERVER_Message** model_metadata)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
@@ -1523,15 +1537,9 @@ TRITONSERVER_ServerModelMetadata(
       lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::STATUS);
 #endif  // TRTIS_ENABLE_STATS
 
-  int64_t model_version_int = -1;
-  if (model_version != nullptr) {
-    RETURN_IF_STATUS_ERROR(
-        ni::GetModelVersionFromString(model_version, &model_version_int));
-  }
-
   std::shared_ptr<ni::InferenceBackend> backend;
   RETURN_IF_STATUS_ERROR(
-      lserver->GetInferenceBackend(model_name, model_version_int, &backend));
+      lserver->GetInferenceBackend(model_name, model_version, &backend));
 
   std::vector<int64_t> ready_versions;
   RETURN_IF_STATUS_ERROR(
@@ -1613,7 +1621,7 @@ TRITONSERVER_ServerModelMetadata(
 TRITONSERVER_Error*
 TRITONSERVER_ServerModelStatistics(
     TRITONSERVER_Server* server, const char* model_name,
-    const char* model_version, TRITONSERVER_Message** model_stats)
+    const int64_t model_version, TRITONSERVER_Message** model_stats)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
@@ -1623,11 +1631,6 @@ TRITONSERVER_ServerModelStatistics(
 #endif  // TRTIS_ENABLE_STATS
 
   auto model_name_string = std::string(model_name);
-  int64_t model_version_int = -1;
-  if (model_version != nullptr) {
-    RETURN_IF_STATUS_ERROR(
-        ni::GetModelVersionFromString(model_version, &model_version_int));
-  }
 
   ni::ServerStatus server_status;
   RETURN_IF_STATUS_ERROR(lserver->GetStatus(&server_status, model_name_string));
@@ -1649,8 +1652,8 @@ TRITONSERVER_ServerModelStatistics(
   for (const auto& m : server_status.model_status()) {
     if (model_name_string.empty() ||
         (m.first.compare(model_name_string) == 0)) {
-      if ((model_version_int != -1) &&
-          (m.second.version_status().find(model_version_int) ==
+      if ((model_version != -1) &&
+          (m.second.version_status().find(model_version) ==
            m.second.version_status().end())) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
@@ -1659,7 +1662,7 @@ TRITONSERVER_ServerModelStatistics(
 
       rapidjson::Value model_stat(rapidjson::kObjectType);
       for (const auto& v : m.second.version_status()) {
-        if ((model_version_int == -1) || (v.first == model_version_int)) {
+        if ((model_version == -1) || (v.first == model_version)) {
           rapidjson::Value inference_stats(rapidjson::kObjectType);
           const auto& ir = v.second.infer_stats().find(1);
           if (ir == v.second.infer_stats().end()) {
@@ -1736,7 +1739,7 @@ TRITONSERVER_ServerModelStatistics(
 TRITONSERVER_Error*
 TRITONSERVER_ServerModelConfig(
     TRITONSERVER_Server* server, const char* model_name,
-    const char* model_version, TRITONSERVER_Message** model_config)
+    const int64_t model_version, TRITONSERVER_Message** model_config)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
@@ -1745,15 +1748,9 @@ TRITONSERVER_ServerModelConfig(
       lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::STATUS);
 #endif  // TRTIS_ENABLE_STATS
 
-  int64_t model_version_int = -1;
-  if (model_version != nullptr) {
-    RETURN_IF_STATUS_ERROR(
-        ni::GetModelVersionFromString(model_version, &model_version_int));
-  }
-
   std::shared_ptr<ni::InferenceBackend> backend;
   RETURN_IF_STATUS_ERROR(
-      lserver->GetInferenceBackend(model_name, model_version_int, &backend));
+      lserver->GetInferenceBackend(model_name, model_version, &backend));
 
   std::string model_config_json;
   ::google::protobuf::util::JsonPrintOptions options;

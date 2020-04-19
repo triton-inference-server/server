@@ -51,9 +51,6 @@
 #include "src/servers/tracer.h"
 #endif  // TRTIS_ENABLE_TRACING
 
-// FIXMEV2
-// Clean-up datatype usage to use TRITONSERVER_DataType.
-
 namespace nvidia { namespace inferenceserver {
 
 namespace {
@@ -201,7 +198,7 @@ struct AllocPayload {
   struct ShmInfo {
     void* base_;
     size_t byte_size_;
-    TRITONSERVER_Memory_Type memory_type_;
+    TRITONSERVER_MemoryType memory_type_;
     int64_t device_id_;
   };
 
@@ -704,7 +701,6 @@ CommonHandler::SetUpAllRequests()
   // 3. Create a CommonCallData object with the above callback
   //    functions
 
-
   //
   //  ModelStatistics
   //
@@ -722,30 +718,35 @@ CommonHandler::SetUpAllRequests()
                                       ModelStatisticsResponse* response,
                                       grpc::Status* status) {
 #ifdef TRTIS_ENABLE_STATS
-    TRITONSERVER_Message* model_stats_message = nullptr;
-    auto err = TRITONSERVER_ServerModelStatistics(
-        tritonserver_.get(), request.name().c_str(), request.version().c_str(),
-        &model_stats_message);
-    rapidjson::Document model_stats_json;
+    int64_t requested_model_version;
+    auto err =
+        GetModelVersionFromString(request.version(), &requested_model_version);
     if (err == nullptr) {
-      const char* buffer;
-      size_t byte_size;
-      err = TRITONSERVER_MessageSerializeToJson(
-          model_stats_message, &buffer, &byte_size);
+      TRITONSERVER_Message* model_stats_message = nullptr;
+      err = TRITONSERVER_ServerModelStatistics(
+          tritonserver_.get(), request.name().c_str(), requested_model_version,
+          &model_stats_message);
+      rapidjson::Document model_stats_json;
       if (err == nullptr) {
-        model_stats_json.Parse(buffer, byte_size);
-        if (model_stats_json.HasParseError()) {
-          err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INTERNAL,
-              std::string(
-                  "failed to parse the model statistics JSON buffer: " +
-                  std::string(
-                      GetParseError_En(model_stats_json.GetParseError())) +
-                  " at " + std::to_string(model_stats_json.GetErrorOffset()))
-                  .c_str());
+        const char* buffer;
+        size_t byte_size;
+        err = TRITONSERVER_MessageSerializeToJson(
+            model_stats_message, &buffer, &byte_size);
+        if (err == nullptr) {
+          model_stats_json.Parse(buffer, byte_size);
+          if (model_stats_json.HasParseError()) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                std::string(
+                    "failed to parse the model statistics JSON buffer: " +
+                    std::string(
+                        GetParseError_En(model_stats_json.GetParseError())) +
+                    " at " + std::to_string(model_stats_json.GetErrorOffset()))
+                    .c_str());
+          }
         }
+        TRITONSERVER_MessageDelete(model_stats_message);
       }
-      TRITONSERVER_MessageDelete(model_stats_message);
     }
 
     if (err == nullptr) {
@@ -1366,9 +1367,14 @@ ModelReadyHandler::Process(Handler::State* state, bool rpc_ok)
 
   if (state->step_ == Steps::START) {
     bool is_ready = false;
-    auto err = TRITONSERVER_ServerModelIsReady(
-        tritonserver_.get(), request.name().c_str(), request.version().c_str(),
-        &is_ready);
+    int64_t requested_model_version;
+    auto err =
+        GetModelVersionFromString(request.version(), &requested_model_version);
+    if (err == nullptr) {
+      err = TRITONSERVER_ServerModelIsReady(
+          tritonserver_.get(), request.name().c_str(), requested_model_version,
+          &is_ready);
+    }
 
     response.set_ready(is_ready);
 
@@ -1554,56 +1560,64 @@ ModelMetadataHandler::Process(Handler::State* state, bool rpc_ok)
   ModelMetadataResponse& response = state->response_;
 
   if (state->step_ == Steps::START) {
-    TRITONSERVER_Message* model_metadata_message = nullptr;
-    TRITONSERVER_Error* err = TRITONSERVER_ServerModelMetadata(
-        tritonserver_.get(), request.name().c_str(), request.version().c_str(),
-        &model_metadata_message);
+    int64_t requested_model_version;
+    auto err =
+        GetModelVersionFromString(request.version(), &requested_model_version);
     if (err == nullptr) {
-      const char* buffer;
-      size_t byte_size;
-      err = TRITONSERVER_MessageSerializeToJson(
-          model_metadata_message, &buffer, &byte_size);
+      TRITONSERVER_Message* model_metadata_message = nullptr;
+      err = TRITONSERVER_ServerModelMetadata(
+          tritonserver_.get(), request.name().c_str(), requested_model_version,
+          &model_metadata_message);
       if (err == nullptr) {
-        rapidjson::Document model_metadata_json;
-        model_metadata_json.Parse(buffer, byte_size);
-        if (model_metadata_json.HasParseError()) {
-          err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INTERNAL,
-              std::string(
-                  "failed to parse the model metadata JSON buffer: " +
-                  std::string(
-                      GetParseError_En(model_metadata_json.GetParseError())) +
-                  " at " + std::to_string(model_metadata_json.GetErrorOffset()))
-                  .c_str());
-        } else {
-          response.set_name(model_metadata_json["name"].GetString());
-          for (const auto& version :
-               model_metadata_json["versions"].GetArray()) {
-            response.add_versions(version.GetString());
-          }
-          response.set_platform(model_metadata_json["platform"].GetString());
-
-          for (const auto& io_json : model_metadata_json["inputs"].GetArray()) {
-            ModelMetadataResponse::TensorMetadata* io = response.add_inputs();
-            io->set_name(io_json["name"].GetString());
-            io->set_datatype(io_json["datatype"].GetString());
-            for (const auto& d : io_json["shape"].GetArray()) {
-              io->add_shape(d.GetInt());
+        const char* buffer;
+        size_t byte_size;
+        err = TRITONSERVER_MessageSerializeToJson(
+            model_metadata_message, &buffer, &byte_size);
+        if (err == nullptr) {
+          rapidjson::Document model_metadata_json;
+          model_metadata_json.Parse(buffer, byte_size);
+          if (model_metadata_json.HasParseError()) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                std::string(
+                    "failed to parse the model metadata JSON buffer: " +
+                    std::string(
+                        GetParseError_En(model_metadata_json.GetParseError())) +
+                    " at " +
+                    std::to_string(model_metadata_json.GetErrorOffset()))
+                    .c_str());
+          } else {
+            response.set_name(model_metadata_json["name"].GetString());
+            for (const auto& version :
+                 model_metadata_json["versions"].GetArray()) {
+              response.add_versions(version.GetString());
             }
-          }
+            response.set_platform(model_metadata_json["platform"].GetString());
 
-          for (const auto& io_json :
-               model_metadata_json["outputs"].GetArray()) {
-            ModelMetadataResponse::TensorMetadata* io = response.add_outputs();
-            io->set_name(io_json["name"].GetString());
-            io->set_datatype(io_json["datatype"].GetString());
-            for (const auto& d : io_json["shape"].GetArray()) {
-              io->add_shape(d.GetInt());
+            for (const auto& io_json :
+                 model_metadata_json["inputs"].GetArray()) {
+              ModelMetadataResponse::TensorMetadata* io = response.add_inputs();
+              io->set_name(io_json["name"].GetString());
+              io->set_datatype(io_json["datatype"].GetString());
+              for (const auto& d : io_json["shape"].GetArray()) {
+                io->add_shape(d.GetInt());
+              }
+            }
+
+            for (const auto& io_json :
+                 model_metadata_json["outputs"].GetArray()) {
+              ModelMetadataResponse::TensorMetadata* io =
+                  response.add_outputs();
+              io->set_name(io_json["name"].GetString());
+              io->set_datatype(io_json["datatype"].GetString());
+              for (const auto& d : io_json["shape"].GetArray()) {
+                io->add_shape(d.GetInt());
+              }
             }
           }
         }
+        TRITONSERVER_MessageDelete(model_metadata_message);
       }
-      TRITONSERVER_MessageDelete(model_metadata_message);
     }
 
     grpc::Status status;
@@ -1681,20 +1695,25 @@ ModelConfigHandler::Process(Handler::State* state, bool rpc_ok)
   ModelConfigResponse& response = state->response_;
 
   if (state->step_ == Steps::START) {
-    TRITONSERVER_Message* model_config_message = nullptr;
-    TRITONSERVER_Error* err = TRITONSERVER_ServerModelConfig(
-        tritonserver_.get(), request.name().c_str(), request.version().c_str(),
-        &model_config_message);
+    int64_t requested_model_version;
+    auto err =
+        GetModelVersionFromString(request.version(), &requested_model_version);
     if (err == nullptr) {
-      const char* buffer;
-      size_t byte_size;
-      err = TRITONSERVER_MessageSerializeToJson(
-          model_config_message, &buffer, &byte_size);
+      TRITONSERVER_Message* model_config_message = nullptr;
+      err = TRITONSERVER_ServerModelConfig(
+          tritonserver_.get(), request.name().c_str(), requested_model_version,
+          &model_config_message);
       if (err == nullptr) {
-        ::google::protobuf::util::JsonStringToMessage(
-            {buffer, (int)byte_size}, response.mutable_config());
+        const char* buffer;
+        size_t byte_size;
+        err = TRITONSERVER_MessageSerializeToJson(
+            model_config_message, &buffer, &byte_size);
+        if (err == nullptr) {
+          ::google::protobuf::util::JsonStringToMessage(
+              {buffer, (int)byte_size}, response.mutable_config());
+        }
+        TRITONSERVER_MessageDelete(model_config_message);
       }
-      TRITONSERVER_MessageDelete(model_config_message);
     }
 
     grpc::Status status;
@@ -1723,9 +1742,9 @@ ModelConfigHandler::Process(Handler::State* state, bool rpc_ok)
 TRITONSERVER_Error*
 InferResponseAlloc(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
-    size_t byte_size, TRITONSERVER_Memory_Type preferred_memory_type,
+    size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
     int64_t preferred_memory_type_id, void* userp, void** buffer,
-    void** buffer_userp, TRITONSERVER_Memory_Type* actual_memory_type,
+    void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
@@ -1779,8 +1798,10 @@ InferResponseAlloc(
       // allocate on GPU memory then force allocation on CPU instead.
       if (*actual_memory_type != TRITONSERVER_MEMORY_CPU) {
         LOG_VERBOSE(1) << "GRPC: unable to provide '" << tensor_name << "' in "
-                       << MemoryTypeString(*actual_memory_type) << ", will use "
-                       << MemoryTypeString(TRITONSERVER_MEMORY_CPU);
+                       << TRITONSERVER_MemoryTypeString(*actual_memory_type)
+                       << ", will use "
+                       << TRITONSERVER_MemoryTypeString(
+                              TRITONSERVER_MEMORY_CPU);
         *actual_memory_type = TRITONSERVER_MEMORY_CPU;
         *actual_memory_type_id = 0;
       }
@@ -1799,7 +1820,7 @@ InferResponseAlloc(
 TRITONSERVER_Error*
 InferResponseRelease(
     TRITONSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
-    size_t byte_size, TRITONSERVER_Memory_Type memory_type,
+    size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
 {
   LOG_VERBOSE(1) << "GRPC release: "
@@ -1933,7 +1954,7 @@ InferAllocatorPayload(
 
     if (has_shared_memory) {
       void* base;
-      TRITONSERVER_Memory_Type memory_type;
+      TRITONSERVER_MemoryType memory_type;
       int64_t memory_type_id;
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, &base, &memory_type, &memory_type_id));
@@ -1955,19 +1976,10 @@ InferAllocatorPayload(
 TRITONSERVER_Error*
 InferGRPCToInputHelper(
     const std::string& input_name, const std::string& model_name,
-    const std::string& tensor_dt, const std::string& input_dt,
-    const size_t byte_size)
+    const TRITONSERVER_DataType tensor_dt, const TRITONSERVER_DataType input_dt,
+    const size_t binary_data_byte_size)
 {
-  if (input_dt.compare(tensor_dt) != 0) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "unexpected explicit tensor data for input tensor '" + input_name +
-            "' for model '" + model_name + "' of type '" + tensor_dt +
-            "', expected datatype '" + input_dt + "'")
-            .c_str());
-  }
-  if (byte_size != 0) {
+  if (binary_data_byte_size != 0) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
@@ -1976,6 +1988,18 @@ InferGRPCToInputHelper(
             "', binary data was already supplied.")
             .c_str());
   }
+
+  if (tensor_dt != input_dt) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "unexpected explicit tensor data for input tensor '" + input_name +
+            "' for model '" + model_name + "' of type '" +
+            TRITONSERVER_DataTypeString(tensor_dt) + "', expected datatype '" +
+            TRITONSERVER_DataTypeString(input_dt) + "'")
+            .c_str());
+  }
+
   return nullptr;  // success
 }
 
@@ -1992,7 +2016,7 @@ InferGRPCToInput(
   for (const auto& io : request.inputs()) {
     const void* base;
     size_t byte_size;
-    TRITONSERVER_Memory_Type memory_type = TRITONSERVER_MEMORY_CPU;
+    TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
     int64_t memory_type_id = 0;
 
     std::string region_name;
@@ -2031,18 +2055,21 @@ InferGRPCToInput(
       byte_size = raw.size();
 
       // Check the presence of explicit tensors
-      const size_t elem_byte_size = GetDataTypeByteSize(io.datatype());
+      TRITONSERVER_DataType dtype =
+          TRITONSERVER_StringToDataType(io.datatype().c_str());
+      const size_t elem_byte_size = TRITONSERVER_DataTypeByteSize(dtype);
       if (io.contents().bool_contents_size() != 0) {
         RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), "BOOL", io.datatype(), byte_size));
+            io.name(), request.model_name(), TRITONSERVER_TYPE_BOOL, dtype,
+            byte_size));
         base = (const void*)io.contents().bool_contents().data();
         byte_size = io.contents().bool_contents_size() * elem_byte_size;
       }
 
       if (io.contents().int_contents_size() != 0) {
-        if (io.datatype().compare("INT8") == 0) {
+        if (dtype == TRITONSERVER_TYPE_INT8) {
           RETURN_IF_ERR(InferGRPCToInputHelper(
-              io.name(), request.model_name(), "INT8", io.datatype(),
+              io.name(), request.model_name(), TRITONSERVER_TYPE_INT8, dtype,
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
           serialized->reserve(
@@ -2057,9 +2084,9 @@ InferGRPCToInput(
           }
           base = serialized->c_str();
           byte_size = serialized->size();
-        } else if (io.datatype().compare("INT16") == 0) {
+        } else if (dtype == TRITONSERVER_TYPE_INT16) {
           RETURN_IF_ERR(InferGRPCToInputHelper(
-              io.name(), request.model_name(), "INT16", io.datatype(),
+              io.name(), request.model_name(), TRITONSERVER_TYPE_INT16, dtype,
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
           serialized->reserve(
@@ -2076,7 +2103,7 @@ InferGRPCToInput(
           byte_size = serialized->size();
         } else {
           RETURN_IF_ERR(InferGRPCToInputHelper(
-              io.name(), request.model_name(), "INT32", io.datatype(),
+              io.name(), request.model_name(), TRITONSERVER_TYPE_INT32, dtype,
               byte_size));
           base = (const void*)io.contents().int_contents().data();
           byte_size = io.contents().int_contents_size() * elem_byte_size;
@@ -2085,16 +2112,16 @@ InferGRPCToInput(
 
       if (io.contents().int64_contents_size() != 0) {
         RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), "INT64", io.datatype(),
+            io.name(), request.model_name(), TRITONSERVER_TYPE_INT64, dtype,
             byte_size));
         base = (const void*)io.contents().int64_contents().data();
         byte_size = io.contents().int64_contents_size() * elem_byte_size;
       }
 
       if (io.contents().uint_contents_size() != 0) {
-        if (io.datatype().compare("UINT8") == 0) {
+        if (dtype == TRITONSERVER_TYPE_UINT8) {
           RETURN_IF_ERR(InferGRPCToInputHelper(
-              io.name(), request.model_name(), "UINT8", io.datatype(),
+              io.name(), request.model_name(), TRITONSERVER_TYPE_UINT8, dtype,
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
           serialized_data_map->emplace(io.name(), serialized);
@@ -2109,9 +2136,9 @@ InferGRPCToInput(
           }
           base = serialized->c_str();
           byte_size = serialized->size();
-        } else if (io.datatype().compare("UINT16") == 0) {
+        } else if (dtype == TRITONSERVER_TYPE_UINT16) {
           RETURN_IF_ERR(InferGRPCToInputHelper(
-              io.name(), request.model_name(), "UINT16", io.datatype(),
+              io.name(), request.model_name(), TRITONSERVER_TYPE_UINT16, dtype,
               byte_size));
           std::shared_ptr<std::string> serialized(new std::string());
           serialized_data_map->emplace(io.name(), serialized);
@@ -2128,7 +2155,7 @@ InferGRPCToInput(
           byte_size = serialized->size();
         } else {
           RETURN_IF_ERR(InferGRPCToInputHelper(
-              io.name(), request.model_name(), "UINT32", io.datatype(),
+              io.name(), request.model_name(), TRITONSERVER_TYPE_UINT32, dtype,
               byte_size));
           base = (const void*)io.contents().int_contents().data();
           byte_size = io.contents().int_contents_size() * elem_byte_size;
@@ -2137,7 +2164,7 @@ InferGRPCToInput(
 
       if (io.contents().uint64_contents_size() != 0) {
         RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), "UINT64", io.datatype(),
+            io.name(), request.model_name(), TRITONSERVER_TYPE_UINT64, dtype,
             byte_size));
         base = (const void*)io.contents().uint64_contents().data();
         byte_size = io.contents().uint64_contents_size() * elem_byte_size;
@@ -2145,21 +2172,23 @@ InferGRPCToInput(
 
       if (io.contents().fp32_contents_size() != 0) {
         RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), "FP32", io.datatype(), byte_size));
+            io.name(), request.model_name(), TRITONSERVER_TYPE_FP32, dtype,
+            byte_size));
         base = (const void*)io.contents().fp32_contents().data();
         byte_size = io.contents().fp32_contents_size() * elem_byte_size;
       }
 
       if (io.contents().fp64_contents_size() != 0) {
         RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), "FP64", io.datatype(), byte_size));
+            io.name(), request.model_name(), TRITONSERVER_TYPE_FP64, dtype,
+            byte_size));
         base = (const void*)io.contents().fp64_contents().data();
         byte_size = io.contents().fp64_contents_size() * elem_byte_size;
       }
 
       if (io.contents().byte_contents_size() != 0) {
         RETURN_IF_ERR(InferGRPCToInputHelper(
-            io.name(), request.model_name(), "BYTES", io.datatype(),
+            io.name(), request.model_name(), TRITONSERVER_TYPE_BYTES, dtype,
             byte_size));
         std::shared_ptr<std::string> serialized(new std::string());
         serialized_data_map->emplace(io.name(), serialized);
@@ -2196,6 +2225,8 @@ SetInferenceRequestMetadata(
   RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetId(
       inference_request, request.id().c_str()));
 
+  // FIXME, instead of find perhaps we should just iterate through the
+  // parameters...
   const auto& sequence_id_it = request.parameters().find("sequence_id");
   if (sequence_id_it != request.parameters().end()) {
     const auto& infer_param = sequence_id_it->second;
@@ -2271,7 +2302,8 @@ SetInferenceRequestMetadata(
 
   for (const auto& input : request.inputs()) {
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(
-        inference_request, input.name().c_str(), input.datatype().c_str(),
+        inference_request, input.name().c_str(),
+        TRITONSERVER_StringToDataType(input.datatype().c_str()),
         input.shape().data(), input.shape_size()));
   }
 
@@ -2324,6 +2356,123 @@ InferRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
       "deleting GRPC inference request");
 }
 
+TRITONSERVER_Error*
+InferResponseCompleteCommon(
+    TRITONSERVER_InferenceResponse* iresponse, ModelInferResponse& response,
+    const AllocPayload& alloc_payload)
+{
+  RETURN_IF_ERR(TRITONSERVER_InferenceResponseError(iresponse));
+
+  const char *model_name, *id;
+  int64_t model_version;
+  RETURN_IF_ERR(TRITONSERVER_InferenceResponseModel(
+      iresponse, &model_name, &model_version));
+  RETURN_IF_ERR(TRITONSERVER_InferenceResponseId(iresponse, &id));
+
+  response.set_id(id);
+  response.set_model_name(model_name);
+  response.set_model_version(std::to_string(model_version));
+
+  // Go through each response output and transfer information to the
+  // corresponding GRPC response output.
+  uint32_t output_count;
+  RETURN_IF_ERR(
+      TRITONSERVER_InferenceResponseOutputCount(iresponse, &output_count));
+  if (output_count != (uint32_t)response.outputs_size()) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, "response output count mismatch");
+  }
+
+  for (uint32_t idx = 0; idx < output_count; ++idx) {
+    const char* cname;
+    TRITONSERVER_DataType datatype;
+    const int64_t* shape;
+    uint64_t dim_count;
+    const void* base;
+    size_t byte_size;
+    TRITONSERVER_MemoryType memory_type;
+    int64_t memory_type_id;
+
+    RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutput(
+        iresponse, idx, &cname, &datatype, &shape, &dim_count, &base,
+        &byte_size, &memory_type, &memory_type_id));
+
+    const std::string name(cname);
+
+    // There are usually very few outputs so fastest just to look for
+    // the one we want... could create a map for cases where there are
+    // a large number of outputs. Or rely on order to be same...
+    ModelInferResponse::InferOutputTensor* output = nullptr;
+    for (auto& io : *(response.mutable_outputs())) {
+      if (io.name() == name) {
+        output = &io;
+        break;
+      }
+    }
+
+    if (output == nullptr) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL,
+          "unable to find expected response output");
+    }
+
+    output->set_datatype(TRITONSERVER_DataTypeString(datatype));
+    for (size_t idx = 0; idx < dim_count; idx++) {
+      output->add_shape(shape[idx]);
+    }
+
+#if 0
+        // FIXMEV2, different handling if the output requested
+        // classification results
+        //
+        // Check if the output can be classification results
+        // (no raw_contents and not using shared memory)
+        if (output.contents().raw_contents().size() == 0) {
+          if ((alloc_payload.shm_map_ == nullptr) ||
+              (alloc_payload.shm_map_->find(output.name()) ==
+               alloc_payload.shm_map_->end())) {
+            size_t element_cnt = shape[0] * shape[1];
+            const char* base = nullptr;
+            size_t byte_size;
+            TRITONSERVER_MemoryType mem_type;
+            int64_t mem_id;
+            err = TRITONSERVER_InferenceResponseOutputData(
+                iresponse, output.name().c_str(), (const void**)&base,
+                &byte_size, &mem_type, &mem_id);
+            if (err != nullptr) {
+              break;
+            }
+            size_t offset = 0;
+            if (base != nullptr) {
+              for (size_t idx = 0; idx < element_cnt; idx++) {
+                size_t length =
+                    *(reinterpret_cast<const uint32_t*>(base + offset));
+                offset += sizeof(uint32_t);
+                output.mutable_contents()->add_byte_contents(
+                    base + offset, length);
+                offset += length;
+              }
+            }
+          }
+        }
+#endif
+  }
+
+  // Make sure response doesn't exceed GRPC limits.
+  if (response.ByteSizeLong() > MAX_GRPC_MESSAGE_SIZE) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "Response has byte size " +
+            std::to_string(response.ByteSizeLong()) +
+            " which exceeds gRPC's byte size limit " + std::to_string(INT_MAX) +
+            ".")
+            .c_str());
+  }
+
+  return nullptr;  // success
+}
+
 //
 // ModelInferHandler
 //
@@ -2345,7 +2494,7 @@ class ModelInferHandler
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_ResponseAllocatorNew(
             &allocator_, InferResponseAlloc, InferResponseRelease),
         "creating inference response allocator");
@@ -2437,13 +2586,18 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
     if (!shutdown) {
       StartNewRequest();
     }
-    // Create the inference request which contians all the
+    // Create the inference request which contains all the
     // input information needed for an inference.
     TRITONSERVER_InferenceRequest* irequest = nullptr;
     if (err == nullptr) {
-      err = TRITONSERVER_InferenceRequestNew(
-          &irequest, tritonserver_.get(), request.model_name().c_str(),
-          request.model_version().c_str());
+      int64_t requested_model_version;
+      err = GetModelVersionFromString(
+          request.model_version(), &requested_model_version);
+      if (err == nullptr) {
+        err = TRITONSERVER_InferenceRequestNew(
+            &irequest, tritonserver_.get(), request.model_name().c_str(),
+            requested_model_version);
+      }
     }
 
     if (err == nullptr) {
@@ -2465,6 +2619,16 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
           &state->alloc_payload_);
     }
     if (err == nullptr) {
+      err = TRITONSERVER_InferenceRequestSetReleaseCallback(
+          irequest, InferRequestComplete, nullptr /* request_release_userp */);
+    }
+    if (err == nullptr) {
+      err = TRITONSERVER_InferenceRequestSetResponseCallback(
+          irequest, allocator_,
+          &state->alloc_payload_ /* response_allocator_userp */,
+          InferResponseComplete, reinterpret_cast<void*>(state));
+    }
+    if (err == nullptr) {
       // Provide the trace manager object to use for this request, if
       // nullptr then no tracing will be performed.
       TRITONSERVER_TraceManager* trace_manager = nullptr;
@@ -2476,19 +2640,11 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
       }
 #endif  // TRTIS_ENABLE_TRACING
 
-      // Set fields that are known in advance.
-      response.set_id(request.id());
-      response.set_model_name(request.model_name());
-      response.set_model_version(request.model_version());
-
       state->step_ = ISSUED;
 
       err = TRITONSERVER_ServerInferAsync(
-          tritonserver_.get(), irequest, allocator_,
-          &state->alloc_payload_ /* response_allocator_userp */,
-          InferRequestComplete, nullptr /* request_release_userp */,
-          InferResponseComplete, reinterpret_cast<void*>(state), trace_manager,
-          TraceManagerComplete, nullptr /* trace_release_userp */);
+          tritonserver_.get(), irequest, trace_manager, TraceManagerComplete,
+          nullptr /* trace_release_userp */);
     }
 
     // If not error then state->step_ == ISSUED and inference request
@@ -2541,73 +2697,10 @@ ModelInferHandler::InferResponseComplete(
   LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
                  << state->unique_id_ << " step " << state->step_;
 
+
   ModelInferResponse& response = state->response_;
-
-  TRITONSERVER_Error* err = TRITONSERVER_InferenceResponseError(iresponse);
-  if (err == nullptr) {
-    for (auto& output : *(response.mutable_outputs())) {
-      const int64_t* shape;
-      uint64_t dim_count;
-      const char* datatype;
-      err = TRITONSERVER_InferenceResponseOutputShape(
-          iresponse, output.name().c_str(), &shape, &dim_count);
-      if (err == nullptr) {
-        err = TRITONSERVER_InferenceResponseOutputDataType(
-            iresponse, output.name().c_str(), &datatype);
-      }
-      if (err != nullptr) {
-        break;
-      }
-
-      for (size_t idx = 0; idx < dim_count; idx++) {
-        output.add_shape(shape[idx]);
-      }
-      output.set_datatype(datatype);
-
-      // Check if the output can be classification results
-      // (no raw_contents and not using shared memory)
-      if (output.contents().raw_contents().size() == 0) {
-        if ((state->alloc_payload_.shm_map_ == nullptr) ||
-            (state->alloc_payload_.shm_map_->find(output.name()) ==
-             state->alloc_payload_.shm_map_->end())) {
-          size_t element_cnt = shape[0] * shape[1];
-          const char* base = nullptr;
-          size_t byte_size;
-          TRITONSERVER_Memory_Type mem_type;
-          int64_t mem_id;
-          err = TRITONSERVER_InferenceResponseOutputData(
-              iresponse, output.name().c_str(), (const void**)&base, &byte_size,
-              &mem_type, &mem_id);
-          if (err != nullptr) {
-            break;
-          }
-          size_t offset = 0;
-          if (base != nullptr) {
-            for (size_t idx = 0; idx < element_cnt; idx++) {
-              size_t length =
-                  *(reinterpret_cast<const uint32_t*>(base + offset));
-              offset += sizeof(uint32_t);
-              output.mutable_contents()->add_byte_contents(
-                  base + offset, length);
-              offset += length;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Make sure response doesn't exceed GRPC limits.
-  if ((err == nullptr) && (response.ByteSizeLong() > INT_MAX)) {
-    err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "Response has byte size " +
-            std::to_string(response.ByteSizeLong()) +
-            " which exceeds gRPC's byte size limit " + std::to_string(INT_MAX) +
-            ".")
-            .c_str());
-  }
+  TRITONSERVER_Error* err =
+      InferResponseCompleteCommon(iresponse, response, state->alloc_payload_);
 
   if (err != nullptr) {
     response.Clear();
@@ -2617,12 +2710,13 @@ ModelInferHandler::InferResponseComplete(
   GrpcStatusUtil::Create(&status, err);
   TRITONSERVER_ErrorDelete(err);
 
-  // Don't need to explicitly delete 'trace_manager'. It will be deleted by
-  // the TraceMetaData object in 'state'.
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceResponseDelete(iresponse),
       "deleting GRPC inference response");
 
+  // FIXME
+  // Don't need to explicitly delete 'trace_manager'. It will be deleted by
+  // the TraceMetaData object in 'state'.
 #ifdef TRTIS_ENABLE_TRACING
   if (state->trace_meta_data_ != nullptr) {
     state->trace_meta_data_->tracer_->CaptureTimestamp(
@@ -2656,7 +2750,7 @@ class ModelStreamInferHandler
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
-    FAIL_IF_TRITON_ERR(
+    FAIL_IF_ERR(
         TRITONSERVER_ResponseAllocatorNew(
             &allocator_, InferResponseAlloc, InferResponseRelease),
         "creating response allocator");
@@ -2733,10 +2827,10 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     const ModelInferRequest& request = state->request_;
 #ifdef TRTIS_ENABLE_TRACING
     if (state->trace_meta_data_ != nullptr) {
+      int64_t requested_model_version;
+      err = GetModelVersionFromString(
+          request.model_version(), &requested_model_version);
       if (err == nullptr) {
-        int64_t requested_model_version;
-        err = GetModelVersionFromString(
-            request.model_version(), &requested_model_version);
         state->trace_meta_data_->tracer_->SetModel(
             state->request_.model_name(), requested_model_version);
       } else {
@@ -2788,9 +2882,14 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // input information needed for an inference.
     TRITONSERVER_InferenceRequest* irequest = nullptr;
     if (err == nullptr) {
-      err = TRITONSERVER_InferenceRequestNew(
-          &irequest, tritonserver_.get(), request.model_name().c_str(),
-          request.model_version().c_str());
+      int64_t requested_model_version;
+      err = GetModelVersionFromString(
+          request.model_version(), &requested_model_version);
+      if (err == nullptr) {
+        err = TRITONSERVER_InferenceRequestNew(
+            &irequest, tritonserver_.get(), request.model_name().c_str(),
+            requested_model_version);
+      }
     }
 
     if (err == nullptr) {
@@ -2812,6 +2911,16 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
           response.mutable_infer_response(), &state->alloc_payload_);
     }
     if (err == nullptr) {
+      err = TRITONSERVER_InferenceRequestSetReleaseCallback(
+          irequest, InferRequestComplete, nullptr /* request_release_userp */);
+    }
+    if (err == nullptr) {
+      err = TRITONSERVER_InferenceRequestSetResponseCallback(
+          irequest, allocator_,
+          &state->alloc_payload_ /* response_allocator_userp */,
+          StreamInferResponseComplete, reinterpret_cast<void*>(state));
+    }
+    if (err == nullptr) {
       // Provide the trace manager object to use for this request, if
       // nullptr then no tracing will be performed.
       TRITONSERVER_TraceManager* trace_manager = nullptr;
@@ -2823,19 +2932,10 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
       }
 #endif  // TRTIS_ENABLE_TRACING
 
-      // Set fields that are known in advance.
-      response.mutable_infer_response()->set_id(request.id());
-      response.mutable_infer_response()->set_model_name(request.model_name());
-      response.mutable_infer_response()->set_model_version(
-          request.model_version());
-
       state->step_ = ISSUED;
+
       err = TRITONSERVER_ServerInferAsync(
-          tritonserver_.get(), irequest, allocator_,
-          &state->alloc_payload_ /* response_allocator_userp */,
-          InferRequestComplete, nullptr /* request_release_userp */,
-          StreamInferResponseComplete, reinterpret_cast<void*>(state),
-          trace_manager, TraceManagerComplete,
+          tritonserver_.get(), irequest, trace_manager, TraceManagerComplete,
           nullptr /* trace_release_userp */);
     }
 
@@ -2948,88 +3048,26 @@ ModelStreamInferHandler::StreamInferResponseComplete(
                  << state->context_->unique_id_ << ", " << state->unique_id_
                  << " step " << state->step_;
 
-  ModelStreamInferResponse& response = state->response_;
-
-  TRITONSERVER_Error* err = TRITONSERVER_InferenceResponseError(iresponse);
-  if (err == nullptr) {
-    for (auto& output :
-         *(response.mutable_infer_response()->mutable_outputs())) {
-      const int64_t* shape;
-      uint64_t dim_count;
-      const char* datatype;
-      err = TRITONSERVER_InferenceResponseOutputShape(
-          iresponse, output.name().c_str(), &shape, &dim_count);
-      if (err == nullptr) {
-        err = TRITONSERVER_InferenceResponseOutputDataType(
-            iresponse, output.name().c_str(), &datatype);
-      }
-      if (err != nullptr) {
-        break;
-      }
-
-      for (size_t idx = 0; idx < dim_count; idx++) {
-        output.add_shape(shape[idx]);
-      }
-      output.set_datatype(datatype);
-
-      // Check if the output is classification results
-      // (no raw_contents and not using shared memory)
-      if (output.contents().raw_contents().size() == 0) {
-        if ((state->alloc_payload_.shm_map_ == nullptr) ||
-            (state->alloc_payload_.shm_map_->find(output.name()) ==
-             state->alloc_payload_.shm_map_->end())) {
-          size_t element_cnt = shape[0] * shape[1];
-          const char* base;
-          size_t byte_size;
-          TRITONSERVER_Memory_Type mem_type;
-          int64_t mem_id;
-          err = TRITONSERVER_InferenceResponseOutputData(
-              iresponse, output.name().c_str(), (const void**)&base, &byte_size,
-              &mem_type, &mem_id);
-          if (err != nullptr) {
-            break;
-          }
-          size_t offset = 0;
-          for (size_t idx = 0; idx < element_cnt; idx++) {
-            size_t length = *(reinterpret_cast<const uint32_t*>(base + offset));
-            offset += sizeof(uint32_t);
-            output.mutable_contents()->add_byte_contents(base + offset, length);
-            offset += length;
-          }
-        }
-      }
-    }
-  }
-
-  if ((err == nullptr) && (response.ByteSizeLong() > INT_MAX)) {
-    err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "Response has byte size " +
-            std::to_string(response.ByteSizeLong()) +
-            " which exceeds gRPC's byte size limit " + std::to_string(INT_MAX) +
-            ".")
-            .c_str());
-  }
-
+  ModelInferResponse& response = *(state->response_.mutable_infer_response());
+  TRITONSERVER_Error* err =
+      InferResponseCompleteCommon(iresponse, response, state->alloc_payload_);
 
   if (err != nullptr) {
-    response.mutable_infer_response()->Clear();
+    grpc::Status status;
+    GrpcStatusUtil::Create(&status, err);
+    state->response_.Clear();
+    state->response_.set_error_message(status.error_message());
   }
 
-  grpc::Status status;
-  GrpcStatusUtil::Create(&status, err);
-
-  if (err != nullptr) {
-    response.set_error_message(status.error_message());
-  }
   TRITONSERVER_ErrorDelete(err);
 
-  // Don't need to explicitly delete 'trace_manager'. It will be deleted by
-  // the TraceMetaData object in 'state'.
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceResponseDelete(iresponse),
       "deleting GRPC inference response");
+
+  // FIXME
+  // Don't need to explicitly delete 'trace_manager'. It will be deleted by
+  // the TraceMetaData object in 'state'.
 
   state->step_ = Steps::WRITEREADY;
   state->context_->WriteResponseIfReady(state);
