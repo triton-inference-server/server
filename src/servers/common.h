@@ -26,6 +26,7 @@
 #pragma once
 
 #include <iostream>
+#include <string>
 #include "src/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -67,5 +68,15 @@ namespace nvidia { namespace inferenceserver {
     }                                                                      \
   } while (false)
 #endif  // TRTIS_ENABLE_GPU
+
+/// Get the integral version from a string, or fail if string does not
+/// represent a valid version.
+///
+/// \param version_string The string version.
+/// \param version Returns the integral version.
+/// \return The error status. Failure if 'version_string' doesn't
+/// convert to valid version.
+TRITONSERVER_Error* GetModelVersionFromString(
+    const std::string& version_string, int64_t* version);
 
 }}  // namespace nvidia::inferenceserver
