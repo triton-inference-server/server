@@ -370,35 +370,6 @@ ValidateIOShape(
 }  // namespace
 
 Status
-GetModelVersionFromString(const std::string& version_string, int64_t* version)
-{
-  if (version_string.empty()) {
-    *version = -1;
-    return Status::Success;
-  }
-
-  try {
-    *version = std::stol(version_string);
-  }
-  catch (std::exception& e) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "failed to get model version from specified version string '" +
-            version_string + "' (details: " + e.what() +
-            "), version should be an integral value > 0");
-  }
-
-  if (*version < 0) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "invalid model version specified '" + version_string +
-            "' , version should be an integral value > 0");
-  }
-
-  return Status::Success;
-}
-
-Status
 GetModelVersionFromPath(const std::string& path, int64_t* version)
 {
   auto version_dir = BaseName(path);
