@@ -58,7 +58,7 @@ def _range_repr_dtype(dtype):
 def _prepend_string_size(input_values):
     input_list = []
     for input_value in input_values:
-        input_list.append(serialize_string_tensor(input_value))
+        input_list.append(serialize_byte_tensor(input_value))
     return input_list
 
 # Perform inference using an "addsum" type verification backend.
@@ -74,13 +74,13 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
-        configs.append(("localhost:8000", ProtocolType.HTTP, False, True))
+        configs.append(("localhost:8000", "http", False, True))
     if use_http:
-        configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
+        configs.append(("localhost:8000", "http", False, False))
     if use_grpc:
-        configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
+        configs.append(("localhost:8001", "grpc", False, False))
     if use_streaming:
-        configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
+        configs.append(("localhost:8001", "grpc", True, False))
 
     # outputs are sum and difference of inputs so set max input
     # values so that they will not overflow the output. This
@@ -188,10 +188,18 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
     for config in configs:
         model_name = tu.get_model_name(pf, input_dtype, output0_dtype, output1_dtype)
         
-        if config[1] == ProtocolType.HTTP:
+        if config[1] == "http":
             triton_client = httpclient.InferenceServerClient(config[0])
         else:
             triton_client = grpcclient.InferenceServerClient(config[0])
+
+        if not (use_cuda_shared_memory or use_system_shared_memory):
+            if config[1] == "http":
+                inputs[0].set_data_from_numpy(input0_list, binary_data=config[3])
+                inputs[1].set_data_from_numpy(input1_list, binary_data=config[3])
+            else:
+                inputs[0].set_data_from_numpy(input0_list)
+                inputs[1].set_data_from_numpy(input1_list)
 
         expected0_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected0_val_list ]
         expected1_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected1_val_list ]
@@ -200,7 +208,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         i=0
         if "OUTPUT0" in outputs:
             if len(shm_regions) != 0:
-                if config[1] == ProtocolType.HTTP:
+                if config[1] == "http":
                     output_req.append(httpclient.InferOutput(OUTPUT0, binary_data=config[3]))
                 else:
                     output_req.append(grpcclient.InferOutput(OUTPUT0))
@@ -212,12 +220,12 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                         precreated_shm_regions[0], output0_byte_size)
             else:
                 if output0_raw:
-                    if config[1] == ProtocolType.HTTP:
+                    if config[1] == "http":
                         outputs.append(httpclient.InferOutput(OUTPUT0, binary_data=config[3]))
                     else:
                         outputs.append(grpcclient.InferOutput(OUTPUT0))
                 else:
-                    if config[1] == ProtocolType.HTTP:
+                    if config[1] == "http":
                         output_req.append(httpclient.InferOutput(
                             OUTPUT0, binary_data=config[3], class_count=num_classes))
                     else:
@@ -225,7 +233,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             i+=1
         if "OUTPUT1" in outputs:
             if len(shm_regions) != 0:
-                if config[1] == ProtocolType.HTTP:
+                if config[1] == "http":
                     output_req.append(httpclient.InferOutput(OUTPUT1, binary_data=config[3]))
                 else:
                     output_req.append(grpcclient.InferOutput(OUTPUT1))
@@ -237,12 +245,12 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                         precreated_shm_regions[i], output1_byte_size)
             else:
                 if output1_raw:
-                    if config[1] == ProtocolType.HTTP:
+                    if config[1] == "http":
                         output_req.append(httpclient.InferOutput(OUTPUT1, binary_data=config[3]))
                     else:
                         output_req.append(grpcclient.InferOutput(OUTPUT1))
                 else:
-                    if config[1] == ProtocolType.HTTP:
+                    if config[1] == "http":
                         output_req.append(httpclient.InferOutput(
                             OUTPUT1, binary_data=config[3], class_count=num_classes))
                     else:
@@ -250,47 +258,55 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                             OUTPUT1, class_count=num_classes))
 
         if config[2]:
-            results = triton_client.async_stream_infer(model_name,
-                                             inputs,
-                                             model_version=model_version,
-                                             stream=stream,
-                                             outputs=output_req)
+            # TODO fix for streaming case
+            continue
+            # results = triton_client.async_stream_infer(model_name,
+            #                                  inputs,
+            #                                  model_version=model_version,
+            #                                  stream=stream,
+            #                                  outputs=output_req)
         else:
             results = triton_client.infer(model_name,
                                 inputs,
                                 model_version=model_version,
                                 outputs=output_req)
 
+        if config[1] == "http":
+            last_response = results.get_response(as_json=True)
+        else:
+            last_response = results.get_response()
+
         if not skip_request_id_check:
             global _seen_request_ids
-            request_id = ctx.get_last_request_id()
+            request_id = last_response["id"]
             tester.assertFalse(request_id in _seen_request_ids,
                                "request_id: {}".format(request_id))
             _seen_request_ids.add(request_id)
 
-        tester.assertEqual(ctx.get_last_request_model_name(), model_name)
+        tester.assertEqual(last_response["model_name"], model_name)
         if model_version is not None:
-            tester.assertEqual(ctx.get_last_request_model_version(), model_version)
+            tester.assertEqual(last_response["model_version"], model_version)
 
         tester.assertEqual(len(results), len(outputs))
-        for (result_name, result_val) in iteritems(results):
+        for result in last_response["outputs"]:
+            result_name = result["name"]
             for b in range(batch_size):
                 if ((result_name == OUTPUT0 and output0_raw) or
                     (result_name == OUTPUT1 and output1_raw)):
                     if result_name == OUTPUT0:
-                        tester.assertTrue(np.array_equal(result_val[b], expected0_list[b]),
+                        tester.assertTrue(np.array_equal(results.as_numpy(OUTPUT0)[b], expected0_list[b]),
                                         "{}, {} expected: {}, got {}".format(
-                                            model_name, OUTPUT0, expected0_list[b], result_val[b]))
+                                        model_name, OUTPUT0, expected0_list[b], results.as_numpy(OUTPUT0)[b]))
                     elif result_name == OUTPUT1:
-                        tester.assertTrue(np.array_equal(result_val[b], expected1_list[b]),
+                        tester.assertTrue(np.array_equal(results.as_numpy(OUTPUT1)[b], expected1_list[b]),
                                         "{}, {} expected: {}, got {}".format(
-                                            model_name, OUTPUT1, expected1_list[b], result_val[b]))
+                                        model_name, OUTPUT1, expected1_list[b], results.as_numpy(OUTPUT1)[b]))
                     else:
                         tester.assertTrue(False, "unexpected raw result {}".format(result_name))
                 else:
                     # num_classes values must be returned and must
                     # match expected top values
-                    class_list = result_val[b]
+                    class_list = results.as_numpy(result_name)[b]
                     tester.assertEqual(len(class_list), num_classes)
 
                     expected0_flatten = expected0_list[b].flatten()
