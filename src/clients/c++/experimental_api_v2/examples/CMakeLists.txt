@@ -156,6 +156,19 @@ else()
     )
 
     #
+    # simple_http_v2_model_control
+    #
+    add_executable(simple_http_v2_model_control simple_http_v2_model_control.cc)
+    target_link_libraries(
+      simple_http_v2_model_control
+      PRIVATE TRTIS::httpclient_static
+    )
+    install(
+      TARGETS simple_http_v2_model_control
+      RUNTIME DESTINATION bin
+    )
+
+    #
     # simple_http_v2_infer_client
     #
     add_executable(simple_http_v2_infer_client simple_http_v2_infer_client.cc)
@@ -180,6 +193,53 @@ else()
       TARGETS simple_http_v2_async_infer_client
       RUNTIME DESTINATION bin
     )
+
+    #
+    # simple_http_v2_shm_client
+    #
+    set(
+      SIMPLE_HTTP_SHM_SRCS
+      simple_http_v2_shm_client.cc
+      shm_utils.cc
+    )
+    set(
+      SIMPLE_HTTP_SHM_HDRS
+      shm_utils.h
+    )
+    add_executable(simple_http_v2_shm_client ${SIMPLE_HTTP_SHM_SRCS} ${SIMPLE_HTTP_SHM_HDRS})
+    target_link_libraries(
+      simple_http_v2_shm_client
+      PRIVATE TRTIS::httpclient_static
+    )
+    install(
+      TARGETS simple_http_v2_shm_client
+      RUNTIME DESTINATION bin
+    )
+
+    if(${TRTIS_ENABLE_GPU})
+      #
+      # simple_http_v2_cudashm_client
+      #
+      set(
+        SIMPLE_HTTP_CUDA_SHM_SRCS
+        simple_http_v2_cudashm_client.cc
+      )
+      set(
+        SIMPLE_HTTP_CUDA_SHM_HDRS
+      )
+      add_executable(simple_http_v2_cudashm_client ${SIMPLE_HTTP_CUDA_SHM_SRCS} ${SIMPLE_HTTP_CUDA_SHM_HDRS})
+      target_include_directories(simple_http_v2_cudashm_client PRIVATE ${CUDA_INCLUDE_DIRS})
+      target_link_libraries(
+        simple_http_v2_cudashm_client
+        PRIVATE TRTIS::httpclient_static
+        PRIVATE ${CUDA_LIBRARIES}
+        PRIVATE -lb64
+      )
+      install(
+        TARGETS simple_http_v2_cudashm_client
+        RUNTIME DESTINATION bin
+      )
+    endif() # TRTIS_ENABLE_GPU
   
   endif()  # TRTIS_ENABLE_HTTP_V2
 endif() # WIN32

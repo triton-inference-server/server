@@ -1387,9 +1387,9 @@ HTTPAPIServerV2::HandleCudaSharedMemory(
                   base64_decodestate s;
                   base64_init_decodestate(&s);
                   std::vector<char> raw_handle(sizeof(cudaIpcMemHandle_t));
-                  size_t decoed_size = base64_decode_block(
+                  size_t decoded_size = base64_decode_block(
                       b64_handle, strlen(b64_handle), raw_handle.data(), &s);
-                  if (decoed_size != sizeof(cudaIpcMemHandle_t)) {
+                  if (decoded_size != sizeof(cudaIpcMemHandle_t)) {
                     err = TRITONSERVER_ErrorNew(
                         TRITONSERVER_ERROR_INVALID_ARG,
                         "'raw_handle' must be a valid base64 encoded "
