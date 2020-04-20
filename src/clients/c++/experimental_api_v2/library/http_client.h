@@ -116,9 +116,10 @@ class InferenceServerHttpClient : public InferenceServerClient {
       const Parameters& query_params = Parameters());
 
   /// Contact the inference server and get its metadata.
-  /// \param server_metadata Returns the server metadata as JSON DOM object.
-  /// \param headers Optional map specifying additional HTTP headers to include
-  /// in request.
+  /// \param server_metadata Returns the server metadata as rapidJSON DOM
+  /// object.
+  /// \param headers Optional map specifying additional HTTP headers to
+  /// include in request.
   /// \param query_params Optional map specifying parameters that must be
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
@@ -127,7 +128,7 @@ class InferenceServerHttpClient : public InferenceServerClient {
       const Parameters& query_params = Parameters());
 
   /// Contact the inference server and get the metadata of specified model.
-  /// \param model_metadata Returns model metadata as JSON DOM object.
+  /// \param model_metadata Returns model metadata as rapidJSON DOM object.
   /// \param model_name The name of the model to get metadata.
   /// \param model_version The version of the model to get metadata.
   /// The default value is an empty string which means then the server will
@@ -143,7 +144,7 @@ class InferenceServerHttpClient : public InferenceServerClient {
       const Parameters& query_params = Parameters());
 
   /// Contact the inference server and get the configuration of specified model.
-  /// \param model_config Returns model config as JSON DOM object.
+  /// \param model_config Returns model config as rapidJSON DOM object.
   /// \param model_name The name of the model to get configuration.
   /// \param model_version The version of the model to get configuration.
   /// The default value is an empty string which means then the server will
@@ -160,8 +161,8 @@ class InferenceServerHttpClient : public InferenceServerClient {
 
   /// Contact the inference server and get the index of model repository
   /// contents.
-  /// \param repository_index Returns the repository index as
-  /// RepositoryIndexRequestResponse
+  /// \param repository_index Returns the repository index as rapidJSON DOM
+  /// object.
   /// \param headers Optional map specifying additional HTTP headers to include
   /// in request.
   /// \param query_params Optional map specifying parameters that must be
@@ -195,8 +196,8 @@ class InferenceServerHttpClient : public InferenceServerClient {
 
   /// Contact the inference server and get the inference statistics for the
   /// specified model name and version.
-  /// \param infer_stat The inference statistics of requested model name and
-  /// version.
+  /// \param infer_stat Returns the inference statistics of requested model name
+  /// and version as rapidJSON DOM object.
   /// \param model_name The name of the model to get inference statistics.
   /// \param model_version The version of the model to get inference statistics.
   /// The default value is an empty string which means then the server will
@@ -213,8 +214,8 @@ class InferenceServerHttpClient : public InferenceServerClient {
 
   /// Contact the inference server and get the status for requested system
   /// shared memory.
-  /// \param status The system shared memory status as
-  /// SystemSharedMemoryStatusResponse
+  /// \param status Returns the system shared memory status as rapidJSON DOM
+  /// object.
   /// \param region_name The name of the region to query status. The default
   /// value is an empty string, which means that the status of all active system
   /// shared memory will be returned.
@@ -262,8 +263,8 @@ class InferenceServerHttpClient : public InferenceServerClient {
 
   /// Contact the inference server and get the status for requested CUDA
   /// shared memory.
-  /// \param status The CUDA shared memory status as
-  /// CudaSharedMemoryStatusResponse
+  /// \param status Returns the CUDA shared memory status as rapidJSON DOM
+  /// object.
   /// \param region_name The name of the region to query status. The default
   /// value is an empty string, which means that the status of all active CUDA
   /// shared memory will be returned.
