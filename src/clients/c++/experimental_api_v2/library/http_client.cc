@@ -31,6 +31,10 @@
 #include <iostream>
 #include <queue>
 
+extern "C" {
+#include <b64/cencode.h>
+}
+
 namespace nvidia { namespace inferenceserver { namespace client {
 
 namespace {
@@ -80,6 +84,17 @@ GetQueryString(const Headers& query_params)
     query_string += pr.first + "=" + pr.second;
   }
   return query_string;
+}
+
+void
+Base64Encode(char* raw_ptr, size_t raw_size, char** encoded_ptr)
+{
+  // Encode the handle object to base64
+  base64_encodestate es;
+  base64_init_encodestate(&es);
+  *encoded_ptr = (char*)malloc(raw_size * 2); /* ~4/3 x raw_size */
+  int offset = base64_encode_block(raw_ptr, raw_size, *encoded_ptr, &es);
+  base64_encode_blockend(*encoded_ptr + offset, &es);
 }
 
 }  // namespace
@@ -566,6 +581,262 @@ InferenceServerHttpClient::ModelConfig(
 
   long http_code;
   err = Get(request_uri, headers, query_params, model_config, &http_code);
+  if ((http_code != 200) && err.IsOk()) {
+    return Error(
+        "[INTERNAL] Request failed with missing error message in response");
+  }
+  return err;
+}
+
+
+Error
+InferenceServerHttpClient::ModelRepositoryIndex(
+    rapidjson::Document* repository_index, const Headers& headers,
+    const Parameters& query_params)
+{
+  Error err;
+  std::string request_uri(url_ + "/v2/repository/index");
+
+  long http_code;
+  err = Get(request_uri, headers, query_params, repository_index, &http_code);
+  if ((http_code != 200) && err.IsOk()) {
+    return Error(
+        "[INTERNAL] Request failed with missing error message in response");
+  }
+  return err;
+}
+
+Error
+InferenceServerHttpClient::LoadModel(
+    const std::string& model_name, const Headers& headers,
+    const Parameters& query_params)
+{
+  Error err;
+
+  std::string request_uri(
+      url_ + "/v2/repository/model/" + model_name + "/load");
+
+  rapidjson::Document request(rapidjson::kObjectType);
+  rapidjson::Document response(rapidjson::kObjectType);
+  long http_code;
+  err =
+      Post(request_uri, request, headers, query_params, &response, &http_code);
+  if ((http_code != 200) && err.IsOk()) {
+    return Error(
+        "[INTERNAL] Request failed with missing error message in response");
+  }
+  return err;
+}
+
+Error
+InferenceServerHttpClient::UnloadModel(
+    const std::string& model_name, const Headers& headers,
+    const Parameters& query_params)
+{
+  Error err;
+
+  std::string request_uri(
+      url_ + "/v2/repository/model/" + model_name + "/unload");
+
+  rapidjson::Document request(rapidjson::kObjectType);
+  rapidjson::Document response(rapidjson::kObjectType);
+  long http_code;
+  err =
+      Post(request_uri, request, headers, query_params, &response, &http_code);
+  if ((http_code != 200) && err.IsOk()) {
+    return Error(
+        "[INTERNAL] Request failed with missing error message in response");
+  }
+  return err;
+}
+
+
+Error
+InferenceServerHttpClient::ModelInferenceStatistics(
+    rapidjson::Document* infer_stat, const std::string& model_name,
+    const std::string& model_version, const Headers& headers,
+    const Parameters& query_params)
+{
+  Error err;
+
+  std::string request_uri(url_ + "/v2/models/" + model_name);
+  if (!model_version.empty()) {
+    request_uri = request_uri + "/versions/" + model_version;
+  }
+  request_uri = request_uri + "/stats";
+
+  long http_code;
+  err = Get(request_uri, headers, query_params, infer_stat, &http_code);
+  if ((http_code != 200) && err.IsOk()) {
+    return Error(
+        "[INTERNAL] Request failed with missing error message in response");
+  }
+  return err;
+}
+
+Error
+InferenceServerHttpClient::SystemSharedMemoryStatus(
+    rapidjson::Document* status, const std::string& name,
+    const Headers& headers, const Parameters& query_params)
+{
+  Error err;
+
+  std::string request_uri(url_ + "/v2/systemsharedmemory");
+  if (!name.empty()) {
+    request_uri = request_uri + "/region/" + name;
+  }
+  request_uri = request_uri + "/status";
+
+  long http_code;
+  err = Get(request_uri, headers, query_params, status, &http_code);
+  if ((http_code != 200) && err.IsOk()) {
+    return Error(
+        "[INTERNAL] Request failed with missing error message in response");
+  }
+  return err;
+}
+
+Error
+InferenceServerHttpClient::RegisterSystemSharedMemory(
+    const std::string& name, const std::string& key, const size_t byte_size,
+    const size_t offset, const Headers& headers, const Parameters& query_params)
+{
+  Error err;
+
+  std::string request_uri(
+      url_ + "/v2/systemsharedmemory/region/" + name + "/register");
+
+  rapidjson::Document request(rapidjson::kObjectType);
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  {
+    rapidjson::Value key_json(key.c_str(), allocator);
+    request.AddMember("key", key_json, allocator);
+    rapidjson::Value offset_json(offset);
+    request.AddMember("offet", offset_json, allocator);
+    rapidjson::Value byte_size_json(byte_size);
+    request.AddMember("byte_size", byte_size_json, allocator);
+  }
+  rapidjson::Document response(rapidjson::kObjectType);
+
+  long http_code;
+  err =
+      Post(request_uri, request, headers, query_params, &response, &http_code);
+  if ((http_code != 200) && err.IsOk()) {
+    return Error(
+        "[INTERNAL] Request failed with missing error message in response");
+  }
+  return err;
+}
+
+Error
+InferenceServerHttpClient::UnregisterSystemSharedMemory(
+    const std::string& region_name, const Headers& headers,
+    const Parameters& query_params)
+{
+  Error err;
+
+  std::string request_uri(url_ + "/v2/systemsharedmemory");
+  if (!region_name.empty()) {
+    request_uri = request_uri + "/region/" + region_name;
+  }
+  request_uri = request_uri + "/unregister";
+
+  rapidjson::Document request(rapidjson::kObjectType);
+  rapidjson::Document response(rapidjson::kObjectType);
+  long http_code;
+  err =
+      Post(request_uri, request, headers, query_params, &response, &http_code);
+  if ((http_code != 200) && err.IsOk()) {
+    return Error(
+        "[INTERNAL] Request failed with missing error message in response");
+  }
+  return err;
+}
+
+Error
+InferenceServerHttpClient::CudaSharedMemoryStatus(
+    rapidjson::Document* status, const std::string& region_name,
+    const Headers& headers, const Parameters& query_params)
+{
+  Error err;
+
+  std::string request_uri(url_ + "/v2/cudasharedmemory");
+  if (!region_name.empty()) {
+    request_uri = request_uri + "/region/" + region_name;
+  }
+  request_uri = request_uri + "/status";
+
+  long http_code;
+  err = Get(request_uri, headers, query_params, status, &http_code);
+  if ((http_code != 200) && err.IsOk()) {
+    return Error(
+        "[INTERNAL] Request failed with missing error message in response");
+  }
+  return err;
+}
+
+Error
+InferenceServerHttpClient::RegisterCudaSharedMemory(
+    const std::string& name, const cudaIpcMemHandle_t& raw_handle,
+    const size_t device_id, const size_t byte_size, const Headers& headers,
+    const Parameters& query_params)
+{
+  Error err;
+
+  std::string request_uri(
+      url_ + "/v2/cudasharedmemory/region/" + name + "/register");
+
+  rapidjson::Document request(rapidjson::kObjectType);
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  {
+    rapidjson::Value raw_handle_json(rapidjson::kObjectType);
+    {
+      char* encoded_handle = nullptr;
+      Base64Encode(
+          (char*)((void*)&raw_handle), sizeof(cudaIpcMemHandle_t),
+          &encoded_handle);
+      if (encoded_handle == nullptr) {
+        return Error("Failed to base64 encode the cudaIpcMemHandle_t");
+      }
+      rapidjson::Value b64_json(encoded_handle, allocator);
+      delete encoded_handle;
+      raw_handle_json.AddMember("b64", b64_json, allocator);
+    }
+    request.AddMember("raw_handle", raw_handle_json, allocator);
+    rapidjson::Value device_id_json(device_id);
+    request.AddMember("device_id", device_id_json, allocator);
+    rapidjson::Value byte_size_json(byte_size);
+    request.AddMember("byte_size", byte_size_json, allocator);
+  }
+  rapidjson::Document response(rapidjson::kObjectType);
+  long http_code;
+  err =
+      Post(request_uri, request, headers, query_params, &response, &http_code);
+  if ((http_code != 200) && err.IsOk()) {
+    return Error(
+        "[INTERNAL] Request failed with missing error message in response");
+  }
+  return err;
+}
+
+Error
+InferenceServerHttpClient::UnregisterCudaSharedMemory(
+    const std::string& name, const Headers& headers,
+    const Parameters& query_params)
+{
+  Error err;
+
+  std::string request_uri(url_ + "/v2/cudasharedmemory");
+  if (!name.empty()) {
+    request_uri = request_uri + "/region/" + name;
+  }
+  request_uri = request_uri + "/unregister";
+
+  rapidjson::Document request(rapidjson::kObjectType);
+  rapidjson::Document response(rapidjson::kObjectType);
+  long http_code;
+  err =
+      Post(request_uri, request, headers, query_params, &response, &http_code);
   if ((http_code != 200) && err.IsOk()) {
     return Error(
         "[INTERNAL] Request failed with missing error message in response");
@@ -1060,6 +1331,17 @@ InferenceServerHttpClient::AsyncTransfer()
   } while (!exiting_);
 }
 
+size_t
+InferenceServerHttpClient::ResponseHandler(
+    void* contents, size_t size, size_t nmemb, void* userp)
+{
+  std::string* response_string = reinterpret_cast<std::string*>(userp);
+  uint8_t* buf = reinterpret_cast<uint8_t*>(contents);
+  size_t result_bytes = size * nmemb;
+  std::copy(buf, buf + result_bytes, std::back_inserter(*response_string));
+  return result_bytes;
+}
+
 Error
 InferenceServerHttpClient::Get(
     std::string& request_uri, const Headers& headers,
@@ -1122,28 +1404,104 @@ InferenceServerHttpClient::Get(
           std::string(GetParseError_En(response->GetParseError())) + " at " +
           std::to_string(response->GetErrorOffset()));
     }
+
     if (verbose_) {
       std::cout << GetJsonText(*response) << std::endl;
     }
 
-    const auto& itr = response->FindMember("error");
-    if (itr != response->MemberEnd()) {
-      return Error(itr->value.GetString());
+    if (response->IsObject()) {
+      const auto& itr = response->FindMember("error");
+      if (itr != response->MemberEnd()) {
+        return Error(itr->value.GetString());
+      }
     }
   }
 
   return Error::Success;
 }
 
-size_t
-InferenceServerHttpClient::ResponseHandler(
-    void* contents, size_t size, size_t nmemb, void* userp)
+Error
+InferenceServerHttpClient::Post(
+    std::string& request_uri, const rapidjson::Document& request,
+    const Headers& headers, const Parameters& query_params,
+    rapidjson::Document* response, long* http_code)
 {
-  std::string* response_string = reinterpret_cast<std::string*>(userp);
-  uint8_t* buf = reinterpret_cast<uint8_t*>(contents);
-  size_t result_bytes = size * nmemb;
-  std::copy(buf, buf + result_bytes, std::back_inserter(*response_string));
-  return result_bytes;
+  if (!query_params.empty()) {
+    request_uri = request_uri + "?" + GetQueryString(query_params);
+  }
+
+  if (!curl_global.Status().IsOk()) {
+    return curl_global.Status();
+  }
+
+  CURL* curl = curl_easy_init();
+  if (!curl) {
+    return Error("failed to initialize HTTP client");
+  }
+
+  // Prepare the string buffer with the request object
+  rapidjson::StringBuffer request_data;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(request_data);
+  request.Accept(writer);
+
+  curl_easy_setopt(curl, CURLOPT_URL, request_uri.c_str());
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, request_data.GetSize());
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request_data.GetString());
+  if (verbose_) {
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  }
+
+  // Response data handled by ResponseHandler()
+  std::string response_string;
+  response_string.reserve(256);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ResponseHandler);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_string);
+
+  // Add user provided headers...
+  struct curl_slist* header_list = nullptr;
+  for (const auto& pr : headers) {
+    std::string hdr = pr.first + ": " + pr.second;
+    header_list = curl_slist_append(header_list, hdr.c_str());
+  }
+
+  if (header_list != nullptr) {
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_list);
+  }
+
+  CURLcode res = curl_easy_perform(curl);
+  if (res != CURLE_OK) {
+    curl_slist_free_all(header_list);
+    curl_easy_cleanup(curl);
+    return Error("HTTP client failed: " + std::string(curl_easy_strerror(res)));
+  }
+
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, http_code);
+
+  curl_slist_free_all(header_list);
+  curl_easy_cleanup(curl);
+
+  if (!response_string.empty()) {
+    response->Parse(response_string.c_str(), response_string.size());
+    if (response->HasParseError()) {
+      return Error(
+          "failed to parse the request JSON buffer: " +
+          std::string(GetParseError_En(response->GetParseError())) + " at " +
+          std::to_string(response->GetErrorOffset()));
+    }
+    if (verbose_) {
+      std::cout << GetJsonText(*response) << std::endl;
+    }
+
+    if (response->IsObject()) {
+      const auto& itr = response->FindMember("error");
+      if (itr != response->MemberEnd()) {
+        return Error(itr->value.GetString());
+      }
+    }
+  }
+
+  return Error::Success;
 }
 
 //==============================================================================

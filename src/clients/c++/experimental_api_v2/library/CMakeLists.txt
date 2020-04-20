@@ -197,6 +197,7 @@ if(${TRTIS_ENABLE_HTTP_V2})
   target_link_libraries(
     httpclient_static
     PRIVATE CURL::libcurl
+    PRIVATE -lb64
     PUBLIC Threads::Threads
   )
 
@@ -229,6 +230,7 @@ if(${TRTIS_ENABLE_HTTP_V2})
   target_link_libraries(
     httpclient
     PRIVATE CURL::libcurl
+    PRIVATE -lb64
     PUBLIC Threads::Threads
   )
 
