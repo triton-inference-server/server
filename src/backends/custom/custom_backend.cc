@@ -715,7 +715,7 @@ CustomBackend::Context::GetOutput(
     // Ignore error caused by CPU-only system.
     if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
         (cuerr != cudaErrorInsufficientDriver)) {
-      if (LOG_VERBOSE_IS_ON(1) {
+      if (LOG_VERBOSE_IS_ON(1)) {
         status = Status(
             Status::Code::INTERNAL, "unable to get current CUDA device: " +
                                         std::string(cudaGetErrorString(cuerr)));
