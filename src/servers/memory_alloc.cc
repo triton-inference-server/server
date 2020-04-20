@@ -89,9 +89,6 @@ ResponseAlloc(
     void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
-  // Pass the tensor name with buffer_userp so we can show it when
-  // releasing the buffer.
-
   // If 'byte_size' is zero just return 'buffer'==nullptr, we don't
   // need to do any other book-keeping.
   if (byte_size == 0) {
@@ -128,6 +125,8 @@ ResponseAlloc(
               .c_str());
     }
 
+    // Pass the tensor name with buffer_userp so we can show it when
+    // releasing the buffer.
     *buffer = allocated_ptr;
     *buffer_userp = new std::string(tensor_name);
     std::cout << "allocated " << byte_size << " bytes in "
