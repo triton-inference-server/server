@@ -97,15 +97,12 @@ ResponseAlloc(
     void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
-  // Pass the tensor name with buffer_userp so we can show it when
-  // releasing the buffer.
-
-  // Unless necessary, the actual memory type and id is the same as preferred
-  // memory type
+  // Initially attempt to make the actual memory type and id that we
+  // allocate be the same as preferred memory type
   *actual_memory_type = preferred_memory_type;
-  *actual_memory_type_id = 0;
+  *actual_memory_type_id = preferred_memory_type_id;
 
-  // If 'byte_size' is zero just return 'buffer'==nullptr, we don't
+  // If 'byte_size' is zero just return 'buffer' == nullptr, we don't
   // need to do any other book-keeping.
   if (byte_size == 0) {
     *buffer = nullptr;
@@ -117,6 +114,7 @@ ResponseAlloc(
     if (enforce_memory_type) {
       *actual_memory_type = requested_memory_type;
     }
+
     switch (*actual_memory_type) {
 #ifdef TRTIS_ENABLE_GPU
       case TRITONSERVER_MEMORY_CPU_PINNED: {
@@ -142,6 +140,7 @@ ResponseAlloc(
         }
         break;
       }
+
       case TRITONSERVER_MEMORY_GPU: {
         auto err = cudaSetDevice(*actual_memory_type_id);
         if ((err != cudaSuccess) && (err != cudaErrorNoDevice) &&
@@ -165,7 +164,9 @@ ResponseAlloc(
         break;
       }
 #endif  // TRTIS_ENABLE_GPU
-      // Fallback if unknown type.
+
+      // Use CPU memory if the requested memory type is unknown
+      // (default case).
       case TRITONSERVER_MEMORY_CPU:
       default: {
         *actual_memory_type = TRITONSERVER_MEMORY_CPU;
@@ -174,6 +175,8 @@ ResponseAlloc(
       }
     }
 
+    // Pass the tensor name with buffer_userp so we can show it when
+    // releasing the buffer.
     if (allocated_ptr != nullptr) {
       *buffer = allocated_ptr;
       *buffer_userp = new std::string(tensor_name);
