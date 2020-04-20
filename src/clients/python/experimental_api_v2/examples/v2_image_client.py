@@ -162,7 +162,7 @@ def parse_model_http(model_metadata, model_config):
         w = input_metadata['shape'][2]
 
     return (input_metadata['name'], output_metadata['name'], c, h, w,
-            "FORMAT_NHWC", input_metadata['datatype'])
+            input_config['format'], input_metadata['datatype'])
 
 def preprocess(img, format, dtype, c, h, w, scaling):
     """
