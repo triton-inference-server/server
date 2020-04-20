@@ -40,6 +40,11 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 
+# S3 credentials are necessary for this test. Pass via ENV variables
+aws configure set default.region us-west-1 && \
+    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+
 # S3 bucket path (Point to bucket when testing cloud storage)
 BUCKET_URL="s3://triton-bucket-${CI_PIPELINE_ID}"
 
