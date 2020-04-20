@@ -189,17 +189,14 @@ operator<<(std::ostream& out, const Steps& step)
 // AllocPayload
 //
 // Simple structure that carries the userp payload needed for
-// allocation. These are just pointers into a HandlerState
-// object. HandlerState lifetime is always longer than what is
-// required for allocation callback so HandlerState manages the
-// lifetime of the actual objects referenced by those pointers.
+// allocation.
 //
 struct AllocPayload {
   struct ShmInfo {
     void* base_;
     size_t byte_size_;
     TRITONSERVER_MemoryType memory_type_;
-    int64_t device_id_;
+    int64_t memory_type_id_;
   };
 
   using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
@@ -1753,7 +1750,8 @@ InferResponseAlloc(
   *actual_memory_type = preferred_memory_type;
   *actual_memory_type_id = preferred_memory_type_id;
 
-  // Called once for each result tensor in the inference request.
+  // We add an output contents even if the 'byte_size' == 0 because we
+  // expect to have a contents for every output.
   ModelInferResponse::InferOutputTensor* output_tensor =
       response->add_outputs();
   output_tensor->set_name(tensor_name);
@@ -1761,13 +1759,11 @@ InferResponseAlloc(
       output_tensor->mutable_contents()->mutable_raw_contents();
 
   if (byte_size > 0) {
-    bool use_shm = false;
-
     if (shm_map != nullptr) {
       const auto& pr = shm_map->find(tensor_name);
       if (pr != shm_map->end()) {
-        // If the output is in shared memory then check whether the shared
-        // memory size is at least the byte size of the output.
+        // The output is in shared memory so check that shared memory
+        // size is at least large enough for the output.
         if (byte_size > pr->second.byte_size_) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
@@ -1782,45 +1778,45 @@ InferResponseAlloc(
 
         *buffer = const_cast<void*>(pr->second.base_);
         *actual_memory_type = pr->second.memory_type_;
-        *actual_memory_type_id = pr->second.device_id_;
-        use_shm = true;
+        *actual_memory_type_id = pr->second.memory_type_id_;
 
         LOG_VERBOSE(1) << "GRPC: using shared-memory for '" << tensor_name
                        << "', size: " << byte_size << ", addr: " << *buffer;
+        return nullptr;  // Success
       }
     }
 
-    if (!use_shm) {
-      // Can't allocate for any memory type other than CPU. If asked to
-      // allocate on GPU memory then force allocation on CPU instead.
-      if (*actual_memory_type != TRITONSERVER_MEMORY_CPU) {
-        LOG_VERBOSE(1) << "GRPC: unable to provide '" << tensor_name << "' in "
-                       << TRITONSERVER_MemoryTypeString(*actual_memory_type)
-                       << ", will use "
-                       << TRITONSERVER_MemoryTypeString(
-                              TRITONSERVER_MEMORY_CPU);
-        *actual_memory_type = TRITONSERVER_MEMORY_CPU;
-        *actual_memory_type_id = 0;
-      }
-
-      raw_output->resize(byte_size);
-      *buffer = static_cast<void*>(&((*raw_output)[0]));
-
-      LOG_VERBOSE(1) << "GRPC: using buffer for '" << tensor_name
-                     << "', size: " << byte_size << ", addr: " << *buffer;
+    // Not using shared memory so allocate a buffer. The buffer we
+    // create is directly in the response protobuf so we can't
+    // allocate any type other than CPU.
+    //
+    // FIXME we could use pinned CPU memory here.
+    if (*actual_memory_type != TRITONSERVER_MEMORY_CPU) {
+      LOG_VERBOSE(1) << "GRPC: unable to provide '" << tensor_name << "' in "
+                     << TRITONSERVER_MemoryTypeString(*actual_memory_type)
+                     << ", will use "
+                     << TRITONSERVER_MemoryTypeString(TRITONSERVER_MEMORY_CPU);
+      *actual_memory_type = TRITONSERVER_MEMORY_CPU;
+      *actual_memory_type_id = 0;
     }
+
+    raw_output->resize(byte_size);
+    *buffer = static_cast<void*>(&((*raw_output)[0]));
+
+    LOG_VERBOSE(1) << "GRPC: using buffer for '" << tensor_name
+                   << "', size: " << byte_size << ", addr: " << *buffer;
   }
 
   return nullptr;  // Success
 }
 
 TRITONSERVER_Error*
-InferResponseRelease(
+InferResponseFree(
     TRITONSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
     size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
 {
-  LOG_VERBOSE(1) << "GRPC release: "
+  LOG_VERBOSE(1) << "GRPC free: "
                  << "size " << byte_size << ", addr " << buffer;
 
   // Don't do anything when releasing a buffer since InferResponseAlloc
@@ -2473,7 +2469,7 @@ class ModelInferHandler
     // the result tensors.
     FAIL_IF_ERR(
         TRITONSERVER_ResponseAllocatorNew(
-            &allocator_, InferResponseAlloc, InferResponseRelease),
+            &allocator_, InferResponseAlloc, InferResponseFree),
         "creating inference response allocator");
   }
 
@@ -2729,7 +2725,7 @@ class ModelStreamInferHandler
     // the result tensors.
     FAIL_IF_ERR(
         TRITONSERVER_ResponseAllocatorNew(
-            &allocator_, InferResponseAlloc, InferResponseRelease),
+            &allocator_, InferResponseAlloc, InferResponseFree),
         "creating response allocator");
   }
 
