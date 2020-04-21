@@ -304,16 +304,16 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// Starts a grpc bi-directional stream to send streaming inferences.
   /// \param callback The callback function to be invoked on receiving a
   /// response at the stream.
-  /// \param skip_stats Indicates whether client library should record the
+  /// \param enable_stats Indicates whether client library should record the
   /// the client-side statistics for inference requests on stream or not.
   /// The library currently doesn't support statistics for decoupled
-  /// streaming. Set this option True when there is no 1:1 mapping between
+  /// streaming. Set this option false when there is no 1:1 mapping between
   /// request and response on the stream.
   /// \param headers Optional map specifying additional HTTP headers to
   /// include in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
   Error StartStream(
-      OnCompleteFn callback, bool skip_stats = false,
+      OnCompleteFn callback, bool enable_stats = true,
       const Headers& headers = Headers());
 
   /// Stops an active grpc bi-directional stream, if one available.
@@ -356,7 +356,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
       grpc_stream_;
   grpc::ClientContext grpc_context_;
 
-  bool skip_stream_stats_;
+  bool enable_stream_stats_;
   std::queue<std::unique_ptr<RequestTimers>> ongoing_stream_request_timers_;
   std::mutex stream_mutex_;
 

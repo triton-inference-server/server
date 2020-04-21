@@ -788,7 +788,7 @@ InferenceServerGrpcClient::AsyncInfer(
 
 Error
 InferenceServerGrpcClient::StartStream(
-    OnCompleteFn callback, bool skip_stats, const Headers& headers)
+    OnCompleteFn callback, bool enable_stats, const Headers& headers)
 {
   if (stream_worker_.joinable()) {
     return Error(
@@ -803,7 +803,7 @@ InferenceServerGrpcClient::StartStream(
   }
 
   stream_callback_ = callback;
-  skip_stream_stats_ = skip_stats;
+  enable_stream_stats_ = enable_stats;
 
   for (const auto& it : headers) {
     grpc_context_.AddMetadata(it.first, it.second);
@@ -834,7 +834,7 @@ InferenceServerGrpcClient::AsyncStreamInfer(
     const std::vector<const InferRequestedOutput*>& outputs)
 {
   std::unique_ptr<RequestTimers> timer;
-  if (!skip_stream_stats_) {
+  if (enable_stream_stats_) {
     timer.reset(new RequestTimers());
     timer->CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
     timer->CaptureTimestamp(RequestTimers::Kind::SEND_START);
@@ -845,11 +845,11 @@ InferenceServerGrpcClient::AsyncStreamInfer(
     return err;
   }
 
-  if (!skip_stream_stats_) {
+  if (enable_stream_stats_) {
     timer->CaptureTimestamp(RequestTimers::Kind::SEND_END);
   }
 
-  if (!skip_stream_stats_) {
+  if (enable_stream_stats_) {
     std::lock_guard<std::mutex> lock(stream_mutex_);
     ongoing_stream_request_timers_.push(std::move(timer));
   }
@@ -1034,7 +1034,7 @@ InferenceServerGrpcClient::AsyncStreamTransfer()
     }
 
     std::unique_ptr<RequestTimers> timer;
-    if (!skip_stream_stats_) {
+    if (enable_stream_stats_) {
       std::lock_guard<std::mutex> lock(stream_mutex_);
       if (!ongoing_stream_request_timers_.empty()) {
         timer = std::move(ongoing_stream_request_timers_.front());
