@@ -208,8 +208,10 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             else:
                 inputs[0].set_data_from_numpy(input0_array)
                 inputs[1].set_data_from_numpy(input1_array)
-        # else:
-        # 
+        else:
+            su.set_shm_regions(inputs, shm_region_names, use_system_shared_memory, 
+                               use_cuda_shared_memory, input0_array.nbytes, input1_array.nbytes)
+
         expected0_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected0_val_list ]
         expected1_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected1_val_list ]
 

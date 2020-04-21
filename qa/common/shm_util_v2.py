@@ -122,7 +122,7 @@ def create_register_shm_regions(input0_list, input1_list, output0_byte_size,
                 triton_client.unregister_cuda_shared_memory(
                     shm_region_names[2]+'_data')
                 triton_client.register_cuda_shared_memory(shm_region_names[2]+'_data',
-                                                          '/'+shm_region_names[2], input0_byte_size)
+                                                          '/'+shm_region_names[2], output0_byte_size)
             else:
                 shm_op0_handle = precreated_shm_regions[0]
             i += 1
@@ -133,7 +133,7 @@ def create_register_shm_regions(input0_list, input1_list, output0_byte_size,
                 triton_client.unregister_cuda_shared_memory(
                     shm_region_names[2+i]+'_data')
                 triton_client.register_cuda_shared_memory(shm_region_names[2+i]+'_data',
-                                                          '/'+shm_region_names[2+i], input0_byte_size)
+                                                          '/'+shm_region_names[2+i], output1_byte_size)
             else:
                 shm_op1_handle = precreated_shm_regions[i]
 
