@@ -85,6 +85,9 @@ class InferResultGrpc : public InferResult {
   static Error Create(
       InferResult** infer_result, std::shared_ptr<ModelInferResponse> response,
       Error& request_status);
+  static Error Create(
+      InferResult** infer_result,
+      std::shared_ptr<ModelStreamInferResponse> response);
 
   Error RequestStatus() const override;
   Error ModelName(std::string* name) const override;
@@ -102,10 +105,13 @@ class InferResultGrpc : public InferResult {
  private:
   InferResultGrpc(
       std::shared_ptr<ModelInferResponse> response, Error& request_status);
+  InferResultGrpc(std::shared_ptr<ModelStreamInferResponse> response);
+
   std::map<std::string, const ModelInferResponse::InferOutputTensor*>
       output_name_to_result_map_;
 
   std::shared_ptr<ModelInferResponse> response_;
+  std::shared_ptr<ModelStreamInferResponse> stream_response_;
   Error request_status_;
 };
 
@@ -116,6 +122,15 @@ InferResultGrpc::Create(
 {
   *infer_result = reinterpret_cast<InferResult*>(
       new InferResultGrpc(response, request_status));
+  return Error::Success;
+}
+
+Error
+InferResultGrpc::Create(
+    InferResult** infer_result,
+    std::shared_ptr<ModelStreamInferResponse> response)
+{
+  *infer_result = reinterpret_cast<InferResult*>(new InferResultGrpc(response));
   return Error::Success;
 }
 
@@ -158,7 +173,7 @@ InferResultGrpc::Shape(
     }
   } else {
     return Error(
-        "The response does not contain results or output name " + output_name);
+        "The response does not contain results for output name " + output_name);
   }
   return Error::Success;
 }
@@ -172,7 +187,7 @@ InferResultGrpc::Datatype(
     *datatype = it->second->datatype();
   } else {
     return Error(
-        "The response does not contain results or output name " + output_name);
+        "The response does not contain results for output name " + output_name);
   }
   return Error::Success;
 }
@@ -189,7 +204,7 @@ InferResultGrpc::RawData(
     *byte_size = it->second->contents().raw_contents().size();
   } else {
     return Error(
-        "The response does not contain results or output name " + output_name);
+        "The response does not contain results for output name " + output_name);
   }
 
   return Error::Success;
@@ -199,6 +214,18 @@ InferResultGrpc::InferResultGrpc(
     std::shared_ptr<ModelInferResponse> response, Error& request_status)
     : response_(response), request_status_(request_status)
 {
+  for (const auto& output : response_->outputs()) {
+    output_name_to_result_map_[output.name()] = &output;
+  }
+}
+
+InferResultGrpc::InferResultGrpc(
+    std::shared_ptr<ModelStreamInferResponse> stream_response)
+    : stream_response_(stream_response)
+{
+  request_status_ = Error(stream_response_->error_message());
+  response_.reset(
+      stream_response->mutable_infer_response(), [](ModelInferResponse*) {});
   for (const auto& output : response_->outputs()) {
     output_name_to_result_map_[output.name()] = &output;
   }
@@ -778,13 +805,11 @@ InferenceServerGrpcClient::StartStream(
   stream_callback_ = callback;
   skip_stream_stats_ = skip_stats;
 
-  grpc::ClientContext context;
-
   for (const auto& it : headers) {
-    context.AddMetadata(it.first, it.second);
+    grpc_context_.AddMetadata(it.first, it.second);
   }
 
-  grpc_stream_ = stub_->ModelStreamInfer(&context);
+  grpc_stream_ = stub_->ModelStreamInfer(&grpc_context_);
   stream_worker_ =
       std::thread(&InferenceServerGrpcClient::AsyncStreamTransfer, this);
 
@@ -999,10 +1024,11 @@ InferenceServerGrpcClient::AsyncTransfer()
 void
 InferenceServerGrpcClient::AsyncStreamTransfer()
 {
-  ModelStreamInferResponse response;
+  std::shared_ptr<ModelStreamInferResponse> response =
+      std::make_shared<ModelStreamInferResponse>();
   // End loop if Read() returns false
   // (stream ended and all responses are drained)
-  while (grpc_stream_->Read(&response)) {
+  while (grpc_stream_->Read(response.get())) {
     if (exiting_) {
       continue;
     }
@@ -1017,9 +1043,6 @@ InferenceServerGrpcClient::AsyncStreamTransfer()
     }
 
     InferResult* stream_result;
-    std::shared_ptr<ModelInferResponse> infer_response_ptr(
-        response.mutable_infer_response());
-    Error err(response.error_message());
     // FIXME, there is no 1:1 mapping between requests and
     // response for decoupled streaming case hence, this
     // method will record incorrect statistics for decoupled
@@ -1027,19 +1050,20 @@ InferenceServerGrpcClient::AsyncStreamTransfer()
     if (timer.get() != nullptr) {
       timer->CaptureTimestamp(RequestTimers::Kind::RECV_START);
     }
-    InferResultGrpc::Create(&stream_result, infer_response_ptr, err);
+    InferResultGrpc::Create(&stream_result, response);
     if (timer.get() != nullptr) {
       timer->CaptureTimestamp(RequestTimers::Kind::RECV_END);
       timer->CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
-      err = UpdateInferStat(*timer);
+      Error err = UpdateInferStat(*timer);
       if (!err.IsOk()) {
         std::cerr << "Failed to update context stat: " << err << std::endl;
       }
     }
     if (verbose_) {
-      std::cout << infer_response_ptr->DebugString() << std::endl;
+      std::cout << response->DebugString() << std::endl;
     }
     stream_callback_(stream_result);
+    response = std::make_shared<ModelStreamInferResponse>();
   }
   grpc_stream_->Finish();
 }

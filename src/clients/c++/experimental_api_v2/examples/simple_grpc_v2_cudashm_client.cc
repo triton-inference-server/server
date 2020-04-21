@@ -46,23 +46,22 @@ namespace nic = nvidia::inferenceserver::client;
 
 namespace {
 
-void
-ValidateShapeAndDatatype(
+void ValidateShapeAndDatatype(
     const std::string& name, std::shared_ptr<nic::InferResult> result)
 {
   std::vector<int64_t> shape;
-  FAIL_IF_ERR(result->Shape(name, &shape), "unable to get shape for " + name);
+  FAIL_IF_ERR(result->Shape(name, &shape), "unable to get shape for '" + name + "'");
   // Validate shape
   if ((shape.size() != 2) || (shape[0] != 1) || (shape[1] != 16)) {
-    std::cerr << "error: received incorrect shapes for " << name << std::endl;
+    std::cerr << "error: received incorrect shapes for '" << name << "'" << std::endl;
     exit(1);
   }
   std::string datatype;
   FAIL_IF_ERR(
-      result->Datatype(name, &datatype), "unable to get datatype for " + name);
+      result->Datatype(name, &datatype), "unable to get datatype for '" + name + "'");
   // Validate datatype
   if (datatype.compare("INT32") != 0) {
-    std::cerr << "error: received incorrect datatype for " << name << ": "
+    std::cerr << "error: received incorrect datatype for '" << name << "': "
               << datatype << std::endl;
     exit(1);
   }
@@ -221,12 +220,12 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       nic::InferRequestedOutput::Create(&output0, "OUTPUT0"),
-      "unable to get OUTPUT0");
+      "unable to get 'OUTPUT0'");
   std::shared_ptr<nic::InferRequestedOutput> output0_ptr;
   output0_ptr.reset(output0);
   FAIL_IF_ERR(
       nic::InferRequestedOutput::Create(&output1, "OUTPUT1"),
-      "unable to get OUTPUT1");
+      "unable to get 'OUTPUT1'");
   std::shared_ptr<nic::InferRequestedOutput> output1_ptr;
   output1_ptr.reset(output1);
 
@@ -247,11 +246,11 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       output0_ptr->SetSharedMemory(
           "output_data", output_byte_size, 0 /* offset */),
-      "unable to set shared memory for OUTPUT0");
+      "unable to set shared memory for 'OUTPUT0'");
   FAIL_IF_ERR(
       output1_ptr->SetSharedMemory(
           "output_data", output_byte_size, output_byte_size /* offset */),
-      "unable to set shared memory for OUTPUT1");
+      "unable to set shared memory for 'OUTPUT1'");
 
 
   // The inference settings. Will be using default for now.

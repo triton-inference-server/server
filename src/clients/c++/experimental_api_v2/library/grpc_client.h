@@ -354,6 +354,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   std::shared_ptr<
       grpc::ClientReaderWriter<ModelInferRequest, ModelStreamInferResponse>>
       grpc_stream_;
+  grpc::ClientContext grpc_context_;
 
   bool skip_stream_stats_;
   std::queue<std::unique_ptr<RequestTimers>> ongoing_stream_request_timers_;

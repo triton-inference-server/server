@@ -334,7 +334,7 @@ InferResultHttp::Shape(
     }
   } else {
     return Error(
-        "The response does not contain results or output name " + output_name);
+        "The response does not contain results for output name " + output_name);
   }
   return Error::Success;
 }
@@ -374,7 +374,7 @@ InferResultHttp::RawData(
     *byte_size = itr->second.second;
   } else {
     return Error(
-        "The response does not contain results or output name " + output_name);
+        "The response does not contain results for output name " + output_name);
   }
 
   return Error::Success;
