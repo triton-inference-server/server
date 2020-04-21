@@ -28,10 +28,8 @@ import sys
 import os
 import numpy as np
 import tritongrpcclient.core as grpcclient
-import tritongrpcclient.model_config_pb2 as mc
 import tritonhttpclient.core as httpclient
-from tritonhttpclient.utils import triton_to_np_dtype, np_to_triton_dtype
-from tritonhttpclient.utils import InferenceServerException
+from tritonhttpclient.utils import *
 import tritonsharedmemoryutils.shared_memory as shm
 import tritonsharedmemoryutils.cuda_shared_memory as cudashm
 import test_util as tu
@@ -172,17 +170,15 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         INPUT0 = "INPUT__0"
         INPUT1 = "INPUT__1"
 
-    inputs = []
-    inputs.append(httpclient.InferInput(INPUT0, tensor_shape, np_to_triton_dtype(input_dtype)))
-    inputs.append(httpclient.InferInput(INPUT1, tensor_shape, np_to_triton_dtype(input_dtype)))
-
+    input0_array = np.concatenate(input0_list_tmp, axis=0)
+    input1_array = np.concatenate(input1_list_tmp, axis=0)
     output0_byte_size = sum([e0.nbytes for e0 in expected0_list_tmp])
     output1_byte_size = sum([e1.nbytes for e1 in expected1_list_tmp])
 
     # Create and register system/cuda shared memory regions if needed
-    shm_regions = su.create_register_set_shm_regions(inputs, input0_list_tmp, input1_list_tmp, output0_byte_size,
-                                                    output1_byte_size, outputs, shm_region_names, precreated_shm_regions,
-                                                    use_system_shared_memory, use_cuda_shared_memory)
+    shm_regions = su.create_register_shm_regions(input0_list_tmp, input1_list_tmp, output0_byte_size,
+                                                output1_byte_size, outputs, shm_region_names, precreated_shm_regions,
+                                                use_system_shared_memory, use_cuda_shared_memory)
 
     # Run inference and check results for each config
     for config in configs:
@@ -193,14 +189,27 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         else:
             triton_client = grpcclient.InferenceServerClient(config[0])
 
+        inputs = []
+        if config[1] == "http":
+            inputs.append(httpclient.InferInput(
+                INPUT0, tensor_shape, np_to_triton_dtype(input_dtype)))
+            inputs.append(httpclient.InferInput(
+                INPUT1, tensor_shape, np_to_triton_dtype(input_dtype)))
+        else:
+            inputs.append(grpcclient.InferInput(
+                INPUT0, tensor_shape, np_to_triton_dtype(input_dtype)))
+            inputs.append(grpcclient.InferInput(
+                INPUT1, tensor_shape, np_to_triton_dtype(input_dtype)))
+
         if not (use_cuda_shared_memory or use_system_shared_memory):
             if config[1] == "http":
-                inputs[0].set_data_from_numpy(input0_list, binary_data=config[3])
-                inputs[1].set_data_from_numpy(input1_list, binary_data=config[3])
+                inputs[0].set_data_from_numpy(input0_array, binary_data=config[3])
+                inputs[1].set_data_from_numpy(input1_array, binary_data=config[3])
             else:
-                inputs[0].set_data_from_numpy(input0_list)
-                inputs[1].set_data_from_numpy(input1_list)
-
+                inputs[0].set_data_from_numpy(input0_array)
+                inputs[1].set_data_from_numpy(input1_array)
+        # else:
+        # 
         expected0_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected0_val_list ]
         expected1_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected1_val_list ]
 
@@ -209,9 +218,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         if "OUTPUT0" in outputs:
             if len(shm_regions) != 0:
                 if config[1] == "http":
-                    output_req.append(httpclient.InferOutput(OUTPUT0, binary_data=config[3]))
+                    output_req.append(httpclient.InferRequestedOutput(OUTPUT0, binary_data=config[3]))
                 else:
-                    output_req.append(grpcclient.InferOutput(OUTPUT0))
+                    output_req.append(grpcclient.InferRequestedOutput(OUTPUT0))
                 
                 if precreated_shm_regions is None:
                     output_req[-1].set_shared_memory_region(shm_regions[2]+'_data', output0_byte_size)
@@ -221,22 +230,22 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             else:
                 if output0_raw:
                     if config[1] == "http":
-                        outputs.append(httpclient.InferOutput(OUTPUT0, binary_data=config[3]))
+                        outputs.append(httpclient.InferRequestedOutput(OUTPUT0, binary_data=config[3]))
                     else:
-                        outputs.append(grpcclient.InferOutput(OUTPUT0))
+                        outputs.append(grpcclient.InferRequestedOutput(OUTPUT0))
                 else:
                     if config[1] == "http":
-                        output_req.append(httpclient.InferOutput(
+                        output_req.append(httpclient.InferRequestedOutput(
                             OUTPUT0, binary_data=config[3], class_count=num_classes))
                     else:
-                        output_req.append(grpcclient.InferOutput(OUTPUT0, class_count=num_classes))                        
+                        output_req.append(grpcclient.InferRequestedOutput(OUTPUT0, class_count=num_classes))                        
             i+=1
         if "OUTPUT1" in outputs:
             if len(shm_regions) != 0:
                 if config[1] == "http":
-                    output_req.append(httpclient.InferOutput(OUTPUT1, binary_data=config[3]))
+                    output_req.append(httpclient.InferRequestedOutput(OUTPUT1, binary_data=config[3]))
                 else:
-                    output_req.append(grpcclient.InferOutput(OUTPUT1))
+                    output_req.append(grpcclient.InferRequestedOutput(OUTPUT1))
                 
                 if precreated_shm_regions is None:
                     output_req[-1].set_shared_memory_region(shm_regions[2+i]+'_data', output1_byte_size)
@@ -246,15 +255,15 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             else:
                 if output1_raw:
                     if config[1] == "http":
-                        output_req.append(httpclient.InferOutput(OUTPUT1, binary_data=config[3]))
+                        output_req.append(httpclient.InferRequestedOutput(OUTPUT1, binary_data=config[3]))
                     else:
-                        output_req.append(grpcclient.InferOutput(OUTPUT1))
+                        output_req.append(grpcclient.InferRequestedOutput(OUTPUT1))
                 else:
                     if config[1] == "http":
-                        output_req.append(httpclient.InferOutput(
+                        output_req.append(httpclient.InferRequestedOutput(
                             OUTPUT1, binary_data=config[3], class_count=num_classes))
                     else:
-                        output_req.append(grpcclient.InferOutput(
+                        output_req.append(grpcclient.InferRequestedOutput(
                             OUTPUT1, class_count=num_classes))
 
         if config[2]:
