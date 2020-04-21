@@ -111,7 +111,9 @@ SyncSend(
 
   nic::InferResult* result;
   // Send inference request to the inference server.
-  FAIL_IF_ERR(client->Infer(&result, options, inputs, outputs, http_headers), "unable to run model");
+  FAIL_IF_ERR(
+      client->Infer(&result, options, inputs, outputs, http_headers),
+      "unable to run model");
   std::shared_ptr<nic::InferResult> this_result(result);
 
   // Get pointers to the result returned...

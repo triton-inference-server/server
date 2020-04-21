@@ -102,9 +102,7 @@ StreamSend(
   std::vector<nic::InferInput*> inputs = {ivalue.get()};
 
   // Send inference request to the inference server.
-  FAIL_IF_ERR(
-      client->AsyncStreamInfer(options, inputs),
-      "unable to run model");
+  FAIL_IF_ERR(client->AsyncStreamInfer(options, inputs), "unable to run model");
 }
 
 }  // namespace
@@ -172,14 +170,16 @@ main(int argc, char** argv)
   ResultList result_list;
 
   FAIL_IF_ERR(
-      client->StartStream([&](nic::InferResult* result) {
-        {
-          std::shared_ptr<nic::InferResult> result_ptr(result);
-          std::lock_guard<std::mutex> lk(mutex_);
-          result_list.push_back(result_ptr);
-        }
-        cv_.notify_all();
-      }, false /*ship_stats*/ , http_headers),
+      client->StartStream(
+          [&](nic::InferResult* result) {
+            {
+              std::shared_ptr<nic::InferResult> result_ptr(result);
+              std::lock_guard<std::mutex> lk(mutex_);
+              result_list.push_back(result_ptr);
+            }
+            cv_.notify_all();
+          },
+          false /*ship_stats*/, http_headers),
       "unable to establish a streaming connection to server");
 
   // Send requests, first reset accumulator for the sequence.
