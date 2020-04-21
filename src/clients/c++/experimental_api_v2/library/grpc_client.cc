@@ -173,7 +173,8 @@ InferResultGrpc::Shape(
     }
   } else {
     return Error(
-        "The response does not contain results for output name " + output_name);
+        "The response does not contain shape for output name '" + output_name +
+        "'");
   }
   return Error::Success;
 }
@@ -187,7 +188,8 @@ InferResultGrpc::Datatype(
     *datatype = it->second->datatype();
   } else {
     return Error(
-        "The response does not contain results for output name " + output_name);
+        "The response does not contain datatype for output name '" +
+        output_name + "'");
   }
   return Error::Success;
 }
@@ -204,7 +206,8 @@ InferResultGrpc::RawData(
     *byte_size = it->second->contents().raw_contents().size();
   } else {
     return Error(
-        "The response does not contain results for output name " + output_name);
+        "The response does not contain results for output name '" +
+        output_name + "'");
   }
 
   return Error::Success;
