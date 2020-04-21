@@ -63,6 +63,9 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-v" << std::endl;
   std::cerr << "\t-u <URL for inference service and its http port>"
             << std::endl;
+  std::cerr
+      << "For -H, header must be 'Header:Value'. May be given multiple times."
+      << std::endl;
   std::cerr << "\t-o <offset for sequence ID>" << std::endl;
   std::cerr << std::endl;
   std::cerr << "For -o, the client will use sequence ID <1 + 2 * offset> "
@@ -75,7 +78,8 @@ void
 SyncSend(
     const std::unique_ptr<nic::InferenceServerHttpClient>& client,
     const std::string& model_name, int32_t value, const uint64_t sequence_id,
-    bool start_of_sequence, bool end_of_sequence, std::vector<int32_t>& result_data)
+    bool start_of_sequence, bool end_of_sequence,
+    std::vector<int32_t>& result_data, nic::Headers& http_headers)
 {
   nic::InferOptions options(model_name);
   options.sequence_id_ = sequence_id;
@@ -96,25 +100,36 @@ SyncSend(
 
   std::vector<nic::InferInput*> inputs = {ivalue.get()};
 
+  nic::InferRequestedOutput* output;
+  FAIL_IF_ERR(
+      nic::InferRequestedOutput::Create(&output, "OUTPUT"),
+      "unable to get 'OUTPUT'");
+  std::shared_ptr<const nic::InferRequestedOutput> routput;
+  routput.reset(output);
+
+  std::vector<const nic::InferRequestedOutput*> outputs = {routput.get()};
+
   nic::InferResult* result;
   // Send inference request to the inference server.
-  FAIL_IF_ERR(client->Infer(&result, options, inputs), "unable to run model");
+  FAIL_IF_ERR(
+      client->Infer(&result, options, inputs, outputs, http_headers),
+      "unable to run model");
   std::shared_ptr<nic::InferResult> this_result(result);
 
-   // Get pointers to the result returned...
-    int32_t* output_data;
-    size_t output_byte_size;
-    FAIL_IF_ERR(
-        this_result->RawData(
-            "OUTPUT", (const uint8_t**)&output_data, &output_byte_size),
-        "unable to get result data for 'OUTPUT'");
-    if (output_byte_size != 4) {
-      std::cerr << "error: received incorrect byte size for 'OUTPUT': "
-                << output_byte_size << std::endl;
-      exit(1);
-    }
+  // Get pointers to the result returned...
+  int32_t* output_data;
+  size_t output_byte_size;
+  FAIL_IF_ERR(
+      this_result->RawData(
+          "OUTPUT", (const uint8_t**)&output_data, &output_byte_size),
+      "unable to get result data for 'OUTPUT'");
+  if (output_byte_size != 4) {
+    std::cerr << "error: received incorrect byte size for 'OUTPUT': "
+              << output_byte_size << std::endl;
+    exit(1);
+  }
 
-    result_data.push_back(*output_data);
+  result_data.push_back(*output_data);
 }
 
 }  // namespace
@@ -126,14 +141,21 @@ main(int argc, char** argv)
   bool dyna_sequence = false;
   std::string url("localhost:8000");
   int sequence_id_offset = 0;
+  nic::Headers http_headers;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vdu:o:")) != -1) {
+  while ((opt = getopt(argc, argv, "vdu:H:o:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
         break;
+      case 'H': {
+        std::string arg = optarg;
+        std::string header = arg.substr(0, arg.find(":"));
+        http_headers[header] = arg.substr(header.size() + 1);
+        break;
+      }
       case 'd':
         dyna_sequence = true;
         break;
@@ -178,19 +200,19 @@ main(int argc, char** argv)
   // Send requests, first reset accumulator for the sequence.
   SyncSend(
       client, model_name, 0, sequence_id0, true /* start-of-sequence */,
-      false /* end-of-sequence */, result0_data);
+      false /* end-of-sequence */, result0_data, http_headers);
   SyncSend(
       client, model_name, 100, sequence_id1, true /* start-of-sequence */,
-      false /* end-of-sequence */, result1_data);
+      false /* end-of-sequence */, result1_data, http_headers);
 
   // Now send a sequence of values...
   for (int32_t v : values) {
     SyncSend(
         client, model_name, v, sequence_id0, false /* start-of-sequence */,
-        (v == 1) /* end-of-sequence */, result0_data);
+        (v == 1) /* end-of-sequence */, result0_data, http_headers);
     SyncSend(
         client, model_name, -v, sequence_id1, false /* start-of-sequence */,
-        (v == 1) /* end-of-sequence */, result1_data);
+        (v == 1) /* end-of-sequence */, result1_data, http_headers);
   }
 
 

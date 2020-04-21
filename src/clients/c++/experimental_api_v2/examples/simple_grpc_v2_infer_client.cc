@@ -43,23 +43,27 @@ namespace nic = nvidia::inferenceserver::client;
 
 namespace {
 
-void ValidateShapeAndDatatype(
+void
+ValidateShapeAndDatatype(
     const std::string& name, std::shared_ptr<nic::InferResult> result)
 {
   std::vector<int64_t> shape;
-  FAIL_IF_ERR(result->Shape(name, &shape), "unable to get shape for '" + name + "'");
+  FAIL_IF_ERR(
+      result->Shape(name, &shape), "unable to get shape for '" + name + "'");
   // Validate shape
   if ((shape.size() != 2) || (shape[0] != 1) || (shape[1] != 16)) {
-    std::cerr << "error: received incorrect shapes for '" << name << "'" << std::endl;
+    std::cerr << "error: received incorrect shapes for '" << name << "'"
+              << std::endl;
     exit(1);
   }
   std::string datatype;
   FAIL_IF_ERR(
-      result->Datatype(name, &datatype), "unable to get datatype for '" + name + "'");
+      result->Datatype(name, &datatype),
+      "unable to get datatype for '" + name + "'");
   // Validate datatype
   if (datatype.compare("INT32") != 0) {
-    std::cerr << "error: received incorrect datatype for '" << name << "': "
-              << datatype << std::endl;
+    std::cerr << "error: received incorrect datatype for '" << name
+              << "': " << datatype << std::endl;
     exit(1);
   }
 }

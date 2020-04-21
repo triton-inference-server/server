@@ -63,6 +63,9 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-v" << std::endl;
   std::cerr << "\t-u <URL for inference service and its gRPC port>"
             << std::endl;
+  std::cerr
+      << "For -H, header must be 'Header:Value'. May be given multiple times."
+      << std::endl;
   std::cerr << "\t-o <offset for sequence ID>" << std::endl;
   std::cerr << std::endl;
   std::cerr << "For -o, the client will use sequence ID <1 + 2 * offset> "
@@ -99,7 +102,9 @@ StreamSend(
   std::vector<nic::InferInput*> inputs = {ivalue.get()};
 
   // Send inference request to the inference server.
-  FAIL_IF_ERR(client->AsyncStreamInfer(options, inputs), "unable to run model");
+  FAIL_IF_ERR(
+      client->AsyncStreamInfer(options, inputs),
+      "unable to run model");
 }
 
 }  // namespace
@@ -110,11 +115,12 @@ main(int argc, char** argv)
   bool verbose = false;
   bool dyna_sequence = false;
   std::string url("localhost:8001");
+  nic::Headers http_headers;
   int sequence_id_offset = 0;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vdu:o:")) != -1) {
+  while ((opt = getopt(argc, argv, "vdu:H:o:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
@@ -125,6 +131,12 @@ main(int argc, char** argv)
       case 'u':
         url = optarg;
         break;
+      case 'H': {
+        std::string arg = optarg;
+        std::string header = arg.substr(0, arg.find(":"));
+        http_headers[header] = arg.substr(header.size() + 1);
+        break;
+      }
       case 'o':
         sequence_id_offset = std::stoi(optarg);
         break;
@@ -167,7 +179,7 @@ main(int argc, char** argv)
           result_list.push_back(result_ptr);
         }
         cv_.notify_all();
-      }),
+      }, false /*ship_stats*/ , http_headers),
       "unable to establish a streaming connection to server");
 
   // Send requests, first reset accumulator for the sequence.
