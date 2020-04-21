@@ -53,7 +53,8 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
 
     try:
-        triton_client = httpclient.InferenceServerClient(FLAGS.url)
+        triton_client = httpclient.InferenceServerClient(url=FLAGS.url,
+                                                         verbose=FLAGS.verbose)
     except Exception as e:
         print("channel creation failed: " + str(e))
         sys.exit(1)
@@ -121,10 +122,12 @@ if __name__ == '__main__':
     inputs[-1].set_shared_memory("input1_data", input_byte_size)
 
     outputs = []
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=False))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT0',
+                                                   binary_data=False))
     outputs[-1].set_shared_memory("output0_data", output_byte_size)
 
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT1',
+                                                   binary_data=False))
     outputs[-1].set_shared_memory("output1_data", output_byte_size)
 
     results = triton_client.infer(model_name=model_name,

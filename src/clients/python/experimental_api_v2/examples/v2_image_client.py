@@ -83,7 +83,7 @@ def parse_model_grpc(model_metadata, model_config):
             format(model_name, len(input_metadata.shape)))
 
     if ((input_config.format != mc.ModelInput.FORMAT_NCHW) and
-            (input_config.format != mc.ModelInput.FORMAT_NHWC)):
+        (input_config.format != mc.ModelInput.FORMAT_NHWC)):
         raise Exception("unexpected input format " +
                         mc.ModelInput.Format.Name(input_config.format) +
                         ", expecting " +
@@ -148,9 +148,9 @@ def parse_model_http(model_metadata, model_config):
             format(model_metadata.name, len(input_metadata['shape'])))
 
     if ((input_config['format'] != "FORMAT_NCHW") and
-            (input_config['format'] != "FORMAT_NHWC")):
-        raise Exception("unexpected input format " + input_config['format']
-                        + ", expecting FORMAT_NCHW or FORMAT_NHWC")
+        (input_config['format'] != "FORMAT_NHWC")):
+        raise Exception("unexpected input format " + input_config['format'] +
+                        ", expecting FORMAT_NCHW or FORMAT_NHWC")
 
     if input_config['format'] == "FORMAT_NHWC":
         h = input_metadata['shape'][0]
@@ -163,6 +163,7 @@ def parse_model_http(model_metadata, model_config):
 
     return (input_metadata['name'], output_metadata['name'], c, h, w,
             input_config['format'], input_metadata['datatype'])
+
 
 def preprocess(img, format, dtype, c, h, w, scaling):
     """
@@ -230,6 +231,7 @@ def postprocess(results, output_name, batch_size):
                 cls = result.split(':')
             print("    {} ({}) = {}".format(cls[0], cls[1], cls[2]))
 
+
 def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
     # Preprocess image into input data according to model requirements
     image_data = None
@@ -242,18 +244,24 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
     # Set the input data
     inputs = []
     if FLAGS.protocol.lower() == "grpc":
-        inputs.append(grpcclient.InferInput(input_name, batched_image_data.shape, dtype))
+        inputs.append(
+            grpcclient.InferInput(input_name, batched_image_data.shape, dtype))
         inputs[0].set_data_from_numpy(batched_image_data)
     else:
-        inputs.append(httpclient.InferInput(input_name, batched_image_data.shape, dtype))
+        inputs.append(
+            httpclient.InferInput(input_name, batched_image_data.shape, dtype))
         inputs[0].set_data_from_numpy(batched_image_data, binary_data=False)
 
     outputs = []
     if FLAGS.protocol.lower() == "grpc":
-        outputs.append(grpcclient.InferRequestedOutput(output_name, class_count=FLAGS.classes))
+        outputs.append(
+            grpcclient.InferRequestedOutput(output_name,
+                                            class_count=FLAGS.classes))
     else:
-        outputs.append(httpclient.InferRequestedOutput(
-            output_name, binary_data=False, class_count=FLAGS.classes))
+        outputs.append(
+            httpclient.InferRequestedOutput(output_name,
+                                            binary_data=False,
+                                            class_count=FLAGS.classes))
 
     yield inputs, outputs, FLAGS.model_name, FLAGS.model_version
 
@@ -271,12 +279,13 @@ if __name__ == '__main__':
                         type=str,
                         required=True,
                         help='Name of model')
-    parser.add_argument('-x',
-                        '--model-version',
-                        type=str,
-                        required=False,
-                        default="",
-                        help='Version of model. Default is to use latest version.')
+    parser.add_argument(
+        '-x',
+        '--model-version',
+        type=str,
+        required=False,
+        default="",
+        help='Version of model. Default is to use latest version.')
     parser.add_argument('-b',
                         '--batch-size',
                         type=int,
@@ -289,13 +298,14 @@ if __name__ == '__main__':
                         required=False,
                         default=1,
                         help='Number of class results to report. Default is 1.')
-    parser.add_argument('-s',
-                        '--scaling',
-                        type=str,
-                        choices=['NONE', 'INCEPTION', 'VGG'],
-                        required=False,
-                        default='NONE',
-                        help='Type of scaling to apply to image pixels. Default is NONE.')
+    parser.add_argument(
+        '-s',
+        '--scaling',
+        type=str,
+        choices=['NONE', 'INCEPTION', 'VGG'],
+        required=False,
+        default='NONE',
+        help='Type of scaling to apply to image pixels. Default is NONE.')
     parser.add_argument('-u',
                         '--url',
                         type=str,
@@ -315,10 +325,12 @@ if __name__ == '__main__':
     try:
         if FLAGS.protocol.lower() == "grpc":
             # Create gRPC client for communicating with the server
-            triton_client = grpcclient.InferenceServerClient(FLAGS.url)
+            triton_client = grpcclient.InferenceServerClient(
+                url=FLAGS.url, verbose=FLAGS.verbose)
         else:
             # Create HTTP client for communicating with the server
-            triton_client = httpclient.InferenceServerClient(FLAGS.url)
+            triton_client = httpclient.InferenceServerClient(
+                url=FLAGS.url, verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()

@@ -51,7 +51,8 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        triton_client = httpclient.InferenceServerClient(FLAGS.url)
+        triton_client = httpclient.InferenceServerClient(url=FLAGS.url,
+                                                         verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()
@@ -75,8 +76,10 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data, binary_data=False)
     inputs[1].set_data_from_numpy(input1_data, binary_data=False)
 
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=False))
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT0',
+                                                   binary_data=False))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT1',
+                                                   binary_data=False))
 
     # Define the callback function. Note the last two parameters should be
     # result and error. InferenceServerClient would povide the results of an

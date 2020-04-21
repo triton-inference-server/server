@@ -125,7 +125,10 @@ class InferenceServerClient {
  public:
   using OnCompleteFn = std::function<void(InferResult*)>;
 
-  InferenceServerClient() : exiting_(false) {}
+  explicit InferenceServerClient(bool verbose)
+      : verbose_(verbose), exiting_(false)
+  {
+  }
 
   /// Obtain the cumulative inference statistics of the client.
   /// \param Returns the InferStat object holding current statistics.
@@ -135,6 +138,8 @@ class InferenceServerClient {
  protected:
   // Update the infer stat with the given timer
   Error UpdateInferStat(const RequestTimers& timer);
+  // Enables verbose operation in the client.
+  bool verbose_;
 
   // worker thread that will perform the asynchronous transfer
   std::thread worker_;

@@ -100,7 +100,8 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
 
     try:
-        triton_client = grpcclient.InferenceServerClient(FLAGS.url)
+        triton_client = grpcclient.InferenceServerClient(url=FLAGS.url,
+                                                         verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()

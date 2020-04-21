@@ -337,7 +337,6 @@ class InferenceServerGrpcClient : public InferenceServerClient {
 
  private:
   InferenceServerGrpcClient(const std::string& url, bool verbose);
-
   Error PreRunProcessing(
       const InferOptions& options, const std::vector<InferInput*>& inputs,
       const std::vector<const InferRequestedOutput*>& outputs);
@@ -362,8 +361,6 @@ class InferenceServerGrpcClient : public InferenceServerClient {
 
   // GRPC end point.
   std::unique_ptr<GRPCInferenceService::Stub> stub_;
-  // Enable verbose output
-  const bool verbose_;
   // request for GRPC call, one request object can be used for multiple calls
   // since it can be overwritten as soon as the GRPC send finishes.
   ModelInferRequest infer_request_;

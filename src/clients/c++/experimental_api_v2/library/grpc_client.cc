@@ -469,6 +469,10 @@ InferenceServerGrpcClient::LoadModel(
       stub_->RepositoryModelLoad(&context, request, &response);
   if (!grpc_status.ok()) {
     err = Error(grpc_status.error_message());
+  } else {
+    if (verbose_) {
+      std::cout << "Loaded model '" << model_name << "'" << std::endl;
+    }
   }
 
   return err;
@@ -493,6 +497,10 @@ InferenceServerGrpcClient::UnloadModel(
       stub_->RepositoryModelUnload(&context, request, &response);
   if (!grpc_status.ok()) {
     err = Error(grpc_status.error_message());
+  } else {
+    if (verbose_) {
+      std::cout << "Unloaded model '" << model_name << "'" << std::endl;
+    }
   }
 
   return err;
@@ -580,6 +588,11 @@ InferenceServerGrpcClient::RegisterSystemSharedMemory(
       stub_->SystemSharedMemoryRegister(&context, request, &response);
   if (!grpc_status.ok()) {
     err = Error(grpc_status.error_message());
+  } else {
+    if (verbose_) {
+      std::cout << "Registered system shared memory with name  '" << name << "'"
+                << std::endl;
+    }
   }
 
   return err;
@@ -604,6 +617,16 @@ InferenceServerGrpcClient::UnregisterSystemSharedMemory(
       stub_->SystemSharedMemoryUnregister(&context, request, &response);
   if (!grpc_status.ok()) {
     err = Error(grpc_status.error_message());
+  } else {
+    if (verbose_) {
+      if (name.size() != 0) {
+        std::cout << "Unregistered system shared memory with name '" << name
+                  << "'" << std::endl;
+      } else {
+        std::cout << "Unregistered all system shared memory regions"
+                  << std::endl;
+      }
+    }
   }
 
   return err;
@@ -661,6 +684,11 @@ InferenceServerGrpcClient::RegisterCudaSharedMemory(
       stub_->CudaSharedMemoryRegister(&context, request, &response);
   if (!grpc_status.ok()) {
     err = Error(grpc_status.error_message());
+  } else {
+    if (verbose_) {
+      std::cout << "Registered cuda shared memory with name  '" << name << "'"
+                << std::endl;
+    }
   }
 
   return err;
@@ -685,6 +713,16 @@ InferenceServerGrpcClient::UnregisterCudaSharedMemory(
       stub_->CudaSharedMemoryUnregister(&context, request, &response);
   if (!grpc_status.ok()) {
     err = Error(grpc_status.error_message());
+  } else {
+    if (verbose_) {
+      if (name.size() != 0) {
+        std::cout << "Unregistered system shared memory with name '" << name
+                  << "'" << std::endl;
+      } else {
+        std::cout << "Unregistered all system shared memory regions"
+                  << std::endl;
+      }
+    }
   }
 
   return err;
@@ -786,6 +824,14 @@ InferenceServerGrpcClient::AsyncInfer(
       async_request->grpc_response_.get(), &async_request->grpc_status_,
       (void*)async_request);
 
+  if (verbose_) {
+    std::cout << "Sent request";
+    if (options.request_id_.size() != 0) {
+      std::cout << " '" << options.request_id_ << "'";
+    }
+    std::cout << std::endl;
+  }
+
   return Error::Success;
 }
 
@@ -816,6 +862,10 @@ InferenceServerGrpcClient::StartStream(
   stream_worker_ =
       std::thread(&InferenceServerGrpcClient::AsyncStreamTransfer, this);
 
+  if (verbose_) {
+    std::cout << "Started stream..." << std::endl;
+  }
+
   return Error::Success;
 }
 
@@ -826,6 +876,9 @@ InferenceServerGrpcClient::StopStream()
     grpc_stream_->WritesDone();
     // The reader thread will drain the stream properly
     stream_worker_.join();
+    if (verbose_) {
+      std::cout << "Stopped stream..." << std::endl;
+    }
   }
 
   return Error::Success;
@@ -859,6 +912,13 @@ InferenceServerGrpcClient::AsyncStreamInfer(
   bool ok = grpc_stream_->Write(infer_request_);
 
   if (ok) {
+    if (verbose_) {
+      std::cout << "Sent request";
+      if (options.request_id_.size() != 0) {
+        std::cout << " '" << options.request_id_ << "'";
+      }
+      std::cout << " to the stream" << std::endl;
+    }
     return Error::Success;
   } else {
     return Error("Stream has been closed.");
@@ -1074,7 +1134,8 @@ InferenceServerGrpcClient::AsyncStreamTransfer()
 
 InferenceServerGrpcClient::InferenceServerGrpcClient(
     const std::string& url, bool verbose)
-    : stub_(GRPCInferenceService::NewStub(GetChannel(url))), verbose_(verbose)
+    : InferenceServerClient(verbose),
+      stub_(GRPCInferenceService::NewStub(GetChannel(url)))
 {
 }
 

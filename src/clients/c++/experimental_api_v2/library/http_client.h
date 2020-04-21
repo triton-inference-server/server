@@ -398,8 +398,6 @@ class InferenceServerHttpClient : public InferenceServerClient {
 
   // The server url
   const std::string url_;
-  // Enable verbose output
-  const bool verbose_;
 
   using AsyncReqMap = std::map<uintptr_t, std::shared_ptr<HttpInferRequest>>;
   // curl multi handle for processing asynchronous requests
