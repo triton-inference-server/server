@@ -1043,10 +1043,10 @@ InferenceServerGrpcClient::AsyncStreamTransfer()
     }
 
     InferResult* stream_result;
-    // FIXME, there is no 1:1 mapping between requests and
-    // response for decoupled streaming case hence, this
-    // method will record incorrect statistics for decoupled
-    // case.
+    // FIXME, DLIS-1263 there is no 1:1 mapping between
+    // requests and response for decoupled streaming case
+    // hence, this method will record incorrect statistics
+    // for decoupled case.
     if (timer.get() != nullptr) {
       timer->CaptureTimestamp(RequestTimers::Kind::RECV_START);
     }
