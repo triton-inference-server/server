@@ -40,9 +40,16 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 
-# S3 bucket path (Point to bucket when testing cloud storage)
+# S3 credentials are necessary for this test. Pass via ENV variables
+aws configure set default.region us-west-1 && \
+    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
 
-BUCKET_URL="s3://bucket"
+# S3 bucket path (Point to bucket when testing cloud storage)
+BUCKET_URL="s3://triton-bucket-${CI_PIPELINE_ID}"
+
+# Make test bucket
+aws s3 mb "${BUCKET_URL}"
 
 # Remove Slash in BUCKET_URL
 BUCKET_URL=${BUCKET_URL%/}
@@ -178,9 +185,10 @@ for MAYBE_SLASH in "" "/"; do
 
         # Clean up bucket
         aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
-
     done
 done 
+
+aws s3 rb "${BUCKET_URL}"
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
