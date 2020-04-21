@@ -91,16 +91,9 @@ class InferenceBackend {
 
  protected:
   struct WarmupData {
-    WarmupData(const std::string& sample_name, size_t batch_size)
-        : sample_name_(sample_name), batch_size_(batch_size)
-    {
-    }
+    WarmupData(const std::string& sample_name) : sample_name_(sample_name) {}
 
     std::string sample_name_;
-
-    // FIXME should not need batch_size_ here as it is available from
-    // 'request_'
-    size_t batch_size_;
     std::unique_ptr<InferenceRequest> request_;
 
     // Placeholder for input data
@@ -118,9 +111,7 @@ class InferenceBackend {
       std::vector<std::unique_ptr<InferenceRequest>>&& requests);
 
   // Warm up context associated with 'runner_idx' with provided 'sample'.
-  virtual void WarmUp(
-      uint32_t runner_idx, WarmupData& sample,
-      std::function<void(Status)> OnCompleteWarmup);
+  virtual void WarmUp(uint32_t runner_idx, WarmupData& sample);
 
   // Set the configuration of the model being served.
   Status SetModelConfig(const std::string& path, const ModelConfig& config);
