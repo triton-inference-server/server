@@ -59,6 +59,8 @@ SIMPLE_HEALTH_CLIENT=../clients/simple_grpc_v2_health_metadata
 SIMPLE_INFER_CLIENT=../clients/simple_grpc_v2_infer_client
 SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_grpc_v2_async_infer_client
 SIMPLE_MODEL_CONTROL=../clients/simple_grpc_v2_model_control
+SIMPLE_STREAM_INFER_CLIENT=../clients/simple_grpc_v2_sequence_stream_infer_client
+SIMPLE_SEQUENCE_INFER_CLIENT=../clients/simple_grpc_v2_sequence_sync_infer_client
 SIMPLE_SHM_CLIENT=../clients/simple_grpc_v2_shm_client
 SIMPLE_CUDASHM_CLIENT=../clients/simple_grpc_v2_cudashm_client
 
@@ -146,6 +148,8 @@ for i in \
    $SIMPLE_INFER_CLIENT \
    $SIMPLE_ASYNC_INFER_CLIENT \
    $SIMPLE_HEALTH_CLIENT \
+   $SIMPLE_STREAM_INFER_CLIENT \
+   $SIMPLE_SEQUENCE_INFER_CLIENT \
    $SIMPLE_SHM_CLIENT \
    $SIMPLE_CUDASHM_CLIENT \
    ; do

@@ -979,9 +979,17 @@ class InferenceServerClient:
         Raises
         ------
         InferenceServerException
-            If unable to start a stream.
+            If unable to start a stream or a stream was already running
+            for this client.
 
         """
+        if self._stream is not None:
+            raise_error(
+                "cannot start another stream with one already running. "
+                "'InferenceServerClient' supports only a single active "
+                "stream at a given time."
+            )
+
         if headers is not None:
             metadata = headers.items()
         else:
