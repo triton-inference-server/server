@@ -79,6 +79,19 @@ else()
     )
 
     #
+    # simple_grpc_v2_string_infer_client
+    #
+    add_executable(simple_grpc_v2_string_infer_client simple_grpc_v2_string_infer_client.cc)
+    target_link_libraries(
+      simple_grpc_v2_string_infer_client
+      PRIVATE TRTIS::grpcclient_static
+    )
+    install(
+      TARGETS simple_grpc_v2_string_infer_client
+      RUNTIME DESTINATION bin
+    )
+
+    #
     # simple_grpc_v2_async_infer_client
     #
     add_executable(simple_grpc_v2_async_infer_client simple_grpc_v2_async_infer_client.cc)
@@ -204,6 +217,19 @@ else()
     )
     install(
       TARGETS simple_http_v2_infer_client
+      RUNTIME DESTINATION bin
+    )
+
+    #
+    # simple_http_v2_string_infer_client
+    #
+    add_executable(simple_http_v2_string_infer_client simple_http_v2_string_infer_client.cc)
+    target_link_libraries(
+      simple_http_v2_string_infer_client
+      PRIVATE TRTIS::httpclient_static
+    )
+    install(
+      TARGETS simple_http_v2_string_infer_client
       RUNTIME DESTINATION bin
     )
 

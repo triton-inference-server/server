@@ -51,6 +51,7 @@ SIMPLE_SEQUENCE_INFER_CLIENT_PY=../clients/simple_http_v2_sequence_sync_infer_cl
 
 SIMPLE_HEALTH_CLIENT=../clients/simple_http_v2_health_metadata
 SIMPLE_INFER_CLIENT=../clients/simple_http_v2_infer_client
+SIMPLE_STRING_INFER_CLIENT=../clients/simple_http_v2_string_infer_client
 SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_http_v2_async_infer_client
 SIMPLE_MODEL_CONTROL=../clients/simple_http_v2_model_control
 SIMPLE_SEQUENCE_INFER_CLIENT=../clients/simple_http_v2_sequence_sync_infer_client
@@ -122,6 +123,7 @@ done
 
 for i in \
    $SIMPLE_INFER_CLIENT \
+   $SIMPLE_STRING_INFER_CLIENT \
    $SIMPLE_ASYNC_INFER_CLIENT \
    $SIMPLE_HEALTH_CLIENT \
    $SIMPLE_SHM_CLIENT \

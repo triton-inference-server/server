@@ -125,7 +125,10 @@ class InferenceServerClient {
  public:
   using OnCompleteFn = std::function<void(InferResult*)>;
 
-  InferenceServerClient() : exiting_(false) {}
+  explicit InferenceServerClient(bool verbose)
+      : verbose_(verbose), exiting_(false)
+  {
+  }
 
   /// Obtain the cumulative inference statistics of the client.
   /// \param Returns the InferStat object holding current statistics.
@@ -135,6 +138,8 @@ class InferenceServerClient {
  protected:
   // Update the infer stat with the given timer
   Error UpdateInferStat(const RequestTimers& timer);
+  // Enables verbose operation in the client.
+  bool verbose_;
 
   // worker thread that will perform the asynchronous transfer
   std::thread worker_;
@@ -435,6 +440,19 @@ class InferResult {
   virtual Error RawData(
       const std::string& output_name, const uint8_t** buf,
       size_t* byte_size) const = 0;
+
+  /// Get the result data as a vector of strings. The vector will
+  /// receive a copy of result data. An error will be generated if
+  /// the datatype of output is not 'BYTES'.
+  /// \param output_name The name of the output to get result data.
+  /// \param string_result Returns the result data represented as
+  /// a vector of strings. The strings are stored in the
+  /// row-major order.
+  /// \return Error object indicating success or failure of the
+  /// request.
+  Error StringData(
+      const std::string& output_name,
+      std::vector<std::string>* string_result) const;
 
   /// Returns the complete response as a user friendly string.
   /// \return The string describing the complete response.
