@@ -34,7 +34,7 @@ cat <<EOF
 
 NVIDIA Release ${NVIDIA_TRITON_SERVER_VERSION} (build ${NVIDIA_BUILD_ID})
 
-Copyright (c) 2018-2019, NVIDIA CORPORATION.  All rights reserved.
+Copyright (c) 2018-2020, NVIDIA CORPORATION.  All rights reserved.
 
 Various files include modifications (c) NVIDIA CORPORATION.  All rights reserved.
 NVIDIA modifications are covered by the license terms that apply to the underlying
