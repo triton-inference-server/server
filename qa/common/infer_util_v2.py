@@ -63,7 +63,7 @@ def _prepend_string_size(input_values):
 def infer_exact(tester, pf, tensor_shape, batch_size,
                 input_dtype, output0_dtype, output1_dtype,
                 output0_raw=True, output1_raw=True,
-                model_version=None, swap=False,
+                model_version="", swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
                 use_json=True, skip_request_id_check=False, use_streaming=True,
                 correlation_id=0, shm_region_names=None, precreated_shm_regions=None,
@@ -71,9 +71,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 priority=0, timeout_us=0):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
-    if use_http:
-        configs.append(("localhost:8000", "http", False, True))
-    if use_http:
+    # if use_http:
+    #     configs.append(("localhost:8000", "http", False, True))
+    if use_json:
         configs.append(("localhost:8000", "http", False, False))
     if use_grpc:
         configs.append(("localhost:8001", "grpc", False, False))
@@ -172,6 +172,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
     input0_array = np.concatenate(input0_list_tmp, axis=0)
     input1_array = np.concatenate(input1_list_tmp, axis=0)
+    output0_array = np.concatenate(expected0_list_tmp, axis=0)
+    output1_array = np.concatenate(expected1_list_tmp, axis=0)
     output0_byte_size = sum([e0.nbytes for e0 in expected0_list_tmp])
     output1_byte_size = sum([e1.nbytes for e1 in expected1_list_tmp])
 
@@ -192,14 +194,14 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         inputs = []
         if config[1] == "http":
             inputs.append(httpclient.InferInput(
-                INPUT0, tensor_shape, np_to_triton_dtype(input_dtype)))
+                INPUT0, [batch_size, ] + list(tensor_shape), np_to_triton_dtype(input_dtype)))
             inputs.append(httpclient.InferInput(
-                INPUT1, tensor_shape, np_to_triton_dtype(input_dtype)))
+                INPUT1, [batch_size, ] + list(tensor_shape), np_to_triton_dtype(input_dtype)))
         else:
             inputs.append(grpcclient.InferInput(
-                INPUT0, tensor_shape, np_to_triton_dtype(input_dtype)))
+                INPUT0, [batch_size, ] + list(tensor_shape), np_to_triton_dtype(input_dtype)))
             inputs.append(grpcclient.InferInput(
-                INPUT1, tensor_shape, np_to_triton_dtype(input_dtype)))
+                INPUT1, [batch_size, ] + list(tensor_shape), np_to_triton_dtype(input_dtype)))
 
         if not (use_cuda_shared_memory or use_system_shared_memory):
             if config[1] == "http":
@@ -232,9 +234,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             else:
                 if output0_raw:
                     if config[1] == "http":
-                        outputs.append(httpclient.InferRequestedOutput(OUTPUT0, binary_data=config[3]))
+                        output_req.append(httpclient.InferRequestedOutput(OUTPUT0, binary_data=config[3]))
                     else:
-                        outputs.append(grpcclient.InferRequestedOutput(OUTPUT0))
+                        output_req.append(grpcclient.InferRequestedOutput(OUTPUT0))
                 else:
                     if config[1] == "http":
                         output_req.append(httpclient.InferRequestedOutput(
@@ -283,9 +285,10 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                                 outputs=output_req)
 
         if config[1] == "http":
-            last_response = results.get_response(as_json=True)
-        else:
             last_response = results.get_response()
+        else:
+            last_response = results.get_response(as_json=True)
+        print(last_response)
 
         if not skip_request_id_check:
             global _seen_request_ids
@@ -294,24 +297,30 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                                "request_id: {}".format(request_id))
             _seen_request_ids.add(request_id)
 
-        tester.assertEqual(last_response["model_name"], model_name)
-        if model_version is not None:
-            tester.assertEqual(last_response["model_version"], model_version)
+        if config[1] == "http":
+            tester.assertEqual(last_response["model_name"], model_name)
+        else:
+            tester.assertEqual(last_response["modelName"], model_name)
+        if model_version != "":
+            if config[1] == "http":
+                tester.assertEqual(last_response["model_version"], model_version)
+            else:
+                tester.assertEqual(last_response["modelVersion"], model_version)
 
-        tester.assertEqual(len(results), len(outputs))
+        tester.assertEqual(len(last_response["outputs"]), len(outputs))
         for result in last_response["outputs"]:
             result_name = result["name"]
             for b in range(batch_size):
                 if ((result_name == OUTPUT0 and output0_raw) or
                     (result_name == OUTPUT1 and output1_raw)):
                     if result_name == OUTPUT0:
-                        tester.assertTrue(np.array_equal(results.as_numpy(OUTPUT0)[b], expected0_list[b]),
+                        tester.assertTrue(np.array_equal(results.as_numpy(OUTPUT0)[b], output0_array[b]),
                                         "{}, {} expected: {}, got {}".format(
-                                        model_name, OUTPUT0, expected0_list[b], results.as_numpy(OUTPUT0)[b]))
+                                        model_name, OUTPUT0, output0_array[b], results.as_numpy(OUTPUT0)[b]))
                     elif result_name == OUTPUT1:
-                        tester.assertTrue(np.array_equal(results.as_numpy(OUTPUT1)[b], expected1_list[b]),
+                        tester.assertTrue(np.array_equal(results.as_numpy(OUTPUT1)[b], output1_array[b]),
                                         "{}, {} expected: {}, got {}".format(
-                                        model_name, OUTPUT1, expected1_list[b], results.as_numpy(OUTPUT1)[b]))
+                                        model_name, OUTPUT1, output1_array[b], results.as_numpy(OUTPUT1)[b]))
                     else:
                         tester.assertTrue(False, "unexpected raw result {}".format(result_name))
                 else:
