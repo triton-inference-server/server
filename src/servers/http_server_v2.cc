@@ -990,7 +990,8 @@ HTTPAPIServerV2::InferResponseFree(
                  << "size " << byte_size << ", addr " << buffer;
 
   // Don't do anything when releasing a buffer since ResponseAlloc
-  // wrote directly into the response ebvuffer.
+  // allocated using response ebvuffers which will be freed when the
+  // response is sent.
   return nullptr;  // Success
 }
 
@@ -2163,10 +2164,11 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     size_t byte_size;
     TRITONSERVER_MemoryType memory_type;
     int64_t memory_type_id;
+    void* userp;
 
     RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutput(
         response, idx, &cname, &datatype, &shape, &dim_count, &base, &byte_size,
-        &memory_type, &memory_type_id));
+        &memory_type, &memory_type_id, &userp));
 
     // FIXME I think this could be doing a lot of copying of json,
     // should structure so that json is constructed in place without

@@ -102,12 +102,14 @@ InferenceResponse::Output::~Output()
 Status
 InferenceResponse::Output::DataBuffer(
     const void** buffer, size_t* buffer_byte_size,
-    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id,
+    void** userp) const
 {
   *buffer = allocated_buffer_;
   *buffer_byte_size = allocated_buffer_byte_size_;
   *memory_type = allocated_memory_type_;
   *memory_type_id = allocated_memory_type_id_;
+  *userp = allocated_userp_;
   return Status::Success;
 }
 
