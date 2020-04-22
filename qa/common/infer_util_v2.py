@@ -101,7 +101,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
     num_classes = 3
 
-    if '_nobatch' in pf:
+    if (pf == "batch_to_nobatch") or (pf == "nobatch_to_batch") or (pf == "mix_nobatch_batch"):
+        input_shape = (batch_size,) + tensor_shape
+    elif '_nobatch' in pf:
         input_shape = tensor_shape
     else:
         input_shape = (batch_size,) + tensor_shape
@@ -299,6 +301,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             last_response = results.get_response()
         else:
             last_response = results.get_response()
+        print(last_response)
 
         if not skip_request_id_check:
             global _seen_request_ids

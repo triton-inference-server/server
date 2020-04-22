@@ -243,169 +243,169 @@ class InferTest(unittest.TestCase):
     #         self._full_exact(np.int32, np.float32, np.float32,
     #                          output0_raw=False, output1_raw=True, swap=False)
 
-    def test_raw_version_latest_1(self):
-        input_size = 16
-        tensor_shape = (input_size,)
+    # def test_raw_version_latest_1(self):
+    #     input_size = 16
+    #     tensor_shape = (input_size,)
 
-        # There are 3 versions of graphdef_int8_int8_int8 but
-        # only version 3 should be available
-        for platform in ('graphdef', 'savedmodel'):
-            if platform not in BACKENDS:
-                continue
-            try:
-                iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.int8, np.int8, np.int8,
-                               model_version="1", swap=False,
-                               use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                               use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            except InferenceServerException as ex:
-                self.assertEqual("inference:0", ex.server_id())
-                self.assertTrue(
-                    ex.message().startswith("Request for unknown model"))
+    #     # There are 3 versions of graphdef_int8_int8_int8 but
+    #     # only version 3 should be available
+    #     for platform in ('graphdef', 'savedmodel'):
+    #         if platform not in BACKENDS:
+    #             continue
+    #         try:
+    #             iu.infer_exact(self, platform, tensor_shape, 1,
+    #                            np.int8, np.int8, np.int8,
+    #                            model_version="1", swap=False,
+    #                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #         except InferenceServerException as ex:
+    #             self.assertEqual("inference:0", ex.server_id())
+    #             self.assertTrue(
+    #                 ex.message().startswith("Request for unknown model"))
 
-            try:
-                iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.int8, np.int8, np.int8,
-                               model_version="2", swap=True,
-                               use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                               use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            except InferenceServerException as ex:
-                self.assertEqual("inference:0", ex.server_id())
-                self.assertTrue(
-                    ex.message().startswith("Request for unknown model"))
+    #         try:
+    #             iu.infer_exact(self, platform, tensor_shape, 1,
+    #                            np.int8, np.int8, np.int8,
+    #                            model_version="2", swap=True,
+    #                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #         except InferenceServerException as ex:
+    #             self.assertEqual("inference:0", ex.server_id())
+    #             self.assertTrue(
+    #                 ex.message().startswith("Request for unknown model"))
 
-            iu.infer_exact(self, platform, tensor_shape, 1,
-                           np.int8, np.int8, np.int8,
-                           model_version="3", swap=True,
-                           use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                           use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #         iu.infer_exact(self, platform, tensor_shape, 1,
+    #                        np.int8, np.int8, np.int8,
+    #                        model_version="3", swap=True,
+    #                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-    def test_raw_version_latest_2(self):
-        input_size = 16
-        tensor_shape = (input_size,)
+    # def test_raw_version_latest_2(self):
+    #     input_size = 16
+    #     tensor_shape = (input_size,)
 
-        # There are 3 versions of graphdef_int16_int16_int16 but only
-        # versions 2 and 3 should be available
-        for platform in ('graphdef', 'savedmodel'):
-            if platform not in BACKENDS:
-                continue
-            try:
-                iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.int16, np.int16, np.int16,
-                               model_version="1", swap=False,
-                               use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                               use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            except InferenceServerException as ex:
-                self.assertEqual("inference:0", ex.server_id())
-                self.assertTrue(
-                    ex.message().startswith("Request for unknown model"))
+    #     # There are 3 versions of graphdef_int16_int16_int16 but only
+    #     # versions 2 and 3 should be available
+    #     for platform in ('graphdef', 'savedmodel'):
+    #         if platform not in BACKENDS:
+    #             continue
+    #         try:
+    #             iu.infer_exact(self, platform, tensor_shape, 1,
+    #                            np.int16, np.int16, np.int16,
+    #                            model_version="1", swap=False,
+    #                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #         except InferenceServerException as ex:
+    #             self.assertEqual("inference:0", ex.server_id())
+    #             self.assertTrue(
+    #                 ex.message().startswith("Request for unknown model"))
 
-            iu.infer_exact(self, platform, tensor_shape, 1,
-                           np.int16, np.int16, np.int16,
-                           model_version="2", swap=True,
-                           use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                           use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            iu.infer_exact(self, platform, tensor_shape, 1,
-                           np.int16, np.int16, np.int16,
-                           model_version="3", swap=True,
-                           use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                           use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #         iu.infer_exact(self, platform, tensor_shape, 1,
+    #                        np.int16, np.int16, np.int16,
+    #                        model_version="2", swap=True,
+    #                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #         iu.infer_exact(self, platform, tensor_shape, 1,
+    #                        np.int16, np.int16, np.int16,
+    #                        model_version="3", swap=True,
+    #                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-    def test_raw_version_all(self):
-        input_size = 16
-        tensor_shape = (input_size,)
+    # def test_raw_version_all(self):
+    #     input_size = 16
+    #     tensor_shape = (input_size,)
 
-        # There are 3 versions of *_int32_int32_int32 and all should
-        # be available.
-        for platform in ('graphdef', 'savedmodel', 'netdef'):
-            if platform not in BACKENDS:
-                continue
-            iu.infer_exact(self, platform, tensor_shape, 1,
-                           np.int32, np.int32, np.int32,
-                           model_version="1", swap=False,
-                           use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                           use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            iu.infer_exact(self, platform, tensor_shape, 1,
-                           np.int32, np.int32, np.int32,
-                           model_version="2", swap=True,
-                           use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                           use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            iu.infer_exact(self, platform, tensor_shape, 1,
-                           np.int32, np.int32, np.int32,
-                           model_version="3", swap=True,
-                           use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                           use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #     # There are 3 versions of *_int32_int32_int32 and all should
+    #     # be available.
+    #     for platform in ('graphdef', 'savedmodel', 'netdef'):
+    #         if platform not in BACKENDS:
+    #             continue
+    #         iu.infer_exact(self, platform, tensor_shape, 1,
+    #                        np.int32, np.int32, np.int32,
+    #                        model_version="1", swap=False,
+    #                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #         iu.infer_exact(self, platform, tensor_shape, 1,
+    #                        np.int32, np.int32, np.int32,
+    #                        model_version="2", swap=True,
+    #                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #         iu.infer_exact(self, platform, tensor_shape, 1,
+    #                        np.int32, np.int32, np.int32,
+    #                        model_version="3", swap=True,
+    #                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-    def test_raw_version_specific_1(self):
-        input_size = 16
-        tensor_shape = (input_size,)
+    # def test_raw_version_specific_1(self):
+    #     input_size = 16
+    #     tensor_shape = (input_size,)
 
-        # There are 3 versions of *_float16_float16_float16 but only
-        # version 1 should be available.
-        for platform in ('graphdef', 'savedmodel'):
-            if platform not in BACKENDS:
-                continue
-            iu.infer_exact(self, platform, tensor_shape, 1,
-                           np.float16, np.float16, np.float16,
-                           model_version="1", swap=False,
-                           use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                           use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #     # There are 3 versions of *_float16_float16_float16 but only
+    #     # version 1 should be available.
+    #     for platform in ('graphdef', 'savedmodel'):
+    #         if platform not in BACKENDS:
+    #             continue
+    #         iu.infer_exact(self, platform, tensor_shape, 1,
+    #                        np.float16, np.float16, np.float16,
+    #                        model_version="1", swap=False,
+    #                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-            try:
-                iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.float16, np.float16, np.float16,
-                               model_version="2", swap=True,
-                               use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                               use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            except InferenceServerException as ex:
-                self.assertEqual("inference:0", ex.server_id())
-                self.assertTrue(
-                    ex.message().startswith("Request for unknown model"))
+    #         try:
+    #             iu.infer_exact(self, platform, tensor_shape, 1,
+    #                            np.float16, np.float16, np.float16,
+    #                            model_version="2", swap=True,
+    #                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #         except InferenceServerException as ex:
+    #             self.assertEqual("inference:0", ex.server_id())
+    #             self.assertTrue(
+    #                 ex.message().startswith("Request for unknown model"))
 
-            try:
-                iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.float16, np.float16, np.float16,
-                               model_version="3", swap=True,
-                               use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                               use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            except InferenceServerException as ex:
-                self.assertEqual("inference:0", ex.server_id())
-                self.assertTrue(
-                    ex.message().startswith("Request for unknown model"))
+    #         try:
+    #             iu.infer_exact(self, platform, tensor_shape, 1,
+    #                            np.float16, np.float16, np.float16,
+    #                            model_version="3", swap=True,
+    #                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #         except InferenceServerException as ex:
+    #             self.assertEqual("inference:0", ex.server_id())
+    #             self.assertTrue(
+    #                 ex.message().startswith("Request for unknown model"))
 
-    def test_raw_version_specific_1_3(self):
-        input_size = 16
+    # def test_raw_version_specific_1_3(self):
+    #     input_size = 16
 
-        # There are 3 versions of *_float32_float32_float32 but only
-        # versions 1 and 3 should be available.
-        for platform in ('graphdef', 'savedmodel', 'netdef', 'plan'):
-            if platform == 'plan' and CPU_ONLY:
-                continue
-            if platform not in BACKENDS:
-                continue
-            tensor_shape = (input_size,)
-            iu.infer_exact(self, platform, tensor_shape, 1,
-                           np.float32, np.float32, np.float32,
-                           model_version="1", swap=False,
-                           use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                           use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #     # There are 3 versions of *_float32_float32_float32 but only
+    #     # versions 1 and 3 should be available.
+    #     for platform in ('graphdef', 'savedmodel', 'netdef', 'plan'):
+    #         if platform == 'plan' and CPU_ONLY:
+    #             continue
+    #         if platform not in BACKENDS:
+    #             continue
+    #         tensor_shape = (input_size,)
+    #         iu.infer_exact(self, platform, tensor_shape, 1,
+    #                        np.float32, np.float32, np.float32,
+    #                        model_version="1", swap=False,
+    #                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-            try:
-                iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.float32, np.float32, np.float32,
-                               model_version="2", swap=True,
-                               use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                               use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-            except InferenceServerException as ex:
-                self.assertEqual("inference:0", ex.server_id())
-                self.assertTrue(
-                    ex.message().startswith("Request for unknown model"))
+    #         try:
+    #             iu.infer_exact(self, platform, tensor_shape, 1,
+    #                            np.float32, np.float32, np.float32,
+    #                            model_version="2", swap=True,
+    #                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #         except InferenceServerException as ex:
+    #             self.assertEqual("inference:0", ex.server_id())
+    #             self.assertTrue(
+    #                 ex.message().startswith("Request for unknown model"))
 
-            iu.infer_exact(self, platform, tensor_shape, 1,
-                           np.float32, np.float32, np.float32,
-                           model_version="3", swap=True,
-                           use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                           use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+    #         iu.infer_exact(self, platform, tensor_shape, 1,
+    #                        np.float32, np.float32, np.float32,
+    #                        model_version="3", swap=True,
+    #                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+    #                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
     if ENSEMBLES:
         if all(x in BACKENDS for x in ['graphdef', 'netdef', 'savedmodel']):
