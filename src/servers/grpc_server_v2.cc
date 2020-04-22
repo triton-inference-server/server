@@ -216,8 +216,11 @@ struct AllocPayload {
 
   ModelInferResponse* response_;
   TensorShmMap* shm_map_;
+
   // Used to extend the lifetime of the serialized data in case
-  // repeated byte contents were provided in the request.
+  // repeated byte contents were provided in the request. It actual
+  // lifetime is that of the request whereas AllocPayload's lifetime
+  // is that of a response... but it is convenient to keep it here.
   TensorSerializedDataMap* serialized_data_map_;
 };
 
