@@ -176,13 +176,6 @@ for TARGET in cpu gpu; do
         RET=1
     fi
 
-    grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed To Run\n***"
-        RET=1
-    fi
-
     set -e
 
     kill $SERVER_PID
