@@ -43,7 +43,8 @@ def test_infer(model_name, input0_data, input1_data):
     inputs[1].set_data_from_numpy(input1_data, binary_data=True)
 
     outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT1',
+                                                   binary_data=False))
     query_params = {'test_1': 1, 'test_2': 2}
     results = triton_client.infer(model_name,
                                   inputs,
@@ -88,7 +89,8 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        triton_client = httpclient.InferenceServerClient(FLAGS.url)
+        triton_client = httpclient.InferenceServerClient(url=FLAGS.url,
+                                                         verbose=FLAGS.verbose)
     except Exception as e:
         print("channel creation failed: " + str(e))
         sys.exit()
@@ -97,7 +99,7 @@ if __name__ == '__main__':
     # to unique integers and the second to all ones.
     input0_data = np.arange(start=0, stop=16, dtype=np.int32)
     input0_data = np.expand_dims(input0_data, axis=0)
-    input1_data = np.full(shape=(1, 16), fill_value= -1, dtype=np.int32)
+    input1_data = np.full(shape=(1, 16), fill_value=-1, dtype=np.int32)
 
     # Infer with simple (With requested Outputs)
     results = test_infer("simple", input0_data, input1_data)
@@ -144,7 +146,8 @@ if __name__ == '__main__':
             sys.exit(1)
 
     # Infer with incorrect model name
-    response = test_infer("wrong_model_name", input0_data, input1_data).get_response()
+    response = test_infer("wrong_model_name", input0_data,
+                          input1_data).get_response()
     print(response)
     if "error" not in response.keys():
         print("improper error message for wrong model name")

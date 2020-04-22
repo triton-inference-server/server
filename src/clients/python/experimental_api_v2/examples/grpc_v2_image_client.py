@@ -108,7 +108,7 @@ def parse_model(model_metadata, model_config):
             format(model_metadata.name, len(input_metadata.shape)))
 
     if ((input_config.format != mc.ModelInput.FORMAT_NCHW) and
-            (input_config.format != mc.ModelInput.FORMAT_NHWC)):
+        (input_config.format != mc.ModelInput.FORMAT_NHWC)):
         raise Exception("unexpected input format " +
                         mc.ModelInput.Format.Name(input_config.format) +
                         ", expecting " +
@@ -180,11 +180,13 @@ def postprocess(results, filenames, batch_size):
 
     batched_result = np.array(results[0].contents.byte_contents)
     contents = np.reshape(batched_result, results[0].shape)
-    
+
     if len(contents) != batch_size:
-        raise Exception("expected {} results, got {}".format(batch_size, len(contents)))
+        raise Exception("expected {} results, got {}".format(
+            batch_size, len(contents)))
     if len(filenames) != batch_size:
-        raise Exception("expected {} filenames, got {}".format(batch_size, len(filenames)))
+        raise Exception("expected {} filenames, got {}".format(
+            batch_size, len(filenames)))
 
     for (index, results) in enumerate(contents):
         print("Image '{}':".format(filenames[index]))
@@ -193,18 +195,23 @@ def postprocess(results, filenames, batch_size):
             print("    {} ({}) = {}".format(cls[0], cls[1], cls[2]))
 
 
-def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS, input_filenames):
+def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
+                     input_filenames):
     request = grpc_service_v2_pb2.ModelInferRequest()
     request.model_name = FLAGS.model_name
     request.model_version = FLAGS.model_version
 
     filenames = []
     if os.path.isdir(FLAGS.image_filename):
-        filenames = [os.path.join(FLAGS.image_filename, f)
-                     for f in os.listdir(FLAGS.image_filename)
-                     if os.path.isfile(os.path.join(FLAGS.image_filename, f))]
+        filenames = [
+            os.path.join(FLAGS.image_filename, f)
+            for f in os.listdir(FLAGS.image_filename)
+            if os.path.isfile(os.path.join(FLAGS.image_filename, f))
+        ]
     else:
-        filenames = [FLAGS.image_filename, ]
+        filenames = [
+            FLAGS.image_filename,
+        ]
 
     filenames.sort()
 
@@ -227,9 +234,8 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS, inp
     image_data = []
     for filename in filenames:
         img = Image.open(filename)
-        image_data.append(preprocess(
-            img, format, dtype, c, h, w, FLAGS.scaling))
-
+        image_data.append(preprocess(img, format, dtype, c, h, w,
+                                     FLAGS.scaling))
 
     # Send requests of FLAGS.batch_size images.
     input_bytes = None
@@ -261,12 +267,13 @@ if __name__ == '__main__':
                         type=str,
                         required=True,
                         help='Name of model')
-    parser.add_argument('-x',
-                        '--model-version',
-                        type=str,
-                        required=False,
-                        default="",
-                        help='Version of model. Default is to use latest version.')
+    parser.add_argument(
+        '-x',
+        '--model-version',
+        type=str,
+        required=False,
+        default="",
+        help='Version of model. Default is to use latest version.')
     parser.add_argument('-b',
                         '--batch-size',
                         type=int,
@@ -279,20 +286,24 @@ if __name__ == '__main__':
                         required=False,
                         default=1,
                         help='Number of class results to report. Default is 1.')
-    parser.add_argument('-s',
-                        '--scaling',
-                        type=str,
-                        choices=['NONE', 'INCEPTION', 'VGG'],
-                        required=False,
-                        default='NONE',
-                        help='Type of scaling to apply to image pixels. Default is NONE.')
+    parser.add_argument(
+        '-s',
+        '--scaling',
+        type=str,
+        choices=['NONE', 'INCEPTION', 'VGG'],
+        required=False,
+        default='NONE',
+        help='Type of scaling to apply to image pixels. Default is NONE.')
     parser.add_argument('-u',
                         '--url',
                         type=str,
                         required=False,
                         default='localhost:8001',
                         help='Inference server URL. Default is localhost:8001.')
-    parser.add_argument('image_filename', type=str, nargs='?', default=None,
+    parser.add_argument('image_filename',
+                        type=str,
+                        nargs='?',
+                        default=None,
                         help='Input image / Input folder.')
     FLAGS = parser.parse_args()
 

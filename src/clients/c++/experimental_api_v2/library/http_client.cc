@@ -973,7 +973,8 @@ InferenceServerHttpClient::AsyncInfer(
 
 InferenceServerHttpClient::InferenceServerHttpClient(
     const std::string& url, bool verbose)
-    : url_(url), verbose_(verbose), multi_handle_(curl_multi_init())
+    : InferenceServerClient(verbose), url_(url),
+      multi_handle_(curl_multi_init())
 {
 }
 

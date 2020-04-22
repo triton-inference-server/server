@@ -254,6 +254,8 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
+        if self._verbose:
+            print(response)
 
         return response.status_code == 200
 
@@ -284,6 +286,8 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
+        if self._verbose:
+            print(response)
 
         return response.status_code == 200
 
@@ -329,6 +333,9 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
+        if self._verbose:
+            print(response)
+
         return response.status_code == 200
 
     def get_server_metadata(self, headers=None, query_params=None):
@@ -358,6 +365,8 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
+        if self._verbose:
+            print(response)
         _raise_if_error(response)
         metadata = json.loads(response.read())
 
@@ -405,6 +414,8 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
+        if self._verbose:
+            print(response)
         _raise_if_error(response)
         metadata = json.loads(response.read())
 
@@ -452,6 +463,8 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
+        if self._verbose:
+            print(response)
         _raise_if_error(response)
         config = json.loads(response.read())
 
@@ -484,6 +497,8 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
+        if self._verbose:
+            print(response)
         _raise_if_error(response)
         index = json.loads(response.read())
 
@@ -515,6 +530,8 @@ class InferenceServerClient:
                               headers=headers,
                               query_params=query_params)
         _raise_if_error(response)
+        if self._verbose:
+            print("Loaded model '{}'".format(model_name))
 
     def unload_model(self, model_name, headers=None, query_params=None):
         """Request the inference server to unload specified model.
@@ -542,6 +559,8 @@ class InferenceServerClient:
                               headers=headers,
                               query_params=query_params)
         _raise_if_error(response)
+        if self._verbose:
+            print("Loaded model '{}'".format(model_name))
 
     def get_inference_statistics(self,
                                  model_name,
@@ -587,6 +606,8 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
+        if self._verbose:
+            print(response)
         _raise_if_error(response)
         statistics = json.loads(response.read())
 
@@ -632,6 +653,9 @@ class InferenceServerClient:
                              headers=headers,
                              query_params=query_params)
         _raise_if_error(response)
+        if self._verbose:
+            print(response)
+
         status = json.loads(response.read())
 
         return status
@@ -687,6 +711,8 @@ class InferenceServerClient:
                               headers=headers,
                               query_params=query_params)
         _raise_if_error(response)
+        if self._verbose:
+            print("Registered system shared memory with name '{}'".format(name))
 
     def unregister_system_shared_memory(self,
                                         name="",
@@ -725,6 +751,12 @@ class InferenceServerClient:
                               headers=headers,
                               query_params=query_params)
         _raise_if_error(response)
+        if self._verbose:
+            if name is not "":
+                print("Unregistered system shared memory with name '{}'".format(
+                    name))
+            else:
+                print("Unregistered all system shared memory regions")
 
     def get_cuda_shared_memory_status(self,
                                       region_name="",
@@ -766,6 +798,8 @@ class InferenceServerClient:
                              headers=headers,
                              query_params=query_params)
         _raise_if_error(response)
+        if self._verbose:
+            print(response)
         status = json.loads(response.read())
 
         return status
@@ -820,6 +854,8 @@ class InferenceServerClient:
                               headers=headers,
                               query_params=query_params)
         _raise_if_error(response)
+        if self._verbose:
+            print("Registered cuda shared memory with name '{}'".format(name))
 
     def unregister_cuda_shared_memory(self,
                                       name="",
@@ -858,6 +894,12 @@ class InferenceServerClient:
                               headers=headers,
                               query_params=query_params)
         _raise_if_error(response)
+        if self._verbose:
+            if name is not "":
+                print("Unregistered cuda shared memory with name '{}'".format(
+                    name))
+            else:
+                print("Unregistered all cuda shared memory regions")
 
     def infer(self,
               model_name,
@@ -977,6 +1019,8 @@ class InferenceServerClient:
                               request_body=request_body,
                               headers=headers,
                               query_params=query_params)
+        if self._verbose:
+            print(response)
         result = InferResult(response)
 
         return result
@@ -1067,6 +1111,8 @@ class InferenceServerClient:
             return self._post(request_uri, request_body, headers, query_params)
 
         def wrapped_callback(response):
+            if self._verbose:
+                print(response)
             callback(result=InferResult(response), error=_get_error(response))
 
         infer_request = _get_inference_request(inputs=inputs,
@@ -1103,6 +1149,12 @@ class InferenceServerClient:
             callback=wrapped_callback)
 
         g.start()
+
+        if self._verbose:
+            verbose_message = "Sent request"
+            if request_id is not "":
+                verbose_message = verbose_message + " '{}'".format(request_id)
+            print(verbose_message)
 
 
 class InferInput:

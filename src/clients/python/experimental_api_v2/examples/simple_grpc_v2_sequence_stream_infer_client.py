@@ -136,7 +136,8 @@ if __name__ == '__main__':
     # It is advisable to use client object within with..as clause
     # when sending streaming requests. This ensures the client
     # is closed when the block inside with exits.
-    with grpcclient.InferenceServerClient(FLAGS.url) as triton_client:
+    with grpcclient.InferenceServerClient(
+            url=FLAGS.url, verbose=FLAGS.verbose) as triton_client:
         try:
             # Establish stream
             triton_client.start_stream(callback=partial(callback, user_data))

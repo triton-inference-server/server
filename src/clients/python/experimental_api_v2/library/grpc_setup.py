@@ -33,9 +33,7 @@ if 'VERSION' not in os.environ:
 
 VERSION = os.environ['VERSION']
 
-REQUIRED = [
-    'numpy', 'python-rapidjson', 'protobuf>=3.5.0', 'grpcio'
-]
+REQUIRED = ['numpy', 'python-rapidjson', 'protobuf>=3.5.0', 'grpcio']
 
 try:
     from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
@@ -58,7 +56,8 @@ setup(
     version=VERSION,
     author='NVIDIA Inc.',
     author_email='tanmayv@nvidia.com',
-    description='Python client library for communicating with NVIDIA Triton Inference Server using gRPC',
+    description=
+    'Python client library for communicating with NVIDIA Triton Inference Server using gRPC',
     license='BSD',
     url='http://nvidia.com',
     keywords='triton tensorrt inference server service client',

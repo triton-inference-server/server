@@ -146,6 +146,8 @@ class InferenceServerClient:
             request = grpc_service_v2_pb2.ServerLiveRequest()
             response = self._client_stub.ServerLive(request=request,
                                                     metadata=metadata)
+            if self._verbose:
+                print(response)
             return response.live
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
@@ -178,6 +180,8 @@ class InferenceServerClient:
             request = grpc_service_v2_pb2.ServerReadyRequest()
             response = self._client_stub.ServerReady(request=request,
                                                      metadata=metadata)
+            if self._verbose:
+                print(response)
             return response.ready
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
@@ -217,6 +221,8 @@ class InferenceServerClient:
                 name=model_name, version=model_version)
             response = self._client_stub.ModelReady(request=request,
                                                     metadata=metadata)
+            if self._verbose:
+                print(response)
             return response.ready
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
@@ -253,6 +259,8 @@ class InferenceServerClient:
             request = grpc_service_v2_pb2.ServerMetadataRequest()
             response = self._client_stub.ServerMetadata(request=request,
                                                         metadata=metadata)
+            if self._verbose:
+                print(response)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -303,6 +311,8 @@ class InferenceServerClient:
                 name=model_name, version=model_version)
             response = self._client_stub.ModelMetadata(request=request,
                                                        metadata=metadata)
+            if self._verbose:
+                print(response)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -353,6 +363,8 @@ class InferenceServerClient:
                 name=model_name, version=model_version)
             response = self._client_stub.ModelConfig(request=request,
                                                      metadata=metadata)
+            if self._verbose:
+                print(response)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -388,6 +400,8 @@ class InferenceServerClient:
             request = grpc_service_v2_pb2.RepositoryIndexRequest()
             response = self._client_stub.RepositoryIndex(request=request,
                                                          metadata=metadata)
+            if self._verbose:
+                print(response)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -421,6 +435,8 @@ class InferenceServerClient:
                 model_name=model_name)
             self._client_stub.RepositoryModelLoad(request=request,
                                                   metadata=metadata)
+            if self._verbose:
+                print("Loaded model '{}'".format(model_name))
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -450,6 +466,8 @@ class InferenceServerClient:
                 model_name=model_name)
             self._client_stub.RepositoryModelUnload(request=request,
                                                     metadata=metadata)
+            if self._verbose:
+                print("Unloaded model '{}'".format(model_name))
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -492,6 +510,8 @@ class InferenceServerClient:
                 name=model_name, version=model_version)
             response = self._client_stub.ModelStatistics(request=request,
                                                          metadata=metadata)
+            if self._verbose:
+                print(response)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -540,6 +560,8 @@ class InferenceServerClient:
                 name=region_name)
             response = self._client_stub.SystemSharedMemoryStatus(
                 request=request, metadata=metadata)
+            if self._verbose:
+                print(response)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -588,6 +610,9 @@ class InferenceServerClient:
                 name=name, key=key, offset=offset, byte_size=byte_size)
             self._client_stub.SystemSharedMemoryRegister(request=request,
                                                          metadata=metadata)
+            if self._verbose:
+                print("Registered system shared memory with name '{}'".format(
+                    name))
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -620,6 +645,12 @@ class InferenceServerClient:
                 name=name)
             self._client_stub.SystemSharedMemoryUnregister(request=request,
                                                            metadata=metadata)
+            if self._verbose:
+                if name is not "":
+                    print("Unregistered system shared memory with name '{}'".
+                          format(name))
+                else:
+                    print("Unregistered all system shared memory regions")
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -665,6 +696,8 @@ class InferenceServerClient:
                 name=region_name)
             response = self._client_stub.CudaSharedMemoryStatus(
                 request=request, metadata=metadata)
+            if self._verbose:
+                print(response)
             if as_json:
                 return json.loads(MessageToJson(response))
             else:
@@ -713,6 +746,9 @@ class InferenceServerClient:
                 byte_size=byte_size)
             self._client_stub.CudaSharedMemoryRegister(request=request,
                                                        metadata=metadata)
+            if self._verbose:
+                print(
+                    "Registered cuda shared memory with name '{}'".format(name))
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -745,6 +781,13 @@ class InferenceServerClient:
                 name=name)
             self._client_stub.CudaSharedMemoryUnregister(request=request,
                                                          metadata=metadata)
+            if self._verbose:
+                if name is not "":
+                    print(
+                        "Unregistered cuda shared memory with name '{}'".format(
+                            name))
+                else:
+                    print("Unregistered all cuda shared memory regions")
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -843,6 +886,8 @@ class InferenceServerClient:
         try:
             response = self._client_stub.ModelInfer(request=request,
                                                     metadata=metadata)
+            if self._verbose:
+                print(response)
             result = InferResult(response)
             return result
         except grpc.RpcError as rpc_error:
@@ -929,7 +974,10 @@ class InferenceServerClient:
         def wrapped_callback(call_future):
             error = result = None
             try:
-                result = InferResult(call_future.result())
+                response = call_future.result()
+                if self._verbose:
+                    print(response)
+                result = InferResult(response)
             except grpc.RpcError as rpc_error:
                 error = get_error_grpc(rpc_error)
             callback(result=result, error=error)
@@ -954,6 +1002,12 @@ class InferenceServerClient:
             self._call_future = self._client_stub.ModelInfer.future(
                 request=request, metadata=metadata)
             self._call_future.add_done_callback(wrapped_callback)
+            if self._verbose:
+                verbose_message = "Sent request"
+                if request_id is not "":
+                    verbose_message = verbose_message + " '{}'".format(
+                        request_id)
+                print(verbose_message)
         except grpc.RpcError as rpc_error:
             raise_error_grpc(rpc_error)
 
@@ -995,7 +1049,7 @@ class InferenceServerClient:
         else:
             metadata = ()
 
-        self._stream = _InferStream(callback)
+        self._stream = _InferStream(callback, self._verbose)
 
         try:
             response_iterator = self._client_stub.ModelStreamInfer(
@@ -1096,6 +1150,8 @@ class InferenceServerClient:
                                          timeout=timeout)
         # Enqueues the request to the stream
         self._stream._enqueue_request(request)
+        if self._verbose:
+            print("enqueued request {} to stream...".format(request_id))
 
 
 class InferInput:
@@ -1415,8 +1471,9 @@ class _InferStream:
         'error' would be None for a successful inference.
     """
 
-    def __init__(self, callback):
+    def __init__(self, callback, verbose):
         self._callback = callback
+        self._verbose = verbose
         self._request_queue = queue.Queue()
         self._handler = None
 
@@ -1432,6 +1489,8 @@ class _InferStream:
             self._request_queue.put(None)
             if self._handler.is_alive():
                 self._handler.join()
+                if self._verbose:
+                    print("stream stopped...")
             self._handler = None
 
     def _init_handler(self, response_iterator):
@@ -1451,6 +1510,8 @@ class _InferStream:
         self._handler = threading.Thread(target=self._process_response,
                                          args=(response_iterator,))
         self._handler.start()
+        if self._verbose:
+            print("stream started...")
 
     def _enqueue_request(self, request):
         """Enqueues the specified request object to be provided
@@ -1492,6 +1553,8 @@ class _InferStream:
         """
         try:
             for response in responses:
+                if self._verbose:
+                    print(response)
                 result = error = None
                 if response.error_message != "":
                     error = InferenceServerException(msg=response.error_message)

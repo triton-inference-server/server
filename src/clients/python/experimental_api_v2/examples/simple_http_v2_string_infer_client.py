@@ -40,7 +40,8 @@ def TestIdentityInference(np_array, binary_data):
     inputs.append(httpclient.InferInput('INPUT0', np_array.shape, "BYTES"))
     inputs[0].set_data_from_numpy(np_array, binary_data=binary_data)
 
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=binary_data))
+    outputs.append(
+        httpclient.InferRequestedOutput('OUTPUT0', binary_data=binary_data))
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
@@ -73,7 +74,8 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        triton_client = httpclient.InferenceServerClient(FLAGS.url)
+        triton_client = httpclient.InferenceServerClient(url=FLAGS.url,
+                                                         verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))
         sys.exit()
@@ -103,7 +105,8 @@ if __name__ == '__main__':
     inputs[1].set_data_from_numpy(input1_data, binary_data=False)
 
     outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT1', binary_data=False))
+    outputs.append(httpclient.InferRequestedOutput('OUTPUT1',
+                                                   binary_data=False))
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
@@ -132,14 +135,14 @@ if __name__ == '__main__':
     # Test with null character
     null_chars_array = np.array(["he\x00llo" for i in range(16)], dtype=object)
     null_char_data = null_chars_array.reshape([1, 16])
-    TestIdentityInference(null_char_data, True) # Using binary data
-    TestIdentityInference(null_char_data, False) # Using JSON data
+    TestIdentityInference(null_char_data, True)  # Using binary data
+    TestIdentityInference(null_char_data, False)  # Using JSON data
 
     # Test with byte arrays
     bytes_data = [b'1' for i in range(16)]
     np_bytes_data = np.array(bytes_data, dtype=bytes)
     np_bytes_data = np_bytes_data.reshape([1, 16])
-    TestIdentityInference(np_bytes_data, True) # Using binary data
-    TestIdentityInference(np_bytes_data, False) # Using JSON data
+    TestIdentityInference(np_bytes_data, True)  # Using binary data
+    TestIdentityInference(np_bytes_data, False)  # Using JSON data
 
     print('PASS: string')
