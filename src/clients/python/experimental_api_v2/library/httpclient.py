@@ -191,6 +191,9 @@ class InferenceServerClient:
         else:
             response = self._client_stub.get(request_uri)
 
+        if self._verbose:
+            print(response)
+
         return response
 
     def _post(self, request_uri, request_body, headers, query_params):
@@ -224,6 +227,9 @@ class InferenceServerClient:
             response = self._client_stub.post(request_uri=request_uri,
                                               body=request_body)
 
+        if self._verbose:
+            print(response)
+
         return response
 
     def is_server_live(self, headers=None, query_params=None):
@@ -254,8 +260,6 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
-        if self._verbose:
-            print(response)
 
         return response.status_code == 200
 
@@ -286,8 +290,6 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
-        if self._verbose:
-            print(response)
 
         return response.status_code == 200
 
@@ -333,8 +335,6 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
-        if self._verbose:
-            print(response)
 
         return response.status_code == 200
 
@@ -365,12 +365,13 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
-        if self._verbose:
-            print(response)
         _raise_if_error(response)
-        metadata = json.loads(response.read())
 
-        return metadata
+        content = response.read()
+        if self._verbose:
+            print(content)
+
+        return json.loads(content)
 
     def get_model_metadata(self,
                            model_name,
@@ -414,12 +415,13 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
-        if self._verbose:
-            print(response)
         _raise_if_error(response)
-        metadata = json.loads(response.read())
 
-        return metadata
+        content = response.read()
+        if self._verbose:
+            print(content)
+
+        return json.loads(content)
 
     def get_model_config(self,
                          model_name,
@@ -463,12 +465,13 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
-        if self._verbose:
-            print(response)
         _raise_if_error(response)
-        config = json.loads(response.read())
 
-        return config
+        content = response.read()
+        if self._verbose:
+            print(content)
+
+        return json.loads(content)
 
     def get_model_repository_index(self, headers=None, query_params=None):
         """Get the index of model repository contents
@@ -497,12 +500,13 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
-        if self._verbose:
-            print(response)
         _raise_if_error(response)
-        index = json.loads(response.read())
 
-        return index
+        content = response.read()
+        if self._verbose:
+            print(content)
+
+        return json.loads(content)
 
     def load_model(self, model_name, headers=None, query_params=None):
         """Request the inference server to load or reload specified model.
@@ -606,12 +610,13 @@ class InferenceServerClient:
         response = self._get(request_uri=request_uri,
                              headers=headers,
                              query_params=query_params)
-        if self._verbose:
-            print(response)
         _raise_if_error(response)
-        statistics = json.loads(response.read())
 
-        return statistics
+        content = response.read()
+        if self._verbose:
+            print(content)
+
+        return json.loads(content)
 
     def get_system_shared_memory_status(self,
                                         region_name="",
@@ -653,12 +658,12 @@ class InferenceServerClient:
                              headers=headers,
                              query_params=query_params)
         _raise_if_error(response)
+
+        content = response.read()
         if self._verbose:
-            print(response)
+            print(content)
 
-        status = json.loads(response.read())
-
-        return status
+        return json.loads(content)
 
     def register_system_shared_memory(self,
                                       name,
@@ -798,11 +803,12 @@ class InferenceServerClient:
                              headers=headers,
                              query_params=query_params)
         _raise_if_error(response)
-        if self._verbose:
-            print(response)
-        status = json.loads(response.read())
 
-        return status
+        content = response.read()
+        if self._verbose:
+            print(content)
+
+        return json.loads(content)
 
     def register_cuda_shared_memory(self,
                                     name,
@@ -1019,11 +1025,8 @@ class InferenceServerClient:
                               request_body=request_body,
                               headers=headers,
                               query_params=query_params)
-        if self._verbose:
-            print(response)
-        result = InferResult(response)
 
-        return result
+        return InferResult(response, self._verbose)
 
     def async_infer(self,
                     model_name,
@@ -1111,9 +1114,8 @@ class InferenceServerClient:
             return self._post(request_uri, request_body, headers, query_params)
 
         def wrapped_callback(response):
-            if self._verbose:
-                print(response)
-            callback(result=InferResult(response), error=_get_error(response))
+            callback(result=InferResult(response, self._verbose),
+                     error=_get_error(response))
 
         infer_request = _get_inference_request(inputs=inputs,
                                                request_id=request_id,
@@ -1401,15 +1403,23 @@ class InferResult:
     ----------
     result : dict
         The inference response from the server
+    verbose : bool
+        If True generate verbose output. Default value is False.
     """
 
-    def __init__(self, response):
+    def __init__(self, response, verbose):
         header_length = response.get('Inference-Header-Content-Length')
         if header_length is None:
-            self._result = json.loads(response.read())
+            content = response.read()
+            if verbose:
+                print(content)
+            self._result = json.loads(content)
         else:
             header_length = int(header_length)
-            self._result = json.loads(response.read(length=header_length))
+            content = response.read(length=header_length)
+            if verbose:
+                print(content)
+            self._result = json.loads(content)
 
             # Maps the output name to the index in buffer for quick retrieval
             self._output_name_to_buffer_map = {}
