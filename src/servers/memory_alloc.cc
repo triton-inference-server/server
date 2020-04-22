@@ -207,11 +207,12 @@ OutputIndex(TRITONSERVER_InferenceResponse* response, const std::string& name)
     size_t byte_size;
     TRITONSERVER_MemoryType memory_type;
     int64_t memory_type_id;
+    void* userp;
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseOutput(
             response, idx, &cname, &datatype, &shape, &dim_count, &base,
-            &byte_size, &memory_type, &memory_type_id),
+            &byte_size, &memory_type, &memory_type_id, &userp),
         "getting output info");
 
     if (name == std::string(cname)) {
@@ -751,12 +752,13 @@ main(int argc, char** argv)
     TRITONSERVER_DataType datatype;
     const int64_t* shape;
     uint64_t dim_count;
+    void* userp;
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseOutput(
             response, OutputIndex(response, output0), &cname, &datatype, &shape,
             &dim_count, &output0_content, &output0_byte_size,
-            &output0_memory_type, &output0_memory_type_id),
+            &output0_memory_type, &output0_memory_type_id, &userp),
         "getting output0 info");
 
     if (dtype == TRITONSERVER_TYPE_BYTES) {
@@ -794,12 +796,13 @@ main(int argc, char** argv)
     TRITONSERVER_DataType datatype;
     const int64_t* shape;
     uint64_t dim_count;
+    void* userp;
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseOutput(
             response, OutputIndex(response, output1), &cname, &datatype, &shape,
             &dim_count, &output1_content, &output1_byte_size,
-            &output1_memory_type, &output1_memory_type_id),
+            &output1_memory_type, &output1_memory_type_id, &userp),
         "getting output1 info");
 
     if (dtype == TRITONSERVER_TYPE_BYTES) {
