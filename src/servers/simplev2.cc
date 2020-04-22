@@ -364,11 +364,12 @@ Check(
     size_t byte_size;
     TRITONSERVER_MemoryType memory_type;
     int64_t memory_type_id;
+    void* userp;
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseOutput(
             response, idx, &cname, &datatype, &shape, &dim_count, &base,
-            &byte_size, &memory_type, &memory_type_id),
+            &byte_size, &memory_type, &memory_type_id, &userp),
         "getting output info");
 
     if (cname == nullptr) {
