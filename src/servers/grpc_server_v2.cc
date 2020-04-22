@@ -28,6 +28,7 @@
 
 #include <condition_variable>
 #include <cstdint>
+#include <list>
 #include <map>
 #include <mutex>
 #include <queue>
@@ -200,28 +201,22 @@ struct AllocPayload {
   };
 
   using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
-  using TensorSerializedDataMap =
-      std::unordered_map<std::string, std::shared_ptr<std::string>>;
 
-  explicit AllocPayload()
-      : response_(nullptr), shm_map_(nullptr), serialized_data_map_(nullptr)
-  {
-  }
+  explicit AllocPayload() : response_(nullptr), shm_map_(nullptr) {}
   ~AllocPayload()
   {
     // Don't delete 'response_'.. it is owned by the HandlerState
     delete shm_map_;
-    delete serialized_data_map_;
   }
 
   ModelInferResponse* response_;
   TensorShmMap* shm_map_;
 
   // Used to extend the lifetime of the serialized data in case
-  // repeated byte contents were provided in the request. It actual
-  // lifetime is that of the request whereas AllocPayload's lifetime
-  // is that of a response... but it is convenient to keep it here.
-  TensorSerializedDataMap* serialized_data_map_;
+  // non-raw contents were provided in the request. It actual lifetime
+  // is that of the request whereas AllocPayload's lifetime is that of
+  // a response... but it is convenient to keep it here.
+  std::list<std::string> serialized_data_;
 };
 
 //
@@ -1921,20 +1916,15 @@ TRITONSERVER_Error*
 InferAllocatorPayload(
     const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const ModelInferRequest& request,
-    AllocPayload::TensorSerializedDataMap* serialized_data_map,
+    const ModelInferRequest& request, std::list<std::string>&& serialized_data,
     ModelInferResponse* response, AllocPayload* alloc_payload)
 {
   alloc_payload->response_ = response;
   if (alloc_payload->shm_map_ != nullptr) {
     alloc_payload->shm_map_->clear();
   }
-  if (alloc_payload->serialized_data_map_ != nullptr) {
-    alloc_payload->serialized_data_map_->clear();
-  }
-  if (!serialized_data_map->empty()) {
-    alloc_payload->serialized_data_map_ = serialized_data_map;
-  }
+
+  alloc_payload->serialized_data_ = std::move(serialized_data);
 
   // If any of the outputs use shared memory, then we must calculate
   // the memory address for that output and store it in the allocator
@@ -2005,8 +1995,7 @@ TRITONSERVER_Error*
 InferGRPCToInput(
     const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const ModelInferRequest& request,
-    AllocPayload::TensorSerializedDataMap* serialized_data_map,
+    const ModelInferRequest& request, std::list<std::string>* serialized_data,
     TRITONSERVER_InferenceRequest* inference_request)
 {
   // Verify that the batch-byte-size of each input matches the size of
@@ -2060,36 +2049,36 @@ InferGRPCToInput(
           RETURN_IF_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), TRITONSERVER_TYPE_INT8, dtype,
               byte_size));
-          std::shared_ptr<std::string> serialized(new std::string());
-          serialized->reserve(
+          serialized_data->emplace_back();
+          auto& serialized = serialized_data->back();
+          serialized.reserve(
               io.contents().int_contents_size() * elem_byte_size);
-          serialized_data_map->emplace(io.name(), serialized);
           for (const auto& element : io.contents().int_contents()) {
             // Assuming the system is little-endian, picking the
             // least significant byte of 32-bit integer as a
             // int8 element
-            serialized->append(
+            serialized.append(
                 reinterpret_cast<const char*>(&element), elem_byte_size);
           }
-          base = serialized->c_str();
-          byte_size = serialized->size();
+          base = serialized.c_str();
+          byte_size = serialized.size();
         } else if (dtype == TRITONSERVER_TYPE_INT16) {
           RETURN_IF_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), TRITONSERVER_TYPE_INT16, dtype,
               byte_size));
-          std::shared_ptr<std::string> serialized(new std::string());
-          serialized->reserve(
+          serialized_data->emplace_back();
+          auto& serialized = serialized_data->back();
+          serialized.reserve(
               io.contents().int_contents_size() * elem_byte_size);
-          serialized_data_map->emplace(io.name(), serialized);
           for (const auto& element : io.contents().int_contents()) {
             // Assuming the system is little-endian, picking the
             // least 2 significant bytes of 32-bit integer as a
             // int16 element
-            serialized->append(
+            serialized.append(
                 reinterpret_cast<const char*>(&element), elem_byte_size);
           }
-          base = serialized->c_str();
-          byte_size = serialized->size();
+          base = serialized.c_str();
+          byte_size = serialized.size();
         } else {
           RETURN_IF_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), TRITONSERVER_TYPE_INT32, dtype,
@@ -2112,36 +2101,36 @@ InferGRPCToInput(
           RETURN_IF_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), TRITONSERVER_TYPE_UINT8, dtype,
               byte_size));
-          std::shared_ptr<std::string> serialized(new std::string());
-          serialized_data_map->emplace(io.name(), serialized);
-          serialized->reserve(
+          serialized_data->emplace_back();
+          auto& serialized = serialized_data->back();
+          serialized.reserve(
               io.contents().uint_contents_size() * elem_byte_size);
           for (const auto& element : io.contents().uint_contents()) {
             // Assuming the system is little-endian, picking the
             // least significant byte of 32-bit unsigned integer as a
             // uint8 element
-            serialized->append(
+            serialized.append(
                 reinterpret_cast<const char*>(&element), elem_byte_size);
           }
-          base = serialized->c_str();
-          byte_size = serialized->size();
+          base = serialized.c_str();
+          byte_size = serialized.size();
         } else if (dtype == TRITONSERVER_TYPE_UINT16) {
           RETURN_IF_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), TRITONSERVER_TYPE_UINT16, dtype,
               byte_size));
-          std::shared_ptr<std::string> serialized(new std::string());
-          serialized_data_map->emplace(io.name(), serialized);
-          serialized->reserve(
+          serialized_data->emplace_back();
+          auto& serialized = serialized_data->back();
+          serialized.reserve(
               io.contents().uint_contents_size() * elem_byte_size);
           for (const auto& element : io.contents().uint_contents()) {
             // Assuming the system is little-endian, picking the
             // least 2 significant bytes of 32-bit integer as a
             // uint16 element
-            serialized->append(
+            serialized.append(
                 reinterpret_cast<const char*>(&element), elem_byte_size);
           }
-          base = serialized->c_str();
-          byte_size = serialized->size();
+          base = serialized.c_str();
+          byte_size = serialized.size();
         } else {
           RETURN_IF_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), TRITONSERVER_TYPE_UINT32, dtype,
@@ -2179,22 +2168,23 @@ InferGRPCToInput(
         RETURN_IF_ERR(InferGRPCToInputHelper(
             io.name(), request.model_name(), TRITONSERVER_TYPE_BYTES, dtype,
             byte_size));
-        std::shared_ptr<std::string> serialized(new std::string());
-        serialized_data_map->emplace(io.name(), serialized);
+
+        serialized_data->emplace_back();
+        auto& serialized = serialized_data->back();
 
         // Serialize the output tensor strings. Each string is
         // serialized as a 4-byte length followed by the string itself
         // with no null-terminator.
         for (const auto& element : io.contents().byte_contents()) {
           uint32_t len{(uint32_t)element.size()};
-          serialized->append(
+          serialized.append(
               reinterpret_cast<const char*>(&len), sizeof(uint32_t));
           if (element.size() > 0) {
-            serialized->append(element.c_str(), len);
+            serialized.append(element.c_str(), len);
           }
         }
-        base = serialized->c_str();
-        byte_size = serialized->size();
+        base = serialized.c_str();
+        byte_size = serialized.size();
       }
     }
 
@@ -2584,17 +2574,16 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
 
     // Will be used to hold the serialized data in case explicit string
     // tensors are present in the request.
-    AllocPayload::TensorSerializedDataMap* serialized_data_map =
-        new AllocPayload::TensorSerializedDataMap();
+    std::list<std::string> serialized_data;
 
     if (err == nullptr) {
       err = InferGRPCToInput(
-          tritonserver_, shm_manager_, request, serialized_data_map, irequest);
+          tritonserver_, shm_manager_, request, &serialized_data, irequest);
     }
     if (err == nullptr) {
       err = InferAllocatorPayload(
-          tritonserver_, shm_manager_, request, serialized_data_map, &response,
-          &state->alloc_payload_);
+          tritonserver_, shm_manager_, request, std::move(serialized_data),
+          &response, &state->alloc_payload_);
     }
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
@@ -2876,16 +2865,15 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
     // Will be used to hold the serialized data in case explicit string
     // tensors are present in the request.
-    AllocPayload::TensorSerializedDataMap* serialized_data_map =
-        new AllocPayload::TensorSerializedDataMap();
+    std::list<std::string> serialized_data;
 
     if (err == nullptr) {
       err = InferGRPCToInput(
-          tritonserver_, shm_manager_, request, serialized_data_map, irequest);
+          tritonserver_, shm_manager_, request, &serialized_data, irequest);
     }
     if (err == nullptr) {
       err = InferAllocatorPayload(
-          tritonserver_, shm_manager_, request, serialized_data_map,
+          tritonserver_, shm_manager_, request, std::move(serialized_data),
           response.mutable_infer_response(), &state->alloc_payload_);
     }
     if (err == nullptr) {
