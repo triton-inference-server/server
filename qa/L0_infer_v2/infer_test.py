@@ -141,106 +141,106 @@ class InferTest(unittest.TestCase):
                                     input_dtype, output0_dtype, output1_dtype,
                                     output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
-    def test_raw_bbb(self):
-        self._full_exact(np.int8, np.int8, np.int8,
-                         output0_raw=True, output1_raw=True, swap=True)
-    def test_raw_sss(self):
-        self._full_exact(np.int16, np.int16, np.int16,
-                         output0_raw=True, output1_raw=True, swap=True)
-    def test_raw_iii(self):
-        self._full_exact(np.int32, np.int32, np.int32,
-                         output0_raw=True, output1_raw=True, swap=True)
-    def test_raw_lll(self):
-        self._full_exact(np.int64, np.int64, np.int64,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_hhh(self):
-        self._full_exact(np.float16, np.float16, np.float16,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_fff(self):
-        self._full_exact(np.float32, np.float32, np.float32,
-                         output0_raw=True, output1_raw=True, swap=True)
-    def test_raw_hff(self):
-        self._full_exact(np.float16, np.float32, np.float32,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_bii(self):
-        self._full_exact(np.int8, np.int32, np.int32,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_ibb(self):
-        self._full_exact(np.int32, np.int8, np.int8,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_ibs(self):
-        self._full_exact(np.int32, np.int8, np.int16,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_iff(self):
-        self._full_exact(np.int32, np.float32, np.float32,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_fii(self):
-        self._full_exact(np.float32, np.int32, np.int32,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_ihs(self):
-        self._full_exact(np.int32, np.float16, np.int16,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_ooo(self):
-        self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_oii(self):
-        self._full_exact(np_dtype_string, np.int32, np.int32,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_oio(self):
-        self._full_exact(np_dtype_string, np.int32, np_dtype_string,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_ooi(self):
-        self._full_exact(np_dtype_string, np_dtype_string, np.int32,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_ioo(self):
-        self._full_exact(np.int32, np_dtype_string, np_dtype_string,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_iio(self):
-        self._full_exact(np.int32, np.int32, np_dtype_string,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_ioi(self):
-        self._full_exact(np.int32, np_dtype_string, np.int32,
-                         output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_bbb(self):
+    #     self._full_exact(np.int8, np.int8, np.int8,
+    #                      output0_raw=True, output1_raw=True, swap=True)
+    # def test_raw_sss(self):
+    #     self._full_exact(np.int16, np.int16, np.int16,
+    #                      output0_raw=True, output1_raw=True, swap=True)
+    # def test_raw_iii(self):
+    #     self._full_exact(np.int32, np.int32, np.int32,
+    #                      output0_raw=True, output1_raw=True, swap=True)
+    # def test_raw_lll(self):
+    #     self._full_exact(np.int64, np.int64, np.int64,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_hhh(self):
+    #     self._full_exact(np.float16, np.float16, np.float16,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_fff(self):
+    #     self._full_exact(np.float32, np.float32, np.float32,
+    #                      output0_raw=True, output1_raw=True, swap=True)
+    # def test_raw_hff(self):
+    #     self._full_exact(np.float16, np.float32, np.float32,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_bii(self):
+    #     self._full_exact(np.int8, np.int32, np.int32,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_ibb(self):
+    #     self._full_exact(np.int32, np.int8, np.int8,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_ibs(self):
+    #     self._full_exact(np.int32, np.int8, np.int16,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_iff(self):
+    #     self._full_exact(np.int32, np.float32, np.float32,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_fii(self):
+    #     self._full_exact(np.float32, np.int32, np.int32,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_ihs(self):
+    #     self._full_exact(np.int32, np.float16, np.int16,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_ooo(self):
+    #     self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_oii(self):
+    #     self._full_exact(np_dtype_string, np.int32, np.int32,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_oio(self):
+    #     self._full_exact(np_dtype_string, np.int32, np_dtype_string,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_ooi(self):
+    #     self._full_exact(np_dtype_string, np_dtype_string, np.int32,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_ioo(self):
+    #     self._full_exact(np.int32, np_dtype_string, np_dtype_string,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_iio(self):
+    #     self._full_exact(np.int32, np.int32, np_dtype_string,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_ioi(self):
+    #     self._full_exact(np.int32, np_dtype_string, np.int32,
+    #                      output0_raw=True, output1_raw=True, swap=False)
 
-    # # shared memory does not support class output
-    # if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
-    #     def test_class_bbb(self):
-    #         self._full_exact(np.int8, np.int8, np.int8,
-    #                          output0_raw=False, output1_raw=False, swap=True)
-    #     def test_class_sss(self):
-    #         self._full_exact(np.int16, np.int16, np.int16,
-    #                          output0_raw=False, output1_raw=False, swap=True)
-    #     def test_class_iii(self):
-    #         self._full_exact(np.int32, np.int32, np.int32,
-    #                          output0_raw=False, output1_raw=False, swap=True)
-    #     def test_class_lll(self):
-    #         self._full_exact(np.int64, np.int64, np.int64,
-    #                          output0_raw=False, output1_raw=False, swap=False)
-    #     def test_class_fff(self):
-    #         self._full_exact(np.float32, np.float32, np.float32,
-    #                          output0_raw=False, output1_raw=False, swap=True)
-    #     def test_class_iff(self):
-    #         self._full_exact(np.int32, np.float32, np.float32,
-    #                          output0_raw=False, output1_raw=False, swap=False)
+    # shared memory does not support class output
+    if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
+        def test_class_bbb(self):
+            self._full_exact(np.int8, np.int8, np.int8,
+                             output0_raw=False, output1_raw=False, swap=True)
+        def test_class_sss(self):
+            self._full_exact(np.int16, np.int16, np.int16,
+                             output0_raw=False, output1_raw=False, swap=True)
+        def test_class_iii(self):
+            self._full_exact(np.int32, np.int32, np.int32,
+                             output0_raw=False, output1_raw=False, swap=True)
+        def test_class_lll(self):
+            self._full_exact(np.int64, np.int64, np.int64,
+                             output0_raw=False, output1_raw=False, swap=False)
+        def test_class_fff(self):
+            self._full_exact(np.float32, np.float32, np.float32,
+                             output0_raw=False, output1_raw=False, swap=True)
+        def test_class_iff(self):
+            self._full_exact(np.int32, np.float32, np.float32,
+                             output0_raw=False, output1_raw=False, swap=False)
 
-    #     def test_mix_bbb(self):
-    #         self._full_exact(np.int8, np.int8, np.int8,
-    #                          output0_raw=True, output1_raw=False, swap=True)
-    #     def test_mix_sss(self):
-    #         self._full_exact(np.int16, np.int16, np.int16,
-    #                          output0_raw=False, output1_raw=True, swap=True)
-    #     def test_mix_iii(self):
-    #         self._full_exact(np.int32, np.int32, np.int32,
-    #                          output0_raw=True, output1_raw=False, swap=True)
-    #     def test_mix_lll(self):
-    #         self._full_exact(np.int64, np.int64, np.int64,
-    #                          output0_raw=False, output1_raw=True, swap=False)
-    #     def test_mix_fff(self):
-    #         self._full_exact(np.float32, np.float32, np.float32,
-    #                          output0_raw=True, output1_raw=False, swap=True)
-    #     def test_mix_iff(self):
-    #         self._full_exact(np.int32, np.float32, np.float32,
-    #                          output0_raw=False, output1_raw=True, swap=False)
+        def test_mix_bbb(self):
+            self._full_exact(np.int8, np.int8, np.int8,
+                             output0_raw=True, output1_raw=False, swap=True)
+        def test_mix_sss(self):
+            self._full_exact(np.int16, np.int16, np.int16,
+                             output0_raw=False, output1_raw=True, swap=True)
+        def test_mix_iii(self):
+            self._full_exact(np.int32, np.int32, np.int32,
+                             output0_raw=True, output1_raw=False, swap=True)
+        def test_mix_lll(self):
+            self._full_exact(np.int64, np.int64, np.int64,
+                             output0_raw=False, output1_raw=True, swap=False)
+        def test_mix_fff(self):
+            self._full_exact(np.float32, np.float32, np.float32,
+                             output0_raw=True, output1_raw=False, swap=True)
+        def test_mix_iff(self):
+            self._full_exact(np.int32, np.float32, np.float32,
+                             output0_raw=False, output1_raw=True, swap=False)
 
     # def test_raw_version_latest_1(self):
     #     input_size = 16

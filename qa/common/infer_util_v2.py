@@ -42,6 +42,7 @@ if sys.version_info.major == 3:
 
 _seen_request_ids = set()
 
+
 def _range_repr_dtype(dtype):
     if dtype == np.float64:
         return np.int32
@@ -101,9 +102,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         input_shape = (batch_size,) + tensor_shape
 
     input0_array = np.random.randint(low=val_min, high=val_max,
-                            size=input_shape, dtype=rinput_dtype)
+                                     size=input_shape, dtype=rinput_dtype)
     input1_array = np.random.randint(low=val_min, high=val_max,
-                            size=input_shape, dtype=rinput_dtype)
+                                     size=input_shape, dtype=rinput_dtype)
     if input_dtype != np.object:
         input0_array = input0_array.astype(input_dtype)
         input1_array = input1_array.astype(input_dtype)
@@ -117,21 +118,21 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
     if output0_dtype == np.object:
         output0_array = np.array([unicode(str(x), encoding='utf-8')
-                                        for x in (output0_array.flatten())], dtype=object).reshape(output0_array.shape)
+                                  for x in (output0_array.flatten())], dtype=object).reshape(output0_array.shape)
     else:
         output0_array = output0_array.astype(output0_dtype)
     if output1_dtype == np.object:
         output1_array = np.array([unicode(str(x), encoding='utf-8')
-                                        for x in (output1_array.flatten())], dtype=object).reshape(output1_array.shape)
+                                  for x in (output1_array.flatten())], dtype=object).reshape(output1_array.shape)
     else:
         output1_array = output1_array.astype(output1_dtype)
 
     if input_dtype == np.object:
         in0n = np.array([str(x)
-                            for x in input0_array.reshape(input0_array.size)], dtype=object)
+                         for x in input0_array.reshape(input0_array.size)], dtype=object)
         input0_array = in0n.reshape(input0_array.shape)
         in1n = np.array([str(x)
-                            for x in input1_array.reshape(input1_array.size)], dtype=object)
+                         for x in input1_array.reshape(input1_array.size)], dtype=object)
         input1_array = in1n.reshape(input1_array.shape)
 
     # prepend size of string to input string data
@@ -176,9 +177,11 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             pf, input_dtype, output0_dtype, output1_dtype)
 
         if config[1] == "http":
-            triton_client = httpclient.InferenceServerClient(config[0], verbose=True)
+            triton_client = httpclient.InferenceServerClient(
+                config[0], verbose=True)
         else:
-            triton_client = grpcclient.InferenceServerClient(config[0], verbose=True)
+            triton_client = grpcclient.InferenceServerClient(
+                config[0], verbose=True)
 
         inputs = []
         if config[1] == "http":
@@ -237,7 +240,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 else:
                     if config[1] == "http":
                         output_req.append(httpclient.InferRequestedOutput(
-                            OUTPUT0, binary_data=config[3], class_count=num_classes))
+                            OUTPUT0, binary_data=False, class_count=num_classes))
                     else:
                         output_req.append(grpcclient.InferRequestedOutput(
                             OUTPUT0, class_count=num_classes))
@@ -267,7 +270,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 else:
                     if config[1] == "http":
                         output_req.append(httpclient.InferRequestedOutput(
-                            OUTPUT1, binary_data=config[3], class_count=num_classes))
+                            OUTPUT1, binary_data=False, class_count=num_classes))
                     else:
                         output_req.append(grpcclient.InferRequestedOutput(
                             OUTPUT1, class_count=num_classes))
@@ -289,7 +292,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         if config[1] == "http":
             last_response = results.get_response()
         else:
-            last_response = results.get_response(as_json=True)
+            last_response = results.get_response()
 
         if not skip_request_id_check:
             global _seen_request_ids
@@ -299,29 +302,39 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             _seen_request_ids.add(request_id)
 
         if config[1] == "http":
-            tester.assertEqual(last_response["model_name"], model_name)
+            response_model_name = last_response["model_name"]
         else:
-            tester.assertEqual(last_response["modelName"], model_name)
-        if model_version != "":
-            if config[1] == "http":
-                tester.assertEqual(
-                    last_response["model_version"], model_version)
-            else:
-                tester.assertEqual(
-                    last_response["modelVersion"], model_version)
+            response_model_name = last_response.model_name
+        tester.assertEqual(response_model_name, model_name)
 
-        tester.assertEqual(len(last_response["outputs"]), len(outputs))
-        for result in last_response["outputs"]:
-            result_name = result["name"]
+        if (model_version is not None) and (model_version != ""):
+            if config[1] == "http":
+                response_model_version = last_response["model_version"]
+            else:
+                response_model_version = last_response.model_version
+            tester.assertEqual(response_model_version, model_version)
+
+        if config[1] == "http":
+            response_outputs = last_response["outputs"]
+        else:
+            response_outputs = last_response.outputs
+        tester.assertEqual(len(response_outputs), len(outputs))
+
+        for result in response_outputs:
+            if config[1] == "http":
+                result_name = result["name"]
+            else:
+                result_name = result.name
+
             if ((result_name == OUTPUT0 and output0_raw) or
                     (result_name == OUTPUT1 and output1_raw)):
                 if result_name == OUTPUT0:
                     tester.assertTrue(np.array_equal(results.as_numpy(OUTPUT0), output0_array),
-                                        "{}, {} expected: {}, got {}".format(
+                                      "{}, {} expected: {}, got {}".format(
                         model_name, OUTPUT0, output0_array, results.as_numpy(OUTPUT0)))
                 elif result_name == OUTPUT1:
                     tester.assertTrue(np.array_equal(results.as_numpy(OUTPUT1), output1_array),
-                                        "{}, {} expected: {}, got {}".format(
+                                      "{}, {} expected: {}, got {}".format(
                         model_name, OUTPUT1, output1_array, results.as_numpy(OUTPUT1)))
                 else:
                     tester.assertTrue(
@@ -332,30 +345,33 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                     # match expected top values
                     class_list = results.as_numpy(result_name)[b]
                     tester.assertEqual(len(class_list), num_classes)
-
-                    expected0_flatten = output0_array[b].flatten()
-                    expected1_flatten = output1_array[b].flatten()
-
-                    for idx, ctuple in enumerate(class_list):
+                    if '_nobatch' in pf:
+                        expected0_flatten = output0_array.flatten()
+                        expected1_flatten = output1_array.flatten()
+                    else:
+                        expected0_flatten = output0_array[b].flatten()
+                        expected1_flatten = output1_array[b].flatten()
+                
+                    for idx, class_label in enumerate(class_list):
+                        # can't compare indices since could have different
+                        # indices with the same value/prob, so check that
+                        # the value of each index equals the expected value.
+                        # Only compare labels when the indices are equal.
+                        ctuple = "".join(chr(x)
+                                         for x in class_label).split(':')
+                        cidx = int(ctuple[0])
+                        cval = float(ctuple[1])
                         if result_name == OUTPUT0:
-                            # can't compare indices since could have
-                            # different indices with the same
-                            # value/prob, so compare that the value of
-                            # each index equals the expected
-                            # value. Can only compare labels when the
-                            # indices are equal.
+                            tester.assertEqual(cval, expected0_flatten[cidx])
                             tester.assertEqual(
-                                ctuple[1], expected0_flatten[ctuple[0]])
-                            tester.assertEqual(
-                                ctuple[1], expected0_flatten[expected0_sort_idx[b][idx]])
-                            if ctuple[0] == expected0_sort_idx[b][idx]:
+                                cval, expected0_flatten[expected0_sort_idx[b][idx]])
+                            if cidx == expected0_sort_idx[b][idx]:
                                 tester.assertEqual(ctuple[2], 'label{}'.format(
                                     expected0_sort_idx[b][idx]))
                         elif result_name == OUTPUT1:
+                            tester.assertEqual(cval, expected1_flatten[cidx])
                             tester.assertEqual(
-                                ctuple[1], expected1_flatten[ctuple[0]])
-                            tester.assertEqual(
-                                ctuple[1], expected1_flatten[expected1_sort_idx[b][idx]])
+                                cval, expected1_flatten[expected1_sort_idx[b][idx]])
                         else:
                             tester.assertTrue(
                                 False, "unexpected class result {}".format(result_name))
