@@ -1337,7 +1337,7 @@ TRITONSERVER_InferenceResponseOutput(
     TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
     const char** name, TRITONSERVER_DataType* datatype, const int64_t** shape,
     uint64_t* dim_count, const void** base, size_t* byte_size,
-    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id, void** userp)
 {
   ni::InferenceResponse* lresponse =
       reinterpret_cast<ni::InferenceResponse*>(inference_response);
@@ -1361,7 +1361,7 @@ TRITONSERVER_InferenceResponseOutput(
   *dim_count = oshape.size();
 
   RETURN_IF_STATUS_ERROR(
-      output.DataBuffer(base, byte_size, memory_type, memory_type_id));
+      output.DataBuffer(base, byte_size, memory_type, memory_type_id, userp));
 
   return nullptr;  // Success
 }

@@ -214,7 +214,8 @@ TRITONSERVER_EXPORT const char* TRITONSERVER_ErrorMessage(
 /// with the buffer, or nullptr if no user-specified value should be
 /// associated with the buffer. This value will be provided in the
 /// call to TRITONSERVER_ResponseAllocatorReleaseFn_t when the buffer
-/// is released.
+/// is released and will also be returned by
+/// TRITONSERVER_InferenceResponseOutput.
 /// \param actual_memory_type Returns the type of memory where the
 /// allocation resides. May be different than the type of memory
 /// requested by 'memory_type'.
@@ -240,8 +241,8 @@ typedef TRITONSERVER_Error* (*TRITONSERVER_ResponseAllocatorAllocFn_t)(
 /// \param allocator The allocator that is provided in the call to
 /// TRITONSERVER_ServerInferAsync.
 /// \param buffer Pointer to the buffer to be freed.
-/// \param buffer_userp The user-specified value to associate
-/// with the buffer in TRITONSERVER_ResponseAllocatorReleaseFn_t.
+/// \param buffer_userp The user-specified value associated
+/// with the buffer in TRITONSERVER_ResponseAllocatorAllocFn_t.
 /// \param byte_size The size of the buffer.
 /// \param memory_type The type of memory holding the buffer.
 /// \param memory_type_id The ID of the memory holding the buffer.
@@ -875,12 +876,15 @@ TRITONSERVER_InferenceResponseOutputCount(
 /// \param byte_size Returns the size, in bytes, of the  data.
 /// \param memory_type Returns the memory type of the data.
 /// \param memory_type_id Returns the memory type id of the data.
+/// \param userp The user-specified value associated with the buffer
+/// in TRITONSERVER_ResponseAllocatorAllocFn_t.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceResponseOutput(
     TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
     const char** name, TRITONSERVER_DataType* datatype, const int64_t** shape,
     uint64_t* dim_count, const void** base, size_t* byte_size,
-    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id);
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id,
+    void** userp);
 
 
 /// TRITONSERVER_ServerOptions
