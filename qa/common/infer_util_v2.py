@@ -42,6 +42,11 @@ if sys.version_info.major == 3:
 
 _seen_request_ids = set()
 
+def _unique_request_id():
+    if len(_seen_request_ids) == 0:
+        return 1
+    else:
+        return max(_seen_request_ids) + 1
 
 def _range_repr_dtype(dtype):
     if dtype == np.float64:
@@ -287,7 +292,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             results = triton_client.infer(model_name,
                                           inputs,
                                           model_version=model_version,
-                                          outputs=output_req)
+                                          outputs=output_req,
+                                          request_id=str(_unique_request_id()))
 
         if config[1] == "http":
             last_response = results.get_response()
@@ -296,7 +302,10 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
         if not skip_request_id_check:
             global _seen_request_ids
-            request_id = last_response["id"]
+            if config[1] == "http":
+                request_id = int(last_response["id"])
+            else:
+                request_id = int(last_response.id)
             tester.assertFalse(request_id in _seen_request_ids,
                                "request_id: {}".format(request_id))
             _seen_request_ids.add(request_id)

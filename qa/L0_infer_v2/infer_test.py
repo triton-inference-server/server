@@ -29,6 +29,7 @@ sys.path.append("../common")
 
 import unittest
 import numpy as np
+from tritonhttpclient.utils import *
 import infer_util_v2 as iu
 import test_util as tu
 import os
