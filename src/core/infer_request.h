@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -182,6 +183,14 @@ class InferenceRequest {
   {
   }
 
+  ~InferenceRequest()
+  {
+    for (auto it = internal_callbacks_.rbegin();
+         it != internal_callbacks_.rend(); it++) {
+      (*it)();
+    }
+  }
+
   const std::string& ModelName() const;
   int64_t RequestedModelVersion() const { return requested_model_version_; }
   int64_t ActualModelVersion() const;
@@ -337,6 +346,15 @@ class InferenceRequest {
     return Status::Success;
   }
 
+  // Add a callback to be invoked on destruction. Multile callbacks
+  // can be added by calling this function in order, and they will be
+  // invoked in reversed order.
+  Status AddInternalCallback(std::function<void()>&& callback)
+  {
+    internal_callbacks_.emplace_back(std::move(callback));
+    return Status::Success;
+  }
+
   // Prepare this request for inference.
   Status PrepareForInference();
 
@@ -428,6 +446,8 @@ class InferenceRequest {
 
   // The response factory associated with this request.
   InferenceResponseFactory response_factory_;
+
+  std::vector<std::function<void()>> internal_callbacks_;
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceRequest& request);
