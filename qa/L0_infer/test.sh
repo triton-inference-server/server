@@ -70,8 +70,7 @@ BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
 # If ENSEMBLES not specified, set to 1
 ENSEMBLES=${ENSEMBLES:="1"}
 
-# for TARGET in cpu gpu; do
-for TARGET in cpu; do
+for TARGET in cpu gpu; do
     if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
         if [ "$TARGET" == "gpu" ]; then
             echo -e "Skip GPU testing on CPU-only device"
@@ -158,7 +157,7 @@ for TARGET in cpu; do
               sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
     fi
 
-    run_server_v2
+    run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
