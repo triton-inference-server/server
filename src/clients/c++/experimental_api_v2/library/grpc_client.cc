@@ -100,6 +100,9 @@ class InferResultGrpc : public InferResult {
   Error RawData(
       const std::string& output_name, const uint8_t** buf,
       size_t* byte_size) const override;
+  Error StringData(
+      const std::string& output_name,
+      std::vector<std::string>* string_result) const override;
   std::string DebugString() const override { return response_->DebugString(); }
 
  private:
@@ -208,6 +211,48 @@ InferResultGrpc::RawData(
     return Error(
         "The response does not contain results for output name '" +
         output_name + "'");
+  }
+
+  return Error::Success;
+}
+
+Error
+InferResultGrpc::StringData(
+    const std::string& output_name,
+    std::vector<std::string>* string_result) const
+{
+  std::string datatype;
+  Error err = Datatype(output_name, &datatype);
+  if (!err.IsOk()) {
+    return err;
+  }
+  if (datatype.compare("BYTES") != 0) {
+    return Error(
+        "This function supports tensors with datatype 'BYTES', requested "
+        "output tensor '" +
+        output_name + "' with datatype '" + datatype + "'");
+  }
+
+  const uint8_t* buf;
+  size_t byte_size;
+  err = RawData(output_name, &buf, &byte_size);
+  string_result->clear();
+  if (byte_size != 0) {
+    size_t buf_offset = 0;
+    while (byte_size > buf_offset) {
+      const uint32_t element_size =
+          *(reinterpret_cast<const uint32_t*>(buf + buf_offset));
+      string_result->emplace_back(
+          reinterpret_cast<const char*>(
+              buf + buf_offset + sizeof(element_size)),
+          element_size);
+      buf_offset += (sizeof(element_size) + element_size);
+    }
+  } else {
+    auto it = output_name_to_result_map_.find(output_name);
+    for (const auto& element : it->second->contents().byte_contents()) {
+      string_result->push_back(element);
+    }
   }
 
   return Error::Success;
