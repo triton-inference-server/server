@@ -208,7 +208,7 @@ main(int argc, char** argv)
   std::vector<std::string> result1_data;
   FAIL_IF_ERR(
       results_ptr->StringData("OUTPUT0", &result0_data),
-      "unable to get datatype for OUTPUT0");
+      "unable to get data for OUTPUT0");
   if (result0_data.size() != 16) {
     std::cerr << "error: received incorrect number of strings for OUTPUT0: "
               << result0_data.size() << std::endl;
@@ -217,7 +217,7 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       results_ptr->StringData("OUTPUT1", &result1_data),
-      "unable to get datatype for OUTPUT1");
+      "unable to get data for OUTPUT1");
   if (result1_data.size() != 16) {
     std::cerr << "error: received incorrect number of strings for OUTPUT1: "
               << result1_data.size() << std::endl;

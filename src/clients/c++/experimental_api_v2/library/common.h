@@ -450,9 +450,9 @@ class InferResult {
   /// row-major order.
   /// \return Error object indicating success or failure of the
   /// request.
-  Error StringData(
+  virtual Error StringData(
       const std::string& output_name,
-      std::vector<std::string>* string_result) const;
+      std::vector<std::string>* string_result) const = 0;
 
   /// Returns the complete response as a user friendly string.
   /// \return The string describing the complete response.
