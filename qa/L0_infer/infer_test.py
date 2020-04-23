@@ -50,7 +50,7 @@ class InferTest(unittest.TestCase):
                 output0_raw=True, output1_raw=True,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
-                use_json=False, skip_request_id_check=True, use_streaming=True,
+                use_http_json_tensors=False, skip_request_id_check=True, use_streaming=True,
                 correlation_id=0):
             for bs in (1, batch_size):
                 # model that does not support batching
@@ -59,7 +59,7 @@ class InferTest(unittest.TestCase):
                                     input_dtype, output0_dtype, output1_dtype,
                                     output0_raw, output1_raw,
                                     model_version, swap,
-                                    outputs, use_http, use_grpc, use_json,
+                                    outputs, use_http, use_grpc, use_http_json_tensors,
                                     skip_request_id_check, use_streaming,
                                     correlation_id,
                                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
@@ -69,7 +69,7 @@ class InferTest(unittest.TestCase):
                                input_dtype, output0_dtype, output1_dtype,
                                output0_raw, output1_raw,
                                model_version, swap, outputs, use_http, use_grpc,
-                               use_json, skip_request_id_check, use_streaming,
+                               use_http_json_tensors, skip_request_id_check, use_streaming,
                                correlation_id,
                                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)

@@ -68,7 +68,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 output0_raw=True, output1_raw=True,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
-                use_json=True, skip_request_id_check=False, use_streaming=True,
+                use_http_json_tensors=True, skip_request_id_check=False, use_streaming=True,
                 correlation_id=0, shm_region_names=None, precreated_shm_regions=None,
                 use_system_shared_memory=False, use_cuda_shared_memory=False,
                 priority=0, timeout_us=0):
@@ -76,7 +76,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
     configs = []
     if use_http:
         configs.append(("localhost:8000", "http", False, True))
-    if use_json and (input_dtype != np.float16):
+    if use_http_json_tensors and (input_dtype != np.float16):
         configs.append(("localhost:8000", "http", False, False))
     if use_grpc:
         configs.append(("localhost:8001", "grpc", False, False))
