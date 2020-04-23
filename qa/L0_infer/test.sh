@@ -157,7 +157,7 @@ for TARGET in cpu gpu; do
               sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
     fi
 
-    run_server_v2
+    run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG

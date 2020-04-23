@@ -48,7 +48,7 @@ class InferTest(unittest.TestCase):
         def _infer_exact_helper(tester, pf, tensor_shape, batch_size,
                 input_dtype, output0_dtype, output1_dtype,
                 output0_raw=True, output1_raw=True,
-                model_version="", swap=False,
+                model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
                 use_http_json_tensors=False, skip_request_id_check=True, use_streaming=True,
                 correlation_id=0):
@@ -255,7 +255,7 @@ class InferTest(unittest.TestCase):
             try:
                 iu.infer_exact(self, platform, tensor_shape, 1,
                                np.int8, np.int8, np.int8,
-                               model_version="1", swap=False,
+                               model_version=1, swap=False,
                                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             except InferenceServerException as ex:
@@ -265,7 +265,7 @@ class InferTest(unittest.TestCase):
             try:
                 iu.infer_exact(self, platform, tensor_shape, 1,
                                np.int8, np.int8, np.int8,
-                               model_version="2", swap=True,
+                               model_version=2, swap=True,
                                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             except InferenceServerException as ex:
@@ -274,7 +274,7 @@ class InferTest(unittest.TestCase):
 
             iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int8, np.int8, np.int8,
-                           model_version="3", swap=True,
+                           model_version=3, swap=True,
                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
@@ -290,7 +290,7 @@ class InferTest(unittest.TestCase):
             try:
                 iu.infer_exact(self, platform, tensor_shape, 1,
                                np.int16, np.int16, np.int16,
-                               model_version="1", swap=False,
+                               model_version=1, swap=False,
                                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             except InferenceServerException as ex:
@@ -299,12 +299,12 @@ class InferTest(unittest.TestCase):
 
             iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int16, np.int16, np.int16,
-                           model_version="2", swap=True,
+                           model_version=2, swap=True,
                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int16, np.int16, np.int16,
-                           model_version="3", swap=True,
+                           model_version=3, swap=True,
                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
@@ -319,17 +319,17 @@ class InferTest(unittest.TestCase):
                 continue
             iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int32, np.int32, np.int32,
-                           model_version="1", swap=False,
+                           model_version=1, swap=False,
                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int32, np.int32, np.int32,
-                           model_version="2", swap=True,
+                           model_version=2, swap=True,
                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int32, np.int32, np.int32,
-                           model_version="3", swap=True,
+                           model_version=3, swap=True,
                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
@@ -344,14 +344,14 @@ class InferTest(unittest.TestCase):
                 continue
             iu.infer_exact(self, platform, tensor_shape, 1,
                            np.float16, np.float16, np.float16,
-                           model_version="1", swap=False,
+                           model_version=1, swap=False,
                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
             try:
                 iu.infer_exact(self, platform, tensor_shape, 1,
                                np.float16, np.float16, np.float16,
-                               model_version="2", swap=True,
+                               model_version=2, swap=True,
                                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             except InferenceServerException as ex:
@@ -361,7 +361,7 @@ class InferTest(unittest.TestCase):
             try:
                 iu.infer_exact(self, platform, tensor_shape, 1,
                                np.float16, np.float16, np.float16,
-                               model_version="3", swap=True,
+                               model_version=3, swap=True,
                                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             except InferenceServerException as ex:
@@ -381,14 +381,14 @@ class InferTest(unittest.TestCase):
             tensor_shape = (1, input_size)
             iu.infer_exact(self, platform, tensor_shape, 1,
                            np.float32, np.float32, np.float32,
-                           model_version="1", swap=False,
+                           model_version=1, swap=False,
                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
             try:
                 iu.infer_exact(self, platform, tensor_shape, 1,
                                np.float32, np.float32, np.float32,
-                               model_version="2", swap=True,
+                               model_version=2, swap=True,
                                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             except InferenceServerException as ex:
@@ -397,7 +397,7 @@ class InferTest(unittest.TestCase):
 
             iu.infer_exact(self, platform, tensor_shape, 1,
                            np.float32, np.float32, np.float32,
-                           model_version="3", swap=True,
+                           model_version=3, swap=True,
                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 

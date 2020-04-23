@@ -66,7 +66,7 @@ def _range_repr_dtype(dtype):
 def infer_exact(tester, pf, tensor_shape, batch_size,
                 input_dtype, output0_dtype, output1_dtype,
                 output0_raw=True, output1_raw=True,
-                model_version="", swap=False,
+                model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
                 use_http_json_tensors=True, skip_request_id_check=False, use_streaming=True,
                 correlation_id=0, shm_region_names=None, precreated_shm_regions=None,
@@ -326,7 +326,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             response_model_name = last_response.model_name
         tester.assertEqual(response_model_name, model_name)
 
-        if (model_version is not None) and (model_version != ""):
+        if model_version != "":
             if config[1] == "http":
                 response_model_version = last_response["model_version"]
             else:
