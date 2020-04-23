@@ -64,6 +64,7 @@ SIMPLE_STREAM_INFER_CLIENT=../clients/simple_grpc_v2_sequence_stream_infer_clien
 SIMPLE_SEQUENCE_INFER_CLIENT=../clients/simple_grpc_v2_sequence_sync_infer_client
 SIMPLE_SHM_CLIENT=../clients/simple_grpc_v2_shm_client
 SIMPLE_CUDASHM_CLIENT=../clients/simple_grpc_v2_cudashm_client
+SIMPLE_IMAGE_CLIENT=../clients/v2_image_client
 
 rm -f *.log
 rm -f *.log.*
@@ -154,14 +155,35 @@ for i in \
    $SIMPLE_SEQUENCE_INFER_CLIENT \
    $SIMPLE_SHM_CLIENT \
    $SIMPLE_CUDASHM_CLIENT \
+   $SIMPLE_IMAGE_CLIENT \
    ; do
    BASE=$(basename -- $i)
    SUFFIX="${BASE%.*}"
-
-    $i -v -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
-    if [ $? -ne 0 ]; then
-        cat ${CLIENT_LOG}.c++.${SUFFIX}
-        RET=1
+    if [ $SUFFIX == "v2_image_client" ]; then
+        $i -m inception_graphdef -s INCEPTION -a -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.async.${SUFFIX}" 2>&1
+        if [ `grep -c VULTURE ${CLIENT_LOG}.c++.async.${SUFFIX}` != "1" ]; then
+            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
+            cat $CLIENT_LOG.c++.${SUFFIX}
+            RET=1
+        fi
+        $i -m inception_graphdef -s INCEPTION -a --streaming -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.streaming.${SUFFIX}" 2>&1
+        if [ `grep -c VULTURE ${CLIENT_LOG}.c++.streaming.${SUFFIX}` != "1" ]; then
+            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
+            cat $CLIENT_LOG.c++.${SUFFIX}
+            RET=1
+        fi
+        $i -m inception_graphdef -s INCEPTION -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.${SUFFIX}" 2>&1
+        if [ `grep -c VULTURE ${CLIENT_LOG}.c++.${SUFFIX}` != "1" ]; then
+            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
+            cat $CLIENT_LOG.c++.${SUFFIX}
+            RET=1
+        fi
+    else
+        $i -v -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
+        if [ $? -ne 0 ]; then
+            cat ${CLIENT_LOG}.c++.${SUFFIX}
+            RET=1
+        fi
     fi
 done
 
