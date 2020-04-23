@@ -571,7 +571,7 @@ ParseModelHttp(
   }
 
   int max_batch_size = 0;
-  const auto bs_itr = model_config.FindMember("max_batch_size");
+  const auto bs_itr = model_config.FindMember("maxBatchSize");
   if (bs_itr != model_config.MemberEnd()) {
     max_batch_size = bs_itr->value.GetInt();
   }
