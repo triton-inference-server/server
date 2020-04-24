@@ -44,14 +44,12 @@ class PersistentBuffer {
   // Return a shared_ptr that is on heap so that it can be transferred as userp
   std::shared_ptr<char[]>* Buffer(size_t byte_size)
   {
-    {
-      std::lock_guard<std::mutex> lk(mtx_);
-      if (byte_size > byte_size_) {
-        byte_size_ = byte_size;
-        buffer_.reset(new char[byte_size]);
-      }
-      return new std::shared_ptr<char[]>(buffer_);
+    std::lock_guard<std::mutex> lk(mtx_);
+    if (byte_size > byte_size_) {
+      byte_size_ = byte_size;
+      buffer_.reset(new char[byte_size]);
     }
+    return new std::shared_ptr<char[]>(buffer_);
   }
 
  private:
