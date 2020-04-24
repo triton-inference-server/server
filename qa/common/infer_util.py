@@ -97,7 +97,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         use_http or use_http_json_tensors or use_grpc or use_streaming)
     configs = []
     if use_http:
-            configs.append(("localhost:8000", "http", False, True))
+        configs.append(("localhost:8000", "http", False, True))
     if output0_raw == output1_raw:
         # Float16 not supported for Input and Output via JSON
         if use_http_json_tensors and (input_dtype != np.float16) and \
