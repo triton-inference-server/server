@@ -152,11 +152,13 @@ for BACKEND in ${BACKENDS}; do
 
     # Test for variable-size data type (string)
     rm -fr models && mkdir models
-    if [ "$BACKEND" != "custom" ]; then
+    SUPPORT_STRING=0 && ([[ $BACKEND == "savedmodel" ]] || [[ $BACKEND == "onnx" ]] || [[ $BACKEND == "savedmodel" ]]) && SUPPORT_STRING=1
+    if [ "$SUPPORT_STRING" == "1" ] ; then
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/${BACKEND}_sequence_object models/.
+    fi
+    if [ "$BACKEND" != "custom" ]; then
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/${BACKEND}_zero_1_object models/.
     else 
-        # custom doesn't have sequence model with string data type
         cp -r ../custom_models/custom_zero_1_float32 models/custom_zero_1_object && \
             mkdir -p models/custom_zero_1_object/1 && \
             cp `pwd`/libidentity.so models/custom_zero_1_object/1/. && \
@@ -203,7 +205,7 @@ for BACKEND in ${BACKENDS}; do
     # user provided data
     #
     # Instruction for sequence model (batch size 8), need to specify control tensor
-    if [ "$BACKEND" != "custom" ]; then
+    if [ "$SUPPORT_STRING" == "1" ]; then
         (cd models/${BACKEND}_sequence_object && \
             echo 'model_warmup [{' >> config.pbtxt && \
             echo '    name : "string statefull"' >> config.pbtxt && \
@@ -260,7 +262,7 @@ for BACKEND in ${BACKENDS}; do
         echo -e "\n***\n*** Failed. Expected warmup for random string stateless model\n***"
         RET=1
     fi
-    if [ "$BACKEND" != "custom" ]; then
+    if [ "$SUPPORT_STRING" == "1" ]; then
         grep "is running warmup sample 'string statefull'" $SERVER_LOG
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Failed. Expected warmup for string stateful model\n***"
