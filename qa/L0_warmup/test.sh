@@ -236,7 +236,7 @@ for BACKEND in ${BACKENDS}; do
         # Prepare string data (one element that is "233")
         mkdir -p models/${BACKEND}_sequence_object/warmup && \
             (cd models/${BACKEND}_sequence_object/warmup && \
-                    echo -n -e '\x00\x00\x00\x03\x32\x33\x33' > raw_string_data)
+                    echo -n -e '\x03\x00\x00\x00\x32\x33\x33' > raw_string_data)
 
         run_server
         if [ "$SERVER_PID" == "0" ]; then
