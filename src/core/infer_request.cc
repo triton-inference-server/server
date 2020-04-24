@@ -35,60 +35,6 @@ namespace nvidia { namespace inferenceserver {
 
 namespace {
 
-class PersistentBufferManager {
- public:
-  class Buffer {
-   public:
-    Buffer(size_t byte_size)
-        : buffer_(malloc(byte_size)), byte_size_(byte_size), count_(1)
-    {
-    }
-    ~Buffer() { free(buffer_); }
-    std::mutex mtx_;
-    void* buffer_;
-    size_t byte_size_;
-    size_t count_;
-  };
-
-  // Note that the buffer is not empty so that we can return a valid
-  // pointer when byte_size == 0
-  PersistentBufferManager() : buffer_(new Buffer(1)) { buffer_->count_++; }
-
-  ~PersistentBufferManager() { ReleaseBuffer(buffer_); }
-
-  // Return a buffer that is on heap so that it can be transferred as userp
-  Buffer* GetBuffer(size_t byte_size)
-  {
-    std::lock_guard<std::mutex> lk(mtx_);
-
-    if (byte_size > buffer_->byte_size_) {
-      ReleaseBuffer(buffer_);
-      buffer_ = new Buffer(byte_size);
-    }
-
-    std::lock_guard<std::mutex> blk(buffer_->mtx_);
-    buffer_->count_++;
-
-    return buffer_;
-  }
-
-  void ReleaseBuffer(Buffer* buffer)
-  {
-    std::lock_guard<std::mutex> blk(buffer->mtx_);
-    buffer->count_--;
-    if (buffer->count_ == 0) {
-      delete buffer;
-    }
-  }
-
- private:
-  std::mutex mtx_;
-  Buffer* buffer_;
-};
-
-std::unique_ptr<PersistentBufferManager> persistent_buffer_manager(
-    new PersistentBufferManager());
-
 // Utilities for Null request feature.
 TRITONSERVER_Error*
 NullResponseAlloc(
@@ -98,24 +44,9 @@ NullResponseAlloc(
     void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
-  auto buffer_sp = persistent_buffer_manager->GetBuffer(byte_size);
-  if (buffer_sp != nullptr) {
-    *buffer = buffer_sp->buffer_;
-    if (*buffer != nullptr) {
-      *actual_memory_type = TRITONSERVER_MEMORY_CPU;
-      *actual_memory_type_id = 0;
-      *buffer_userp = buffer_sp;
-      return nullptr;
-    } else {
-      persistent_buffer_manager->ReleaseBuffer(
-          reinterpret_cast<PersistentBufferManager::Buffer*>(buffer_sp));
-    }
-  }
-
-  *buffer_userp = nullptr;
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_INTERNAL,
-      "failed to allocate output buffer for null request.");
+      "unexpected allocation for null request, no output should be requestd.");
 }
 
 TRITONSERVER_Error*
@@ -124,11 +55,9 @@ NullResponseRelease(
     size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
 {
-  if (buffer_userp != nullptr) {
-    persistent_buffer_manager->ReleaseBuffer(
-        reinterpret_cast<PersistentBufferManager::Buffer*>(buffer_userp));
-  }
-  return nullptr;
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_INTERNAL,
+      "unexpected release for null request, no output should be requestd.");
 }
 
 ResponseAllocator null_allocator =
@@ -146,10 +75,6 @@ void
 NullRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
 {
   TRITONSERVER_InferenceRequestDelete(request);
-  if (userp != nullptr) {
-    persistent_buffer_manager->ReleaseBuffer(
-        reinterpret_cast<PersistentBufferManager::Buffer*>(userp));
-  }
 }
 
 }  // namespace
@@ -235,7 +160,7 @@ InferenceRequest::Release(std::unique_ptr<InferenceRequest>&& request)
     (*it)();
   }
   request->release_callbacks_.clear();
-  
+
   void* userp = request->release_userp_;
   request->release_fn_(
       reinterpret_cast<TRITONSERVER_InferenceRequest*>(request.release()),
@@ -256,25 +181,39 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
   // Two pass: first to obtain the max input byte size for allocating a large
   // enough buffer for all inputs; second to construct the inputs
   size_t max_byte_size = 0;
+  const std::string* max_input_name;
   for (const auto& input : from.OriginalInputs()) {
     if (input.second.Data()->TotalByteSize() > max_byte_size) {
       max_byte_size = input.second.Data()->TotalByteSize();
+      max_input_name = &(input.first);
     }
   }
 
-  auto data_sp = persistent_buffer_manager->GetBuffer(max_byte_size);
+  // [DLIS-1268] should use one growable static buffer for all null requests
+  auto mem_type = TRITONSERVER_MEMORY_CPU;
+  int64_t mem_id = 0;
+  std::shared_ptr<Memory> data =
+      std::make_shared<AllocatedMemory>(max_byte_size, mem_type, mem_id);
+  auto data_base = data->BufferAt(0, &max_byte_size, &mem_type, &mem_id);
   for (const auto& input : from.OriginalInputs()) {
     Input* new_input;
     lrequest->AddOriginalInput(
         input.first, input.second.DType(), input.second.Shape(), &new_input);
-    new_input->AppendData(
-        data_sp->buffer_, input.second.Data()->TotalByteSize(),
-        TRITONSERVER_MEMORY_CPU, 0);
+    // Note that the input that have max byte size will be responsible for
+    // holding the artifical data, while other inputs will hold a reference to
+    // it with byte size that matches 'from'
+    if (input.first == *max_input_name) {
+      new_input->SetData(data);
+    } else {
+      new_input->AppendData(
+          data_base, input.second.Data()->TotalByteSize(), mem_type, mem_id);
+    }
   }
 
+  // No outputs were requested and thus there should be no allocations.
   lrequest->SetResponseCallback(
       &null_allocator, nullptr, NullResponseComplete, nullptr);
-  lrequest->SetReleaseCallback(NullRequestComplete, data_sp);
+  lrequest->SetReleaseCallback(NullRequestComplete, nullptr);
 
   for (auto& pr : lrequest->original_inputs_) {
     lrequest->inputs_.emplace(

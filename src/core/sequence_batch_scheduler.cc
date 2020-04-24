@@ -1067,8 +1067,7 @@ DirectSequenceBatch::SchedulerThread(
             // Note that when the not-ready control input of the
             // request is "true" the model can't assume that any
             // other inputs are meaningful, including CORRID. So we
-            // just use zero for that and use whatever values the
-            // other inputs have in request_.
+            // just use zero for that.
             SetControlTensors(
                 ni, seq_slot, 0 /* corrid */, true /* not_ready */);
             requests.emplace_back(std::move(ni));
@@ -1282,7 +1281,7 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
                        << seq_slot;
         in_flight_[seq_slot] = true;
 
-        irequest->AddReleaseCallback(
+        irequest->AddInternalReleaseCallback(
             [this, seq_slot]() { CompleteAndNext(seq_slot); });
 
         dynamic_batcher_->Enqueue(irequest);

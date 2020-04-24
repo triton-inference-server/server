@@ -338,10 +338,10 @@ class InferenceRequest {
     return Status::Success;
   }
 
-  // Add a callback to be invoked on destruction. Multile callbacks
-  // can be added by calling this function in order, and they will be
-  // invoked in reversed order.
-  Status AddReleaseCallback(std::function<void()>&& callback)
+  // Add a callback to be invoked on releasing the request object from Triton.
+  // Multile callbacks can be added by calling this function in order,
+  // and they will be invoked in reversed order.
+  Status AddInternalReleaseCallback(std::function<void()>&& callback)
   {
     release_callbacks_.emplace_back(std::move(callback));
     return Status::Success;
