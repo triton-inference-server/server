@@ -103,17 +103,10 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
     num_classes = 3
 
-    if (pf == "batch_to_nobatch") or (pf == "nobatch_to_batch") or (pf == "mix_nobatch_batch"):
-        input_shape = (batch_size,) + tensor_shape
-    elif '_nobatch' in pf:
-        input_shape = tensor_shape
-    else:
-        input_shape = (batch_size,) + tensor_shape
-
     input0_array = np.random.randint(low=val_min, high=val_max,
-                                     size=input_shape, dtype=rinput_dtype)
+                                     size=tensor_shape, dtype=rinput_dtype)
     input1_array = np.random.randint(low=val_min, high=val_max,
-                                     size=input_shape, dtype=rinput_dtype)
+                                     size=tensor_shape, dtype=rinput_dtype)
     if input_dtype != np.object:
         input0_array = input0_array.astype(input_dtype)
         input1_array = input1_array.astype(input_dtype)
@@ -195,14 +188,14 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         inputs = []
         if config[1] == "http":
             inputs.append(httpclient.InferInput(
-                INPUT0, input_shape, np_to_triton_dtype(input_dtype)))
+                INPUT0, tensor_shape, np_to_triton_dtype(input_dtype)))
             inputs.append(httpclient.InferInput(
-                INPUT1, input_shape, np_to_triton_dtype(input_dtype)))
+                INPUT1, tensor_shape, np_to_triton_dtype(input_dtype)))
         else:
             inputs.append(grpcclient.InferInput(
-                INPUT0, input_shape, np_to_triton_dtype(input_dtype)))
+                INPUT0, tensor_shape, np_to_triton_dtype(input_dtype)))
             inputs.append(grpcclient.InferInput(
-                INPUT1, input_shape, np_to_triton_dtype(input_dtype)))
+                INPUT1, tensor_shape, np_to_triton_dtype(input_dtype)))
 
         if not (use_cuda_shared_memory or use_system_shared_memory):
             if config[1] == "http":
@@ -217,10 +210,16 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             su.set_shm_regions(inputs, shm_region_names, use_system_shared_memory,
                                use_cuda_shared_memory, input0_array.nbytes, input1_array.nbytes)
 
-        expected0_sort_idx = [np.flip(np.argsort(x.flatten()), 0)
-                              for x in output0_array.reshape((batch_size,) + tensor_shape)]
-        expected1_sort_idx = [np.flip(np.argsort(x.flatten()), 0)
-                              for x in output1_array.reshape((batch_size,) + tensor_shape)]
+        if batch_size == 1:
+            expected0_sort_idx = [np.flip(np.argsort(x.flatten()), 0) 
+                                    for x in output0_array.reshape((1,) + tensor_shape)]
+            expected1_sort_idx = [np.flip(np.argsort(x.flatten()), 0)
+                                    for x in output1_array.reshape((1,) + tensor_shape)]
+        else:
+            expected0_sort_idx = [np.flip(np.argsort(x.flatten()), 0)
+                                    for x in output0_array.reshape(tensor_shape)]
+            expected1_sort_idx = [np.flip(np.argsort(x.flatten()), 0)
+                                    for x in output1_array.reshape(tensor_shape)]
 
         output_req = []
         i = 0
