@@ -1023,7 +1023,7 @@ class InferenceServerClient:
                 headers = {}
             headers["Inference-Header-Content-Length"] = json_size
 
-        if model_version != "":
+        if (model_version is not None) and (model_version != ""):
             request_uri = "v2/models/{}/versions/{}/infer".format(
                 quote(model_name), model_version)
         else:
@@ -1308,7 +1308,7 @@ class InferInput:
             The underlying tensor specification as dict
         """
         if self._parameters.get('shared_memory_region') is not None or \
-                                            self._raw_data is not None:
+                self._raw_data is not None:
             return {
                 'name': self._name,
                 'shape': self._shape,
@@ -1489,7 +1489,7 @@ class InferResult:
         name : str
             The name of the tensor for which Output is to be
             retrieved.
-    
+
         Returns
         -------
         Dict
