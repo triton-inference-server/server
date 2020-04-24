@@ -87,8 +87,7 @@ WarmupResponseComplete(TRITONSERVER_InferenceResponse* iresponse, void* userp)
 void
 WarmupRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
 {
-  // do nothing with request object as it is created on stack,
-  // see SetConfiguredScheduler()
+  TRITONSERVER_InferenceRequestDelete(request);
   auto warmup_promise = reinterpret_cast<std::promise<void>*>(userp);
   warmup_promise->set_value();
 }
