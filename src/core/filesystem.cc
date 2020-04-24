@@ -643,10 +643,14 @@ S3FileSystem::S3FileSystem(
   // check ENV vars for S3 credentials -> AWS_PROFILE -> default
   const char* secret_key = std::getenv("AWS_SECRET_ACCESS_KEY");
   const char* key_id = std::getenv("AWS_ACCESS_KEY_ID");
+  const char* region = std::getenv("AWS_DEFAULT_REGION");
   if ((secret_key != NULL) && (key_id != NULL)) {
     credentials.SetAWSAccessKeyId(key_id);
     credentials.SetAWSSecretKey(secret_key);
     config = Aws::Client::ClientConfiguration();
+    if (region != NULL) {
+      config.region = region;
+    }
   } else if (const char* profile_name = std::getenv("AWS_PROFILE")) {
     config = Aws::Client::ClientConfiguration(profile_name);
   } else {
