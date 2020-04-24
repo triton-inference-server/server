@@ -234,6 +234,8 @@ InferenceRequest::Release(std::unique_ptr<InferenceRequest>&& request)
        it != request->release_callbacks_.rend(); it++) {
     (*it)();
   }
+  request->release_callbacks_.clear();
+  
   void* userp = request->release_userp_;
   request->release_fn_(
       reinterpret_cast<TRITONSERVER_InferenceRequest*>(request.release()),
