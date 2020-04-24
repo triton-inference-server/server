@@ -42,72 +42,125 @@ $object and $array refer to the fundamental JSON types. #optional
 indicates an optional JSON field.
 
 Triton exposes the statistics endpoint at the following URL. The
-versions portion of the URL is optional; if not provided Triton will
-return statistics for all versions of the model.
+specific model name portion of the URL is optional; if not provided
+Triton will return the statistics for all versions of all models. If a
+specific model is given in the URL the versions portion of the URL is
+optional; if not provided Triton will return statistics for all
+versions of the specified model.
 
 ```
-GET v2/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]/stats
+GET v2/models[/${MODEL_NAME}[/versions/${MODEL_VERSION}]]/stats
 ```
 
 ### Statistics Response JSON Object
 
 A successful statistics request is indicated by a 200 HTTP status
-code. For a model the statistics response object, identified as
-$stats_model_response, is returned in the HTTP body for every
-successful statistics request.
+code. The response object, identified as $stats_model_response, is
+returned in the HTTP body for every successful statistics request.
 
 ```
 $stats_model_response =
 {
-  "version_stats" : [ $version_stat, ... ]
+  "model_stats" : [ $model_stat, ... ]
 }
 ```
 
-Each $version_stat object gives the statistics for a specific model version.
+Each $model_stat object gives the statistics for a specific model and
+version. The $version field is optional for servers that do not
+support versions.
 
 ```
-$version_stat =
+$model_stat =
 {
+  "name" : $string,
   "version" : $string #optional,
-  "stats" : $stats
+  "last_inference" : $number,
+  "inference_stats" : $inference_stats,
+  "batch_stats" : [ $batch_stat, ... ]
 }
 ```
 
+- "name" : The name of the model.
+
+- "version" : The version of the model.
+
+- "last_inference" : The timestamp of the last inference request made
+  for this model, as milliseconds since the epoch.
+
+- "inference_stats" : The aggregate statistics for the
+  model/version. So, for example, "inference_stats":"success"
+  indicates the number of successful inference requests for the model.
+
+- "batch_stats" : The aggregate statistics for each different batch
+  size that is executed in the model. The batch statistics indicate
+  how many actual model executions were performed and show differences
+  due to different batch size (for example, larger batches typically
+  take longer to compute).
+
 ```
-$stats =
+$inference_stats =
 {
-  "inference" : {
-    "success" : $duration_stat,
-    "fail" : $duration_stat,
-    "queue" : $duration_stat,
-    "compute_input" : $duration_stat,
-    "compute_infer" : $duration_stat,
-    "compute_output" : $duration_stat
-  }
+  "success" : $duration_stat,
+  "fail" : $duration_stat,
+  "queue" : $duration_stat,
+  "compute_input" : $duration_stat,
+  "compute_infer" : $duration_stat,
+  "compute_output" : $duration_stat
 }
 ```
 
-- “inference:success” : The count and cumulative duration for all
-  successful inference requests.
-
-- “inference:fail” : The count and cumulative duration for all failed
+- “success” : The count and cumulative duration for all successful
   inference requests.
 
-- “inference:queue” : The count and cumulative duration that inference
-  requests wait in scheduling or other queues.
+- “fail” : The count and cumulative duration for all failed inference
+  requests.
 
-- “inference:compute_input” : The count and cumulative duration to
-  prepare input tensor data as required by the model framework /
-  backend. For example, this duration should include the time to copy
-  input tensor data to the GPU.
+- “queue” : The count and cumulative duration that inference requests
+  wait in scheduling or other queues.
 
-- “inference:compute_infer” : The count and cumulative duration to
-  execute the model.
+- “compute_input” : The count and cumulative duration to prepare input
+  tensor data as required by the model framework / backend. For
+  example, this duration should include the time to copy input tensor
+  data to the GPU.
 
-- “inference:compute_output” : The count and cumulative duration to
-  extract output tensor data produced by the model framework /
-  backend. For example, this duration should include the time to copy
-  output tensor data from the GPU.
+- “compute_infer” : The count and cumulative duration to execute the
+  model.
+
+- “compute_output” : The count and cumulative duration to extract
+  output tensor data produced by the model framework / backend. For
+  example, this duration should include the time to copy output tensor
+  data from the GPU.
+
+```
+$batch_stats =
+{
+  "batch_size" : $number,
+  "count" : $number,
+  "compute_input" : $duration_stat,
+  "compute_infer" : $duration_stat,
+  "compute_output" : $duration_stat
+}
+```
+
+- "batch_size" : The size of the batch.
+
+- "count" : The number of times the batch size was executed on the
+  model. A single model execution performs inferencing for the entire
+  request batch and can perform inferencing for multiple requests if
+  dynamic batching is enabled.
+
+- “compute_input” : The count and cumulative duration to prepare input
+  tensor data as required by the model framework / backend with the
+  given batch size. For example, this duration should include the time
+  to copy input tensor data to the GPU.
+
+- “compute_infer” : The count and cumulative duration to execute the
+  model with the given batch size.
+
+- “compute_output” : The count and cumulative duration to extract
+  output tensor data produced by the model framework / backend with
+  the given batch size. For example, this duration should include the
+  time to copy output tensor data from the GPU.
 
 The $duration_stat object reports a count and a total time. This
 format can be sampled to determine not only long-running averages but
@@ -163,7 +216,8 @@ response messages for ModelStatistics are:
 ```
 message ModelStatisticsRequest
 {
-  // The name of the model.
+  // The name of the model. If not given returns statistics for all
+  // models.
   string name = 1;
 
   // The version of the model. If not given returns statistics for
@@ -173,8 +227,8 @@ message ModelStatisticsRequest
 
 message ModelStatisticsResponse
 {
-    // Map from version to inference statistics for that version.
-    map<string, InferStatistics> inference = 1;
+  // Statistics for each requested model.
+  repeated ModelStatistics model_stats = 1;
 }
 ```
 
@@ -189,6 +243,31 @@ message StatisticDuration
 
   // Total collected duration of this metric in nanoseconds.
   uint64 ns = 2;
+}
+
+// Statistics for a specific model and version.
+message ModelStatistics
+{
+  // The name of the model.
+  string name = 1;
+
+  // The version of the model.
+  string version = 2;
+
+  // The timestamp of the last inference request made for this model,
+  // as milliseconds since the epoch.
+  uint64 last_inference = 3;
+
+  // The aggregate statistics for the model/version. So, for example,
+  // inference_stats:success indicates the number of successful inference
+  // requests for the model.
+  InferStatistics inference_stats = 4;
+
+  // The aggregate statistics for each different batch size that is
+  // executed in the model. The batch statistics indicate how many actual
+  // model executions were performed and show differences due to different
+  // batch size (for example, larger batches typically take longer to compute).
+  InferBatchStatistics batch_stats = 5;
 }
 
 // Inference statistics.
@@ -216,5 +295,34 @@ message InferStatistics
   // produced by the model framework / backend. For example, this duration
   // should include the time to copy output tensor data from the GPU.
   StatisticDuration compute_output = 6;
+}
+
+// Inference batch statistics.
+message InferBatchStatistics
+{
+  // The size of the batch.
+  uint64 batch_size = 1;
+
+  // The number of times the batch size was executed on the
+  // model. A single model execution performs inferencing for the entire
+  // request batch and can perform inferencing for multiple requests if
+  // dynamic batching is enabled.
+  uint64 count = 2;
+
+  // The count and cumulative duration to prepare input tensor data as
+  // required by the model framework / backend with the given batch size.
+  // For example, this duration should include the time to copy input
+  // tensor data to the GPU.
+  StatisticDuration compute_input = 3;
+
+  // The count and cumulative duration to execute the model with the given
+  // batch size.
+  StatisticDuration compute_infer = 4;
+
+  // The count and cumulative duration to extract output tensor data
+  // produced by the model framework / backend with the given batch size.
+  // For example, this duration should include the time to copy output
+  // tensor data from the GPU.
+  StatisticDuration compute_output = 5;
 }
 ```
