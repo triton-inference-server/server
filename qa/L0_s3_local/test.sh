@@ -88,7 +88,7 @@ RET=0
 SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=explicit"
 SERVER_LOG="./inference_server_hostname.log"
 
-BACKENDS="graphdef libtorch netdef onnx plan savedmodel"
+BACKENDS="graphdef libtorch netdef onnx plan savedmodel custom"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
