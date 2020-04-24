@@ -70,6 +70,10 @@ for $ENV_VAR in "env" "no_env"; do
         unset AWS_ACCESS_KEY_ID
         unset AWS_SECRET_ACCESS_KEY
         unset AWS_DEFAULT_REGION
+    elif
+        aws configure set default.region "dummy_region" && \
+            aws configure set aws_access_key_id "dummy_id" && \
+            aws configure set aws_secret_access_key "dummy_key"
     fi
     rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
@@ -103,7 +107,17 @@ for $ENV_VAR in "env" "no_env"; do
 
         # run with a non-root empty model repo
         touch models/dummy
+        if [ "$ENV_VAR" == "env" ]; then
+            aws configure set default.region $AWS_DEFAULT_REGION && \
+                aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+                aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+        fi
         aws s3 cp . "$BUCKET_URL_SLASH" --recursive --include "*"
+        if [ "$ENV_VAR" == "env" ]; then
+            aws configure set default.region "dummy_region" && \
+                aws configure set aws_access_key_id "dummy_id" && \
+                aws configure set aws_secret_access_key "dummy_key"
+        fi
 
         SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
 
@@ -117,6 +131,11 @@ for $ENV_VAR in "env" "no_env"; do
         kill $SERVER_PID
         wait $SERVER_PID
 
+        if [ "$ENV_VAR" == "env" ]; then
+            aws configure set default.region $AWS_DEFAULT_REGION && \
+                aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+                aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+        fi
         aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
         rm models/dummy
 
@@ -148,8 +167,13 @@ for $ENV_VAR in "env" "no_env"; do
         # Perform test with model repository variants
         for src in "models/" "."  ; do
 
-            # copy contents of /models into GCS bucket.
+            # copy contents of /models into S3 bucket.
             aws s3 cp $src $BUCKET_URL_SLASH --recursive --include "*"
+            if [ "$ENV_VAR" == "env" ]; then
+                aws configure set default.region "dummy_region" && \
+                    aws configure set aws_access_key_id "dummy_id" && \
+                    aws configure set aws_secret_access_key "dummy_key"
+            fi
 
             if [ "$src" == "." ]; then
                 # set server arguments
@@ -191,6 +215,11 @@ for $ENV_VAR in "env" "no_env"; do
             wait $SERVER_PID
 
             # Clean up bucket
+            if [ "$ENV_VAR" == "env" ]; then
+                aws configure set default.region $AWS_DEFAULT_REGION && \
+                    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+                    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+            fi
             aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
         done
     done
