@@ -35,30 +35,59 @@ namespace nvidia { namespace inferenceserver {
 
 namespace {
 
-class PersistentBuffer {
+class PersistentBufferManager {
  public:
+  class Buffer {
+   public:
+    Buffer(size_t byte_size)
+        : buffer_(malloc(byte_size)), byte_size_(byte_size), count_(1)
+    {
+    }
+    ~Buffer() { free(buffer_); }
+    std::mutex mtx_;
+    void* buffer_;
+    size_t byte_size_;
+    size_t count_;
+  };
+
   // Note that the buffer is not empty so that we can return a valid
   // pointer when byte_size == 0
-  PersistentBuffer() : buffer_(new char[1]), byte_size_(0) {}
+  PersistentBufferManager() : buffer_(new Buffer(1)) { buffer_->count_++; }
 
-  // Return a shared_ptr that is on heap so that it can be transferred as userp
-  std::shared_ptr<char[]>* Buffer(size_t byte_size)
+  ~PersistentBufferManager() { ReleaseBuffer(buffer_); }
+
+  // Return a buffer that is on heap so that it can be transferred as userp
+  Buffer* GetBuffer(size_t byte_size)
   {
     std::lock_guard<std::mutex> lk(mtx_);
-    if (byte_size > byte_size_) {
-      byte_size_ = byte_size;
-      buffer_.reset(new char[byte_size]);
+
+    if (byte_size > buffer_->byte_size_) {
+      ReleaseBuffer(buffer_);
+      buffer_ = new Buffer(byte_size);
     }
-    return new std::shared_ptr<char[]>(buffer_);
+
+    std::lock_guard<std::mutex> blk(buffer_->mtx_);
+    buffer_->count_++;
+
+    return buffer_;
+  }
+
+  void ReleaseBuffer(Buffer* buffer)
+  {
+    std::lock_guard<std::mutex> blk(buffer->mtx_);
+    buffer->count_--;
+    if (buffer->count_ == 0) {
+      delete buffer;
+    }
   }
 
  private:
   std::mutex mtx_;
-  std::shared_ptr<char[]> buffer_;
-  size_t byte_size_;
+  Buffer* buffer_;
 };
 
-std::unique_ptr<PersistentBuffer> persistent_buffer(new PersistentBuffer());
+std::unique_ptr<PersistentBufferManager> persistent_buffer_manager(
+    new PersistentBufferManager());
 
 // Utilities for Null request feature.
 TRITONSERVER_Error*
@@ -69,16 +98,17 @@ NullResponseAlloc(
     void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
-  auto buffer_sp = persistent_buffer->Buffer(byte_size);
+  auto buffer_sp = persistent_buffer_manager->GetBuffer(byte_size);
   if (buffer_sp != nullptr) {
-    *buffer = buffer_sp->get();
+    *buffer = buffer_sp->buffer_;
     if (*buffer != nullptr) {
       *actual_memory_type = TRITONSERVER_MEMORY_CPU;
       *actual_memory_type_id = 0;
       *buffer_userp = buffer_sp;
       return nullptr;
     } else {
-      delete buffer_sp;
+      persistent_buffer_manager->ReleaseBuffer(
+          reinterpret_cast<PersistentBufferManager::Buffer*>(buffer_sp));
     }
   }
 
@@ -95,7 +125,8 @@ NullResponseRelease(
     int64_t memory_type_id)
 {
   if (buffer_userp != nullptr) {
-    delete reinterpret_cast<std::shared_ptr<char[]>*>(buffer_userp);
+    persistent_buffer_manager->ReleaseBuffer(
+        reinterpret_cast<PersistentBufferManager::Buffer*>(buffer_userp));
   }
   return nullptr;
 }
@@ -116,7 +147,8 @@ NullRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
 {
   TRITONSERVER_InferenceRequestDelete(request);
   if (userp != nullptr) {
-    delete reinterpret_cast<std::shared_ptr<char[]>*>(userp);
+    persistent_buffer_manager->ReleaseBuffer(
+        reinterpret_cast<PersistentBufferManager::Buffer*>(userp));
   }
 }
 
@@ -228,13 +260,13 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
     }
   }
 
-  auto data_sp = persistent_buffer->Buffer(max_byte_size);
+  auto data_sp = persistent_buffer_manager->GetBuffer(max_byte_size);
   for (const auto& input : from.OriginalInputs()) {
     Input* new_input;
     lrequest->AddOriginalInput(
         input.first, input.second.DType(), input.second.Shape(), &new_input);
     new_input->AppendData(
-        data_sp->get(), input.second.Data()->TotalByteSize(),
+        data_sp->buffer_, input.second.Data()->TotalByteSize(),
         TRITONSERVER_MEMORY_CPU, 0);
   }
 
