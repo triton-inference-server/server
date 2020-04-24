@@ -87,8 +87,7 @@ WarmupResponseComplete(TRITONSERVER_InferenceResponse* iresponse, void* userp)
 void
 WarmupRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
 {
-  // do nothing with request object as it is created on stack,
-  // see SetConfiguredScheduler()
+  TRITONSERVER_InferenceRequestDelete(request);
   auto warmup_promise = reinterpret_cast<std::promise<void>*>(userp);
   warmup_promise->set_value();
 }
@@ -192,13 +191,18 @@ InferenceBackend::SetConfiguredScheduler(
   // the scheduler.
   // But running warmup synchronously allows us to use one set of warmup data
   // for all contexts.
-  std::vector<WarmupData> samples;
+  std::vector<std::vector<WarmupData>> samples{runner_cnt};
   if (Config().model_warmup_size() != 0) {
-    RETURN_IF_ERROR(GenerateWarmupData(&samples));
+    // The ownership of InferenceRequest will be transferred on model execution,
+    // so must have unique set of samples for each runner
+    for (auto& runner_samples : samples) {
+      RETURN_IF_ERROR(GenerateWarmupData(&runner_samples));
+    }
   }
 
   auto OnWarmup = [this, &samples](uint32_t runner_idx) -> Status {
-    for (auto& sample : samples) {
+    auto& runner_samples = samples[runner_idx];
+    for (auto& sample : runner_samples) {
       LOG_VERBOSE(1) << "model '" << sample.request_->ModelName()
                      << "' instance " << std::to_string(runner_idx)
                      << " is running warmup sample '" << sample.sample_name_
