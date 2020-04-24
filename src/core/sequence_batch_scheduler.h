@@ -326,9 +326,7 @@ class OldestSequenceBatch : public SequenceBatch {
       std::unique_ptr<InferenceRequest>& request) override;
 
  private:
-  void CompleteAndNext(
-      const uint32_t seq_slot, std::function<void(const Status&)> OnComplete,
-      const Status& status);
+  void CompleteAndNext(const uint32_t seq_slot);
 
   // The dynamic batcher for this scheduler
   std::unique_ptr<Scheduler> dynamic_batcher_;

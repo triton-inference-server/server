@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -337,6 +338,15 @@ class InferenceRequest {
     return Status::Success;
   }
 
+  // Add a callback to be invoked on releasing the request object from Triton.
+  // Multile callbacks can be added by calling this function in order,
+  // and they will be invoked in reversed order.
+  Status AddInternalReleaseCallback(std::function<void()>&& callback)
+  {
+    release_callbacks_.emplace_back(std::move(callback));
+    return Status::Success;
+  }
+
   // Prepare this request for inference.
   Status PrepareForInference();
 
@@ -428,6 +438,8 @@ class InferenceRequest {
 
   // The response factory associated with this request.
   InferenceResponseFactory response_factory_;
+
+  std::vector<std::function<void()>> release_callbacks_;
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceRequest& request);
