@@ -968,7 +968,7 @@ DirectSequenceBatch::SchedulerThread(
                  << " queued requests, current total = " << total_size;
       } else {
         PendingBatchShapes pending_batch_shapes;
-        std::unique_ptr<InferenceRequest> null_irequest;
+        InferenceRequest* null_irequest = nullptr;
 
         // Make one pass through the active slots to:
         //
@@ -1010,16 +1010,7 @@ DirectSequenceBatch::SchedulerThread(
             // this null request will have the correct shape for any
             // created batch.
             if (null_irequest == nullptr) {
-              null_irequest.reset(InferenceRequest::CopyAsNull(*queue.front()));
-
-              // Note that when the not-ready control input of the
-              // request is "true" the model can't assume that any
-              // other inputs are meaningful, including CORRID. So we
-              // just use zero for that and use whatever values the
-              // other inputs have in request_.
-              SetControlTensors(
-                  null_irequest, seq_slot, 0 /* corrid */,
-                  true /* not_ready */);
+              null_irequest = queue.front().get();
             }
 
             // If this is the first non-null request capture the shape
@@ -1073,6 +1064,12 @@ DirectSequenceBatch::SchedulerThread(
           if (use_null_request) {
             std::unique_ptr<InferenceRequest> ni(
                 InferenceRequest::CopyAsNull(*null_irequest));
+            // Note that when the not-ready control input of the
+            // request is "true" the model can't assume that any
+            // other inputs are meaningful, including CORRID. So we
+            // just use zero for that.
+            SetControlTensors(
+                ni, seq_slot, 0 /* corrid */, true /* not_ready */);
             requests.emplace_back(std::move(ni));
           } else {
             std::unique_ptr<InferenceRequest>& irequest = queue.front();
@@ -1081,14 +1078,14 @@ DirectSequenceBatch::SchedulerThread(
             SetControlTensors(
                 irequest, seq_slot, seq_slot_correlation_ids_[seq_slot]);
 
-            requests.emplace_back(std::move(irequest));
-
-            queue.pop_front();
-
             if ((irequest->Flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
                 0) {
               end_of_sequence = true;
             }
+
+            requests.emplace_back(std::move(irequest));
+
+            queue.pop_front();
           }
 
           // If the sequence has ended then attempt to refill the
@@ -1137,51 +1134,6 @@ DirectSequenceBatch::SchedulerThread(
     }
 
     if (!requests.empty()) {
-#if 0
-  // FIXME
-    auto OnCompleteQueuedPayloads = [payloads](const Status& rstatus) {
-        // Payloads that don't have a completion function don't have
-        // anywhere to report their errors. Those errors could have
-        // caused other payloads to have issues (due to mis-alignment
-        // within the batch, etc.). So if any such payload has an
-        // error we just fail all payloads.
-        Status status = rstatus;
-        if (status.IsOk()) {
-          for (auto& payload : *payloads) {
-            if (payload.complete_function_ == nullptr) {
-              if (!payload.status_.IsOk()) {
-                status = payload.status_;
-                break;
-              }
-            }
-          }
-        }
-
-        // Complete each payload by calling the competion function.
-#ifdef TRTIS_ENABLE_STATS
-        bool found_success = false;
-#endif  // TRTIS_ENABLE_STATS
-        for (auto& payload : *payloads) {
-          const Status& final_status = status.IsOk() ? payload.status_ : status;
-
-#ifdef TRTIS_ENABLE_STATS
-          // All the payloads executed together, so count 1 execution
-          // in the first successful payload. Other payloads stay at 0
-          // executions.
-          if (!found_success && final_status.IsOk() &&
-              (payload.stats_ != nullptr)) {
-            payload.stats_->SetModelExecutionCount(1);
-            found_success = true;
-          }
-#endif  // TRTIS_ENABLE_STATS
-
-          if (payload.complete_function_ != nullptr) {
-            payload.complete_function_(final_status);
-          }
-        }
-      };
-#endif
-
       // Run the backend...
       OnSchedule_(batcher_idx_, std::move(requests));
 
@@ -1274,18 +1226,9 @@ OldestSequenceBatch::OldestSequenceBatch(
 
 OldestSequenceBatch::~OldestSequenceBatch() {}
 
-#if 0  // FIXME
 void
-OldestSequenceBatch::CompleteAndNext(
-    const uint32_t seq_slot, std::function<void(const Status&)> OnComplete,
-    const Status& status)
+OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
 {
-  // If there is a completion function, call it to communicate the
-  // completion of the sequence's inference request.
-  if (OnComplete != nullptr) {
-    OnComplete(status);
-  }
-
   std::lock_guard<std::mutex> lock(mu_);
 
   // We may enqueue 1 or more pending inferences triggered by the
@@ -1296,7 +1239,7 @@ OldestSequenceBatch::CompleteAndNext(
   // being force-ended) then we try to fill the now-free sequence slot
   // from the backlog and then send the first inference from that
   // sequence to the dynamic batcher...
-  std::deque<Scheduler::Payload>& queue = queues_[seq_slot];
+  std::deque<std::unique_ptr<InferenceRequest>>& queue = queues_[seq_slot];
   bool retry = true;
   while (retry) {
     retry = false;
@@ -1307,8 +1250,7 @@ OldestSequenceBatch::CompleteAndNext(
     // If the next sequence inference is ready in the queue then enqueue
     // it in the dynamic batcher now.
     if (!queue.empty()) {
-      Scheduler::Payload& payload = queue.front();
-      const auto& irequest = payload.request_;
+      auto& irequest = queue.front();
 
       // If the request is null then this inference request is from
       // the reaper thread indicating a timed-out sequence. Mark that
@@ -1339,13 +1281,9 @@ OldestSequenceBatch::CompleteAndNext(
                        << seq_slot;
         in_flight_[seq_slot] = true;
 
-#if 0  // FIXME
-        auto on_complete_fn = std::bind(
-            &OldestSequenceBatch::CompleteAndNext, this, seq_slot,
-            payload.complete_function_, std::placeholders::_1);
-#endif
+        irequest->AddInternalReleaseCallback(
+            [this, seq_slot]() { CompleteAndNext(seq_slot); });
 
-        // FIXME handle error status.
         dynamic_batcher_->Enqueue(irequest);
       }
 
@@ -1384,7 +1322,6 @@ OldestSequenceBatch::CompleteAndNext(
     }
   }
 }
-#endif
 
 void
 OldestSequenceBatch::Enqueue(
@@ -1398,12 +1335,12 @@ OldestSequenceBatch::Enqueue(
     std::lock_guard<std::mutex> lock(mu_);
 
     std::deque<std::unique_ptr<InferenceRequest>>& queue = queues_[seq_slot];
-    queue.emplace_back(std::move(request));  // FIXME complete and next?
+    queue.emplace_back(std::move(request));
     in_flight = in_flight_[seq_slot];
   }
 
   if (!in_flight) {
-    //    CompleteAndNext(seq_slot, nullptr, Status::Success);
+    CompleteAndNext(seq_slot);
   }
 }
 

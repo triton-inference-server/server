@@ -544,9 +544,13 @@ CustomBackend::Context::Run(
     if (custom_payloads[i].error_code == 0) {
       GetInputOutputContext* ocontext = static_cast<GetInputOutputContext*>(
           custom_payloads[i].output_context);
-      LOG_STATUS_ERROR(
-          InferenceResponse::Send(std::move(ocontext->response_)),
-          "failed to send custom backend response");
+      // response may not be created if the custom backend doesn't call
+      // GetOutput() on the output
+      if (ocontext->response_ != nullptr) {
+        LOG_STATUS_ERROR(
+            InferenceResponse::Send(std::move(ocontext->response_)),
+            "failed to send custom backend response");
+      }
       InferenceRequest::Release(std::move(requests[i]));
     } else {
       InferenceRequest::RespondWithError(
