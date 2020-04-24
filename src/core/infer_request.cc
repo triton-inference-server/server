@@ -33,6 +33,52 @@
 
 namespace nvidia { namespace inferenceserver {
 
+namespace {
+
+// Utilities for Null request feature.
+TRITONSERVER_Error*
+NullResponseAlloc(
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
+    int64_t preferred_memory_type_id, void* userp, void** buffer,
+    void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
+    int64_t* actual_memory_type_id)
+{
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_INTERNAL,
+      "unexpected allocation for null request, no output should be requestd.");
+}
+
+TRITONSERVER_Error*
+NullResponseRelease(
+    TRITONSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+    size_t byte_size, TRITONSERVER_MemoryType memory_type,
+    int64_t memory_type_id)
+{
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_INTERNAL,
+      "unexpected release for null request, no output should be requestd.");
+}
+
+ResponseAllocator null_allocator =
+    ResponseAllocator(NullResponseAlloc, NullResponseRelease);
+
+void
+NullResponseComplete(TRITONSERVER_InferenceResponse* iresponse, void* userp)
+{
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceResponseDelete(iresponse),
+      "deleting null response");
+}
+
+void
+NullRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
+{
+  TRITONSERVER_InferenceRequestDelete(request);
+}
+
+}  // namespace
+
 const std::string&
 InferenceRequest::ModelName() const
 {
@@ -107,6 +153,14 @@ InferenceRequest::RespondWithError(
 void
 InferenceRequest::Release(std::unique_ptr<InferenceRequest>&& request)
 {
+  // Invoke the release callbacks added internally before releasing the
+  // request to user provided callback.
+  for (auto it = request->release_callbacks_.rbegin();
+       it != request->release_callbacks_.rend(); it++) {
+    (*it)();
+  }
+  request->release_callbacks_.clear();
+
   void* userp = request->release_userp_;
   request->release_fn_(
       reinterpret_cast<TRITONSERVER_InferenceRequest*>(request.release()),
@@ -116,9 +170,57 @@ InferenceRequest::Release(std::unique_ptr<InferenceRequest>&& request)
 InferenceRequest*
 InferenceRequest::CopyAsNull(const InferenceRequest& from)
 {
-  // FIXME
-  LOG_ERROR << "CopyAsNull: NYI";
-  return nullptr;
+  // Create a copy of 'from' request with artifical inputs and no requested
+  // outputs. Maybe more efficient to share inputs and other metadata,
+  // but that binds the Null request with 'from' request's lifecycle.
+  std::unique_ptr<InferenceRequest> lrequest(
+      new InferenceRequest(from.backend_raw_, from.requested_model_version_));
+  lrequest->needs_normalization_ = false;
+  lrequest->batch_size_ = from.batch_size_;
+
+  // Two pass: first to obtain the max input byte size for allocating a large
+  // enough buffer for all inputs; second to construct the inputs
+  size_t max_byte_size = 0;
+  const std::string* max_input_name;
+  for (const auto& input : from.OriginalInputs()) {
+    if (input.second.Data()->TotalByteSize() > max_byte_size) {
+      max_byte_size = input.second.Data()->TotalByteSize();
+      max_input_name = &(input.first);
+    }
+  }
+
+  // [DLIS-1268] should use one growable static buffer for all null requests
+  auto mem_type = TRITONSERVER_MEMORY_CPU;
+  int64_t mem_id = 0;
+  std::shared_ptr<Memory> data =
+      std::make_shared<AllocatedMemory>(max_byte_size, mem_type, mem_id);
+  auto data_base = data->BufferAt(0, &max_byte_size, &mem_type, &mem_id);
+  for (const auto& input : from.OriginalInputs()) {
+    Input* new_input;
+    lrequest->AddOriginalInput(
+        input.first, input.second.DType(), input.second.Shape(), &new_input);
+    // Note that the input that have max byte size will be responsible for
+    // holding the artifical data, while other inputs will hold a reference to
+    // it with byte size that matches 'from'
+    if (input.first == *max_input_name) {
+      new_input->SetData(data);
+    } else {
+      new_input->AppendData(
+          data_base, input.second.Data()->TotalByteSize(), mem_type, mem_id);
+    }
+  }
+
+  // No outputs were requested and thus there should be no allocations.
+  lrequest->SetResponseCallback(
+      &null_allocator, nullptr, NullResponseComplete, nullptr);
+  lrequest->SetReleaseCallback(NullRequestComplete, nullptr);
+
+  for (auto& pr : lrequest->original_inputs_) {
+    lrequest->inputs_.emplace(
+        std::make_pair(pr.first, std::addressof(pr.second)));
+  }
+
+  return lrequest.release();
 }
 
 Status
