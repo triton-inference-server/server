@@ -98,7 +98,7 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR --api-version 2"
 source ../common/util.sh
 
-run_server_v2
+run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -225,7 +225,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit --api-version 2"
-run_server_v2
+run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -250,7 +250,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit --api-version 2"
-run_server_v2
+run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
