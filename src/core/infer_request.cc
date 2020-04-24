@@ -35,6 +35,33 @@ namespace nvidia { namespace inferenceserver {
 
 namespace {
 
+class PersistentBuffer {
+ public:
+  // Note that the buffer is not empty so that we can return a valid
+  // pointer when byte_size == 0
+  PersistentBuffer() : buffer_(new char[1]), byte_size_(0) {}
+
+  // Return a shared_ptr that is on heap so that it can be transferred as userp
+  std::shared_ptr<char[]>* Buffer(size_t byte_size)
+  {
+    {
+      std::lock_guard<std::mutex> lk(mtx_);
+      if (byte_size > byte_size_) {
+        byte_size_ = byte_size;
+        buffer_.reset(new char[byte_size]);
+      }
+      return new std::shared_ptr<char[]>(buffer_);
+    }
+  }
+
+ private:
+  std::mutex mtx_;
+  std::shared_ptr<char[]> buffer_;
+  size_t byte_size_;
+};
+
+std::unique_ptr<PersistentBuffer> persistent_buffer(new PersistentBuffer());
+
 // Utilities for Null request feature.
 TRITONSERVER_Error*
 NullResponseAlloc(
@@ -44,13 +71,20 @@ NullResponseAlloc(
     void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
-  *buffer = malloc(byte_size);
-  if (*buffer != nullptr) {
-    *actual_memory_type = TRITONSERVER_MEMORY_CPU;
-    *actual_memory_type_id = 0;
-    return nullptr;
+  auto buffer_sp = persistent_buffer->Buffer(byte_size);
+  if (buffer_sp != nullptr) {
+    *buffer = buffer_sp->get();
+    if (*buffer != nullptr) {
+      *actual_memory_type = TRITONSERVER_MEMORY_CPU;
+      *actual_memory_type_id = 0;
+      *buffer_userp = buffer_sp;
+      return nullptr;
+    } else {
+      delete buffer_sp;
+    }
   }
 
+  *buffer_userp = nullptr;
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_INTERNAL,
       "failed to allocate output buffer for null request.");
@@ -62,7 +96,9 @@ NullResponseRelease(
     size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
 {
-  free(buffer);
+  if (buffer_userp != nullptr) {
+    delete reinterpret_cast<std::shared_ptr<char[]>*>(buffer_userp);
+  }
   return nullptr;
 }
 
@@ -74,13 +110,16 @@ NullResponseComplete(TRITONSERVER_InferenceResponse* iresponse, void* userp)
 {
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceResponseDelete(iresponse),
-      "deleting warmup response");
+      "deleting null response");
 }
 
 void
 NullRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
 {
   TRITONSERVER_InferenceRequestDelete(request);
+  if (userp != nullptr) {
+    delete reinterpret_cast<std::shared_ptr<char[]>*>(userp);
+  }
 }
 
 }  // namespace
@@ -159,6 +198,12 @@ InferenceRequest::RespondWithError(
 void
 InferenceRequest::Release(std::unique_ptr<InferenceRequest>&& request)
 {
+  // Invoke the release callbacks added internally before releasing the
+  // request to user provided callback.
+  for (auto it = request->release_callbacks_.rbegin();
+       it != request->release_callbacks_.rend(); it++) {
+    (*it)();
+  }
   void* userp = request->release_userp_;
   request->release_fn_(
       reinterpret_cast<TRITONSERVER_InferenceRequest*>(request.release()),
@@ -173,43 +218,36 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
   // but that binds the Null request with 'from' request's lifecycle.
   std::unique_ptr<InferenceRequest> lrequest(
       new InferenceRequest(from.backend_raw_, from.requested_model_version_));
-  lrequest->needs_normalization_ = from.needs_normalization_;
+  lrequest->needs_normalization_ = false;
   lrequest->batch_size_ = from.batch_size_;
 
   // Two pass: first to obtain the max input byte size for allocating a large
   // enough buffer for all inputs; second to construct the inputs
   size_t max_byte_size = 0;
-  const std::string* max_input_name;
   for (const auto& input : from.OriginalInputs()) {
     if (input.second.Data()->TotalByteSize() > max_byte_size) {
       max_byte_size = input.second.Data()->TotalByteSize();
-      max_input_name = &(input.first);
     }
   }
 
-  auto mem_type = TRITONSERVER_MEMORY_CPU;
-  int64_t mem_id = 0;
-  std::shared_ptr<Memory> data =
-      std::make_shared<AllocatedMemory>(max_byte_size, mem_type, mem_id);
-  auto data_base = data->BufferAt(0, &max_byte_size, &mem_type, &mem_id);
+  auto data_sp = persistent_buffer->Buffer(max_byte_size);
   for (const auto& input : from.OriginalInputs()) {
     Input* new_input;
     lrequest->AddOriginalInput(
         input.first, input.second.DType(), input.second.Shape(), &new_input);
-    // Note that the input that have max byte size will be responsible for
-    // holding the artifical data, while other inputs will hold a reference to
-    // it with byte size that matches 'from'
-    if (input.first == *max_input_name) {
-      new_input->SetData(data);
-    } else {
-      new_input->AppendData(
-          data_base, input.second.Data()->TotalByteSize(), mem_type, mem_id);
-    }
+    new_input->AppendData(
+        data_sp->get(), input.second.Data()->TotalByteSize(),
+        TRITONSERVER_MEMORY_CPU, 0);
   }
 
   lrequest->SetResponseCallback(
       &null_allocator, nullptr, NullResponseComplete, nullptr);
-  lrequest->SetReleaseCallback(NullRequestComplete, nullptr);
+  lrequest->SetReleaseCallback(NullRequestComplete, data_sp);
+
+  for (auto& pr : lrequest->original_inputs_) {
+    lrequest->inputs_.emplace(
+        std::make_pair(pr.first, std::addressof(pr.second)));
+  }
 
   return lrequest.release();
 }

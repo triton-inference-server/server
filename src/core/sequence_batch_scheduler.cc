@@ -968,7 +968,7 @@ DirectSequenceBatch::SchedulerThread(
                  << " queued requests, current total = " << total_size;
       } else {
         PendingBatchShapes pending_batch_shapes;
-        std::unique_ptr<InferenceRequest> null_irequest;
+        InferenceRequest* null_irequest = nullptr;
 
         // Make one pass through the active slots to:
         //
@@ -1010,16 +1010,7 @@ DirectSequenceBatch::SchedulerThread(
             // this null request will have the correct shape for any
             // created batch.
             if (null_irequest == nullptr) {
-              null_irequest.reset(InferenceRequest::CopyAsNull(*queue.front()));
-
-              // Note that when the not-ready control input of the
-              // request is "true" the model can't assume that any
-              // other inputs are meaningful, including CORRID. So we
-              // just use zero for that and use whatever values the
-              // other inputs have in request_.
-              SetControlTensors(
-                  null_irequest, seq_slot, 0 /* corrid */,
-                  true /* not_ready */);
+              null_irequest = queue.front().get();
             }
 
             // If this is the first non-null request capture the shape
@@ -1073,6 +1064,13 @@ DirectSequenceBatch::SchedulerThread(
           if (use_null_request) {
             std::unique_ptr<InferenceRequest> ni(
                 InferenceRequest::CopyAsNull(*null_irequest));
+            // Note that when the not-ready control input of the
+            // request is "true" the model can't assume that any
+            // other inputs are meaningful, including CORRID. So we
+            // just use zero for that and use whatever values the
+            // other inputs have in request_.
+            SetControlTensors(
+                ni, seq_slot, 0 /* corrid */, true /* not_ready */);
             requests.emplace_back(std::move(ni));
           } else {
             std::unique_ptr<InferenceRequest>& irequest = queue.front();
@@ -1284,7 +1282,7 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
                        << seq_slot;
         in_flight_[seq_slot] = true;
 
-        irequest->AddInternalCallback(
+        irequest->AddReleaseCallback(
             [this, seq_slot]() { CompleteAndNext(seq_slot); });
 
         dynamic_batcher_->Enqueue(irequest);
@@ -1338,7 +1336,7 @@ OldestSequenceBatch::Enqueue(
     std::lock_guard<std::mutex> lock(mu_);
 
     std::deque<std::unique_ptr<InferenceRequest>>& queue = queues_[seq_slot];
-    queue.emplace_back(std::move(request));  // FIXME complete and next?
+    queue.emplace_back(std::move(request));
     in_flight = in_flight_[seq_slot];
   }
 
