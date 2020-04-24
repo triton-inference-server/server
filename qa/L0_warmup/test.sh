@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -155,57 +155,54 @@ for BACKEND in ${BACKENDS}; do
     SUPPORT_STRING=0 && ([[ $BACKEND == "savedmodel" ]] || [[ $BACKEND == "onnx" ]] || [[ $BACKEND == "savedmodel" ]]) && SUPPORT_STRING=1
     if [ "$SUPPORT_STRING" == "1" ] ; then
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/${BACKEND}_sequence_object models/.
-    fi
-    if [ "$BACKEND" != "custom" ]; then
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/${BACKEND}_zero_1_object models/.
-    else 
-        cp -r ../custom_models/custom_zero_1_float32 models/custom_zero_1_object && \
-            mkdir -p models/custom_zero_1_object/1 && \
-            cp `pwd`/libidentity.so models/custom_zero_1_object/1/. && \
-            (cd models/custom_zero_1_object && \
-                    echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
-                    echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt && \
-                    sed -i "s/custom_zero_1_float32/custom_zero_1_object/" config.pbtxt && \
-                    sed -i "s/max_batch_size: 1/max_batch_size: 8/" config.pbtxt && \
-                    sed -i "s/TYPE_FP32/TYPE_STRING/" config.pbtxt && \
-                    sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt)
-    fi
+        if [ "$BACKEND" = "custom" ]; then
+            cp -r ../custom_models/custom_zero_1_float32 models/custom_zero_1_object && \
+                mkdir -p models/custom_zero_1_object/1 && \
+                cp `pwd`/libidentity.so models/custom_zero_1_object/1/. && \
+                (cd models/custom_zero_1_object && \
+                        echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
+                        echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt && \
+                        sed -i "s/custom_zero_1_float32/custom_zero_1_object/" config.pbtxt && \
+                        sed -i "s/max_batch_size: 1/max_batch_size: 8/" config.pbtxt && \
+                        sed -i "s/TYPE_FP32/TYPE_STRING/" config.pbtxt && \
+                        sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt)
+        fi
 
-    # random and zero data (two samples)
-    #
-    # Provide warmup instruction (batch size 1) in model config
-    (cd models/${BACKEND}_zero_1_object && \
-        echo 'model_warmup [' >> config.pbtxt && \
-        echo '{' >> config.pbtxt && \
-        echo '    name : "zero string stateless"' >> config.pbtxt && \
-        echo '    batch_size: 1' >> config.pbtxt && \
-        echo '    inputs {' >> config.pbtxt && \
-        echo '        key: "INPUT0"' >> config.pbtxt && \
-        echo '        value: {' >> config.pbtxt && \
-        echo '            data_type: TYPE_STRING' >> config.pbtxt && \
-        echo '            dims: 16' >> config.pbtxt && \
-        echo '            zero_data: true' >> config.pbtxt && \
-        echo '        }' >> config.pbtxt && \
-        echo '    }' >> config.pbtxt && \
-        echo '},' >> config.pbtxt && \
-        echo '{' >> config.pbtxt && \
-        echo '    name : "random string stateless"' >> config.pbtxt && \
-        echo '    batch_size: 1' >> config.pbtxt && \
-        echo '    inputs {' >> config.pbtxt && \
-        echo '        key: "INPUT0"' >> config.pbtxt && \
-        echo '        value: {' >> config.pbtxt && \
-        echo '            data_type: TYPE_STRING' >> config.pbtxt && \
-        echo '            dims: 16' >> config.pbtxt && \
-        echo '            random_data: true' >> config.pbtxt && \
-        echo '        }' >> config.pbtxt && \
-        echo '    }' >> config.pbtxt && \
-        echo '}' >> config.pbtxt && \
-        echo ']' >> config.pbtxt )
+        # random and zero data (two samples)
+        #
+        # Provide warmup instruction (batch size 1) in model config
+        (cd models/${BACKEND}_zero_1_object && \
+            echo 'model_warmup [' >> config.pbtxt && \
+            echo '{' >> config.pbtxt && \
+            echo '    name : "zero string stateless"' >> config.pbtxt && \
+            echo '    batch_size: 1' >> config.pbtxt && \
+            echo '    inputs {' >> config.pbtxt && \
+            echo '        key: "INPUT0"' >> config.pbtxt && \
+            echo '        value: {' >> config.pbtxt && \
+            echo '            data_type: TYPE_STRING' >> config.pbtxt && \
+            echo '            dims: 16' >> config.pbtxt && \
+            echo '            zero_data: true' >> config.pbtxt && \
+            echo '        }' >> config.pbtxt && \
+            echo '    }' >> config.pbtxt && \
+            echo '},' >> config.pbtxt && \
+            echo '{' >> config.pbtxt && \
+            echo '    name : "random string stateless"' >> config.pbtxt && \
+            echo '    batch_size: 1' >> config.pbtxt && \
+            echo '    inputs {' >> config.pbtxt && \
+            echo '        key: "INPUT0"' >> config.pbtxt && \
+            echo '        value: {' >> config.pbtxt && \
+            echo '            data_type: TYPE_STRING' >> config.pbtxt && \
+            echo '            dims: 16' >> config.pbtxt && \
+            echo '            random_data: true' >> config.pbtxt && \
+            echo '        }' >> config.pbtxt && \
+            echo '    }' >> config.pbtxt && \
+            echo '}' >> config.pbtxt && \
+            echo ']' >> config.pbtxt )
 
-    # user provided data
-    #
-    # Instruction for sequence model (batch size 8), need to specify control tensor
-    if [ "$SUPPORT_STRING" == "1" ]; then
+        # user provided data
+        #
+        # Instruction for sequence model (batch size 8), need to specify control tensor
         (cd models/${BACKEND}_sequence_object && \
             echo 'model_warmup [{' >> config.pbtxt && \
             echo '    name : "string statefull"' >> config.pbtxt && \
@@ -240,40 +237,37 @@ for BACKEND in ${BACKENDS}; do
         mkdir -p models/${BACKEND}_sequence_object/warmup && \
             (cd models/${BACKEND}_sequence_object/warmup && \
                     echo -n -e '\x00\x00\x00\x03\x32\x33\x33' > raw_string_data)
-    fi
 
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
 
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
+        set +e
 
-    set +e
-
-    grep "is running warmup sample 'zero string stateless'" $SERVER_LOG
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected warmup for zero string stateless model\n***"
-        RET=1
-    fi
-    grep "is running warmup sample 'random string stateless'" $SERVER_LOG
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected warmup for random string stateless model\n***"
-        RET=1
-    fi
-    if [ "$SUPPORT_STRING" == "1" ]; then
+        grep "is running warmup sample 'zero string stateless'" $SERVER_LOG
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Failed. Expected warmup for zero string stateless model\n***"
+            RET=1
+        fi
+        grep "is running warmup sample 'random string stateless'" $SERVER_LOG
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Failed. Expected warmup for random string stateless model\n***"
+            RET=1
+        fi
         grep "is running warmup sample 'string statefull'" $SERVER_LOG
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Failed. Expected warmup for string stateful model\n***"
             RET=1
         fi
+
+        set -e
+
+        kill $SERVER_PID
+        wait $SERVER_PID
     fi
-
-    set -e
-
-    kill $SERVER_PID
-    wait $SERVER_PID
 
     if [ "$BACKEND" == "graphdef" ]; then
         # Show effect of warmup by using a TF model with TF-TRT optimization which is
