@@ -150,10 +150,9 @@ struct BackendContext {
   // should call cudaStreamSynchronize before using the
   // data. Otherwise, return false.
   bool SetFixedSizeOutputBuffer(
-      const std::unique_ptr<InferenceRequest>& request,
       std::unique_ptr<InferenceResponse>* response,
       InferenceResponse::Output* response_output, OutputInfo* output_info,
-      size_t* tensor_offset, const size_t expected_byte_size);
+      const size_t tensor_byte_size, const size_t tensor_offset);
 
   // Helper function to set output buffer for a shape tensor. It is
   // callers resposibilty to ensure this method is called only for the

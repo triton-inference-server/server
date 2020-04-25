@@ -189,9 +189,7 @@ class InferenceResponse {
   const std::string& Id() const { return id_; }
   const std::string& ModelName() const;
   int64_t ActualModelVersion() const;
-
   const Status& ResponseStatus() const { return status_; }
-  void SetResponseStatus(const Status& s) { status_ = s; }
 
   const std::deque<Output>& Outputs() const { return outputs_; }
 
@@ -204,9 +202,16 @@ class InferenceResponse {
       const std::string& name, const DataType datatype,
       std::vector<int64_t>&& shape, Output** output = nullptr);
 
-  // Send the response. Calling this function releases ownership of
-  // the response object and gives it to the callback function.
+  // Send the response with success status. Calling this function
+  // releases ownership of the response object and gives it to the
+  // callback function.
   static Status Send(std::unique_ptr<InferenceResponse>&& response);
+
+  // Send the response with explicit status. Calling this function
+  // releases ownership of the response object and gives it to the
+  // callback function.
+  static Status SendWithStatus(
+      std::unique_ptr<InferenceResponse>&& response, const Status& status);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(InferenceResponse);

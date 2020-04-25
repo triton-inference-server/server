@@ -128,7 +128,7 @@ BackendContext::SetInputBuffer(
     const InferenceRequest::Input* rinput;
     Status status = request->ImmutableInput(name, &rinput);
     if (!status.IsOk()) {
-      InferenceRequest::RespondWithError(request, status);
+      // FIXME      InferenceRequest::RespondWithError(request, status);
       break;
     }
 
@@ -149,14 +149,15 @@ BackendContext::SetInputBuffer(
       }
 
       if ((copied_byte_size + content_byte_size) > expected_byte_size) {
-        InferenceRequest::RespondWithError(
-            request,
-            Status(
-                Status::Code::INVALID_ARG,
-                "unexpected size " +
-                    std::to_string(copied_byte_size + content_byte_size) +
-                    " for inference input '" + name + "', expecting " +
-                    std::to_string(expected_byte_size)));
+        // FIXME        InferenceRequest::RespondWithError(
+        //            request,
+        //            Status(
+        //                Status::Code::INVALID_ARG,
+        //                "unexpected size " +
+        //                    std::to_string(copied_byte_size +
+        //                    content_byte_size) + " for inference input '" +
+        //                    name + "', expecting " +
+        //                    std::to_string(expected_byte_size)));
         break;
       }
 
@@ -178,7 +179,8 @@ BackendContext::SetInputBuffer(
               input->input_buffer_ + buffer_copy_offset + copied_byte_size,
               stream, &cuda_used);
           if (!status.IsOk()) {
-            InferenceRequest::RespondWithError(request, status);
+            // FIXME            InferenceRequest::RespondWithError(request,
+            // status);
           }
 
           cuda_copy |= cuda_used;
@@ -198,12 +200,12 @@ BackendContext::SetInputBuffer(
     }
 
     if ((request != nullptr) && (copied_byte_size != expected_byte_size)) {
-      InferenceRequest::RespondWithError(
-          request, Status(
-                       Status::Code::INTERNAL,
-                       "expected " + std::to_string(expected_byte_size) +
-                           " bytes of data for inference input '" + name +
-                           "', got " + std::to_string(copied_byte_size)));
+      // FIXME      InferenceRequest::RespondWithError(
+      //          request, Status(
+      //                      Status::Code::INTERNAL,
+      //                    "expected " + std::to_string(expected_byte_size) +
+      //                      " bytes of data for inference input '" + name +
+      //                    "', got " + std::to_string(copied_byte_size)));
     }
 
     // When the request is nullptr that indicates that an error
@@ -295,8 +297,8 @@ BackendContext::IssueIndirectInputBufferCopy(
         name, src_mem_type, src_mem_type_id, mem_type, mem_id, src_byte_size,
         src_data, buffer + buffer_offset, stream, &cuda_used);
     if (!status.IsOk()) {
-      auto& request = (*requests)[request_idxs.back()];
-      InferenceRequest::RespondWithError(request, status);
+      //      auto& request = (*requests)[request_idxs.back()];
+      // FIXME      InferenceRequest::RespondWithError(request, status);
     }
 
     buffer_offset += src_byte_size;
@@ -329,7 +331,7 @@ BackendContext::SetShapeInputBuffer(
   const InferenceRequest::Input* rinput;
   Status status = request->ImmutableInput(name, &rinput);
   if (!status.IsOk()) {
-    InferenceRequest::RespondWithError(request, status);
+    // FIXME    InferenceRequest::RespondWithError(request, status);
     return false;
   }
 
@@ -345,17 +347,17 @@ BackendContext::SetShapeInputBuffer(
       0 /* idx */, &content, &content_byte_size, &src_memory_type,
       &src_memory_type_id);
   if (!status.IsOk()) {
-    InferenceRequest::RespondWithError(request, status);
+    // FIXME    InferenceRequest::RespondWithError(request, status);
     return false;
   }
 
   if ((expected_byte_size) != (int)content_byte_size) {
-    InferenceRequest::RespondWithError(
-        request, Status(
-                     Status::Code::INVALID_ARG,
-                     "unexpected size " + std::to_string(content_byte_size) +
-                         " for inference input '" + name + "', expecting " +
-                         std::to_string(expected_byte_size)));
+    // FIXME    InferenceRequest::RespondWithError(
+    //        request, Status(
+    //                   Status::Code::INVALID_ARG,
+    //                 "unexpected size " + std::to_string(content_byte_size) +
+    //                   " for inference input '" + name + "', expecting " +
+    //                 std::to_string(expected_byte_size)));
     return false;
   }
 
@@ -368,7 +370,7 @@ BackendContext::SetShapeInputBuffer(
         dst_memory_type_id, expected_byte_size, content,
         input_buffer + buffer_copy_offset, stream_, &cuda_used);
     if (!status.IsOk()) {
-      InferenceRequest::RespondWithError(request, status);
+      // FIXME      InferenceRequest::RespondWithError(request, status);
       return cuda_copy;
     }
   }
@@ -380,7 +382,7 @@ BackendContext::SetShapeInputBuffer(
         sizeof(int32_t), (void*)&total_batch_size, input_buffer, stream_,
         &cuda_used);
     if (!status.IsOk()) {
-      InferenceRequest::RespondWithError(request, status);
+      // FIXME      InferenceRequest::RespondWithError(request, status);
     }
     cuda_copy |= cuda_used;
   }
@@ -390,10 +392,9 @@ BackendContext::SetShapeInputBuffer(
 
 bool
 BackendContext::SetFixedSizeOutputBuffer(
-    const std::unique_ptr<InferenceRequest>& request,
     std::unique_ptr<InferenceResponse>* response,
     InferenceResponse::Output* response_output, OutputInfo* output_info,
-    size_t* tensor_offset, const size_t expected_byte_size)
+    const size_t tensor_byte_size, const size_t tensor_offset)
 {
   void* buffer = nullptr;
   bool cuda_copy = false;
@@ -402,44 +403,46 @@ BackendContext::SetFixedSizeOutputBuffer(
   TRITONSERVER_MemoryType actual_memory_type = output_info->memory_type_;
   int64_t actual_memory_type_id = output_info->memory_type_id_;
 
-  // If 'response_output' is nullptr then don't need this output for
-  // 'request'... just need to advance state appropriately.
-  bool need_output = (response_output != nullptr);
-
-  if (need_output) {
-    Status status = response_output->AllocateDataBuffer(
-        &buffer, expected_byte_size, &actual_memory_type,
-        &actual_memory_type_id);
-    if (!status.IsOk()) {
-      (*response)->SetResponseStatus(status);
-      need_output = false;
-    }
+  Status status = response_output->AllocateDataBuffer(
+      &buffer, tensor_byte_size, &actual_memory_type, &actual_memory_type_id);
+  if (!status.IsOk()) {
+    LOG_STATUS_ERROR(
+        InferenceResponse::SendWithStatus(std::move(*response), status),
+        "error sending TensorFlow response");
+    return cuda_copy;
   }
 
-  if (need_output) {
 #if 0  // FIXME handling of pinned memory
           if (output_info->need_indirect_buffer_ &&
           (actual_memory_type == output_info_->indirect_candidate_type_)) {
             std::unique_ptr<MutableMemory> local_mutable_buffer(
                 new MutableMemory(
-                    (char*)buffer, expected_byte_size, actual_memory_type,
+                    (char*)buffer, tensor_byte_size, actual_memory_type,
                     actual_memory_type_id));
-            std::get<1>(pinned_buffer_info) += expected_byte_size;
+            std::get<1>(pinned_buffer_info) += tensor_byte_size;
             std::get<2>(pinned_buffer_info)
                 .emplace_back(idx, local_mutable_buffer.get());
             output->indirect_buffers_.back().second.emplace_back(
                 idx, std::move(local_mutable_buffer));
           } else
 #endif
-    {
-      bool cuda_used = false;
-      Status status = CopyBuffer(
-          response_output->Name(), output_info->memory_type_,
-          output_info->memory_type_id_, actual_memory_type,
-          actual_memory_type_id, expected_byte_size,
-          output_info->output_buffer_ + *tensor_offset, buffer, stream_,
-          &cuda_used);
-      cuda_copy |= cuda_used;
+
+  // FIXME test for 'tensor_offset' out of range
+
+  bool cuda_used = false;
+  status = CopyBuffer(
+      response_output->Name(), output_info->memory_type_,
+      output_info->memory_type_id_, actual_memory_type, actual_memory_type_id,
+      tensor_byte_size, output_info->output_buffer_ + tensor_offset, buffer,
+      stream_, &cuda_used);
+  cuda_copy |= cuda_used;
+
+  if (!status.IsOk()) {
+    LOG_STATUS_ERROR(
+        InferenceResponse::SendWithStatus(std::move(*response), status),
+        "error sending TensorFlow response");
+    return cuda_copy;
+  }
 
 #if 0  // FIXME pinned
             if (std::get<1>(pinned_buffer_info) > 0) {
@@ -449,10 +452,8 @@ BackendContext::SetFixedSizeOutputBuffer(
 
             // reset 'pinned_buffer_info'
             pinned_buffer_info =
-                OutputBufferInfo{output_offset + expected_byte_size, 0, {}};
+                OutputBufferInfo{output_offset + tensor_byte_size, 0, {}};
 #endif
-    }
-  }
 
 #if 0  // FIXME pinned
     // If the output is not processed due to unexpected status or
@@ -466,11 +467,9 @@ BackendContext::SetFixedSizeOutputBuffer(
       }
       // reset 'pinned_buffer_info'
       pinned_buffer_info =
-          OutputBufferInfo{output_offset + expected_byte_size, 0, {}};
+          OutputBufferInfo{output_offset + tensor_byte_size, 0, {}};
     }
 #endif
-
-  *tensor_offset += expected_byte_size;
 
 #if 0  // FIXME pinned
   // Issue pending indirect copy if any
@@ -530,8 +529,8 @@ BackendContext::IssueIndirectOutputBufferCopy(
           byte_size, output_buffer + buffer_offset, dst_buffer, stream,
           &cuda_used);
       if (!status.IsOk()) {
-        auto& request = (*requests)[data_info.first];
-        InferenceRequest::RespondWithError(request, status);
+        //        auto& request = (*requests)[data_info.first];
+        // FIXME        InferenceRequest::RespondWithError(request, status);
       }
 
       buffer_offset += byte_size;
@@ -609,7 +608,7 @@ BackendContext::SetOutputShapeTensorBuffer(
       }
 
       if (!status.IsOk()) {
-        InferenceRequest::RespondWithError(request, status);
+        // FIXME        InferenceRequest::RespondWithError(request, status);
       }
     }
   }
