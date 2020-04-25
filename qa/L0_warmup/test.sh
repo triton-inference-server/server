@@ -67,63 +67,68 @@ for BACKEND in ${BACKENDS}; do
         cp -r ../custom_models/${BACKEND}_sequence_int32 models/.
     fi
 
+    INPUT_PREFIX="INPUT" && [ "$BACKEND" == "libtorch" ] && INPUT_PREFIX="INPUT__"
+    SEQ_INPUT="INPUT" && [ "$BACKEND" == "libtorch" ] && SEQ_INPUT="INPUT__0"
+    START="START" && [ "$BACKEND" == "libtorch" ] && START="START__1"
+    READY="READY" && [ "$BACKEND" == "libtorch" ] && READY="READY__2"
+
     # 2 instances per device with random / zero data
     #
     # Provide warmup instruction (batch size 1) in model config
     (cd models/${BACKEND}_float32_float32_float32 && \
-        echo 'model_warmup [{' >> config.pbtxt && \
-        echo '    name : "regular sample"' >> config.pbtxt && \
-        echo '    batch_size: 1' >> config.pbtxt && \
-        echo '    inputs {' >> config.pbtxt && \
-        echo '        key: "INPUT0"' >> config.pbtxt && \
-        echo '        value: {' >> config.pbtxt && \
-        echo '            data_type: TYPE_FP32' >> config.pbtxt && \
-        echo '            dims: 16' >> config.pbtxt && \
-        echo '            zero_data: true' >> config.pbtxt && \
-        echo '        }' >> config.pbtxt && \
-        echo '    }' >> config.pbtxt && \
-        echo '    inputs {' >> config.pbtxt && \
-        echo '        key: "INPUT1"' >> config.pbtxt && \
-        echo '        value: {' >> config.pbtxt && \
-        echo '            data_type: TYPE_FP32' >> config.pbtxt && \
-        echo '            dims: 16' >> config.pbtxt && \
-        echo '            random_data: true' >> config.pbtxt && \
-        echo '        }' >> config.pbtxt && \
-        echo '    }' >> config.pbtxt && \
-        echo '}]' >> config.pbtxt )
+        echo "model_warmup [{" >> config.pbtxt && \
+        echo "    name : \"regular sample\"" >> config.pbtxt && \
+        echo "    batch_size: 1" >> config.pbtxt && \
+        echo "    inputs {" >> config.pbtxt && \
+        echo "        key: \"${INPUT_PREFIX}0\"" >> config.pbtxt && \
+        echo "        value: {" >> config.pbtxt && \
+        echo "            data_type: TYPE_FP32" >> config.pbtxt && \
+        echo "            dims: 16" >> config.pbtxt && \
+        echo "            zero_data: true" >> config.pbtxt && \
+        echo "        }" >> config.pbtxt && \
+        echo "    }" >> config.pbtxt && \
+        echo "    inputs {" >> config.pbtxt && \
+        echo "        key: \"${INPUT_PREFIX}1\"" >> config.pbtxt && \
+        echo "        value: {" >> config.pbtxt && \
+        echo "            data_type: TYPE_FP32" >> config.pbtxt && \
+        echo "            dims: 16" >> config.pbtxt && \
+        echo "            random_data: true" >> config.pbtxt && \
+        echo "        }" >> config.pbtxt && \
+        echo "    }" >> config.pbtxt && \
+        echo "}]" >> config.pbtxt )
 
     # zero data
     #
     # Instruction for sequence model (batch size 8), need to specify control tensor
     (cd models/${BACKEND}_sequence_int32 && \
-        echo 'model_warmup [{' >> config.pbtxt && \
-        echo '    name : "sequence sample"' >> config.pbtxt && \
-        echo '    batch_size: 8' >> config.pbtxt && \
-        echo '    inputs {' >> config.pbtxt && \
-        echo '        key: "INPUT"' >> config.pbtxt && \
-        echo '        value: {' >> config.pbtxt && \
-        echo '            data_type: TYPE_INT32' >> config.pbtxt && \
-        echo '            dims: 1' >> config.pbtxt && \
-        echo '            zero_data: true' >> config.pbtxt && \
-        echo '        }' >> config.pbtxt && \
-        echo '    }' >> config.pbtxt && \
-        echo '    inputs {' >> config.pbtxt && \
-        echo '        key: "START"' >> config.pbtxt && \
-        echo '        value: {' >> config.pbtxt && \
-        echo '            data_type: TYPE_INT32' >> config.pbtxt && \
-        echo '            dims: 1' >> config.pbtxt && \
-        echo '            zero_data: true' >> config.pbtxt && \
-        echo '        }' >> config.pbtxt && \
-        echo '    }' >> config.pbtxt && \
-        echo '    inputs {' >> config.pbtxt && \
-        echo '        key: "READY"' >> config.pbtxt && \
-        echo '        value: {' >> config.pbtxt && \
-        echo '            data_type: TYPE_INT32' >> config.pbtxt && \
-        echo '            dims: 1' >> config.pbtxt && \
-        echo '            zero_data: true' >> config.pbtxt && \
-        echo '        }' >> config.pbtxt && \
-        echo '    }' >> config.pbtxt && \
-        echo '}]' >> config.pbtxt )
+        echo "model_warmup [{" >> config.pbtxt && \
+        echo "    name : \"sequence sample\"" >> config.pbtxt && \
+        echo "    batch_size: 8" >> config.pbtxt && \
+        echo "    inputs {" >> config.pbtxt && \
+        echo "        key: \"${SEQ_INPUT}\"" >> config.pbtxt && \
+        echo "        value: {" >> config.pbtxt && \
+        echo "            data_type: TYPE_INT32" >> config.pbtxt && \
+        echo "            dims: 1" >> config.pbtxt && \
+        echo "            zero_data: true" >> config.pbtxt && \
+        echo "        }" >> config.pbtxt && \
+        echo "    }" >> config.pbtxt && \
+        echo "    inputs {" >> config.pbtxt && \
+        echo "        key: \"${START}\"" >> config.pbtxt && \
+        echo "        value: {" >> config.pbtxt && \
+        echo "            data_type: TYPE_INT32" >> config.pbtxt && \
+        echo "            dims: 1" >> config.pbtxt && \
+        echo "            zero_data: true" >> config.pbtxt && \
+        echo "        }" >> config.pbtxt && \
+        echo "    }" >> config.pbtxt && \
+        echo "    inputs {" >> config.pbtxt && \
+        echo "        key: \"${READY}\"" >> config.pbtxt && \
+        echo "        value: {" >> config.pbtxt && \
+        echo "            data_type: TYPE_INT32" >> config.pbtxt && \
+        echo "            dims: 1" >> config.pbtxt && \
+        echo "            zero_data: true" >> config.pbtxt && \
+        echo "        }" >> config.pbtxt && \
+        echo "    }" >> config.pbtxt && \
+        echo "}]" >> config.pbtxt )
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -173,65 +178,65 @@ for BACKEND in ${BACKENDS}; do
         #
         # Provide warmup instruction (batch size 1) in model config
         (cd models/${BACKEND}_zero_1_object && \
-            echo 'model_warmup [' >> config.pbtxt && \
-            echo '{' >> config.pbtxt && \
-            echo '    name : "zero string stateless"' >> config.pbtxt && \
-            echo '    batch_size: 1' >> config.pbtxt && \
-            echo '    inputs {' >> config.pbtxt && \
-            echo '        key: "INPUT0"' >> config.pbtxt && \
-            echo '        value: {' >> config.pbtxt && \
-            echo '            data_type: TYPE_STRING' >> config.pbtxt && \
-            echo '            dims: 16' >> config.pbtxt && \
-            echo '            zero_data: true' >> config.pbtxt && \
-            echo '        }' >> config.pbtxt && \
-            echo '    }' >> config.pbtxt && \
-            echo '},' >> config.pbtxt && \
-            echo '{' >> config.pbtxt && \
-            echo '    name : "random string stateless"' >> config.pbtxt && \
-            echo '    batch_size: 1' >> config.pbtxt && \
-            echo '    inputs {' >> config.pbtxt && \
-            echo '        key: "INPUT0"' >> config.pbtxt && \
-            echo '        value: {' >> config.pbtxt && \
-            echo '            data_type: TYPE_STRING' >> config.pbtxt && \
-            echo '            dims: 16' >> config.pbtxt && \
-            echo '            random_data: true' >> config.pbtxt && \
-            echo '        }' >> config.pbtxt && \
-            echo '    }' >> config.pbtxt && \
-            echo '}' >> config.pbtxt && \
-            echo ']' >> config.pbtxt )
+            echo "model_warmup [" >> config.pbtxt && \
+            echo "{" >> config.pbtxt && \
+            echo "    name : \"zero string stateless\"" >> config.pbtxt && \
+            echo "    batch_size: 1" >> config.pbtxt && \
+            echo "    inputs {" >> config.pbtxt && \
+            echo "        key: \"${INPUT_PREFIX}0\"" >> config.pbtxt && \
+            echo "        value: {" >> config.pbtxt && \
+            echo "            data_type: TYPE_STRING" >> config.pbtxt && \
+            echo "            dims: 16" >> config.pbtxt && \
+            echo "            zero_data: true" >> config.pbtxt && \
+            echo "        }" >> config.pbtxt && \
+            echo "    }" >> config.pbtxt && \
+            echo "}," >> config.pbtxt && \
+            echo "{" >> config.pbtxt && \
+            echo "    name : \"random string stateless\"" >> config.pbtxt && \
+            echo "    batch_size: 1" >> config.pbtxt && \
+            echo "    inputs {" >> config.pbtxt && \
+            echo "        key: \"${INPUT_PREFIX}0\"" >> config.pbtxt && \
+            echo "        value: {" >> config.pbtxt && \
+            echo "            data_type: TYPE_STRING" >> config.pbtxt && \
+            echo "            dims: 16" >> config.pbtxt && \
+            echo "            random_data: true" >> config.pbtxt && \
+            echo "        }" >> config.pbtxt && \
+            echo "    }" >> config.pbtxt && \
+            echo "}" >> config.pbtxt && \
+            echo "]" >> config.pbtxt )
 
         # user provided data
         #
         # Instruction for sequence model (batch size 8), need to specify control tensor
         (cd models/${BACKEND}_sequence_object && \
-            echo 'model_warmup [{' >> config.pbtxt && \
-            echo '    name : "string statefull"' >> config.pbtxt && \
-            echo '    batch_size: 8' >> config.pbtxt && \
-            echo '    inputs {' >> config.pbtxt && \
-            echo '        key: "INPUT"' >> config.pbtxt && \
-            echo '        value: {' >> config.pbtxt && \
-            echo '            data_type: TYPE_STRING' >> config.pbtxt && \
-            echo '            dims: 1' >> config.pbtxt && \
-            echo '            input_data_file: "raw_string_data"' >> config.pbtxt && \
-            echo '        }' >> config.pbtxt && \
-            echo '    }' >> config.pbtxt && \
-            echo '    inputs {' >> config.pbtxt && \
-            echo '        key: "START"' >> config.pbtxt && \
-            echo '        value: {' >> config.pbtxt && \
-            echo '            data_type: TYPE_INT32' >> config.pbtxt && \
-            echo '            dims: 1' >> config.pbtxt && \
-            echo '            zero_data: true' >> config.pbtxt && \
-            echo '        }' >> config.pbtxt && \
-            echo '    }' >> config.pbtxt && \
-            echo '    inputs {' >> config.pbtxt && \
-            echo '        key: "READY"' >> config.pbtxt && \
-            echo '        value: {' >> config.pbtxt && \
-            echo '            data_type: TYPE_INT32' >> config.pbtxt && \
-            echo '            dims: 1' >> config.pbtxt && \
-            echo '            zero_data: true' >> config.pbtxt && \
-            echo '        }' >> config.pbtxt && \
-            echo '    }' >> config.pbtxt && \
-            echo '}]' >> config.pbtxt )
+            echo "model_warmup [{" >> config.pbtxt && \
+            echo "    name : \"string statefull\"" >> config.pbtxt && \
+            echo "    batch_size: 8" >> config.pbtxt && \
+            echo "    inputs {" >> config.pbtxt && \
+            echo "        key: \"${SEQ_INPUT}\"" >> config.pbtxt && \
+            echo "        value: {" >> config.pbtxt && \
+            echo "            data_type: TYPE_STRING" >> config.pbtxt && \
+            echo "            dims: 1" >> config.pbtxt && \
+            echo "            input_data_file: \"raw_string_data\"" >> config.pbtxt && \
+            echo "        }" >> config.pbtxt && \
+            echo "    }" >> config.pbtxt && \
+            echo "    inputs {" >> config.pbtxt && \
+            echo "        key: \"${START}\"" >> config.pbtxt && \
+            echo "        value: {" >> config.pbtxt && \
+            echo "            data_type: TYPE_INT32" >> config.pbtxt && \
+            echo "            dims: 1" >> config.pbtxt && \
+            echo "            zero_data: true" >> config.pbtxt && \
+            echo "        }" >> config.pbtxt && \
+            echo "    }" >> config.pbtxt && \
+            echo "    inputs {" >> config.pbtxt && \
+            echo "        key: \"${READY}\"" >> config.pbtxt && \
+            echo "        value: {" >> config.pbtxt && \
+            echo "            data_type: TYPE_INT32" >> config.pbtxt && \
+            echo "            dims: 1" >> config.pbtxt && \
+            echo "            zero_data: true" >> config.pbtxt && \
+            echo "        }" >> config.pbtxt && \
+            echo "    }" >> config.pbtxt && \
+            echo "}]" >> config.pbtxt )
         
         # Prepare string data (one element that is "233")
         mkdir -p models/${BACKEND}_sequence_object/warmup && \
