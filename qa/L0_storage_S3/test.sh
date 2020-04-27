@@ -70,7 +70,7 @@ for $ENV_VAR in "env" "no_env"; do
         unset AWS_ACCESS_KEY_ID
         unset AWS_SECRET_ACCESS_KEY
         unset AWS_DEFAULT_REGION
-    elif
+    else
         aws configure set default.region "dummy_region" && \
             aws configure set aws_access_key_id "dummy_id" && \
             aws configure set aws_secret_access_key "dummy_key"
