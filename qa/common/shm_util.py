@@ -57,8 +57,15 @@ def create_register_shm_regions(input0_list, input1_list, output0_byte_size,
 
     triton_client = httpclient.InferenceServerClient("localhost:8000")
 
-    input0_byte_size = sum([i0.nbytes for i0 in input0_list])
-    input1_byte_size = sum([i1.nbytes for i1 in input1_list])
+    if input0_list[0].dtype == np.object:
+        input0_list_tmp = [serialize_byte_tensor(i0) for i0 in input0_list]
+        input1_list_tmp = [serialize_byte_tensor(i1) for i1 in input1_list]
+    else:
+        input0_list_tmp = input0_list
+        input1_list_tmp = input1_list
+
+    input0_byte_size = sum([i0.nbytes for i0 in input0_list_tmp])
+    input1_byte_size = sum([i1.nbytes for i1 in input1_list_tmp])
 
     if shm_region_names is None:
         shm_region_names = ['input0', 'input1', 'output0', 'output1']
@@ -100,8 +107,8 @@ def create_register_shm_regions(input0_list, input1_list, output0_byte_size,
             else:
                 shm_op1_handle = precreated_shm_regions[i]
 
-        shm.set_shared_memory_region(shm_ip0_handle, input0_list)
-        shm.set_shared_memory_region(shm_ip1_handle, input1_list)
+        shm.set_shared_memory_region(shm_ip0_handle, input0_list_tmp)
+        shm.set_shared_memory_region(shm_ip1_handle, input1_list_tmp)
 
     if use_cuda_shared_memory:
         shm_ip0_handle = cudashm.create_shared_memory_region(shm_region_names[0]+'_data', input0_byte_size, 0)
@@ -137,8 +144,8 @@ def create_register_shm_regions(input0_list, input1_list, output0_byte_size,
             else:
                 shm_op1_handle = precreated_shm_regions[i]
 
-        cudashm.set_shared_memory_region(shm_ip0_handle, input0_list)
-        cudashm.set_shared_memory_region(shm_ip1_handle, input1_list)
+        cudashm.set_shared_memory_region(shm_ip0_handle, input0_list_tmp)
+        cudashm.set_shared_memory_region(shm_ip1_handle, input1_list_tmp)
 
     return shm_region_names, shm_op0_handle, shm_op1_handle
 

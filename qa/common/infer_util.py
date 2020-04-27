@@ -61,6 +61,11 @@ def _range_repr_dtype(dtype):
         return np.int32
     return dtype
 
+def _prepend_string_size(input_values):	
+    input_list = []	
+    for input_value in input_values:	
+        input_list.append(serialize_byte_tensor(input_value))
+    return input_list
 
 # Perform inference using an "addsum" type verification backend.
 def infer_exact(tester, pf, tensor_shape, batch_size,
@@ -137,21 +142,20 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                          for x in input1_array.reshape(input1_array.size)], dtype=object)
         input1_array = in1n.reshape(input1_array.shape)
 
-    # prepend size of string to input string data
-    if input_dtype == np.object:
-        input0_array_tmp = serialize_byte_tensor(input0_array)
-        input1_array_tmp = serialize_byte_tensor(input1_array)
-    else:
-        input0_array_tmp = input0_array
-        input1_array_tmp = input1_array
-
+    # prepend size of string to output string data
     if output0_dtype == np.object:
-        output0_array_tmp = serialize_byte_tensor(output0_array)
+        if batch_size == 1:
+            output0_array_tmp = _prepend_string_size([output0_array])
+        else:
+            output0_array_tmp = _prepend_string_size(output0_array)
     else:
         output0_array_tmp = output0_array
 
     if output1_dtype == np.object:
-        output1_array_tmp = serialize_byte_tensor(output1_array)
+        if batch_size == 1:
+            output1_array_tmp = _prepend_string_size([output1_array])
+        else:
+            output1_array_tmp = _prepend_string_size(output1_array)
     else:
         output1_array_tmp = output1_array
 
@@ -165,15 +169,15 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         INPUT0 = "INPUT__0"
         INPUT1 = "INPUT__1"
 
-    output0_byte_size = output0_array_tmp.nbytes
-    output1_byte_size = output1_array_tmp.nbytes
+    output0_byte_size = sum([o0.nbytes for o0 in output0_array_tmp])
+    output1_byte_size = sum([o1.nbytes for o1 in output1_array_tmp])
 
     if batch_size == 1:
-        input0_list = [input0_array_tmp]
-        input1_list = [input1_array_tmp]
+        input0_list = [input0_array]
+        input1_list = [input1_array]
     else:
-        input0_list = [x for x in input0_array_tmp]
-        input1_list = [x for x in input1_array_tmp]
+        input0_list = [x for x in input0_array]
+        input1_list = [x for x in input1_array]
 
     # Create and register system/cuda shared memory regions if needed
     shm_regions, op0_handle, op1_handle = su.create_register_shm_regions(input0_list, input1_list, output0_byte_size,
