@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <list>
 #include <memory>
 #include <string>
 #include <vector>
@@ -50,22 +51,6 @@ struct InputInfo {
   // and the requests that are associated with this buffer (for reporting error)
   std::vector<
       std::tuple<std::unique_ptr<AllocatedMemory>, size_t, std::vector<size_t>>>
-      indirect_buffers_;
-};
-
-struct OutputInfo {
-  const char* output_buffer_;
-  TRITONSERVER_MemoryType memory_type_;
-  int64_t memory_type_id_;
-
-  bool need_indirect_buffer_;
-  TRITONSERVER_MemoryType indirect_candidate_type_;
-
-  // indirect pinned memory buffers, the memory references appointing to
-  // the destinations in requests and the request's index
-  std::vector<std::pair<
-      std::unique_ptr<AllocatedMemory>,
-      std::vector<std::pair<size_t, std::unique_ptr<MutableMemory>>>>>
       indirect_buffers_;
 };
 
@@ -145,15 +130,6 @@ struct BackendContext {
       TRITONSERVER_MemoryType dst_memory_type, int64_t dst_memory_type_id,
       char* input_buffer);
 
-  // Helper function to set output buffer of fixed size data
-  // type. Return true if cudaMemcpyAsync is called, and the caller
-  // should call cudaStreamSynchronize before using the
-  // data. Otherwise, return false.
-  bool SetFixedSizeOutputBuffer(
-      std::unique_ptr<InferenceResponse>* response,
-      InferenceResponse::Output* response_output, OutputInfo* output_info,
-      const size_t tensor_byte_size, const size_t tensor_offset);
-
   // Helper function to set output buffer for a shape tensor. It is
   // callers resposibilty to ensure this method is called only for the
   // shape tensors. Return true if cudaMemcpyAsync is called, and the
@@ -199,14 +175,6 @@ struct BackendContext {
   using BufferInfo = std::tuple<
       size_t, size_t, std::vector<std::tuple<size_t, const Memory*, size_t>>>;
 
-  // Meta data for constructing an indirect pinned memory buffer for output
-  // <offset in output buffer,
-  //  indirect buffer size,
-  //  vector of <index of the request (for status update),
-  //             memory block of the provider's output>>
-  using OutputBufferInfo = std::tuple<
-      size_t, size_t, std::vector<std::pair<size_t, MutableMemory*>>>;
-
   // Helper function to construct an 'indirect_buffer', and to copy
   // data in 'requests' to the indirect buffer first, then to copy the
   // indirect buffer to proper location in 'input_buffer', according
@@ -215,19 +183,6 @@ struct BackendContext {
       const std::string& name, const BufferInfo& pinned_buffer_info,
       std::vector<std::unique_ptr<InferenceRequest>>* requests,
       cudaStream_t stream, InputInfo* input);
-
-  bool IssueIndirectOutputBufferCopy(
-      const std::string& name,
-      const BackendContext::OutputBufferInfo& pinned_buffer_info,
-      std::vector<std::unique_ptr<InferenceRequest>>* requests,
-      cudaStream_t stream, OutputInfo* output);
-
-  // Helper function to return whether an indirect buffer is needed in
-  // 'need_indirect_buffer', and the memory type that should utilize the
-  // indirect buffer in 'candiate_type'.
-  void GetIndirectBufferRequirement(
-      TRITONSERVER_MemoryType ref_buffer_type, bool is_input,
-      TRITONSERVER_MemoryType* candidate_type, bool* need_indirect_buffer);
 
   // Name of the model instance
   std::string name_;
@@ -246,6 +201,77 @@ struct BackendContext {
 
   // The stream where data transfer operations are executed on.
   cudaStream_t stream_;
+};
+
+class BackendResponder {
+ public:
+  explicit BackendResponder(
+      const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+      std::vector<std::unique_ptr<InferenceResponse>>* responses,
+      const bool pinned_enabled, cudaStream_t stream)
+      : need_sync_(false), requests_(requests), responses_(responses),
+        pinned_enabled_(pinned_enabled), stream_(stream),
+        pending_pinned_byte_size_(0)
+  {
+  }
+
+  // Process all responses for a named output tensor.
+  void ProcessTensor(
+      const std::string& name, const DataType datatype,
+      const std::vector<int64_t>& shape, const char* buffer,
+      const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id);
+
+  // Finalize processing of all responses for all output
+  // tensors. Return true if cudaMemcpyAsync is called, and the caller
+  // should call cudaStreamSynchronize before using the data.
+  bool Finalize();
+
+ private:
+  bool FlushPendingPinned(
+      const char* tensor_buffer,
+      const TRITONSERVER_MemoryType tensor_memory_type,
+      const int64_t tensor_memory_type_id);
+  bool SetFixedSizeOutputBuffer(
+      std::unique_ptr<InferenceResponse>* response,
+      InferenceResponse::Output* response_output, const size_t tensor_byte_size,
+      const size_t tensor_offset, const char* tensor_buffer,
+      const TRITONSERVER_MemoryType tensor_memory_type,
+      const int64_t tensor_memory_type_id,
+      const TRITONSERVER_MemoryType use_pinned_memory_type);
+
+  bool need_sync_;
+  const std::vector<std::unique_ptr<InferenceRequest>>& requests_;
+  std::vector<std::unique_ptr<InferenceResponse>>* responses_;
+  const bool pinned_enabled_;
+  cudaStream_t stream_;
+
+  using ResponsesList = std::list<std::pair<
+      std::unique_ptr<InferenceResponse>*, InferenceResponse::Output*>>;
+
+  size_t pending_pinned_byte_size_;
+  size_t pending_pinned_offset_;
+  ResponsesList pending_pinned_output_;
+
+  // Pinned memories that need to live over the lifetime of this
+  // BackendResponder object.
+  std::list<std::unique_ptr<AllocatedMemory>> pinned_memories_;
+
+  // Pinned memory buffers and the corresponding response outputs
+  // where the final copy to the response is deferred until Finalize()
+  // after waiting for all in-flight copies.
+  struct DeferredPinned {
+    DeferredPinned(
+        std::unique_ptr<AllocatedMemory>&& pinned_memory,
+        ResponsesList&& responses)
+        : pinned_memory_(std::move(pinned_memory)),
+          responses_(std::move(responses))
+    {
+    }
+    std::unique_ptr<AllocatedMemory> pinned_memory_;
+    ResponsesList responses_;
+  };
+
+  std::list<DeferredPinned> deferred_pinned_;
 };
 
 }}  // namespace nvidia::inferenceserver
