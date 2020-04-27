@@ -79,7 +79,6 @@ TRTISTF_DataType ConvertDataType(DataType dtype);
       TRTISTF_ErrorDelete(error__);                                \
       return status;                                               \
     }                                                              \
-    TRTISTF_ErrorDelete(error__);                                  \
   } while (false)
 
 }}  // namespace nvidia::inferenceserver

@@ -390,88 +390,76 @@ BackendContext::SetShapeInputBuffer(
 
 bool
 BackendContext::SetFixedSizeOutputBuffer(
-    const std::string& name, const size_t batch1_byte_size, OutputInfo* output,
-    std::vector<std::unique_ptr<InferenceRequest>>* requests)
+    const std::unique_ptr<InferenceRequest>& request,
+    std::unique_ptr<InferenceResponse>* response,
+    InferenceResponse::Output* response_output, OutputInfo* output_info,
+    size_t* tensor_offset, const size_t expected_byte_size)
 {
+  void* buffer = nullptr;
   bool cuda_copy = false;
-  size_t output_offset = 0;
-  bool need_buffer;
-  TRITONSERVER_MemoryType candidate_type;
-  GetIndirectBufferRequirement(
-      output->memory_type_, false, &candidate_type, &need_buffer);
-  OutputBufferInfo pinned_buffer_info{0, 0, {}};
-  output->indirect_buffers_.emplace_back();
-  for (size_t idx = 0; idx < requests->size(); idx++) {
-    auto& request = (*requests)[idx];
-    const size_t expected_byte_size = request->BatchSize() * batch1_byte_size;
+  //  OutputBufferInfo pinned_buffer_info{0, 0, {}};
 
-    // If 'request' should have valid output (status ok) and
-    // if 'request' requested this output then copy it from
-    // 'output->output_buffer_'. If it did not request this output then just
-    // skip it in the 'output->output_buffer_'.
-    bool process_request =
-        (request != nullptr) && false /* FIXME request->RequiresOutput(name) */;
-    if (process_request) {
-      TRITONSERVER_MemoryType dst_memory_type = TRITONSERVER_MEMORY_CPU;
-      int64_t dst_memory_type_id = 0;
-      void* buffer = nullptr;
+  TRITONSERVER_MemoryType actual_memory_type = output_info->memory_type_;
+  int64_t actual_memory_type_id = output_info->memory_type_id_;
 
-      // try to get buffer with the same memory type as the output tensor
-      // FIXME need response object...
-      Status status(Status::Code::INTERNAL, "NYI response");
-#if 0
-response_provider_->AllocateOutputBuffer(
-          name, &buffer, expected_byte_size, output->output_shape_,
-          output->memory_type_, output->memory_type_id_, &dst_memory_type,
-          &dst_memory_type_id);
-#endif
-      if (status.IsOk() && (expected_byte_size != 0)) {
-        if (buffer == nullptr) {
-          status = Status(
-              Status::Code::INTERNAL,
-              "failed to allocate buffer for output '" + name + "'");
-        } else {
-          if (need_buffer && (dst_memory_type == candidate_type)) {
+  // If 'response_output' is nullptr then don't need this output for
+  // 'request'... just need to advance state appropriately.
+  bool need_output = (response_output != nullptr);
+
+  if (need_output) {
+    Status status = response_output->AllocateDataBuffer(
+        &buffer, expected_byte_size, &actual_memory_type,
+        &actual_memory_type_id);
+    if (!status.IsOk()) {
+      (*response)->SetResponseStatus(status);
+      need_output = false;
+    }
+  }
+
+  if (need_output) {
+#if 0  // FIXME handling of pinned memory
+          if (output_info->need_indirect_buffer_ &&
+          (actual_memory_type == output_info_->indirect_candidate_type_)) {
             std::unique_ptr<MutableMemory> local_mutable_buffer(
                 new MutableMemory(
-                    (char*)buffer, expected_byte_size, dst_memory_type,
-                    dst_memory_type_id));
+                    (char*)buffer, expected_byte_size, actual_memory_type,
+                    actual_memory_type_id));
             std::get<1>(pinned_buffer_info) += expected_byte_size;
             std::get<2>(pinned_buffer_info)
                 .emplace_back(idx, local_mutable_buffer.get());
             output->indirect_buffers_.back().second.emplace_back(
                 idx, std::move(local_mutable_buffer));
-          } else {
-            bool cuda_used = false;
-            status = CopyBuffer(
-                name, output->memory_type_, output->memory_type_id_,
-                dst_memory_type, dst_memory_type_id, expected_byte_size,
-                output->output_buffer_ + output_offset, buffer, stream_,
-                &cuda_used);
-            cuda_copy |= cuda_used;
+          } else
+#endif
+    {
+      bool cuda_used = false;
+      Status status = CopyBuffer(
+          response_output->Name(), output_info->memory_type_,
+          output_info->memory_type_id_, actual_memory_type,
+          actual_memory_type_id, expected_byte_size,
+          output_info->output_buffer_ + *tensor_offset, buffer, stream_,
+          &cuda_used);
+      cuda_copy |= cuda_used;
 
+#if 0  // FIXME pinned
             if (std::get<1>(pinned_buffer_info) > 0) {
               cuda_copy |= IssueIndirectOutputBufferCopy(
                   name, pinned_buffer_info, requests, stream_, output);
             }
+
             // reset 'pinned_buffer_info'
             pinned_buffer_info =
                 OutputBufferInfo{output_offset + expected_byte_size, 0, {}};
-          }
-        }
-      }
-
-      if (!status.IsOk()) {
-        InferenceRequest::RespondWithError(request, status);
-        process_request = false;
-      }
+#endif
     }
+  }
 
-    // If the request is not processed due to unexpected status or
+#if 0  // FIXME pinned
+    // If the output is not processed due to unexpected status or
     // output is not required for it, maintain a new indirect buffer
     // as the contiguousity ends here. And there are pending indirect
     // buffer copies, issue them.
-    if (!process_request) {
+    if (!need_output) {
       if (std::get<1>(pinned_buffer_info) > 0) {
         cuda_copy |= IssueIndirectOutputBufferCopy(
             name, pinned_buffer_info, requests, stream_, output);
@@ -480,10 +468,11 @@ response_provider_->AllocateOutputBuffer(
       pinned_buffer_info =
           OutputBufferInfo{output_offset + expected_byte_size, 0, {}};
     }
+#endif
 
-    output_offset += expected_byte_size;
-  }
+  *tensor_offset += expected_byte_size;
 
+#if 0  // FIXME pinned
   // Issue pending indirect copy if any
   if (std::get<1>(pinned_buffer_info) > 0) {
     cuda_copy |= IssueIndirectOutputBufferCopy(
@@ -493,7 +482,8 @@ response_provider_->AllocateOutputBuffer(
   // The last element in 'indirect_buffers_' is always a placeholder for next
   // possible indirect buffer, side-affect from IssueIndirectOutputBufferCopy(),
   // so we should always remove it to avoid accessing nullptr
-  output->indirect_buffers_.pop_back();
+  output_info->indirect_buffers_.pop_back();
+#endif
 
   return cuda_copy;
 }
