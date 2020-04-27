@@ -61,23 +61,28 @@ SERVER_TIMEOUT=360
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 
-# First test with AWS ENV vars and then without AWS ENV vars
-for $ENV_VAR in "env" "no_env"; do
+rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
+RET=0
+
+# Test 3 Scenarios:
+# 1. Only AWS ENV vars (Without aws configure)
+# 2. AWS ENV vars + dummy values in aws configure [ENV vars have higher priority]
+# 3. Only aws configure (Without AWS ENV vars)
+for ENV_VAR in "env" "env_dummy" "config"; do
     SERVER_LOG=$SERVER_LOG_BASE.$ENV_VAR.log
     CLIENT_LOG=$CLIENT_LOG_BASE.$ENV_VAR.log
     
-    if [ "$ENV_VAR" != "env" ]; then
+    if [ "$ENV_VAR" == "config" ]; then
         unset AWS_ACCESS_KEY_ID
         unset AWS_SECRET_ACCESS_KEY
         unset AWS_DEFAULT_REGION
-    else
+    elif [ "$ENV_VAR" == "env_dummy" ]; then
         aws configure set default.region "dummy_region" && \
             aws configure set aws_access_key_id "dummy_id" && \
             aws configure set aws_secret_access_key "dummy_key"
+    else
+        rm ~/.aws/credentials && rm ~/.aws/config
     fi
-    rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
-
-    RET=0
 
     # Construct model repository
 
@@ -107,16 +112,18 @@ for $ENV_VAR in "env" "no_env"; do
 
         # run with a non-root empty model repo
         touch models/dummy
-        if [ "$ENV_VAR" == "env" ]; then
+        if [ "$ENV_VAR" != "config" ]; then
             aws configure set default.region $AWS_DEFAULT_REGION && \
                 aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
                 aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
         fi
         aws s3 cp . "$BUCKET_URL_SLASH" --recursive --include "*"
-        if [ "$ENV_VAR" == "env" ]; then
+        if [ "$ENV_VAR" == "env_dummy" ]; then
             aws configure set default.region "dummy_region" && \
                 aws configure set aws_access_key_id "dummy_id" && \
                 aws configure set aws_secret_access_key "dummy_key"
+        else
+            rm ~/.aws/credentials && rm ~/.aws/config
         fi
 
         SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
@@ -131,7 +138,7 @@ for $ENV_VAR in "env" "no_env"; do
         kill $SERVER_PID
         wait $SERVER_PID
 
-        if [ "$ENV_VAR" == "env" ]; then
+        if [ "$ENV_VAR" != "config" ]; then
             aws configure set default.region $AWS_DEFAULT_REGION && \
                 aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
                 aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
@@ -169,10 +176,12 @@ for $ENV_VAR in "env" "no_env"; do
 
             # copy contents of /models into S3 bucket.
             aws s3 cp $src $BUCKET_URL_SLASH --recursive --include "*"
-            if [ "$ENV_VAR" == "env" ]; then
+            if [ "$ENV_VAR" == "env_dummy" ]; then
                 aws configure set default.region "dummy_region" && \
                     aws configure set aws_access_key_id "dummy_id" && \
                     aws configure set aws_secret_access_key "dummy_key"
+            else
+                rm ~/.aws/credentials && rm ~/.aws/config
             fi
 
             if [ "$src" == "." ]; then
@@ -215,7 +224,7 @@ for $ENV_VAR in "env" "no_env"; do
             wait $SERVER_PID
 
             # Clean up bucket
-            if [ "$ENV_VAR" == "env" ]; then
+            if [ "$ENV_VAR" != "config" ]; then
                 aws configure set default.region $AWS_DEFAULT_REGION && \
                     aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
                     aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
