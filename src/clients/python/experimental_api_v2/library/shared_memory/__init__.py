@@ -133,7 +133,7 @@ def set_shared_memory_region(shm_handle, input_values):
     ----------
     shm_handle : c_void_p
         The handle for the shared memory region.
-    input_values : np.array
+    input_values : list
         The list of numpy arrays to be copied into the shared memory region.
 
     Raises

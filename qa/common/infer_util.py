@@ -372,16 +372,13 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                     else:
                         output_datatype = output.datatype
                         output_shape = output.shape
+                    output_dtype = triton_to_np_dtype(output_datatype)
                 if use_system_shared_memory:
                     output_data = shm.get_contents_as_numpy(
-                        shm_handle, triton_to_np_dtype(
-                            output_datatype),
-                        output_shape)
+                        shm_handle, output_dtype, output_shape)
                 elif use_cuda_shared_memory:
                     output_data = cudashm.get_contents_as_numpy(
-                        shm_handle, triton_to_np_dtype(
-                            output_datatype),
-                        output_shape)
+                        shm_handle, output_dtype, output_shape)
                 else:
                     output_data = results.as_numpy(result_name)
 
