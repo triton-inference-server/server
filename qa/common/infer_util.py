@@ -228,13 +228,14 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             expected1_sort_idx = [np.flip(np.argsort(x.flatten()), 0)
                                   for x in output1_array.reshape(tensor_shape)]
 
+        # Force binary_data = False for shared memory and class 
         output_req = []
         i = 0
         if "OUTPUT0" in outputs:
             if len(shm_regions) != 0:
                 if config[1] == "http":
                     output_req.append(httpclient.InferRequestedOutput(
-                        OUTPUT0, binary_data=config[3]))
+                        OUTPUT0, binary_data=False))
                 else:
                     output_req.append(grpcclient.InferRequestedOutput(OUTPUT0))
 
@@ -264,7 +265,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             if len(shm_regions) != 0:
                 if config[1] == "http":
                     output_req.append(httpclient.InferRequestedOutput(
-                        OUTPUT1, binary_data=config[3]))
+                        OUTPUT1, binary_data=False))
                 else:
                     output_req.append(grpcclient.InferRequestedOutput(OUTPUT1))
 
