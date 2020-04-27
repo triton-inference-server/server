@@ -102,6 +102,15 @@ class InferenceResponse {
           allocated_buffer_(nullptr)
     {
     }
+    Output(
+        const std::string& name, const DataType datatype,
+        std::vector<int64_t>&& shape, const ResponseAllocator* allocator,
+        void* alloc_userp)
+        : name_(name), datatype_(datatype), shape_(std::move(shape)),
+          allocator_(allocator), alloc_userp_(alloc_userp),
+          allocated_buffer_(nullptr)
+    {
+    }
 
     ~Output();
 
@@ -191,6 +200,9 @@ class InferenceResponse {
   Status AddOutput(
       const std::string& name, const DataType datatype,
       const std::vector<int64_t>& shape, Output** output = nullptr);
+  Status AddOutput(
+      const std::string& name, const DataType datatype,
+      std::vector<int64_t>&& shape, Output** output = nullptr);
 
   // Send the response. Calling this function releases ownership of
   // the response object and gives it to the callback function.
