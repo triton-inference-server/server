@@ -55,9 +55,12 @@ struct InputInfo {
 
 struct OutputInfo {
   const char* output_buffer_;
-  std::vector<int64_t> output_shape_;
   TRITONSERVER_MemoryType memory_type_;
   int64_t memory_type_id_;
+
+  bool need_indirect_buffer_;
+  TRITONSERVER_MemoryType indirect_candidate_type_;
+
   // indirect pinned memory buffers, the memory references appointing to
   // the destinations in requests and the request's index
   std::vector<std::pair<
@@ -147,9 +150,10 @@ struct BackendContext {
   // should call cudaStreamSynchronize before using the
   // data. Otherwise, return false.
   bool SetFixedSizeOutputBuffer(
-      const std::string& name, const size_t batch1_byte_size,
-      OutputInfo* output,
-      std::vector<std::unique_ptr<InferenceRequest>>* requests);
+      const std::unique_ptr<InferenceRequest>& request,
+      std::unique_ptr<InferenceResponse>* response,
+      InferenceResponse::Output* response_output, OutputInfo* output_info,
+      size_t* tensor_offset, const size_t expected_byte_size);
 
   // Helper function to set output buffer for a shape tensor. It is
   // callers resposibilty to ensure this method is called only for the
