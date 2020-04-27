@@ -40,9 +40,7 @@
 #include <string>
 #include <thread>
 #include <vector>
-#ifdef _WIN32
 #include <algorithm>
-#endif  //_WIN32
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
