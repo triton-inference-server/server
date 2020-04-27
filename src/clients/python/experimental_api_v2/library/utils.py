@@ -159,7 +159,7 @@ def triton_to_np_dtype(dtype):
     elif dtype == "FP64":
         return np.float64
     elif dtype == "BYTES":
-        return np.bytes_
+        return np.object
     return None
 
 
