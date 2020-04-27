@@ -525,8 +525,9 @@ CustomBackend::Context::Run(
   }
 #endif  // TRTIS_ENABLE_STATS
 
-  // If the custom execute function returns an error then send any
-  // responses and so send an error response for each request.
+  // If the custom execute function returns an error then it did not
+  // send any responses and so send an error response for each
+  // request.
   if (err != 0) {
     InferenceRequest::RespondWithError(
         requests,

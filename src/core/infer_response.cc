@@ -78,6 +78,23 @@ InferenceResponse::AddOutput(
 }
 
 Status
+InferenceResponse::AddOutput(
+    const std::string& name, const DataType datatype,
+    std::vector<int64_t>&& shape, InferenceResponse::Output** output)
+{
+  outputs_.emplace_back(
+      name, datatype, std::move(shape), allocator_, alloc_userp_);
+
+  LOG_VERBOSE(1) << "add response output: " << outputs_.back();
+
+  if (output != nullptr) {
+    *output = std::addressof(outputs_.back());
+  }
+
+  return Status::Success;
+}
+
+Status
 InferenceResponse::Send(std::unique_ptr<InferenceResponse>&& response)
 {
   void* userp = response->response_userp_;
