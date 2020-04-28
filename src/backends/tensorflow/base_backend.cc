@@ -360,6 +360,61 @@ FillStringTensor(TRTISTF_Tensor* tensor, const size_t idx, const size_t cnt)
   }
 }
 
+bool
+SetStringOutputBuffer(
+    TRTISTF_Tensor* tensor, std::unique_ptr<InferenceResponse>* response,
+    InferenceResponse::Output* response_output,
+    const size_t tensor_element_count, const size_t tensor_offset,
+    cudaStream_t stream)
+{
+  bool cuda_copy = false;
+
+  // Serialize the output tensor strings. Each string is serialized as
+  // a 4-byte length followed by the string itself with no
+  // null-terminator.
+  std::string serialized;
+  for (size_t e = 0; e < tensor_element_count; ++e) {
+    size_t len;
+    const char* cstr = TRTISTF_TensorString(tensor, tensor_offset + e, &len);
+    serialized.append(reinterpret_cast<const char*>(&len), sizeof(uint32_t));
+    if (len > 0) {
+      serialized.append(cstr, len);
+    }
+  }
+
+  // Allocate a buffer large enough to hold the serialized tensor.
+  TRITONSERVER_MemoryType actual_memory_type = TRITONSERVER_MEMORY_CPU;
+  int64_t actual_memory_type_id = 0;
+
+  void* buffer;
+  Status status = response_output->AllocateDataBuffer(
+      &buffer, serialized.size(), &actual_memory_type, &actual_memory_type_id);
+  if (!status.IsOk()) {
+    LOG_STATUS_ERROR(
+        InferenceResponse::SendWithStatus(std::move(*response), status),
+        "error sending TensorFlow response");
+    return cuda_copy;
+  }
+
+  // Copy the serialized tensor into the allocated buffer.
+  bool cuda_used = false;
+  status = CopyBuffer(
+      response_output->Name(), TRITONSERVER_MEMORY_CPU /* src_memory_type */,
+      0 /* src_memory_type_id */, actual_memory_type, actual_memory_type_id,
+      serialized.size(), reinterpret_cast<const void*>(serialized.c_str()),
+      buffer, stream, &cuda_used);
+  cuda_copy |= cuda_used;
+
+  if (!status.IsOk()) {
+    LOG_STATUS_ERROR(
+        InferenceResponse::SendWithStatus(std::move(*response), status),
+        "error sending TensorFlow response");
+    return cuda_copy;
+  }
+
+  return cuda_copy;
+}
+
 }  // namespace
 
 // FIXME instead of returning status, errors should be reported in the
@@ -491,7 +546,7 @@ BaseBackend::Context::SetStringInputTensor(
         &content, &content_byte_size, &contiguous_buffer, &cuda_copy);
 
     if (!status.IsOk()) {
-      InferenceRequest::RespondWithError(irequest, status);
+      InferenceRequest::RespondIfError(irequest, status);
       FillStringTensor(
           tensor, tensor_element_idx + element_idx,
           expected_element_cnt - element_idx);
@@ -511,7 +566,7 @@ BaseBackend::Context::SetStringInputTensor(
     // itself with no null-terminator.
     while (content_byte_size >= sizeof(uint32_t)) {
       if (element_idx >= expected_element_cnt) {
-        InferenceRequest::RespondWithError(
+        InferenceRequest::RespondIfError(
             irequest,
             Status(
                 Status::Code::INVALID_ARG,
@@ -530,7 +585,7 @@ BaseBackend::Context::SetStringInputTensor(
       content_byte_size -= sizeof(uint32_t);
 
       if (content_byte_size < len) {
-        InferenceRequest::RespondWithError(
+        InferenceRequest::RespondIfError(
             irequest,
             Status(
                 Status::Code::INVALID_ARG,
@@ -552,7 +607,7 @@ BaseBackend::Context::SetStringInputTensor(
     }
 
     if ((irequest != nullptr) && (element_idx != expected_element_cnt)) {
-      InferenceRequest::RespondWithError(
+      InferenceRequest::RespondIfError(
           irequest, Status(
                         Status::Code::INTERNAL,
                         "expected " + std::to_string(expected_element_cnt) +
@@ -565,66 +620,6 @@ BaseBackend::Context::SetStringInputTensor(
 
     tensor_element_idx += expected_element_cnt;
   }
-}
-
-void
-BaseBackend::Context::ReadStringOutputTensor(
-    TRTISTF_Tensor* tensor, const std::string& output_name,
-    const std::vector<int64_t>& shape, const size_t batch1_element_cnt,
-    std::vector<std::unique_ptr<InferenceRequest>>* requests, bool* cuda_copy)
-{
-#if 0  // FIXME
-  size_t tensor_element_idx = 0;
-
-  for (auto& irequest : *requests) {
-    const size_t expected_element_cnt =
-        irequest->BatchSize() * batch1_element_cnt;
-
-    // If 'irequest' should have valid output (status ok) and if
-    // 'irequest' requested this output then copy it from tensor. If
-    // it did not request this output then just skip it.
-    if (payload.status_.IsOk() && (payload.response_provider_ != nullptr) &&
-        payload.response_provider_->RequiresOutput(output_name)) {
-      // Serialize the output tensor strings. Each string is
-      // serialized as a 4-byte length followed by the string itself
-      // with no null-terminator.
-      std::string serialized;
-      for (size_t e = 0; e < expected_element_cnt; ++e) {
-        size_t len;
-        const char* cstr =
-            TRTISTF_TensorString(tensor, tensor_element_idx + e, &len);
-        serialized.append(
-            reinterpret_cast<const char*>(&len), sizeof(uint32_t));
-        if (len > 0) {
-          serialized.append(cstr, len);
-        }
-      }
-
-      void* content;
-      TRITONSERVER_MemoryType actual_memory_type;
-      int64_t actual_memory_type_id;
-      Status status = payload.response_provider_->AllocateOutputBuffer(
-          output_name, &content, serialized.size(), shape,
-          TRITONSERVER_MEMORY_CPU_PINNED /* preferred_memory_type */,
-          0 /* preferred_memory_type_id */, &actual_memory_type,
-          &actual_memory_type_id);
-      if (status.IsOk()) {
-        bool cuda_used = false;
-        status = CopyBuffer(
-            output_name, TRITONSERVER_MEMORY_CPU /* src_memory_type */,
-            0 /* src_memory_type_id */, actual_memory_type,
-            actual_memory_type_id, serialized.size(),
-            reinterpret_cast<const void*>(serialized.c_str()), content, stream_,
-            &cuda_used);
-        *cuda_copy |= cuda_used;
-      }
-
-      payload.status_ = status;
-    }
-
-    tensor_element_idx += expected_element_cnt;
-  }
-#endif
 }
 
 void
@@ -642,12 +637,15 @@ BaseBackend::Context::Run(
   // input has already been checked so don't need to do that here.
   size_t total_batch_size = 0;
   for (auto& request : requests) {
+    // If we get a nullptr request then something is badly wrong. Fail
+    // and release all requests.
     if (request == nullptr) {
-      InferenceRequest::RespondWithError(
+      InferenceRequest::RespondIfError(
           requests,
           Status(
               Status::Code::INTERNAL,
-              "null request given to TensorFlow runner for '" + name_ + "'"));
+              "null request given to TensorFlow runner for '" + name_ + "'"),
+          true /* release_requests */);
       return;
     }
 
@@ -658,28 +656,61 @@ BaseBackend::Context::Run(
     repr_input_request = request.get();
   }
 
-  // If there are no valid requests then no need to run the inference.
+  // If there are no valid requests then no need to run the
+  // inference. This should never happen unless called with an empty
+  // 'requests' for some reason.
   if (total_batch_size == 0) {
     return;
   }
 
-  // total_batch_size can be 1 for models that don't support batching
-  // (i.e. max_batch_size_ == 0).
+  // Make sure the maximum batch size is not exceeded. The
+  // total_batch_size must be 1 for models that don't support batching
+  // (i.e. max_batch_size_ == 0). If max_batch_size is exceeded then
+  // scheduler has done something badly wrong so fail and release all
+  // requests.
   if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size_)) {
-    InferenceRequest::RespondWithError(
-        requests, Status(
-                      Status::Code::INTERNAL,
-                      "dynamic batch size " + std::to_string(total_batch_size) +
-                          " for '" + name_ + "', max allowed is " +
-                          std::to_string(max_batch_size_)));
+    InferenceRequest::RespondIfError(
+        requests,
+        Status(
+            Status::Code::INTERNAL,
+            "dynamic batch size " + std::to_string(total_batch_size) +
+                " for '" + name_ + "', max allowed is " +
+                std::to_string(max_batch_size_)),
+        true /* release_requests */);
+    return;
+  }
+
+  // At this point we are committed to running inference with all
+  // 'requests'. Create a response for each request. During input
+  // processing if there is an error with any request that error will
+  // be sent immediately with the corresponding response (and the
+  // response unique_ptr will then be nullptr). The request object
+  // itself will not be released until after all inferencing is done
+  // (below) as we may need to access the request object when
+  // determine how to process outputs (for example, even if we don't
+  // need the outputs for a request that has an error, we do need to
+  // know the size of those outputs associated with the request so we
+  // can skip them in the output tensors).
+  std::vector<std::unique_ptr<InferenceResponse>> responses;
+  responses.reserve(requests.size());
+
+  for (auto& request : requests) {
+    std::unique_ptr<InferenceResponse> response;
+    Status status = request->ResponseFactory().CreateResponse(&response);
+    if (!status.IsOk()) {
+      InferenceRequest::RespondIfError(request, status);
+      response.reset();
+    }
+
+    responses.emplace_back(std::move(response));
   }
 
   // Create a tensor for each input sized correctly for the total
   // batch size. Concatenate input values from each request into the
   // corresponding tensor.
 
-  // Smart pointer is TensorList** as the pointer to input head (TensorList*)
-  // will be updated in SetInput()
+  // Unique pointer is TensorList** as the pointer to input head
+  // (TensorList*) will be updated in SetInput()
   TRTISTF_TensorList* input_head_ptr = nullptr;
   static auto input_deleter = [](TRTISTF_TensorList** list) {
     if (list != nullptr) {
@@ -696,16 +727,22 @@ BaseBackend::Context::Run(
     const InferenceRequest::Input* input = pr.second;
     const std::string& name = input->Name();
 
+    // FIXME
     SetInput(
         name, input->DType(), input->Shape(), total_batch_size, &requests,
         &inputs, input_tensors.get(), &cuda_copy);
   }
 
-  // Collect the names of requested outputs.
+  // Collect the names of requested outputs. Do not include outputs
+  // for requests that have already responded with an error.
   std::set<std::string> required_outputs;
-  for (auto& irequest : requests) {
-    for (const auto& pr : irequest->ImmutableRequestedOutputs()) {
-      required_outputs.insert(pr.first);
+  for (size_t idx = 0; idx < requests.size(); idx++) {
+    const auto& request = requests[idx];
+    const auto& response = responses[idx];
+    if (response != nullptr) {
+      for (const auto& pr : request->ImmutableRequestedOutputs()) {
+        required_outputs.insert(pr.first);
+      }
     }
   }
 
@@ -731,6 +768,7 @@ BaseBackend::Context::Run(
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
+
   cuda_copy = false;
   for (auto& input : inputs) {
     for (auto& indirect_buffer : input.indirect_buffers_) {
@@ -749,13 +787,19 @@ BaseBackend::Context::Run(
           &cuda_used);
       if (!status.IsOk()) {
         for (const auto& request_idx : std::get<2>(indirect_buffer)) {
-          InferenceRequest::RespondWithError(requests[request_idx], status);
+          if (responses[request_idx] != nullptr) {
+            LOG_STATUS_ERROR(
+                InferenceResponse::SendWithStatus(
+                    std::move(responses[request_idx]), status),
+                "error sending TensorFlow response");
+          }
         }
       } else {
         cuda_copy |= cuda_used;
       }
     }
   }
+
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
@@ -781,8 +825,18 @@ BaseBackend::Context::Run(
         trtistf_model_.get(), *(input_tensors.release()),
         required_outputs.size(), output_names_cstr, &rtl);
     if (err != nullptr) {
-      InferenceRequest::RespondWithError(
-          requests, Status(Status::Code::INTERNAL, err->msg_));
+      // Something went wrong with the entire batch inference. For
+      // every response that has not already been sent with an
+      // error... send it now...
+      for (auto& response : responses) {
+        if (response != nullptr) {
+          LOG_STATUS_ERROR(
+              InferenceResponse::SendWithStatus(
+                  std::move(response),
+                  Status(Status::Code::INTERNAL, err->msg_)),
+              "error sending TensorFlow response");
+        }
+      }
       TRTISTF_ErrorDelete(err);
     }
 
@@ -798,148 +852,89 @@ BaseBackend::Context::Run(
   }
 #endif  // TRTIS_ENABLE_STATS
 
-  // Create a response for each request. If a request is nullptr that
-  // means an error response has already been sent for it so we just
-  // skip it.
-  std::vector<std::unique_ptr<InferenceResponse>> responses;
-  responses.reserve(requests.size());
-
-  for (auto& request : requests) {
-    std::unique_ptr<InferenceResponse> response;
-    if (request != nullptr) {
-      Status status = request->ResponseFactory().CreateResponse(&response);
-      if (!status.IsOk()) {
-        InferenceRequest::RespondWithError(request, status);
-        response.reset();
-      }
-    }
-
-    responses.emplace_back(std::move(response));
-  }
-
-  // For each model output, create a corresponding output in every
-  // response that requires it and copy the appropriate tensor data
-  // into the response.
+  // Create the response tensors and copy the appropriate tensor data
+  // into each. For tensors with string data type we must handle
+  // ourselves since we must use TF-specific string tensor APIs.
   cuda_copy = false;
-  std::vector<OutputInfo> outputs;
-  TRTISTF_TensorList* output_tensor_itr = output_tensors.get();
-  for (const auto& name : model_output_names) {
-    outputs.emplace_back();
-    OutputInfo& output_info = outputs.back();
-    TRTISTF_Tensor* output_tensor = output_tensor_itr->tensor_;
 
-    // Initialize information about the tensor data coming from TF.
-    // FIXME seems like OutputInfo should be promoted to a full class
-    // with a constructor that can do all this initialization.
-    output_info.output_buffer_ = TRTISTF_TensorData(output_tensor);
-    output_info.memory_type_ = (TRTISTF_TensorIsGPUTensor(output_tensor))
-                                   ? TRITONSERVER_MEMORY_GPU
-                                   : TRITONSERVER_MEMORY_CPU;
-    output_info.memory_type_id_ =
-        (TRTISTF_TensorIsGPUTensor(output_tensor)) ? gpu_device_ : 0;
-    GetIndirectBufferRequirement(
-        output_info.memory_type_, false, &output_info.indirect_candidate_type_,
-        &output_info.need_indirect_buffer_);
-    output_info.indirect_buffers_.emplace_back();
+  {
+    BackendResponder responder(
+        requests, &responses, enable_pinned_output_, stream_);
 
-    // Get the shape and datatype of the output from the output
-    // tensor.
-    TRTISTF_DataType tf_datatype = TRTISTF_TensorDataType(output_tensor);
-    TRTISTF_Shape* tf_shape = TRTISTF_TensorShape(output_tensor);
-    std::vector<int64_t> shape;
-    shape.reserve(tf_shape->rank_);
-    for (size_t itr = 0; itr < tf_shape->rank_; itr++) {
-      const int64_t dim = tf_shape->dims_[itr];
-      shape.push_back(dim);
-    }
+    TRTISTF_TensorList* output_tensor_itr = output_tensors.get();
+    for (const auto& name : model_output_names) {
+      TRTISTF_Tensor* output_tensor = output_tensor_itr->tensor_;
 
-    const DataType datatype = ConvertDataType(tf_datatype);
-    const size_t expected_byte_size = GetByteSize(datatype, shape);
+      TRTISTF_DataType tf_datatype = TRTISTF_TensorDataType(output_tensor);
+      TRTISTF_Shape* tf_shape = TRTISTF_TensorShape(output_tensor);
 
-    // Create and set tensor for each response that want's this output
-    // and that is not already in an error state. If a response is
-    // already in an error state we just skip over all outputs for
-    // it... even if the corresponding request wanted them.
-    size_t tensor_offset = 0;
-    for (size_t idx = 0; idx < responses.size(); idx++) {
-      auto& request = requests[idx];
-      auto& response = responses[idx];
-
-      InferenceResponse::Output* response_output = nullptr;
-      if (response->ResponseStatus().IsOk() &&
-          (request->ImmutableRequestedOutputs().find(name) !=
-           request->ImmutableRequestedOutputs().end())) {
-        response->AddOutput(name, datatype, shape, &response_output);
+      const DataType datatype = ConvertDataType(tf_datatype);
+      std::vector<int64_t> shape;
+      shape.reserve(tf_shape->rank_);
+      for (size_t itr = 0; itr < tf_shape->rank_; itr++) {
+        const int64_t dim = tf_shape->dims_[itr];
+        shape.push_back(dim);
       }
 
-      if (tf_datatype != TRTISTF_DataType::TRTISTF_TYPE_STRING) {
-        cuda_copy |= SetFixedSizeOutputBuffer(
-            request, &response, response_output, &output_info, &tensor_offset,
-            expected_byte_size);
-      } else {
-        // FIXME
-        // ReadStringOutputTensor(
-        //     output_tensor, name, outputs.back().output_shape_,
-        //     batch1_element_cnt, responses, &cuda_copy);
+      // Custom handling for string/bytes tensor...
+      if (datatype == DataType::TYPE_STRING) {
+        size_t tensor_offset = 0;
+        const size_t tensor_element_count = GetElementCount(shape);
+
+        for (size_t idx = 0; idx < responses.size(); idx++) {
+          auto& request = requests[idx];
+          auto& response = responses[idx];
+
+          // Only need an response tensor for requested outputs.
+          if ((response != nullptr) &&
+              (request->ImmutableRequestedOutputs().find(name) !=
+               request->ImmutableRequestedOutputs().end())) {
+            InferenceResponse::Output* response_output = nullptr;
+            response->AddOutput(name, datatype, shape, &response_output);
+            cuda_copy |= SetStringOutputBuffer(
+                output_tensor, &response, response_output, tensor_element_count,
+                tensor_offset, stream_);
+          }
+
+          tensor_offset += tensor_element_count;
+        }
       }
+      // Use the responder for non-STRING datatype...
+      else {  // datatype != DataType::TYPE_STRING
+        responder.ProcessTensor(
+            name, datatype, shape, TRTISTF_TensorData(output_tensor),
+            (TRTISTF_TensorIsGPUTensor(output_tensor))
+                ? TRITONSERVER_MEMORY_GPU
+                : TRITONSERVER_MEMORY_CPU,
+            (TRTISTF_TensorIsGPUTensor(output_tensor)) ? gpu_device_ : 0);
+      }
+
+      output_tensor_itr = output_tensor_itr->next_;
     }
 
-    output_tensor_itr = output_tensor_itr->next_;
-  }
-
-  // FIXME got through all requests and release them... we are done
-  // with them and we don't have to wait for the responses to be
-  // ready...
-  for (auto& request : requests) {
-    InferenceRequest::Release(std::move(request));
+    // Finalize and wait for any pending buffer copies.
+    cuda_copy |= responder.Finalize();
   }
 
 #ifdef TRTIS_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
-    cuda_copy = false;
   }
-
-#if 0  // FIXME pinned
-  for (auto& output : outputs) {
-    for (auto& indirect_buffer : output.indirect_buffers_) {
-      bool cuda_used;
-      TRITONSERVER_MemoryType src_memory_type;
-      int64_t src_memory_type_id;
-      // placeholder, copy byte size is determined by dst_byte_size
-      size_t src_byte_size;
-      auto src = indirect_buffer.first->BufferAt(
-          0, &src_byte_size, &src_memory_type, &src_memory_type_id);
-      TRITONSERVER_MemoryType dst_memory_type;
-      int64_t dst_memory_type_id;
-      for (auto& request_output : indirect_buffer.second) {
-        char* dst = request_output.second->MutableBuffer(
-            &dst_memory_type, &dst_memory_type_id);
-        auto dst_byte_size = request_output.second->TotalByteSize();
-        responses[request_output.first]->SetResponseStatus(CopyBuffer(
-            "indirect buffer", src_memory_type, src_memory_type_id,
-            dst_memory_type, dst_memory_type_id, dst_byte_size, src, dst,
-            stream_, &cuda_used));
-        cuda_copy |= cuda_used;
-        src += dst_byte_size;
-      }
-    }
-  }
-
-  if (cuda_copy) {
-    cudaStreamSynchronize(stream_);
-  }
-#endif
 #endif  // TRTIS_ENABLE_GPU
 
-  // FIXME All the output tensors are written so now send all the
-  // responses.
+  // Send all the responses that haven't already been sent because of
+  // an earlier error.
   for (auto& response : responses) {
     if (response != nullptr) {
       LOG_STATUS_ERROR(
           InferenceResponse::Send(std::move(response)),
           "failed to send TensorFlow backend response");
     }
+  }
+
+  // Release all requests.
+  for (auto& request : requests) {
+    InferenceRequest::Release(std::move(request));
   }
 }
 
