@@ -297,13 +297,17 @@ InferenceBackend::Run(
     uint32_t runner_idx,
     std::vector<std::unique_ptr<InferenceRequest>>&& requests)
 {
-  // Each runner executes using the corresponding context...
+  // Each runner executes using the corresponding context...  If the
+  // runner_idx is invalid then the scheduler has done something badly
+  // wrong so fail and release all requests.
   if (runner_idx >= contexts_.size()) {
-    InferenceRequest::RespondWithError(
-        requests, Status(
-                      Status::Code::INTERNAL,
-                      "unexpected runner index" + std::to_string(runner_idx) +
-                          ", max allowed " + std::to_string(contexts_.size())));
+    InferenceRequest::RespondIfError(
+        requests,
+        Status(
+            Status::Code::INTERNAL,
+            "unexpected runner index" + std::to_string(runner_idx) +
+                ", max allowed " + std::to_string(contexts_.size())),
+        true /*release_requests */);
     return;
   }
 
