@@ -49,6 +49,15 @@ by the host and port (separated by a semicolon) and subsequently
 the bucket path. For example,
 -\\-model-repository=s3://host:port/bucket/path/to/model/repository.
 
+When using Amazon S3, the credentials and default region can be passed
+by using either the `aws config
+<https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html>_` 
+command or via the respective `environment variables
+<https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html>`_.
+If the environment variables are set they will take a higher priority
+and be used by the Triton Inference Server instead of the credentials 
+set using the aws config command. 
+
 :ref:`section-example-model-repository` describes how to create an
 example repository with a couple of image classification models.
 
