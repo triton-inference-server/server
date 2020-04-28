@@ -228,7 +228,7 @@ InferInput::GetNext(
 
   while ((bufs_idx_ < bufs_.size()) && (size > 0)) {
     const size_t buf_byte_size = buf_byte_sizes_[bufs_idx_];
-    const size_t csz = std::min(buf_byte_size - buf_pos_, size);
+    const size_t csz = (std::min)(buf_byte_size - buf_pos_, size);
     if (csz > 0) {
       const uint8_t* input_ptr = bufs_[bufs_idx_] + buf_pos_;
       std::copy(input_ptr, input_ptr + csz, buf);

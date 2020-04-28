@@ -144,7 +144,7 @@ management tool on Windows. The following shows how to install the dependencies
 using them, and you can also install the dependencies in other ways that you
 prefer::
 
-  > .\vcpkg.exe install openssl:x64-windows zlib:x64-windows
+  > .\vcpkg.exe install openssl:x64-windows zlib:x64-windows rapidjson:x64-windows
   > .\pip.exe install grpcio-tools wheel
 
 The vcpkg step above installs openssl and zlib, ":x64-windows" specifies the
