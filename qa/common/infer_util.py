@@ -501,8 +501,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
 
         expected_array = expected_array.reshape(output_shapes[io_num])
 
-        # input_list.append(input_array)
-        # expected_list.append(expected_array)
+        input_list = [x for x in input_array]
         expected_dict[output_name] = [x for x in expected_array]
 
         input_byte_size = tu.shape_element_count(input_shape) *\

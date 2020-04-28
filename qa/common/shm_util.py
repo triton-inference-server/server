@@ -191,3 +191,4 @@ def unregister_cleanup_shm_regions(shm_regions, precreated_shm_regions, outputs,
             else:
                 triton_client.unregister_system_shared_memory(
                     shm_regions[2+i]+'_data')
+
