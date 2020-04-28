@@ -81,27 +81,6 @@ class BaseBackend : public InferenceBackend {
     Status ValidateOutputs(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
 
-    // Set an input tensor data from requests.
-    Status SetInput(
-        const std::string& name, const DataType datatype,
-        const std::vector<int64_t>& dims, const size_t total_batch_size,
-        std::vector<std::unique_ptr<InferenceRequest>>* requests,
-        std::vector<InputInfo>* inputs, TRTISTF_TensorList** input_tensors,
-        bool* cuda_copy);
-
-    // Helper function to set the input for fixed-sized data type
-    void SetFixedSizedInputTensor(
-        TRTISTF_Tensor* tensor, const std::string& input_name,
-        const size_t batch1_byte_size,
-        std::vector<std::unique_ptr<InferenceRequest>>* requests,
-        InputInfo* input, bool* cuda_copy);
-
-    // Helper function to set the input for String data type
-    void SetStringInputTensor(
-        TRTISTF_Tensor* tensor, const std::string& input_name,
-        const size_t batch1_element_cnt,
-        std::vector<std::unique_ptr<InferenceRequest>>* requests);
-
     // See BackendContext::Run()
     void Run(
         const InferenceBackend* base,
