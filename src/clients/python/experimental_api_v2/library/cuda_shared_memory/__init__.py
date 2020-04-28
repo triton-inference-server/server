@@ -174,8 +174,7 @@ def set_shared_memory_region(cuda_shm_handle, input_values):
     for input_value in input_values:
         if not isinstance(input_value, (np.ndarray,)):
             _raise_error(
-                "input_values must be specified as a list/tuple of numpy arrays"
-            )
+                "input_values must be specified as a list/tuple of numpy arrays")
 
     offset_current = 0
     for input_value in input_values:
@@ -218,7 +217,7 @@ def get_contents_as_numpy(cuda_shm_handle, datatype, shape):
                                                     byref(offset),
                                                     byref(byte_size))))
         start_pos = offset.value
-        if (datatype != np.object) or (datatype != np.bytes_):
+        if (datatype != np.object) and (datatype != np.bytes_):
             requested_byte_size = np.prod(shape) * np.dtype(datatype).itemsize
             cval_len = start_pos + requested_byte_size
             if byte_size.value < cval_len:

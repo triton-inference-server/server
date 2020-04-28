@@ -151,12 +151,17 @@ def create_register_shm_regions(input0_list, input1_list, output0_byte_size,
 
 
 def set_shm_regions(inputs, shm_region_names, use_system_shared_memory, use_cuda_shared_memory, 
-                    input0_byte_size, input1_byte_size):
-    if use_system_shared_memory:
-        inputs[0].set_shared_memory(shm_region_names[0]+'_data', input0_byte_size)
-        inputs[1].set_shared_memory(shm_region_names[1]+'_data', input1_byte_size)
+                    input0_list, input1_list):
+    if use_system_shared_memory or use_cuda_shared_memory:
+        if input0_list[0].dtype == np.object:
+            input0_list_tmp = [serialize_byte_tensor(i0) for i0 in input0_list]
+            input1_list_tmp = [serialize_byte_tensor(i1) for i1 in input1_list]
+        else:
+            input0_list_tmp = input0_list
+            input1_list_tmp = input1_list
 
-    if use_cuda_shared_memory:
+        input0_byte_size = sum([i0.nbytes for i0 in input0_list_tmp])
+        input1_byte_size = sum([i1.nbytes for i1 in input1_list_tmp])
         inputs[0].set_shared_memory(shm_region_names[0]+'_data', input0_byte_size)
         inputs[1].set_shared_memory(shm_region_names[1]+'_data', input1_byte_size)
 

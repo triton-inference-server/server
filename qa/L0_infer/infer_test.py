@@ -50,7 +50,7 @@ class InferTest(unittest.TestCase):
                 output0_raw=True, output1_raw=True,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
-                use_http_json_tensors=False, skip_request_id_check=True, use_streaming=False,
+                use_http_json_tensors=True, skip_request_id_check=True, use_streaming=False,
                 correlation_id=0):
             for bs in (1, batch_size):
                 # model that does not support batching
@@ -181,22 +181,18 @@ class InferTest(unittest.TestCase):
     def test_raw_ihs(self):
         self._full_exact(np.int32, np.float16, np.int16,
                          output0_raw=True, output1_raw=True, swap=False)
-
-    # String input not supported for shared memory 
-    if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
-        def test_raw_ooo(self):
-            self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string,
-                            output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_oii(self):
-            self._full_exact(np_dtype_string, np.int32, np.int32,
-                            output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_oio(self):
-            self._full_exact(np_dtype_string, np.int32, np_dtype_string,
-                            output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_ooi(self):
-            self._full_exact(np_dtype_string, np_dtype_string, np.int32,
-                            output0_raw=True, output1_raw=True, swap=False)
-
+    def test_raw_ooo(self):
+        self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string,
+                        output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_oii(self):
+        self._full_exact(np_dtype_string, np.int32, np.int32,
+                        output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_oio(self):
+        self._full_exact(np_dtype_string, np.int32, np_dtype_string,
+                        output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_ooi(self):
+        self._full_exact(np_dtype_string, np_dtype_string, np.int32,
+                        output0_raw=True, output1_raw=True, swap=False)
     def test_raw_ioo(self):
         self._full_exact(np.int32, np_dtype_string, np_dtype_string,
                          output0_raw=True, output1_raw=True, swap=False)
