@@ -102,13 +102,6 @@ class BaseBackend : public InferenceBackend {
         const size_t batch1_element_cnt,
         std::vector<std::unique_ptr<InferenceRequest>>* requests);
 
-    // Helper function to set an output with a BYTES data type
-    void ReadStringOutputTensor(
-        TRTISTF_Tensor* tensor, const std::string& output_name,
-        const std::vector<int64_t>& shape, const size_t batch1_element_cnt,
-        std::vector<std::unique_ptr<InferenceRequest>>* requests,
-        bool* cuda_copy);
-
     // See BackendContext::Run()
     void Run(
         const InferenceBackend* base,
