@@ -221,10 +221,9 @@ WORKDIR /workspace
 COPY --from=build /workspace/qa/ qa/
 RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp install/bin/* qa/clients/. && \
-    cp install/lib/librequest.so qa/clients/. && \
     cp install/lib/libgrpcclient.so qa/clients/. && \
+    cp install/lib/libhttpclient.so qa/clients/. && \
     cp install/python/*.py qa/clients/. && \
-    cp install/python/tensorrtserver*.whl qa/pkgs/. && \
     cp install/python/triton*.whl qa/pkgs/.
 
 ############################################################################
@@ -287,7 +286,6 @@ COPY --chown=1000:1000 --from=cbe /workspace/qa/ qa/
 # Remove CI tests that are meant to run only on build image and
 # install the tritonserver/triton python client APIs.
 RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
-    pip3 install --upgrade qa/pkgs/tensorrtserver*.whl && \
     pip3 install --upgrade qa/pkgs/triton*.whl
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
