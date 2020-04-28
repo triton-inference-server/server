@@ -104,6 +104,19 @@ InferenceResponse::Send(std::unique_ptr<InferenceResponse>&& response)
   return Status::Success;
 }
 
+Status
+InferenceResponse::SendWithStatus(
+    std::unique_ptr<InferenceResponse>&& response, const Status& status)
+{
+  response->status_ = status;
+
+  void* userp = response->response_userp_;
+  response->response_fn_(
+      reinterpret_cast<TRITONSERVER_InferenceResponse*>(response.release()),
+      userp);
+  return Status::Success;
+}
+
 //
 // InferenceResponse::Output
 //

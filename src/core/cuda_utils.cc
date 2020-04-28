@@ -118,6 +118,7 @@ CopyBuffer(
         msg + ": try to use CUDA copy while GPU is not supported");
 #endif  // TRTIS_ENABLE_GPU
   }
+
   return Status::Success;
 }
 
