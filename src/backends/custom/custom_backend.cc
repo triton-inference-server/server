@@ -336,12 +336,15 @@ CustomBackend::Context::Run(
   uint32_t total_inputs = 0;
   uint32_t total_requested_outputs = 0;
   for (auto& request : requests) {
+    // If we get a nullptr request then something is badly wrong. Fail
+    // and release all requests.
     if (request == nullptr) {
-      InferenceRequest::RespondWithError(
+      InferenceRequest::RespondIfError(
           requests,
           Status(
               Status::Code::INTERNAL,
-              "null request given to custom runner for '" + name_ + "'"));
+              "null request given to custom runner for '" + name_ + "'"),
+          true /* release_requests */);
       return;
     }
 
@@ -356,16 +359,21 @@ CustomBackend::Context::Run(
     return;
   }
 
-  // total_batch_size can be 1 for models that don't support batching
-  // (i.e. max_batch_size_ == 0).
+  // Make sure the maximum batch size is not exceeded. The
+  // total_batch_size must be 1 for models that don't support batching
+  // (i.e. max_batch_size_ == 0). If max_batch_size is exceeded then
+  // scheduler has done something badly wrong so fail and release all
+  // requests.
   if ((total_batch_size != 1) &&
       (total_batch_size > (uint32_t)max_batch_size_)) {
-    InferenceRequest::RespondWithError(
-        requests, Status(
-                      Status::Code::INTERNAL,
-                      "dynamic batch size " + std::to_string(total_batch_size) +
-                          " for '" + name_ + "', max allowed is " +
-                          std::to_string(max_batch_size_)));
+    InferenceRequest::RespondIfError(
+        requests,
+        Status(
+            Status::Code::INTERNAL,
+            "dynamic batch size " + std::to_string(total_batch_size) +
+                " for '" + name_ + "', max allowed is " +
+                std::to_string(max_batch_size_)),
+        true /* release_requests */);
     return;
   }
 
@@ -526,21 +534,22 @@ CustomBackend::Context::Run(
 #endif  // TRTIS_ENABLE_STATS
 
   // If the custom execute function returns an error then it did not
-  // send any responses and so send an error response for each
-  // request.
+  // send any responses and so send an error response and releasee
+  // each request.
   if (err != 0) {
-    InferenceRequest::RespondWithError(
+    InferenceRequest::RespondIfError(
         requests,
         Status(
             Status::Code::INTERNAL, "execute error for '" + name_ + "': (" +
                                         std::to_string(err) + ") " +
-                                        LibraryErrorString(err)));
+                                        LibraryErrorString(err)),
+        true /* release_requests */);
     return;
   }
 
   // Send the response for each custom payload and release the request
-  // as we are done with it. If a payload has an error then send error
-  // response.
+  // as we are done with it. If a payload has an error then send an
+  // error response.
   for (size_t i = 0; i < custom_payloads.size(); ++i) {
     if (custom_payloads[i].error_code == 0) {
       GetInputOutputContext* ocontext = static_cast<GetInputOutputContext*>(
@@ -552,9 +561,8 @@ CustomBackend::Context::Run(
             InferenceResponse::Send(std::move(ocontext->response_)),
             "failed to send custom backend response");
       }
-      InferenceRequest::Release(std::move(requests[i]));
     } else {
-      InferenceRequest::RespondWithError(
+      InferenceRequest::RespondIfError(
           requests[i],
           Status(
               Status::Code::INTERNAL,
@@ -562,6 +570,8 @@ CustomBackend::Context::Run(
                   std::to_string(custom_payloads[i].error_code) + ") " +
                   LibraryErrorString(custom_payloads[i].error_code)));
     }
+
+    InferenceRequest::Release(std::move(requests[i]));
   }
 }
 
