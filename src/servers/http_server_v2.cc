@@ -370,8 +370,8 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
   void HandleModelStats(
-      evhtp_request_t* req, const std::string& model_name,
-      const std::string& model_version_str);
+      evhtp_request_t* req, const std::string& model_name = "",
+      const std::string& model_version_str = "");
   void HandleRepositoryIndex(
       evhtp_request_t* req, const std::string& repository_name);
   void HandleRepositoryControl(
@@ -865,6 +865,12 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
   LOG_VERBOSE(1) << "HTTP V2 request: " << req->method << " "
                  << req->uri->path->full;
 
+  if (std::string(req->uri->path->full) == "/v2/models/stats") {
+    // model statistics
+    HandleModelStats(req);
+    return;
+  }
+
   std::string model_name, version, kind;
   if (RE2::FullMatch(
           std::string(req->uri->path->full), model_regex_, &model_name,
@@ -884,6 +890,7 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
     } else if (kind == "stats") {
       // model statistics
       HandleModelStats(req, model_name, version);
+      return;
     } else if (kind == "") {
       // model metadata
       HandleModelMetadata(req, model_name, version);
@@ -1136,11 +1143,6 @@ HTTPAPIServerV2::HandleModelStats(
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  if (model_name.empty()) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
   }
 

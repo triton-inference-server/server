@@ -696,11 +696,14 @@ InferenceServerHttpClient::ModelInferenceStatistics(
 {
   Error err;
 
-  std::string request_uri(url_ + "/v2/models/" + model_name);
-  if (!model_version.empty()) {
-    request_uri = request_uri + "/versions/" + model_version;
+  std::string request_uri(url_ + "/v2/models");
+  if (!model_name.empty()) {
+    request_uri += "/" + model_name;
   }
-  request_uri = request_uri + "/stats";
+  if (!model_version.empty()) {
+    request_uri += "/versions/" + model_version;
+  }
+  request_uri += "/stats";
 
   long http_code;
   err = Get(request_uri, headers, query_params, infer_stat, &http_code);

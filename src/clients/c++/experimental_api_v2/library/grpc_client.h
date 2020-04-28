@@ -166,7 +166,9 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// specified model name and version.
   /// \param infer_stat The inference statistics of requested model name and
   /// version.
-  /// \param model_name The name of the model to get inference statistics.
+  /// \param model_name The name of the model to get inference statistics. The
+  /// default value is an empty string which means statistics of all models will
+  /// be returned in the response.
   /// \param model_version The version of the model to get inference statistics.
   /// The default value is an empty string which means then the server will
   /// choose a version based on the model and internal policy.
@@ -174,7 +176,7 @@ class InferenceServerGrpcClient : public InferenceServerClient {
   /// in the metadata of gRPC request.
   /// \return Error object indicating success or failure of the request.
   Error ModelInferenceStatistics(
-      ModelStatisticsResponse* infer_stat, const std::string& model_name,
+      ModelStatisticsResponse* infer_stat, const std::string& model_name = "",
       const std::string& model_version = "",
       const Headers& headers = Headers());
 

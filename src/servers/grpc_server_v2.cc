@@ -729,38 +729,40 @@ CommonHandler::SetUpAllRequests()
     }
 
     if (err == nullptr) {
-      for (const auto& version_stats :
-           model_stats_json["version_stats"].GetArray()) {
-        const auto& infer_stats_json = version_stats["stats"]["inference"];
-        InferStatistics infer_stats;
-        infer_stats.mutable_success()->set_count(
-            infer_stats_json["success"]["count"].GetInt());
-        infer_stats.mutable_success()->set_ns(
-            infer_stats_json["success"]["ns"].GetInt());
-        infer_stats.mutable_fail()->set_count(
-            infer_stats_json["fail"]["count"].GetInt());
-        infer_stats.mutable_fail()->set_ns(
-            infer_stats_json["fail"]["ns"].GetInt());
-        infer_stats.mutable_queue()->set_count(
-            infer_stats_json["queue"]["count"].GetInt());
-        infer_stats.mutable_queue()->set_ns(
-            infer_stats_json["queue"]["ns"].GetInt());
-        infer_stats.mutable_compute_input()->set_count(
-            infer_stats_json["compute_input"]["count"].GetInt());
-        infer_stats.mutable_compute_input()->set_ns(
-            infer_stats_json["compute_input"]["ns"].GetInt());
-        infer_stats.mutable_compute_infer()->set_count(
-            infer_stats_json["compute_infer"]["count"].GetInt());
-        infer_stats.mutable_compute_infer()->set_ns(
-            infer_stats_json["compute_infer"]["ns"].GetInt());
-        infer_stats.mutable_compute_output()->set_count(
-            infer_stats_json["compute_output"]["count"].GetInt());
-        infer_stats.mutable_compute_output()->set_ns(
-            infer_stats_json["compute_output"]["ns"].GetInt());
+      for (const auto& model_stat :
+           model_stats_json["model_stats"].GetArray()) {
+        auto statistics = response->add_model_stats();
 
-        // Add the statistics to the response
-        (*response->mutable_inference())[version_stats["version"].GetString()] =
-            infer_stats;
+        const auto& infer_stats_json = model_stat["inference_stats"];
+        statistics->set_name(model_stat["name"].GetString());
+        statistics->set_version(model_stat["version"].GetString());
+        statistics->mutable_inference_stats()->mutable_success()->set_count(
+            infer_stats_json["success"]["count"].GetInt());
+        statistics->mutable_inference_stats()->mutable_success()->set_ns(
+            infer_stats_json["success"]["ns"].GetInt());
+        statistics->mutable_inference_stats()->mutable_fail()->set_count(
+            infer_stats_json["fail"]["count"].GetInt());
+        statistics->mutable_inference_stats()->mutable_fail()->set_ns(
+            infer_stats_json["fail"]["ns"].GetInt());
+        statistics->mutable_inference_stats()->mutable_queue()->set_count(
+            infer_stats_json["queue"]["count"].GetInt());
+        statistics->mutable_inference_stats()->mutable_queue()->set_ns(
+            infer_stats_json["queue"]["ns"].GetInt());
+        statistics->mutable_inference_stats()
+            ->mutable_compute_input()
+            ->set_count(infer_stats_json["compute_input"]["count"].GetInt());
+        statistics->mutable_inference_stats()->mutable_compute_input()->set_ns(
+            infer_stats_json["compute_input"]["ns"].GetInt());
+        statistics->mutable_inference_stats()
+            ->mutable_compute_infer()
+            ->set_count(infer_stats_json["compute_infer"]["count"].GetInt());
+        statistics->mutable_inference_stats()->mutable_compute_infer()->set_ns(
+            infer_stats_json["compute_infer"]["ns"].GetInt());
+        statistics->mutable_inference_stats()
+            ->mutable_compute_output()
+            ->set_count(infer_stats_json["compute_output"]["count"].GetInt());
+        statistics->mutable_inference_stats()->mutable_compute_output()->set_ns(
+            infer_stats_json["compute_output"]["ns"].GetInt());
       }
     }
 #else
