@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     statistics = triton_client.get_inference_statistics(model_name=model_name)
     print(statistics)
-    if len(statistics.inference) != 1:
+    if len(statistics.model_stats) != 1:
         print("FAILED: Inference Statistics")
         sys.exit(1)
 

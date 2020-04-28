@@ -1183,96 +1183,104 @@ TRITONSERVER_ServerModelStatistics(
 
   ni::ServerStatus server_status;
   RETURN_IF_STATUS_ERROR(lserver->GetStatus(&server_status, model_name_string));
-  const auto& model_status =
-      server_status.model_status().find(model_name_string)->second;
-
-  if ((model_version_int != -1) &&
-      (model_status.version_status().find(model_version_int) ==
-       model_status.version_status().end())) {
+  if ((!model_name_string.empty()) &&
+      (server_status.model_status().find(model_name_string) ==
+       server_status.model_status().end())) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
-        "requested model version is not found for the model");
+        std::string("requested model " + model_name_string + " not found")
+            .c_str());
   }
+
 
   rapidjson::Document metadata;
   auto& allocator = metadata.GetAllocator();
   metadata.SetObject();
 
-  rapidjson::Value versions(rapidjson::kArrayType);
-  for (const auto& v : model_status.version_status()) {
-    if ((model_version_int == -1) || (v.first == model_version_int)) {
-      rapidjson::Value inference_stats(rapidjson::kObjectType);
-      const auto& ir = v.second.infer_stats().find(1);
-      if (ir == v.second.infer_stats().end()) {
-        static nvidia::inferenceserver::StatDuration zero_duration;
-        rapidjson::Value duration_stats;
-        SetDurationStats(zero_duration, allocator, &duration_stats);
-        // Explicit use rapidjson's copy semantics to avoid calling
-        // SetDurationStats()
-        inference_stats.AddMember(
-            "success", rapidjson::Value(duration_stats, allocator), allocator);
-        inference_stats.AddMember(
-            "fail", rapidjson::Value(duration_stats, allocator), allocator);
-        ;
-        inference_stats.AddMember(
-            "queue", rapidjson::Value(duration_stats, allocator), allocator);
-        ;
-        inference_stats.AddMember(
-            "compute_input", rapidjson::Value(duration_stats, allocator),
-            allocator);
-        ;
-        inference_stats.AddMember(
-            "compute_infer", rapidjson::Value(duration_stats, allocator),
-            allocator);
-        ;
-        inference_stats.AddMember(
-            "compute_output", rapidjson::Value(duration_stats, allocator),
-            allocator);
-        ;
-      } else {
-        rapidjson::Value duration_stats;
-        SetDurationStats(ir->second.success(), allocator, &duration_stats);
-        inference_stats.AddMember("success", duration_stats, allocator);
-
-        SetDurationStats(ir->second.failed(), allocator, &duration_stats);
-        inference_stats.AddMember("fail", duration_stats, allocator);
-        ;
-
-        SetDurationStats(ir->second.queue(), allocator, &duration_stats);
-        inference_stats.AddMember("queue", duration_stats, allocator);
-        ;
-
-        SetDurationStats(
-            ir->second.compute_input(), allocator, &duration_stats);
-        inference_stats.AddMember("compute_input", duration_stats, allocator);
-        ;
-
-        SetDurationStats(
-            ir->second.compute_infer(), allocator, &duration_stats);
-        inference_stats.AddMember("compute_infer", duration_stats, allocator);
-        ;
-
-        SetDurationStats(
-            ir->second.compute_output(), allocator, &duration_stats);
-        inference_stats.AddMember("compute_output", duration_stats, allocator);
-        ;
+  rapidjson::Value model_stats_json(rapidjson::kArrayType);
+  for (const auto& m : server_status.model_status()) {
+    std::cout << m.first << std::endl;
+    if (model_name_string.empty() ||
+        (m.first.compare(model_name_string) == 0)) {
+      if ((model_version_int != -1) &&
+          (m.second.version_status().find(model_version_int) ==
+           m.second.version_status().end())) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "requested model version is not found for the model");
       }
-      rapidjson::Value stats(rapidjson::kObjectType);
-      stats.AddMember("inference", inference_stats, allocator);
 
-      rapidjson::Value version_stats(rapidjson::kObjectType);
-      auto version_str = std::to_string(v.first);
-      version_stats.AddMember(
-          "version", rapidjson::Value(version_str.c_str(), allocator).Move(),
-          allocator);
-      version_stats.AddMember("stats", stats, allocator);
-      versions.PushBack(version_stats, allocator);
-      if (model_version_int != -1) {
-        break;
+      rapidjson::Value model_stat(rapidjson::kObjectType);
+      for (const auto& v : m.second.version_status()) {
+        if ((model_version_int == -1) || (v.first == model_version_int)) {
+          rapidjson::Value inference_stats(rapidjson::kObjectType);
+          const auto& ir = v.second.infer_stats().find(1);
+          if (ir == v.second.infer_stats().end()) {
+            static nvidia::inferenceserver::StatDuration zero_duration;
+            rapidjson::Value duration_stats;
+            SetDurationStats(zero_duration, allocator, &duration_stats);
+            // Explicit use rapidjson's copy semantics to avoid calling
+            // SetDurationStats()
+            inference_stats.AddMember(
+                "success", rapidjson::Value(duration_stats, allocator),
+                allocator);
+            inference_stats.AddMember(
+                "fail", rapidjson::Value(duration_stats, allocator), allocator);
+            inference_stats.AddMember(
+                "queue", rapidjson::Value(duration_stats, allocator),
+                allocator);
+            inference_stats.AddMember(
+                "compute_input", rapidjson::Value(duration_stats, allocator),
+                allocator);
+            inference_stats.AddMember(
+                "compute_infer", rapidjson::Value(duration_stats, allocator),
+                allocator);
+            inference_stats.AddMember(
+                "compute_output", rapidjson::Value(duration_stats, allocator),
+                allocator);
+          } else {
+            rapidjson::Value duration_stats;
+            SetDurationStats(ir->second.success(), allocator, &duration_stats);
+            inference_stats.AddMember("success", duration_stats, allocator);
+
+            SetDurationStats(ir->second.failed(), allocator, &duration_stats);
+            inference_stats.AddMember("fail", duration_stats, allocator);
+
+            SetDurationStats(ir->second.queue(), allocator, &duration_stats);
+            inference_stats.AddMember("queue", duration_stats, allocator);
+
+            SetDurationStats(
+                ir->second.compute_input(), allocator, &duration_stats);
+            inference_stats.AddMember(
+                "compute_input", duration_stats, allocator);
+
+            SetDurationStats(
+                ir->second.compute_infer(), allocator, &duration_stats);
+            inference_stats.AddMember(
+                "compute_infer", duration_stats, allocator);
+
+            SetDurationStats(
+                ir->second.compute_output(), allocator, &duration_stats);
+            inference_stats.AddMember(
+                "compute_output", duration_stats, allocator);
+          }
+          rapidjson::Value model_stat(rapidjson::kObjectType);
+          rapidjson::Value version_stats(rapidjson::kObjectType);
+          auto version_str = std::to_string(v.first);
+          model_stat.AddMember(
+              "name", rapidjson::Value(m.first.c_str(), allocator).Move(),
+              allocator);
+          model_stat.AddMember(
+              "version",
+              rapidjson::Value(version_str.c_str(), allocator).Move(),
+              allocator);
+          model_stat.AddMember("inference_stats", inference_stats, allocator);
+          model_stats_json.PushBack(model_stat, allocator);
+        }
       }
     }
   }
-  metadata.AddMember("version_stats", versions, allocator);
+  metadata.AddMember("model_stats", model_stats_json, allocator);
   *model_stats = reinterpret_cast<TRITONSERVER_Message*>(
       new TritonServerMessage(metadata));
   return nullptr;  // success
