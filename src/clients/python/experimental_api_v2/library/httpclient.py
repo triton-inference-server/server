@@ -97,8 +97,25 @@ def _get_inference_request(inputs, request_id, outputs, sequence_id,
 
     if parameters:
         infer_request['parameters'] = parameters
+    
+    request_body = json.dumps(infer_request)
+    json_size = len(request_body)
+    binary_data = None
+    for input_tensor in inputs:
+        raw_data = input_tensor._get_binary_data()
+        if raw_data is not None:
+            if binary_data is not None:
+                binary_data += raw_data
+            else:
+                binary_data = raw_data
 
-    return infer_request
+    if binary_data is not None:
+        request_body = struct.pack(
+            '{}s{}s'.format(len(request_body), len(binary_data)),
+            request_body.encode(), binary_data)
+        return request_body, json_size
+
+    return request_body, None
 
 
 class InferenceServerClient:
@@ -992,7 +1009,7 @@ class InferenceServerClient:
             If server fails to perform inference.
         """
 
-        infer_request = _get_inference_request(inputs=inputs,
+        request_body, json_size = _get_inference_request(inputs=inputs,
                                                request_id=request_id,
                                                outputs=outputs,
                                                sequence_id=sequence_id,
@@ -1001,24 +1018,10 @@ class InferenceServerClient:
                                                priority=priority,
                                                timeout=timeout)
 
-        request_body = json.dumps(infer_request)
-        json_size = len(request_body)
-        binary_data = None
-        for input_tensor in inputs:
-            raw_data = input_tensor._get_binary_data()
-            if raw_data is not None:
-                if binary_data is not None:
-                    binary_data += raw_data
-                else:
-                    binary_data = raw_data
-
-        if binary_data is not None:
+        if json_size is not None:
             if headers is None:
                 headers = {}
             headers["Inference-Header-Content-Length"] = json_size
-            request_body = struct.pack(
-                '{}s{}s'.format(len(request_body), len(binary_data)),
-                request_body.encode(), binary_data)
 
         if model_version != "":
             request_uri = "v2/models/{}/versions/{}/infer".format(
@@ -1122,7 +1125,7 @@ class InferenceServerClient:
             callback(result=InferResult(response, self._verbose),
                      error=_get_error(response))
 
-        infer_request = _get_inference_request(inputs=inputs,
+        request_body, json_size = _get_inference_request(inputs=inputs,
                                                request_id=request_id,
                                                outputs=outputs,
                                                sequence_id=sequence_id,
@@ -1131,16 +1134,7 @@ class InferenceServerClient:
                                                priority=priority,
                                                timeout=timeout)
 
-        request_body = json.dumps(infer_request)
-        json_size = len(request_body)
-        has_binary_data = False
-        for input_tensor in inputs:
-            raw_data = input_tensor._get_binary_data()
-            if raw_data is not None:
-                request_body = request_body + raw_data.decode()
-                has_binary_data = True
-
-        if has_binary_data:
+        if json_size is not None:
             if headers is None:
                 headers = {}
             headers["Inference-Header-Content-Length"] = json_size
