@@ -29,6 +29,7 @@
 
 #include "src/core/constants.h"
 
+#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <cstring>
@@ -40,7 +41,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <algorithm>
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
