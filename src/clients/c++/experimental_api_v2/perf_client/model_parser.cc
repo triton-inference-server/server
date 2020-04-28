@@ -1,0 +1,264 @@
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+#include "src/clients/c++/experimental_api_v2/perf_client/model_parser.h"
+
+nic::Error
+ModelParser::Init(
+    const ni::ModelMetadataResponse& metadata, const ni::ModelConfig& config,
+    const std::string& model_version, const nic::Headers& http_headers,
+    std::unique_ptr<nic::InferenceServerGrpcClient> client)
+{
+  // Get the scheduler type for the model
+  if (config.has_ensemble_scheduling()) {
+    bool is_sequential = false;
+    RETURN_IF_ERROR(GetEnsembleSchedulerType(
+        config, model_version, http_headers, std::move(client),
+        &is_sequential));
+    if (is_sequential) {
+      scheduler_type_ = ENSEMBLE_SEQUENCE;
+    } else {
+      scheduler_type_ = ENSEMBLE;
+    }
+  } else if (config.has_sequence_batching()) {
+    scheduler_type_ = SEQUENCE;
+  } else if (config.has_dynamic_batching()) {
+    scheduler_type_ = DYNAMIC;
+  } else {
+    scheduler_type_ = NONE;
+  }
+
+  max_batch_size_ = config.max_batch_size();
+
+  // Get the information about inputs from metadata
+  for (const auto& input : metadata.inputs()) {
+    auto it = inputs_->emplace(input.name(), ModelTensor()).first;
+    it->second.name_ = input.name();
+    it->second.datatype_ = input.datatype();
+    for (const auto dim : input.shape()) {
+      it->second.shape_.push_back(dim);
+    }
+  }
+
+  // Check whether the tensor is shape tensor or not from config.
+  for (const auto& input_config : config.input()) {
+    const auto& itr = inputs_->find(input_config.name());
+    if (itr == inputs_->end()) {
+      return nic::Error(
+          "no metadata found for input tensor " + input_config.name());
+    }
+    itr->second.is_shape_tensor_ = input_config.is_shape_tensor();
+  }
+
+  // Get the information about outputs from metadata
+  for (const auto& output : metadata.outputs()) {
+    auto it = outputs_->emplace(output.name(), ModelTensor()).first;
+    it->second.name_ = output.name();
+    it->second.datatype_ = output.datatype();
+    for (const auto dim : output.shape()) {
+      it->second.shape_.push_back(dim);
+    }
+  }
+
+  // Check whether the tensor is shape tensor or not from config.
+  for (const auto& output_config : config.output()) {
+    const auto& itr = outputs_->find(output_config.name());
+    if (itr == outputs_->end()) {
+      return nic::Error(
+          "no metadata found for output tensor " + output_config.name());
+    }
+    itr->second.is_shape_tensor_ = output_config.is_shape_tensor();
+  }
+  return nic::Error::Success;
+}
+
+
+nic::Error
+ModelParser::GetEnsembleSchedulerType(
+    const ni::ModelConfig& config, const std::string& model_version,
+    const nic::Headers& http_headers,
+    std::unique_ptr<nic::InferenceServerGrpcClient> client, bool* is_sequential)
+{
+  if (config.has_sequence_batching()) {
+    *is_sequential = true;
+  }
+
+  if (config.platform() == "ensemble") {
+    for (const auto& step : config.ensemble_scheduling().step()) {
+      ni::ModelConfigResponse model_config;
+      std::string step_version(std::to_string(step.model_version()));
+      composing_models_map_->emplace(
+          std::make_pair(config.name(), model_version),
+          std::make_pair(step.model_name(), step_version));
+      RETURN_IF_ERROR(client->ModelConfig(
+          &model_config, step.model_name(), step_version, http_headers));
+      RETURN_IF_ERROR(GetEnsembleSchedulerType(
+          model_config.config(), std::to_string(step.model_version()),
+          http_headers, std::move(client), is_sequential));
+    }
+  }
+
+  return nic::Error::Success;
+}
+
+nic::Error
+ModelParser::Init(
+    const rapidjson::Document& metadata, const rapidjson::Document& config,
+    const std::string& model_version, const nic::Headers& http_headers,
+    std::unique_ptr<nic::InferenceServerHttpClient> client)
+{
+  // Get the scheduler type for the model
+  scheduler_type_ = NONE;
+  const auto& ensemble_itr = config.FindMember("ensembleScheduling");
+  if (ensemble_itr != config.MemberEnd()) {
+    bool is_sequential = false;
+    RETURN_IF_ERROR(GetEnsembleSchedulerType(
+        config, model_version, http_headers, std::move(client),
+        &is_sequential));
+    if (is_sequential) {
+      scheduler_type_ = ENSEMBLE_SEQUENCE;
+    } else {
+      scheduler_type_ = ENSEMBLE;
+    }
+  } else {
+    const auto& sequence_itr = config.FindMember("sequenceBatching");
+    if (sequence_itr != config.MemberEnd()) {
+      scheduler_type_ = SEQUENCE;
+    } else {
+      const auto& dynamic_itr = config.FindMember("dynamicBatching");
+      if (dynamic_itr != config.MemberEnd()) {
+        scheduler_type_ = DYNAMIC;
+      }
+    }
+  }
+
+  max_batch_size_ = 0;
+  const auto bs_itr = config.FindMember("maxBatchSize");
+  if (bs_itr != config.MemberEnd()) {
+    max_batch_size_ = bs_itr->value.GetInt();
+  }
+
+
+  // Get the information about inputs from metadata
+  const auto inputs_itr = metadata.FindMember("inputs");
+  if (inputs_itr != metadata.MemberEnd()) {
+    for (const auto& input : inputs_itr->value.GetArray()) {
+      auto it =
+          inputs_->emplace(input["name"].GetString(), ModelTensor()).first;
+      it->second.name_ = input["name"].GetString();
+      it->second.datatype_ = input["datatype"].GetString();
+      for (const auto& dim : input["shape"].GetArray()) {
+        it->second.shape_.push_back(dim.GetInt());
+      }
+    }
+  }
+
+  // Check whether the tensor is shape tensor or not from config.
+  const auto inputs_config_itr = config.FindMember("input");
+  if (inputs_config_itr != config.MemberEnd()) {
+    for (const auto& input_config : inputs_config_itr->value.GetArray()) {
+      const auto name = std::string(
+          input_config["name"].GetString(),
+          input_config["name"].GetStringLength());
+      auto it = inputs_->find(name);
+      if (it == inputs_->end()) {
+        return nic::Error("no metadata found for input tensor " + name);
+      }
+      const auto& shape_tensor_itr = input_config.FindMember("is_shape_tensor");
+      if (shape_tensor_itr != input_config.MemberEnd()) {
+        it->second.is_shape_tensor_ = shape_tensor_itr->value.GetBool();
+      }
+    }
+  }
+
+  // Get the information about outputs from metadata
+  const auto outputs_itr = metadata.FindMember("outputs");
+  if (outputs_itr != metadata.MemberEnd()) {
+    for (const auto& output : outputs_itr->value.GetArray()) {
+      auto it =
+          outputs_->emplace(output["name"].GetString(), ModelTensor()).first;
+      it->second.name_ = output["name"].GetString();
+      it->second.datatype_ = output["datatype"].GetString();
+      for (const auto& dim : output["shape"].GetArray()) {
+        it->second.shape_.push_back(dim.GetInt());
+      }
+    }
+  }
+
+  // Check whether the tensor is shape tensor or not from config.
+  const auto output_config_itr = config.FindMember("output");
+  if (output_config_itr != config.MemberEnd()) {
+    for (const auto& output_config : output_config_itr->value.GetArray()) {
+      const auto name = std::string(
+          output_config["name"].GetString(),
+          output_config["name"].GetStringLength());
+      auto itr = outputs_->find(name);
+      if (itr == outputs_->end()) {
+        return nic::Error("no metadata found for output tensor " + name);
+      }
+      const auto& shape_tensor_itr =
+          output_config.FindMember("is_shape_tensor");
+      if (shape_tensor_itr != output_config.MemberEnd()) {
+        itr->second.is_shape_tensor_ = shape_tensor_itr->value.GetBool();
+      }
+    }
+  }
+  return nic::Error::Success;
+}
+
+
+nic::Error
+ModelParser::GetEnsembleSchedulerType(
+    const rapidjson::Document& config, const std::string& model_version,
+    const nic::Headers& http_headers,
+    std::unique_ptr<nic::InferenceServerHttpClient> client, bool* is_sequential)
+{
+  const auto& sequence_itr = config.FindMember("sequenceBatching");
+  if (sequence_itr != config.MemberEnd()) {
+    *is_sequential = true;
+  }
+
+  if (std::string(config["platform"].GetString()).compare("ensemble") == 0) {
+    const auto step_itr = config["ensembleScheduling"].FindMember("step");
+    for (const auto& step : step_itr->value.GetArray()) {
+      composing_models_map_->emplace(
+          std::make_pair(
+              config["name"].GetString(), config["version"].GetString()),
+          std::make_pair(
+              step["model_name"].GetString(),
+              step["model_version"].GetString()));
+      rapidjson::Document model_config;
+      RETURN_IF_ERROR(client->ModelConfig(
+          &model_config, step["model_name"].GetString(),
+          step["model_version"].GetString(), http_headers));
+      RETURN_IF_ERROR(GetEnsembleSchedulerType(
+          model_config, std::to_string(step["model_version"].GetInt()),
+          http_headers, std::move(client), is_sequential));
+    }
+  }
+
+  return nic::Error::Success;
+}
