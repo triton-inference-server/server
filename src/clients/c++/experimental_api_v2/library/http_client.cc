@@ -32,8 +32,12 @@
 #include <queue>
 
 extern "C" {
-#include <b64/cencode.h>
+#include <src/clients/c++/experimental_api_v2/library/cencode.h>
 }
+
+#ifdef _WIN32
+#define strncasecmp(x, y, z) _strnicmp(x, y, z)
+#endif  //_WIN32
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
@@ -210,7 +214,7 @@ HttpInferRequest::GetNextInput(uint8_t* buf, size_t size, size_t* input_bytes)
   }
 
   while (!data_buffers_.empty() && size > 0) {
-    const size_t csz = std::min(data_buffers_.front().second, size);
+    const size_t csz = (std::min)(data_buffers_.front().second, size);
     if (csz > 0) {
       const uint8_t* input_ptr = data_buffers_.front().first;
       std::copy(input_ptr, input_ptr + csz, buf);
