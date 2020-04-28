@@ -472,7 +472,7 @@ class InferenceServerClient:
             raise_error_grpc(rpc_error)
 
     def get_inference_statistics(self,
-                                 model_name,
+                                 model_name="",
                                  model_version="",
                                  headers=None,
                                  as_json=False):
@@ -482,7 +482,9 @@ class InferenceServerClient:
         Parameters
         ----------
         model_name : str
-            The name of the model to be unloaded.
+            The name of the model to get statistics. The default value is
+            an empty string, which means statistics of all models will
+            be returned.
         model_version: str
             The version of the model to get inference statistics. The
             default value is an empty string which means then the server

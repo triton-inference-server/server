@@ -567,7 +567,7 @@ class InferenceServerClient:
             print("Loaded model '{}'".format(model_name))
 
     def get_inference_statistics(self,
-                                 model_name,
+                                 model_name="",
                                  model_version="",
                                  headers=None,
                                  query_params=None):
@@ -577,7 +577,9 @@ class InferenceServerClient:
         Parameters
         ----------
         model_name : str
-            The name of the model to be unloaded.
+            The name of the model to get statistics. The default value is
+            an empty string, which means statistics of all models will
+            be returned.
         model_version: str
             The version of the model to get inference statistics. The
             default value is an empty string which means then the server
@@ -601,11 +603,14 @@ class InferenceServerClient:
 
         """
 
-        if model_version != "":
-            request_uri = "v2/models/{}/versions/{}/stats".format(
-                quote(model_name), model_version)
+        if model_name != "":
+            if model_version != "":
+                request_uri = "v2/models/{}/versions/{}/stats".format(
+                    quote(model_name), model_version)
+            else:
+                request_uri = "v2/models/{}/stats".format(quote(model_name))
         else:
-            request_uri = "v2/models/{}/stats".format(quote(model_name))
+            request_uri = "v2/models/stats"
 
         response = self._get(request_uri=request_uri,
                              headers=headers,

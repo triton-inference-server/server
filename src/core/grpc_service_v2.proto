@@ -891,17 +891,45 @@ message InferStatistics
 }
 
 //@@
+//@@.. cpp:var:: message ModelStatistics
+//@@
+//@@   Statistics for a specific model and version.
+//@@
+message ModelStatistics
+{
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the model. If not given returns statistics for all
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: string version
+  //@@
+  //@@     The version of the model.
+  //@@
+  string version = 2;
+
+  //@@  .. cpp:var:: InferStatistics inference_stats
+  //@@
+  //@@     The aggregate statistics for the model/version. So, for example,
+  //@@     inference_stats:success indicates the number of successful inference
+  //@@     requests for the model.
+  //@@
+  InferStatistics inference_stats = 3;
+}
+
+//@@
 //@@.. cpp:var:: message ModelStatisticsResponse
 //@@
 //@@   Response message for ModelStatistics.
 //@@
 message ModelStatisticsResponse
 {
-  //@@  .. cpp:var:: map<string, InferStatistics> inference
+  //@@  .. cpp:var:: ModelStatistics model_stats (repeated)
   //@@
-  //@@     Map from version to inference statistics for that version.
+  //@@     // Statistics for each requested model.
   //@@
-  map<string, InferStatistics> inference = 1;
+  repeated ModelStatistics model_stats = 1;
 }
 
 //@@

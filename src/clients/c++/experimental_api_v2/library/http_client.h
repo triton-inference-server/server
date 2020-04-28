@@ -198,7 +198,9 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// specified model name and version.
   /// \param infer_stat Returns the inference statistics of requested model name
   /// and version as rapidJSON DOM object.
-  /// \param model_name The name of the model to get inference statistics.
+  /// \param model_name The name of the model to get inference statistics. The
+  /// default value is an empty string which means statistics of all models will
+  /// be returned in the response.
   /// \param model_version The version of the model to get inference statistics.
   /// The default value is an empty string which means then the server will
   /// choose a version based on the model and internal policy.
@@ -208,7 +210,7 @@ class InferenceServerHttpClient : public InferenceServerClient {
   /// included with URL query.
   /// \return Error object indicating success or failure of the request.
   Error ModelInferenceStatistics(
-      rapidjson::Document* infer_stat, const std::string& model_name,
+      rapidjson::Document* infer_stat, const std::string& model_name = "",
       const std::string& model_version = "", const Headers& headers = Headers(),
       const Parameters& query_params = Parameters());
 
