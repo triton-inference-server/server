@@ -439,12 +439,131 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
     return results
 
 
+# Perform inference using a "nop" model that expects some form or
+# zero-sized input/output tensor.
+def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes,
+               model_version=None, use_http=True, use_grpc=True,
+               use_http_json_tensors=True, use_streaming=True, shm_region_name_prefix=None,
+               use_system_shared_memory=False, use_cuda_shared_memory=False,
+               priority=0, timeout_us=0):
+    tester.assertTrue(use_http or use_grpc or use_http_json_tensors or use_streaming)
+    configs = []
+    if use_http:
+        configs.append(("localhost:8000", "http", False, True))
+    if use_http_json_tensors and (tensor_dtype != np.float16):
+        configs.append(("localhost:8000", "http", False, False))
+    if use_grpc:
+        configs.append(("localhost:8001", "grpc", False, False))
+    if use_streaming:
+        configs.append(("localhost:8001", "grpc", True, False))
+    tester.assertEqual(len(input_shapes), len(output_shapes))
+    io_cnt = len(input_shapes)
+
+    if shm_region_name_prefix is None:
+        shm_region_name_prefix = ["input", "output"]
+
+    input_dict = {}
+    output_dict = {}
+    expected_dict = {}
+    shm_ip_handles = list()
+    shm_op_handles = list()
+    shm_client = httpclient.InferenceServerClient("localhost:8000")
+
+    for io_num in range(io_cnt):
+        if pf == "libtorch" or pf == "libtorch_nobatch":
+            input_name = "INPUT__{}".format(io_num)
+            output_name = "OUTPUT__{}".format(io_num)
+        else:
+            input_name = "INPUT{}".format(io_num)
+            output_name = "OUTPUT{}".format(io_num)
+
+        input_list = list()
+        expected_list = list()
+
+        input_shape = [batch_size,] + input_shapes[io_num]
+        output_shape = [batch_size,] + output_shapes[io_num]
+
+        rtensor_dtype = _range_repr_dtype(tensor_dtype)
+        if (rtensor_dtype != np.bool):
+            input_array = np.random.randint(low=np.iinfo(rtensor_dtype).min,
+                                    high=np.iinfo(rtensor_dtype).max,
+                                    size=input_shape, dtype=rtensor_dtype)
+        else:
+            input_array = np.random.choice(a=[False, True], size=input_shape)
+        if tensor_dtype != np.object:
+            input_array = input_array.astype(tensor_dtype)
+            expected_array = np.ndarray.copy(input_array)
+        else:
+            expected_array = np.array([unicode(str(x), encoding='utf-8')
+                            for x in input_array.flatten()], dtype=object)
+            input_array = np.array([str(x) for x in input_array.flatten()],
+                            dtype=object).reshape(input_array.shape)
+
+        expected_array = expected_array.reshape(output_shapes[io_num])
+
+        # input_list.append(input_array)
+        # expected_list.append(expected_array)
+        expected_dict[output_name] = [x for x in expected_array]
+
+        input_byte_size = tu.shape_element_count(input_shape) *\
+                            np.dtype(tensor_dtype).itemsize
+        output_byte_size = tu.shape_element_count(output_shape) *\
+                            np.dtype(tensor_dtype).itemsize
+
+        # create and register shared memory region for inputs and outputs
+        shm_io_handles = su.create_register_set_either_shm_region([shm_region_name_prefix[0]+str(io_num),
+                                                shm_region_name_prefix[1]+str(io_num)], input_array,
+                                                input_byte_size, output_byte_size, shm_client,
+                                                use_system_shared_memory, use_cuda_shared_memory)
+        if len(shm_io_handles) != 0:
+            shm_ip_handles.append(shm_io_handles[0])
+            shm_op_handles.append(shm_io_handles[1])
+            input_dict[input_name] = (shm_ip_handles[io_num], input_shapes)
+            output_dict[output_name] = (InferContext.ResultFormat.RAW, shm_op_handles[io_num])
+        else:
+            input_dict[input_name] = input_list
+            output_dict[output_name] = InferContext.ResultFormat.RAW
+
+    # Run inference and check results for each config
+    for config in configs:
+        model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
+
+        ctx = InferContext(config[0], config[1], model_name, model_version,
+                           correlation_id=0, streaming=config[2],
+                           verbose=True)
+        results = ctx.run(input_dict, output_dict, batch_size,
+                          priority=priority, timeout_us=timeout_us)
+
+        tester.assertEqual(ctx.get_last_request_model_name(), model_name)
+        if model_version is not None:
+            tester.assertEqual(ctx.get_last_request_model_version(), model_version)
+
+        tester.assertEqual(len(results), io_cnt)
+        for (result_name, result_val) in iteritems(results):
+            tester.assertTrue(result_name in output_dict)
+            tester.assertTrue(result_name in expected_dict)
+            for b in range(batch_size):
+                expected = expected_dict[result_name][b]
+                tester.assertEqual(result_val[b].shape, expected.shape)
+                tester.assertTrue(np.array_equal(result_val[b], expected),
+                                  "{}, {}, slot {}, expected: {}, got {}".format(
+                                      model_name, result_name, b, expected, result_val[b]))
+
+    if len(shm_ip_handles) != 0:
+        for io_num in range(io_cnt):
+            shared_memory_ctx.unregister(shm_ip_handles[io_num])
+            shared_memory_ctx.unregister(shm_op_handles[io_num])
+            su.destroy_either_shm_region(shm_ip_handles[io_num], use_system_shared_memory, use_cuda_shared_memory)
+            su.destroy_either_shm_region(shm_op_handles[io_num], use_system_shared_memory, use_cuda_shared_memory)
+
+    return results
+
 
 # Perform inference on a model that takes a shape and a dummy tensors as inputs,
 # resize the dummy tensor with the provided values in the shape tensor and finally
 # return the shape of the resized tensor.
 def infer_shape_tensor(tester, pf, batch_size, tensor_dtype, input_shape_values, dummy_input_shapes,
-                       model_version=None, use_http=True, use_grpc=True,  use_http_json_tensors=True,
+                       model_version=None, use_http=True, use_grpc=True, use_http_json_tensors=True,
                        use_streaming=True, shm_suffix="", use_system_shared_memory=False,
                        use_cuda_shared_memory=False, priority=0, timeout_us=0):
     tester.assertTrue(
