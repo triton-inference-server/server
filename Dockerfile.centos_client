@@ -83,7 +83,6 @@ COPY qa/images/mug.jpg images/mug.jpg
 # be used to run the client examples.
 RUN python -m pip install --user --upgrade pip && \
     python -m pip install --upgrade --ignore-installed \
-            install/python/tensorrtserver*.whl \
             install/python/triton*.whl \
             numpy pillow
 
