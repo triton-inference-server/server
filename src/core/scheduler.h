@@ -65,16 +65,6 @@ class Scheduler {
       uint32_t runner_idx,
       std::vector<std::unique_ptr<InferenceRequest>>&& requests)>;
 
-  // The prototype for the shape-tensor peek function that can be
-  // called by the "standard" schedulers created based on a model's
-  // scheduling_choice settings. The peek function can be called to
-  // get the contents of a shape tensor. A non-OK error status
-  // indicates that the peek failed.
-  using StandardShapeTensorPeekFunc = std::function<Status(
-      uint32_t runner_idx, const InferenceRequest::Input& input,
-      const std::unique_ptr<InferenceRequest>& request,
-      std::vector<int64_t>* shape)>;
-
   // Enqueue a request with the scheduler. If Status::Success is returned
   // then the backend has taken ownership of the request object and so
   // 'request' will be nullptr. If non-success is returned then the
