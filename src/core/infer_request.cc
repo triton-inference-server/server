@@ -108,7 +108,7 @@ InferenceRequest::Run(std::unique_ptr<InferenceRequest>& request)
 }
 
 void
-InferenceRequest::RespondWithError(
+InferenceRequest::RespondIfError(
     std::unique_ptr<InferenceRequest>& request, const Status& status,
     const bool release_request)
 {
@@ -123,9 +123,8 @@ InferenceRequest::RespondWithError(
   LOG_STATUS_ERROR(
       request->response_factory_.CreateResponse(&response),
       "failed to create error response");
-  response->SetResponseStatus(status);
   LOG_STATUS_ERROR(
-      InferenceResponse::Send(std::move(response)),
+      InferenceResponse::SendWithStatus(std::move(response), status),
       "failed to send error response");
 
   // If releasing the request then invoke the release callback which
@@ -137,7 +136,7 @@ InferenceRequest::RespondWithError(
 }
 
 void
-InferenceRequest::RespondWithError(
+InferenceRequest::RespondIfError(
     std::vector<std::unique_ptr<InferenceRequest>>& requests,
     const Status& status, const bool release_requests)
 {
@@ -146,7 +145,7 @@ InferenceRequest::RespondWithError(
   }
 
   for (auto& request : requests) {
-    RespondWithError(request, status, release_requests);
+    RespondIfError(request, status, release_requests);
   }
 }
 

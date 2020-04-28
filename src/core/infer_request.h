@@ -358,23 +358,25 @@ class InferenceRequest {
   static Status Run(std::unique_ptr<InferenceRequest>& request);
 
   // Send an error response for this request. If 'status' is Success
-  // then no response is sent. If 'release_request' is true then the
+  // then no response is sent and the request is not released (even if
+  // 'release_request' is true). If 'release_request' is true then the
   // release callback is called for this request and ownership is
   // given to the callback. Thus, if 'release_request' is true
   // 'request' is returned as nullptr.
-  static void RespondWithError(
+  static void RespondIfError(
       std::unique_ptr<InferenceRequest>& request, const Status& status,
-      const bool release_request = true);
+      const bool release_request = false);
 
   // Send an error response to a set of 'requests'. If 'status' is
-  // Success then no responses are sent. If 'release_request' is true
-  // then the release callback is called for each request, and the
-  // request ownership is given to the callback. Thus, if
-  // 'release_request' is true 'requests' is returned with all
-  // nullptrs.
-  static void RespondWithError(
+  // Success then no responses are sent and the requests are not
+  // released (even if 'release_request' is true). If
+  // 'release_request' is true then the release callback is called for
+  // each request, and the request ownership is given to the
+  // callback. Thus, if 'release_request' is true 'requests' is
+  // returned with all nullptrs.
+  static void RespondIfError(
       std::vector<std::unique_ptr<InferenceRequest>>& requests,
-      const Status& status, const bool release_requests = true);
+      const Status& status, const bool release_requests = false);
 
   // Release the request. Call the release callback and transfer
   // ownership of the request to the callback. On return 'request' is
