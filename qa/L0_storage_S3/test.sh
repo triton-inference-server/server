@@ -122,7 +122,7 @@ for ENV_VAR in "env" "env_dummy" "config"; do
             aws configure set default.region "dummy_region" && \
                 aws configure set aws_access_key_id "dummy_id" && \
                 aws configure set aws_secret_access_key "dummy_key"
-        else
+        elif [ "$ENV_VAR" == "env" ]; then
             rm ~/.aws/credentials && rm ~/.aws/config
         fi
 
@@ -180,7 +180,7 @@ for ENV_VAR in "env" "env_dummy" "config"; do
                 aws configure set default.region "dummy_region" && \
                     aws configure set aws_access_key_id "dummy_id" && \
                     aws configure set aws_secret_access_key "dummy_key"
-            else
+            elif [ "$ENV_VAR" == "env" ]; then
                 rm ~/.aws/credentials && rm ~/.aws/config
             fi
 
