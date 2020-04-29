@@ -39,6 +39,7 @@
 #include <aws/s3/model/HeadBucketRequest.h>
 #include <aws/s3/model/HeadObjectRequest.h>
 #include <aws/s3/model/ListObjectsRequest.h>
+#include <aws/core/auth/AWSCredentialsProvider.h>
 #endif  // TRTIS_ENABLE_S3
 
 #include <google/protobuf/io/coded_stream.h>
@@ -637,7 +638,20 @@ S3FileSystem::S3FileSystem(
                              "[0-9a-zA-Z.-_]+)*)?)")
 {
   Aws::Client::ClientConfiguration config;
-  if (const char* profile_name = std::getenv("AWS_PROFILE")) {
+  Aws::Auth::AWSCredentials credentials;
+
+  // check ENV vars for S3 credentials -> AWS_PROFILE -> default
+  const char* secret_key = std::getenv("AWS_SECRET_ACCESS_KEY");
+  const char* key_id = std::getenv("AWS_ACCESS_KEY_ID");
+  const char* region = std::getenv("AWS_DEFAULT_REGION");
+  if ((secret_key != NULL) && (key_id != NULL)) {
+    credentials.SetAWSAccessKeyId(key_id);
+    credentials.SetAWSSecretKey(secret_key);
+    config = Aws::Client::ClientConfiguration();
+    if (region != NULL) {
+      config.region = region;
+    }
+  } else if (const char* profile_name = std::getenv("AWS_PROFILE")) {
     config = Aws::Client::ClientConfiguration(profile_name);
   } else {
     config = Aws::Client::ClientConfiguration("default");
@@ -650,9 +664,17 @@ S3FileSystem::S3FileSystem(
     config.scheme = Aws::Http::Scheme::HTTP;
   }
 
-  client_ = s3::S3Client(
-      config, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
-      /*useVirtualAdressing*/ false);
+  if ((secret_key != NULL) && (key_id != NULL)) {
+    client_ = s3::S3Client(
+        credentials, config,
+        Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
+        /*useVirtualAdressing*/ false);
+
+  } else {
+    client_ = s3::S3Client(
+        config, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
+        /*useVirtualAdressing*/ false);
+  }
 }
 
 S3FileSystem::~S3FileSystem()
