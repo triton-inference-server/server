@@ -34,9 +34,9 @@
 #include <vector>
 
 #include "src/core/api.pb.h"
+#include "src/core/infer_stats.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_repository_manager.h"
-#include "src/core/server_status.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/status.h"
 
@@ -194,12 +194,6 @@ class InferenceServer {
     tf_vgpu_memory_limits_ = memory_limits;
   }
 
-  // Return the status manager for this server.
-  std::shared_ptr<ServerStatusManager> StatusManager() const
-  {
-    return status_manager_;
-  }
-
   // Return the requested InferenceBackend object.
   Status GetInferenceBackend(
       const std::string& model_name, const int64_t model_version,
@@ -241,7 +235,6 @@ class InferenceServer {
   // for all in-flight requests to complete before exiting.
   std::atomic<uint64_t> inflight_request_counter_;
 
-  std::shared_ptr<ServerStatusManager> status_manager_;
   std::unique_ptr<ModelRepositoryManager> model_repository_manager_;
 };
 

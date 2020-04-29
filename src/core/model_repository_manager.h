@@ -38,7 +38,6 @@ namespace nvidia { namespace inferenceserver {
 
 class InferenceServer;
 class InferenceBackend;
-class ServerStatusManager;
 
 /// An object to manage the model repository active in the server.
 class ModelRepositoryManager {
@@ -71,8 +70,6 @@ class ModelRepositoryManager {
   /// Create a manager for a repository.
   /// \param server The pointer to the inference server.
   /// \param server_version The version of the inference server.
-  /// \param status_manager The status manager that the model repository manager
-  /// will update model configuration and state to.
   /// \param repositpory_paths A set of file-system paths of the repositories.
   /// \param startup_models A set of models to be loaded at startup
   /// if model control is enabled.
@@ -93,7 +90,6 @@ class ModelRepositoryManager {
   /// \return The error status.
   static Status Create(
       InferenceServer* server, const std::string& server_version,
-      const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::set<std::string>& repository_paths,
       const std::set<std::string>& startup_models,
       const bool strict_model_config, const float tf_gpu_memory_fraction,
@@ -123,6 +119,9 @@ class ModelRepositoryManager {
 
   /// \return the states of all versions of all live model backends.
   const ModelStateMap GetLiveBackendStates(bool strict_readiness = false);
+
+  /// \return the states of all versions of all model backends served.
+  const ModelStateMap GetBackendStates();
 
   /// \return the states of all versions of a specific model.
   const VersionStateMap GetVersionStates(const std::string& model_name);
@@ -155,7 +154,6 @@ class ModelRepositoryManager {
   using NodeSet = std::set<DependencyNode*>;
 
   ModelRepositoryManager(
-      const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::set<std::string>& repository_paths,
       const BackendConfigMap& backend_config_map, const bool autofill,
       const bool polling_enabled, const bool model_control_enabled,
@@ -192,17 +190,6 @@ class ModelRepositoryManager {
       std::set<std::string>* deleted, std::set<std::string>* modified,
       std::set<std::string>* unmodified, ModelInfoMap* updated_infos,
       bool* all_models_polled);
-
-  /// Update the configurations of newly added / modified model and their
-  /// information shown in server status
-  /// \param added The names of the models added to the repository.
-  /// \param deleted The names of the models removed from the repository.
-  /// \param modified The names of the models remaining in the
-  /// repository that have been changed.
-  /// \return The error status.
-  Status Update(
-      const std::set<std::string>& added, const std::set<std::string>& deleted,
-      const std::set<std::string>& modified);
 
   /// Load models based on the dependency graph. The function will iteratively
   /// load models that all the models they depend on has been loaded, and unload
@@ -280,8 +267,6 @@ class ModelRepositoryManager {
       dependency_graph_;
   std::unordered_map<std::string, std::unique_ptr<DependencyNode>>
       missing_nodes_;
-
-  std::shared_ptr<ServerStatusManager> status_manager_;
 
   std::unique_ptr<BackendLifeCycle> backend_life_cycle_;
 };

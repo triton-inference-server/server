@@ -26,16 +26,14 @@
 #pragma once
 
 #include <time.h>
+#include <map>
 #include <mutex>
-#include "src/core/model_config.pb.h"
-#include "src/core/server_status.pb.h"
 #include "src/core/status.h"
 #include "src/core/tracing.h"
 
 namespace nvidia { namespace inferenceserver {
 
 class MetricModelReporter;
-class ServerStatusManager;
 class OpaqueTraceManager;
 class Trace;
 
@@ -105,39 +103,6 @@ class ModelInferStats {
 };
 #endif
 
-// FIXME remove the need for status manager. Model related info should be
-// obtained from model manager directly.
-// Manage access and updates to server status information.
-class ServerStatusManager {
- public:
-  // Create a manager for server status
-  explicit ServerStatusManager() = default;
-
-  // Initialize status for a model.
-  Status InitForModel(
-      const std::string& model_name, const ModelConfig& model_config);
-
-  // Update model config for an existing model.
-  Status UpdateConfigForModel(
-      const std::string& model_name, const ModelConfig& model_config);
-
-  // Update the version ready state and reason for an existing model.
-  Status SetModelVersionReadyState(
-      const std::string& model_name, int64_t version, ModelReadyState state,
-      const ModelReadyStateReason& state_reason);
-
-  // Get the entire server status, including status for all models.
-  Status Get(ServerStatus* server_status) const;
-
-  // Get the server status and the status for a single model.
-  Status Get(ServerStatus* server_status, const std::string& model_name) const;
-
- private:
-  mutable std::mutex mu_;
-  ServerStatus server_status_;
-};
-
-// FIXME good place? move to backend maybe
 // A stats aggregator used for one backend.
 class StatsAggregator {
  public:

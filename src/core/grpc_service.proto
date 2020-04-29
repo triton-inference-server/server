@@ -124,12 +124,7 @@ message StatusResponse
   //@@
   RequestStatus request_status = 1;
 
-  //@@
-  //@@  .. cpp:var:: ServerStatus server_status
-  //@@
-  //@@     The server and model status.
-  //@@
-  ServerStatus server_status = 2;
+  // Dropping to avoid modifying CMakeList to not compile grpc_service.proto
 }
 
 //@@

@@ -30,118 +30,6 @@ package nvidia.inferenceserver;
 
 //@@.. cpp:namespace:: nvidia::inferenceserver
 
-import "model_config.proto";
-
-//@@
-//@@.. cpp:var:: message StatDuration
-//@@
-//@@   Statistic collecting a duration metric.
-//@@
-message StatDuration
-{
-  //@@  .. cpp:var:: uint64 count
-  //@@
-  //@@     Cumulative number of times this metric occurred.
-  //@@
-  uint64 count = 1;
-
-  //@@  .. cpp:var:: uint64 total_time_ns
-  //@@
-  //@@     Total collected duration of this metric in nanoseconds.
-  //@@
-  uint64 total_time_ns = 2;
-}
-
-//@@
-//@@.. cpp:var:: message InferRequestStats
-//@@
-//@@   Statistics collected for Infer requests.
-//@@
-message InferRequestStats
-{
-  //@@  .. cpp:var:: StatDuration success
-  //@@
-  //@@     Total time required to handle successful Infer requests, not
-  //@@     including HTTP or GRPC endpoint handling time.
-  //@@
-  StatDuration success = 1;
-
-  //@@  .. cpp:var:: StatDuration failed
-  //@@
-  //@@     Total time required to handle failed Infer requests, not
-  //@@     including HTTP or GRPC endpoint handling time.
-  //@@
-  StatDuration failed = 2;
-
-  //@@  .. cpp:var:: StatDuration compute
-  //@@
-  //@@     Time required to run inferencing for an inference request;
-  //@@     including time copying input tensors to GPU memory, time
-  //@@     executing the model, and time copying output tensors from GPU
-  //@@     memory.
-  //@@
-  StatDuration compute = 3;
-
-  //@@  .. cpp:var:: StatDuration queue
-  //@@
-  //@@     Time an inference request waits in scheduling queue for an
-  //@@     available model instance.
-  //@@
-  StatDuration queue = 4;
-
-  //@@  .. cpp:var:: StatisticDuration compute_input
-  //@@
-  //@@    The count and cumulative duration to prepare input tensor data as
-  //@@    required by the model framework / backend. For example, this duration
-  //@@    should include the time to copy input tensor data to the GPU.
-  //@@
-  StatDuration compute_input = 5;
-
-  //@@  .. cpp:var:: StatisticDuration compute_infer
-  //@@
-  //@@     The count and cumulative duration to execute the model.
-  //@@
-  StatDuration compute_infer = 6;
-
-  //@@  .. cpp:var:: StatisticDuration compute_output
-  //@@
-  //@@     The count and cumulative duration to extract output tensor data
-  //@@     produced by the model framework / backend. For example, this duration
-  //@@     should include the time to copy output tensor data from the GPU.
-  //@@
-  StatDuration compute_output = 7;
-}
-
-//@@
-//@@.. cpp:var:: message InferBatchStats
-//@@
-//@@   Statistics collected for Infer batches.
-//@@
-message InferBatchStats
-{
-  //@@  .. cpp:var:: StatisticDuration compute_input
-  //@@
-  //@@    The count and cumulative duration to prepare input tensor data as
-  //@@    required by the model framework / backend. For example, this duration
-  //@@    should include the time to copy input tensor data to the GPU.
-  //@@
-  StatDuration compute_input = 1;
-
-  //@@  .. cpp:var:: StatisticDuration compute_infer
-  //@@
-  //@@     The count and cumulative duration to execute the model.
-  //@@
-  StatDuration compute_infer = 2;
-
-  //@@  .. cpp:var:: StatisticDuration compute_output
-  //@@
-  //@@     The count and cumulative duration to extract output tensor data
-  //@@     produced by the model framework / backend. For example, this duration
-  //@@     should include the time to copy output tensor data from the GPU.
-  //@@
-  StatDuration compute_output = 3;
-}
-
 //@@
 //@@.. cpp:enum:: ModelReadyState
 //@@
@@ -182,65 +70,6 @@ enum ModelReadyState {
   //@@     not available for inferencing.
   //@@
   MODEL_UNLOADING = 4;
-}
-
-//@@
-//@@.. cpp:enum:: ModelReadyStateReason
-//@@
-//@@   Detail associated with a model's readiness status.
-//@@
-message ModelReadyStateReason
-{
-  //@@  .. cpp:var:: string message
-  //@@
-  //@@     The message that explains the cause of being in the current readiness
-  //@@     state.
-  //@@
-  string message = 1;
-}
-
-//@@
-//@@.. cpp:var:: message ModelVersionStatus
-//@@
-//@@   Status for a version of a model.
-//@@
-message ModelVersionStatus
-{
-  //@@  .. cpp:var:: ModelReadyState ready_state
-  //@@
-  //@@     Current readiness state for the model.
-  //@@
-  ModelReadyState ready_state = 1;
-
-  //@@  .. cpp:var:: ModelReadyStateReason ready_state_reason
-  //@@
-  //@@     Supplemental information regarding the current readiness state.
-  //@@
-  ModelReadyStateReason ready_state_reason = 2;
-}
-
-//@@
-//@@.. cpp:var:: message ModelStatus
-//@@
-//@@   Status for a model.
-//@@
-message ModelStatus
-{
-  //@@  .. cpp:var:: ModelConfig config
-  //@@
-  //@@     The configuration for the model.
-  //@@
-  ModelConfig config = 1;
-
-  //@@  .. cpp:var:: map<int64, ModelVersionStatus> version_status
-  //@@
-  //@@     Duration statistics for each version of the model, as a map
-  //@@     from version to the status. A version will not occur in the map
-  //@@     unless there has been at least one inference request of
-  //@@     that model version. A version of -1 indicates the status is
-  //@@     for requests for which the version could not be determined.
-  //@@
-  map<int64, ModelVersionStatus> version_status = 2;
 }
 
 //@@
@@ -349,21 +178,6 @@ message SharedMemoryRegion
   //@@     Size of the shared memory block, in bytes.
   //@@
   uint64 byte_size = 5;
-}
-
-//@@
-//@@.. cpp:var:: message ServerStatus
-//@@
-//@@   Status for the inference server.
-//@@
-message ServerStatus
-{
-  //@@  .. cpp:var:: map<string, ModelStatus> model_status
-  //@@
-  //@@     Status for each model, as a map from model name to the
-  //@@     status.
-  //@@
-  map<string, ModelStatus> model_status = 1;
 }
 
 //@@

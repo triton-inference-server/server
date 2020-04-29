@@ -27,10 +27,10 @@
 
 #include "src/core/api.pb.h"
 #include "src/core/backend_context.h"
+#include "src/core/infer_stats.h"
 #include "src/core/label_provider.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
-#include "src/core/server_status.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {

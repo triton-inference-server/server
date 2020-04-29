@@ -30,10 +30,10 @@
 #include <unordered_map>
 #include <vector>
 #include "src/core/infer_response.h"
+#include "src/core/infer_stats.h"
 #include "src/core/memory.h"
 #include "src/core/model_config.h"
 #include "src/core/response_allocator.h"
-#include "src/core/server_status.h"
 #include "src/core/status.h"
 #include "src/core/tritonserver.h"
 

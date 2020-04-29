@@ -28,7 +28,7 @@
 #include <atomic>
 #include <memory>
 #include <vector>
-#include "src/core/server_status.h"
+#include "src/core/infer_stats.h"
 #include "src/core/status.h"
 #include "src/core/tritonserver.h"
 

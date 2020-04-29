@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/core/server_status.h"
+#include "src/core/infer_stats.h"
 
 #include <time.h>
 #include "src/core/constants.h"
@@ -34,103 +34,6 @@
 #include "src/core/tracing.h"
 
 namespace nvidia { namespace inferenceserver {
-
-Status
-ServerStatusManager::InitForModel(
-    const std::string& model_name, const ModelConfig& model_config)
-{
-  std::lock_guard<std::mutex> lock(mu_);
-
-  auto& ms = *server_status_.mutable_model_status();
-  if (ms.find(model_name) == ms.end()) {
-    LOG_INFO << "New status tracking for model '" << model_name << "'";
-  } else {
-    LOG_INFO << "New status tracking for re-added model '" << model_name << "'";
-    ms[model_name].Clear();
-  }
-
-  ms[model_name].mutable_config()->CopyFrom(model_config);
-
-  return Status::Success;
-}
-
-Status
-ServerStatusManager::UpdateConfigForModel(
-    const std::string& model_name, const ModelConfig& model_config)
-{
-  std::lock_guard<std::mutex> lock(mu_);
-
-  auto& ms = *server_status_.mutable_model_status();
-  if (ms.find(model_name) == ms.end()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "try to update config for non-existing model '" + model_name + "'");
-  } else {
-    LOG_INFO << "Updating config for model '" << model_name << "'";
-  }
-
-  ms[model_name].mutable_config()->CopyFrom(model_config);
-
-  return Status::Success;
-}
-
-Status
-ServerStatusManager::SetModelVersionReadyState(
-    const std::string& model_name, int64_t version, ModelReadyState state,
-    const ModelReadyStateReason& state_reason)
-{
-  std::lock_guard<std::mutex> lock(mu_);
-  auto itr = server_status_.mutable_model_status()->find(model_name);
-  if (itr == server_status_.model_status().end()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "fail to update ready state for unknown model '" + model_name + "'");
-  }
-
-  auto vitr = itr->second.mutable_version_status()->find(version);
-  if (vitr == itr->second.version_status().end()) {
-    // Completely fresh
-    ModelVersionStatus version_status;
-    version_status.set_ready_state(state);
-    *version_status.mutable_ready_state_reason() = state_reason;
-    (*(itr->second.mutable_version_status()))[version] = version_status;
-  } else {
-    vitr->second.set_ready_state(state);
-    *(vitr->second.mutable_ready_state_reason()) = state_reason;
-  }
-
-  return Status::Success;
-}
-
-Status
-ServerStatusManager::Get(ServerStatus* server_status) const
-{
-  std::lock_guard<std::mutex> lock(mu_);
-  server_status->CopyFrom(server_status_);
-
-  return Status::Success;
-}
-
-Status
-ServerStatusManager::Get(
-    ServerStatus* server_status, const std::string& model_name) const
-{
-  std::lock_guard<std::mutex> lock(mu_);
-
-  server_status->Clear();
-
-  const auto& itr = server_status_.model_status().find(model_name);
-  if (itr == server_status_.model_status().end()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "no status available for unknown model '" + model_name + "'");
-  }
-
-  auto& ms = *server_status->mutable_model_status();
-  ms[model_name].CopyFrom(itr->second);
-
-  return Status::Success;
-}
 
 #if 0
 void

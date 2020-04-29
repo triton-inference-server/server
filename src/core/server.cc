@@ -114,8 +114,6 @@ InferenceServer::InferenceServer()
   tf_vgpu_memory_limits_ = {};
 
   inflight_request_counter_ = 0;
-
-  status_manager_.reset(new ServerStatusManager());
 }
 
 Status
@@ -174,7 +172,7 @@ InferenceServer::Init()
   bool polling_enabled = (model_control_mode_ == MODE_POLL);
   bool model_control_enabled = (model_control_mode_ == MODE_EXPLICIT);
   status = ModelRepositoryManager::Create(
-      this, version_, status_manager_, model_repository_paths_, startup_models_,
+      this, version_, model_repository_paths_, startup_models_,
       strict_model_config_, tf_gpu_memory_fraction_, tf_soft_placement_enabled_,
       tf_vgpu_memory_limits_, polling_enabled, model_control_enabled,
       min_supported_compute_capability_, &model_repository_manager_);
@@ -299,27 +297,23 @@ InferenceServer::IsReady(bool* ready)
   if (*ready && strict_readiness_) {
     // Strict readiness... get the model status and make sure all
     // models are ready.
-    ServerStatus server_status;
-    Status status = status_manager_->Get(&server_status);
+    const auto model_versions = model_repository_manager_->GetBackendStates();
 
-    *ready = status.IsOk();
-    if (*ready) {
-      for (const auto& ms : server_status.model_status()) {
-        // If a model status is present but no version status,
-        // the model is not ready as there is no proper version to be served
-        if (ms.second.version_status().size() == 0) {
+    for (const auto& mv : model_versions) {
+      // If a model status is present but no version status,
+      // the model is not ready as there is no proper version to be served
+      if (mv.second.size() == 0) {
+        *ready = false;
+        goto strict_done;
+      }
+      for (const auto& vs : mv.second) {
+        if (vs.second != ModelReadyState::MODEL_READY) {
           *ready = false;
           goto strict_done;
         }
-        for (const auto& vs : ms.second.version_status()) {
-          if (vs.second.ready_state() != ModelReadyState::MODEL_READY) {
-            *ready = false;
-            goto strict_done;
-          }
-        }
       }
-    strict_done:;
     }
+  strict_done:;
   }
 
   return Status::Success;

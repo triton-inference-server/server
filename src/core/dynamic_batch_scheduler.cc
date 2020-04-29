@@ -32,10 +32,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "src/core/constants.h"
+#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/nvtx.h"
-#include "src/core/server_status.h"
 
 namespace nvidia { namespace inferenceserver {
 
