@@ -135,6 +135,8 @@ InferenceBackend::SetModelConfig(
   metric_reporter_ = std::make_shared<MetricModelReporter>(
       Name(), version_, config_.metric_tags());
 
+  stats_collector_ = std::make_shared<StatsAggregator>(metric_reporter_);
+
   // Initialize the input map
   for (const auto& io : config.input()) {
     input_map_.insert(std::make_pair(io.name(), io));
@@ -311,29 +313,7 @@ InferenceBackend::Run(
     return;
   }
 
-#ifdef TRTIS_ENABLE_STATS
-  // Stop queue timer and start compute timer when the request is
-  // scheduled to run
-  for (auto& request : *requests) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeStart);
-      payload.stats_->SetGPUDevice(contexts_[runner_idx]->gpu_device_);
-    }
-  }
-#endif  // TRTIS_ENABLE_STATS
-
   contexts_[runner_idx]->Run(this, std::move(requests));
-
-#ifdef TRTIS_ENABLE_STATS
-  // Stop compute timers.
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeEnd);
-    }
-  }
-#endif  // TRTIS_ENABLE_STATS
 }
 
 void

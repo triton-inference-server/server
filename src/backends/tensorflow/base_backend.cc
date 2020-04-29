@@ -630,6 +630,12 @@ BaseBackend::Context::Run(
   LOG_VERBOSE(1) << "Running " << name_ << " with " << requests.size()
                  << " requests";
 
+#ifdef TRTIS_ENABLE_STATS
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  auto compute_start_ns = TIMESPEC_TO_NANOS(ts);
+#endif  // TRTIS_ENABLE_STATS
+
   const InferenceRequest* repr_input_request = nullptr;
 
   // For each request collect the total batch size for this inference
@@ -806,12 +812,8 @@ BaseBackend::Context::Run(
 #endif  // TRTIS_ENABLE_GPU
 
 #ifdef TRTIS_ENABLE_STATS
-  for (auto& request : *requests) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeInputEnd);
-    }
-  }
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  auto compute_input_end_ns = TIMESPEC_TO_NANOS(ts);
 #endif  // TRTIS_ENABLE_STATS
 
   // Run. Session will update the 'output_tensors'.
@@ -844,12 +846,8 @@ BaseBackend::Context::Run(
   }
 
 #ifdef TRTIS_ENABLE_STATS
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeOutputStart);
-    }
-  }
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  auto compute_output_start_ns = TIMESPEC_TO_NANOS(ts);
 #endif  // TRTIS_ENABLE_STATS
 
   // Create the response tensors and copy the appropriate tensor data
@@ -921,6 +919,28 @@ BaseBackend::Context::Run(
     cudaStreamSynchronize(stream_);
   }
 #endif  // TRTIS_ENABLE_GPU
+
+#ifdef TRTIS_ENABLE_STATS
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  auto compute_end_ns = TIMESPEC_TO_NANOS(ts);
+
+  // Report stats
+  auto compute_input_duration_ns = compute_input_end_ns - compute_start_ns;
+  auto compute_infer_duration_ns =
+      compute_output_start_ns - compute_input_end_ns;
+  auto compute_output_duration_ns = compute_end_ns - compute_output_start_ns;
+  for (size_t i = 0; i < requests.size(); ++i) {
+    requests[i]->Report(
+        (responses[i] != nullptr), gpu_device_, compute_start_ns,
+        compute_input_end_ns, compute_output_start_ns, compute_end_ns,
+        compute_input_duration_ns, compute_infer_duration_ns,
+        compute_output_duration_ns);
+  }
+  // Also reporting batch stats
+  base->StatsCollector()->UpdateInferBatchStats(
+      gpu_device_, total_batch_size, compute_input_duration_ns,
+      compute_infer_duration_ns, compute_output_duration_ns);
+#endif  // TRTIS_ENABLE_STATS
 
   // Send all the responses that haven't already been sent because of
   // an earlier error.

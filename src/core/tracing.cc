@@ -44,6 +44,7 @@ namespace {
 
 std::atomic<int64_t> Trace::next_id_(0);
 
+#if 0
 void
 Trace::Report(const ModelInferStats* infer_stats)
 {
@@ -91,5 +92,6 @@ Trace::Report(const ModelInferStats* infer_stats)
     }
   }
 }
+#endif
 
 }}  // namespace nvidia::inferenceserver

@@ -39,46 +39,8 @@ class ServerStatusManager;
 class OpaqueTraceManager;
 class Trace;
 
-// Updates a server stat with duration measured by a C++ scope.
-class ServerStatTimerScoped {
- public:
-  enum Kind {
-    // Stat for status request. Duration from request to response.
-    STATUS,
-    // Stat for health request. Duration from request to response.
-    HEALTH,
-    // Stat for model control request. Duration from request to
-    // response.
-    MODEL_CONTROL,
-    // Stat for repository request. Duration from request to response.
-    REPOSITORY
-  };
-
-  // Start server timer for a given status 'kind'.
-  ServerStatTimerScoped(
-      const std::shared_ptr<ServerStatusManager>& status_manager, Kind kind)
-      : status_manager_(status_manager), kind_(kind), enabled_(true)
-  {
-    clock_gettime(CLOCK_MONOTONIC, &start_);
-  }
-
-  // Stop the timer and record the duration, unless reporting has been
-  // disabled.
-  ~ServerStatTimerScoped();
-
-  // Enable/Disable reporting for this timer. By default reporting is
-  // enabled and so the server status is updated when this object is
-  // destructed. Reporting may be enabled/disabled multiple times
-  // while the timer is running without affecting the duration.
-  void SetEnabled(bool enabled) { enabled_ = enabled; }
-
- private:
-  std::shared_ptr<ServerStatusManager> status_manager_;
-  const Kind kind_;
-  bool enabled_;
-  struct timespec start_;
-};
-
+// FIXME move the trace handling to infer request directly.
+#if 0
 // Stats collector for an inference request. If TRTIS_ENABLE_STATS is not
 // defined, it will only records timestamps that may be used by other objects
 // along the inference pipeline (i.e. scheduler)
@@ -96,7 +58,6 @@ class ModelInferStats {
   };
 
  public:
-#ifdef TRTIS_ENABLE_STATS
   // Start model-specific timer for 'model_name' and a given status
   // 'kind'.
   ModelInferStats(
@@ -112,34 +73,6 @@ class ModelInferStats {
   {
     memset(&timestamps_[0], 0, sizeof(struct timespec) * timestamps_.size());
   }
-
-  // Report collected statistics.
-  void Report();
-
-  // Mark inferencing request as failed / not-failed.
-  void SetFailed(bool failed) { failed_ = failed; }
-
-  // Set the model version explicitly requested for the inference, or
-  // -1 if latest version was requested.
-  void SetRequestedVersion(int64_t v) { requested_model_version_ = v; }
-
-  // Set the metric reporter for the model.
-  void SetMetricReporter(const std::shared_ptr<MetricModelReporter> m)
-  {
-    metric_reporter_ = m;
-  }
-
-  // Set batch size for the inference stats.
-  void SetBatchSize(size_t bs) { batch_size_ = bs; }
-
-  // Set CUDA GPU device index where inference was performed.
-  void SetGPUDevice(int idx) { gpu_device_ = idx; }
-
-  // Set the number of model executions that were performed for this
-  // inference request. Can be zero if this request was dynamically
-  // batched with another request (in dynamic batch case only one of
-  // the batched requests will count the execution).
-  void SetModelExecutionCount(uint32_t count) { execution_count_ = count; }
 
   // Set the trace manager associated with the inference.
   void SetTraceManager(OpaqueTraceManager* tm) { trace_manager_ = tm; }
@@ -159,60 +92,8 @@ class ModelInferStats {
   // has not been called.
   Trace* GetTrace() const { return trace_; }
 
-  // Include queue time from another stat into this stat's queue time.
-  void IncrementQueueDuration(const ModelInferStats& other);
-
-  // Include compute time from another stat into this stat's compute
-  // time.
-  void IncrementComputeDuration(const ModelInferStats& other);
-
-#else
-  // Start model-specific timer for 'model_name' and a given status
-  // 'kind'.
-  ModelInferStats() : timestamps_((size_t)TimestampKind::COUNT__)
-  {
-    memset(&timestamps_[0], 0, sizeof(struct timespec) * timestamps_.size());
-  }
-
-#endif  // TRTIS_ENABLE_STATS
-
-  // Get the timestamp for a kind.
-  const struct timespec& Timestamp(TimestampKind kind) const
-  {
-    return timestamps_[(size_t)kind];
-  }
-
-  // Set a timestamp to the current time. Return the timestamp.
-  const struct timespec& CaptureTimestamp(TimestampKind kind)
-  {
-    struct timespec& ts = timestamps_[(size_t)kind];
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts;
-  }
 
  private:
-#ifdef TRTIS_ENABLE_STATS
-  uint64_t Duration(
-      ModelInferStats::TimestampKind start_kind,
-      ModelInferStats::TimestampKind end_kind) const;
-
-  std::shared_ptr<ServerStatusManager> status_manager_;
-  std::shared_ptr<MetricModelReporter> metric_reporter_;
-  const std::string model_name_;
-  int64_t requested_model_version_;
-  size_t batch_size_;
-  int gpu_device_;
-  bool failed_;
-
-  uint32_t execution_count_;
-
-  uint64_t extra_queue_duration_;
-  uint64_t extra_compute_duration_;
-
-  // Duration needed for V2 version of API
-  uint64_t extra_compute_input_duration_;
-  uint64_t extra_compute_infer_duration_;
-  uint64_t extra_compute_output_duration_;
 
   // The trace manager associated with these stats. This object is not owned by
   // this ModelInferStats object and so is not destroyed by this object.
@@ -221,16 +102,16 @@ class ModelInferStats {
   // The trace associated with these stats. This object is not owned by
   // this ModelInferStats object and so is not destroyed by this object.
   Trace* trace_;
-#endif  // TRTIS_ENABLE_STATS
-
-  std::vector<struct timespec> timestamps_;
 };
+#endif
 
+// FIXME remove the need for status manager. Model related info should be
+// obtained from model manager directly.
 // Manage access and updates to server status information.
 class ServerStatusManager {
  public:
   // Create a manager for server status
-  explicit ServerStatusManager(const std::string& server_version);
+  explicit ServerStatusManager() = default;
 
   // Initialize status for a model.
   Status InitForModel(
@@ -246,42 +127,92 @@ class ServerStatusManager {
       const ModelReadyStateReason& state_reason);
 
   // Get the entire server status, including status for all models.
-  Status Get(
-      ServerStatus* server_status, const std::string& server_id,
-      ServerReadyState server_ready_state, uint64_t server_uptime_ns) const;
+  Status Get(ServerStatus* server_status) const;
 
   // Get the server status and the status for a single model.
-  Status Get(
-      ServerStatus* server_status, const std::string& server_id,
-      ServerReadyState server_ready_state, uint64_t server_uptime_ns,
-      const std::string& model_name) const;
-
-  // Add a duration to the Server Stat specified by 'kind'.
-  void UpdateServerStat(uint64_t duration, ServerStatTimerScoped::Kind kind);
-
-  // Add durations to Infer stats for a failed inference request.
-  void UpdateFailedInferStats(
-      const std::string& model_name, const int64_t model_version,
-      size_t batch_size, uint64_t last_timestamp_ms,
-      uint64_t request_duration_ns);
-
-  // [V1] Add durations to Infer stats for a successful inference request.
-  void UpdateSuccessInferStats(
-      const std::string& model_name, const int64_t model_version,
-      size_t batch_size, uint32_t execution_cnt, uint64_t last_timestamp_ms,
-      uint64_t request_duration_ns, uint64_t queue_duration_ns,
-      uint64_t compute_duration_ns);
-
-  // [V2] Add durations to Infer stats for a successful inference request.
-  void UpdateSuccessInferStats(
-      const std::string& model_name, const int64_t model_version,
-      uint32_t execution_cnt, uint64_t last_timestamp_ms,
-      uint64_t request_duration_ns, uint64_t queue_duration_ns,
-      uint64_t compute_input_duration_ns, uint64_t compute_infer_duration_ns,
-      uint64_t compute_output_duration_ns);
+  Status Get(ServerStatus* server_status, const std::string& model_name) const;
 
  private:
   mutable std::mutex mu_;
   ServerStatus server_status_;
+};
+
+// FIXME good place? move to backend maybe
+// A stats aggregator used for one backend.
+class StatsAggregator {
+ public:
+  struct InferStats {
+    InferStats()
+        : failure_count_(0), failure_duration_ns_(0), success_count_(0),
+          request_duration_ns_(0), queue_duration_ns_(0),
+          compute_input_duration_ns_(0), compute_infer_duration_ns_(0),
+          compute_output_duration_ns_(0)
+    {
+    }
+    uint64_t failure_count_;
+    uint64_t failure_duration_ns_;
+
+    uint64_t success_count_;
+    uint64_t request_duration_ns_;
+    uint64_t queue_duration_ns_;
+    uint64_t compute_input_duration_ns_;
+    uint64_t compute_infer_duration_ns_;
+    uint64_t compute_output_duration_ns_;
+  };
+
+  struct InferBatchStats {
+    InferBatchStats()
+        : count_(0), compute_input_duration_ns_(0),
+          compute_infer_duration_ns_(0), compute_output_duration_ns_(0)
+    {
+    }
+    uint64_t count_;
+    uint64_t compute_input_duration_ns_;
+    uint64_t compute_infer_duration_ns_;
+    uint64_t compute_output_duration_ns_;
+  };
+
+  // Create an aggregator for model statistics
+  StatsAggregator() : last_inference_ms_(0) {}
+
+  // Create an aggregator with metric reporter attached for model statistics
+  StatsAggregator(const std::shared_ptr<MetricModelReporter>& metric_reporter)
+      : last_inference_ms_(0), metric_reporter_(metric_reporter)
+  {
+  }
+
+  uint64_t LastInferenceMs() const { return last_inference_ms_; }
+  const InferStats& ImmutableInferStats() const { return infer_stats_; }
+  const std::map<size_t, InferBatchStats>& ImmutableInferBatchStats() const
+  {
+    return batch_stats_;
+  }
+
+  // FIXME passing device is somewhat confusing here, that is for updating
+  // metrics properly, but is here the good place for updating matrics?
+  //
+  // Add durations to Infer stats for a failed inference request.
+  void UpdateFailedInferStats(
+      int device, uint64_t last_timestamp_ms, uint64_t request_duration_ns);
+
+  // Add durations to infer stats for a successful inference request.
+  void UpdateSuccessInferStats(
+      int device, uint64_t last_timestamp_ms, uint64_t request_duration_ns,
+      uint64_t queue_duration_ns, uint64_t compute_input_duration_ns,
+      uint64_t compute_infer_duration_ns, uint64_t compute_output_duration_ns);
+
+  // Add durations to batch infer stats for a batch execution.
+  // 'success_request_count' is the number of sucess requests in the batch that
+  // have infer_stats attached.
+  void UpdateInferBatchStats(
+      int device, size_t batch_size, uint64_t compute_input_duration_ns,
+      uint64_t compute_infer_duration_ns, uint64_t compute_output_duration_ns);
+
+ private:
+  std::mutex mu_;
+  uint64_t last_inference_ms_;
+  InferStats infer_stats_;
+  std::map<size_t, InferBatchStats> batch_stats_;
+  std::shared_ptr<MetricModelReporter> metric_reporter_;
 };
 }}  // namespace nvidia::inferenceserver

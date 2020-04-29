@@ -71,7 +71,10 @@ class Trace {
   int64_t Id() const { return id_; }
   int64_t ParentId() const { return parent_id_; }
 
+  // FIXME
+#if 0
   void Report(const ModelInferStats* infer_stats);
+#endif
 
  private:
   Trace(

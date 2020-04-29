@@ -562,6 +562,62 @@ InferenceRequest::Normalize()
   return Status::Success;
 }
 
+void
+InferenceRequest::Report(
+    bool success, int device, uint64_t compute_start_ns,
+    uint64_t compute_input_end_ns, uint64_t compute_output_start_ns,
+    uint64_t compute_end_ns, uint64_t compute_input_duration_ns,
+    uint64_t compute_infer_duration_ns, uint64_t compute_output_duration_ns)
+{
+  struct timespec last_ts;
+
+  clock_gettime(CLOCK_REALTIME, &last_ts);
+  const uint64_t last_timestamp_ms = TIMESPEC_TO_MILLIS(last_ts);
+
+  // Need a monotonic clock for request end time
+  clock_gettime(CLOCK_MONOTONIC, &last_ts);
+  auto request_duration_ns = TIMESPEC_TO_NANOS(last_ts) - request_start_ns_;
+
+  if (success) {
+    auto queue_duration_ns = compute_start_ns - queue_start_ns_;
+    backend_raw_->StatsCollector()->UpdateSuccessInferStats(
+        device, last_timestamp_ms, request_duration_ns, queue_duration_ns,
+        compute_input_duration_ns, compute_infer_duration_ns,
+        compute_output_duration_ns);
+    for (auto& stats_collector : stats_collectors_) {
+      stats_collector->UpdateSuccessInferStats(
+          device, last_timestamp_ms, request_duration_ns, queue_duration_ns,
+          compute_input_duration_ns, compute_infer_duration_ns,
+          compute_output_duration_ns);
+    }
+  } else {
+    backend_raw_->StatsCollector()->UpdateFailedInferStats(
+        device, last_timestamp_ms, request_duration_ns);
+    for (auto& stats_collector : stats_collectors_) {
+      stats_collector->UpdateFailedInferStats(
+          device, last_timestamp_ms, request_duration_ns);
+    }
+  }
+
+#ifdef TRTIS_ENABLE_TRACING
+  // FIXME Report() should now accept all timestamps as there is no InferStats
+  // object that contains all available timestamps
+  if (trace_ != nullptr) {
+    trace_->Report(this);
+    // Inform that the trace object is done and can be released
+    if (trace_manager_->using_triton_) {
+      trace_manager_->triton_release_fn_(
+          reinterpret_cast<TRITONSERVER_Trace*>(trace_),
+          trace_->ActivityUserp(), trace_manager_->userp_);
+    } else {
+      trace_manager_->release_fn_(
+          reinterpret_cast<TRITONSERVER_Trace*>(trace_),
+          trace_->ActivityUserp(), trace_manager_->userp_);
+    }
+  }
+#endif  // TRTIS_ENABLE_TRACING
+}
+
 //
 // Input
 //

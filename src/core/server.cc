@@ -115,7 +115,7 @@ InferenceServer::InferenceServer()
 
   inflight_request_counter_ = 0;
 
-  status_manager_.reset(new ServerStatusManager(version_));
+  status_manager_.reset(new ServerStatusManager());
 }
 
 Status
@@ -300,8 +300,7 @@ InferenceServer::IsReady(bool* ready)
     // Strict readiness... get the model status and make sure all
     // models are ready.
     ServerStatus server_status;
-    Status status =
-        status_manager_->Get(&server_status, id_, ready_state_, UptimeNs());
+    Status status = status_manager_->Get(&server_status);
 
     *ready = status.IsOk();
     if (*ready) {
@@ -383,22 +382,14 @@ InferenceServer::InferAsync(std::unique_ptr<InferenceRequest>& request)
   std::shared_ptr<ScopedAtomicIncrement> inflight(
       new ScopedAtomicIncrement(inflight_request_counter_));
 
-// FIXME this needs to move into InferenceRequest and be simplified
 #ifdef TRTIS_ENABLE_STATS
-  auto infer_stats = std::make_shared<ni::ModelInferStats>(
-      lserver->StatusManager(), lrequest->ModelName());
-  infer_stats->CaptureTimestamp(
-      ni::ModelInferStats::TimestampKind::kRequestStart);
-  infer_stats->SetRequestedVersion(lrequest->RequestedModelVersion());
-  infer_stats->SetMetricReporter(lbackend->MetricReporter());
-  infer_stats->SetBatchSize(lrequest->BatchSize());
-  infer_stats->SetFailed(true);
+  request->CaptureRequestStartNs();
+#ifdef TRTIS_ENABLE_TRACING
+  // FIXME this needs to move into InferenceRequest and be simplified
   infer_stats->SetTraceManager(
       reinterpret_cast<ni::OpaqueTraceManager*>(trace_manager));
   infer_stats->NewTrace();
-#else
-// FIXME
-//  auto infer_stats = std::make_shared<ni::ModelInferStats>();
+#endif  // TRTIS_ENABLE_TRACING
 #endif  // TRTIS_ENABLE_STATS
 
 #if 0
@@ -437,8 +428,9 @@ InferenceServer::InferAsync(std::unique_ptr<InferenceRequest>& request)
 }
 
 Status
-InferenceServer::GetStatus(
-    ServerStatus* server_status, const std::string& model_name)
+InferenceServer::GetReadyModelVersions(
+    const std::string& model_name, const int64_t model_version,
+    std::map<std::string, std::vector<int64_t>>* ready_model_versions)
 {
   if (ready_state_ == ServerReadyState::SERVER_EXITING) {
     return Status(Status::Code::UNAVAILABLE, "Server exiting");
@@ -446,13 +438,37 @@ InferenceServer::GetStatus(
 
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
-  // If no specific model request just return the entire status
-  // object.
+  const auto model_versions =
+      model_repository_manager_->GetLiveBackendStates(true);
+
+  ready_model_versions->clear();
   if (model_name.empty()) {
-    return status_manager_->Get(server_status, id_, ready_state_, UptimeNs());
+    std::vector<int64_t> versions;
+    for (const auto& mv_pair : model_versions) {
+      for (const auto& vs_pair : mv_pair.second) {
+        versions.emplace_back(vs_pair.first);
+      }
+      ready_model_versions->emplace(mv_pair.first, std::move(versions));
+    }
   } else {
-    return status_manager_->Get(
-        server_status, id_, ready_state_, UptimeNs(), model_name);
+    auto mv_it = model_versions.find(model_name);
+    if (mv_it == model_versions.end()) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "requested model " + model_name + " not found");
+    }
+    std::vector<int64_t> versions;
+    for (const auto& vs_pair : mv_it->second) {
+      if ((model_version == -1) || (model_version == vs_pair.first)) {
+        versions.emplace_back(vs_pair.first);
+      }
+    }
+    if (versions.empty()) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "requested model version is not found for model " + model_name);
+    }
+    ready_model_versions->emplace(mv_it->first, std::move(versions));
   }
 
   return Status::Success;

@@ -367,10 +367,9 @@ PriorityQueue::AdvanceCursor()
     }
   }
 
-  // FIXME stats
-  uint64_t curr_enqueue_time_ns = 0; /* TIMESPEC_TO_NANOS(
+  uint64_t curr_enqueue_time_ns =
       pending_cursor_.curr_it_->second.At(pending_cursor_.queue_idx_)
-          .stats_->Timestamp(ModelInferStats::TimestampKind::kQueueStart)); */
+          ->QueueStartNs();
   if (pending_cursor_.pending_batch_oldest_enqueue_time_ns_ != 0) {
     pending_cursor_.pending_batch_oldest_enqueue_time_ns_ = std::min(
         pending_cursor_.pending_batch_oldest_enqueue_time_ns_,

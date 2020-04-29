@@ -122,7 +122,7 @@ class ModelRepositoryManager {
   Status UnloadAllModels();
 
   /// \return the states of all versions of all live model backends.
-  const ModelStateMap GetLiveBackendStates();
+  const ModelStateMap GetLiveBackendStates(bool strict_readiness = false);
 
   /// \return the states of all versions of a specific model.
   const VersionStateMap GetVersionStates(const std::string& model_name);

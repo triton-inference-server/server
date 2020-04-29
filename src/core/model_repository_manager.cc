@@ -296,7 +296,7 @@ class ModelRepositoryManager::BackendLifeCycle {
 
   // Get the ModelStateMap representation of the live backends. A backend is
   // live if at least one of the versions is not unknown nor unavailable.
-  const ModelStateMap GetLiveBackendStates();
+  const ModelStateMap GetLiveBackendStates(bool strict_readiness = false);
 
   // Get the VersionStateMap representation of the specified model.
   const VersionStateMap GetVersionStates(const std::string& model_name);
@@ -474,7 +474,8 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 }
 
 const ModelRepositoryManager::ModelStateMap
-ModelRepositoryManager::BackendLifeCycle::GetLiveBackendStates()
+ModelRepositoryManager::BackendLifeCycle::GetLiveBackendStates(
+    bool strict_readiness)
 {
   LOG_VERBOSE(1) << "GetLiveBackendStates()";
   std::lock_guard<std::mutex> map_lock(map_mtx_);
@@ -485,6 +486,11 @@ ModelRepositoryManager::BackendLifeCycle::GetLiveBackendStates()
 
     for (auto& version_backend : model_version.second) {
       std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
+      if (strict_readiness &&
+          version_backend.second->state_ != ModelReadyState::MODEL_READY) {
+        continue;
+      }
+
       // At lease one version is live (ready / loading / unloading)
       if ((version_backend.second->state_ != ModelReadyState::MODEL_UNKNOWN) &&
           (version_backend.second->state_ !=
@@ -1378,9 +1384,9 @@ ModelRepositoryManager::UnloadAllModels()
 }
 
 const ModelRepositoryManager::ModelStateMap
-ModelRepositoryManager::GetLiveBackendStates()
+ModelRepositoryManager::GetLiveBackendStates(bool strict_readiness)
 {
-  return backend_life_cycle_->GetLiveBackendStates();
+  return backend_life_cycle_->GetLiveBackendStates(strict_readiness);
 }
 
 const ModelRepositoryManager::VersionStateMap

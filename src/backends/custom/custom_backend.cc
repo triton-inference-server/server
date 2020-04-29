@@ -329,6 +329,12 @@ CustomBackend::Context::Run(
   LOG_VERBOSE(1) << "Running " << name_ << " with " << requests.size()
                  << " requests";
 
+#ifdef TRTIS_ENABLE_STATS
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  auto compute_start_ns = TIMESPEC_TO_NANOS(ts);
+#endif  // TRTIS_ENABLE_STATS
+
   // For each request collect the total batch size for this inference
   // execution. The batch-size, number of inputs, and size of each
   // input has already been checked so don't need to do that here.
@@ -465,12 +471,8 @@ CustomBackend::Context::Run(
   }
 
 #ifdef TRTIS_ENABLE_STATS
-  for (auto& request : requests) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeInputEnd);
-    }
-  }
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  auto compute_input_end_ns = TIMESPEC_TO_NANOS(ts);
 #endif  // TRTIS_ENABLE_STATS
 
 #ifdef TRTIS_ENABLE_GPU
@@ -525,12 +527,8 @@ CustomBackend::Context::Run(
 #endif  // TRTIS_ENABLE_GPU
 
 #ifdef TRTIS_ENABLE_STATS
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeOutputStart);
-    }
-  }
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  auto compute_output_start_ns = TIMESPEC_TO_NANOS(ts);
 #endif  // TRTIS_ENABLE_STATS
 
   // If the custom execute function returns an error then it did not
@@ -546,6 +544,28 @@ CustomBackend::Context::Run(
         true /* release_requests */);
     return;
   }
+
+#ifdef TRTIS_ENABLE_STATS
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  auto compute_end_ns = TIMESPEC_TO_NANOS(ts);
+
+  // Report stats
+  auto compute_input_duration_ns = compute_input_end_ns - compute_start_ns;
+  auto compute_infer_duration_ns =
+      compute_output_start_ns - compute_input_end_ns;
+  auto compute_output_duration_ns = compute_end_ns - compute_output_start_ns;
+  for (size_t i = 0; i < custom_payloads.size(); ++i) {
+    requests[i]->Report(
+        (custom_payloads[i].error_code == 0), gpu_device_, compute_start_ns,
+        compute_input_end_ns, compute_output_start_ns, compute_end_ns,
+        compute_input_duration_ns, compute_infer_duration_ns,
+        compute_output_duration_ns);
+  }
+  // Also reporting batch stats
+  base->StatsCollector()->UpdateInferBatchStats(
+      gpu_device_, total_batch_size, compute_input_duration_ns,
+      compute_infer_duration_ns, compute_output_duration_ns);
+#endif  // TRTIS_ENABLE_STATS
 
   // Send the response for each custom payload and release the request
   // as we are done with it. If a payload has an error then send an

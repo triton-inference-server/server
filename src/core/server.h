@@ -78,9 +78,12 @@ class InferenceServer {
   // ownership of 'request'.
   Status InferAsync(std::unique_ptr<InferenceRequest>& request);
 
-  // Update the ServerStatus object with the status of the model. If
-  // 'model_name' is empty, update with the status of all models.
-  Status GetStatus(ServerStatus* server_status, const std::string& model_name);
+  // Return 'ready_model_versions' for 'model_name' and 'model_versions'.
+  // If 'model_version' is -1, update with all ready versions of 'model_name'.
+  // If 'model_name' is empty, update with the all ready versions of all models.
+  Status GetReadyModelVersions(
+      const std::string& model_name, const int64_t model_version,
+      std::map<std::string, std::vector<int64_t>>* ready_model_versions);
 
   // Update the ModelRepositoryIndex object with the index of the model
   // repository.

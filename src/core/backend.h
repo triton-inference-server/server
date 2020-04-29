@@ -30,6 +30,7 @@
 #include "src/core/label_provider.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
+#include "src/core/server_status.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -61,6 +62,12 @@ class InferenceBackend {
   const std::shared_ptr<MetricModelReporter>& MetricReporter() const
   {
     return metric_reporter_;
+  }
+
+  // Get the stats collector for the model being served.
+  const std::shared_ptr<StatsAggregator>& StatsCollector() const
+  {
+    return stats_collector_;
   }
 
   // Get the model configuration for a named input.
@@ -147,6 +154,9 @@ class InferenceBackend {
 
   // The metric reporter for the model that this backend represents.
   std::shared_ptr<MetricModelReporter> metric_reporter_;
+
+  // The stats collector for the model that this backend represents.
+  std::shared_ptr<StatsAggregator> stats_collector_;
 
   // Label provider for this model.
   std::shared_ptr<LabelProvider> label_provider_;

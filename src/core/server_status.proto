@@ -53,85 +53,6 @@ message StatDuration
 }
 
 //@@
-//@@.. cpp:var:: message StatusRequestStats
-//@@
-//@@   Statistics collected for Status requests.
-//@@
-message StatusRequestStats
-{
-  //@@  .. cpp:var:: StatDuration success
-  //@@
-  //@@     Total time required to handle successful Status requests, not
-  //@@     including HTTP or gRPC endpoint termination time.
-  //@@
-  StatDuration success = 1;
-}
-
-//@@
-//@@.. cpp:var:: message HealthRequestStats
-//@@
-//@@   Statistics collected for Health requests.
-//@@
-message HealthRequestStats
-{
-  //@@  .. cpp:var:: StatDuration success
-  //@@
-  //@@     Total time required to handle successful Health requests, not
-  //@@     including HTTP or gRPC endpoint termination time.
-  //@@
-  StatDuration success = 1;
-}
-
-//@@
-//@@.. cpp:var:: message ModelControlRequestStats
-//@@
-//@@   Statistics collected for ModelControl requests.
-//@@
-message ModelControlRequestStats
-{
-  //@@  .. cpp:var:: StatDuration success
-  //@@
-  //@@     Total time required to handle successful ModelControl requests, not
-  //@@     including HTTP or gRPC endpoint termination time.
-  //@@
-  StatDuration success = 1;
-}
-
-//@@
-//@@.. cpp:var:: message SharedMemoryControlRequestStats
-//@@
-//@@   Statistics for SharedMemoryControl requests
-//@@
-//@@   [DEPRECATED] The message has been deprecated and will
-//@@   always report 0.
-//@@
-message SharedMemoryControlRequestStats
-{
-  option deprecated = true;
-  //@@  .. cpp:var:: StatDuration success
-  //@@
-  //@@     Total time required to handle successful SharedMemoryControl
-  //@@     requests, not including HTTP or gRPC endpoint termination time.
-  //@@
-  StatDuration success = 1;
-}
-
-//@@
-//@@.. cpp:var:: message RepositoryRequestStats
-//@@
-//@@   Statistics collected for Repository requests.
-//@@
-message RepositoryRequestStats
-{
-  //@@  .. cpp:var:: StatDuration success
-  //@@
-  //@@     Total time required to handle successful Repository requests, not
-  //@@     including HTTP or gRPC endpoint termination time.
-  //@@
-  StatDuration success = 1;
-}
-
-//@@
 //@@.. cpp:var:: message InferRequestStats
 //@@
 //@@   Statistics collected for Infer requests.
@@ -189,6 +110,36 @@ message InferRequestStats
   //@@     should include the time to copy output tensor data from the GPU.
   //@@
   StatDuration compute_output = 7;
+}
+
+//@@
+//@@.. cpp:var:: message InferBatchStats
+//@@
+//@@   Statistics collected for Infer batches.
+//@@
+message InferBatchStats
+{
+  //@@  .. cpp:var:: StatisticDuration compute_input
+  //@@
+  //@@    The count and cumulative duration to prepare input tensor data as
+  //@@    required by the model framework / backend. For example, this duration
+  //@@    should include the time to copy input tensor data to the GPU.
+  //@@
+  StatDuration compute_input = 1;
+
+  //@@  .. cpp:var:: StatisticDuration compute_infer
+  //@@
+  //@@     The count and cumulative duration to execute the model.
+  //@@
+  StatDuration compute_infer = 2;
+
+  //@@  .. cpp:var:: StatisticDuration compute_output
+  //@@
+  //@@     The count and cumulative duration to extract output tensor data
+  //@@     produced by the model framework / backend. For example, this duration
+  //@@     should include the time to copy output tensor data from the GPU.
+  //@@
+  StatDuration compute_output = 3;
 }
 
 //@@
@@ -265,41 +216,7 @@ message ModelVersionStatus
   //@@
   //@@     Supplemental information regarding the current readiness state.
   //@@
-  ModelReadyStateReason ready_state_reason = 5;
-
-  //@@  .. cpp:var:: map<uint32, InferRequestStats> infer_stats
-  //@@
-  //@@     Inference statistics for the model, as a map from batch size
-  //@@     to the statistics. A batch size will not occur in the map
-  //@@     unless there has been at least one inference request of
-  //@@     that batch size. However, for V2 API all InferRequestStats are
-  //@@     recorded at a single key which is 1.
-  //@@
-  map<uint32, InferRequestStats> infer_stats = 2;
-
-  //@@  .. cpp:var:: uint64 model_execution_count
-  //@@
-  //@@     Cumulative number of model executions performed for the
-  //@@     model. A single model execution performs inferencing for
-  //@@     the entire request batch and can perform inferencing for multiple
-  //@@     requests if dynamic batching is enabled.
-  //@@
-  uint64 model_execution_count = 3;
-
-  //@@  .. cpp:var:: uint64 model_inference_count
-  //@@
-  //@@     Cumulative number of model inferences performed for the
-  //@@     model. Each inference in a batched request is counted as
-  //@@     an individual inference.
-  //@@
-  uint64 model_inference_count = 4;
-
-  //@@  .. cpp:var:: uint64 last_inference_timestamp_milliseconds
-  //@@
-  //@@     The timestamp of the last inference request made for this model,
-  //@@     given as milliseconds since the epoch.
-  //@@
-  uint64 last_inference_timestamp_milliseconds = 6;
+  ModelReadyStateReason ready_state_reason = 2;
 }
 
 //@@
@@ -441,66 +358,12 @@ message SharedMemoryRegion
 //@@
 message ServerStatus
 {
-  //@@  .. cpp:var:: string id
-  //@@
-  //@@     The server's ID.
-  //@@
-  string id = 1;
-
-  //@@  .. cpp:var:: string version
-  //@@
-  //@@     The server's version.
-  //@@
-  string version = 2;
-
-  //@@  .. cpp:var:: ServerReadyState ready_state
-  //@@
-  //@@     Current readiness state for the server.
-  //@@
-  ServerReadyState ready_state = 7;
-
-  //@@  .. cpp:var:: uint64 uptime_ns
-  //@@
-  //@@     Server uptime in nanoseconds.
-  //@@
-  uint64 uptime_ns = 3;
-
   //@@  .. cpp:var:: map<string, ModelStatus> model_status
   //@@
   //@@     Status for each model, as a map from model name to the
   //@@     status.
   //@@
-  map<string, ModelStatus> model_status = 4;
-
-  //@@  .. cpp:var:: StatusRequestStats status_stats
-  //@@
-  //@@     Statistics for Status requests.
-  //@@
-  StatusRequestStats status_stats = 5;
-
-  //@@  .. cpp:var:: HealthRequestStats health_stats
-  //@@
-  //@@     Statistics for Health requests.
-  //@@
-  HealthRequestStats health_stats = 8;
-
-  //@@  .. cpp:var:: ModelControlRequestStats model_control_stats
-  //@@
-  //@@     Statistics for ModelControl requests.
-  //@@
-  ModelControlRequestStats model_control_stats = 9;
-
-  //@@  .. cpp:var:: SharedMemoryControlRequestStats shm_control_stats
-  //@@
-  //@@     [DEPRECATED] Statistics for SharedMemoryControl requests.
-  //@@
-  SharedMemoryControlRequestStats shm_control_stats = 10;
-
-  //@@  .. cpp:var:: RepositoryRequestStats repository_stats
-  //@@
-  //@@     Statistics for Repository requests.
-  //@@
-  RepositoryRequestStats repository_stats = 11;
+  map<string, ModelStatus> model_status = 1;
 }
 
 //@@

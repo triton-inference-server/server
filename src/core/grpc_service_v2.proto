@@ -891,17 +891,101 @@ message InferStatistics
 }
 
 //@@
+//@@.. cpp:var:: message InferBatchStatistics
+//@@
+//@@   Inference batch statistics.
+//@@
+message InferBatchStatistics
+{
+  //@@  .. cpp:var:: uint64 batch_size
+  //@@
+  //@@     The size of the batch.
+  //@@
+  uint64 batch_size = 1;
+
+  //@@  .. cpp:var:: StatisticDuration compute_input
+  //@@
+  //@@     The count and cumulative duration to prepare input tensor data as
+  //@@     required by the model framework / backend with the given batch size.
+  //@@     For example, this duration should include the time to copy input
+  //@@     tensor data to the GPU.
+  //@@
+  StatisticDuration compute_input = 2;
+
+  //@@  .. cpp:var:: StatisticDuration compute_infer
+  //@@
+  //@@     The count and cumulative duration to execute the model with the given
+  //@@     batch size.
+  //@@
+  StatisticDuration compute_infer = 3;
+
+  //@@  .. cpp:var:: StatisticDuration compute_output
+  //@@
+  //@@     The count and cumulative duration to extract output tensor data
+  //@@     produced by the model framework / backend with the given batch size.
+  //@@     For example, this duration should include the time to copy output
+  //@@     tensor data from the GPU.
+  //@@
+  StatisticDuration compute_output = 4;
+}
+
+//@@
+//@@.. cpp:var:: message ModelStatistics
+//@@
+//@@   Statistics for a specific model and version.
+//@@
+message ModelStatistics
+{
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name of the model. If not given returns statistics for all
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: string version
+  //@@
+  //@@     The version of the model.
+  //@@
+  string version = 2;
+
+  //@@  .. cpp:var:: uint64 last_inference
+  //@@
+  //@@     The timestamp of the last inference request made for this model,
+  //@@     as milliseconds since the epoch.
+  //@@
+  uint64 last_inference = 3;
+
+  //@@  .. cpp:var:: InferStatistics inference_stats
+  //@@
+  //@@     The aggregate statistics for the model/version. So, for example,
+  //@@     inference_stats:success indicates the number of successful inference
+  //@@     requests for the model.
+  //@@
+  InferStatistics inference_stats = 4;
+
+  //@@  .. cpp:var:: InferBatchStatistics batch_stats (repeated)
+  //@@
+  //@@     The aggregate statistics for each different batch size that is
+  //@@     executed in the model. The batch statistics indicate how many actual
+  //@@     model executions were performed and show differences due to different
+  //@@     batch size (for example, larger batches typically take longer to
+  //@@     compute).
+  //@@
+  repeated InferBatchStatistics batch_stats = 5;
+}
+
+//@@
 //@@.. cpp:var:: message ModelStatisticsResponse
 //@@
 //@@   Response message for ModelStatistics.
 //@@
 message ModelStatisticsResponse
 {
-  //@@  .. cpp:var:: map<string, InferStatistics> inference
+  //@@  .. cpp:var:: ModelStatistics model_stats (repeated)
   //@@
-  //@@     Map from version to inference statistics for that version.
+  //@@     // Statistics for each requested model.
   //@@
-  map<string, InferStatistics> inference = 1;
+  repeated ModelStatistics model_stats = 1;
 }
 
 //@@

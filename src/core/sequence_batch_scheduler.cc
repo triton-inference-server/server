@@ -317,7 +317,7 @@ SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
 #ifdef TRTIS_ENABLE_STATS
   // Queue timer starts at the beginning of the queueing and
   // scheduling process
-  stats->CaptureTimestamp(ModelInferStats::TimestampKind::kQueueStart);
+  irequest->CaptureQueueStartNs();
 #endif  // TRTIS_ENABLE_STATS
 
   // For now the request must have batch-size 1 since the sequence
