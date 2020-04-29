@@ -50,7 +50,7 @@ class InferTest(unittest.TestCase):
                 output0_raw=True, output1_raw=True,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
-                use_http_json_tensors=True, skip_request_id_check=True, use_streaming=False,
+                use_http_json_tensors=True, skip_request_id_check=True, use_streaming=True,
                 correlation_id=0):
             for bs in (1, batch_size):
                 # model that does not support batching
