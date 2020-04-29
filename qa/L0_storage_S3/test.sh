@@ -41,7 +41,7 @@ CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 
 # S3 credentials are necessary for this test. Pass via ENV variables
-aws configure set default.region us-west-1 && \
+aws configure set default.region $AWS_DEFAULT_REGION && \
     aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
     aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
 
@@ -61,96 +61,44 @@ SERVER_TIMEOUT=360
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 
-SERVER_LOG=$SERVER_LOG_BASE.log
-CLIENT_LOG=$CLIENT_LOG_BASE.log
-    
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
-
 RET=0
 
-# Construct model repository
-
-KIND="KIND_GPU"
-
-for MAYBE_SLASH in "" "/"; do
-
-    ROOT_REPO="$BUCKET_URL$MAYBE_SLASH"
-    MODEL_REPO="${BUCKET_URL_SLASH}models${MAYBE_SLASH}"
-
-    # copy models in model directory
-    rm -rf models && mkdir -p models
-
-    # perform empty repo tests
-
-    SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120"
-
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
+# Test 3 Scenarios:
+# 1. Only AWS ENV vars (Without aws configure)
+# 2. AWS ENV vars + dummy values in aws configure [ENV vars have higher priority]
+# 3. Only aws configure (Without AWS ENV vars)
+for ENV_VAR in "env" "env_dummy" "config"; do
+    SERVER_LOG=$SERVER_LOG_BASE.$ENV_VAR.log
+    CLIENT_LOG=$CLIENT_LOG_BASE.$ENV_VAR.log
+    
+    if [ "$ENV_VAR" == "config" ]; then
+        unset AWS_ACCESS_KEY_ID
+        unset AWS_SECRET_ACCESS_KEY
+        unset AWS_DEFAULT_REGION
+    elif [ "$ENV_VAR" == "env_dummy" ]; then
+        aws configure set default.region "dummy_region" && \
+            aws configure set aws_access_key_id "dummy_id" && \
+            aws configure set aws_secret_access_key "dummy_key"
+    else
+        rm ~/.aws/credentials && rm ~/.aws/config
     fi
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+    # Construct model repository
 
-    # run with a non-root empty model repo
-    touch models/dummy
-    aws s3 cp . "$BUCKET_URL_SLASH" --recursive --include "*"
+    KIND="KIND_GPU"
 
-    SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
+    for MAYBE_SLASH in "" "/"; do
 
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
+        ROOT_REPO="$BUCKET_URL$MAYBE_SLASH"
+        MODEL_REPO="${BUCKET_URL_SLASH}models${MAYBE_SLASH}"
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+        # copy models in model directory
+        rm -rf models && mkdir -p models
 
-    aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
-    rm models/dummy
+        # perform empty repo tests
 
-    # Now start model tests
-
-    for FW in graphdef savedmodel netdef onnx libtorch plan; do
-        cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32/ models/
-    done
-
-    # Copy models with string inputs and remove nobatch (bs=1) models
-    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object/ models/
-    rm -rf models/*nobatch*
-
-    for FW in graphdef savedmodel netdef onnx libtorch plan; do
-        for MC in `ls models/${FW}*/config.pbtxt`; do
-            echo "instance_group [ { kind: ${KIND} }]" >> $MC
-        done
-    done
-
-    # now traverse the tree and create empty version directories that the CLI skips
-    for dir in `ls models/`; do
-        for subdir in `ls models/$dir`; do
-            if [ -d models/$dir/$subdir ] && [ -z "$(ls models/$dir/$subdir)" ]; then
-                touch models/$dir/$subdir/$subdir
-            fi
-        done
-    done
-
-    # Perform test with model repository variants
-    for src in "models/" "."  ; do
-
-        # copy contents of /models into GCS bucket.
-        aws s3 cp $src $BUCKET_URL_SLASH --recursive --include "*"
-
-        if [ "$src" == "." ]; then
-            # set server arguments
-            SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
-        else
-            # set server arguments
-            SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120"
-        fi
+        SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120"
 
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -159,34 +107,132 @@ for MAYBE_SLASH in "" "/"; do
             exit 1
         fi
 
-        set +e
+        kill $SERVER_PID
+        wait $SERVER_PID
 
-        # python unittest seems to swallow ImportError and still return 0
-        # exit code. So need to explicitly check CLIENT_LOG to make sure
-        # we see some running tests
-        python $INFER_TEST >$CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Failed\n***"
-            RET=1
+        # run with a non-root empty model repo
+        touch models/dummy
+        if [ "$ENV_VAR" != "config" ]; then
+            aws configure set default.region $AWS_DEFAULT_REGION && \
+                aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+                aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+        fi
+        aws s3 cp . "$BUCKET_URL_SLASH" --recursive --include "*"
+        if [ "$ENV_VAR" == "env_dummy" ]; then
+            aws configure set default.region "dummy_region" && \
+                aws configure set aws_access_key_id "dummy_id" && \
+                aws configure set aws_secret_access_key "dummy_key"
+        elif [ "$ENV_VAR" == "env" ]; then
+            rm ~/.aws/credentials && rm ~/.aws/config
         fi
 
-        grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Failed To Run\n***"
-            RET=1
-        fi
+        SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
 
-        set -e
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
 
         kill $SERVER_PID
         wait $SERVER_PID
 
-        # Clean up bucket
+        if [ "$ENV_VAR" != "config" ]; then
+            aws configure set default.region $AWS_DEFAULT_REGION && \
+                aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+                aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+        fi
         aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+        rm models/dummy
+
+        # Now start model tests
+
+        for FW in graphdef savedmodel netdef onnx libtorch plan; do
+            cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32/ models/
+        done
+
+        # Copy models with string inputs and remove nobatch (bs=1) models
+        cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object/ models/
+        rm -rf models/*nobatch*
+
+        for FW in graphdef savedmodel netdef onnx libtorch plan; do
+            for MC in `ls models/${FW}*/config.pbtxt`; do
+                echo "instance_group [ { kind: ${KIND} }]" >> $MC
+            done
+        done
+
+        # now traverse the tree and create empty version directories that the CLI skips
+        for dir in `ls models/`; do
+            for subdir in `ls models/$dir`; do
+                if [ -d models/$dir/$subdir ] && [ -z "$(ls models/$dir/$subdir)" ]; then
+                    touch models/$dir/$subdir/$subdir
+                fi
+            done
+        done
+
+        # Perform test with model repository variants
+        for src in "models/" "."  ; do
+
+            # copy contents of /models into S3 bucket.
+            aws s3 cp $src $BUCKET_URL_SLASH --recursive --include "*"
+            if [ "$ENV_VAR" == "env_dummy" ]; then
+                aws configure set default.region "dummy_region" && \
+                    aws configure set aws_access_key_id "dummy_id" && \
+                    aws configure set aws_secret_access_key "dummy_key"
+            elif [ "$ENV_VAR" == "env" ]; then
+                rm ~/.aws/credentials && rm ~/.aws/config
+            fi
+
+            if [ "$src" == "." ]; then
+                # set server arguments
+                SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
+            else
+                # set server arguments
+                SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120"
+            fi
+
+            run_server
+            if [ "$SERVER_PID" == "0" ]; then
+                echo -e "\n***\n*** Failed to start $SERVER\n***"
+                cat $SERVER_LOG
+                exit 1
+            fi
+
+            set +e
+
+            # python unittest seems to swallow ImportError and still return 0
+            # exit code. So need to explicitly check CLIENT_LOG to make sure
+            # we see some running tests
+            python $INFER_TEST >$CLIENT_LOG 2>&1
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Failed\n***"
+                RET=1
+            fi
+
+            grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Failed To Run\n***"
+                RET=1
+            fi
+
+            set -e
+
+            kill $SERVER_PID
+            wait $SERVER_PID
+
+            # Clean up bucket
+            if [ "$ENV_VAR" != "config" ]; then
+                aws configure set default.region $AWS_DEFAULT_REGION && \
+                    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+                    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+            fi
+            aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+        done
     done
-done 
+done
 
 aws s3 rb "${BUCKET_URL}"
 
