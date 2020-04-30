@@ -68,7 +68,7 @@ NextUniqueId()
 #define NEXT_UNIQUE_ID NextUniqueId()
 #else
 #define NEXT_UNIQUE_ID (0)
-#endif
+#endif  // NDEBUG
 
 //
 // C++11 doesn't have a barrier so we implement our own.
@@ -270,9 +270,9 @@ class HandlerState {
       }
 
 #ifdef TRTIS_ENABLE_TRACING
-      if (state->trace_meta_data_ != nullptr) {
-        state->trace_meta_data_->tracer_->CaptureTimestamp(
-            TRITONSERVER_TRACE_LEVEL_MIN, "grpc send start");
+      if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
+        state->trace_manager_->CaptureTimestamp(
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
       }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -358,7 +358,9 @@ class HandlerState {
   Steps step_;
 
 #ifdef TRTIS_ENABLE_TRACING
-  std::unique_ptr<TraceMetaData> trace_meta_data_;
+  TraceManager* trace_manager_;
+  TRITONSERVER_InferenceTrace* trace_;
+  uint64_t trace_id_;
 #endif  // TRTIS_ENABLE_TRACING
 
   RequestType request_;
@@ -2347,14 +2349,6 @@ SetInferenceRequestMetadata(
 }
 
 void
-TraceManagerComplete(TRITONSERVER_TraceManager* trace_manager, void* userp)
-{
-  LOG_VERBOSE(1) << "ModelInferHandler::TraceManagerComplete";
-
-  // FIXME need to sort out trace manager handling
-}
-
-void
 InferRequestComplete(TRITONSERVER_InferenceRequest* request, void* userp)
 {
   LOG_VERBOSE(1) << "ModelInferHandler::InferRequestComplete";
@@ -2494,7 +2488,7 @@ class ModelInferHandler
   ModelInferHandler(
       const std::string& name,
       const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
-      const std::shared_ptr<TraceManager>& trace_manager,
+      TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
@@ -2517,7 +2511,7 @@ class ModelInferHandler
   static void InferResponseComplete(
       TRITONSERVER_InferenceResponse* response, void* userp);
 
-  std::shared_ptr<TraceManager> trace_manager_;
+  TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
   TRITONSERVER_ResponseAllocator* allocator_;
 };
@@ -2529,11 +2523,17 @@ ModelInferHandler::StartNewRequest()
   State* state = StateNew(context);
 
 #ifdef TRTIS_ENABLE_TRACING
+  state->trace_manager_ = nullptr;
+  state->trace_ = nullptr;
+  state->trace_id_ = 0;
   if (trace_manager_ != nullptr) {
-    state->trace_meta_data_.reset(trace_manager_->SampleTrace());
-    if (state->trace_meta_data_ != nullptr) {
-      state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
+    state->trace_ = trace_manager_->SampleTrace();
+    if (state->trace_ != nullptr) {
+      state->trace_manager_ = trace_manager_;
+      TRITONSERVER_InferenceTraceId(state->trace_, &state->trace_id_);
+      trace_manager_->CaptureTimestamp(
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+          "GRPC_WAITREAD_START");
     }
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -2573,21 +2573,9 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
   if (state->step_ == Steps::START) {
     TRITONSERVER_Error* err = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
-    if (state->trace_meta_data_ != nullptr) {
-      int64_t requested_model_version;
-      err = GetModelVersionFromString(
-          request.model_version(), &requested_model_version);
-      if (err == nullptr) {
-        state->trace_meta_data_->tracer_->SetModel(
-            request.model_name(), requested_model_version);
-      } else {
-        // If failed to retrieve the requested_model_version
-        // then use the default model version just to record
-        // the timestamps in the tracer
-        state->trace_meta_data_->tracer_->SetModel(request.model_name(), -1);
-      }
-      state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
+    if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
+      state->trace_manager_->CaptureTimestamp(
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_WAITREAD_END");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -2637,22 +2625,13 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
           InferResponseComplete, reinterpret_cast<void*>(state));
     }
     if (err == nullptr) {
-      // Provide the trace manager object to use for this request, if
-      // nullptr then no tracing will be performed.
-      TRITONSERVER_TraceManager* trace_manager = nullptr;
+      TRITONSERVER_InferenceTrace* trace = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
-      if (state->trace_meta_data_ != nullptr) {
-        TRITONSERVER_TraceManagerNew(
-            &trace_manager, TraceManager::CreateTrace,
-            TraceManager::ReleaseTrace, state->trace_meta_data_.get());
-      }
+      trace = state->trace_;
 #endif  // TRTIS_ENABLE_TRACING
 
       state->step_ = ISSUED;
-
-      err = TRITONSERVER_ServerInferAsync(
-          tritonserver_.get(), irequest, trace_manager, TraceManagerComplete,
-          nullptr /* trace_release_userp */);
+      err = TRITONSERVER_ServerInferAsync(tritonserver_.get(), irequest, trace);
     }
 
     // If not error then state->step_ == ISSUED and inference request
@@ -2672,9 +2651,9 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
       response.Clear();
 
 #ifdef TRTIS_ENABLE_TRACING
-      if (state->trace_meta_data_ != nullptr) {
-        state->trace_meta_data_->tracer_->CaptureTimestamp(
-            TRITONSERVER_TRACE_LEVEL_MIN, "grpc send start");
+      if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
+        state->trace_manager_->CaptureTimestamp(
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
       }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -2683,9 +2662,9 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
     }
   } else if (state->step_ == Steps::COMPLETE) {
 #ifdef TRTIS_ENABLE_TRACING
-    if (state->trace_meta_data_ != nullptr) {
-      state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRITONSERVER_TRACE_LEVEL_MIN, "grpc send end");
+    if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
+      state->trace_manager_->CaptureTimestamp(
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_END");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -2722,13 +2701,10 @@ ModelInferHandler::InferResponseComplete(
       TRITONSERVER_InferenceResponseDelete(iresponse),
       "deleting GRPC inference response");
 
-  // FIXME
-  // Don't need to explicitly delete 'trace_manager'. It will be deleted by
-  // the TraceMetaData object in 'state'.
 #ifdef TRTIS_ENABLE_TRACING
-  if (state->trace_meta_data_ != nullptr) {
-    state->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRITONSERVER_TRACE_LEVEL_MIN, "grpc send start");
+  if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
+    state->trace_manager_->CaptureTimestamp(
+        state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
   }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -2749,7 +2725,7 @@ class ModelStreamInferHandler
   ModelStreamInferHandler(
       const std::string& name,
       const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
-      const std::shared_ptr<TraceManager>& trace_manager,
+      TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count)
@@ -2772,7 +2748,7 @@ class ModelStreamInferHandler
   static void StreamInferResponseComplete(
       TRITONSERVER_InferenceResponse* response, void* userp);
 
-  std::shared_ptr<TraceManager> trace_manager_;
+  TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
   TRITONSERVER_ResponseAllocator* allocator_;
 };
@@ -2784,11 +2760,17 @@ ModelStreamInferHandler::StartNewRequest()
   State* state = StateNew(context);
 
 #ifdef TRTIS_ENABLE_TRACING
+  state->trace_manager_ = nullptr;
+  state->trace_ = nullptr;
+  state->trace_id_ = 0;
   if (trace_manager_ != nullptr) {
-    state->trace_meta_data_.reset(trace_manager_->SampleTrace());
-    if (state->trace_meta_data_ != nullptr) {
-      state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
+    state->trace_ = trace_manager_->SampleTrace();
+    if (state->trace_ != nullptr) {
+      state->trace_manager_ = trace_manager_;
+      TRITONSERVER_InferenceTraceId(state->trace_, &state->trace_id_);
+      state->trace_manager_->CaptureTimestamp(
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+          "GRPC_WAITREAD_START");
     }
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -2834,22 +2816,9 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     TRITONSERVER_Error* err = nullptr;
     const ModelInferRequest& request = state->request_;
 #ifdef TRTIS_ENABLE_TRACING
-    if (state->trace_meta_data_ != nullptr) {
-      int64_t requested_model_version;
-      err = GetModelVersionFromString(
-          request.model_version(), &requested_model_version);
-      if (err == nullptr) {
-        state->trace_meta_data_->tracer_->SetModel(
-            state->request_.model_name(), requested_model_version);
-      } else {
-        // If failed to retrieve the requested_model_version
-        // then use the default model version just to record
-        // the timestamps in the tracer
-        state->trace_meta_data_->tracer_->SetModel(
-            state->request_.model_name(), -1);
-      }
-      state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
+    if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
+      state->trace_manager_->CaptureTimestamp(
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_WAITREAD_END");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -2928,22 +2897,13 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
           StreamInferResponseComplete, reinterpret_cast<void*>(state));
     }
     if (err == nullptr) {
-      // Provide the trace manager object to use for this request, if
-      // nullptr then no tracing will be performed.
-      TRITONSERVER_TraceManager* trace_manager = nullptr;
+      TRITONSERVER_InferenceTrace* trace = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
-      if (state->trace_meta_data_ != nullptr) {
-        TRITONSERVER_TraceManagerNew(
-            &trace_manager, TraceManager::CreateTrace,
-            TraceManager::ReleaseTrace, state->trace_meta_data_.get());
-      }
+      trace = state->trace_;
 #endif  // TRTIS_ENABLE_TRACING
 
       state->step_ = ISSUED;
-
-      err = TRITONSERVER_ServerInferAsync(
-          tritonserver_.get(), irequest, trace_manager, TraceManagerComplete,
-          nullptr /* trace_release_userp */);
+      err = TRITONSERVER_ServerInferAsync(tritonserver_.get(), irequest, trace);
     }
 
     // If there was not an error in issuing the 'state' request then
@@ -2977,11 +2937,18 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 #ifdef TRTIS_ENABLE_TRACING
     // Capture a timestamp for the time when we start waiting for this
     // next request to read.
+    next_read_state->trace_manager_ = nullptr;
+    next_read_state->trace_ = nullptr;
+    next_read_state->trace_id_ = 0;
     if (trace_manager_ != nullptr) {
-      next_read_state->trace_meta_data_.reset(trace_manager_->SampleTrace());
-      if (next_read_state->trace_meta_data_ != nullptr) {
-        next_read_state->trace_meta_data_->tracer_->CaptureTimestamp(
-            TRITONSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
+      next_read_state->trace_ = trace_manager_->SampleTrace();
+      if (next_read_state->trace_ != nullptr) {
+        next_read_state->trace_manager_ = trace_manager_;
+        TRITONSERVER_InferenceTraceId(
+            next_read_state->trace_, &next_read_state->trace_id_);
+        next_read_state->trace_manager_->CaptureTimestamp(
+            next_read_state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+            "GRPC_WAITREAD_START");
       }
     }
 #endif  // TRTIS_ENABLE_TRACING
@@ -2991,9 +2958,9 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
   } else if (state->step_ == Steps::WRITTEN) {
 #ifdef TRTIS_ENABLE_TRACING
-    if (state->trace_meta_data_ != nullptr) {
-      state->trace_meta_data_->tracer_->CaptureTimestamp(
-          TRITONSERVER_TRACE_LEVEL_MIN, "grpc send end");
+    if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
+      state->trace_manager_->CaptureTimestamp(
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_END");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -3072,10 +3039,6 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       TRITONSERVER_InferenceResponseDelete(iresponse),
       "deleting GRPC inference response");
 
-  // FIXME
-  // Don't need to explicitly delete 'trace_manager'. It will be deleted by
-  // the TraceMetaData object in 'state'.
-
   state->step_ = Steps::WRITEREADY;
   state->context_->WriteResponseIfReady(state);
 }
@@ -3087,7 +3050,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 //
 GRPCServerV2::GRPCServerV2(
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
+    nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const std::string& server_addr, const int infer_allocation_pool_size)
     : server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
@@ -3104,7 +3067,7 @@ GRPCServerV2::~GRPCServerV2()
 TRITONSERVER_Error*
 GRPCServerV2::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
+    nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
     int infer_allocation_pool_size, std::unique_ptr<GRPCServerV2>* grpc_server)
 {
