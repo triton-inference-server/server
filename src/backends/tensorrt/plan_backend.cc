@@ -1505,6 +1505,154 @@ PlanBackend::WarmUp(
   OnCompleteWarmup(status);
 }
 
+bool
+PlanBackend::Context::SetShapeInputBuffer(
+    const std::string& name, const int32_t total_batch_size,
+    const int expected_byte_size, const bool support_batching,
+    std::unique_ptr<InferenceRequest>& request,
+    TRITONSERVER_MemoryType dst_memory_type, int64_t dst_memory_type_id,
+    char* input_buffer)
+{
+  if (request == nullptr) {
+    return false;
+  }
+
+  size_t buffer_copy_offset = support_batching ? sizeof(int32_t) : 0;
+
+  const InferenceRequest::Input* rinput;
+  Status status = request->ImmutableInput(name, &rinput);
+  if (!status.IsOk()) {
+    // FIXME    InferenceRequest::RespondWithError(request, status);
+    return false;
+  }
+
+  auto src_memory_type = dst_memory_type;
+  auto src_memory_type_id = dst_memory_type_id;
+  const void* content;
+  size_t content_byte_size = expected_byte_size;
+
+  // This code assumes that the entire tensor data is in a single
+  // buffer... but the expected_byte_size check below will fail if
+  // that is not the case.
+  status = rinput->DataBuffer(
+      0 /* idx */, &content, &content_byte_size, &src_memory_type,
+      &src_memory_type_id);
+  if (!status.IsOk()) {
+    // FIXME    InferenceRequest::RespondWithError(request, status);
+    return false;
+  }
+
+  if ((expected_byte_size) != (int)content_byte_size) {
+    // FIXME    InferenceRequest::RespondWithError(
+    //        request, Status(
+    //                   Status::Code::INVALID_ARG,
+    //                 "unexpected size " + std::to_string(content_byte_size) +
+    //                   " for inference input '" + name + "', expecting " +
+    //                 std::to_string(expected_byte_size)));
+    return false;
+  }
+
+  bool cuda_copy = false;
+
+  if (content_byte_size > 0) {
+    bool cuda_used = false;
+    status = CopyBuffer(
+        name, src_memory_type, src_memory_type_id, dst_memory_type,
+        dst_memory_type_id, expected_byte_size, content,
+        input_buffer + buffer_copy_offset, stream_, &cuda_used);
+    if (!status.IsOk()) {
+      // FIXME      InferenceRequest::RespondWithError(request, status);
+      return cuda_copy;
+    }
+  }
+
+  if (support_batching) {
+    bool cuda_used = false;
+    status = CopyBuffer(
+        name, TRITONSERVER_MEMORY_CPU, 0, dst_memory_type, dst_memory_type_id,
+        sizeof(int32_t), (void*)&total_batch_size, input_buffer, stream_,
+        &cuda_used);
+    if (!status.IsOk()) {
+      // FIXME      InferenceRequest::RespondWithError(request, status);
+    }
+    cuda_copy |= cuda_used;
+  }
+
+  return cuda_copy;
+}
+
+bool
+PlanBackend::Context::SetOutputShapeTensorBuffer(
+    const std::string& name, const int32_t* content,
+    std::vector<int64_t>& content_shape, const bool support_batching,
+    TRITONSERVER_MemoryType src_memory_type, int64_t src_memory_type_id,
+    std::vector<std::unique_ptr<InferenceRequest>>* requests)
+{
+  if (content_shape.empty()) {
+    return false;
+  }
+
+  bool cuda_copy = false;
+  int shape_index = (support_batching ? 1 : 0);
+  int nb_shape_values = content_shape[shape_index];
+  for (auto& request : *requests) {
+    int this_batch_size = request->BatchSize();
+    // Fix the content shape for this request
+    if (support_batching) {
+      content_shape[0] = this_batch_size;
+    }
+
+    const size_t expected_byte_size =
+        nb_shape_values * sizeof(int32_t) * this_batch_size;
+
+    // If 'request' should have valid output (status ok) and
+    // if 'request' requested this output then copy it from
+    // 'content'. If it did not request this output then just
+    // skip it in the 'content'.
+    if ((request != nullptr) &&
+        false /* FIXME request->RequiresOutput(name) */) {
+      auto dst_memory_type = src_memory_type;
+      int64_t dst_memory_type_id = 0;
+      char* buffer = nullptr;
+
+      Status status(Status::Code::INTERNAL, "NYI...");
+#if 0
+      // FIXME
+      response_provider_->AllocateOutputBuffer(
+          name, (void**)&buffer, expected_byte_size, content_shape,
+          src_memory_type, src_memory_type_id, &dst_memory_type,
+          &dst_memory_type_id);
+#endif
+      if (status.IsOk() && (expected_byte_size != 0)) {
+        if (buffer == nullptr) {
+          status = Status(
+              Status::Code::INTERNAL,
+              "failed to allocate buffer for output '" + name + "'");
+        } else {
+          bool cuda_used = false;
+          size_t content_offset = support_batching ? 1 : 0;
+          size_t buffer_offset = 0;
+          for (int i = 0; i < this_batch_size; i++) {
+            status = CopyBuffer(
+                name, src_memory_type, src_memory_type_id, dst_memory_type,
+                dst_memory_type_id, nb_shape_values * sizeof(int32_t),
+                (void*)(content + content_offset),
+                (void*)(buffer + buffer_offset), stream_, &cuda_used);
+            cuda_copy |= cuda_used;
+            buffer_offset += nb_shape_values * sizeof(int32_t);
+          }
+        }
+      }
+
+      if (!status.IsOk()) {
+        // FIXME        InferenceRequest::RespondWithError(request, status);
+      }
+    }
+  }
+
+  return cuda_copy;
+}
+
 Status
 PlanBackend::Context::Run(
     const InferenceBackend* base, std::vector<Scheduler::Payload>* payloads)
