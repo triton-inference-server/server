@@ -185,7 +185,7 @@ set(
   scheduler_utils.cc
   sequence_batch_scheduler.cc
   server.cc
-  server_status.cc
+  infer_stats.cc
   status.cc
   tracing.cc
   tritonserver.cc
@@ -219,7 +219,7 @@ set(
   scheduler_utils.h
   sequence_batch_scheduler.h
   server.h
-  server_status.h
+  infer_stats.h
   status.h
   tracing.h
   tritonserver.h

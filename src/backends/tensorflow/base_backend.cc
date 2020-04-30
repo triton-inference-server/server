@@ -31,10 +31,10 @@
 #include "src/backends/tensorflow/tf_virtual_device.h"
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"
+#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
-#include "src/core/server_status.h"
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -588,11 +588,13 @@ SetStringOutputBuffer(
 
 void
 BaseBackend::Context::Run(
-    const InferenceBackend* base,
+    InferenceBackend* base,
     std::vector<std::unique_ptr<InferenceRequest>>&& requests)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << requests.size()
                  << " requests";
+
+  INFER_STATS_DECL_TIMESTAMP(compute_start_ns);
 
   const InferenceRequest* repr_input_request = nullptr;
 
@@ -829,14 +831,7 @@ BaseBackend::Context::Run(
   }
 #endif
 
-#ifdef TRTIS_ENABLE_STATS
-  for (auto& request : *requests) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeInputEnd);
-    }
-  }
-#endif  // TRTIS_ENABLE_STATS
+  INFER_STATS_DECL_TIMESTAMP(compute_input_end_ns);
 
   // Run. Session will update the 'output_tensors'.
   std::unique_ptr<TRTISTF_TensorList, decltype(&TRTISTF_TensorListDelete)>
@@ -872,14 +867,7 @@ BaseBackend::Context::Run(
     output_tensors.reset(rtl);
   }
 
-#ifdef TRTIS_ENABLE_STATS
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeOutputStart);
-    }
-  }
-#endif  // TRTIS_ENABLE_STATS
+  INFER_STATS_DECL_TIMESTAMP(compute_output_start_ns);
 
   // Create the response tensors and copy the appropriate tensor data
   // into each. For tensors with string data type we must handle
@@ -959,6 +947,21 @@ BaseBackend::Context::Run(
     cudaStreamSynchronize(stream_);
   }
 #endif  // TRTIS_ENABLE_GPU
+
+#ifdef TRTIS_ENABLE_STATS
+  INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
+
+  // Report stats
+  for (size_t i = 0; i < requests.size(); ++i) {
+    requests[i]->ReportStatistics(
+        (responses[i] != nullptr), compute_start_ns, compute_input_end_ns,
+        compute_output_start_ns, compute_end_ns);
+  }
+  // Also reporting batch stats
+  base->MutableStatsAggregator()->UpdateInferBatchStats(
+      total_batch_size, compute_start_ns, compute_input_end_ns,
+      compute_output_start_ns, compute_end_ns);
+#endif  // TRTIS_ENABLE_STATS
 
   // Send all the responses that haven't already been sent because of
   // an earlier error.

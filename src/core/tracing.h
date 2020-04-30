@@ -28,7 +28,7 @@
 #include <atomic>
 #include <memory>
 #include <vector>
-#include "src/core/server_status.h"
+#include "src/core/infer_stats.h"
 #include "src/core/status.h"
 #include "src/core/tritonserver.h"
 
@@ -71,7 +71,10 @@ class Trace {
   int64_t Id() const { return id_; }
   int64_t ParentId() const { return parent_id_; }
 
+  // FIXME
+#if 0
   void Report(const ModelInferStats* infer_stats);
+#endif
 
  private:
   Trace(
