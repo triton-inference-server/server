@@ -32,10 +32,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "src/core/constants.h"
+#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/nvtx.h"
-#include "src/core/server_status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -173,14 +173,9 @@ DynamicBatchScheduler::~DynamicBatchScheduler()
 Status
 DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 {
-#ifdef TRTIS_ENABLE_STATS
-  // FIXME this stat is needed for correct batcher functioning so should
-  // not be ifdefed
-  //
   // Queue timer starts at the beginning of the queueing and
   // scheduling process
-  stats->CaptureTimestamp(ModelInferStats::TimestampKind::kQueueStart);
-#endif  // TRTIS_ENABLE_STATS
+  request->CaptureQueueStartNs();
 
   Status enqueue_status;
   bool wake_runner = false;

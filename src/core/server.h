@@ -34,9 +34,9 @@
 #include <vector>
 
 #include "src/core/api.pb.h"
+#include "src/core/infer_stats.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_repository_manager.h"
-#include "src/core/server_status.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/status.h"
 
@@ -69,18 +69,20 @@ class InferenceServer {
   Status IsReady(bool* ready);
   Status ModelIsReady(
       const std::string& model_name, const int64_t model_version, bool* ready);
+
+  // Return the ready versions of specific model
   Status ModelReadyVersions(
       const std::string& model_name, std::vector<int64_t>* versions);
+
+  // Return the ready versions of all models
+  Status ModelReadyVersions(
+      std::map<std::string, std::vector<int64_t>>* model_versions);
 
   // Inference. If Status::Success is returned then this function has
   // taken ownership of the request object and so 'request' will be
   // nullptr. If non-success is returned then the caller still retains
   // ownership of 'request'.
   Status InferAsync(std::unique_ptr<InferenceRequest>& request);
-
-  // Update the ServerStatus object with the status of the model. If
-  // 'model_name' is empty, update with the status of all models.
-  Status GetStatus(ServerStatus* server_status, const std::string& model_name);
 
   // Update the ModelRepositoryIndex object with the index of the model
   // repository.
@@ -191,12 +193,6 @@ class InferenceServer {
     tf_vgpu_memory_limits_ = memory_limits;
   }
 
-  // Return the status manager for this server.
-  std::shared_ptr<ServerStatusManager> StatusManager() const
-  {
-    return status_manager_;
-  }
-
   // Return the requested InferenceBackend object.
   Status GetInferenceBackend(
       const std::string& model_name, const int64_t model_version,
@@ -241,7 +237,6 @@ class InferenceServer {
   // for all in-flight requests to complete before exiting.
   std::atomic<uint64_t> inflight_request_counter_;
 
-  std::shared_ptr<ServerStatusManager> status_manager_;
   std::unique_ptr<ModelRepositoryManager> model_repository_manager_;
 };
 
