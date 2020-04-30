@@ -34,12 +34,12 @@
 
 #ifdef TRTIS_ENABLE_S3
 #include <aws/core/Aws.h>
+#include <aws/core/auth/AWSCredentialsProvider.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/model/GetObjectRequest.h>
 #include <aws/s3/model/HeadBucketRequest.h>
 #include <aws/s3/model/HeadObjectRequest.h>
 #include <aws/s3/model/ListObjectsRequest.h>
-#include <aws/core/auth/AWSCredentialsProvider.h>
 #endif  // TRTIS_ENABLE_S3
 
 #include <google/protobuf/io/coded_stream.h>
@@ -923,7 +923,7 @@ S3FileSystem::DownloadFileFolder(
   std::string effective_path, host_name, host_port, bucket, object;
   if (RE2::FullMatch(
           path, s3_regex_, &host_name, &host_port, &bucket, &object)) {
-    effective_path = "s3://" + bucket + '/' + object;
+    effective_path = "s3://" + bucket + object;
   } else {
     effective_path = path;
   }
@@ -937,7 +937,8 @@ S3FileSystem::DownloadFileFolder(
     if (tmp_folder == nullptr) {
       return Status(
           Status::Code::INTERNAL,
-          "Failed to create local temp folder: " + file_template);
+          "Failed to create local temp folder: " + file_template +
+              ", errno:" + strerror(errno));
     }
 
     *local_path = std::string(tmp_folder);
@@ -953,10 +954,11 @@ S3FileSystem::DownloadFileFolder(
         int status = mkdir(
             const_cast<char*>(local_fpath.c_str()),
             S_IRUSR | S_IWUSR | S_IXUSR);
-        if (!status) {
+        if (status == -1) {
           return Status(
               Status::Code::INTERNAL,
-              "Failed to create local folder: " + local_fpath);
+              "Failed to create local folder: " + local_fpath +
+                  ", errno:" + strerror(errno));
         }
 
         // Add with s3 path
@@ -964,7 +966,7 @@ S3FileSystem::DownloadFileFolder(
         RETURN_IF_ERROR(GetDirectoryFiles(s3_fpath, &subdir_files));
         for (auto itr = subdir_files.begin(); itr != subdir_files.end();
              ++itr) {
-          files.insert(JoinPath({s3_fpath, *iter}));
+          files.insert(JoinPath({s3_fpath, *itr}));
         }
 
       } else {
@@ -992,13 +994,12 @@ S3FileSystem::DownloadFileFolder(
         output_file.close();
       } else {
         return Status(
-            Status::Code::INTERNAL,
-            "Failed to get object at " + effective_path);
+            Status::Code::INTERNAL, "Failed to get object at " + *iter);
       }
     }
   } else {
     int status = mkstemp(const_cast<char*>(file_template.c_str()));
-    if (!status) {
+    if (status == -1) {
       return Status(
           Status::Code::INTERNAL,
           "Failed to create local temp file: " + file_template);
