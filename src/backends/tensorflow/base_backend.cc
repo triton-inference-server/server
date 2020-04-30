@@ -31,7 +31,6 @@
 #include "src/backends/tensorflow/tf_virtual_device.h"
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"
-#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
@@ -951,12 +950,25 @@ BaseBackend::Context::Run(
 #ifdef TRTIS_ENABLE_STATS
   INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
 
-  // Report stats
+  // Report stats and trace
   for (size_t i = 0; i < requests.size(); ++i) {
-    requests[i]->ReportStatistics(
+    auto& request = requests[i];
+    request->ReportStatistics(
         (responses[i] != nullptr), compute_start_ns, compute_input_end_ns,
         compute_output_start_ns, compute_end_ns);
+
+#ifdef TRTIS_ENABLE_TRACING
+    if (request->Trace() != nullptr) {
+      auto& trace = request->Trace();
+      trace->Report(TRITONSERVER_TRACE_COMPUTE_START, compute_start_ns);
+      trace->Report(TRITONSERVER_TRACE_COMPUTE_INPUT_END, compute_input_end_ns);
+      trace->Report(
+          TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
+      trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
+    }
+#endif  // TRTIS_ENABLE_TRACING
   }
+
   // Also reporting batch stats
   base->MutableStatsAggregator()->UpdateInferBatchStats(
       total_batch_size, compute_start_ns, compute_input_end_ns,
