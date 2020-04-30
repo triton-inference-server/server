@@ -26,9 +26,7 @@
 #pragma once
 
 #include <functional>
-#include "src/core/api.pb.h"
 #include "src/core/infer_request.h"
-#include "src/core/infer_stats.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {

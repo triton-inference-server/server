@@ -28,13 +28,21 @@
 #include <time.h>
 #include <map>
 #include <mutex>
+#include "src/core/constants.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/status.h"
+#include "src/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
-// A stats aggregator used for one backend.
-class StatsAggregator {
+#ifdef TRTIS_ENABLE_STATS
+
+//
+// InferenceStatsAggregator
+//
+// A statistics aggregator.
+//
+class InferenceStatsAggregator {
  public:
   struct InferStats {
     InferStats()
@@ -68,7 +76,7 @@ class StatsAggregator {
   };
 
   // Create an aggregator for model statistics
-  StatsAggregator() : last_inference_ms_(0) {}
+  InferenceStatsAggregator() : last_inference_ms_(0) {}
 
   // Set metric reporter for the model statistics
   void SetMetricReporter(
@@ -96,8 +104,8 @@ class StatsAggregator {
       const uint64_t request_end_ns);
 
   // Add durations to batch infer stats for a batch execution.
-  // 'success_request_count' is the number of sucess requests in the batch that
-  // have infer_stats attached.
+  // 'success_request_count' is the number of sucess requests in the
+  // batch that have infer_stats attached.
   void UpdateInferBatchStats(
       size_t batch_size, const uint64_t compute_start_ns,
       const uint64_t compute_input_end_ns,
@@ -111,8 +119,10 @@ class StatsAggregator {
   std::shared_ptr<MetricModelReporter> metric_reporter_;
 };
 
+#endif  // TRTIS_ENABLE_STATS
+
 //
-// Macros to set infer stats
+// Macros to set infer stats.
 //
 #ifdef TRTIS_ENABLE_STATS
 #define INFER_STATS_SET_TIMESTAMP(TS_NS) \
@@ -128,4 +138,5 @@ class StatsAggregator {
 #define INFER_STATS_DECL_TIMESTAMP(TS_NS)
 #define INFER_STATS_SET_TIMESTAMP(TS_NS)
 #endif  // TRTIS_ENABLE_STATS
-}}      // namespace nvidia::inferenceserver
+
+}}  // namespace nvidia::inferenceserver
