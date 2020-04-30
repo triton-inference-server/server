@@ -29,10 +29,10 @@
 #include <stdint.h>
 #include "src/backends/custom/loader.h"
 #include "src/core/constants.h"
+#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
-#include "src/core/server_status.h"
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -319,11 +319,13 @@ CustomBackend::InitBackend(uint32_t runner_idx)
 
 void
 CustomBackend::Context::Run(
-    const InferenceBackend* base,
+    InferenceBackend* base,
     std::vector<std::unique_ptr<InferenceRequest>>&& requests)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << requests.size()
                  << " requests";
+
+  INFER_STATS_DECL_TIMESTAMP(compute_start_ns);
 
   // For each request collect the total batch size for this inference
   // execution. The batch-size, number of inputs, and size of each
@@ -460,14 +462,7 @@ CustomBackend::Context::Run(
     custom_payload.error_code = 0;
   }
 
-#ifdef TRTIS_ENABLE_STATS
-  for (auto& request : requests) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeInputEnd);
-    }
-  }
-#endif  // TRTIS_ENABLE_STATS
+  INFER_STATS_DECL_TIMESTAMP(compute_input_end_ns);
 
 #ifdef TRTIS_ENABLE_GPU
   if (current_execute_device_ != CUSTOM_NO_GPU_DEVICE) {
@@ -520,14 +515,7 @@ CustomBackend::Context::Run(
   cudaStreamSynchronize(stream_);
 #endif  // TRTIS_ENABLE_GPU
 
-#ifdef TRTIS_ENABLE_STATS
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeOutputStart);
-    }
-  }
-#endif  // TRTIS_ENABLE_STATS
+  INFER_STATS_DECL_TIMESTAMP(compute_output_start_ns);
 
   // If the custom execute function returns an error then it did not
   // send any responses and so send an error response and releasee
@@ -542,6 +530,21 @@ CustomBackend::Context::Run(
         true /* release_requests */);
     return;
   }
+
+#ifdef TRTIS_ENABLE_STATS
+  INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
+
+  // Report stats
+  for (size_t i = 0; i < custom_payloads.size(); ++i) {
+    requests[i]->ReportStatistics(
+        (custom_payloads[i].error_code == 0), compute_start_ns,
+        compute_input_end_ns, compute_output_start_ns, compute_end_ns);
+  }
+  // Also reporting batch stats
+  base->MutableStatsAggregator()->UpdateInferBatchStats(
+      total_batch_size, compute_start_ns, compute_input_end_ns,
+      compute_output_start_ns, compute_end_ns);
+#endif  // TRTIS_ENABLE_STATS
 
   // Send the response for each custom payload and release the request
   // as we are done with it. If a payload has an error then send an
