@@ -535,6 +535,15 @@ InferenceRequest::NormalizeV2(const InferenceBackend& backend)
     batch_size_ = 0;
     for (auto& pr : original_inputs_) {
       auto& input = pr.second;
+
+      // Keep shape tensor's shape as it is
+      const ModelInput* input_config;
+      RETURN_IF_ERROR(backend.GetInput(pr.first, &input_config));
+      if (input_config->is_shape_tensor()) {
+        *input.MutableShape() = input.OriginalShape();
+        continue;
+      }
+
       if (input.OriginalShape().size() == 0) {
         return Status(
             Status::Code::INVALID_ARG,
