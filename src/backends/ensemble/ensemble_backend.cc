@@ -29,7 +29,6 @@
 #include <stdint.h>
 #include "src/core/constants.h"
 #include "src/core/ensemble_scheduler.h"
-#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 

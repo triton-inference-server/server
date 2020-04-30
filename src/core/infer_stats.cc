@@ -27,14 +27,15 @@
 #include "src/core/infer_stats.h"
 
 #include <time.h>
-#include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 
 namespace nvidia { namespace inferenceserver {
 
+#ifdef TRTIS_ENABLE_STATS
+
 void
-StatsAggregator::UpdateFailure(
+InferenceStatsAggregator::UpdateFailure(
     const uint64_t request_start_ns, const uint64_t request_end_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
@@ -49,7 +50,7 @@ StatsAggregator::UpdateFailure(
 }
 
 void
-StatsAggregator::UpdateSuccess(
+InferenceStatsAggregator::UpdateSuccess(
     const uint64_t request_start_ns, const uint64_t queue_start_ns,
     const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
     const uint64_t compute_output_start_ns, const uint64_t compute_end_ns,
@@ -90,7 +91,7 @@ StatsAggregator::UpdateSuccess(
 }
 
 void
-StatsAggregator::UpdateInferBatchStats(
+InferenceStatsAggregator::UpdateInferBatchStats(
     size_t batch_size, const uint64_t compute_start_ns,
     const uint64_t compute_input_end_ns, const uint64_t compute_output_start_ns,
     const uint64_t compute_end_ns)
@@ -122,5 +123,7 @@ StatsAggregator::UpdateInferBatchStats(
   }
 #endif  // TRTIS_ENABLE_METRICS
 }
+
+#endif  // TRTIS_ENABLE_STATS
 
 }}  // namespace nvidia::inferenceserver

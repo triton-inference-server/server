@@ -32,7 +32,6 @@
 #include <unistd.h>
 #include "src/core/constants.h"
 #include "src/core/dynamic_batch_scheduler.h"
-#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 
@@ -313,11 +312,11 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
 Status
 SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
 {
-#ifdef TRTIS_ENABLE_STATS
   // Queue timer starts at the beginning of the queueing and
   // scheduling process
-  irequest->CaptureQueueStartNs();
-#endif  // TRTIS_ENABLE_STATS
+  INFER_TRACE_ACTIVITY(
+      irequest->Trace(), TRITONSERVER_TRACE_QUEUE_START,
+      irequest->CaptureQueueStartNs());
 
   // For now the request must have batch-size 1 since the sequence
   // batcher does not yet support requests that are statically

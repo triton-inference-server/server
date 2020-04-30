@@ -52,13 +52,12 @@ extern "C" {
 struct TRITONSERVER_Error;
 struct TRITONSERVER_InferenceRequest;
 struct TRITONSERVER_InferenceResponse;
+struct TRITONSERVER_InferenceTrace;
 struct TRITONSERVER_Message;
 struct TRITONSERVER_Metrics;
 struct TRITONSERVER_ResponseAllocator;
 struct TRITONSERVER_Server;
 struct TRITONSERVER_ServerOptions;
-struct TRITONSERVER_Trace;
-struct TRITONSERVER_TraceManager;
 
 /// TRITONSERVER_DataType
 ///
@@ -341,9 +340,9 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_MetricsFormatted(
     TRITONSERVER_Metrics* metrics, TRITONSERVER_Metric_Format format,
     const char** base, size_t* byte_size);
 
-/// TRITONSERVER_Trace
+/// TRITONSERVER_InferenceTrace
 ///
-/// Object that represents tracing for a request.
+/// Object that represents tracing for an inference request.
 ///
 
 /// Trace levels
@@ -351,149 +350,129 @@ typedef enum tritonserver_tracelevel_enum {
   TRITONSERVER_TRACE_LEVEL_DISABLED,
   TRITONSERVER_TRACE_LEVEL_MIN,
   TRITONSERVER_TRACE_LEVEL_MAX
-} TRITONSERVER_Trace_Level;
+} TRITONSERVER_InferenceTraceLevel;
+
+/// Get the string representation of a trace level. The returned
+/// string is not owned by the caller and so should not be modified or
+/// freed.
+///
+/// \param level The trace level.
+/// \return The string representation of the trace level.
+TRITONSERVER_EXPORT const char* TRITONSERVER_InferenceTraceLevelString(
+    TRITONSERVER_InferenceTraceLevel level);
 
 // Trace activities
 typedef enum tritonserver_traceactivity_enum {
-  TRITONSERVER_TRACE_REQUEST_START,
-  TRITONSERVER_TRACE_QUEUE_START,
-  TRITONSERVER_TRACE_COMPUTE_START,
-  TRITONSERVER_TRACE_COMPUTE_INPUT_END,
-  TRITONSERVER_TRACE_COMPUTE_OUTPUT_START,
-  TRITONSERVER_TRACE_COMPUTE_END,
-  TRITONSERVER_TRACE_REQUEST_END
-} TRITONSERVER_Trace_Activity;
+  TRITONSERVER_TRACE_REQUEST_START = 0,
+  TRITONSERVER_TRACE_QUEUE_START = 1,
+  TRITONSERVER_TRACE_COMPUTE_START = 2,
+  TRITONSERVER_TRACE_COMPUTE_INPUT_END = 3,
+  TRITONSERVER_TRACE_COMPUTE_OUTPUT_START = 4,
+  TRITONSERVER_TRACE_COMPUTE_END = 5,
+  TRITONSERVER_TRACE_REQUEST_END = 6
+} TRITONSERVER_InferenceTraceActivity;
+
+/// Get the string representation of a trace activity. The returned
+/// string is not owned by the caller and so should not be modified or
+/// freed.
+///
+/// \param activity The trace activity.
+/// \return The string representation of the trace activity.
+TRITONSERVER_EXPORT const char* TRITONSERVER_InferenceTraceActivityString(
+    TRITONSERVER_InferenceTraceActivity activity);
 
 /// Type for trace activity callback function. This callback function
-/// is used to report activity occurring during a traced request. The
-/// 'userp' data is the same as what is supplied in the call to
-/// TRITONSERVER_TraceNew.
-typedef void (*TRITONSERVER_TraceActivityFn_t)(
-    TRITONSERVER_Trace* trace, TRITONSERVER_Trace_Activity activity,
-    uint64_t timestamp_ns, void* userp);
+/// is used to report activity occurring for a trace. This function
+/// does not take ownership of 'trace' and so any information needed
+/// from that object must be copied before returning. The 'userp' data
+/// is the same as what is supplied in the call to
+/// TRITONSERVER_InferenceTraceNew.
+typedef void (*TRITONSERVER_InferenceTraceActivityFn_t)(
+    TRITONSERVER_InferenceTrace* trace,
+    TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
+    void* userp);
 
-/// Create a new trace object. The caller takes ownership of the
-/// TRITONSERVER_Trace object and must call TRITONSERVER_TraceDelete to
-/// release the object.
+/// Type for trace release callback function. This callback function
+/// is called when all activity for the trace has completed. The
+/// callback function takes ownership of the
+/// TRITONSERVER_InferenceTrace object. The 'userp' data is the same
+/// as what is supplied in the call to TRITONSERVER_InferenceTraceNew.
+typedef void (*TRITONSERVER_InferenceTraceReleaseFn_t)(
+    TRITONSERVER_InferenceTrace* trace, void* userp);
+
+/// Create a new inference trace object. The caller takes ownership of
+/// the TRITONSERVER_InferenceTrace object and must call
+/// TRITONSERVER_TraceDelete to release the object.
 ///
-/// \param trace Returns the new trace object.
+/// The activity callback function will be called to report activity
+/// for 'trace' as well as for any child traces that are spawned by
+/// 'trace', and so the activity callback must check the trace object
+/// to determine specifically what activity is being reported.
+///
+/// The release callback is called for both 'trace' and for any child
+/// traces spawned by 'trace'.
+///
+/// \param trace Returns the new infernece trace object.
 /// \param level The tracing level.
+/// \param parent_id The parent trace id for this trace. A value of 0
+/// indicates that there is not parent trace.
 /// \param activity_fn The callback function where activity for the
 /// trace is reported.
-/// \param activity_userp User-provided pointer that is delivered to
-/// the activity function.
+/// \param release_fn The callback function called when all activity
+/// is complete for the trace.
+/// \param trace_userp User-provided pointer that is delivered to
+/// the activity and release callback functions.
 /// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_TraceNew(
-    TRITONSERVER_Trace** trace, TRITONSERVER_Trace_Level level,
-    TRITONSERVER_TraceActivityFn_t activity_fn, void* activity_userp);
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceTraceNew(
+    TRITONSERVER_InferenceTrace** trace, TRITONSERVER_InferenceTraceLevel level,
+    uint64_t parent_id, TRITONSERVER_InferenceTraceActivityFn_t activity_fn,
+    TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* trace_userp);
 
 /// Delete a trace object.
 ///
 /// \param trace The trace object.
 /// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_TraceDelete(
-    TRITONSERVER_Trace* trace);
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceTraceDelete(
+    TRITONSERVER_InferenceTrace* trace);
 
-/// Get the name of the model being traced. The caller
-/// does not own the returned string and must not modify or delete
-/// it. The lifetime of the returned string extends only as long as
-/// 'trace' and must not be accessed once 'trace' is deleted.
-/// This method is only guaranteed to correctly return the 'model_name' in the
-/// invocation of TRITONSERVER_TraceManagerReleaseTraceFn_t
+/// Get the id associated with a trace. Every trace is assigned an id
+/// that is unique across all traces created for a Triton server.
 ///
-/// \param trace The trace object.
-/// \param model_name Returns the name of the model being traced.
+/// \param trace The trace.
+/// \param id Returns the id associated with the trace.
 /// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_TraceModelName(
-    TRITONSERVER_Trace* trace, const char** model_name);
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceTraceId(
+    TRITONSERVER_InferenceTrace* trace, uint64_t* id);
 
-/// Get the version of the model being traced.
-/// This method is only guaranteed to correctly return the 'model_version' in
-/// the invocation of TRITONSERVER_TraceManagerReleaseTraceFn_t
+/// Get the parent id associated with a trace. The parent id indicates
+/// a parent-child relationship between two traces. A parent id value
+/// of 0 indicates that there is no parent trace.
 ///
-/// \param trace The trace object.
-/// \param model_version Returns the version of the model being traced.
+/// \param trace The trace.
+/// \param id Returns the parent id associated with the trace.
 /// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_TraceModelVersion(
-    TRITONSERVER_Trace* trace, int64_t* model_version);
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceTraceParentId(
+    TRITONSERVER_InferenceTrace* trace, uint64_t* parent_id);
 
-/// Get the id of the trace object. Each trace object created during execution
-/// of the inference server has a unique id.
+/// Get the name of the model associated with a trace. The caller does
+/// not own the returned string and must not modify or delete it. The
+/// lifetime of the returned string extends only as long as 'trace'.
 ///
-/// \param trace The trace object.
-/// \param id Returns the id of the trace object.
+/// \param trace The trace.
+/// \param model_name Returns the name of the model associated with
+/// the trace.
 /// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_TraceId(
-    TRITONSERVER_Trace* trace, int64_t* id);
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceTraceModelName(
+    TRITONSERVER_InferenceTrace* trace, const char** model_name);
 
-/// Get the parent id of the trace object. The parent id will be set if the
-/// trace object is created from within another traced request, and the parent
-/// id will be set to the id of the trace object associated with that
-/// traced request.
-/// This method is only guaranteed to correctly return the 'parent_id' in
-/// the invocation of TRITONSERVER_TraceManagerReleaseTraceFn_t
+/// Get the version of the model associated with a trace.
 ///
-/// \param trace The trace object.
-/// \param parent_id Returns the parent id of the trace object. -1 indicates
-/// that the trace object has no parent.
+/// \param trace The trace.
+/// \param model_version Returns the version of the model associated
+/// with the trace.
 /// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_TraceParentId(
-    TRITONSERVER_Trace* trace, int64_t* parent_id);
-
-/// TRITONSERVER_TraceManager
-///
-/// Object representing a manager for initiating traces.
-///
-
-/// Type for trace manager release callback function. The callback
-/// function takes ownership of the TRITONSERVER_TraceManager
-/// object. The 'userp' data is the same as what is supplied in the
-/// call to TRITONSERVER_ServerInferAsync.
-typedef void (*TRITONSERVER_TraceManagerReleaseFn_t)(
-    TRITONSERVER_TraceManager* trace_manager, void* userp);
-
-/// Type for trace creation callback function. This callback function
-/// is used when a model execution is initiated within the request, if the
-/// request is to be traced. The user should call TRITONSERVER_TraceNew and
-/// return the new trace object if the user decides to trace the model
-/// execution. Otherwise, the user should set 'trace' == nullptr. The 'userp'
-/// data is the same as 'userp' supplied in the call to
-/// TRITONSERVER_TraceManagerNew.
-typedef void (*TRITONSERVER_TraceManagerCreateTraceFn_t)(
-    TRITONSERVER_Trace** trace, const char* model_name, int64_t version,
-    void* userp);
-
-/// Type for trace release callback function. This callback function
-/// is invoked when the model execution being traced is completed. By this
-/// point, it is the user's responsiblity to delete 'trace' object created from
-/// TRITONSERVER_TraceManagerCreateTraceFn_t by calling
-/// TRITONSERVER_TraceDelete. The 'activity_userp' data is the same as
-/// 'activity_userp' supplied in the call to TRITONSERVER_TraceNew. The 'userp'
-/// data is the same as 'userp' supplied in the call to
-/// TRITONSERVER_TraceManagerNew.
-typedef void (*TRITONSERVER_TraceManagerReleaseTraceFn_t)(
-    TRITONSERVER_Trace* trace, void* activity_userp, void* userp);
-
-/// Create a new trace manager object.
-///
-/// \param trace_manager Returns the new trace manager object.
-/// \param create_fn The function to call to create trace object for a request.
-/// \param release_fn The function to call when the request associated with a
-/// trace object is complete.
-/// \param userp User-provided pointer that is delivered to the trace
-/// creation and release function.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_TraceManagerNew(
-    TRITONSERVER_TraceManager** trace_manager,
-    TRITONSERVER_TraceManagerCreateTraceFn_t create_fn,
-    TRITONSERVER_TraceManagerReleaseTraceFn_t release_fn, void* userp);
-
-/// Delete a trace manager.
-///
-/// \param trace_manager The trace manager object.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_TraceManagerDelete(
-    TRITONSERVER_TraceManager* trace_manager);
+TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceTraceModelVersion(
+    TRITONSERVER_InferenceTrace* trace, int64_t* model_version);
 
 /// TRITONSERVER_InferenceRequest
 ///
@@ -1309,13 +1288,12 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerMetrics(
 /// caller releases ownership of 'inference_request' and must not
 /// access it in any way after this call, until ownership is returned
 /// via the 'request_release_fn' callback registered in the request
-/// object with
-/// TRITONSERVER_InferenceRequestSetReleaseCallback. Similarly, the
-/// caller releases ownership of 'trace_manager' and must not access
-/// it in any way after this call, until ownership is returned via the
-/// 'trace_release_fn' callback. If the function returns a non-success
-/// error then the caller retains ownership of both
-/// 'inference_request' and 'trace_manager'.
+/// object with TRITONSERVER_InferenceRequestSetReleaseCallback.
+///
+/// The function unconditionally takes ownership of 'trace' and so the
+/// caller must not access it in any way after this call (except in
+/// the trace id callback) until ownership is returned via the trace's
+/// release_fn callback.
 ///
 /// Responses produced for this request are returned using the
 /// allocator and callback register with the request by
@@ -1323,20 +1301,13 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerMetrics(
 ///
 /// \param server The inference server object.
 /// \param inference_request The request object.
-/// \param trace_manager The trace manager object for this request, or
-/// nullptr if no tracing.
-/// \param trace_manager_release_fn The function called to return
-/// ownership of the 'trace_manager' object. May be nullptr if no
-/// trace manager.
-/// \param trace_manager_release_userp User-provided pointer that is
-/// delivered to the 'trace_managerrelease_fn' callback.
+/// \param trace The trace object for this request, or nullptr if no
+/// tracing.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerInferAsync(
     TRITONSERVER_Server* server,
     TRITONSERVER_InferenceRequest* inference_request,
-    TRITONSERVER_TraceManager* trace_manager,
-    TRITONSERVER_TraceManagerReleaseFn_t trace_manager_release_fn,
-    void* trace_manager_release_userp);
+    TRITONSERVER_InferenceTrace* trace);
 
 
 #ifdef __cplusplus
