@@ -408,6 +408,10 @@ InferenceRequest::PrepareForInference()
     inputs_.emplace(std::make_pair(pr.first, std::addressof(pr.second)));
   }
 
+  // Clear the timestamps
+  request_start_ns_ = 0;
+  queue_start_ns_ = 0;
+
   LOG_VERBOSE(1) << "prepared: " << *this;
 
   return Status::Success;
@@ -569,6 +573,55 @@ InferenceRequest::Normalize()
   }
 
   return Status::Success;
+}
+
+void
+InferenceRequest::ReportStatistics(
+    bool success, const uint64_t compute_start_ns,
+    const uint64_t compute_input_end_ns, const uint64_t compute_output_start_ns,
+    const uint64_t compute_end_ns)
+{
+#ifdef TRTIS_ENABLE_STATS
+  INFER_STATS_DECL_TIMESTAMP(request_end_ns);
+
+  if (success) {
+    backend_raw_->MutableStatsAggregator()->UpdateSuccess(
+        request_start_ns_, queue_start_ns_, compute_start_ns,
+        compute_input_end_ns, compute_output_start_ns, compute_end_ns,
+        request_end_ns);
+    if (secondary_stats_aggregator_ != nullptr) {
+      secondary_stats_aggregator_->UpdateSuccess(
+          request_start_ns_, queue_start_ns_, compute_start_ns,
+          compute_input_end_ns, compute_output_start_ns, compute_end_ns,
+          request_end_ns);
+    }
+  } else {
+    backend_raw_->MutableStatsAggregator()->UpdateFailure(
+        request_start_ns_, request_end_ns);
+    if (secondary_stats_aggregator_ != nullptr) {
+      secondary_stats_aggregator_->UpdateFailure(
+          request_start_ns_, request_end_ns);
+    }
+  }
+
+#ifdef TRTIS_ENABLE_TRACING
+  // FIXME Report() should now accept all timestamps as there is no InferStats
+  // object that contains all available timestamps
+  if (trace_ != nullptr) {
+    trace_->Report(this);
+    // Inform that the trace object is done and can be released
+    if (trace_manager_->using_triton_) {
+      trace_manager_->triton_release_fn_(
+          reinterpret_cast<TRITONSERVER_Trace*>(trace_),
+          trace_->ActivityUserp(), trace_manager_->userp_);
+    } else {
+      trace_manager_->release_fn_(
+          reinterpret_cast<TRITONSERVER_Trace*>(trace_),
+          trace_->ActivityUserp(), trace_manager_->userp_);
+    }
+  }
+#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRTIS_ENABLE_STATS
 }
 
 //
