@@ -107,6 +107,31 @@ class PlanBackend : public InferenceBackend {
     Status InitOptimizationProfiles(
         const ::google::protobuf::RepeatedPtrField<std::string>& profile_names);
 
+    // Helper function to populate the shape value of specified shape
+    // input that corresponds with the batch size. The first shape
+    // value is asssumed to be the batch size. Its the user's
+    // responsibility to ensure it is called only for the shape
+    // tensors. Return true if cudaMemcpyAsync is called, and the
+    // caller should call cudaStreamSynchronize before using the
+    // data. Otherwise, return false.
+    bool SetShapeInputBuffer(
+        const std::string& name, const int32_t total_batch_size,
+        const int expected_byte_size, const bool support_batching,
+        std::unique_ptr<InferenceRequest>& request,
+        TRITONSERVER_MemoryType dst_memory_type, int64_t dst_memory_type_id,
+        char* input_buffer);
+
+    // Helper function to set output buffer for a shape tensor. It is
+    // callers resposibilty to ensure this method is called only for
+    // the shape tensors. Return true if cudaMemcpyAsync is called,
+    // and the caller should call cudaStreamSynchronize before using
+    // the data. Otherwise, return false.
+    bool SetOutputShapeTensorBuffer(
+        const std::string& name, const int32_t* content,
+        std::vector<int64_t>& content_shape, const bool support_batching,
+        TRITONSERVER_MemoryType src_memory_type, int64_t src_memory_type_id,
+        std::vector<std::unique_ptr<InferenceRequest>>* requests);
+
     // See BackendContext::Run()
     Status Run(
         const InferenceBackend* base,
