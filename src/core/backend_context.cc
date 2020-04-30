@@ -62,7 +62,7 @@ GetContiguousInputContent(
   *cuda_copy = false;
   contiguous_buffer->reset();
 
-  // Peek input buffers to check if data copy is necessary
+  // Check input buffers to see if data copy is necessary
   MemoryReference input_buffers;
   size_t chunk_count = 0;
   bool type_mismatch = false;
@@ -400,16 +400,6 @@ BackendContext::CompareOutputDims(
   }
 
   return Status::Success;
-}
-
-Status
-BackendContext::PeekShapeTensor(
-    const InferenceRequest::Input& input,
-    const std::unique_ptr<InferenceRequest>& request,
-    std::vector<int64_t>* shape)
-{
-  // By default a backend doesn't support shape tensors.
-  return Status(Status::Code::INTERNAL, "shape tensors not supported");
 }
 
 //

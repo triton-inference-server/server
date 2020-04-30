@@ -179,8 +179,7 @@ InferenceBackend::SetScheduler(std::unique_ptr<Scheduler> scheduler)
 Status
 InferenceBackend::SetConfiguredScheduler(
     const uint32_t runner_cnt, const Scheduler::StandardInitFunc& OnInit,
-    const Scheduler::StandardRunFunc& OnRun,
-    const Scheduler::StandardShapeTensorPeekFunc& OnPeek)
+    const Scheduler::StandardRunFunc& OnRun)
 {
   std::unique_ptr<Scheduler> scheduler;
 
@@ -239,7 +238,7 @@ InferenceBackend::SetConfiguredScheduler(
   if (config_.has_sequence_batching()) {
     // Sequence batcher
     RETURN_IF_ERROR(SequenceBatchScheduler::Create(
-        config_, runner_cnt, OnInit, OnWarmup, OnRun, OnPeek,
+        config_, runner_cnt, OnInit, OnWarmup, OnRun,
         enforce_equal_shape_tensors, &scheduler));
   } else if (config_.has_dynamic_batching()) {
     // Dynamic batcher
@@ -250,7 +249,7 @@ InferenceBackend::SetConfiguredScheduler(
 
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         0 /* runner_id_start */, runner_cnt, GetCpuNiceLevel(config_), OnInit,
-        OnWarmup, OnRun, OnPeek, true /* dynamic_batching_enabled */,
+        OnWarmup, OnRun, true /* dynamic_batching_enabled */,
         enforce_equal_shape_tensors,
         config_.dynamic_batching().preserve_ordering(), preferred_batch_sizes,
         config_.dynamic_batching().max_queue_delay_microseconds(),
@@ -262,7 +261,7 @@ InferenceBackend::SetConfiguredScheduler(
     // disabled) as the default scheduler.
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         0 /* runner_id_start */, runner_cnt, GetCpuNiceLevel(config_), OnInit,
-        OnWarmup, OnRun, OnPeek, false /* dynamic_batching_enabled */,
+        OnWarmup, OnRun, false /* dynamic_batching_enabled */,
         std::unordered_map<
             std::string, bool>() /* enforce_equal_shape_tensors */,
         false /* preserve_ordering */,

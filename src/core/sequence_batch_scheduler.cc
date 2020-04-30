@@ -43,7 +43,6 @@ SequenceBatchScheduler::Create(
     const ModelConfig& config, const uint32_t runner_cnt,
     const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
     const StandardRunFunc& OnSchedule,
-    const StandardShapeTensorPeekFunc& OnPeek,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     std::unique_ptr<Scheduler>* scheduler)
 {
@@ -96,13 +95,13 @@ SequenceBatchScheduler::Create(
     if (config.sequence_batching().has_oldest()) {
       sb.reset(new OldestSequenceBatch(
           sched.get(), c, seq_slot_cnt, config, OnInit, OnWarmup, OnSchedule,
-          OnPeek, enforce_equal_shape_tensors, start, end, startend, cont,
-          notready, &init_state));
+          enforce_equal_shape_tensors, start, end, startend, cont, notready,
+          &init_state));
     } else {
       sb.reset(new DirectSequenceBatch(
           sched.get(), c, seq_slot_cnt, config, OnInit, OnWarmup, OnSchedule,
-          OnPeek, enforce_equal_shape_tensors, start, end, startend, cont,
-          notready, &init_state));
+          enforce_equal_shape_tensors, start, end, startend, cont, notready,
+          &init_state));
     }
 
     if (init_state.get_future().get()) {
@@ -798,7 +797,6 @@ DirectSequenceBatch::DirectSequenceBatch(
     const Scheduler::StandardInitFunc& OnInit,
     const Scheduler::StandardWarmupFunc& OnWarmup,
     const Scheduler::StandardRunFunc& OnSchedule,
-    const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         start_input_overrides,
@@ -816,7 +814,7 @@ DirectSequenceBatch::DirectSequenceBatch(
           start_input_overrides, end_input_overrides, startend_input_overrides,
           continue_input_overrides, notready_input_overrides),
       OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
-      OnPeek_(OnPeek), scheduler_thread_exit_(false), scheduler_idle_(false),
+      scheduler_thread_exit_(false), scheduler_idle_(false),
       queues_(seq_slot_cnt), seq_slot_correlation_ids_(seq_slot_cnt, 0),
       max_active_seq_slot_(-1)
 {
@@ -967,7 +965,7 @@ DirectSequenceBatch::SchedulerThread(
                  << delay_cnt
                  << " queued requests, current total = " << total_size;
       } else {
-        PendingBatchShapes pending_batch_shapes;
+        RequiredEqualInputs required_equal_inputs;
         InferenceRequest* null_irequest = nullptr;
 
         // Make one pass through the active slots to:
@@ -1006,7 +1004,7 @@ DirectSequenceBatch::SchedulerThread(
             // batched but has controls set to "not ready". Any
             // request can serve this purpose so grab a copy of the
             // first one. This first request is also used to
-            // initialize 'pending_batch_shapes' so we are sure that
+            // initialize 'required_equal_inputs' so we are sure that
             // this null request will have the correct shape for any
             // created batch.
             if (null_irequest == nullptr) {
@@ -1016,16 +1014,16 @@ DirectSequenceBatch::SchedulerThread(
             // If this is the first non-null request capture the shape
             // of the tensors that don't support ragged so we can
             // compare them to later requests.
-            if (pending_batch_shapes.empty() &&
+            if (required_equal_inputs.empty() &&
                 !enforce_equal_shape_tensors_.empty()) {
-              Status status = InitPendingShape(
-                  batcher_idx_, queue.front(), enforce_equal_shape_tensors_,
-                  OnPeek_, &pending_batch_shapes);
+              Status status = InitRequiredEqualInputs(
+                  queue.front(), enforce_equal_shape_tensors_,
+                  &required_equal_inputs);
               if (!status.IsOk()) {
                 LOG_ERROR
                     << "internal: unexpecting failure initializing shape: "
                     << status.Message();
-                pending_batch_shapes.clear();
+                required_equal_inputs.clear();
               }
             }
 
@@ -1051,10 +1049,11 @@ DirectSequenceBatch::SchedulerThread(
           // If there are one or more tensors that don't support
           // ragged batch, then don't allow a request into an existing
           // batch if shape differs.
-          else if (!pending_batch_shapes.empty()) {
-            if (!CompareWithPendingShape(
-                    batcher_idx_, queue.front(), OnPeek_,
-                    pending_batch_shapes)) {
+          else if (
+              !required_equal_inputs.empty() &&
+              !enforce_equal_shape_tensors_.empty()) {
+            if (!CompareWithRequiredEqualInputs(
+                    queue.front(), required_equal_inputs)) {
               use_null_request = true;
             }
           }
@@ -1172,7 +1171,6 @@ OldestSequenceBatch::OldestSequenceBatch(
     const Scheduler::StandardInitFunc& OnInit,
     const Scheduler::StandardWarmupFunc& OnWarmup,
     const Scheduler::StandardRunFunc& OnSchedule,
-    const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         start_input_overrides,
@@ -1209,7 +1207,7 @@ OldestSequenceBatch::OldestSequenceBatch(
 
   Status status = DynamicBatchScheduler::Create(
       batcher_idx_, 1 /* runner_cnt */, GetCpuNiceLevel(config), OnInit,
-      OnWarmup, OnSchedule, OnPeek, true /* dynamic_batching_enabled */,
+      OnWarmup, OnSchedule, true /* dynamic_batching_enabled */,
       enforce_equal_shape_tensors_, true /* preserve_ordering */,
       preferred_batch_sizes,
       config.sequence_batching().oldest().max_queue_delay_microseconds(),

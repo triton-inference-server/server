@@ -148,11 +148,7 @@ CustomBackend::CreateExecutionContexts(
           uint32_t runner_idx,
           std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
         Run(runner_idx, std::move(requests));
-      },
-      [this](
-          uint32_t runner_idx, const InferenceRequest::Input& input,
-          const std::unique_ptr<InferenceRequest>& request,
-          std::vector<int64_t>* shape) -> Status { return Status::Success; }));
+      }));
 
   LOG_VERBOSE(1) << "custom backend for " << Name() << std::endl << *this;
   return Status::Success;
