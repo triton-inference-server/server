@@ -28,6 +28,7 @@
 
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
+#include "src/core/metric_model_reporter.h"
 #include "src/core/nvtx.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -57,10 +58,12 @@ GetUsePinnedMemoryType(TRITONSERVER_MemoryType ref_buffer_type)
 //
 BackendContext::BackendContext(
     const std::string& name, const int gpu_device, const int max_batch_size,
-    const bool enable_pinned_input, const bool enable_pinned_output)
+    const bool enable_pinned_input, const bool enable_pinned_output,
+    std::unique_ptr<MetricModelReporter>&& metric_reporter)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
       enable_pinned_input_(enable_pinned_input),
-      enable_pinned_output_(enable_pinned_output)
+      enable_pinned_output_(enable_pinned_output),
+      metric_reporter_(std::move(metric_reporter))
 {
 #ifdef TRTIS_ENABLE_GPU
   stream_ = nullptr;

@@ -146,11 +146,6 @@ endif() # TRTIS_ENABLE_GPU
 #
 # Inference server core
 #
-if(${TRTIS_ENABLE_METRICS})
-  find_package(prometheus-cpp CONFIG REQUIRED)
-  message(STATUS "Using prometheus-cpp ${prometheus-cpp_VERSION}")
-endif() # TRTIS_ENABLE_METRICS
-
 if(${TRTIS_ENABLE_GCS})
   find_package(storage_client REQUIRED)
   message(STATUS "Using google-cloud-cpp ${storage_client_VERSION}")

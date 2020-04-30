@@ -32,6 +32,7 @@
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
+#include "src/core/metrics.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
 
@@ -43,10 +44,11 @@ namespace nvidia { namespace inferenceserver {
 
 BaseBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size,
-    const bool enable_pinned_input, const bool enable_pinned_output)
+    const bool enable_pinned_input, const bool enable_pinned_output,
+    std::unique_ptr<MetricModelReporter>&& metric_reporter)
     : BackendContext(
           name, gpu_device, max_batch_size, enable_pinned_input,
-          enable_pinned_output),
+          enable_pinned_output, std::move(metric_reporter)),
       trtistf_model_(nullptr, TRTISTF_ModelDelete),
       input_device_id_(MODEL_DEVICE)
 {
@@ -189,8 +191,17 @@ BaseBackend::CreateExecutionContext(
   const bool pinned_output =
       Config().optimization().output_pinned_memory().enable();
 
-  contexts_.emplace_back(
-      new Context(instance_name, gpu_device, mbs, pinned_input, pinned_output));
+  std::unique_ptr<MetricModelReporter> metric_reporter;
+#ifdef TRTIS_ENABLE_METRICS
+  if (Metrics::Enabled()) {
+    metric_reporter.reset(new MetricModelReporter(
+        Name(), Version(), gpu_device, Config().metric_tags()));
+  }
+#endif  // TRTIS_ENABLE_METRICS
+
+  contexts_.emplace_back(new Context(
+      instance_name, gpu_device, mbs, pinned_input, pinned_output,
+      std::move(metric_reporter)));
   Context* context = static_cast<Context*>(contexts_.back().get());
 
   RETURN_IF_ERROR(context->CreateCudaStream());
@@ -734,7 +745,7 @@ BaseBackend::Context::Run(
                 DataType_Name(datatype) + " for '" + name_ + "'");
 
         FAIL_ALL_AND_RETURN_IF_ERROR(
-            requests, responses, status,
+            requests, responses, metric_reporter_.get(), status,
             "error creating TensorFlow input tensor");
       }
 
@@ -839,7 +850,8 @@ BaseBackend::Context::Run(
       // every response that has not already been sent with an
       // error... send it now...
       FAIL_ALL_AND_RETURN_IF_ERROR(
-          requests, responses, status, "error sending TensorFlow response");
+          requests, responses, metric_reporter_.get(), status,
+          "error sending TensorFlow response");
     }
 
     output_tensors.reset(rtl);
@@ -935,8 +947,8 @@ BaseBackend::Context::Run(
   for (size_t i = 0; i < requests.size(); ++i) {
     auto& request = requests[i];
     request->ReportStatistics(
-        (responses[i] != nullptr), compute_start_ns, compute_input_end_ns,
-        compute_output_start_ns, compute_end_ns);
+        metric_reporter_.get(), (responses[i] != nullptr), compute_start_ns,
+        compute_input_end_ns, compute_output_start_ns, compute_end_ns);
 
 #ifdef TRTIS_ENABLE_TRACING
     if (request->Trace() != nullptr) {
@@ -952,8 +964,8 @@ BaseBackend::Context::Run(
 
   // Also reporting batch stats
   base->MutableStatsAggregator()->UpdateInferBatchStats(
-      total_batch_size, compute_start_ns, compute_input_end_ns,
-      compute_output_start_ns, compute_end_ns);
+      metric_reporter_.get(), total_batch_size, compute_start_ns,
+      compute_input_end_ns, compute_output_start_ns, compute_end_ns);
 #endif  // TRTIS_ENABLE_STATS
 
   // Send all the responses that haven't already been sent because of

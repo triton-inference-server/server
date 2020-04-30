@@ -58,3 +58,9 @@ add_dependencies(tensorrt-backend-library proto-library)
 if(${TRTIS_ENABLE_GPU})
   target_include_directories(tensorrt-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRTIS_ENABLE_GPU
+if(${TRTIS_ENABLE_METRICS})
+  target_include_directories(
+    tensorrt-backend-library
+    PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
+  )
+endif() # TRTIS_ENABLE_METRICS

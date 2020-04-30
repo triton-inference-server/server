@@ -33,6 +33,7 @@
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
+#include "src/core/metrics.h"
 #include "src/core/model_config_cuda.h"
 #include "src/core/model_config_utils.h"
 
@@ -53,10 +54,11 @@ namespace nvidia { namespace inferenceserver {
 
 OnnxBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size,
-    const bool enable_pinned_input, const bool enable_pinned_output)
+    const bool enable_pinned_input, const bool enable_pinned_output,
+    std::unique_ptr<MetricModelReporter>&& metric_reporter)
     : BackendContext(
           name, gpu_device, max_batch_size, enable_pinned_input,
-          enable_pinned_output),
+          enable_pinned_output, std::move(metric_reporter)),
       session_(nullptr), allocator_(nullptr)
 {
 }
@@ -205,8 +207,17 @@ OnnxBackend::CreateExecutionContext(
   const bool pinned_output =
       Config().optimization().output_pinned_memory().enable();
 
-  contexts_.emplace_back(
-      new Context(instance_name, gpu_device, mbs, pinned_input, pinned_output));
+  std::unique_ptr<MetricModelReporter> metric_reporter;
+#ifdef TRTIS_ENABLE_METRICS
+  if (Metrics::Enabled()) {
+    metric_reporter.reset(new MetricModelReporter(
+        Name(), Version(), gpu_device, Config().metric_tags()));
+  }
+#endif  // TRTIS_ENABLE_METRICS
+
+  contexts_.emplace_back(new Context(
+      instance_name, gpu_device, mbs, pinned_input, pinned_output,
+      std::move(metric_reporter)));
   Context* context = static_cast<Context*>(contexts_.back().get());
 
   RETURN_IF_ERROR(context->CreateCudaStream());
@@ -631,7 +642,7 @@ OnnxBackend::Context::Run(
   std::vector<const char*> input_names;
   bool cuda_copy = false;
   FAIL_ALL_AND_RETURN_IF_ERROR(
-      requests, responses,
+      requests, responses, metric_reporter_.get(),
       SetInputTensors(
           total_batch_size, requests, &responses, &input_buffers, &input_names,
           &cuda_copy),
@@ -656,13 +667,13 @@ OnnxBackend::Context::Run(
 
   // Run...
   FAIL_ALL_AND_RETURN_IF_ERROR(
-      requests, responses, OrtRun(input_names, output_names),
-      "error sending ONNX response");
+      requests, responses, metric_reporter_.get(),
+      OrtRun(input_names, output_names), "error sending ONNX response");
 
   INFER_STATS_DECL_TIMESTAMP(compute_output_start_ns);
 
   FAIL_ALL_AND_RETURN_IF_ERROR(
-      requests, responses,
+      requests, responses, metric_reporter_.get(),
       ReadOutputTensors(total_batch_size, output_names, requests, &responses),
       "error sending ONNX response");
 
@@ -673,8 +684,8 @@ OnnxBackend::Context::Run(
   for (size_t i = 0; i < requests.size(); ++i) {
     auto& request = requests[i];
     request->ReportStatistics(
-        (responses[i] != nullptr), compute_start_ns, compute_input_end_ns,
-        compute_output_start_ns, compute_end_ns);
+        metric_reporter_.get(), (responses[i] != nullptr), compute_start_ns,
+        compute_input_end_ns, compute_output_start_ns, compute_end_ns);
 
 #ifdef TRTIS_ENABLE_TRACING
     if (request->Trace() != nullptr) {
@@ -690,8 +701,8 @@ OnnxBackend::Context::Run(
 
   // Also reporting batch stats
   base->MutableStatsAggregator()->UpdateInferBatchStats(
-      total_batch_size, compute_start_ns, compute_input_end_ns,
-      compute_output_start_ns, compute_end_ns);
+      metric_reporter_.get(), total_batch_size, compute_start_ns,
+      compute_input_end_ns, compute_output_start_ns, compute_end_ns);
 #endif  // TRTIS_ENABLE_STATS
 
   // Send all the responses that haven't already been sent because of

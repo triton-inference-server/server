@@ -31,6 +31,7 @@
 #include <memory>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
+#include "src/core/metrics.h"
 #include "src/core/model_config_cuda.h"
 #include "src/core/model_config_utils.h"
 
@@ -51,10 +52,11 @@ struct LibTorchBackend::Context::InputMetaData {
 
 LibTorchBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size,
-    const bool enable_pinned_input, const bool enable_pinned_output)
+    const bool enable_pinned_input, const bool enable_pinned_output,
+    std::unique_ptr<MetricModelReporter>&& metric_reporter)
     : BackendContext(
           name, gpu_device, max_batch_size, enable_pinned_input,
-          enable_pinned_output),
+          enable_pinned_output, std::move(metric_reporter)),
       device_(torch::Device(torch::kCPU))
 {
 }
@@ -239,8 +241,17 @@ LibTorchBackend::CreateExecutionContext(
   const bool pinned_output =
       Config().optimization().output_pinned_memory().enable();
 
-  contexts_.emplace_back(
-      new Context(instance_name, gpu_device, mbs, pinned_input, pinned_output));
+  std::unique_ptr<MetricModelReporter> metric_reporter;
+#ifdef TRTIS_ENABLE_METRICS
+  if (Metrics::Enabled()) {
+    metric_reporter.reset(new MetricModelReporter(
+        Name(), Version(), gpu_device, Config().metric_tags()));
+  }
+#endif  // TRTIS_ENABLE_METRICS
+
+  contexts_.emplace_back(new Context(
+      instance_name, gpu_device, mbs, pinned_input, pinned_output,
+      std::move(metric_reporter)));
   Context* context = static_cast<Context*>(contexts_.back().get());
 
   RETURN_IF_ERROR(context->CreateCudaStream());

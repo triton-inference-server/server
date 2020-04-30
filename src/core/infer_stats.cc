@@ -37,71 +37,74 @@ namespace nvidia { namespace inferenceserver {
 
 void
 InferenceStatsAggregator::UpdateFailure(
-    const uint64_t request_start_ns, const uint64_t request_end_ns)
+    MetricModelReporter* metric_reporter, const uint64_t request_start_ns,
+    const uint64_t request_end_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
   infer_stats_.failure_count_++;
   infer_stats_.failure_duration_ns_ += (request_end_ns - request_start_ns);
 
 #ifdef TRTIS_ENABLE_METRICS
-  if (metric_reporter_ != nullptr) {
-    metric_reporter_->MetricInferenceFailure(device).Increment();
+  if (metric_reporter != nullptr) {
+    metric_reporter->MetricInferenceFailure().Increment();
   }
 #endif  // TRTIS_ENABLE_METRICS
 }
 
 void
 InferenceStatsAggregator::UpdateSuccess(
-    const uint64_t request_start_ns, const uint64_t queue_start_ns,
-    const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
-    const uint64_t compute_output_start_ns, const uint64_t compute_end_ns,
-    const uint64_t request_end_ns)
+    MetricModelReporter* metric_reporter, const uint64_t request_start_ns,
+    const uint64_t queue_start_ns, const uint64_t compute_start_ns,
+    const uint64_t compute_input_end_ns, const uint64_t compute_output_start_ns,
+    const uint64_t compute_end_ns, const uint64_t request_end_ns)
 {
+  const uint64_t request_duration_ns = request_end_ns - request_start_ns;
+  const uint64_t queue_duration_ns = compute_start_ns - queue_start_ns;
+  const uint64_t compute_input_duration_ns =
+      compute_input_end_ns - compute_start_ns;
+  const uint64_t compute_infer_duration_ns =
+      compute_output_start_ns - compute_input_end_ns;
+  const uint64_t compute_output_duration_ns =
+      compute_end_ns - compute_output_start_ns;
+
   std::lock_guard<std::mutex> lock(mu_);
 
   infer_stats_.success_count_++;
-  infer_stats_.request_duration_ns_ += (request_end_ns - request_start_ns);
-  infer_stats_.queue_duration_ns_ += (compute_start_ns - queue_start_ns);
-  infer_stats_.compute_input_duration_ns_ +=
-      (compute_input_end_ns - compute_start_ns);
-  infer_stats_.compute_infer_duration_ns_ +=
-      (compute_output_start_ns - compute_input_end_ns);
-  infer_stats_.compute_output_duration_ns_ +=
-      (compute_end_ns - compute_output_start_ns);
+  infer_stats_.request_duration_ns_ += request_duration_ns;
+  infer_stats_.queue_duration_ns_ += queue_duration_ns;
+  infer_stats_.compute_input_duration_ns_ += compute_input_duration_ns;
+  infer_stats_.compute_infer_duration_ns_ += compute_infer_duration_ns;
+  infer_stats_.compute_output_duration_ns_ += compute_output_duration_ns;
 
 #ifdef TRTIS_ENABLE_METRICS
-  if (metric_reporter_ != nullptr) {
-    auto compute_duration_ns = compute_input_duration_ns +
-                               compute_infer_duration_ns +
-                               compute_output_duration_ns;
-    metric_reporter_->MetricInferenceSuccess(device).Increment();
-    metric_reporter_->MetricInferenceCount(device).Increment(1);
-
-    metric_reporter_->MetricInferenceRequestDuration(device).Increment(
+  if (metric_reporter != nullptr) {
+    metric_reporter->MetricInferenceSuccess().Increment();
+    metric_reporter->MetricInferenceRequestDuration().Increment(
         request_duration_ns / 1000);
-    metric_reporter_->MetricInferenceComputeDuration(device).Increment(
-        compute_duration_ns / 1000);
-    metric_reporter_->MetricInferenceQueueDuration(device).Increment(
+    metric_reporter->MetricInferenceQueueDuration().Increment(
         queue_duration_ns / 1000);
-
-    metric_reporter_->MetricInferenceLoadRatio(device).Observe(
-        (double)request_duration_ns /
-        std::max(1.0, (double)compute_duration_ns));
+    metric_reporter->MetricInferenceComputeInputDuration().Increment(
+        compute_input_duration_ns / 1000);
+    metric_reporter->MetricInferenceComputeInferDuration().Increment(
+        compute_infer_duration_ns / 1000);
+    metric_reporter->MetricInferenceComputeOutputDuration().Increment(
+        compute_output_duration_ns / 1000);
   }
 #endif  // TRTIS_ENABLE_METRICS
 }
 
 void
 InferenceStatsAggregator::UpdateInferBatchStats(
-    size_t batch_size, const uint64_t compute_start_ns,
-    const uint64_t compute_input_end_ns, const uint64_t compute_output_start_ns,
-    const uint64_t compute_end_ns)
+    MetricModelReporter* metric_reporter, size_t batch_size,
+    const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
+    const uint64_t compute_output_start_ns, const uint64_t compute_end_ns)
 {
   struct timespec last_ts;
   clock_gettime(CLOCK_REALTIME, &last_ts);
   auto inference_ms = TIMESPEC_TO_MILLIS(last_ts);
 
   std::lock_guard<std::mutex> lock(mu_);
+
   if (inference_ms > last_inference_ms_) {
     last_inference_ms_ = inference_ms;
   }
@@ -119,8 +122,9 @@ InferenceStatsAggregator::UpdateInferBatchStats(
       (compute_end_ns - compute_output_start_ns);
 
 #ifdef TRTIS_ENABLE_METRICS
-  if (metric_reporter_ != nullptr) {
-    metric_reporter_->MetricInferenceExecutionCount(device).Increment(1);
+  if (metric_reporter != nullptr) {
+    metric_reporter->MetricInferenceExecutionCount().Increment(1);
+    metric_reporter->MetricInferenceCount().Increment(batch_size);
   }
 #endif  // TRTIS_ENABLE_METRICS
 }
