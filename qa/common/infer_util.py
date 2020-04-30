@@ -62,15 +62,13 @@ def _range_repr_dtype(dtype):
     return dtype
 
 
-def _prepend_string_size(input_values):
-    input_list = []
-    for input_value in input_values:
-        input_list.append(serialize_byte_tensor(input_value))
-    return input_list
+def _serialize_byte_tensor_list(tensor_values):
+    tensor_list = []
+    for tensor_value in tensor_values:
+        tensor_list.append(serialize_byte_tensor(tensor_value))
+    return tensor_list
 
 # Perform inference using an "addsum" type verification backend.
-
-
 def infer_exact(tester, pf, tensor_shape, batch_size,
                 input_dtype, output0_dtype, output1_dtype,
                 output0_raw=True, output1_raw=True,
@@ -84,9 +82,12 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         use_http or use_http_json_tensors or use_grpc or use_streaming)
     configs = []
     if use_http:
-        configs.append(("localhost:8000", "http", False, True))
-    if use_http_json_tensors and (input_dtype != np.float16):
-        configs.append(("localhost:8000", "http", False, False))
+            configs.append(("localhost:8000", "http", False, True))
+    if output0_raw == output1_raw:
+        # Float16 not supported for Input and Output via JSON
+        if use_http_json_tensors and (input_dtype != np.float16) and \
+            (output0_dtype != np.float16) and (output1_dtype != np.float16):
+            configs.append(("localhost:8000", "http", False, False))
     if use_grpc:
         configs.append(("localhost:8001", "grpc", False, False))
     if use_streaming:
@@ -149,17 +150,17 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
     # prepend size of string to output string data
     if output0_dtype == np.object:
         if batch_size == 1:
-            output0_array_tmp = _prepend_string_size([output0_array])
+            output0_array_tmp = _serialize_byte_tensor_list([output0_array])
         else:
-            output0_array_tmp = _prepend_string_size(output0_array)
+            output0_array_tmp = _serialize_byte_tensor_list(output0_array)
     else:
         output0_array_tmp = output0_array
 
     if output1_dtype == np.object:
         if batch_size == 1:
-            output1_array_tmp = _prepend_string_size([output1_array])
+            output1_array_tmp = _serialize_byte_tensor_list([output1_array])
         else:
-            output1_array_tmp = _prepend_string_size(output1_array)
+            output1_array_tmp = _serialize_byte_tensor_list(output1_array)
     else:
         output1_array_tmp = output1_array
 
@@ -384,6 +385,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 else:
                     output_data = results.as_numpy(result_name)
 
+                if (output_data.dtype == np.object) and (config[3] == False):
+                    output_data = output_data.astype(np.bytes_)
+
                 if result_name == OUTPUT0:
                     tester.assertTrue(np.array_equal(output_data, output0_array),
                                       "{}, {} expected: {}, got {}".format(
@@ -413,7 +417,10 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                         # indices with the same value/prob, so check that
                         # the value of each index equals the expected value.
                         # Only compare labels when the indices are equal.
-                        ctuple = "".join(chr(x)
+                        if type(class_label) == str:
+                            ctuple = class_label.split(':')
+                        else:
+                            ctuple = "".join(chr(x)
                                          for x in class_label).split(':')
                         cidx = int(ctuple[0])
                         cval = float(ctuple[1])
