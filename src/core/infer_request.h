@@ -30,6 +30,7 @@
 #include <unordered_map>
 #include <vector>
 #include "src/core/infer_response.h"
+#include "src/core/infer_stats.h"
 #include "src/core/memory.h"
 #include "src/core/model_config.h"
 #include "src/core/response_allocator.h"
@@ -179,7 +180,8 @@ class InferenceRequest {
       InferenceBackend* backend, const int64_t requested_model_version)
       : needs_normalization_(true), backend_raw_(backend),
         requested_model_version_(requested_model_version), flags_(0),
-        correlation_id_(0), batch_size_(0), priority_(0), timeout_us_(0)
+        correlation_id_(0), batch_size_(0), priority_(0), timeout_us_(0),
+        secondary_stats_aggregator_(nullptr)
   {
   }
 
@@ -388,6 +390,38 @@ class InferenceRequest {
   // contain only the minimum content required for a null request.
   static InferenceRequest* CopyAsNull(const InferenceRequest& from);
 
+  void CaptureRequestStartNs()
+  {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    request_start_ns_ = TIMESPEC_TO_NANOS(ts);
+  }
+
+  void CaptureQueueStartNs()
+  {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    queue_start_ns_ = TIMESPEC_TO_NANOS(ts);
+  }
+
+  uint64_t RequestStartNs() const { return request_start_ns_; }
+  uint64_t QueueStartNs() const { return queue_start_ns_; }
+
+  // Report the statistics to stats collectors associated with the request.
+  // Duration and timestamps provide two granularities for stats collectors.
+  void ReportStatistics(
+      bool success, const uint64_t compute_start_ns,
+      const uint64_t compute_input_end_ns,
+      const uint64_t compute_output_start_ns, const uint64_t compute_end_ns);
+
+  // Statistics for each request are aggregated into the corresponding
+  // backend's statistics. Optionally this function may be used to
+  // add an additional aggregator where statistics are also aggregated.
+  void SetSecondaryStatsAggregator(StatsAggregator* secondary_stats_aggregator)
+  {
+    secondary_stats_aggregator_ = secondary_stats_aggregator;
+  }
+
  private:
   DISALLOW_COPY_AND_ASSIGN(InferenceRequest);
   friend std::ostream& operator<<(
@@ -442,6 +476,11 @@ class InferenceRequest {
   InferenceResponseFactory response_factory_;
 
   std::vector<std::function<void()>> release_callbacks_;
+
+  // timestamps that is request specific
+  uint64_t request_start_ns_;
+  uint64_t queue_start_ns_;
+  StatsAggregator* secondary_stats_aggregator_;
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceRequest& request);

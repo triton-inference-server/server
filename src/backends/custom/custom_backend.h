@@ -88,7 +88,7 @@ class CustomBackend : public InferenceBackend {
 
     // See BackendContext::Run()
     void Run(
-        const InferenceBackend* base,
+        InferenceBackend* base,
         std::vector<std::unique_ptr<InferenceRequest>>&& requests) override;
 
     struct GetInputOutputContext {

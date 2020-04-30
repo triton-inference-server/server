@@ -27,9 +27,9 @@
 
 #include <deque>
 #include <unordered_map>
+#include "src/core/infer_stats.h"
 #include "src/core/model_config.h"
 #include "src/core/scheduler.h"
-#include "src/core/server_status.h"
 
 namespace nvidia { namespace inferenceserver {
 

@@ -1233,6 +1233,8 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelMetadata(
 ///
 /// \param server The inference server object.
 /// \param model_name The name of the model to get statistics for.
+/// If empty, then statistics for all available models will be returned,
+/// and the server will choose a version based on those models' policies.
 /// \param model_version The version of the model to get statistics
 /// for.  If -1 then the server will choose a version based on the
 /// model's policy.

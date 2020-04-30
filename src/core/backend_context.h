@@ -78,7 +78,7 @@ struct BackendContext {
   // 'requests' and is responsible for generating responses and
   // releasing the requests.
   virtual void Run(
-      const InferenceBackend* base,
+      InferenceBackend* base,
       std::vector<std::unique_ptr<InferenceRequest>>&& requests) = 0;
 
   // Check if output tensor produced by a model is compatible with the

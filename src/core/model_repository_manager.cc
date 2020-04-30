@@ -36,9 +36,9 @@
 #include "src/core/constants.h"
 #include "src/core/ensemble_utils.h"
 #include "src/core/filesystem.h"
+#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
-#include "src/core/server_status.h"
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -271,7 +271,6 @@ class ModelRepositoryManager::BackendLifeCycle {
  public:
   static Status Create(
       InferenceServer* server, const double min_compute_capability,
-      const std::shared_ptr<ServerStatusManager>& status_manager,
       const BackendConfigMap& backend_map,
       std::unique_ptr<BackendLifeCycle>* life_cycle);
 
@@ -296,7 +295,12 @@ class ModelRepositoryManager::BackendLifeCycle {
 
   // Get the ModelStateMap representation of the live backends. A backend is
   // live if at least one of the versions is not unknown nor unavailable.
-  const ModelStateMap GetLiveBackendStates();
+  // If 'strict_readiness' is true, a backend is only live if
+  // at least one of the versions is ready.
+  const ModelStateMap GetLiveBackendStates(bool strict_readiness = false);
+
+  // Get the ModelStateMap representation of the backends.
+  const ModelStateMap GetBackendStates();
 
   // Get the VersionStateMap representation of the specified model.
   const VersionStateMap GetVersionStates(const std::string& model_name);
@@ -322,7 +326,7 @@ class ModelRepositoryManager::BackendLifeCycle {
 
     std::recursive_mutex mtx_;
     ModelReadyState state_;
-    ModelReadyStateReason state_reason_;
+    std::string state_reason_;
 
     // next_action will be set in the case where a load / unload is requested
     // while the backend is already in loading / unloading state. Then the new
@@ -335,11 +339,8 @@ class ModelRepositoryManager::BackendLifeCycle {
     std::shared_ptr<InferenceBackend> backend_;
   };
 
-  BackendLifeCycle(
-      const double min_compute_capability,
-      const std::shared_ptr<ServerStatusManager>& status_manager)
-      : min_compute_capability_(min_compute_capability),
-        status_manager_(status_manager)
+  BackendLifeCycle(const double min_compute_capability)
+      : min_compute_capability_(min_compute_capability)
   {
   }
 
@@ -370,8 +371,6 @@ class ModelRepositoryManager::BackendLifeCycle {
   BackendMap map_;
   std::mutex map_mtx_;
 
-  std::shared_ptr<ServerStatusManager> status_manager_;
-
 #ifdef TRTIS_ENABLE_CAFFE2
   std::unique_ptr<NetDefBackendFactory> netdef_factory_;
 #endif  // TRTIS_ENABLE_CAFFE2
@@ -399,12 +398,11 @@ class ModelRepositoryManager::BackendLifeCycle {
 Status
 ModelRepositoryManager::BackendLifeCycle::Create(
     InferenceServer* server, const double min_compute_capability,
-    const std::shared_ptr<ServerStatusManager>& status_manager,
     const BackendConfigMap& backend_map,
     std::unique_ptr<BackendLifeCycle>* life_cycle)
 {
   std::unique_ptr<BackendLifeCycle> local_life_cycle(
-      new BackendLifeCycle(min_compute_capability, status_manager));
+      new BackendLifeCycle(min_compute_capability));
 
 #ifdef TRTIS_ENABLE_TENSORFLOW
   {
@@ -474,7 +472,8 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 }
 
 const ModelRepositoryManager::ModelStateMap
-ModelRepositoryManager::BackendLifeCycle::GetLiveBackendStates()
+ModelRepositoryManager::BackendLifeCycle::GetLiveBackendStates(
+    bool strict_readiness)
 {
   LOG_VERBOSE(1) << "GetLiveBackendStates()";
   std::lock_guard<std::mutex> map_lock(map_mtx_);
@@ -485,6 +484,11 @@ ModelRepositoryManager::BackendLifeCycle::GetLiveBackendStates()
 
     for (auto& version_backend : model_version.second) {
       std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
+      if (strict_readiness &&
+          version_backend.second->state_ != ModelReadyState::MODEL_READY) {
+        continue;
+      }
+
       // At lease one version is live (ready / loading / unloading)
       if ((version_backend.second->state_ != ModelReadyState::MODEL_UNKNOWN) &&
           (version_backend.second->state_ !=
@@ -499,6 +503,25 @@ ModelRepositoryManager::BackendLifeCycle::GetLiveBackendStates()
     }
   }
   return live_backend_states;
+}
+
+const ModelRepositoryManager::ModelStateMap
+ModelRepositoryManager::BackendLifeCycle::GetBackendStates()
+{
+  LOG_VERBOSE(1) << "GetBackendStates()";
+  std::lock_guard<std::mutex> map_lock(map_mtx_);
+  ModelStateMap backend_states;
+  for (auto& model_version : map_) {
+    VersionStateMap version_map;
+
+    for (auto& version_backend : model_version.second) {
+      std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
+      version_map[version_backend.first] = version_backend.second->state_;
+    }
+
+    backend_states[model_version.first] = version_map;
+  }
+  return backend_states;
 }
 
 const ModelRepositoryManager::VersionStateMap
@@ -707,10 +730,7 @@ ModelRepositoryManager::BackendLifeCycle::Load(
     case ModelReadyState::MODEL_READY:
       LOG_INFO << "re-loading: " << model_name << ":" << version;
       backend_info->state_ = ModelReadyState::MODEL_UNLOADING;
-      backend_info->state_reason_.Clear();
-      status_manager_->SetModelVersionReadyState(
-          model_name, version, backend_info->state_,
-          backend_info->state_reason_);
+      backend_info->state_reason_.clear();
       backend_info->next_action_ = ActionType::LOAD;
       // The load will be triggered once the unload is done (deleter is called)
       backend_info->backend_.reset();
@@ -722,10 +742,7 @@ ModelRepositoryManager::BackendLifeCycle::Load(
     default:
       LOG_INFO << "loading: " << model_name << ":" << version;
       backend_info->state_ = ModelReadyState::MODEL_LOADING;
-      backend_info->state_reason_.Clear();
-      status_manager_->SetModelVersionReadyState(
-          model_name, version, backend_info->state_,
-          backend_info->state_reason_);
+      backend_info->state_reason_.clear();
       {
         std::thread worker(
             &ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend,
@@ -752,10 +769,7 @@ ModelRepositoryManager::BackendLifeCycle::Unload(
     case ModelReadyState::MODEL_READY:
       LOG_INFO << "unloading: " << model_name << ":" << version;
       backend_info->state_ = ModelReadyState::MODEL_UNLOADING;
-      backend_info->state_reason_.Clear();
-      status_manager_->SetModelVersionReadyState(
-          model_name, version, backend_info->state_,
-          backend_info->state_reason_);
+      backend_info->state_reason_.clear();
       backend_info->backend_.reset();
       break;
     case ModelReadyState::MODEL_LOADING:
@@ -872,29 +886,20 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
             {
               std::lock_guard<std::recursive_mutex> lock(backend_info->mtx_);
               backend_info->state_ = ModelReadyState::MODEL_UNAVAILABLE;
-              backend_info->state_reason_.set_message("unloaded");
-              status_manager_->SetModelVersionReadyState(
-                  model_name, version, backend_info->state_,
-                  backend_info->state_reason_);
+              backend_info->state_reason_ = "unloaded";
               // Check if next action is requested
               this->TriggerNextAction(model_name, version, backend_info);
             }
           }));
       backend_info->state_ = ModelReadyState::MODEL_READY;
-      backend_info->state_reason_.Clear();
-      status_manager_->SetModelVersionReadyState(
-          model_name, version, backend_info->state_,
-          backend_info->state_reason_);
+      backend_info->state_reason_.clear();
       LOG_INFO << "successfully loaded '" << model_name << "' version "
                << version;
     } else {
       LOG_ERROR << "failed to load '" << model_name << "' version " << version
                 << ": " << status.AsString();
       backend_info->state_ = ModelReadyState::MODEL_UNAVAILABLE;
-      backend_info->state_reason_.set_message(status.AsString());
-      status_manager_->SetModelVersionReadyState(
-          model_name, version, backend_info->state_,
-          backend_info->state_reason_);
+      backend_info->state_reason_ = status.AsString();
     }
   }
 
@@ -903,7 +908,6 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
 }
 
 ModelRepositoryManager::ModelRepositoryManager(
-    const std::shared_ptr<ServerStatusManager>& status_manager,
     const std::set<std::string>& repository_paths,
     const BackendConfigMap& backend_config_map, const bool autofill,
     const bool polling_enabled, const bool model_control_enabled,
@@ -914,7 +918,6 @@ ModelRepositoryManager::ModelRepositoryManager(
       polling_enabled_(polling_enabled),
       model_control_enabled_(model_control_enabled),
       min_compute_capability_(min_compute_capability),
-      status_manager_(status_manager),
       backend_life_cycle_(std::move(life_cycle))
 {
 }
@@ -924,7 +927,6 @@ ModelRepositoryManager::~ModelRepositoryManager() {}
 Status
 ModelRepositoryManager::Create(
     InferenceServer* server, const std::string& server_version,
-    const std::shared_ptr<ServerStatusManager>& status_manager,
     const std::set<std::string>& repository_paths,
     const std::set<std::string>& startup_models, const bool strict_model_config,
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
@@ -958,15 +960,14 @@ ModelRepositoryManager::Create(
 
   std::unique_ptr<BackendLifeCycle> life_cycle;
   RETURN_IF_ERROR(BackendLifeCycle::Create(
-      server, min_compute_capability, status_manager, backend_config_map,
-      &life_cycle));
+      server, min_compute_capability, backend_config_map, &life_cycle));
 
   // Not setting the smart pointer directly to simplify clean up
   std::unique_ptr<ModelRepositoryManager> local_manager(
       new ModelRepositoryManager(
-          status_manager, repository_paths, backend_config_map,
-          !strict_model_config, polling_enabled, model_control_enabled,
-          min_compute_capability, std::move(life_cycle)));
+          repository_paths, backend_config_map, !strict_model_config,
+          polling_enabled, model_control_enabled, min_compute_capability,
+          std::move(life_cycle)));
 
   bool all_models_polled = true;
   if (!model_control_enabled) {
@@ -1083,7 +1084,7 @@ ModelRepositoryManager::PollAndUpdateInternal(bool* all_models_polled)
 
   infos_.swap(new_infos);
 
-  Update(added, deleted, modified);
+  UpdateDependencyGraph(added, deleted, modified);
 
   for (const auto& name : deleted) {
     ModelConfig model_config;
@@ -1095,30 +1096,6 @@ ModelRepositoryManager::PollAndUpdateInternal(bool* all_models_polled)
 
   // model loading / unloading error will be printed but ignored
   LoadModelByDependency();
-
-  return Status::Success;
-}
-
-Status
-ModelRepositoryManager::Update(
-    const std::set<std::string>& added, const std::set<std::string>& deleted,
-    const std::set<std::string>& modified)
-{
-  RETURN_IF_ERROR(UpdateDependencyGraph(added, deleted, modified));
-
-  // Added model should be initialized for status reporting. Otherwise,
-  // we want to keep the current status information so don't re-init it.
-  for (const auto& model_name : added) {
-    const auto& model_config =
-        dependency_graph_.find(model_name)->second->model_config_;
-    RETURN_IF_ERROR(status_manager_->InitForModel(model_name, model_config));
-  }
-  for (const auto& model_name : modified) {
-    const auto& model_config =
-        dependency_graph_.find(model_name)->second->model_config_;
-    RETURN_IF_ERROR(
-        status_manager_->UpdateConfigForModel(model_name, model_config));
-  }
 
   return Status::Success;
 }
@@ -1352,7 +1329,7 @@ ModelRepositoryManager::LoadUnloadModels(
   }
 
   // Update dependency graph and load
-  Update(added, deleted, modified);
+  UpdateDependencyGraph(added, deleted, modified);
 
   // model loading / unloading error will be printed but ignored
   LoadModelByDependency();
@@ -1381,9 +1358,15 @@ ModelRepositoryManager::UnloadAllModels()
 }
 
 const ModelRepositoryManager::ModelStateMap
-ModelRepositoryManager::GetLiveBackendStates()
+ModelRepositoryManager::GetLiveBackendStates(bool strict_readiness)
 {
-  return backend_life_cycle_->GetLiveBackendStates();
+  return backend_life_cycle_->GetLiveBackendStates(strict_readiness);
+}
+
+const ModelRepositoryManager::ModelStateMap
+ModelRepositoryManager::GetBackendStates()
+{
+  return backend_life_cycle_->GetBackendStates();
 }
 
 const ModelRepositoryManager::VersionStateMap
