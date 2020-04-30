@@ -413,46 +413,10 @@ InferenceServer::InferAsync(std::unique_ptr<InferenceRequest>& request)
       new ScopedAtomicIncrement(inflight_request_counter_));
 
 #ifdef TRTIS_ENABLE_STATS
-  request->CaptureRequestStartNs();
-#ifdef TRTIS_ENABLE_TRACING
-  // FIXME this needs to move into InferenceRequest and be simplified
-  infer_stats->SetTraceManager(
-      reinterpret_cast<ni::OpaqueTraceManager*>(trace_manager));
-  infer_stats->NewTrace();
-#endif  // TRTIS_ENABLE_TRACING
+  INFER_TRACE_ACTIVITY(
+      request->Trace(), TRITONSERVER_TRACE_REQUEST_START,
+      request->CaptureRequestStartNs());
 #endif  // TRTIS_ENABLE_STATS
-
-#if 0
-      [infer_stats, trace_manager, lrequest, server](const ni::Status& status) mutable {
-        if (!status.IsOk()) {
-          LOG_VERBOSE(1) << "Infer failed: " << status.Message();
-        }
-
-#ifdef TRTIS_ENABLE_STATS
-        infer_stats->SetFailed(!status.IsOk());
-        infer_stats->CaptureTimestamp(
-            ni::ModelInferStats::TimestampKind::kRequestEnd);
-
-        // We must explicitly update the inference stats before
-        // sending the response... otherwise it is possible that the
-        // client will be able to query the stats after the response
-        // is received but before they've been updated for the request
-        // (this is especially important for testing).
-        infer_stats->Report();
-#endif  // TRTIS_ENABLE_STATS
-
-        // FIXMEV2 status should live in InferenceRequest instead of
-        // being a callback arg.
-        lrequest->SetRequestStatus(status);
-
-        lrequest->SetResponse(infer_response_provider);
-
-        complete_fn(
-            server, trace_manager,
-            reinterpret_cast<TRITONSERVER_InferenceRequest*>(lrequest),
-            complete_userp);
-      });
-#endif
 
   return InferenceRequest::Run(request);
 }

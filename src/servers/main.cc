@@ -107,7 +107,8 @@ int32_t metrics_port_ = 8002;
 
 #ifdef TRTIS_ENABLE_TRACING
 std::string trace_filepath_;
-auto trace_level_ = TRITONSERVER_TRACE_LEVEL_DISABLED;
+TRITONSERVER_InferenceTraceLevel trace_level_ =
+    TRITONSERVER_TRACE_LEVEL_DISABLED;
 int32_t trace_rate_ = 1000;
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -421,7 +422,7 @@ TRITONSERVER_Error*
 StartGrpcServiceV2(
     std::unique_ptr<nvidia::inferenceserver::GRPCServerV2>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
+    nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
         shm_manager)
 {
@@ -446,7 +447,7 @@ StartHttpV2Service(
     std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServerV2>>*
         services,
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
+    nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
         shm_manager,
     std::map<int32_t, std::vector<std::string>>& port_map)
@@ -498,7 +499,7 @@ StartMetricsV2Service(
 bool
 StartEndpoints(
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
+    nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
         shm_manager)
 {
@@ -624,10 +625,9 @@ StopEndpoints()
 }
 
 bool
-StartTracing(
-    std::shared_ptr<nvidia::inferenceserver::TraceManager>* trace_manager)
+StartTracing(nvidia::inferenceserver::TraceManager** trace_manager)
 {
-  trace_manager->reset();
+  *trace_manager = nullptr;
 
 #ifdef TRTIS_ENABLE_TRACING
   TRITONSERVER_Error* err = nullptr;
@@ -635,18 +635,12 @@ StartTracing(
   // Configure tracing if host is specified.
   if (trace_level_ != TRITONSERVER_TRACE_LEVEL_DISABLED) {
     err = nvidia::inferenceserver::TraceManager::Create(
-        trace_manager, trace_filepath_);
-    if (err == nullptr) {
-      err = (*trace_manager)->SetRate(trace_rate_);
-      if (err == nullptr) {
-        err = (*trace_manager)->SetLevel(trace_level_);
-      }
-    }
+        trace_manager, trace_level_, trace_rate_, trace_filepath_);
   }
 
   if (err != nullptr) {
     LOG_TRITONSERVER_ERROR(err, "failed to configure tracing");
-    trace_manager->reset();
+    *trace_manager = nullptr;
     return false;
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -655,10 +649,13 @@ StartTracing(
 }
 
 bool
-StopTracing(
-    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager)
+StopTracing(nvidia::inferenceserver::TraceManager** trace_manager)
 {
 #ifdef TRTIS_ENABLE_TRACING
+  // We assume that at this point Triton has been stopped gracefully,
+  // so can delete the trace manager to finalize the output.
+  delete (*trace_manager);
+  *trace_manager = nullptr;
 #endif  // TRTIS_ENABLE_TRACING
 
   return true;
@@ -740,7 +737,7 @@ ParseIntBoolOption(std::string arg)
 #endif  // TRTIS_ENABLE_LOGGING
 
 #ifdef TRTIS_ENABLE_TRACING
-TRITONSERVER_Trace_Level
+TRITONSERVER_InferenceTraceLevel
 ParseTraceLevelOption(std::string arg)
 {
   std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
@@ -893,7 +890,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #ifdef TRTIS_ENABLE_TRACING
   std::string trace_filepath = trace_filepath_;
-  auto trace_level = trace_level_;
+  TRITONSERVER_InferenceTraceLevel trace_level = trace_level_;
   int32_t trace_rate = trace_rate_;
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -1254,7 +1251,7 @@ main(int argc, char** argv)
   }
 
   // Trace manager.
-  std::shared_ptr<nvidia::inferenceserver::TraceManager> trace_manager;
+  nvidia::inferenceserver::TraceManager* trace_manager;
 
   // Manager for shared memory blocks.
   auto shm_manager =
@@ -1304,12 +1301,18 @@ main(int argc, char** argv)
   }
 
   TRITONSERVER_Error* stop_err = TRITONSERVER_ServerStop(server_ptr);
-  const int ret = (stop_err != nullptr) ? 1 : 0;
-  LOG_TRITONSERVER_ERROR(stop_err, "failed to stop server");
+
+  // If unable to gracefully stop the server then Triton threads and
+  // state are potentially in an invalid state, so just exit
+  // immediately.
+  if (stop_err != nullptr) {
+    LOG_TRITONSERVER_ERROR(stop_err, "failed to stop server");
+    exit(1);
+  }
 
   // Stop tracing and the HTTP, GRPC, and metrics endpoints.
-  StopTracing(trace_manager);
   StopEndpoints();
+  StopTracing(&trace_manager);
 
 #ifdef TRTIS_ENABLE_ASAN
   // Can invoke ASAN before exit though this is typically not very
@@ -1324,5 +1327,5 @@ main(int argc, char** argv)
     return 1;
   }
 
-  return ret;
+  return 0;
 }

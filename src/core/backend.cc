@@ -131,11 +131,13 @@ InferenceBackend::SetModelConfig(
   config_ = config;
   RETURN_IF_ERROR(GetModelVersionFromPath(path, &version_));
 
+#ifdef TRTIS_ENABLE_STATS
   // Create the metric reporter for this backend.
   metric_reporter_ = std::make_shared<MetricModelReporter>(
       Name(), version_, config_.metric_tags());
 
   stats_aggregator_.SetMetricReporter(metric_reporter_);
+#endif  // TRTIS_ENABLE_STATS
 
   // Initialize the input map
   for (const auto& io : config.input()) {
@@ -283,13 +285,6 @@ InferenceBackend::Init(
       ValidateModelConfig(config, platform, min_compute_capability_));
   RETURN_IF_ERROR(SetModelConfig(path, config));
 
-  return Status::Success;
-}
-
-Status
-InferenceBackend::Enqueue(std::unique_ptr<InferenceRequest>& request)
-{
-  scheduler_->Enqueue(request);
   return Status::Success;
 }
 

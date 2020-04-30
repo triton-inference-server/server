@@ -64,14 +64,17 @@ class InferenceBackend {
     return metric_reporter_;
   }
 
+#ifdef TRTIS_ENABLE_STATS
   // Get the stats collector for the model being served.
-  StatsAggregator* MutableStatsAggregator() { return &stats_aggregator_; }
-
-  // Get the stats collector for the model being served.
-  const StatsAggregator& ImmutableStatsAggregator()
+  InferenceStatsAggregator* MutableStatsAggregator()
+  {
+    return &stats_aggregator_;
+  }
+  const InferenceStatsAggregator& StatsAggregator() const
   {
     return stats_aggregator_;
   }
+#endif  // TRTIS_ENABLE_STATS
 
   // Get the model configuration for a named input.
   Status GetInput(const std::string& name, const ModelInput** input) const;
@@ -93,7 +96,10 @@ class InferenceBackend {
   // then the backend has taken ownership of the request object and so
   // 'request' will be nullptr. If non-success is returned then the
   // caller still retains ownership of 'request'.
-  Status Enqueue(std::unique_ptr<InferenceRequest>& request);
+  Status Enqueue(std::unique_ptr<InferenceRequest>& request)
+  {
+    return scheduler_->Enqueue(request);
+  }
 
   uint32_t DefaultPriorityLevel() const { return default_priority_level_; }
 
@@ -157,8 +163,10 @@ class InferenceBackend {
   // The metric reporter for the model that this backend represents.
   std::shared_ptr<MetricModelReporter> metric_reporter_;
 
+#ifdef TRTIS_ENABLE_STATS
   // The stats collector for the model that this backend represents.
-  StatsAggregator stats_aggregator_;
+  InferenceStatsAggregator stats_aggregator_;
+#endif  // TRTIS_ENABLE_STATS
 
   // Label provider for this model.
   std::shared_ptr<LabelProvider> label_provider_;

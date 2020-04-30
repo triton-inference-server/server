@@ -160,10 +160,26 @@ InferenceRequest::Release(std::unique_ptr<InferenceRequest>&& request)
   }
   request->release_callbacks_.clear();
 
+#ifdef TRTIS_ENABLE_TRACING
+  // Take ownership of trace object so it is not lost when we release
+  // the request below.
+  std::unique_ptr<InferenceTrace> trace = std::move(request->trace_);
+#endif  // TRTIS_ENABLE_TRACING
+
   void* userp = request->release_userp_;
   request->release_fn_(
       reinterpret_cast<TRITONSERVER_InferenceRequest*>(request.release()),
       userp);
+
+#ifdef TRTIS_ENABLE_TRACING
+  // If tracing then record request end (after the callback completes
+  // so that any callback overhead is included in the request time)
+  // and release the trace.
+  if (trace != nullptr) {
+    trace->ReportNow(TRITONSERVER_TRACE_REQUEST_END);
+    InferenceTrace::Release(std::move(trace));
+  }
+#endif  // TRTIS_ENABLE_TRACING
 }
 
 InferenceRequest*
@@ -409,8 +425,10 @@ InferenceRequest::PrepareForInference()
   }
 
   // Clear the timestamps
-  request_start_ns_ = 0;
   queue_start_ns_ = 0;
+#ifdef TRTIS_ENABLE_STATS
+  request_start_ns_ = 0;
+#endif  // TRTIS_ENABLE_STATS
 
   LOG_VERBOSE(1) << "prepared: " << *this;
 
@@ -471,7 +489,7 @@ InferenceRequest::Normalize()
 
       // Keep shape tensor's shape as it is
       const ModelInput* input_config;
-      RETURN_IF_ERROR(backend.GetInput(pr.first, &input_config));
+      RETURN_IF_ERROR(backend_raw_->GetInput(pr.first, &input_config));
       if (input_config->is_shape_tensor()) {
         *input.MutableShape() = input.OriginalShape();
         continue;
@@ -575,13 +593,13 @@ InferenceRequest::Normalize()
   return Status::Success;
 }
 
+#ifdef TRTIS_ENABLE_STATS
 void
 InferenceRequest::ReportStatistics(
     bool success, const uint64_t compute_start_ns,
     const uint64_t compute_input_end_ns, const uint64_t compute_output_start_ns,
     const uint64_t compute_end_ns)
 {
-#ifdef TRTIS_ENABLE_STATS
   INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 
   if (success) {
@@ -603,26 +621,8 @@ InferenceRequest::ReportStatistics(
           request_start_ns_, request_end_ns);
     }
   }
-
-#ifdef TRTIS_ENABLE_TRACING
-  // FIXME Report() should now accept all timestamps as there is no InferStats
-  // object that contains all available timestamps
-  if (trace_ != nullptr) {
-    trace_->Report(this);
-    // Inform that the trace object is done and can be released
-    if (trace_manager_->using_triton_) {
-      trace_manager_->triton_release_fn_(
-          reinterpret_cast<TRITONSERVER_Trace*>(trace_),
-          trace_->ActivityUserp(), trace_manager_->userp_);
-    } else {
-      trace_manager_->release_fn_(
-          reinterpret_cast<TRITONSERVER_Trace*>(trace_),
-          trace_->ActivityUserp(), trace_manager_->userp_);
-    }
-  }
-#endif  // TRTIS_ENABLE_TRACING
-#endif  // TRTIS_ENABLE_STATS
 }
+#endif  // TRTIS_ENABLE_STATS
 
 //
 // Input
