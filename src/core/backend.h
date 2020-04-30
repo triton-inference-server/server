@@ -65,9 +65,12 @@ class InferenceBackend {
   }
 
   // Get the stats collector for the model being served.
-  const std::shared_ptr<StatsAggregator>& StatsCollector() const
+  StatsAggregator* MutableStatsAggregator() { return &stats_aggregator_; }
+
+  // Get the stats collector for the model being served.
+  const StatsAggregator& ImmutableStatsAggregator()
   {
-    return stats_collector_;
+    return stats_aggregator_;
   }
 
   // Get the model configuration for a named input.
@@ -156,7 +159,7 @@ class InferenceBackend {
   std::shared_ptr<MetricModelReporter> metric_reporter_;
 
   // The stats collector for the model that this backend represents.
-  std::shared_ptr<StatsAggregator> stats_collector_;
+  StatsAggregator stats_aggregator_;
 
   // Label provider for this model.
   std::shared_ptr<LabelProvider> label_provider_;

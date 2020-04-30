@@ -159,6 +159,9 @@ InferenceRequest::Release(std::unique_ptr<InferenceRequest>&& request)
     (*it)();
   }
   request->release_callbacks_.clear();
+  // Reset here instead of PrepareForInference() because InferenceRequest users
+  // will set this before PrepareForInfernce() is called.
+  request->secondary_stats_aggregator_ = nullptr;
 
   void* userp = request->release_userp_;
   request->release_fn_(
@@ -408,6 +411,10 @@ InferenceRequest::PrepareForInference()
     inputs_.emplace(std::make_pair(pr.first, std::addressof(pr.second)));
   }
 
+  // Clear the timestamps
+  request_start_ns_ = 0;
+  queue_start_ns_ = 0;
+
   LOG_VERBOSE(1) << "prepared: " << *this;
 
   return Status::Success;
@@ -563,39 +570,29 @@ InferenceRequest::Normalize()
 }
 
 void
-InferenceRequest::Report(
-    bool success, int device, uint64_t compute_start_ns,
-    uint64_t compute_input_end_ns, uint64_t compute_output_start_ns,
-    uint64_t compute_end_ns, uint64_t compute_input_duration_ns,
-    uint64_t compute_infer_duration_ns, uint64_t compute_output_duration_ns)
+InferenceRequest::ReportStatistics(
+    bool success, uint64_t compute_start_ns, uint64_t compute_input_end_ns,
+    uint64_t compute_output_start_ns, uint64_t compute_end_ns)
 {
-  struct timespec last_ts;
-
-  clock_gettime(CLOCK_REALTIME, &last_ts);
-  const uint64_t last_timestamp_ms = TIMESPEC_TO_MILLIS(last_ts);
-
-  // Need a monotonic clock for request end time
-  clock_gettime(CLOCK_MONOTONIC, &last_ts);
-  auto request_duration_ns = TIMESPEC_TO_NANOS(last_ts) - request_start_ns_;
+  INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 
   if (success) {
-    auto queue_duration_ns = compute_start_ns - queue_start_ns_;
-    backend_raw_->StatsCollector()->UpdateSuccessInferStats(
-        device, last_timestamp_ms, request_duration_ns, queue_duration_ns,
-        compute_input_duration_ns, compute_infer_duration_ns,
-        compute_output_duration_ns);
-    for (auto& stats_collector : stats_collectors_) {
-      stats_collector->UpdateSuccessInferStats(
-          device, last_timestamp_ms, request_duration_ns, queue_duration_ns,
-          compute_input_duration_ns, compute_infer_duration_ns,
-          compute_output_duration_ns);
+    backend_raw_->MutableStatsAggregator()->UpdateSuccess(
+        request_start_ns_, queue_start_ns_, compute_start_ns,
+        compute_input_end_ns, compute_output_start_ns, compute_end_ns,
+        request_end_ns);
+    if (secondary_stats_aggregator_ != nullptr) {
+      secondary_stats_aggregator_->UpdateSuccess(
+          request_start_ns_, queue_start_ns_, compute_start_ns,
+          compute_input_end_ns, compute_output_start_ns, compute_end_ns,
+          request_end_ns);
     }
   } else {
-    backend_raw_->StatsCollector()->UpdateFailedInferStats(
-        device, last_timestamp_ms, request_duration_ns);
-    for (auto& stats_collector : stats_collectors_) {
-      stats_collector->UpdateFailedInferStats(
-          device, last_timestamp_ms, request_duration_ns);
+    backend_raw_->MutableStatsAggregator()->UpdateFailure(
+        request_start_ns_, request_end_ns);
+    if (secondary_stats_aggregator_ != nullptr) {
+      secondary_stats_aggregator_->UpdateFailure(
+          request_start_ns_, request_end_ns);
     }
   }
 

@@ -104,7 +104,7 @@ class BaseBackend : public InferenceBackend {
 
     // See BackendContext::Run()
     void Run(
-        const InferenceBackend* base,
+        InferenceBackend* base,
         std::vector<std::unique_ptr<InferenceRequest>>&& requests) override;
 
     // Map from configuration name for an input to tensor name for

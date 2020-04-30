@@ -181,7 +181,7 @@ class InferenceRequest {
       : needs_normalization_(true), backend_raw_(backend),
         requested_model_version_(requested_model_version), flags_(0),
         correlation_id_(0), batch_size_(0), priority_(0), timeout_us_(0),
-        request_start_ns_(0), queue_start_ns_(0)
+        secondary_stats_aggregator_(nullptr)
   {
   }
 
@@ -404,20 +404,22 @@ class InferenceRequest {
     queue_start_ns_ = TIMESPEC_TO_NANOS(ts);
   }
 
+  uint64_t RequestStartNs() { return request_start_ns_; }
   uint64_t QueueStartNs() { return queue_start_ns_; }
 
   // Report the statistics to stats collectors associated with the request.
   // Duration and timestamps provide two granularities for stats collectors.
-  void Report(
-      bool success, int device, uint64_t compute_start_ns,
-      uint64_t compute_input_end_ns, uint64_t compute_output_start_ns,
-      uint64_t compute_end_ns, uint64_t compute_input_duration_ns,
-      uint64_t compute_infer_duration_ns, uint64_t compute_output_duration_ns);
+  void ReportStatistics(
+      bool success, uint64_t compute_start_ns, uint64_t compute_input_end_ns,
+      uint64_t compute_output_start_ns, uint64_t compute_end_ns);
 
-  // Associate a stats collector with the request. We may generalize it
-  // and expose it for user to use.
-  void AddStatsCollector(
-      const std::shared_ptr<StatsAggregator>& stats_collector);
+  // Statistics for each request are aggregated into the corresponding
+  // backend's statistics. Optionally this function may be used to
+  // add an additional aggregator where statistics are also aggregated.
+  void SetSecondaryStatsAggregator(StatsAggregator* secondary_stats_aggregator)
+  {
+    secondary_stats_aggregator_ = secondary_stats_aggregator;
+  }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(InferenceRequest);
@@ -477,7 +479,7 @@ class InferenceRequest {
   // timestamps that is request specific
   uint64_t request_start_ns_;
   uint64_t queue_start_ns_;
-  std::vector<std::shared_ptr<StatsAggregator>> stats_collectors_;
+  StatsAggregator* secondary_stats_aggregator_;
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceRequest& request);

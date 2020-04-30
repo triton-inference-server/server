@@ -124,7 +124,8 @@ message StatusResponse
   //@@
   RequestStatus request_status = 1;
 
-  // Dropping to avoid modifying CMakeList to not compile grpc_service.proto
+  // Dropping ServerStatus to avoid modifying CMakeList to not compile
+  // grpc_service.proto
 }
 
 //@@

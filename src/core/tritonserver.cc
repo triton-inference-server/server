@@ -1596,8 +1596,44 @@ TRITONSERVER_ServerModelStatistics(
 
   auto model_name_string = std::string(model_name);
   std::map<std::string, std::vector<int64_t>> ready_model_versions;
-  RETURN_IF_STATUS_ERROR(lserver->GetReadyModelVersions(
-      model_name_string, model_version, &ready_model_versions));
+  if (model_name_string.empty()) {
+    RETURN_IF_STATUS_ERROR(lserver->ModelReadyVersions(&ready_model_versions));
+  } else {
+    std::vector<int64_t> ready_versions;
+    RETURN_IF_STATUS_ERROR(
+        lserver->ModelReadyVersions(model_name_string, &ready_versions));
+    if (ready_versions.empty()) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "requested model '" + model_name_string + "' is not available")
+              .c_str());
+    }
+
+    if (model_version == -1) {
+      ready_model_versions.emplace(
+          model_name_string, std::move(ready_versions));
+    } else {
+      bool found = false;
+      for (const auto v : ready_versions) {
+        if (v == model_version) {
+          found = true;
+          break;
+        }
+      }
+      if (found) {
+        ready_model_versions.emplace(
+            model_name_string, std::vector<int64_t>{model_version});
+      } else {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "requested model version is not available for model '" +
+                model_name_string + "'")
+                .c_str());
+      }
+    }
+  }
 
   rapidjson::Document metadata;
   auto& allocator = metadata.GetAllocator();
@@ -1610,9 +1646,9 @@ TRITONSERVER_ServerModelStatistics(
       RETURN_IF_STATUS_ERROR(
           lserver->GetInferenceBackend(mv_pair.first, version, &backend));
       const auto& infer_stats =
-          backend->StatsCollector()->ImmutableInferStats();
+          backend->ImmutableStatsAggregator().ImmutableInferStats();
       const auto& infer_batch_stats =
-          backend->StatsCollector()->ImmutableInferBatchStats();
+          backend->ImmutableStatsAggregator().ImmutableInferBatchStats();
 
       rapidjson::Value inference_stats(rapidjson::kObjectType);
       rapidjson::Value duration_stats;
@@ -1674,7 +1710,9 @@ TRITONSERVER_ServerModelStatistics(
 
       model_stat.AddMember(
           "last_inference",
-          rapidjson::Value(backend->StatsCollector()->LastInferenceMs()).Move(),
+          rapidjson::Value(
+              backend->ImmutableStatsAggregator().LastInferenceMs())
+              .Move(),
           allocator);
       model_stat.AddMember("inference_stats", inference_stats, allocator);
       model_stat.AddMember("batch_stats", batch_stats, allocator);

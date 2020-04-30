@@ -135,7 +135,7 @@ InferenceBackend::SetModelConfig(
   metric_reporter_ = std::make_shared<MetricModelReporter>(
       Name(), version_, config_.metric_tags());
 
-  stats_collector_ = std::make_shared<StatsAggregator>(metric_reporter_);
+  stats_aggregator_.SetMetricReporter(metric_reporter_);
 
   // Initialize the input map
   for (const auto& io : config.input()) {

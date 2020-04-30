@@ -295,6 +295,8 @@ class ModelRepositoryManager::BackendLifeCycle {
 
   // Get the ModelStateMap representation of the live backends. A backend is
   // live if at least one of the versions is not unknown nor unavailable.
+  // If 'strict_readiness' is true, a backend is only live if
+  // at least one of the versions is ready.
   const ModelStateMap GetLiveBackendStates(bool strict_readiness = false);
 
   // Get the ModelStateMap representation of the backends.

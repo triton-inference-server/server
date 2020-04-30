@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,74 +34,6 @@
 namespace nvidia { namespace inferenceserver {
 
 class MetricModelReporter;
-class OpaqueTraceManager;
-class Trace;
-
-// FIXME move the trace handling to infer request directly.
-#if 0
-// Stats collector for an inference request. If TRTIS_ENABLE_STATS is not
-// defined, it will only records timestamps that may be used by other objects
-// along the inference pipeline (i.e. scheduler)
-class ModelInferStats {
- public:
-  enum class TimestampKind {
-    kRequestStart,        // Start request processing
-    kQueueStart,          // Request enters the queue
-    kComputeStart,        // Request leaves queue and starts compute
-    kComputeInputEnd,     // Requests finishes preparing inputs
-    kComputeOutputStart,  // Request starts processing outputs
-    kComputeEnd,          // Request completes compute
-    kRequestEnd,          // Done with request processing
-    COUNT__
-  };
-
- public:
-  // Start model-specific timer for 'model_name' and a given status
-  // 'kind'.
-  ModelInferStats(
-      const std::shared_ptr<ServerStatusManager>& status_manager,
-      const std::string& model_name)
-      : status_manager_(status_manager), model_name_(model_name),
-        requested_model_version_(-1), batch_size_(0), gpu_device_(-1),
-        failed_(false), execution_count_(0), extra_queue_duration_(0),
-        extra_compute_duration_(0), extra_compute_input_duration_(0),
-        extra_compute_infer_duration_(0), extra_compute_output_duration_(0),
-        trace_manager_(nullptr), trace_(nullptr),
-        timestamps_((size_t)TimestampKind::COUNT__)
-  {
-    memset(&timestamps_[0], 0, sizeof(struct timespec) * timestamps_.size());
-  }
-
-  // Set the trace manager associated with the inference.
-  void SetTraceManager(OpaqueTraceManager* tm) { trace_manager_ = tm; }
-
-  // Get the trace manager associated with the inference.
-  OpaqueTraceManager* GetTraceManager() const { return trace_manager_; }
-
-  // Create a trace object associated to the inference.
-  // Optional 'parent' can be provided if the trace object has a parent.
-  // Model name, model version, and trace manager should be set before calling
-  // this function. And each ModelInferStats instance should not call this
-  // function more than once.
-  void NewTrace(Trace* parent = nullptr);
-
-  // Get the trace object associated to the inference.
-  // Return nullptr if the inference will not be traced or if NewTrace()
-  // has not been called.
-  Trace* GetTrace() const { return trace_; }
-
-
- private:
-
-  // The trace manager associated with these stats. This object is not owned by
-  // this ModelInferStats object and so is not destroyed by this object.
-  OpaqueTraceManager* trace_manager_;
-
-  // The trace associated with these stats. This object is not owned by
-  // this ModelInferStats object and so is not destroyed by this object.
-  Trace* trace_;
-};
-#endif
 
 // A stats aggregator used for one backend.
 class StatsAggregator {
@@ -140,10 +72,11 @@ class StatsAggregator {
   // Create an aggregator for model statistics
   StatsAggregator() : last_inference_ms_(0) {}
 
-  // Create an aggregator with metric reporter attached for model statistics
-  StatsAggregator(const std::shared_ptr<MetricModelReporter>& metric_reporter)
-      : last_inference_ms_(0), metric_reporter_(metric_reporter)
+  // Set metric reporter for the model statistics
+  void SetMetricReporter(
+      const std::shared_ptr<MetricModelReporter>& metric_reporter)
   {
+    metric_reporter_ = metric_reporter;
   }
 
   uint64_t LastInferenceMs() const { return last_inference_ms_; }
@@ -153,25 +86,23 @@ class StatsAggregator {
     return batch_stats_;
   }
 
-  // FIXME passing device is somewhat confusing here, that is for updating
-  // metrics properly, but is here the good place for updating matrics?
-  //
   // Add durations to Infer stats for a failed inference request.
-  void UpdateFailedInferStats(
-      int device, uint64_t last_timestamp_ms, uint64_t request_duration_ns);
+  void UpdateFailure(uint64_t request_start_ns, uint64_t request_end_ns);
 
   // Add durations to infer stats for a successful inference request.
-  void UpdateSuccessInferStats(
-      int device, uint64_t last_timestamp_ms, uint64_t request_duration_ns,
-      uint64_t queue_duration_ns, uint64_t compute_input_duration_ns,
-      uint64_t compute_infer_duration_ns, uint64_t compute_output_duration_ns);
+  void UpdateSuccess(
+      uint64_t request_start_ns, uint64_t queue_start_ns,
+      uint64_t compute_start_ns, uint64_t compute_input_end_ns,
+      uint64_t compute_output_start_ns, uint64_t compute_end_ns,
+      uint64_t request_end_ns);
 
   // Add durations to batch infer stats for a batch execution.
   // 'success_request_count' is the number of sucess requests in the batch that
   // have infer_stats attached.
   void UpdateInferBatchStats(
-      int device, size_t batch_size, uint64_t compute_input_duration_ns,
-      uint64_t compute_infer_duration_ns, uint64_t compute_output_duration_ns);
+      size_t batch_size, uint64_t compute_start_ns,
+      uint64_t compute_input_end_ns, uint64_t compute_output_start_ns,
+      uint64_t compute_end_ns);
 
  private:
   std::mutex mu_;
@@ -180,4 +111,22 @@ class StatsAggregator {
   std::map<size_t, InferBatchStats> batch_stats_;
   std::shared_ptr<MetricModelReporter> metric_reporter_;
 };
-}}  // namespace nvidia::inferenceserver
+
+//
+// Macros to set infer stats
+//
+#ifdef TRTIS_ENABLE_STATS
+#define INFER_STATS_SET_TIMESTAMP(TS_NS) \
+  {                                      \
+    struct timespec ts;                  \
+    clock_gettime(CLOCK_MONOTONIC, &ts); \
+    TS_NS = TIMESPEC_TO_NANOS(ts);       \
+  }
+#define INFER_STATS_DECL_TIMESTAMP(TS_NS) \
+  uint64_t TS_NS;                         \
+  INFER_STATS_SET_TIMESTAMP(TS_NS);
+#else
+#define INFER_STATS_DECL_TIMESTAMP(TS_NS) uint64_t TS_NS = 0;
+#define INFER_STATS_SET_TIMESTAMP(TS_NS)
+#endif  // TRTIS_ENABLE_STATS
+}}      // namespace nvidia::inferenceserver

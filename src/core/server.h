@@ -69,21 +69,20 @@ class InferenceServer {
   Status IsReady(bool* ready);
   Status ModelIsReady(
       const std::string& model_name, const int64_t model_version, bool* ready);
+
+  // Return the ready versions of specific model
   Status ModelReadyVersions(
       const std::string& model_name, std::vector<int64_t>* versions);
+
+  // Return the ready versions of all models
+  Status ModelReadyVersions(
+      std::map<std::string, std::vector<int64_t>>* model_versions);
 
   // Inference. If Status::Success is returned then this function has
   // taken ownership of the request object and so 'request' will be
   // nullptr. If non-success is returned then the caller still retains
   // ownership of 'request'.
   Status InferAsync(std::unique_ptr<InferenceRequest>& request);
-
-  // Return 'ready_model_versions' for 'model_name' and 'model_versions'.
-  // If 'model_version' is -1, update with all ready versions of 'model_name'.
-  // If 'model_name' is empty, update with the all ready versions of all models.
-  Status GetReadyModelVersions(
-      const std::string& model_name, const int64_t model_version,
-      std::map<std::string, std::vector<int64_t>>* ready_model_versions);
 
   // Update the ModelRepositoryIndex object with the index of the model
   // repository.

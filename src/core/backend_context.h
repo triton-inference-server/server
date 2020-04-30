@@ -86,7 +86,7 @@ struct BackendContext {
   // 'requests' and is responsible for generating responses and
   // releasing the requests.
   virtual void Run(
-      const InferenceBackend* base,
+      InferenceBackend* base,
       std::vector<std::unique_ptr<InferenceRequest>>&& requests) = 0;
 
   // Return the contents of a shape tensor. It is the caller's

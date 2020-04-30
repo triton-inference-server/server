@@ -366,6 +366,32 @@ InferenceServer::ModelReadyVersions(
 }
 
 Status
+InferenceServer::ModelReadyVersions(
+    std::map<std::string, std::vector<int64_t>>* ready_model_versions)
+{
+  if (ready_state_ == ServerReadyState::SERVER_EXITING) {
+    return Status(Status::Code::UNAVAILABLE, "Server exiting");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  const auto model_versions = model_repository_manager_->GetLiveBackendStates(
+      true /* strict_readiness */);
+
+  ready_model_versions->clear();
+  std::vector<int64_t> versions;
+  for (const auto& mv_pair : model_versions) {
+    for (const auto& vs_pair : mv_pair.second) {
+      versions.emplace_back(vs_pair.first);
+    }
+    ready_model_versions->emplace(mv_pair.first, std::move(versions));
+  }
+
+  return Status::Success;
+}
+
+
+Status
 InferenceServer::InferAsync(std::unique_ptr<InferenceRequest>& request)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
@@ -419,53 +445,6 @@ InferenceServer::InferAsync(std::unique_ptr<InferenceRequest>& request)
 #endif
 
   return InferenceRequest::Run(request);
-}
-
-Status
-InferenceServer::GetReadyModelVersions(
-    const std::string& model_name, const int64_t model_version,
-    std::map<std::string, std::vector<int64_t>>* ready_model_versions)
-{
-  if (ready_state_ == ServerReadyState::SERVER_EXITING) {
-    return Status(Status::Code::UNAVAILABLE, "Server exiting");
-  }
-
-  ScopedAtomicIncrement inflight(inflight_request_counter_);
-
-  const auto model_versions =
-      model_repository_manager_->GetLiveBackendStates(true);
-
-  ready_model_versions->clear();
-  if (model_name.empty()) {
-    std::vector<int64_t> versions;
-    for (const auto& mv_pair : model_versions) {
-      for (const auto& vs_pair : mv_pair.second) {
-        versions.emplace_back(vs_pair.first);
-      }
-      ready_model_versions->emplace(mv_pair.first, std::move(versions));
-    }
-  } else {
-    auto mv_it = model_versions.find(model_name);
-    if (mv_it == model_versions.end()) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "requested model " + model_name + " not found");
-    }
-    std::vector<int64_t> versions;
-    for (const auto& vs_pair : mv_it->second) {
-      if ((model_version == -1) || (model_version == vs_pair.first)) {
-        versions.emplace_back(vs_pair.first);
-      }
-    }
-    if (versions.empty()) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "requested model version is not found for model " + model_name);
-    }
-    ready_model_versions->emplace(mv_it->first, std::move(versions));
-  }
-
-  return Status::Success;
 }
 
 Status

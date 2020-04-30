@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -35,46 +35,17 @@
 
 namespace nvidia { namespace inferenceserver {
 
-#if 0
 void
-ModelInferStats::NewTrace(Trace* parent)
-{
-#ifdef TRTIS_ENABLE_TRACING
-  if (trace_manager_ != nullptr) {
-    auto ltrace_manager = reinterpret_cast<OpaqueTraceManager*>(trace_manager_);
-    trace_ = nullptr;
-    if (trace_manager_->using_triton_) {
-      ltrace_manager->triton_create_fn_(
-          reinterpret_cast<TRITONSERVER_Trace**>(&trace_), model_name_.c_str(),
-          requested_model_version_, ltrace_manager->userp_);
-    } else {
-      ltrace_manager->create_fn_(
-          reinterpret_cast<TRITONSERVER_Trace**>(&trace_), model_name_.c_str(),
-          requested_model_version_, ltrace_manager->userp_);
-    }
-    if (trace_ != nullptr) {
-      trace_->SetModelName(model_name_);
-      trace_->SetModelVersion(requested_model_version_);
-      if (parent != nullptr) {
-        trace_->SetParentId(parent->Id());
-      }
-    }
-  }
-#endif  // TRTIS_ENABLE_TRACING
-}
-#endif
-
-void
-StatsAggregator::UpdateFailedInferStats(
-    int device, uint64_t last_timestamp_ms, uint64_t request_duration_ns)
+StatsAggregator::UpdateFailure(
+    uint64_t request_start_ns, uint64_t request_end_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
 
-  if (last_inference_ms_ < last_timestamp_ms) {
-    last_inference_ms_ = last_timestamp_ms;
-  }
+  struct timespec last_ts;
+  clock_gettime(CLOCK_REALTIME, &last_ts);
+  last_inference_ms_ = TIMESPEC_TO_MILLIS(last_ts);
   infer_stats_.failure_count_++;
-  infer_stats_.failure_duration_ns_ += request_duration_ns;
+  infer_stats_.failure_duration_ns_ += (request_end_ns - request_start_ns);
 
 #ifdef TRTIS_ENABLE_METRICS
   if (metric_reporter_ != nullptr) {
@@ -84,23 +55,27 @@ StatsAggregator::UpdateFailedInferStats(
 }
 
 void
-StatsAggregator::UpdateSuccessInferStats(
-    int device, uint64_t last_timestamp_ms, uint64_t request_duration_ns,
-    uint64_t queue_duration_ns, uint64_t compute_input_duration_ns,
-    uint64_t compute_infer_duration_ns, uint64_t compute_output_duration_ns)
+StatsAggregator::UpdateSuccess(
+    uint64_t request_start_ns, uint64_t queue_start_ns,
+    uint64_t compute_start_ns, uint64_t compute_input_end_ns,
+    uint64_t compute_output_start_ns, uint64_t compute_end_ns,
+    uint64_t request_end_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
 
-  if (last_inference_ms_ < last_timestamp_ms) {
-    last_inference_ms_ = last_timestamp_ms;
-  }
+  struct timespec last_ts;
+  clock_gettime(CLOCK_REALTIME, &last_ts);
+  last_inference_ms_ = TIMESPEC_TO_MILLIS(last_ts);
 
   infer_stats_.success_count_++;
-  infer_stats_.request_duration_ns_ += request_duration_ns;
-  infer_stats_.queue_duration_ns_ += queue_duration_ns;
-  infer_stats_.compute_input_duration_ns_ += compute_input_duration_ns;
-  infer_stats_.compute_infer_duration_ns_ += compute_infer_duration_ns;
-  infer_stats_.compute_output_duration_ns_ += compute_output_duration_ns;
+  infer_stats_.request_duration_ns_ += (request_end_ns - request_start_ns);
+  infer_stats_.queue_duration_ns_ += (compute_start_ns - queue_start_ns);
+  infer_stats_.compute_input_duration_ns_ +=
+      (compute_input_end_ns - compute_start_ns);
+  infer_stats_.compute_infer_duration_ns_ +=
+      (compute_output_start_ns - compute_input_end_ns);
+  infer_stats_.compute_output_duration_ns_ +=
+      (compute_end_ns - compute_output_start_ns);
 
 #ifdef TRTIS_ENABLE_METRICS
   if (metric_reporter_ != nullptr) {
@@ -126,8 +101,8 @@ StatsAggregator::UpdateSuccessInferStats(
 
 void
 StatsAggregator::UpdateInferBatchStats(
-    int device, size_t batch_size, uint64_t compute_input_duration_ns,
-    uint64_t compute_infer_duration_ns, uint64_t compute_output_duration_ns)
+    size_t batch_size, uint64_t compute_start_ns, uint64_t compute_input_end_ns,
+    uint64_t compute_output_start_ns, uint64_t compute_end_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
 
@@ -136,9 +111,12 @@ StatsAggregator::UpdateInferBatchStats(
     it = batch_stats_.emplace(batch_size, InferBatchStats()).first;
   }
   it->second.count_++;
-  it->second.compute_input_duration_ns_ += compute_input_duration_ns;
-  it->second.compute_infer_duration_ns_ += compute_infer_duration_ns;
-  it->second.compute_output_duration_ns_ += compute_output_duration_ns;
+  it->second.compute_input_duration_ns_ +=
+      (compute_input_end_ns - compute_start_ns);
+  it->second.compute_infer_duration_ns_ +=
+      (compute_output_start_ns - compute_input_end_ns);
+  it->second.compute_output_duration_ns_ +=
+      (compute_end_ns - compute_output_start_ns);
 
 #ifdef TRTIS_ENABLE_METRICS
   if (metric_reporter_ != nullptr) {

@@ -87,6 +87,7 @@ class ModelRepositoryManager {
   /// Cannot be set to true if polling_enabled is true.
   /// \param min_compute_capability The minimum support CUDA compute
   /// capability.
+  /// \param model_repository_manager Return the model repository manager.
   /// \return The error status.
   static Status Create(
       InferenceServer* server, const std::string& server_version,
@@ -117,6 +118,9 @@ class ModelRepositoryManager {
   /// the model repository manager.
   Status UnloadAllModels();
 
+  /// \param strict_readiness If true, only models that have at least one
+  /// ready version will be considered as live. Otherwise, the models that
+  /// have loading / unloading versions will also be live.
   /// \return the states of all versions of all live model backends.
   const ModelStateMap GetLiveBackendStates(bool strict_readiness = false);
 
