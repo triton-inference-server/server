@@ -764,7 +764,7 @@ TRITONSERVER_ServerOptionsSetModelRepositoryPath(
 
 TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetModelControlMode(
-    TRITONSERVER_ServerOptions* options, TRITONSERVER_Model_Control_Mode mode)
+    TRITONSERVER_ServerOptions* options, TRITONSERVER_ModelControlMode mode)
 {
   TritonServerOptions* loptions =
       reinterpret_cast<TritonServerOptions*>(options);
