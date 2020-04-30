@@ -578,22 +578,22 @@ ReadDataFromJsonHelper(
         }
         case TYPE_UINT8: {
           uint8_t* data_vec = reinterpret_cast<uint8_t*>(base->data());
-          data_vec[*counter] = (uint8_t)payload_data[i].GetInt();
+          data_vec[*counter] = (uint8_t)payload_data[i].GetUint();
           break;
         }
         case TYPE_UINT16: {
           uint16_t* data_vec = reinterpret_cast<uint16_t*>(base->data());
-          data_vec[*counter] = (uint16_t)payload_data[i].GetInt();
+          data_vec[*counter] = (uint16_t)payload_data[i].GetUint();
           break;
         }
         case TYPE_UINT32: {
           uint32_t* data_vec = reinterpret_cast<uint32_t*>(base->data());
-          data_vec[*counter] = (uint32_t)payload_data[i].GetInt();
+          data_vec[*counter] = (uint32_t)payload_data[i].GetUint();
           break;
         }
         case TYPE_UINT64: {
           uint64_t* data_vec = reinterpret_cast<uint64_t*>(base->data());
-          data_vec[*counter] = (uint64_t)payload_data[i].GetInt();
+          data_vec[*counter] = (uint64_t)payload_data[i].GetUint64();
           break;
         }
         case TYPE_INT8: {
@@ -613,7 +613,7 @@ ReadDataFromJsonHelper(
         }
         case TYPE_INT64: {
           int64_t* data_vec = reinterpret_cast<int64_t*>(base->data());
-          data_vec[*counter] = (int64_t)payload_data[i].GetInt();
+          data_vec[*counter] = (int64_t)payload_data[i].GetInt64();
           break;
         }
         case TYPE_FP32: {
@@ -715,25 +715,39 @@ WriteDataToJsonHelper(
     const rapidjson::Value& shape, int shape_index, T* base, int* counter,
     const DataType dtype)
 {
-  for (int i = 0; i < shape[shape_index].GetInt(); i++) {
-    if ((shape_index + 1) != (int)shape.Size()) {
-      rapidjson::Value response_output_array(rapidjson::kArrayType);
-      WriteDataToJsonHelper(
-          &response_output_array, allocator, shape, shape_index + 1, base,
-          counter, dtype);
-      response_output_val->PushBack(response_output_array, allocator);
+  if (shape_index == (int)shape.Size()) {
+    if (dtype != TYPE_STRING) {
+      rapidjson::Value data_val((T)(base[*counter]));
+      response_output_val->PushBack(data_val, allocator);
+      *counter += 1;
     } else {
-      if (dtype != TYPE_STRING) {
-        rapidjson::Value data_val((T)(base[*counter]));
-        response_output_val->PushBack(data_val, allocator);
-        *counter += 1;
+      uint32_t* len = reinterpret_cast<uint32_t*>(base + *counter);
+      char* cstr = reinterpret_cast<char*>(base + *counter + sizeof(uint32_t));
+      rapidjson::Value data_val(cstr, *len, allocator);
+      response_output_val->PushBack(data_val, allocator);
+      *counter += *len + sizeof(uint32_t);
+    }
+  } else {
+    for (int i = 0; i < shape[shape_index].GetInt(); i++) {
+      if ((shape_index + 1) != (int)shape.Size()) {
+        rapidjson::Value response_output_array(rapidjson::kArrayType);
+        WriteDataToJsonHelper(
+            &response_output_array, allocator, shape, shape_index + 1, base,
+            counter, dtype);
+        response_output_val->PushBack(response_output_array, allocator);
       } else {
-        uint32_t* len = reinterpret_cast<uint32_t*>(base + *counter);
-        char* cstr =
-            reinterpret_cast<char*>(base + *counter + sizeof(uint32_t));
-        rapidjson::Value data_val(cstr, *len, allocator);
-        response_output_val->PushBack(data_val, allocator);
-        *counter += *len + sizeof(uint32_t);
+        if (dtype != TYPE_STRING) {
+          rapidjson::Value data_val((T)(base[*counter]));
+          response_output_val->PushBack(data_val, allocator);
+          *counter += 1;
+        } else {
+          uint32_t* len = reinterpret_cast<uint32_t*>(base + *counter);
+          char* cstr =
+              reinterpret_cast<char*>(base + *counter + sizeof(uint32_t));
+          rapidjson::Value data_val(cstr, *len, allocator);
+          response_output_val->PushBack(data_val, allocator);
+          *counter += *len + sizeof(uint32_t);
+        }
       }
     }
   }
