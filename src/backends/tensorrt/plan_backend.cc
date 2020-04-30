@@ -286,34 +286,11 @@ PlanBackend::CreateExecutionContexts(
           uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
           std::function<void(Status)> func) {
         Run(runner_idx, payloads, func);
-      },
-      [this](
-          uint32_t runner_idx, const InferenceRequest::Input& input,
-          const Scheduler::Payload& payload,
-          std::vector<int64_t>* shape) -> Status {
-        return PeekShapeTensor(runner_idx, input, payload, shape);
       }));
 
   LOG_VERBOSE(1) << "plan backend for " << Name() << std::endl << *this;
 
   return Status::Success;
-}
-
-Status
-PlanBackend::PeekShapeTensor(
-    uint32_t runner_idx, const InferenceRequest::Input& input,
-    const Scheduler::Payload& payload, std::vector<int64_t>* shape)
-{
-  // Each runner performs the peek using the corresponding since it
-  // may require a CUDA stream to get the tensor contents.
-  if (runner_idx >= contexts_.size()) {
-    return Status(
-        Status::Code::INTERNAL,
-        "unexpected runner index" + std::to_string(runner_idx) +
-            ", max allowed " + std::to_string(contexts_.size()));
-  }
-
-  return contexts_[runner_idx]->PeekShapeTensor(input, payload, shape);
 }
 
 Status
@@ -790,7 +767,7 @@ PlanBackend::Context::InitializeShapeInputBinding(
     }
   }
 
-  if (max_byte_size != 0) {
+  if (max_byte_size != NO_BATCHING) {
     // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
     // indicate that the buffer has been correctly initalized so even
     // for zero-sized tensors always allocate something.
@@ -1149,7 +1126,7 @@ PlanBackend::Context::InitializeConfigShapeOutputBindings(
       max_byte_size = std::max(max_byte_size, byte_size);
     }
 
-    if (max_byte_size != 0) {
+    if (max_byte_size != NO_BATCHING) {
       // Allocate CUDA memory. We rely on buffer_bindings_ being non-nullptr to
       // indicate that the buffer has been correctly initalized so even
       // for zero-sized tensors always allocate something.
@@ -1297,71 +1274,6 @@ PlanBackend::Context::InitializeConfigExecuteOutputBindings(
       auto binding_index =
           num_expected_bindings_ * trt_context.first + io_index;
       buffer_bindings_[binding_index] = buffers_[io_index];
-    }
-  }
-
-  return Status::Success;
-}
-
-Status
-PlanBackend::Context::PeekShapeTensor(
-    const InferenceRequest::Input& input, const Scheduler::Payload& payload,
-    std::vector<int64_t>* shape)
-{
-  // It is the caller's responsibility to only call on shape tensors,
-  // which means the datatype must be INT32.
-  int64_t element_cnt = GetElementCount(input.Shape());
-  size_t expected_byte_size =
-      element_cnt * GetDataTypeByteSize(DataType::TYPE_INT32);
-
-  const char* content;
-  size_t content_byte_size = expected_byte_size;
-
-  // Get the tensor contents into contiguous CPU memory...
-  std::unique_ptr<AllocatedMemory> contiguous_buffer;
-  bool cuda_copy = false;
-  RETURN_IF_ERROR(GetContiguousInputContent(
-      input.Name(), TRITONSERVER_MEMORY_CPU, 0 /* src_memory_type_id */,
-      payload, &content, &content_byte_size, &contiguous_buffer, &cuda_copy));
-  if (expected_byte_size != content_byte_size) {
-    return Status(
-        Status::Code::INTERNAL,
-        "unexpected content size of shape tensor peek. Got " +
-            std::to_string(content_byte_size) + " expecting " +
-            std::to_string(expected_byte_size));
-  }
-
-  if (cuda_copy) {
-    cudaStreamSynchronize(stream_);
-  }
-
-  shape->clear();
-
-  const int32_t* dims = reinterpret_cast<const int32_t*>(content);
-  for (int64_t i = 0; i < element_cnt; ++i) {
-    shape->push_back(dims[i]);
-  }
-
-  // Peeking is expensive so use input override to record the value.
-  auto overrides = payload.request_->MutableOverrideInputs();
-  auto pr = overrides->find(input.Name());
-  if (pr == overrides->end()) {
-    std::shared_ptr<InferenceRequest::Input> override;
-    RETURN_IF_ERROR(payload.request_->AddOverrideInput(
-        input.Name(), DataType::TYPE_INT32, input.Shape(), content_byte_size,
-        &override));
-
-    // If a buffer was allocated to hold the shape then want to take
-    // ownership of that for the override. Otherwise the override can
-    // just point to the existing data for the input which is already
-    // contiguous.
-    if ((contiguous_buffer != nullptr) &&
-        (contiguous_buffer->TotalByteSize() > 0)) {
-      std::shared_ptr<AllocatedMemory> buf(contiguous_buffer.release());
-      RETURN_IF_ERROR(override->SetData(buf));
-    } else {
-      RETURN_IF_ERROR(override->AppendData(
-          content, content_byte_size, TRITONSERVER_MEMORY_CPU, 0));
     }
   }
 
@@ -1712,7 +1624,7 @@ PlanBackend::Context::Run(
           ConvertTrtTypeToDataType(engine_->getBindingDataType(io_index));
 
       batch1_byte_size = GetByteSize(dt, shape);
-      if (max_batch_size_ != 0) {
+      if (max_batch_size_ != NO_BATCHING) {
         // The first element of the vector will be the batch size and should not
         // be included in the batch1_byte_size computation above.
         shape.insert(shape.begin(), total_batch_size);
@@ -2107,22 +2019,55 @@ PlanBackend::Context::GetRequestShapeValues(
     if (engine_->isShapeBinding(io_index)) {
       auto it =
           request_shape_values->emplace(io_index, std::vector<int32_t>()).first;
-      if (max_batch_size_ != 0) {
+      if (max_batch_size_ != NO_BATCHING) {
         it->second.push_back((int32_t)total_batch_size);
       }
 
-      // Using Peek to read shape values from the tensor.
-      std::vector<int64_t> shape;
-      if (!PeekShapeTensor(*input, payload, &shape).IsOk()) {
+      // For now being conservative and requiring that shape tensors
+      // be in a single buffer on the CPU. We can handle more cases in
+      // future if necessary.
+      const auto& data = input->Data();
+      if (data->BufferCount() != 1) {
         return Status(
-            Status::Code::INTERNAL,
-            "unable to peek shape values for input '" + input->Name() + "'");
+            Status::Code::INVALID_ARG,
+            "shape tensor for input '" + input->Name() +
+                "' must be in single contiguous buffer on CPU");
       }
-      for (auto value : shape) {
-        it->second.push_back((int32_t)value);
+
+      size_t data_byte_size;
+      TRITONSERVER_MemoryType data_memory_type;
+      int64_t data_memory_id;
+      const char* data_buffer = data->BufferAt(
+          0 /* idx */, &data_byte_size, &data_memory_type, &data_memory_id);
+      if ((data_buffer == nullptr) ||
+          (data_memory_type == TRITONSERVER_MEMORY_GPU)) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "shape tensor for input '" + input->Name() +
+                "' must be in single contiguous buffer on CPU");
+      }
+
+      // Shape tensors datatype is INT32.
+      const int64_t element_cnt = GetElementCount(input.Shape());
+      const size_t expected_byte_size =
+          element_cnt * GetDataTypeByteSize(DataType::TYPE_INT32);
+
+      if (expected_byte_size != data_byte_size) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "shape tensor for input '" + input->Name() +
+                "' expected byte size is " +
+                std::to_string(expected_byte_size) + ", got " +
+                std::to_string(data_byte_size));
+      }
+
+      const int32_t* dims = reinterpret_cast<const int32_t*>(data_buffer);
+      for (int64_t i = 0; i < element_cnt; ++i) {
+        it->second.push_back(dims[i]);
       }
     }
   }
+
   return Status::Success;
 }
 

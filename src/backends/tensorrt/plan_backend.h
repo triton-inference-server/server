@@ -68,10 +68,6 @@ class PlanBackend : public InferenceBackend {
   DISALLOW_COPY_AND_ASSIGN(PlanBackend);
   friend std::ostream& operator<<(std::ostream&, const PlanBackend&);
 
-  Status PeekShapeTensor(
-      uint32_t runner_idx, const InferenceRequest::Input& input,
-      const Scheduler::Payload& payload, std::vector<int64_t>* shape);
-
   // For each model instance there is a context.
   struct Context : BackendContext {
     Context(
@@ -118,11 +114,6 @@ class PlanBackend : public InferenceBackend {
 
     void ProcessResponse(
         size_t context_idx, std::shared_ptr<SyncQueue<size_t>> context_queue);
-
-    // See BackendContext::PeekShapeTensor()
-    Status PeekShapeTensor(
-        const InferenceRequest::Input& input, const Scheduler::Payload& payload,
-        std::vector<int64_t>* shape) override;
 
     // A struct to hold TensorRT execution context and its meta data, a backend
     // context can have multiple of this struct if multiple optimization

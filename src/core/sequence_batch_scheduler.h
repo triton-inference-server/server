@@ -59,7 +59,6 @@ class SequenceBatchScheduler : public Scheduler {
       const ModelConfig& config, const uint32_t runner_cnt,
       const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
       const StandardRunFunc& OnSchedule,
-      const StandardShapeTensorPeekFunc& OnPeek,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       std::unique_ptr<Scheduler>* scheduler);
 
@@ -236,7 +235,6 @@ class DirectSequenceBatch : public SequenceBatch {
       const Scheduler::StandardInitFunc& OnInit,
       const Scheduler::StandardWarmupFunc& OnWarmup,
       const Scheduler::StandardRunFunc& OnSchedule,
-      const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           start_input_overrides,
@@ -266,9 +264,6 @@ class DirectSequenceBatch : public SequenceBatch {
 
   // Function to call to execute this batch of requests.
   const Scheduler::StandardRunFunc OnSchedule_;
-
-  // Function the scheduler will call to peek at shape tensors.
-  const Scheduler::StandardShapeTensorPeekFunc OnPeek_;
 
   // The thread scheduling requests that are queued in this batch.
   std::unique_ptr<std::thread> scheduler_thread_;
@@ -306,7 +301,6 @@ class OldestSequenceBatch : public SequenceBatch {
       const Scheduler::StandardInitFunc& OnInit,
       const Scheduler::StandardWarmupFunc& OnWarmup,
       const Scheduler::StandardRunFunc& OnSchedule,
-      const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           start_input_overrides,
