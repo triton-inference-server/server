@@ -903,8 +903,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::set<std::string> startup_models_;
 
   bool control_mode_set = false;
-  TRITONSERVER_Model_Control_Mode control_mode =
-      TRITONSERVER_MODEL_CONTROL_POLL;
+  TRITONSERVER_ModelControlMode control_mode = TRITONSERVER_MODEL_CONTROL_POLL;
 
 #ifdef TRTIS_ENABLE_LOGGING
   bool log_info = true;
