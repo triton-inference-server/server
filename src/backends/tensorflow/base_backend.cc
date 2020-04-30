@@ -347,6 +347,85 @@ BaseBackend::Context::ValidateOutputs(
 
 namespace {
 
+// This function will return a tensor's contents as a contiguous
+// chunk. In some cases this will require copying the data. If that
+// happens, 'contiguous_buffer' will be set to hold the contiguous
+// chunk and 'cuda_copy' will be set to indicate whether CUDA copy is
+// conducted.  The data copy can be avoided if the input is already in
+// a contiguous chunk and the input is located in memory type and id
+// specified.
+Status
+GetContiguousInputContent(
+    const InferenceRequest::Input* rinput, TRITONSERVER_MemoryType memory_type,
+    int64_t memory_type_id, const char** content, size_t* content_byte_size,
+    std::unique_ptr<AllocatedMemory>* contiguous_buffer, cudaStream_t stream,
+    bool* cuda_copy)
+{
+  *cuda_copy = false;
+  contiguous_buffer->reset();
+
+  // Check input buffers to see if data copy is necessary
+  MemoryReference input_buffers;
+  size_t chunk_count = 0;
+  bool type_mismatch = false;
+  for (size_t idx = 0; idx < rinput->DataBufferCount(); ++idx) {
+    TRITONSERVER_MemoryType src_memory_type;
+    int64_t src_memory_type_id;
+    size_t src_byte_size;
+    const void* src_ptr;
+
+    RETURN_IF_ERROR(rinput->DataBuffer(
+        idx, &src_ptr, &src_byte_size, &src_memory_type, &src_memory_type_id));
+
+    if (src_ptr != nullptr) {
+      input_buffers.AddBuffer(
+          (const char*)src_ptr, src_byte_size, src_memory_type,
+          src_memory_type_id);
+      chunk_count++;
+      type_mismatch |=
+          ((src_memory_type != memory_type) ||
+           (src_memory_type_id != memory_type_id));
+    }
+  }
+
+  if (chunk_count == 0) {
+    *content = nullptr;
+    *content_byte_size = 0;
+  } else if ((chunk_count == 1) && !type_mismatch) {
+    *content = input_buffers.BufferAt(
+        0, content_byte_size, &memory_type, &memory_type_id);
+  } else {
+    contiguous_buffer->reset(new AllocatedMemory(
+        input_buffers.TotalByteSize(), memory_type, memory_type_id));
+    auto dst_ptr =
+        (*contiguous_buffer)->MutableBuffer(&memory_type, &memory_type_id);
+    if (dst_ptr == nullptr) {
+      return Status(
+          Status::Code::INTERNAL, "failed to allocate contiguous buffer");
+    }
+
+    size_t offset = 0;
+    for (size_t i = 0; i < chunk_count; i++) {
+      bool cuda_used;
+      TRITONSERVER_MemoryType src_memory_type;
+      int64_t src_memory_type_id;
+      auto src_ptr = input_buffers.BufferAt(
+          i, content_byte_size, &src_memory_type, &src_memory_type_id);
+      RETURN_IF_ERROR(CopyBuffer(
+          rinput->Name(), src_memory_type, src_memory_type_id, memory_type,
+          memory_type_id, *content_byte_size, src_ptr, dst_ptr + offset, stream,
+          &cuda_used));
+      *cuda_copy |= cuda_used;
+      offset += *content_byte_size;
+    }
+
+    *content = dst_ptr;
+    *content_byte_size = (*contiguous_buffer)->TotalByteSize();
+  }
+
+  return Status::Success;
+}
+
 void
 FillStringTensor(TRTISTF_Tensor* tensor, const size_t idx, const size_t cnt)
 {
