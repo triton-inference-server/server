@@ -184,10 +184,21 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         input0_list = [x for x in input0_array]
         input1_list = [x for x in input1_array]
 
+    # Serialization of string tensors in the case of shared memory must be done manually
+    if input_dtype == np.object:
+        input0_list_tmp = _serialize_byte_tensor_list(input0_list)
+        input1_list_tmp = _serialize_byte_tensor_list(input1_list)
+    else:
+        input0_list_tmp = input0_list
+        input1_list_tmp = input1_list
+
+    input0_byte_size = sum([i0.nbytes for i0 in input0_list_tmp])
+    input1_byte_size = sum([i1.nbytes for i1 in input1_list_tmp])
+
     # Create and register system/cuda shared memory regions if needed
-    shm_regions, op0_handle, op1_handle = su.create_register_shm_regions(input0_list, input1_list, output0_byte_size,
-                                                                         output1_byte_size, outputs, shm_region_names, precreated_shm_regions,
-                                                                         use_system_shared_memory, use_cuda_shared_memory)
+    shm_regions, shm_handles = su.create_set_shm_regions(input0_list_tmp, input1_list_tmp, output0_byte_size,
+                                                                    output1_byte_size, outputs, shm_region_names, precreated_shm_regions,
+                                                                    use_system_shared_memory, use_cuda_shared_memory)
 
     # Run inference and check results for each config
     for config in configs:
@@ -223,8 +234,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 inputs[0].set_data_from_numpy(input0_array)
                 inputs[1].set_data_from_numpy(input1_array)
         else:
-            su.set_shm_regions(inputs, shm_regions, use_system_shared_memory,
-                               use_cuda_shared_memory, input0_list, input1_list)
+            su.register_add_shm_regions(inputs, outputs, shm_regions, precreated_shm_regions, shm_handles,
+                                input0_byte_size, input1_byte_size, output0_byte_size, output1_byte_size,
+                                use_system_shared_memory, use_cuda_shared_memory, triton_client)
 
         if batch_size == 1:
             expected0_sort_idx = [np.flip(np.argsort(x.flatten()), 0)
@@ -362,12 +374,12 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
             if ((result_name == OUTPUT0 and output0_raw) or
                     (result_name == OUTPUT1 and output1_raw)):
-                if result_name == OUTPUT0:
-                    shm_handle = op0_handle
-                else:
-                    shm_handle = op1_handle
-
                 if use_system_shared_memory or use_cuda_shared_memory:
+                    if result_name == OUTPUT0:
+                        shm_handle = shm_handles[2]
+                    else:
+                        shm_handle = shm_handles[3]
+
                     output = results.get_output(result_name)
                     if config[1] == "http":
                         output_datatype = output['datatype']
