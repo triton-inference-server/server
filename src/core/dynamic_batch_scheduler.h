@@ -51,9 +51,7 @@ class DynamicBatchScheduler : public Scheduler {
   static Status Create(
       const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
       const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
-      const StandardRunFunc& OnSchedule,
-      const StandardShapeTensorPeekFunc& OnPeek,
-      const bool dynamic_batching_enabled,
+      const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
@@ -66,9 +64,7 @@ class DynamicBatchScheduler : public Scheduler {
   static Status Create(
       const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
       const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
-      const StandardRunFunc& OnSchedule,
-      const StandardShapeTensorPeekFunc& OnPeek,
-      const bool dynamic_batching_enabled,
+      const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
@@ -87,9 +83,7 @@ class DynamicBatchScheduler : public Scheduler {
   DynamicBatchScheduler(
       const uint32_t runner_id_start, const uint32_t runner_cnt,
       const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
-      const StandardRunFunc& OnSchedule,
-      const StandardShapeTensorPeekFunc& OnPeek,
-      const bool dynamic_batching_enabled,
+      const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
       const std::set<int32_t>& preferred_batch_sizes,
@@ -116,9 +110,6 @@ class DynamicBatchScheduler : public Scheduler {
   // Function the scheduler will call to schedule a batch of requests.
   const StandardRunFunc OnSchedule_;
 
-  // Function the scheduler will call to peek at shape tensors.
-  const StandardShapeTensorPeekFunc OnPeek_;
-
   // True if dynamic batching is enabled.
   const bool dynamic_batching_enabled_;
 
@@ -144,7 +135,7 @@ class DynamicBatchScheduler : public Scheduler {
   std::set<int32_t> preferred_batch_sizes_;
   uint64_t pending_batch_delay_ns_;
   size_t pending_batch_size_;
-  PendingBatchShapes pending_batch_shapes_;
+  RequiredEqualInputs required_equal_inputs_;
 
   size_t queued_batch_size_;
   size_t next_preferred_batch_size_;

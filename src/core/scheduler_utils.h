@@ -33,20 +33,22 @@
 
 namespace nvidia { namespace inferenceserver {
 
-using PendingBatchShapes = std::unordered_map<
-    std::string, std::pair<std::vector<int64_t>, std::vector<int64_t>>>;
+using RequiredEqualInputs = std::unordered_map<
+    std::string,
+    std::pair<const InferenceRequest::Input*, bool /* compare contents */>>;
 
-Status InitPendingShape(
-    const int64_t runner_id, const std::unique_ptr<InferenceRequest>& request,
+Status InitRequiredEqualInputs(
+    const std::unique_ptr<InferenceRequest>& request,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
-    PendingBatchShapes* pending_batch_shapes);
+    RequiredEqualInputs* required_equal_inputs);
 
-bool CompareWithPendingShape(
-    const int64_t runner_id, const std::unique_ptr<InferenceRequest>& request,
-    const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
-    const PendingBatchShapes& pending_batch_shapes);
+bool CompareWithRequiredEqualInputs(
+    const std::unique_ptr<InferenceRequest>& request,
+    const RequiredEqualInputs& required_equal_inputs);
 
+//
+// PriorityQueue
+//
 using ModelQueuePolicyMap =
     ::google::protobuf::Map<::google::protobuf::uint32, ModelQueuePolicy>;
 
