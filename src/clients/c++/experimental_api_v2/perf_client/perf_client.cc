@@ -1076,7 +1076,7 @@ main(int argc, char** argv)
         "failed to create model parser");
   }
 
-  if ((parser_->MaxBatchsize() == 0) && batch_size > 1) {
+  if ((parser->MaxBatchSize() == 0) && batch_size > 1) {
     std::cerr << "can not specify batch size > 1 as the model does not support "
                  "batching"
               << std::endl;

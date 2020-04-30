@@ -218,21 +218,21 @@ LoadManager::InitManagerInputs(
   // Read provided data
   if (!user_data.empty()) {
     if (IsDirectory(user_data[0])) {
-      // RETURN_IF_ERROR(
-      //    data_loader_->ReadDataFromDir(parser_->Inputs(), user_data[0]));
+      RETURN_IF_ERROR(
+          data_loader_->ReadDataFromDir(parser_->Inputs(), user_data[0]));
     } else {
-      // using_json_data_ = true;
-      // for (const auto& json_file : user_data) {
-      //   RETURN_IF_ERROR(
-      //       data_loader_->ReadDataFromJSON(parser_->Inputs(), json_file));
-      // }
-      // std::cout << " Successfully read data for "
-      //           << data_loader_->GetDataStreamsCount() << " stream/streams";
-      // if (data_loader_->GetDataStreamsCount() == 1) {
-      //   std::cout << " with " << data_loader_->GetTotalSteps(0)
-      //             << " step/steps";
-      // }
-      // std::cout << "." << std::endl;
+       using_json_data_ = true;
+       for (const auto& json_file : user_data) {
+         RETURN_IF_ERROR(
+             data_loader_->ReadDataFromJSON(parser_->Inputs(), json_file));
+       }
+       std::cout << " Successfully read data for "
+                 << data_loader_->GetDataStreamsCount() << " stream/streams";
+       if (data_loader_->GetDataStreamsCount() == 1) {
+         std::cout << " with " << data_loader_->GetTotalSteps(0)
+                   << " step/steps";
+       }
+       std::cout << "." << std::endl;
     }
   } else {
     RETURN_IF_ERROR(data_loader_->GenerateData(
@@ -447,6 +447,7 @@ nic::Error
 LoadManager::PrepareInfer(InferContextMetaData* ctx)
 {
   // Initialize inputs
+  // Tanmay: Convert map into list
   for (const auto& input : *(parser_->Inputs())) {
     const uint8_t* data_ptr;
     size_t batch1_bytesize;

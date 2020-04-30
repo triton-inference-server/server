@@ -37,7 +37,6 @@ DataLoader::DataLoader(const size_t batch_size)
 {
 }
 
-/*
 nic::Error
 DataLoader::ReadDataFromDir(
     std::shared_ptr<ModelTensorMap> inputs, const std::string& data_directory)
@@ -46,26 +45,27 @@ DataLoader::ReadDataFromDir(
   data_stream_cnt_ = 1;
   step_num_.push_back(1);
 
-  for (const auto& input : inputs) {
-    if (input.datatype_.compare("BYTES") != 0) {
-      const auto file_path = data_directory + "/" + input.name_;
+  for (const auto& input : *inputs) {
+    if (input.second.datatype_.compare("BYTES") != 0) {
+      const auto file_path = data_directory + "/" + input.second.name_;
       std::string key_name(
-          input.name_ + "_" + std::to_string(0) + "_" + std::to_string(0));
+          input.second.name_ + "_" + std::to_string(0) + "_" +
+          std::to_string(0));
       auto it = input_data_.emplace(key_name, std::vector<char>()).first;
       RETURN_IF_ERROR(ReadFile(file_path, &it->second));
     } else {
-      const auto file_path = data_directory + "/" + input->Name();
+      const auto file_path = data_directory + "/" + input.second.name_;
       std::vector<std::string> input_string_data;
       RETURN_IF_ERROR(ReadTextFile(file_path, &input_string_data));
       std::string key_name(
-          input->Name() + "_" + std::to_string(0) + "_" + std::to_string(0));
+          input.second.name_ + "_" + std::to_string(0) + "_" +
+          std::to_string(0));
       auto it = input_data_.emplace(key_name, std::vector<char>()).first;
       SerializeStringTensor(input_string_data, &it->second);
     }
   }
   return nic::Error::Success;
 }
-
 
 nic::Error
 DataLoader::ReadDataFromJSON(
@@ -128,8 +128,6 @@ DataLoader::ReadDataFromJSON(
   fclose(data_file);
   return nic::Error::Success;
 }
-
-*/
 
 nic::Error
 DataLoader::GenerateData(
@@ -275,15 +273,13 @@ DataLoader::GetInputShape(
   return nic::Error::Success;
 }
 
-/*
-
 nic::Error
 DataLoader::ReadInputTensorData(
     const rapidjson::Value& step, std::shared_ptr<ModelTensorMap> inputs,
     int stream_index, int step_index)
 {
-  for (const auto& input : inputs) {
-    if (step.HasMember((input.first.c_str())) {
+  for (const auto& input : *inputs) {
+    if (step.HasMember(input.first.c_str())) {
       std::string key_name(
           input.first + "_" + std::to_string(stream_index) + "_" +
           std::to_string(step_index));
@@ -336,7 +332,7 @@ DataLoader::ReadInputTensorData(
                 D.decode(encoded.c_str(), encoded.length(), &it->second[0]);
             it->second.resize(size);
 
-            int64_t batch1_byte = input->ByteSize();
+            int64_t batch1_byte = ByteSize(input.second.shape_, input.second.datatype_);;
             if (batch1_byte > 0 && (size_t)batch1_byte != it->second.size()) {
               return nic::Error(
                   "mismatch in the data provided. "
@@ -364,7 +360,7 @@ DataLoader::ReadInputTensorData(
       }
     } else {
       return nic::Error(
-          "missing input " + input->Name() +
+          "missing input " + input.first +
           " ( Location stream id: " + std::to_string(stream_index) +
           ", step id: " + std::to_string(step_index) + ")");
     }
@@ -372,4 +368,3 @@ DataLoader::ReadInputTensorData(
 
   return nic::Error::Success;
 }
-*/

@@ -51,23 +51,22 @@ class DataLoader {
     return 0;
   }
 
-  /*
-    /// Reads the input data from the specified data directory
-    /// \param inputs The vector of inputs to the target model.
-    /// \param data_directory The path to the directory containing the data
-    nic::Error ReadDataFromDir(
-        std::shared_ptr<ModelTensorMap> inputs,
-        const std::string& data_directory);
 
-    /// Reads the input data from the specified json file and append to the
-    /// stream buffers.
-    /// \param inputs The vector of inputs to the target model.
-    /// \param json_file The json file containing the user-provided input
-    /// data.
-    /// Returns error object indicating status
-    nic::Error ReadDataFromJSON(
-        std::shared_ptr<ModelTensorMap> inputs, const std::string& json_file);
-  */
+  /// Reads the input data from the specified data directory
+  /// \param inputs The vector of inputs to the target model.
+  /// \param data_directory The path to the directory containing the data
+  nic::Error ReadDataFromDir(
+      std::shared_ptr<ModelTensorMap> inputs,
+      const std::string& data_directory);
+
+  /// Reads the input data from the specified json file and append to the
+  /// stream buffers.
+  /// \param inputs The vector of inputs to the target model.
+  /// \param json_file The json file containing the user-provided input
+  /// data.
+  /// Returns error object indicating status
+  nic::Error ReadDataFromJSON(
+      std::shared_ptr<ModelTensorMap> inputs, const std::string& json_file);
 
   /// Generates the input data to use with the inference requests
   /// \param inputs The vector of inputs to the target model.
@@ -105,19 +104,16 @@ class DataLoader {
       const std::vector<int64_t>** shape);
 
  private:
-  /*
-   /// Helper function to read data for the specified input from json
-   /// \param step the DOM for current step
-   /// \param inputs The inputs to the model
-   /// \param stream_index the stream index the data should be exported to.
-   /// \param step_index the step index the data should be exported to.
-   /// Returns error object indicating status
-   nic::Error ReadInputTensorData(
-       const rapidjson::Value& step,
-       std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
-       int stream_index, int step_index);
-
- */
+  /// Helper function to read data for the specified input from json
+  /// \param step the DOM for current step
+  /// \param inputs The inputs to the model
+  /// \param stream_index the stream index the data should be exported to.
+  /// \param step_index the step index the data should be exported to.
+  /// Returns error object indicating status
+  nic::Error ReadInputTensorData(
+      const rapidjson::Value& step,
+      std::shared_ptr<ModelTensorMap> inputs,
+      int stream_index, int step_index);
 
 
   // The batch_size_ for the data
