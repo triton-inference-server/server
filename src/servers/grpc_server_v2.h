@@ -37,8 +37,7 @@ class GRPCServerV2 {
  public:
   static TRITONSERVER_Error* Create(
       const std::shared_ptr<TRITONSERVER_Server>& server,
-      const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
-          trace_manager,
+      nvidia::inferenceserver::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
       int infer_allocation_pool_size,
       std::unique_ptr<GRPCServerV2>* grpc_server);
@@ -65,13 +64,12 @@ class GRPCServerV2 {
  private:
   GRPCServerV2(
       const std::shared_ptr<TRITONSERVER_Server>& server,
-      const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
-          trace_manager,
+      nvidia::inferenceserver::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const std::string& server_addr, const int infer_allocation_pool_size);
 
   std::shared_ptr<TRITONSERVER_Server> server_;
-  std::shared_ptr<TraceManager> trace_manager_;
+  TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
   const std::string server_addr_;
 

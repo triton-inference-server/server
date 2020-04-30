@@ -23,36 +23,25 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include <map>
-#include <memory>
-#include <string>
-#include <vector>
-#include "src/core/tritonserver.h"
-#include "src/servers/shared_memory_manager.h"
-#include "src/servers/tracer.h"
+#include "src/core/infer_trace.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class HTTPServerV2 {
- public:
-  static TRITONSERVER_Error* CreateAPIServer(
-      const std::shared_ptr<TRITONSERVER_Server>& server,
-      nvidia::inferenceserver::TraceManager* trace_manager,
-      const std::shared_ptr<SharedMemoryManager>& smb_manager,
-      const std::map<int32_t, std::vector<std::string>>& port_map,
-      const int thread_cnt,
-      std::vector<std::unique_ptr<HTTPServerV2>>* http_servers);
+#ifdef TRTIS_ENABLE_TRACING
 
-  static TRITONSERVER_Error* CreateMetricsServer(
-      const std::shared_ptr<TRITONSERVER_Server>& server, int32_t port,
-      int thread_cnt, std::unique_ptr<HTTPServerV2>* metrics_server);
+// Start the trace id at 1, because id 0 is reserved to indicate no
+// parent.
+std::atomic<uint64_t> InferenceTrace::next_id_(1);
 
-  virtual ~HTTPServerV2() = default;
+void
+InferenceTrace::Release(std::unique_ptr<InferenceTrace>&& trace)
+{
+  void* userp = trace->userp_;
+  trace->release_fn_(
+      reinterpret_cast<TRITONSERVER_InferenceTrace*>(trace.release()), userp);
+}
 
-  virtual TRITONSERVER_Error* Start() = 0;
-  virtual TRITONSERVER_Error* Stop() = 0;
-};
+#endif  // TRTIS_ENABLE_TRACING
 
 }}  // namespace nvidia::inferenceserver

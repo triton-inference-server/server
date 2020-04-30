@@ -724,8 +724,7 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       TRITONSERVER_ServerInferAsync(
-          server.get(), irequest, nullptr /* trace_manager */,
-          nullptr /* trace_release_fn */, nullptr /* trace_release_userp */),
+          server.get(), irequest, nullptr /* trace */),
       "running inference");
 
   // Wait for the inference response and check the status.

@@ -33,11 +33,8 @@
 #include <thread>
 #include <vector>
 
-#include "src/core/api.pb.h"
-#include "src/core/infer_stats.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_repository_manager.h"
-#include "src/core/server_status.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
