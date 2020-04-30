@@ -509,7 +509,7 @@ typedef enum tritonserver_requestflag_enum {
   TRITONSERVER_REQUEST_FLAG_NONE = 0,
   TRITONSERVER_REQUEST_FLAG_SEQUENCE_START = 1,
   TRITONSERVER_REQUEST_FLAG_SEQUENCE_END = 2
-} TRITONSERVER_Request_Flag;
+} TRITONSERVER_RequestFlag;
 
 /// Type for inference request release callback function. The callback
 /// function takes ownership of the TRITONSERVER_InferenceRequest
@@ -566,8 +566,8 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceRequestSetId(
     TRITONSERVER_InferenceRequest* inference_request, const char* id);
 
 /// Get the flag(s) associated with a request. On return 'flags' holds
-/// a bitwise-or of all flag values, see
-/// TRITONSERVER_Request_Options_Flag for available flags.
+/// a bitwise-or of all flag values, see TRITONSERVER_RequestFlag for
+/// available flags.
 ///
 /// \param inference_request The request object.
 /// \param flags Returns the flags.
@@ -575,9 +575,9 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceRequestSetId(
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceRequestFlags(
     TRITONSERVER_InferenceRequest* inference_request, uint32_t* flags);
 
-/// Set the flag(s) associated with a request. 'flags'
-/// should holds a bitwise-or of all flag values, see
-/// TRITONSERVER_Request_Flag for available flags.
+/// Set the flag(s) associated with a request. 'flags' should holds a
+/// bitwise-or of all flag values, see TRITONSERVER_RequestFlag for
+/// available flags.
 ///
 /// \param inference_request The request object.
 /// \param flags The flags.
@@ -897,7 +897,7 @@ typedef enum tritonserver_modelcontrolmode_enum {
   TRITONSERVER_MODEL_CONTROL_NONE,
   TRITONSERVER_MODEL_CONTROL_POLL,
   TRITONSERVER_MODEL_CONTROL_EXPLICIT
-} TRITONSERVER_Model_Control_Mode;
+} TRITONSERVER_ModelControlMode;
 
 /// Create a new server options object. The caller takes ownership of
 /// the TRITONSERVER_ServerOptions object and must call
@@ -959,7 +959,7 @@ TRITONSERVER_ServerOptionsSetModelRepositoryPath(
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetModelControlMode(
-    TRITONSERVER_ServerOptions* options, TRITONSERVER_Model_Control_Mode mode);
+    TRITONSERVER_ServerOptions* options, TRITONSERVER_ModelControlMode mode);
 
 /// Set the model to be loaded at startup in a server options. The model must be
 /// present in one, and only one, of the specified model repositories.
