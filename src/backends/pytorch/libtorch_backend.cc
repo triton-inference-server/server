@@ -30,10 +30,10 @@
 #include <exception>
 #include <memory>
 #include "src/core/constants.h"
+#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_cuda.h"
 #include "src/core/model_config_utils.h"
-#include "src/core/server_status.h"
 
 #ifdef TRTIS_ENABLE_GPU
 #include <c10/cuda/CUDACachingAllocator.h>

@@ -32,9 +32,9 @@
 #include "src/core/api.pb.h"
 #include "src/core/backend.h"
 #include "src/core/cuda_utils.h"
+#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/server.h"
-#include "src/core/server_status.h"
 
 namespace nvidia { namespace inferenceserver {
 
