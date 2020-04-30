@@ -31,6 +31,7 @@
 #include <vector>
 #include "src/core/infer_response.h"
 #include "src/core/infer_stats.h"
+#include "src/core/infer_trace.h"
 #include "src/core/memory.h"
 #include "src/core/model_config.h"
 #include "src/core/response_allocator.h"
@@ -180,8 +181,7 @@ class InferenceRequest {
       InferenceBackend* backend, const int64_t requested_model_version)
       : needs_normalization_(true), backend_raw_(backend),
         requested_model_version_(requested_model_version), flags_(0),
-        correlation_id_(0), batch_size_(0), priority_(0), timeout_us_(0),
-        secondary_stats_aggregator_(nullptr)
+        correlation_id_(0), batch_size_(0), priority_(0), timeout_us_(0)
   {
   }
 
@@ -207,6 +207,15 @@ class InferenceRequest {
 
   uint64_t TimeoutMicroseconds() const { return timeout_us_; }
   void SetTimeoutMicroseconds(uint64_t t) { timeout_us_ = t; }
+
+#ifdef TRTIS_ENABLE_TRACING
+  const std::unique_ptr<InferenceTrace>& Trace() const { return trace_; }
+  std::unique_ptr<InferenceTrace>* MutableTrace() { return &trace_; }
+  void SetTrace(std::unique_ptr<InferenceTrace>&& trace)
+  {
+    trace_ = std::move(trace);
+  }
+#endif  // TRTIS_ENABLE_TRACING
 
   // The original inputs are the inputs added to the request before
   // the inference execution (that is before
@@ -390,22 +399,24 @@ class InferenceRequest {
   // contain only the minimum content required for a null request.
   static InferenceRequest* CopyAsNull(const InferenceRequest& from);
 
-  void CaptureRequestStartNs()
-  {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    request_start_ns_ = TIMESPEC_TO_NANOS(ts);
-  }
-
-  void CaptureQueueStartNs()
+  uint64_t QueueStartNs() const { return queue_start_ns_; }
+  uint64_t CaptureQueueStartNs()
   {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     queue_start_ns_ = TIMESPEC_TO_NANOS(ts);
+    return queue_start_ns_;
   }
 
+#ifdef TRTIS_ENABLE_STATS
   uint64_t RequestStartNs() const { return request_start_ns_; }
-  uint64_t QueueStartNs() const { return queue_start_ns_; }
+  uint64_t CaptureRequestStartNs()
+  {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    request_start_ns_ = TIMESPEC_TO_NANOS(ts);
+    return request_start_ns_;
+  }
 
   // Report the statistics to stats collectors associated with the request.
   // Duration and timestamps provide two granularities for stats collectors.
@@ -417,10 +428,12 @@ class InferenceRequest {
   // Statistics for each request are aggregated into the corresponding
   // backend's statistics. Optionally this function may be used to
   // add an additional aggregator where statistics are also aggregated.
-  void SetSecondaryStatsAggregator(StatsAggregator* secondary_stats_aggregator)
+  void SetSecondaryStatsAggregator(
+      InferenceStatsAggregator* secondary_stats_aggregator)
   {
     secondary_stats_aggregator_ = secondary_stats_aggregator;
   }
+#endif  // TRTIS_ENABLE_STATS
 
  private:
   DISALLOW_COPY_AND_ASSIGN(InferenceRequest);
@@ -472,15 +485,25 @@ class InferenceRequest {
   TRITONSERVER_InferenceRequestReleaseFn_t release_fn_;
   void* release_userp_;
 
+  // Additional release callbacks invoked before 'release_fn_'.
+  std::vector<std::function<void()>> release_callbacks_;
+
   // The response factory associated with this request.
   InferenceResponseFactory response_factory_;
 
-  std::vector<std::function<void()>> release_callbacks_;
-
-  // timestamps that is request specific
-  uint64_t request_start_ns_;
+  // Request timestamps. Queue start is needed for schedulers even
+  // when statistics are not being collected.
   uint64_t queue_start_ns_;
-  StatsAggregator* secondary_stats_aggregator_;
+
+#ifdef TRTIS_ENABLE_STATS
+  uint64_t request_start_ns_;
+  InferenceStatsAggregator* secondary_stats_aggregator_ = nullptr;
+#endif  // TRTIS_ENABLE_STATS
+
+#ifdef TRTIS_ENABLE_TRACING
+  // Inference trace associated with this request.
+  std::unique_ptr<InferenceTrace> trace_;
+#endif  // TRTIS_ENABLE_TRACING
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceRequest& request);

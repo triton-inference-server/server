@@ -659,8 +659,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
  public:
   explicit HTTPAPIServerV2(
       const std::shared_ptr<TRITONSERVER_Server>& server,
-      const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
-          trace_manager,
+      nvidia::inferenceserver::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const std::vector<std::string>& endpoints, const int32_t port,
       const int thread_cnt)
@@ -778,13 +777,12 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
         TRITONSERVER_InferenceRequest* request, void* userp);
     static void InferResponseComplete(
         TRITONSERVER_InferenceResponse* response, void* userp);
-    static void TraceManagerComplete(
-        TRITONSERVER_TraceManager* trace_manager, void* userp);
     TRITONSERVER_Error* FinalizeResponse(
         TRITONSERVER_InferenceResponse* response);
 
 #ifdef TRTIS_ENABLE_TRACING
-    std::unique_ptr<TraceMetaData> trace_meta_data_;
+    TraceManager* trace_manager_;
+    uint64_t trace_id_;
 #endif  // TRTIS_ENABLE_TRACING
 
     AllocPayload alloc_payload_;
@@ -857,7 +855,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
   std::string server_metadata_;
   const char* server_id_;
 
-  std::shared_ptr<TraceManager> trace_manager_;
+  TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
 
   // The allocator that will be used to allocate buffers for the
@@ -1953,25 +1951,28 @@ HTTPAPIServerV2::HandleInfer(
   int64_t requested_model_version;
   auto err = GetModelVersionFromString(
       model_version_str.c_str(), &requested_model_version);
-  if (err == nullptr) {
+
+  // If tracing is enabled see if this request should be traced.
+  TRITONSERVER_InferenceTrace* trace = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
-    // Timestamps from evhtp are capture in 'req'. We record here since
-    // this is the first place where we have a tracer.
-    std::unique_ptr<TraceMetaData> trace_meta_data;
-    if (trace_manager_ != nullptr) {
-      trace_meta_data.reset(trace_manager_->SampleTrace());
-      if (trace_meta_data != nullptr) {
-        trace_meta_data->tracer_->SetModel(model_name, requested_model_version);
-        trace_meta_data->tracer_->CaptureTimestamp(
-            TRITONSERVER_TRACE_LEVEL_MIN, "http recv start",
-            TIMESPEC_TO_NANOS(req->recv_start_ts));
-        trace_meta_data->tracer_->CaptureTimestamp(
-            TRITONSERVER_TRACE_LEVEL_MIN, "http recv end",
-            TIMESPEC_TO_NANOS(req->recv_end_ts));
-      }
+  uint64_t trace_id = 0;
+  if ((err == nullptr) && (trace_manager_ != nullptr)) {
+    trace = trace_manager_->SampleTrace();
+    if (trace != nullptr) {
+      TRITONSERVER_InferenceTraceId(trace, &trace_id);
+
+      // Timestamps from evhtp are capture in 'req'. We record here
+      // since this is the first place where we have access to trace
+      // manager.
+      trace_manager_->CaptureTimestamp(
+          trace_id, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_RECV_START",
+          TIMESPEC_TO_NANOS(req->recv_start_ts));
+      trace_manager_->CaptureTimestamp(
+          trace_id, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_RECV_END",
+          TIMESPEC_TO_NANOS(req->recv_end_ts));
     }
-#endif  // TRTIS_ENABLE_TRACING
   }
+#endif  // TRTIS_ENABLE_TRACING
 
   // Create the inference request object which provides all information needed
   // for an inference.
@@ -1984,6 +1985,10 @@ HTTPAPIServerV2::HandleInfer(
   if (err == nullptr) {
     std::unique_ptr<InferRequestClass> infer_request(
         new InferRequestClass(req, server_id_));
+#ifdef TRTIS_ENABLE_TRACING
+    infer_request->trace_manager_ = trace_manager_;
+    infer_request->trace_id_ = trace_id;
+#endif  // TRTIS_ENABLE_TRACING
 
     // Find Inference-Header-Content-Length in header. If missing set to 0
     size_t header_length = 0;
@@ -1997,18 +2002,6 @@ HTTPAPIServerV2::HandleInfer(
         model_name, irequest, req->buffer_in, infer_request.get(),
         header_length);
     if (err == nullptr) {
-      // Provide the trace manager object to use for this request, if nullptr
-      // then no tracing will be performed.
-      TRITONSERVER_TraceManager* trace_manager = nullptr;
-#ifdef TRTIS_ENABLE_TRACING
-      if (trace_meta_data != nullptr) {
-        infer_request->trace_meta_data_ = std::move(trace_meta_data);
-        TRITONSERVER_TraceManagerNew(
-            &trace_manager, TraceManager::CreateTrace,
-            TraceManager::ReleaseTrace, infer_request->trace_meta_data_.get());
-      }
-#endif  // TRTIS_ENABLE_TRACING
-
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestClass::InferRequestComplete,
           nullptr /* request_release_userp */);
@@ -2020,10 +2013,7 @@ HTTPAPIServerV2::HandleInfer(
             reinterpret_cast<void*>(infer_request.get()));
       }
       if (err == nullptr) {
-        err = TRITONSERVER_ServerInferAsync(
-            server_.get(), irequest, trace_manager,
-            InferRequestClass::TraceManagerComplete,
-            nullptr /* trace_release_userp */);
+        err = TRITONSERVER_ServerInferAsync(server_.get(), irequest, trace);
       }
       if (err == nullptr) {
         infer_request.release();
@@ -2055,12 +2045,13 @@ HTTPAPIServerV2::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
   evhtp_request_resume(request);
 
 #ifdef TRTIS_ENABLE_TRACING
-  if (infer_request->trace_meta_data_ != nullptr) {
-    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRITONSERVER_TRACE_LEVEL_MIN, "http send start",
-        TIMESPEC_TO_NANOS(request->send_start_ts));
-    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRITONSERVER_TRACE_LEVEL_MIN, "http send end",
+  if ((infer_request->trace_manager_ != nullptr) &&
+      (infer_request->trace_id_ != 0)) {
+    infer_request->trace_manager_->CaptureTimestamp(
+        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+        "HTTP_SEND_START", TIMESPEC_TO_NANOS(request->send_start_ts));
+    infer_request->trace_manager_->CaptureTimestamp(
+        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_SEND_END",
         TIMESPEC_TO_NANOS(request->send_end_ts));
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -2079,12 +2070,13 @@ HTTPAPIServerV2::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   evhtp_request_resume(request);
 
 #ifdef TRTIS_ENABLE_TRACING
-  if (infer_request->trace_meta_data_ != nullptr) {
-    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRITONSERVER_TRACE_LEVEL_MIN, "http send start",
-        TIMESPEC_TO_NANOS(request->send_start_ts));
-    infer_request->trace_meta_data_->tracer_->CaptureTimestamp(
-        TRITONSERVER_TRACE_LEVEL_MIN, "http send end",
+  if ((infer_request->trace_manager_ != nullptr) &&
+      (infer_request->trace_id_ != 0)) {
+    infer_request->trace_manager_->CaptureTimestamp(
+        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+        "HTTP_SEND_START", TIMESPEC_TO_NANOS(request->send_start_ts));
+    infer_request->trace_manager_->CaptureTimestamp(
+        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_SEND_END",
         TIMESPEC_TO_NANOS(request->send_end_ts));
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -2099,13 +2091,6 @@ HTTPAPIServerV2::InferRequestClass::InferRequestClass(
   evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
   thread_ = htpconn->thread;
   evhtp_request_pause(req);
-}
-
-void
-HTTPAPIServerV2::InferRequestClass::TraceManagerComplete(
-    TRITONSERVER_TraceManager* trace_manager, void* userp)
-{
-  // FIXME need to sort out trace manager handling
 }
 
 void
@@ -2278,7 +2263,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
 TRITONSERVER_Error*
 HTTPServerV2::CreateAPIServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
+    nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
     std::vector<std::unique_ptr<HTTPServerV2>>* http_servers)

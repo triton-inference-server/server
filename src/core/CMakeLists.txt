@@ -186,8 +186,8 @@ set(
   sequence_batch_scheduler.cc
   server.cc
   infer_stats.cc
+  infer_trace.cc
   status.cc
-  tracing.cc
   tritonserver.cc
 )
 
@@ -220,8 +220,8 @@ set(
   sequence_batch_scheduler.h
   server.h
   infer_stats.h
+  infer_trace.h
   status.h
-  tracing.h
   tritonserver.h
 )
 

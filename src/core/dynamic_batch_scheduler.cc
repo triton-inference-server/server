@@ -32,7 +32,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "src/core/constants.h"
-#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/nvtx.h"
@@ -175,7 +174,10 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 {
   // Queue timer starts at the beginning of the queueing and
   // scheduling process
-  request->CaptureQueueStartNs();
+  {
+    const uint64_t ns = request->CaptureQueueStartNs();
+    INFER_TRACE_ACTIVITY(request->Trace(), TRITONSERVER_TRACE_QUEUE_START, ns);
+  }
 
   Status enqueue_status;
   bool wake_runner = false;

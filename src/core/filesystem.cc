@@ -34,12 +34,12 @@
 
 #ifdef TRTIS_ENABLE_S3
 #include <aws/core/Aws.h>
+#include <aws/core/auth/AWSCredentialsProvider.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/model/GetObjectRequest.h>
 #include <aws/s3/model/HeadBucketRequest.h>
 #include <aws/s3/model/HeadObjectRequest.h>
 #include <aws/s3/model/ListObjectsRequest.h>
-#include <aws/core/auth/AWSCredentialsProvider.h>
 #endif  // TRTIS_ENABLE_S3
 
 #include <google/protobuf/io/coded_stream.h>

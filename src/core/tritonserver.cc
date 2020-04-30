@@ -36,6 +36,7 @@
 #include "src/core/backend.h"
 #include "src/core/infer_request.h"
 #include "src/core/infer_response.h"
+#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/model_config_utils.h"
@@ -43,7 +44,6 @@
 #include "src/core/response_allocator.h"
 #include "src/core/server.h"
 #include "src/core/status.h"
-#include "src/core/tracing.h"
 
 namespace ni = nvidia::inferenceserver;
 
@@ -599,126 +599,130 @@ TRITONSERVER_MetricsFormatted(
 }
 
 //
-// TRITONSERVER_Trace
+// TRITONSERVER_InferenceTrace
 //
+const char*
+TRITONSERVER_InferenceTraceLevelString(TRITONSERVER_InferenceTraceLevel level)
+{
+  switch (level) {
+    case TRITONSERVER_TRACE_LEVEL_DISABLED:
+      return "DISABLED";
+    case TRITONSERVER_TRACE_LEVEL_MIN:
+      return "MIN";
+    case TRITONSERVER_TRACE_LEVEL_MAX:
+      return "MAX";
+  }
+
+  return "<unknown>";
+}
+
+const char*
+TRITONSERVER_InferenceTraceActivityString(
+    TRITONSERVER_InferenceTraceActivity activity)
+{
+  switch (activity) {
+    case TRITONSERVER_TRACE_REQUEST_START:
+      return "REQUEST_START";
+    case TRITONSERVER_TRACE_QUEUE_START:
+      return "QUEUE_START";
+    case TRITONSERVER_TRACE_COMPUTE_START:
+      return "COMPUTE_START";
+    case TRITONSERVER_TRACE_COMPUTE_INPUT_END:
+      return "COMPUTE_INPUT_END";
+    case TRITONSERVER_TRACE_COMPUTE_OUTPUT_START:
+      return "COMPUTE_OUTPUT_START";
+    case TRITONSERVER_TRACE_COMPUTE_END:
+      return "COMPUTE_END";
+    case TRITONSERVER_TRACE_REQUEST_END:
+      return "REQUEST_END";
+  }
+
+  return "<unknown>";
+}
+
 TRITONSERVER_Error*
-TRITONSERVER_TraceNew(
-    TRITONSERVER_Trace** trace, TRITONSERVER_Trace_Level level,
-    TRITONSERVER_TraceActivityFn_t activity_fn, void* activity_userp)
+TRITONSERVER_InferenceTraceNew(
+    TRITONSERVER_InferenceTrace** trace, TRITONSERVER_InferenceTraceLevel level,
+    uint64_t parent_id, TRITONSERVER_InferenceTraceActivityFn_t activity_fn,
+    TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* trace_userp)
 {
 #ifdef TRTIS_ENABLE_TRACING
-  std::unique_ptr<ni::Trace> ltrace;
-  RETURN_IF_STATUS_ERROR(
-      ni::Trace::Create(level, activity_fn, activity_userp, &ltrace));
-  *trace = reinterpret_cast<TRITONSERVER_Trace*>(ltrace.release());
+  ni::InferenceTrace* ltrace = new ni::InferenceTrace(
+      level, parent_id, activity_fn, release_fn, trace_userp);
+  *trace = reinterpret_cast<TRITONSERVER_InferenceTrace*>(ltrace);
   return nullptr;  // Success
 #else
   *trace = nullptr;
   return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+      TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
 #endif  // TRTIS_ENABLE_TRACING
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_TraceDelete(TRITONSERVER_Trace* trace)
+TRITONSERVER_InferenceTraceDelete(TRITONSERVER_InferenceTrace* trace)
 {
 #ifdef TRTIS_ENABLE_TRACING
-  ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
+  ni::InferenceTrace* ltrace = reinterpret_cast<ni::InferenceTrace*>(trace);
   delete ltrace;
   return nullptr;  // Success
 #else
   return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+      TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
 #endif  // TRTIS_ENABLE_TRACING
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_TraceModelName(TRITONSERVER_Trace* trace, const char** model_name)
+TRITONSERVER_InferenceTraceId(TRITONSERVER_InferenceTrace* trace, uint64_t* id)
 {
 #ifdef TRTIS_ENABLE_TRACING
-  ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
-  *model_name = ltrace->ModelName();
-  return nullptr;  // Success
-#else
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED, "tracing not supported");
-#endif  // TRTIS_ENABLE_TRACING
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_TraceModelVersion(
-    TRITONSERVER_Trace* trace, int64_t* model_version)
-{
-#ifdef TRTIS_ENABLE_TRACING
-  ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
-  *model_version = ltrace->ModelVersion();
-  return nullptr;  // Success
-#else
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED, "tracing not supported");
-#endif  // TRTIS_ENABLE_TRACING
-}
-
-TRITONSERVER_Error*
-TRITONSERVER_TraceId(TRITONSERVER_Trace* trace, int64_t* id)
-{
-#ifdef TRTIS_ENABLE_TRACING
-  ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
+  ni::InferenceTrace* ltrace = reinterpret_cast<ni::InferenceTrace*>(trace);
   *id = ltrace->Id();
   return nullptr;  // Success
 #else
   return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+      TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
 #endif  // TRTIS_ENABLE_TRACING
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_TraceParentId(TRITONSERVER_Trace* trace, int64_t* parent_id)
+TRITONSERVER_InferenceTraceParentId(
+    TRITONSERVER_InferenceTrace* trace, uint64_t* parent_id)
 {
 #ifdef TRTIS_ENABLE_TRACING
-  ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
+  ni::InferenceTrace* ltrace = reinterpret_cast<ni::InferenceTrace*>(trace);
   *parent_id = ltrace->ParentId();
   return nullptr;  // Success
 #else
   return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+      TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
 #endif  // TRTIS_ENABLE_TRACING
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_TraceManagerNew(
-    TRITONSERVER_TraceManager** trace_manager,
-    TRITONSERVER_TraceManagerCreateTraceFn_t create_fn,
-    TRITONSERVER_TraceManagerReleaseTraceFn_t release_fn, void* userp)
+TRITONSERVER_InferenceTraceModelName(
+    TRITONSERVER_InferenceTrace* trace, const char** model_name)
 {
 #ifdef TRTIS_ENABLE_TRACING
-  std::unique_ptr<ni::OpaqueTraceManager> ltrace_manager(
-      new ni::OpaqueTraceManager);
-  ltrace_manager->triton_create_fn_ = create_fn;
-  ltrace_manager->triton_release_fn_ = release_fn;
-  ltrace_manager->using_triton_ = true;
-  ltrace_manager->userp_ = userp;
-  *trace_manager =
-      reinterpret_cast<TRITONSERVER_TraceManager*>(ltrace_manager.release());
+  ni::InferenceTrace* ltrace = reinterpret_cast<ni::InferenceTrace*>(trace);
+  *model_name = ltrace->ModelName().c_str();
   return nullptr;  // Success
 #else
-  *trace_manager = nullptr;
   return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+      TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
 #endif  // TRTIS_ENABLE_TRACING
 }
 
-TRITONSERVER_Error*
-TRITONSERVER_TraceManagerDelete(TRITONSERVER_TraceManager* trace_manager)
+TRITONSERVER_EXPORT TRITONSERVER_Error*
+TRITONSERVER_InferenceTraceModelVersion(
+    TRITONSERVER_InferenceTrace* trace, int64_t* model_version)
 {
 #ifdef TRTIS_ENABLE_TRACING
-  ni::OpaqueTraceManager* ltrace_manager =
-      reinterpret_cast<ni::OpaqueTraceManager*>(trace_manager);
-  delete ltrace_manager;
+  ni::InferenceTrace* ltrace = reinterpret_cast<ni::InferenceTrace*>(trace);
+  *model_version = ltrace->ModelVersion();
   return nullptr;  // Success
 #else
   return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+      TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
 #endif  // TRTIS_ENABLE_TRACING
 }
 
@@ -1592,6 +1596,11 @@ TRITONSERVER_ServerModelStatistics(
     TRITONSERVER_Server* server, const char* model_name,
     const int64_t model_version, TRITONSERVER_Message** model_stats)
 {
+#ifndef TRTIS_ENABLE_STATS
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNSUPPORTED, "statistics not supported");
+#else
+
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   auto model_name_string = std::string(model_name);
@@ -1647,9 +1656,9 @@ TRITONSERVER_ServerModelStatistics(
       RETURN_IF_STATUS_ERROR(
           lserver->GetInferenceBackend(mv_pair.first, version, &backend));
       const auto& infer_stats =
-          backend->ImmutableStatsAggregator().ImmutableInferStats();
+          backend->StatsAggregator().ImmutableInferStats();
       const auto& infer_batch_stats =
-          backend->ImmutableStatsAggregator().ImmutableInferBatchStats();
+          backend->StatsAggregator().ImmutableInferBatchStats();
 
       rapidjson::Value inference_stats(rapidjson::kObjectType);
       rapidjson::Value duration_stats;
@@ -1711,9 +1720,7 @@ TRITONSERVER_ServerModelStatistics(
 
       model_stat.AddMember(
           "last_inference",
-          rapidjson::Value(
-              backend->ImmutableStatsAggregator().LastInferenceMs())
-              .Move(),
+          rapidjson::Value(backend->StatsAggregator().LastInferenceMs()).Move(),
           allocator);
       model_stat.AddMember("inference_stats", inference_stats, allocator);
       model_stat.AddMember("batch_stats", batch_stats, allocator);
@@ -1724,7 +1731,10 @@ TRITONSERVER_ServerModelStatistics(
   metadata.AddMember("model_stats", model_stats_json, allocator);
   *model_stats = reinterpret_cast<TRITONSERVER_Message*>(
       new TritonServerMessage(metadata));
+
   return nullptr;  // success
+
+#endif  // TRTIS_ENABLE_STATS
 }
 
 TRITONSERVER_Error*
@@ -1827,9 +1837,7 @@ TRITONSERVER_Error*
 TRITONSERVER_ServerInferAsync(
     TRITONSERVER_Server* server,
     TRITONSERVER_InferenceRequest* inference_request,
-    TRITONSERVER_TraceManager* trace_manager,
-    TRITONSERVER_TraceManagerReleaseFn_t trace_manager_release_fn,
-    void* trace_manager_release_userp)
+    TRITONSERVER_InferenceTrace* trace)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
   ni::InferenceRequest* lrequest =
@@ -1837,32 +1845,44 @@ TRITONSERVER_ServerInferAsync(
 
   RETURN_IF_STATUS_ERROR(lrequest->PrepareForInference());
 
-  // FIXME trace manager should have callback set and then be set in
-  // the inference request
+  // Set the trace object in the request so that activity associated
+  // with the request can be recorded as the request flows through
+  // Triton.
+  if (trace != nullptr) {
+#ifdef TRTIS_ENABLE_TRACING
+    ni::InferenceTrace* ltrace = reinterpret_cast<ni::InferenceTrace*>(trace);
+    ltrace->SetModelName(lrequest->ModelName());
+    ltrace->SetModelVersion(lrequest->ActualModelVersion());
 
-  // We wrap the request in a unique pointer to ensure that the
-  // request flows through inferencing with clear ownership.
-  //
-  // FIXME add a custom deleter that logs an error if ever called. We
-  // expect the request to never be destroyed during the inference
-  // flow... instead we expect it to be released from the unique
-  // pointer and its completion callback envoked.
-  std::unique_ptr<ni::InferenceRequest> ureq(lrequest);
-  ni::Status status = lserver->InferAsync(ureq);
-
-  // If there is error then should not release trace manager since in
-  // that case the caller retains ownership.
-  //
-  // FIXME, this release should not occur here... it should occur when
-  // trace manager is no longer in use by the requests or any
-  // response. So this code should be removed eventually.
-  if (status.IsOk() && (trace_manager != nullptr)) {
-    trace_manager_release_fn(trace_manager, trace_manager_release_userp);
+    std::unique_ptr<ni::InferenceTrace> utrace(ltrace);
+    lrequest->SetTrace(std::move(utrace));
+#else
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
+#endif  // TRTIS_ENABLE_TRACING
   }
 
-  // If there is error then ureq will still have 'lrequest' and we
+  // We wrap the request in a unique pointer to ensure that it flows
+  // through inferencing with clear ownership.
+  std::unique_ptr<ni::InferenceRequest> ureq(lrequest);
+
+  // Run inference...
+  ni::Status status = lserver->InferAsync(ureq);
+
+  // If there is an error then must explicitly release any trace
+  // object associated with the inference request above.
+#ifdef TRTIS_ENABLE_TRACING
+  if (!status.IsOk()) {
+    std::unique_ptr<ni::InferenceTrace>* trace = ureq->MutableTrace();
+    if (*trace != nullptr) {
+      ni::InferenceTrace::Release(std::move(*trace));
+    }
+  }
+#endif  // TRTIS_ENABLE_TRACING
+
+  // If there is an error then ureq will still have 'lrequest' and we
   // must release it from unique_ptr since the caller should retain
-  // ownership when there is error. If there is not an error the ureq
+  // ownership when there is error. If there is not an error then ureq
   // == nullptr and so this release is a nop.
   ureq.release();
 
