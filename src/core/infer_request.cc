@@ -159,9 +159,6 @@ InferenceRequest::Release(std::unique_ptr<InferenceRequest>&& request)
     (*it)();
   }
   request->release_callbacks_.clear();
-  // Reset here instead of PrepareForInference() because InferenceRequest users
-  // will set this before PrepareForInfernce() is called.
-  request->secondary_stats_aggregator_ = nullptr;
 
   void* userp = request->release_userp_;
   request->release_fn_(
@@ -571,9 +568,11 @@ InferenceRequest::Normalize()
 
 void
 InferenceRequest::ReportStatistics(
-    bool success, uint64_t compute_start_ns, uint64_t compute_input_end_ns,
-    uint64_t compute_output_start_ns, uint64_t compute_end_ns)
+    bool success, const uint64_t compute_start_ns,
+    const uint64_t compute_input_end_ns, const uint64_t compute_output_start_ns,
+    const uint64_t compute_end_ns)
 {
+#ifdef TRTIS_ENABLE_STATS
   INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 
   if (success) {
@@ -613,6 +612,7 @@ InferenceRequest::ReportStatistics(
     }
   }
 #endif  // TRTIS_ENABLE_TRACING
+#endif  // TRTIS_ENABLE_STATS
 }
 
 //

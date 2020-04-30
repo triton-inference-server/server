@@ -29,21 +29,15 @@
 #include <time.h>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
-#include "src/core/metric_model_reporter.h"
 #include "src/core/metrics.h"
-#include "src/core/tracing.h"
 
 namespace nvidia { namespace inferenceserver {
 
 void
 StatsAggregator::UpdateFailure(
-    uint64_t request_start_ns, uint64_t request_end_ns)
+    const uint64_t request_start_ns, const uint64_t request_end_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
-
-  struct timespec last_ts;
-  clock_gettime(CLOCK_REALTIME, &last_ts);
-  last_inference_ms_ = TIMESPEC_TO_MILLIS(last_ts);
   infer_stats_.failure_count_++;
   infer_stats_.failure_duration_ns_ += (request_end_ns - request_start_ns);
 
@@ -56,16 +50,12 @@ StatsAggregator::UpdateFailure(
 
 void
 StatsAggregator::UpdateSuccess(
-    uint64_t request_start_ns, uint64_t queue_start_ns,
-    uint64_t compute_start_ns, uint64_t compute_input_end_ns,
-    uint64_t compute_output_start_ns, uint64_t compute_end_ns,
-    uint64_t request_end_ns)
+    const uint64_t request_start_ns, const uint64_t queue_start_ns,
+    const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
+    const uint64_t compute_output_start_ns, const uint64_t compute_end_ns,
+    const uint64_t request_end_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
-
-  struct timespec last_ts;
-  clock_gettime(CLOCK_REALTIME, &last_ts);
-  last_inference_ms_ = TIMESPEC_TO_MILLIS(last_ts);
 
   infer_stats_.success_count_++;
   infer_stats_.request_duration_ns_ += (request_end_ns - request_start_ns);
@@ -101,10 +91,18 @@ StatsAggregator::UpdateSuccess(
 
 void
 StatsAggregator::UpdateInferBatchStats(
-    size_t batch_size, uint64_t compute_start_ns, uint64_t compute_input_end_ns,
-    uint64_t compute_output_start_ns, uint64_t compute_end_ns)
+    size_t batch_size, const uint64_t compute_start_ns,
+    const uint64_t compute_input_end_ns, const uint64_t compute_output_start_ns,
+    const uint64_t compute_end_ns)
 {
+  struct timespec last_ts;
+  clock_gettime(CLOCK_REALTIME, &last_ts);
+  auto inference_ms = TIMESPEC_TO_MILLIS(last_ts);
+
   std::lock_guard<std::mutex> lock(mu_);
+  if (inference_ms > last_inference_ms_) {
+    last_inference_ms_ = inference_ms;
+  }
 
   auto it = batch_stats_.find(batch_size);
   if (it == batch_stats_.end()) {

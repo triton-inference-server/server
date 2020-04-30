@@ -28,12 +28,10 @@
 #include <time.h>
 #include <map>
 #include <mutex>
+#include "src/core/metric_model_reporter.h"
 #include "src/core/status.h"
-#include "src/core/tracing.h"
 
 namespace nvidia { namespace inferenceserver {
-
-class MetricModelReporter;
 
 // A stats aggregator used for one backend.
 class StatsAggregator {
@@ -87,22 +85,23 @@ class StatsAggregator {
   }
 
   // Add durations to Infer stats for a failed inference request.
-  void UpdateFailure(uint64_t request_start_ns, uint64_t request_end_ns);
+  void UpdateFailure(
+      const uint64_t request_start_ns, const uint64_t request_end_ns);
 
   // Add durations to infer stats for a successful inference request.
   void UpdateSuccess(
-      uint64_t request_start_ns, uint64_t queue_start_ns,
-      uint64_t compute_start_ns, uint64_t compute_input_end_ns,
-      uint64_t compute_output_start_ns, uint64_t compute_end_ns,
-      uint64_t request_end_ns);
+      const uint64_t request_start_ns, const uint64_t queue_start_ns,
+      const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
+      const uint64_t compute_output_start_ns, const uint64_t compute_end_ns,
+      const uint64_t request_end_ns);
 
   // Add durations to batch infer stats for a batch execution.
   // 'success_request_count' is the number of sucess requests in the batch that
   // have infer_stats attached.
   void UpdateInferBatchStats(
-      size_t batch_size, uint64_t compute_start_ns,
-      uint64_t compute_input_end_ns, uint64_t compute_output_start_ns,
-      uint64_t compute_end_ns);
+      size_t batch_size, const uint64_t compute_start_ns,
+      const uint64_t compute_input_end_ns,
+      const uint64_t compute_output_start_ns, const uint64_t compute_end_ns);
 
  private:
   std::mutex mu_;
@@ -126,7 +125,7 @@ class StatsAggregator {
   uint64_t TS_NS;                         \
   INFER_STATS_SET_TIMESTAMP(TS_NS);
 #else
-#define INFER_STATS_DECL_TIMESTAMP(TS_NS) uint64_t TS_NS = 0;
+#define INFER_STATS_DECL_TIMESTAMP(TS_NS)
 #define INFER_STATS_SET_TIMESTAMP(TS_NS)
 #endif  // TRTIS_ENABLE_STATS
 }}      // namespace nvidia::inferenceserver

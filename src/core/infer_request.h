@@ -404,14 +404,15 @@ class InferenceRequest {
     queue_start_ns_ = TIMESPEC_TO_NANOS(ts);
   }
 
-  uint64_t RequestStartNs() { return request_start_ns_; }
-  uint64_t QueueStartNs() { return queue_start_ns_; }
+  uint64_t RequestStartNs() const { return request_start_ns_; }
+  uint64_t QueueStartNs() const { return queue_start_ns_; }
 
   // Report the statistics to stats collectors associated with the request.
   // Duration and timestamps provide two granularities for stats collectors.
   void ReportStatistics(
-      bool success, uint64_t compute_start_ns, uint64_t compute_input_end_ns,
-      uint64_t compute_output_start_ns, uint64_t compute_end_ns);
+      bool success, const uint64_t compute_start_ns,
+      const uint64_t compute_input_end_ns,
+      const uint64_t compute_output_start_ns, const uint64_t compute_end_ns);
 
   // Statistics for each request are aggregated into the corresponding
   // backend's statistics. Optionally this function may be used to
