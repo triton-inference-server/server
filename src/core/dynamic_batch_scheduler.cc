@@ -42,9 +42,7 @@ namespace nvidia { namespace inferenceserver {
 DynamicBatchScheduler::DynamicBatchScheduler(
     const uint32_t runner_id_start, const uint32_t runner_cnt,
     const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
-    const StandardRunFunc& OnSchedule,
-    const StandardShapeTensorPeekFunc& OnPeek,
-    const bool dynamic_batching_enabled,
+    const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
@@ -52,7 +50,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
     const ModelQueuePolicy& default_queue_policy,
     const uint32_t priority_levels, const ModelQueuePolicyMap& queue_policy_map)
     : OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
-      OnPeek_(OnPeek), dynamic_batching_enabled_(dynamic_batching_enabled),
+      dynamic_batching_enabled_(dynamic_batching_enabled),
       scheduler_thread_cnt_(runner_cnt), idle_scheduler_thread_cnt_(0),
       queue_(default_queue_policy, priority_levels, queue_policy_map),
       preferred_batch_sizes_(preferred_batch_sizes),
@@ -73,9 +71,7 @@ Status
 DynamicBatchScheduler::Create(
     const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
     const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
-    const StandardRunFunc& OnSchedule,
-    const StandardShapeTensorPeekFunc& OnPeek,
-    const bool dynamic_batching_enabled,
+    const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
@@ -83,7 +79,7 @@ DynamicBatchScheduler::Create(
     std::unique_ptr<Scheduler>* scheduler)
 {
   return Create(
-      runner_id_start, runner_cnt, nice, OnInit, OnWarmup, OnSchedule, OnPeek,
+      runner_id_start, runner_cnt, nice, OnInit, OnWarmup, OnSchedule,
       dynamic_batching_enabled, enforce_equal_shape_tensors, preserve_ordering,
       preferred_batch_sizes, max_queue_delay_microseconds, ModelQueuePolicy(),
       0, ModelQueuePolicyMap(), scheduler);
@@ -93,9 +89,7 @@ Status
 DynamicBatchScheduler::Create(
     const uint32_t runner_id_start, const uint32_t runner_cnt, const int nice,
     const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
-    const StandardRunFunc& OnSchedule,
-    const StandardShapeTensorPeekFunc& OnPeek,
-    const bool dynamic_batching_enabled,
+    const StandardRunFunc& OnSchedule, const bool dynamic_batching_enabled,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const bool preserve_ordering,
     const std::set<int32_t>& preferred_batch_sizes,
@@ -105,7 +99,7 @@ DynamicBatchScheduler::Create(
     std::unique_ptr<Scheduler>* scheduler)
 {
   DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
-      runner_id_start, runner_cnt, OnInit, OnWarmup, OnSchedule, OnPeek,
+      runner_id_start, runner_cnt, OnInit, OnWarmup, OnSchedule,
       dynamic_batching_enabled, enforce_equal_shape_tensors, preserve_ordering,
       preferred_batch_sizes, max_queue_delay_microseconds, default_queue_policy,
       priority_levels, queue_policy_map);
@@ -348,7 +342,7 @@ DynamicBatchScheduler::SchedulerThread(
           next_preferred_batch_size_ = 0;
 
           pending_batch_size_ = 0;
-          pending_batch_shapes_.clear();
+          required_equal_inputs_.clear();
 
           // If there are still requests in the queue after removing
           // the pending batch and if there are any idle threads then
@@ -474,9 +468,9 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
     if (queue_.PendingBatchCount() == 0) {
       // Get the shape of the new batch that is being started...
       if (!enforce_equal_shape_tensors_.empty()) {
-        if (!InitPendingShape(
-                 runner_id, queue_.RequestAtCursor(),
-                 enforce_equal_shape_tensors_, OnPeek_, &pending_batch_shapes_)
+        if (!InitRequiredEqualInputs(
+                 queue_.RequestAtCursor(), enforce_equal_shape_tensors_,
+                 &required_equal_inputs_)
                  .IsOk()) {
           send_now = true;
           break;
@@ -493,9 +487,8 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
       // There is a pending batch and it has a different shape then
       // this request, so send the pending batch as it is.
       if (!enforce_equal_shape_tensors_.empty() &&
-          !CompareWithPendingShape(
-              runner_id, queue_.RequestAtCursor(), OnPeek_,
-              pending_batch_shapes_)) {
+          !CompareWithRequiredEqualInputs(
+              queue_.RequestAtCursor(), required_equal_inputs_)) {
         send_now = true;
         break;
       }

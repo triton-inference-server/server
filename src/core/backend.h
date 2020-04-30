@@ -124,8 +124,7 @@ class InferenceBackend {
   // can only be set once for a backend.
   Status SetConfiguredScheduler(
       const uint32_t runner_cnt, const Scheduler::StandardInitFunc& OnInit,
-      const Scheduler::StandardRunFunc& OnRun,
-      const Scheduler::StandardShapeTensorPeekFunc& OnPeek);
+      const Scheduler::StandardRunFunc& OnRun);
 
   // Get the raw pointer to the scheduler of this backend.
   Scheduler* BackendScheduler() { return scheduler_.get(); }
