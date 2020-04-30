@@ -33,33 +33,20 @@
 namespace nvidia { namespace inferenceserver {
 
 Status
-InitPendingShape(
-    const int64_t runner_id, const std::unique_ptr<InferenceRequest>& irequest,
+InitRequiredEqualInputs(
+    const std::unique_ptr<InferenceRequest>& request,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
-    PendingBatchShapes* pending_batch_shapes)
+    RequiredEqualInputs* required_equal_inputs)
 {
-  pending_batch_shapes->clear();
+  required_equal_inputs->clear();
 
-  for (const auto& pr : irequest->ImmutableInputs()) {
+  for (const auto& pr : request->ImmutableInputs()) {
     const InferenceRequest::Input* input = pr.second;
     const auto itr = enforce_equal_shape_tensors.find(input->Name());
     if (itr != enforce_equal_shape_tensors.end()) {
-      std::pair<std::vector<int64_t>, std::vector<int64_t>> shapes;
-      shapes.first = input->Shape();
-
-      // For shape tensors must compare the contents of the tensor in
-      // addition to the tensor shape itself.
-      if (itr->second) {
-        RETURN_IF_ERROR(OnPeek(runner_id, *input, irequest, &shapes.second));
-
-        LOG_VERBOSE(1) << "peek '" << input->Name() << "', shape "
-                       << DimsListToString(shapes.first) << ", value "
-                       << DimsListToString(shapes.second);
-      }
-
-      pending_batch_shapes->emplace(
-          std::make_pair(input->Name(), std::move(shapes)));
+      required_equal_inputs->emplace(
+          std::piecewise_construct, std::forward_as_tuple(input->Name()),
+          std::forward_as_tuple(input, itr->second));
     }
   }
 
@@ -67,30 +54,49 @@ InitPendingShape(
 }
 
 bool
-CompareWithPendingShape(
-    const int64_t runner_id, const std::unique_ptr<InferenceRequest>& irequest,
-    const Scheduler::StandardShapeTensorPeekFunc& OnPeek,
-    const PendingBatchShapes& pending_batch_shapes)
+CompareWithRequiredEqualInputs(
+    const std::unique_ptr<InferenceRequest>& request,
+    const RequiredEqualInputs& required_equal_inputs)
 {
-  for (const auto& pr : irequest->ImmutableInputs()) {
+  for (const auto& pr : request->ImmutableInputs()) {
     const InferenceRequest::Input* input = pr.second;
-    const auto itr = pending_batch_shapes.find(input->Name());
-    if (itr != pending_batch_shapes.end()) {
-      if (!CompareDims(itr->second.first, input->Shape())) {
+    const auto itr = required_equal_inputs.find(input->Name());
+    if (itr != required_equal_inputs.end()) {
+      // Make sure shape of input tensors is equal.
+      if (!CompareDims(itr->second.first->Shape(), input->Shape())) {
         return false;
       }
 
-      // If there are shape-tensor contents then compare those as
-      // well.
-      if (!itr->second.second.empty()) {
-        std::vector<int64_t> shape;
+      // If necessary compare the contents as well...
+      if (itr->second.second) {
+        const auto& d1 = itr->second.first->Data();
+        const auto& d2 = input->Data();
 
-        // If fail getting the tensor shape then conservatively return
-        // false to indicate that the shapes don't match.
-        if (!OnPeek(runner_id, *input, irequest, &shape).IsOk()) {
+        // For now being conservative and assuming that content
+        // comparison is for shape tensors which are likely to always
+        // be in a single buffer.
+        if ((d1->BufferCount() != 1) || (d2->BufferCount() != 1)) {
           return false;
         }
-        if (!CompareDims(itr->second.second, shape)) {
+
+        size_t d1_byte_size, d2_byte_size;
+        TRITONSERVER_MemoryType d1_memory_type, d2_memory_type;
+        int64_t d1_memory_id, d2_memory_id;
+        const char* d1_buffer = d1->BufferAt(
+            0 /* idx */, &d1_byte_size, &d1_memory_type, &d1_memory_id);
+        const char* d2_buffer = d2->BufferAt(
+            0 /* idx */, &d2_byte_size, &d2_memory_type, &d2_memory_id);
+
+        // Tensor must be same size and in in CPU memory so that it
+        // can be easily compared. If not return false conservatively.
+        if ((d1_byte_size != d2_byte_size) || (d1_buffer == nullptr) ||
+            (d2_buffer == nullptr) ||
+            (d1_memory_type == TRITONSERVER_MEMORY_GPU) ||
+            (d2_memory_type == TRITONSERVER_MEMORY_GPU)) {
+          return false;
+        }
+
+        if (strncmp(d1_buffer, d2_buffer, d1_byte_size) != 0) {
           return false;
         }
       }

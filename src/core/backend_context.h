@@ -81,15 +81,6 @@ struct BackendContext {
       const InferenceBackend* base,
       std::vector<std::unique_ptr<InferenceRequest>>&& requests) = 0;
 
-  // Return the contents of a shape tensor. It is the caller's
-  // responsibility to call this only for shape tensors that are
-  // 1-dimensional, INT32 tensors. A non-OK status indicates that the
-  // contents of the tensor could not be peeked.
-  virtual Status PeekShapeTensor(
-      const InferenceRequest::Input& input,
-      const std::unique_ptr<InferenceRequest>& request,
-      std::vector<int64_t>* shape);
-
   // Helper function to populate the shape value of specified shape input
   // that corresponds with the batch size. The first shape value is asssumed
   // to be the batch size. Its the user's responsibility to ensure it is called
