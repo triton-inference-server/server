@@ -81,30 +81,6 @@ struct BackendContext {
       const InferenceBackend* base,
       std::vector<std::unique_ptr<InferenceRequest>>&& requests) = 0;
 
-  // Helper function to populate the shape value of specified shape input
-  // that corresponds with the batch size. The first shape value is asssumed
-  // to be the batch size. Its the user's responsibility to ensure it is called
-  // only for the shape tensors.
-  // Return true if cudaMemcpyAsync is called, and the caller should call
-  // cudaStreamSynchronize before using the data. Otherwise, return false.
-  bool SetShapeInputBuffer(
-      const std::string& name, const int32_t total_batch_size,
-      const int expected_byte_size, const bool support_batching,
-      std::unique_ptr<InferenceRequest>& request,
-      TRITONSERVER_MemoryType dst_memory_type, int64_t dst_memory_type_id,
-      char* input_buffer);
-
-  // Helper function to set output buffer for a shape tensor. It is
-  // callers resposibilty to ensure this method is called only for the
-  // shape tensors. Return true if cudaMemcpyAsync is called, and the
-  // caller should call cudaStreamSynchronize before using the
-  // data. Otherwise, return false.
-  bool SetOutputShapeTensorBuffer(
-      const std::string& name, const int32_t* content,
-      std::vector<int64_t>& content_shape, const bool support_batching,
-      TRITONSERVER_MemoryType src_memory_type, int64_t src_memory_type_id,
-      std::vector<std::unique_ptr<InferenceRequest>>* requests);
-
   // Check if output tensor produced by a model is compatible with the
   // model configuration.  Dimensions with variable size in the model
   // configuration can support any size in the corresponding output
@@ -295,19 +271,5 @@ class BackendInputCollector {
 
   std::list<DeferredPinned> deferred_pinned_;
 };
-
-// This function will return a tensor's contents as a contiguous
-// chunk. In some cases this will require copying the data. If that
-// happens, 'contiguous_buffer' will be set to hold the contiguous
-// chunk and 'cuda_copy' will be set to indicate whether CUDA copy is
-// conducted.  The data copy can be avoided if the input is already in
-// a contiguous chunk and the input is located in memory type and id
-// specified.
-Status GetContiguousInputContent(
-    const InferenceRequest::Input* rinput, TRITONSERVER_MemoryType memory_type,
-    int64_t memory_type_id, const char** content, size_t* content_byte_size,
-    std::unique_ptr<AllocatedMemory>* contiguous_buffer, cudaStream_t stream,
-    bool* cuda_copy);
-
 
 }}  // namespace nvidia::inferenceserver
