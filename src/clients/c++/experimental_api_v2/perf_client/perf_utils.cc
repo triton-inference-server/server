@@ -139,23 +139,42 @@ IsFile(const std::string& complete_path)
   }
 }
 
-/*
-size_t
-GetElementCount(std::shared_ptr<nic::InferContext::Input> input)
+int64_t
+ByteSize(const std::vector<int64_t>& shape, const std::string& datatype)
 {
-  size_t count = 1;
-  if (!input->Shape().empty()) {
-    for (const auto dim : input->Shape()) {
-      count *= dim;
-    }
+  int one_element_size;
+  if ((datatype.compare("BOOL") == 0) || (datatype.compare("INT8") == 0) ||
+      (datatype.compare("UINT8") == 0)) {
+    one_element_size = 1;
+  } else if (
+      (datatype.compare("INT16") == 0) || (datatype.compare("UINT16") == 0) ||
+      (datatype.compare("FP16") == 0)) {
+    one_element_size = 2;
+  } else if (
+      (datatype.compare("INT32") == 0) || (datatype.compare("UINT32") == 0) ||
+      (datatype.compare("FP32") == 0)) {
+    one_element_size = 4;
+  } else if (
+      (datatype.compare("INT64") == 0) || (datatype.compare("UINT64") == 0) ||
+      (datatype.compare("FP64") == 0)) {
+    one_element_size = 8;
   } else {
-    for (const auto dim : input->Dims()) {
-      count *= dim;
-    }
+    return -1;
+  }
+
+  return (one_element_size * ElementCount(shape));
+}
+
+int64_t
+ElementCount(const std::vector<int64_t>& shape)
+{
+  int64_t count = 1;
+  for (const auto dim : shape) {
+    count *= dim;
   }
   return count;
 }
-*/
+
 
 void
 SerializeStringTensor(
@@ -176,10 +195,10 @@ SerializeStringTensor(
 
 nic::Error
 SerializeExplicitTensor(
-    const rapidjson::Value& tensor, ni::DataType dt,
+    const rapidjson::Value& tensor, const std::string& dt,
     std::vector<char>* decoded_data)
 {
-  if (dt == ni::DataType::TYPE_STRING) {
+  if (dt.compare("BYTES") == 0) {
     std::string serialized = "";
     for (const auto& value : tensor.GetArray()) {
       if (!value.IsString()) {
@@ -195,80 +214,80 @@ SerializeExplicitTensor(
         std::back_inserter(*decoded_data));
   } else {
     for (const auto& value : tensor.GetArray()) {
-      if (dt == ni::DataType::TYPE_BOOL) {
+      if (dt.compare("BOOL") == 0) {
         if (!value.IsBool()) {
           return nic::Error("unable to find bool data in json");
         }
         bool element(value.GetBool());
         const char* src = reinterpret_cast<const char*>(&element);
         decoded_data->insert(decoded_data->end(), src, src + sizeof(bool));
-      } else if (dt == ni::DataType::TYPE_UINT8) {
+      } else if (dt.compare("UINT8") == 0) {
         if (!value.IsUint()) {
           return nic::Error("unable to find uint8_t data in json");
         }
         uint8_t element(static_cast<uint8_t>(value.GetUint()));
         const char* src = reinterpret_cast<const char*>(&element);
         decoded_data->insert(decoded_data->end(), src, src + sizeof(uint8_t));
-      } else if (dt == ni::DataType::TYPE_INT8) {
+      } else if (dt.compare("INT8") == 0) {
         if (!value.IsInt()) {
           return nic::Error("unable to find int8_t data in json");
         }
         int8_t element(static_cast<int8_t>(value.GetInt()));
         const char* src = reinterpret_cast<const char*>(&element);
         decoded_data->insert(decoded_data->end(), src, src + sizeof(int8_t));
-      } else if (dt == ni::DataType::TYPE_UINT16) {
+      } else if (dt.compare("UINT16") == 0) {
         if (!value.IsUint()) {
           return nic::Error("unable to find uint16_t data in json");
         }
         uint16_t element(static_cast<uint16_t>(value.GetUint()));
         const char* src = reinterpret_cast<const char*>(&element);
         decoded_data->insert(decoded_data->end(), src, src + sizeof(uint16_t));
-      } else if (dt == ni::DataType::TYPE_INT16) {
+      } else if (dt.compare("INT16") == 0) {
         if (!value.IsInt()) {
           return nic::Error("unable to find int16_t data in json");
         }
         int16_t element(static_cast<int16_t>(value.GetInt()));
         const char* src = reinterpret_cast<const char*>(&element);
         decoded_data->insert(decoded_data->end(), src, src + sizeof(int16_t));
-      } else if (dt == ni::DataType::TYPE_FP16) {
+      } else if (dt.compare("FP16") == 0) {
         return nic::Error(
             "Can not use explicit tensor description for fp16 datatype");
-      } else if (dt == ni::DataType::TYPE_UINT32) {
+      } else if (dt.compare("UINT32") == 0) {
         if (!value.IsUint()) {
           return nic::Error("unable to find uint32_t data in json");
         }
         uint32_t element(value.GetUint());
         const char* src = reinterpret_cast<const char*>(&element);
         decoded_data->insert(decoded_data->end(), src, src + sizeof(uint32_t));
-      } else if (dt == ni::DataType::TYPE_INT32) {
+      } else if (dt.compare("INT32") == 0) {
         if (!value.IsInt()) {
           return nic::Error("unable to find int32_t data in json");
         }
         int32_t element(value.GetInt());
         const char* src = reinterpret_cast<const char*>(&element);
         decoded_data->insert(decoded_data->end(), src, src + sizeof(int32_t));
-      } else if (dt == ni::DataType::TYPE_FP32) {
+      } else if (dt.compare("FP32") == 0) {
         if (!value.IsDouble()) {
           return nic::Error("unable to find float data in json");
         }
         float element(value.GetFloat());
         const char* src = reinterpret_cast<const char*>(&element);
         decoded_data->insert(decoded_data->end(), src, src + sizeof(float));
-      } else if (dt == ni::DataType::TYPE_UINT64) {
+      } else if (dt.compare("UINT64") == 0) {
         if (!value.IsUint64()) {
           return nic::Error("unable to find uint64_t data in json");
         }
         uint64_t element(value.GetUint64());
         const char* src = reinterpret_cast<const char*>(&element);
         decoded_data->insert(decoded_data->end(), src, src + sizeof(uint64_t));
-      } else if (dt == ni::DataType::TYPE_INT64) {
+      } else if (dt.compare("INT64") == 0) {
         if (!value.IsInt64()) {
           return nic::Error("unable to find int64_t data in json");
         }
         int64_t element(value.GetInt64());
         const char* src = reinterpret_cast<const char*>(&element);
         decoded_data->insert(decoded_data->end(), src, src + sizeof(int64_t));
-      } else if (dt == ni::DataType::TYPE_FP64) {
+      } else if (dt.compare("FP64") == 0) {
         if (!value.IsDouble()) {
           return nic::Error("unable to find fp64 data in json");
         }

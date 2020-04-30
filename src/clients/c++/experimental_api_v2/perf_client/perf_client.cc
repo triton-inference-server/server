@@ -26,6 +26,8 @@
 
 #include <getopt.h>
 
+#include "src/clients/c++/experimental_api_v2/perf_client/concurrency_manager.h"
+#include "src/clients/c++/experimental_api_v2/perf_client/inference_profiler.h"
 #include "src/clients/c++/experimental_api_v2/perf_client/model_parser.h"
 #include "src/clients/c++/experimental_api_v2/perf_client/perf_utils.h"
 
@@ -1026,52 +1028,59 @@ main(int argc, char** argv)
   // trap SIGINT to allow threads to exit gracefully
   signal(SIGINT, SignalHandler);
 
-  TritonClient triton_client;
-  if (protocol == ProtocolType::HTTP) {
-    FAIL_IF_ERR(
-        nic::InferenceServerHttpClient::Create(
-            &triton_client.http_client_, url, verbose),
-        "unable to create http client for inference");
-  } else {
-    FAIL_IF_ERR(
-        nic::InferenceServerGrpcClient::Create(
-            &triton_client.grpc_client_, url, verbose),
-        "unable to create grpc client for inference");
-  }
+  std::shared_ptr<TritonClientFactory> factory;
+  FAIL_IF_ERR(
+      TritonClientFactory::Create(
+          url, protocol, http_headers, verbose, &factory),
+      "failed to create client factory");
+
+  std::unique_ptr<TritonClientWrapper> triton_client_wrapper;
+  FAIL_IF_ERR(
+      factory->CreateTritonClient(&triton_client_wrapper),
+      "failed to create triton client");
 
   std::shared_ptr<ModelParser> parser = std::make_shared<ModelParser>();
   if (protocol == ProtocolType::HTTP) {
     rapidjson::Document model_metadata;
     FAIL_IF_ERR(
-        triton_client.http_client_->ModelMetadata(
-            &model_metadata, model_name, model_version, http_headers),
+        triton_client_wrapper->ModelMetadata(
+            &model_metadata, model_name, model_version),
         "failed to get model metadata");
     rapidjson::Document model_config;
     FAIL_IF_ERR(
-        triton_client.http_client_->ModelConfig(
-            &model_config, model_name, model_version, http_headers),
+        triton_client_wrapper->ModelConfig(
+            &model_config, model_name, model_version),
         "failed to get model config");
     FAIL_IF_ERR(
         parser->Init(
-            model_metadata, model_config, model_version, http_headers,
-            std::move(triton_client.http_client_)),
+            model_metadata, model_config, model_version, input_shapes,
+            triton_client_wrapper),
         "failed to create model parser");
   } else {
+    std::cout << "here" << std::endl;
     ni::ModelMetadataResponse model_metadata;
     FAIL_IF_ERR(
-        triton_client.grpc_client_->ModelMetadata(
-            &model_metadata, model_name, model_version, http_headers),
+        triton_client_wrapper->ModelMetadata(
+            &model_metadata, model_name, model_version),
         "failed to get model metadata");
+
     ni::ModelConfigResponse model_config;
     FAIL_IF_ERR(
-        triton_client.grpc_client_->ModelConfig(
-            &model_config, model_name, model_version, http_headers),
+        triton_client_wrapper->ModelConfig(
+            &model_config, model_name, model_version),
         "failed to get model config");
     FAIL_IF_ERR(
         parser->Init(
-            model_metadata, model_config.config(), model_version, http_headers,
-            std::move(triton_client.grpc_client_)),
+            model_metadata, model_config.config(), model_version, input_shapes,
+            triton_client_wrapper),
         "failed to create model parser");
+  }
+
+  if ((parser_->MaxBatchsize() == 0) && batch_size > 1) {
+    std::cerr << "can not specify batch size > 1 as the model does not support "
+                 "batching"
+              << std::endl;
+    return 1;
   }
 
   // Change the default value for the --async option for sequential models
@@ -1129,13 +1138,13 @@ main(int argc, char** argv)
     }
     FAIL_IF_ERR(
         ConcurrencyManager::Create(
-            protocol, async, batch_size, max_threads, max_concurrency,
-            sequence_length, string_length, string_data, zero_input,
-            input_shapes, user_data, shared_memory_type, output_shm_size,
-            parser, &manager),
+            async, batch_size, max_threads, max_concurrency, sequence_length,
+            string_length, string_data, zero_input, user_data,
+            shared_memory_type, output_shm_size, parser, factory, &manager),
         "failed to create concurrency manager");
 
   } else if (using_request_rate_range) {
+    /*
     FAIL_IF_ERR(
         RequestRateManager::Create(
             protocol, async, measurement_window_ms, request_distribution,
@@ -1143,8 +1152,10 @@ main(int argc, char** argv)
             string_length, string_data, zero_input, input_shapes, user_data,
             shared_memory_type, output_shm_size, parser, &manager),
         "failed to create request rate manager");
+    */
 
   } else {
+    /*
     FAIL_IF_ERR(
         CustomLoadManager::Create(
             protocol, async, measurement_window_ms, request_intervals_file,
@@ -1152,15 +1163,15 @@ main(int argc, char** argv)
             string_length, string_data, zero_input, input_shapes, user_data,
             shared_memory_type, output_shm_size, parser, &manager),
         "failed to create custom load manager");
+    */
   }
 
-#if 0
   std::unique_ptr<InferenceProfiler> profiler;
   FAIL_IF_ERR(
       InferenceProfiler::Create(
-          protocol, verbose, stability_threshold, measurement_window_ms, max_trials,
-          percentile, latency_threshold_ms, parser, std::move(manager),
-          &profiler),
+          verbose, stability_threshold, measurement_window_ms, max_trials,
+          percentile, latency_threshold_ms, parser,
+          std::move(triton_client_wrapper), std::move(manager), &profiler),
       "failed to create profiler");
 
   // pre-run report
@@ -1289,7 +1300,6 @@ main(int argc, char** argv)
           });
 
       for (PerfStatus& status : summary) {
-        // Tanmay : Update stats to the new ones!!!
         uint64_t avg_queue_ns = status.server_stats.queue_time_ns /
                                 status.server_stats.request_count;
         uint64_t avg_compute_ns = status.server_stats.compute_time_ns /
@@ -1327,11 +1337,11 @@ main(int argc, char** argv)
       if (!summary.front().server_stats.composing_models_stat.empty()) {
         // For each of the composing model, generate CSV file in the same format
         // as the one for ensemble.
-        for (const auto& model_info :
+        for (const auto& model_identifier :
              summary[0].server_stats.composing_models_stat) {
-          const auto& name = model_info.first.first;
-          const auto& version = model_info.first.second;
-          const auto name_ver = name + "_v" + std::to_string(version);
+          const auto& name = model_identifier.first.first;
+          const auto& version = model_identifier.first.second;
+          const auto name_ver = name + "_v" + version;
 
           std::ofstream ofs(name_ver + "." + filename, std::ofstream::out);
           if (target_concurrency) {
@@ -1345,7 +1355,7 @@ main(int argc, char** argv)
 
           for (PerfStatus& status : summary) {
             auto it = status.server_stats.composing_models_stat.find(
-                model_info.first);
+                model_identifier.first);
             const auto& stats = it->second;
             uint64_t avg_queue_ns = stats.queue_time_ns / stats.request_count;
             uint64_t avg_compute_ns =
@@ -1374,6 +1384,5 @@ main(int argc, char** argv)
       }
     }
   }
-#endif
   return 0;
 }

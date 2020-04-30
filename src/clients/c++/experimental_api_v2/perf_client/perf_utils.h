@@ -69,18 +69,8 @@ extern volatile bool early_exit;
     }                                                              \
   }
 
-union TritonClient {
-  TritonClient()
-  {
-    new (&http_client_) std::unique_ptr<nic::InferenceServerHttpClient>{};
-  }
-  ~TritonClient() {}
-
-  std::unique_ptr<nic::InferenceServerHttpClient> http_client_;
-  std::unique_ptr<nic::InferenceServerGrpcClient> grpc_client_;
-};
-
 enum ProtocolType { HTTP = 0, GRPC = 1, UNKNOWN = 2 };
+
 enum Distribution { POISSON = 0, CONSTANT = 1, CUSTOM = 2 };
 enum SearchMode { LINEAR = 0, BINARY = 1, NONE = 2 };
 enum SharedMemoryType {
@@ -124,18 +114,16 @@ bool IsDirectory(const std::string& path);
 // To check whether the path points to a valid system file
 bool IsFile(const std::string& complete_path);
 
-/*
-// Returns the number of elements in the specified input tensor.
-// \param input pointer to the input tensor
-// \returns the number of elements in the tensor
-size_t GetElementCount(std::shared_ptr<nic::InferInput> input);
-*/
+int64_t ByteSize(
+    const std::vector<int64_t>& shape, const std::string& datatype);
+
+int64_t ElementCount(const std::vector<int64_t>& shape);
 
 void SerializeStringTensor(
     std::vector<std::string> string_tensor, std::vector<char>* serialized_data);
 
 nic::Error SerializeExplicitTensor(
-    const rapidjson::Value& tensor, ni::DataType dt,
+    const rapidjson::Value& tensor, const std::string& dt,
     std::vector<char>* decoded_data);
 
 // Generates a random string of specified length using characters specified in

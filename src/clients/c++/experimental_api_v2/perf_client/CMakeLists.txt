@@ -38,12 +38,24 @@ set(
   perf_client.cc
   model_parser.cc
   perf_utils.cc
+  load_manager.cc
+  data_loader.cc
+  concurrency_manager.cc
+  triton_client_wrapper.cc
+  inference_profiler.cc
+  ../examples/shm_utils.cc
 )
 
 set(
   PERF_CLIENT_HDRS
   model_parser.h
   perf_utils.h
+  load_manager.h
+  data_loader.h
+  concurrency_manager.h
+  triton_client_wrapper.h
+  inference_profiler.h
+ ../examples/shm_utils.h
 )
 
 add_executable(perf_client_v2

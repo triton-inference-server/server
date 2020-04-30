@@ -29,15 +29,17 @@
 nic::Error
 ModelParser::Init(
     const ni::ModelMetadataResponse& metadata, const ni::ModelConfig& config,
-    const std::string& model_version, const nic::Headers& http_headers,
-    std::unique_ptr<nic::InferenceServerGrpcClient> client)
+    const std::string& model_version,
+    const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
+    std::unique_ptr<TritonClientWrapper>& client_wrapper)
 {
+  model_name_ = metadata.name();
+  model_version_ = model_version;
   // Get the scheduler type for the model
   if (config.has_ensemble_scheduling()) {
     bool is_sequential = false;
     RETURN_IF_ERROR(GetEnsembleSchedulerType(
-        config, model_version, http_headers, std::move(client),
-        &is_sequential));
+        config, model_version, client_wrapper, &is_sequential));
     if (is_sequential) {
       scheduler_type_ = ENSEMBLE_SEQUENCE;
     } else {
@@ -58,8 +60,23 @@ ModelParser::Init(
     auto it = inputs_->emplace(input.name(), ModelTensor()).first;
     it->second.name_ = input.name();
     it->second.datatype_ = input.datatype();
+    bool is_dynamic = false;
     for (const auto dim : input.shape()) {
+      if (dim == -1) {
+        is_dynamic = true;
+      }
       it->second.shape_.push_back(dim);
+    }
+
+    if (is_dynamic) {
+      const auto user_shape_it = input_shapes.find(input.name());
+      if (user_shape_it != input_shapes.end()) {
+        // Update the default shape to be used.
+        it->second.shape_.clear();
+        for (const auto dim : user_shape_it->second) {
+          it->second.shape_.push_back(dim);
+        }
+      }
     }
   }
 
@@ -99,8 +116,7 @@ ModelParser::Init(
 nic::Error
 ModelParser::GetEnsembleSchedulerType(
     const ni::ModelConfig& config, const std::string& model_version,
-    const nic::Headers& http_headers,
-    std::unique_ptr<nic::InferenceServerGrpcClient> client, bool* is_sequential)
+    std::unique_ptr<TritonClientWrapper>& client_wrapper, bool* is_sequential)
 {
   if (config.has_sequence_batching()) {
     *is_sequential = true;
@@ -110,14 +126,13 @@ ModelParser::GetEnsembleSchedulerType(
     for (const auto& step : config.ensemble_scheduling().step()) {
       ni::ModelConfigResponse model_config;
       std::string step_version(std::to_string(step.model_version()));
-      composing_models_map_->emplace(
-          std::make_pair(config.name(), model_version),
-          std::make_pair(step.model_name(), step_version));
-      RETURN_IF_ERROR(client->ModelConfig(
-          &model_config, step.model_name(), step_version, http_headers));
+      (*composing_models_map_)[config.name()].emplace(
+          step.model_name(), step_version);
+      RETURN_IF_ERROR(client_wrapper->ModelConfig(
+          &model_config, step.model_name(), step_version));
       RETURN_IF_ERROR(GetEnsembleSchedulerType(
           model_config.config(), std::to_string(step.model_version()),
-          http_headers, std::move(client), is_sequential));
+          client_wrapper, is_sequential));
     }
   }
 
@@ -127,17 +142,19 @@ ModelParser::GetEnsembleSchedulerType(
 nic::Error
 ModelParser::Init(
     const rapidjson::Document& metadata, const rapidjson::Document& config,
-    const std::string& model_version, const nic::Headers& http_headers,
-    std::unique_ptr<nic::InferenceServerHttpClient> client)
+    const std::string& model_version,
+    const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
+    std::unique_ptr<TritonClientWrapper>& client_wrapper)
 {
+  model_name_ = metadata["name"].GetString();
+  model_version_ = model_version;
   // Get the scheduler type for the model
   scheduler_type_ = NONE;
   const auto& ensemble_itr = config.FindMember("ensembleScheduling");
   if (ensemble_itr != config.MemberEnd()) {
     bool is_sequential = false;
     RETURN_IF_ERROR(GetEnsembleSchedulerType(
-        config, model_version, http_headers, std::move(client),
-        &is_sequential));
+        config, model_version, client_wrapper, &is_sequential));
     if (is_sequential) {
       scheduler_type_ = ENSEMBLE_SEQUENCE;
     } else {
@@ -233,8 +250,7 @@ ModelParser::Init(
 nic::Error
 ModelParser::GetEnsembleSchedulerType(
     const rapidjson::Document& config, const std::string& model_version,
-    const nic::Headers& http_headers,
-    std::unique_ptr<nic::InferenceServerHttpClient> client, bool* is_sequential)
+    std::unique_ptr<TritonClientWrapper>& client_wrapper, bool* is_sequential)
 {
   const auto& sequence_itr = config.FindMember("sequenceBatching");
   if (sequence_itr != config.MemberEnd()) {
@@ -244,19 +260,17 @@ ModelParser::GetEnsembleSchedulerType(
   if (std::string(config["platform"].GetString()).compare("ensemble") == 0) {
     const auto step_itr = config["ensembleScheduling"].FindMember("step");
     for (const auto& step : step_itr->value.GetArray()) {
-      composing_models_map_->emplace(
-          std::make_pair(
-              config["name"].GetString(), config["version"].GetString()),
-          std::make_pair(
-              step["model_name"].GetString(),
-              step["model_version"].GetString()));
+      (*composing_models_map_)[config["name"].GetString()].emplace(
+          std::string(step["model_name"].GetString()),
+          std::string(step["model_version"].GetString()));
+
       rapidjson::Document model_config;
-      RETURN_IF_ERROR(client->ModelConfig(
+      RETURN_IF_ERROR(client_wrapper->ModelConfig(
           &model_config, step["model_name"].GetString(),
-          step["model_version"].GetString(), http_headers));
+          step["model_version"].GetString()));
       RETURN_IF_ERROR(GetEnsembleSchedulerType(
           model_config, std::to_string(step["model_version"].GetInt()),
-          http_headers, std::move(client), is_sequential));
+          client_wrapper, is_sequential));
     }
   }
 

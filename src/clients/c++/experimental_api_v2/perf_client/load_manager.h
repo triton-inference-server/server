@@ -25,9 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/clients/c++/perf_client/context_factory.h"
-#include "src/clients/c++/perf_client/data_loader.h"
-#include "src/clients/c++/perf_client/perf_utils.h"
+#include "src/clients/c++/experimental_api_v2/perf_client/data_loader.h"
+#include "src/clients/c++/experimental_api_v2/perf_client/model_parser.h"
+#include "src/clients/c++/experimental_api_v2/perf_client/perf_utils.h"
 
 #include <condition_variable>
 #include <thread>
@@ -49,7 +49,7 @@ class LoadManager {
   /// Get the sum of all contexts' stat
   /// \param contexts_stat Returned the accumulated stat from all contexts
   /// in load manager
-  nic::Error GetAccumulatedClientStat(nic::InferContext::Stat* contexts_stat);
+  nic::Error GetAccumulatedClientStat(nic::InferStat* contexts_stat);
 
   /// \return the batch size used for the inference requests
   size_t BatchSize() const { return batch_size_; }
@@ -59,28 +59,37 @@ class LoadManager {
   virtual nic::Error ResetWorkers()
   {
     return nic::Error(
-        ni::RequestStatusCode::INTERNAL,
         "resetting worker threads not supported for this load manager.");
   }
 
   struct InferContextMetaData {
-    InferContextMetaData() : inflight_request_cnt_(0) {}
+    explicit InferContextMetaData() : inflight_request_cnt_(0) {}
     InferContextMetaData(InferContextMetaData&&) = delete;
     InferContextMetaData(const InferContextMetaData&) = delete;
+    ~InferContextMetaData()
+    {
+      for (const auto input : inputs_) {
+        delete input;
+      }
+      for (const auto output : outputs_) {
+        delete output;
+      }
+    }
 
-    std::unique_ptr<nic::InferContext> ctx_;
+    std::unique_ptr<TritonClientWrapper> infer_client_;
+    std::vector<nic::InferInput*> inputs_;
+    std::vector<const nic::InferRequestedOutput*> outputs_;
+    std::unique_ptr<nic::InferOptions> options_;
     std::atomic<size_t> inflight_request_cnt_;
   };
 
 
  protected:
   LoadManager(
-      const bool async,
-      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-      const int32_t batch_size, const size_t max_threads,
+      const bool async, const int32_t batch_size, const size_t max_threads,
       const size_t sequence_length, const SharedMemoryType shared_memory_type,
-      const size_t output_shm_size,
-      const std::shared_ptr<ContextFactory>& factory);
+      const size_t output_shm_size, const std::shared_ptr<ModelParser>& parser,
+      const std::shared_ptr<TritonClientFactory>& factory);
 
   /// Helper funtion to retrieve the input data for the inferences
   /// \param string_length The length of the random strings to be generated
@@ -103,18 +112,19 @@ class LoadManager {
   /// \param ctx Returns a new InferContext.
   /// \param options Returns the options used by 'ctx'.
   /// \return Error object indicating success or failure.
-  nic::Error PrepareInfer(
-      std::unique_ptr<nic::InferContext>* ctx,
-      std::unique_ptr<nic::InferContext::Options>* options);
+  nic::Error PrepareInfer(InferContextMetaData* ctx);
 
-  /// Helper function to prepare the InferContext for sending inference request
-  /// in shared memory.
-  /// \param ctx Returns a new InferContext.
-  /// \param options
-  /// Returns the options used by 'ctx'.
-  nic::Error PrepareSharedMemoryInfer(
-      std::unique_ptr<nic::InferContext>* ctx,
-      std::unique_ptr<nic::InferContext::Options>* options);
+  /*
+    /// Helper function to prepare the InferContext for sending inference
+    request
+    /// in shared memory.
+    /// \param ctx Returns a new InferContext.
+    /// \param options
+    /// Returns the options used by 'ctx'.
+    nic::Error PrepareSharedMemoryInfer(
+        std::unique_ptr<nic::InferContext>* ctx,
+        std::unique_ptr<nic::InferContext::Options>* options);
+  */
 
   /// Updates the input data to use for inference request
   /// \param inputs The inputs to the model
@@ -122,8 +132,8 @@ class LoadManager {
   /// \param step_index The step index to use for next data
   /// \return Error object indicating success or failure.
   nic::Error UpdateInputs(
-      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
-      int stream_index, int step_index);
+      const std::vector<nic::InferInput*>& inputs, int stream_index,
+      int step_index);
 
   void InitNewSequence(int sequence_id);
 
@@ -143,22 +153,21 @@ class LoadManager {
   /// \param step_index The step index to use for next data
   /// \return Error object indicating success or failure.
   nic::Error SetInputs(
-      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
-      const int stream_index, const int step_index);
-
-  /// Helper function to update the shared memory inputs
-  /// \param inputs The inputs to the model
-  /// \param stream_index The data stream to use for next data
-  /// \param step_index The step index to use for next data
-  /// \return Error object indicating success or failure.
-  nic::Error SetInputsSharedMemory(
-      const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
-      const int stream_index, const int step_index);
+      const std::vector<nic::InferInput*>& inputs, const int stream_index,
+      const int step_index);
+  /*
+    /// Helper function to update the shared memory inputs
+    /// \param inputs The inputs to the model
+    /// \param stream_index The data stream to use for next data
+    /// \param step_index The step index to use for next data
+    /// \return Error object indicating success or failure.
+    nic::Error SetInputsSharedMemory(
+        const std::vector<nic::InferInput*>& inputs,
+        const int stream_index, const int step_index);
+  */
 
  protected:
   bool async_;
-  // User provided input shape
-  std::unordered_map<std::string, std::vector<int64_t>> default_input_shapes_;
   size_t batch_size_;
   size_t max_threads_;
   size_t sequence_length_;
@@ -166,12 +175,13 @@ class LoadManager {
   size_t output_shm_size_;
   bool on_sequence_model_;
 
-  std::shared_ptr<ContextFactory> factory_;
+  std::shared_ptr<ModelParser> parser_;
+  std::shared_ptr<TritonClientFactory> factory_;
 
   bool using_json_data_;
 
   std::unique_ptr<DataLoader> data_loader_;
-  std::unique_ptr<nic::SharedMemoryControlContext> shared_memory_ctx_;
+  std::unique_ptr<TritonClientWrapper> client_;
 
   // Map from shared memory key to its starting address and size
   std::unordered_map<std::string, std::pair<uint8_t*, size_t>>
@@ -179,18 +189,14 @@ class LoadManager {
 
   // Holds the running status of the thread.
   struct ThreadStat {
-    ThreadStat()
-        : status_(ni::RequestStatusCode::SUCCESS),
-          cb_status_(ni::RequestStatusCode::SUCCESS)
-    {
-    }
+    ThreadStat() {}
 
     // The status of the worker thread
     nic::Error status_;
     // The status of the callback thread for async requests
     nic::Error cb_status_;
     // The statistics of the InferContext
-    std::vector<nic::InferContext::Stat> contexts_stat_;
+    std::vector<nic::InferStat> contexts_stat_;
     // The concurrency level that the worker should produce
     size_t concurrency_;
     // A vector of request timestamps <start_time, end_time>
@@ -202,12 +208,12 @@ class LoadManager {
 
   // Holds the status of the inflight sequence
   struct SequenceStat {
-    SequenceStat(uint64_t corr_id)
-        : corr_id_(corr_id), data_stream_id_(0), remaining_queries_(0)
+    SequenceStat(uint64_t seq_id)
+        : seq_id_(seq_id), data_stream_id_(0), remaining_queries_(0)
     {
     }
     // The unique correlation id allocated to the sequence
-    uint64_t corr_id_;
+    uint64_t seq_id_;
     // The data stream id providing data for the sequence
     uint64_t data_stream_id_;
     // The number of queries remaining to complete the sequence
@@ -217,7 +223,7 @@ class LoadManager {
   };
 
   std::vector<std::shared_ptr<SequenceStat>> sequence_stat_;
-  std::atomic<ni::CorrelationID> next_corr_id_;
+  std::atomic<uint64_t> next_seq_id_;
 
   // Worker threads that loads the server with inferences
   std::vector<std::thread> threads_;

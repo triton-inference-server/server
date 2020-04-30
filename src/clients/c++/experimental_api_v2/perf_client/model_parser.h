@@ -26,18 +26,18 @@
 #pragma once
 
 #include "src/clients/c++/experimental_api_v2/perf_client/perf_utils.h"
+#include "src/clients/c++/experimental_api_v2/perf_client/triton_client_wrapper.h"
 
 struct ModelTensor {
   ModelTensor() : is_shape_tensor_(false) {}
   std::string name_;
   std::string datatype_;
-  std::vector<int> shape_;
+  std::vector<int64_t> shape_;
   bool is_shape_tensor_;
 };
 
 using ModelTensorMap = std::map<std::string, ModelTensor>;
-using ModelInfo = std::pair<std::string, std::string>;
-using ComposingModelMap = std::map<ModelInfo, std::set<ModelInfo>>;
+using ComposingModelMap = std::map<std::string, std::set<ModelIdentifier>>;
 
 class ModelParser {
  public:
@@ -59,12 +59,14 @@ class ModelParser {
 
   nic::Error Init(
       const ni::ModelMetadataResponse& metadata, const ni::ModelConfig& config,
-      const std::string& model_version, const nic::Headers& http_headers,
-      std::unique_ptr<nic::InferenceServerGrpcClient> client);
+      const std::string& model_version,
+      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
+      std::unique_ptr<TritonClientWrapper>& client_wrapper);
   nic::Error Init(
       const rapidjson::Document& metadata, const rapidjson::Document& config,
-      const std::string& model_version, const nic::Headers& http_headers,
-      std::unique_ptr<nic::InferenceServerHttpClient> client);
+      const std::string& model_version,
+      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
+      std::unique_ptr<TritonClientWrapper>& client_wrapper);
 
   std::string ModelName() const { return model_name_; }
   std::string ModelVersion() const { return model_version_; }
@@ -82,14 +84,12 @@ class ModelParser {
  private:
   nic::Error GetEnsembleSchedulerType(
       const ni::ModelConfig& config, const std::string& model_version,
-      const nic::Headers& http_headers,
-      std::unique_ptr<nic::InferenceServerGrpcClient> client,
+      std::unique_ptr<TritonClientWrapper>& client_wrapper,
       bool* is_sequential);
 
   nic::Error GetEnsembleSchedulerType(
       const rapidjson::Document& config, const std::string& model_version,
-      const nic::Headers& http_headers,
-      std::unique_ptr<nic::InferenceServerHttpClient> client,
+      std::unique_ptr<TritonClientWrapper>& client_wrapper,
       bool* is_sequential);
 
 

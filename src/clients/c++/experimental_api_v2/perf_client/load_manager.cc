@@ -24,8 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/clients/c++/perf_client/load_manager.h"
-#include "src/clients/c++/api_v1/examples/shm_utils.h"
+#include "src/clients/c++/experimental_api_v2/perf_client/load_manager.h"
+#include "src/clients/c++/experimental_api_v2/examples/shm_utils.h"
 #include "src/core/model_config.h"
 
 #include <algorithm>
@@ -33,22 +33,21 @@
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
 
-#define RETURN_IF_CUDA_ERR(FUNC)                               \
-  {                                                            \
-    const cudaError_t result = FUNC;                           \
-    if (result != cudaSuccess) {                               \
-      return nic::Error(                                       \
-          ni::RequestStatusCode::INTERNAL,                     \
-          "CUDA exception (line " + std::to_string(__LINE__) + \
-              "): " + cudaGetErrorName(result) + " (" +        \
-              cudaGetErrorString(result) + ")");               \
-    }                                                          \
+#define RETURN_IF_CUDA_ERR(FUNC)                                               \
+  {                                                                            \
+    const cudaError_t result = FUNC;                                           \
+    if (result != cudaSuccess) {                                               \
+      return nic::Error(                                                       \
+          "CUDA exception (line " + std::to_string(__LINE__) + "): " +         \
+          cudaGetErrorName(result) + " (" + cudaGetErrorString(result) + ")"); \
+    }                                                                          \
   }
 
 #endif  // TRTIS_ENABLE_GPU
 
 namespace {
 
+#if 0
 std::string
 TensorToRegionName(std::string name)
 {
@@ -77,54 +76,61 @@ CreateCUDAIPCHandle(
 
 #endif  // TRTIS_ENABLE_GPU
 
+#endif
+
 }  // namespace
 
 LoadManager::~LoadManager()
 {
-  nic::Error err;
-  if (shared_memory_ctx_ != nullptr) {
-    err = shared_memory_ctx_->UnregisterAllSharedMemory();
-    if (!err.IsOk()) {
-      std::cerr << "Unable to unregister all shared memory regions"
-                << std::endl;
-    }
-    if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
-      for (auto region : shared_memory_regions_) {
-        err = nic::UnmapSharedMemory(
-            shared_memory_regions_[region.first].first,
-            shared_memory_regions_[region.first].second);
-        if (!err.IsOk()) {
-          std::cerr << "Unable to unmap shared memory with key ("
-                    << region.first << "): Starting: "
-                    << static_cast<void*>(
-                           shared_memory_regions_[region.first].first)
-                    << ", size: " << shared_memory_regions_[region.first].second
-                    << std::endl;
-        }
-        err = nic::UnlinkSharedMemoryRegion(region.first);
-        if (!err.IsOk()) {
-          std::cerr << "Unable to unlink shared memory with key: "
-                    << region.first << std::endl;
-        }
+  /*
+    nic::Error err;
+    if (shared_memory_ctx_ != nullptr) {
+      err = shared_memory_ctx_->UnregisterAllSharedMemory();
+      if (!err.IsOk()) {
+        std::cerr << "Unable to unregister all shared memory regions"
+                  << std::endl;
       }
-    } else if (shared_memory_type_ == SharedMemoryType::CUDA_SHARED_MEMORY) {
-#ifdef TRTIS_ENABLE_GPU
-      for (auto region : shared_memory_regions_) {
-        cudaError_t cuda_err =
-            cudaFree(shared_memory_regions_[region.first].first);
-        if (cuda_err != cudaSuccess) {
-          std::cerr << "Unable to free cuda shared memory for " << region.first
-                    << ": Starting: "
-                    << static_cast<void*>(
-                           shared_memory_regions_[region.first].first)
-                    << ", size: " << shared_memory_regions_[region.first].second
-                    << " bytes, Details: " << cudaGetErrorString(cuda_err)
-                    << std::endl;
+      if (shared_memory_type_ == SharedMemoryType::SYSTEM_SHARED_MEMORY) {
+        for (auto region : shared_memory_regions_) {
+          err = nic::UnmapSharedMemory(
+              shared_memory_regions_[region.first].first,
+              shared_memory_regions_[region.first].second);
+          if (!err.IsOk()) {
+            std::cerr << "Unable to unmap shared memory with key ("
+                      << region.first << "): Starting: "
+                      << static_cast<void*>(
+                             shared_memory_regions_[region.first].first)
+                      << ", size: " <<
+  shared_memory_regions_[region.first].second
+                      << std::endl;
+          }
+          err = nic::UnlinkSharedMemoryRegion(region.first);
+          if (!err.IsOk()) {
+            std::cerr << "Unable to unlink shared memory with key: "
+                      << region.first << std::endl;
+          }
         }
+      } else if (shared_memory_type_ == SharedMemoryType::CUDA_SHARED_MEMORY) {
+  #ifdef TRTIS_ENABLE_GPU
+        for (auto region : shared_memory_regions_) {
+          cudaError_t cuda_err =
+              cudaFree(shared_memory_regions_[region.first].first);
+          if (cuda_err != cudaSuccess) {
+            std::cerr << "Unable to free cuda shared memory for " <<
+  region.first
+                      << ": Starting: "
+                      << static_cast<void*>(
+                             shared_memory_regions_[region.first].first)
+                      << ", size: " <<
+  shared_memory_regions_[region.first].second
+                      << " bytes, Details: " << cudaGetErrorString(cuda_err)
+                      << std::endl;
+          }
+        }
+  #endif  // TRTIS_ENABLE_GPU
       }
-#endif  // TRTIS_ENABLE_GPU
     }
-  }
+  */
 }
 
 nic::Error
@@ -138,14 +144,11 @@ LoadManager::CheckHealth()
   for (auto& thread_stat : threads_stat_) {
     if (!thread_stat->status_.IsOk()) {
       return nic::Error(
-          ni::RequestStatusCode::INTERNAL,
           "Failed to maintain requested inference load."
           " Worker thread(s) failed to generate concurrent requests.");
     }
     if (!thread_stat->cb_status_.IsOk()) {
-      return nic::Error(
-          ni::RequestStatusCode::INTERNAL,
-          "Failed to retrieve results from inference request.");
+      return nic::Error("Failed to retrieve results from inference request.");
     }
   }
   return nic::Error::Success;
@@ -190,24 +193,21 @@ LoadManager::GetAccumulatedClientStat(nic::InferStat* contexts_stat)
 
 
 LoadManager::LoadManager(
-    const bool async,
-    const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
-    const int32_t batch_size, const size_t max_threads,
+    const bool async, const int32_t batch_size, const size_t max_threads,
     const size_t sequence_length, const SharedMemoryType shared_memory_type,
-    const size_t output_shm_size,
-    const std::shared_ptr<ContextFactory>& factory)
-    : async_(async), default_input_shapes_(input_shapes),
-      batch_size_(batch_size), max_threads_(max_threads),
+    const size_t output_shm_size, const std::shared_ptr<ModelParser>& parser,
+    const std::shared_ptr<TritonClientFactory>& factory)
+    : async_(async), batch_size_(batch_size), max_threads_(max_threads),
       sequence_length_(sequence_length),
       shared_memory_type_(shared_memory_type),
-      output_shm_size_(output_shm_size), factory_(factory),
-      using_json_data_(false), next_corr_id_(1)
+      output_shm_size_(output_shm_size), parser_(parser), factory_(factory),
+      using_json_data_(false), next_seq_id_(1)
 {
   on_sequence_model_ =
-      ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
-       (factory_->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE));
+      ((parser_->SchedulerType() == ModelParser::SEQUENCE) ||
+       (parser->SchedulerType() == ModelParser::ENSEMBLE_SEQUENCE));
 
-  data_loader_.reset(new DataLoader(batch_size, input_shapes));
+  data_loader_.reset(new DataLoader(batch_size));
 }
 
 nic::Error
@@ -215,89 +215,28 @@ LoadManager::InitManagerInputs(
     const size_t string_length, const std::string& string_data,
     const bool zero_input, std::vector<std::string>& user_data)
 {
-  std::unique_ptr<nic::InferContext> ctx;
-  RETURN_IF_ERROR(factory_->CreateInferContext(&ctx));
-
-  for (const auto& input : ctx->Inputs()) {
-    // Validate user provided shape
-    if (!default_input_shapes_.empty()) {
-      auto it = default_input_shapes_.find(input->Name());
-      if (it != default_input_shapes_.end()) {
-        const auto& dims = it->second;
-        const auto& config_dims = input->Dims();
-        if (!ni::CompareDimsWithWildcard(config_dims, dims)) {
-          return nic::Error(
-              ni::RequestStatusCode::INVALID_ARG,
-              "input '" + input->Name() + "' expects shape " +
-                  ni::DimsListToString(config_dims) +
-                  " and user supplied shape " + ni::DimsListToString(dims));
-        }
-      }
-    }
-
-    // For variable shape, set the shape if specified
-    if (input->Shape().empty()) {
-      auto it = default_input_shapes_.find(input->Name());
-      if (it != default_input_shapes_.end()) {
-        input->SetShape(it->second);
-      }
-    }
-
-    const int64_t bs = input->ByteSize();
-    if (bs < 0 && input->DType() != ni::DataType::TYPE_STRING) {
-      if (input->Shape().empty()) {
-        return nic::Error(
-            ni::RequestStatusCode::INVALID_ARG,
-            "input '" + input->Name() +
-                "' has variable-size shape and the shape to be used is not "
-                "specified, unable to create input values for model '" +
-                ctx->ModelName() + "'");
-      }
-    }
-
-    // Validate the shape specification for TYPE_STRING
-    if (input->DType() == ni::DataType::TYPE_STRING) {
-      bool is_variable_shape = false;
-      for (const auto dim : input->Dims()) {
-        if (dim == -1) {
-          is_variable_shape = true;
-          break;
-        }
-      }
-      if (is_variable_shape && input->Shape().empty()) {
-        return nic::Error(
-            ni::RequestStatusCode::INVALID_ARG,
-            "input '" + input->Name() +
-                "' has variable-size shape and the shape to be used is "
-                "not specified, unable to create input values for "
-                "model '" +
-                ctx->ModelName() + "'");
-      }
-    }
-  }
-
   // Read provided data
   if (!user_data.empty()) {
     if (IsDirectory(user_data[0])) {
-      RETURN_IF_ERROR(
-          data_loader_->ReadDataFromDir(ctx->Inputs(), user_data[0]));
+      // RETURN_IF_ERROR(
+      //    data_loader_->ReadDataFromDir(parser_->Inputs(), user_data[0]));
     } else {
-      using_json_data_ = true;
-      for (const auto& json_file : user_data) {
-        RETURN_IF_ERROR(
-            data_loader_->ReadDataFromJSON(ctx->Inputs(), json_file));
-      }
-      std::cout << " Successfully read data for "
-                << data_loader_->GetDataStreamsCount() << " stream/streams";
-      if (data_loader_->GetDataStreamsCount() == 1) {
-        std::cout << " with " << data_loader_->GetTotalSteps(0)
-                  << " step/steps";
-      }
-      std::cout << "." << std::endl;
+      // using_json_data_ = true;
+      // for (const auto& json_file : user_data) {
+      //   RETURN_IF_ERROR(
+      //       data_loader_->ReadDataFromJSON(parser_->Inputs(), json_file));
+      // }
+      // std::cout << " Successfully read data for "
+      //           << data_loader_->GetDataStreamsCount() << " stream/streams";
+      // if (data_loader_->GetDataStreamsCount() == 1) {
+      //   std::cout << " with " << data_loader_->GetTotalSteps(0)
+      //             << " step/steps";
+      // }
+      // std::cout << "." << std::endl;
     }
   } else {
     RETURN_IF_ERROR(data_loader_->GenerateData(
-        ctx->Inputs(), zero_input, string_length, string_data));
+        parser_->Inputs(), zero_input, string_length, string_data));
   }
 
   // Reserve the required vector space
@@ -306,13 +245,11 @@ LoadManager::InitManagerInputs(
   return nic::Error::Success;
 }
 
+/*
 nic::Error
 LoadManager::InitSharedMemory()
 {
   nic::Error err;
-
-  RETURN_IF_ERROR(
-      factory_->CreateSharedMemoryControlContext(&shared_memory_ctx_));
 
   // Calling this function for the clean start
   shared_memory_ctx_->UnregisterAllSharedMemory();
@@ -347,10 +284,9 @@ LoadManager::InitSharedMemory()
       cudaError_t cuda_err = cudaMalloc((void**)&output_shm_ptr, alloc_size);
       if (cuda_err != cudaSuccess) {
         return nic::Error(
-            ni::RequestStatusCode::INTERNAL,
             "unable to allocate memory of " + std::to_string(alloc_size) +
-                " bytes on gpu for output " + output->Name() + " : " +
-                std::string(cudaGetErrorString(cuda_err)));
+            " bytes on gpu for output " + output->Name() + " : " +
+            std::string(cudaGetErrorString(cuda_err)));
       }
       shared_memory_regions_[region_name] =
           std::pair<uint8_t*, size_t>(output_shm_ptr, alloc_size);
@@ -389,12 +325,11 @@ LoadManager::InitSharedMemory()
               if (!std::equal(
                       shape->begin(), shape->end(), input->Shape().begin())) {
                 return nic::Error(
-                    ni::RequestStatusCode::INVALID_ARG,
                     "can not batch tensors with different shapes together "
                     "(input '" +
-                        input->Name() + "' expected shape " +
-                        ShapeVecToString(input->Shape()) + " and received " +
-                        ShapeVecToString(*shape) + ")");
+                    input->Name() + "' expected shape " +
+                    ShapeVecToString(input->Shape()) + " and received " +
+                    ShapeVecToString(*shape) + ")");
               }
             }
           }
@@ -418,7 +353,6 @@ LoadManager::InitSharedMemory()
               &batch1_bytesize));
           if (batch1_bytesize != byte_size.back()) {
             return nic::Error(
-                ni::RequestStatusCode::INVALID_ARG,
                 "The shape tensors should be identical in a batch (mismatch in "
                 "size)");
           }
@@ -426,7 +360,6 @@ LoadManager::InitSharedMemory()
           for (size_t data_idx = 0; data_idx < batch1_bytesize; data_idx++) {
             if (*(data_ptr + data_idx) != *(data_ptrs.back() + data_idx)) {
               return nic::Error(
-                  ni::RequestStatusCode::INVALID_ARG,
                   "The shape tensors should be identical in a batch (mismatch "
                   "in content)");
             }
@@ -468,10 +401,9 @@ LoadManager::InitSharedMemory()
           cudaError_t cuda_err = cudaMalloc((void**)&input_shm_ptr, alloc_size);
           if (cuda_err != cudaSuccess) {
             return nic::Error(
-                ni::RequestStatusCode::INTERNAL,
                 "unable to allocate memory of " + std::to_string(alloc_size) +
-                    "bytes on gpu for input " + region_name + " : " +
-                    std::string(cudaGetErrorString(cuda_err)));
+                "bytes on gpu for input " + region_name + " : " +
+                std::string(cudaGetErrorString(cuda_err)));
           }
 
           shared_memory_regions_[region_name] =
@@ -487,10 +419,9 @@ LoadManager::InitSharedMemory()
                 byte_size[count], cudaMemcpyHostToDevice);
             if (cuda_err != cudaSuccess) {
               return nic::Error(
-                  ni::RequestStatusCode::INTERNAL,
                   "Failed to copy data to cuda shared memory for " +
-                      region_name + " : " +
-                      std::string(cudaGetErrorString(cuda_err)));
+                  region_name + " : " +
+                  std::string(cudaGetErrorString(cuda_err)));
             }
             offset += byte_size[count];
             count++;
@@ -510,74 +441,47 @@ LoadManager::InitSharedMemory()
   }
   return nic::Error::Success;
 }
+*/
 
 nic::Error
-LoadManager::PrepareInfer(
-    std::unique_ptr<nic::InferContext>* ctx,
-    std::unique_ptr<nic::InferContext::Options>* options)
+LoadManager::PrepareInfer(InferContextMetaData* ctx)
 {
-  RETURN_IF_ERROR(factory_->CreateInferContext(ctx));
-
-  uint64_t max_batch_size = (*ctx)->MaxBatchSize();
-
-  // Model specifying maximum batch size of 0 indicates that batching
-  // is not supported and so the input tensors do not expect a "N"
-  // dimension (and 'batch_size' should be 1 so that only a single
-  // image instance is inferred at a time).
-  if (max_batch_size == 0) {
-    if (batch_size_ != 1) {
-      return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "expecting batch size 1 for model '" + (*ctx)->ModelName() +
-              "' which does not support batching");
-    }
-  } else if (batch_size_ > max_batch_size) {
-    return nic::Error(
-        ni::RequestStatusCode::INVALID_ARG,
-        "expecting batch size <= " + std::to_string(max_batch_size) +
-            " for model '" + (*ctx)->ModelName() + "'");
-  }
-
-  // Prepare context for 'batch_size' batches. Request that all
-  // outputs be returned.
-  // Only set options if it has not been created, otherwise,
-  // assuming that the options for this model has been created previously
-  if (*options == nullptr) {
-    RETURN_IF_ERROR(nic::InferContext::Options::Create(options));
-
-    (*options)->SetBatchSize(batch_size_);
-    for (const auto& output : (*ctx)->Outputs()) {
-      (*options)->AddRawResult(output);
-    }
-  }
-
-  RETURN_IF_ERROR((*ctx)->SetRunOptions(*(*options)));
-
   // Initialize inputs
-  for (const auto& input : (*ctx)->Inputs()) {
-    RETURN_IF_ERROR(input->Reset());
-
+  for (const auto& input : *(parser_->Inputs())) {
     const uint8_t* data_ptr;
     size_t batch1_bytesize;
     // Set input shape before getting the input data
-    const std::vector<int64_t>* shape = nullptr;
-    RETURN_IF_ERROR(data_loader_->GetInputShape(input, 0, 0, &shape));
+    std::vector<int64_t>* shape = nullptr;
+    RETURN_IF_ERROR(data_loader_->GetInputShape(
+        input.second, 0, 0,
+        (const_cast<const std::vector<int64_t>**>(&shape))));
     if (shape != nullptr) {
-      input->SetShape(*shape);
+      if ((parser_->MaxBatchSize() != 0) && (!input.second.is_shape_tensor_)) {
+        shape->insert(shape->begin(), (int64_t)batch_size_);
+      }
+    } else {
+      return nic::Error("unable to set shape for the input");
     }
 
-    RETURN_IF_ERROR(
-        data_loader_->GetInputData(input, 0, 0, &data_ptr, &batch1_bytesize));
+    nic::InferInput* infer_input;
+    RETURN_IF_ERROR(nic::InferInput::Create(
+        &infer_input, input.first, *shape, input.second.datatype_));
 
-    size_t max_count = input->IsShapeTensor() ? 1 : batch_size_;
+    RETURN_IF_ERROR(data_loader_->GetInputData(
+        input.second, 0, 0, &data_ptr, &batch1_bytesize));
+
+    size_t max_count = (parser_->MaxBatchSize() == 0) ? 1 : batch_size_;
     for (size_t i = 0; i < max_count; ++i) {
-      RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
+      RETURN_IF_ERROR(infer_input->AppendRaw(data_ptr, batch1_bytesize));
     }
+
+    ctx->inputs_.push_back(infer_input);
   }
 
   return nic::Error::Success;
 }
 
+/*
 nic::Error
 LoadManager::PrepareSharedMemoryInfer(
     std::unique_ptr<nic::InferContext>* ctx,
@@ -595,15 +499,13 @@ LoadManager::PrepareSharedMemoryInfer(
   if (max_batch_size == 0) {
     if (batch_size_ != 1) {
       return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
           "expecting batch size 1 for model '" + (*ctx)->ModelName() +
-              "' which does not support batching");
+          "' which does not support batching");
     }
   } else if (batch_size_ > max_batch_size) {
     return nic::Error(
-        ni::RequestStatusCode::INVALID_ARG,
         "expecting batch size <= " + std::to_string(max_batch_size) +
-            " for model '" + (*ctx)->ModelName() + "'");
+        " for model '" + (*ctx)->ModelName() + "'");
   }
 
   // Only set options if it has not been created, otherwise,
@@ -641,33 +543,35 @@ LoadManager::PrepareSharedMemoryInfer(
 
   return nic::Error::Success;
 }
+*/
 
+#if 0
 nic::Error
 LoadManager::UpdateInputs(
-    const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
-    int stream_index, int step_index)
+    const std::vector<nic::InferInput*>& inputs, int stream_index,
+    int step_index)
 {
   // Validate update parameters here
   size_t data_stream_count = data_loader_->GetDataStreamsCount();
   if (stream_index < 0 || stream_index >= (int)data_stream_count) {
     return nic::Error(
-        ni::RequestStatusCode::INTERNAL,
         "stream_index for retrieving the data should be less than " +
-            std::to_string(data_stream_count) + ", got " +
-            std::to_string(stream_index));
+        std::to_string(data_stream_count) + ", got " +
+        std::to_string(stream_index));
   }
   size_t step_count = data_loader_->GetTotalSteps(stream_index);
   if (step_index < 0 || step_index >= (int)step_count) {
     return nic::Error(
-        ni::RequestStatusCode::INTERNAL,
         "step_id for retrieving the data should be less than " +
-            std::to_string(step_count) + ", got " + std::to_string(step_index));
+        std::to_string(step_count) + ", got " + std::to_string(step_index));
   }
 
   if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
     RETURN_IF_ERROR(SetInputs(inputs, stream_index, step_index));
   } else {
+    /*
     RETURN_IF_ERROR(SetInputsSharedMemory(inputs, stream_index, step_index));
+    */
   }
 
   return nic::Error::Success;
@@ -675,8 +579,8 @@ LoadManager::UpdateInputs(
 
 nic::Error
 LoadManager::SetInputs(
-    const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
-    const int stream_index, const int step_index)
+    const std::vector<nic::InferInput*>& inputs, const int stream_index,
+    const int step_index)
 {
   for (const auto& input : inputs) {
     RETURN_IF_ERROR(input->Reset());
@@ -699,12 +603,11 @@ LoadManager::SetInputs(
           if (!std::equal(
                   shape->begin(), shape->end(), input->Shape().begin())) {
             return nic::Error(
-                ni::RequestStatusCode::INVALID_ARG,
                 "can not batch tensors with different shapes together "
                 "(input '" +
-                    input->Name() + "' expected shape " +
-                    ShapeVecToString(input->Shape()) + " and received " +
-                    ShapeVecToString(*shape));
+                input->Name() + "' expected shape " +
+                ShapeVecToString(input->Shape()) + " and received " +
+                ShapeVecToString(*shape));
           }
         }
       }
@@ -734,15 +637,14 @@ LoadManager::SetInputs(
           }
           if (!is_identical) {
             return nic::Error(
-                ni::RequestStatusCode::INVALID_ARG,
                 "can not batch shape tensors with different values together "
                 "(input '" +
-                    input->Name() + "' expected shape values" +
-                    ShapeTensorValuesToString(
-                        set_shape_values, set_shape_value_cnt) +
-                    " and received " +
-                    ShapeTensorValuesToString(
-                        (int*)data_ptr, (batch1_bytesize / sizeof(int))));
+                input->Name() + "' expected shape values" +
+                ShapeTensorValuesToString(
+                    set_shape_values, set_shape_value_cnt) +
+                " and received " +
+                ShapeTensorValuesToString(
+                    (int*)data_ptr, (batch1_bytesize / sizeof(int))));
           }
         }
       }
@@ -752,6 +654,7 @@ LoadManager::SetInputs(
 }
 
 
+/*
 nic::Error
 LoadManager::SetInputsSharedMemory(
     const std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
@@ -775,11 +678,12 @@ LoadManager::SetInputsSharedMemory(
   }
   return nic::Error::Success;
 }
+*/
 
 void
 LoadManager::InitNewSequence(int sequence_id)
 {
-  sequence_stat_[sequence_id]->corr_id_ = next_corr_id_++;
+  sequence_stat_[sequence_id]->seq_id_ = next_seq_id_++;
   if (!using_json_data_) {
     size_t new_length = GetRandomLength(0.2);
     sequence_stat_[sequence_id]->remaining_queries_ =
@@ -788,13 +692,14 @@ LoadManager::InitNewSequence(int sequence_id)
     // Selecting next available data stream in a round-robin fashion.
     // TODO: A mode to randomly pick data stream for new sequences.
     sequence_stat_[sequence_id]->data_stream_id_ =
-        sequence_stat_[sequence_id]->corr_id_ %
+        sequence_stat_[sequence_id]->seq_id_ %
         data_loader_->GetDataStreamsCount();
     sequence_stat_[sequence_id]->remaining_queries_ =
         data_loader_->GetTotalSteps(
             sequence_stat_[sequence_id]->data_stream_id_);
   }
 }
+#endif
 
 size_t
 LoadManager::GetRandomLength(double offset_ratio)

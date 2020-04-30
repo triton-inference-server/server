@@ -222,6 +222,18 @@ class InferInput {
       InferInput** infer_input, const std::string& name,
       const std::vector<int64_t>& dims, const std::string& datatype);
 
+  /// Gets name of the associated input tensor.
+  /// \return The name of the tensor.
+  std::string Name() const { return name_; }
+
+  /// Gets datatype of the associated input tensor.
+  /// \return The datatype of the tensor.
+  std::string Datatype() const { return datatype_; }
+
+  /// Gets the shape of the input tensor.
+  /// \return The shape of the tensor.
+  std::vector<int64_t> Shape() const { return shape_; }
+
   /// Set the shape of input associated with this object.
   /// \param dims the vector of dims representing the new shape
   /// of input.
@@ -301,9 +313,6 @@ class InferInput {
       const std::string& name, const std::vector<int64_t>& dims,
       const std::string& datatype);
 
-  const std::string& Name() const { return name_; }
-  const std::string& Datatype() const { return datatype_; }
-  const std::vector<int64_t>& Shape() const { return shape_; }
   bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
   Error SharedMemoryInfo(
       std::string* name, size_t* batch_byte_size, size_t* offset) const;
