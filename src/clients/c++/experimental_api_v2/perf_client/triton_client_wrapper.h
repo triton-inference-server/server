@@ -39,7 +39,8 @@ struct ModelStatistics {
 };
 
 //==============================================================================
-/// TritonClientWrapper is a helper class to create and utilize triton clients
+/// TritonClientWrapper is a light-weight wrapper around the triton client
+/// library and is responsible for invoking right clients for a set protocol.
 ///
 class TritonClientWrapper {
  public:
@@ -53,63 +54,79 @@ class TritonClientWrapper {
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const std::string& url, const ProtocolType protocol,
-      const nic::Headers& http_headers, const bool verbose,
+      std::shared_ptr<nic::Headers> http_headers, const bool verbose,
       std::unique_ptr<TritonClientWrapper>* triton_client);
 
+  /// Get the model metadata from the server for specified name and
+  /// version as rapidjson DOM object.
   nic::Error ModelMetadata(
       rapidjson::Document* model_metadata, const std::string& model_name,
       const std::string& model_version);
 
+  /// Get the model metadata from the server for specified name and
+  /// version as message.
   nic::Error ModelMetadata(
       ni::ModelMetadataResponse* model_metadata, const std::string& model_name,
       const std::string& model_version);
 
+  /// Get the model config from the server for specified name and
+  /// version as rapidjson DOM object.
   nic::Error ModelConfig(
       rapidjson::Document* model_config, const std::string& model_name,
       const std::string& model_version);
 
+  /// Get the model config from the server for specified name and
+  /// version as message.
   nic::Error ModelConfig(
       ni::ModelConfigResponse* model_config, const std::string& model_name,
       const std::string& model_version);
 
+  /// Issues a synchronous inference request to the server.
   nic::Error Infer(
       nic::InferResult** result, const nic::InferOptions& options,
       const std::vector<nic::InferInput*>& inputs,
       const std::vector<const nic::InferRequestedOutput*>& outputs);
 
+  /// Issues an asynchronous inference request to the server.
   nic::Error AsyncInfer(
       nic::InferenceServerClient::OnCompleteFn callback,
       const nic::InferOptions& options,
       const std::vector<nic::InferInput*>& inputs,
       const std::vector<const nic::InferRequestedOutput*>& outputs);
 
+  /// Established a stream to the server.
   nic::Error StartStream(nic::InferenceServerClient::OnCompleteFn callback);
 
+  /// Issues an asynchronous inference request to the underlying stream.
   nic::Error AsyncStreamInfer(
       const nic::InferOptions& options,
       const std::vector<nic::InferInput*>& inputs,
       const std::vector<const nic::InferRequestedOutput*>& outputs);
 
+  /// Gets the client side inference statistics from the client library.
   nic::Error ClientInferStat(nic::InferStat* infer_stat);
 
+  /// Gets the server-side model inference statistics from the server.
   nic::Error ModelInferenceStatistics(
       std::map<ModelIdentifier, ModelStatistics>* model_stats,
       const std::string& model_name = "",
       const std::string& model_version = "");
 
-  // Implement these
+  /// Unregisters all the shared memory from the server
   nic::Error UnregisterAllSharedMemory();
 
+  /// Registers a system shared memory from the server
   nic::Error RegisterSystemSharedMemory(
       const std::string& name, const std::string& key, const size_t byte_size);
 
+  /// Registers cuda shared memory to the server.
   nic::Error RegisterCudaSharedMemory(
       const std::string& name, const cudaIpcMemHandle_t& handle,
       const size_t byte_size);
 
  private:
   TritonClientWrapper(
-      const ProtocolType protocol, const nic::Headers& http_headers)
+      const ProtocolType protocol, std::shared_ptr<nic::Headers> http_headers)
       : protocol_(protocol), http_headers_(http_headers)
   {
   }
@@ -117,7 +134,6 @@ class TritonClientWrapper {
   void ParseStatistics(
       ni::ModelStatisticsResponse& infer_stat,
       std::map<ModelIdentifier, ModelStatistics>* model_stats);
-
 
   void ParseStatistics(
       rapidjson::Document& infer_stat,
@@ -137,7 +153,7 @@ class TritonClientWrapper {
   } client_;
 
   const ProtocolType protocol_;
-  const nic::Headers http_headers_;
+  std::shared_ptr<nic::Headers> http_headers_;
 };
 
 class TritonClientFactory {
@@ -153,17 +169,17 @@ class TritonClientFactory {
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const std::string& url, const ProtocolType protocol,
-      const nic::Headers& http_headers, const bool verbose,
+      std::shared_ptr<nic::Headers> http_headers, const bool verbose,
       std::shared_ptr<TritonClientFactory>* factory);
 
   /// Create a TritonClientWrapper.
-  /// \param ctx Returns a new TritonClientWrapper object.
+  /// \param client Returns a new TritonClientWrapper object.
   nic::Error CreateTritonClient(std::unique_ptr<TritonClientWrapper>* client);
 
  private:
   TritonClientFactory(
       const std::string& url, const ProtocolType protocol,
-      const nic::Headers& http_headers, const bool verbose)
+      const std::shared_ptr<nic::Headers> http_headers, const bool verbose)
       : url_(url), protocol_(protocol), http_headers_(http_headers),
         verbose_(verbose)
   {
@@ -171,7 +187,6 @@ class TritonClientFactory {
 
   const std::string url_;
   const ProtocolType protocol_;
-  // FIXME: Use shared_ptr instead of copying maps
-  nic::Headers http_headers_;
+  std::shared_ptr<nic::Headers> http_headers_;
   const bool verbose_;
 };

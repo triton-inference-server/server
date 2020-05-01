@@ -574,7 +574,7 @@ main(int argc, char** argv)
   std::string url("localhost:8000");
   std::string filename("");
   ProtocolType protocol = ProtocolType::HTTP;
-  nic::Headers http_headers;
+  std::shared_ptr<nic::Headers> http_headers(new nic::Headers());
   SharedMemoryType shared_memory_type = SharedMemoryType::NO_SHARED_MEMORY;
   size_t output_shm_size = 100 * 1024;
   std::unordered_map<std::string, std::vector<int64_t>> input_shapes;
@@ -869,7 +869,7 @@ main(int argc, char** argv)
       case 'H': {
         std::string arg = optarg;
         std::string header = arg.substr(0, arg.find(":"));
-        http_headers[header] = arg.substr(header.size() + 1);
+        (*http_headers)[header] = arg.substr(header.size() + 1);
         break;
       }
       case 'l':
@@ -918,11 +918,6 @@ main(int argc, char** argv)
   }
   if (streaming && (protocol != ProtocolType::GRPC)) {
     Usage(argv, "streaming is only allowed with gRPC protocol");
-  }
-  if (!http_headers.empty() && (protocol != ProtocolType::HTTP)) {
-    std::cerr << "WARNING: HTTP headers specified with -H are ignored when "
-                 "using non-HTTP protocol."
-              << std::endl;
   }
   if (max_threads == 0) {
     Usage(argv, "maximum number of threads must be > 0");
@@ -1029,9 +1024,11 @@ main(int argc, char** argv)
   signal(SIGINT, SignalHandler);
 
   std::shared_ptr<TritonClientFactory> factory;
+  // Disabling verbosity in the clients to prevent huge dump of
+  // messages.
   FAIL_IF_ERR(
       TritonClientFactory::Create(
-          url, protocol, http_headers, verbose, &factory),
+          url, protocol, http_headers, false /*verbose*/, &factory),
       "failed to create client factory");
 
   std::unique_ptr<TritonClientWrapper> triton_client_wrapper;
@@ -1057,7 +1054,6 @@ main(int argc, char** argv)
             triton_client_wrapper),
         "failed to create model parser");
   } else {
-    std::cout << "here" << std::endl;
     ni::ModelMetadataResponse model_metadata;
     FAIL_IF_ERR(
         triton_client_wrapper->ModelMetadata(

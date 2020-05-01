@@ -152,7 +152,7 @@ ConcurrencyManager::Infer(
     std::shared_ptr<ThreadStat> thread_stat,
     std::shared_ptr<ThreadConfig> thread_config)
 {
-  std::vector<std::unique_ptr<InferContextMetaData>> ctxs;
+  std::vector<std::unique_ptr<InferContext>> ctxs;
   uint32_t seq_id = 0, ctx_id = 0;
   std::queue<int> free_ctx_ids;
 
@@ -251,7 +251,7 @@ ConcurrencyManager::Infer(
 
     while (active_ctx_cnt > ctxs.size()) {
       free_ctx_ids.push(ctxs.size());
-      ctxs.emplace_back(new InferContextMetaData());
+      ctxs.emplace_back(new InferContext());
       thread_stat->status_ =
           factory_->CreateTritonClient(&(ctxs.back()->infer_client_));
       ctxs.back()->options_.reset(new nic::InferOptions(parser_->ModelName()));

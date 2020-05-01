@@ -28,7 +28,6 @@
 #include <thread>
 #include "src/clients/c++/experimental_api_v2/perf_client/concurrency_manager.h"
 #include "src/clients/c++/experimental_api_v2/perf_client/model_parser.h"
-// #include "src/clients/c++/experimental_v2//perf_client/context_factory.h"
 // #include "src/clients/c++/experimental_v2//perf_client/custom_load_manager.h"
 // #include
 // "src/clients/c++/experimental_v2//perf_client/request_rate_manager.h"
@@ -48,8 +47,6 @@ struct LoadParams {
 /// Data structure to keep track of real-time load status and determine wether
 /// stopping criteria has met for the current phase of testing.
 struct LoadStatus {
-  // Record of the measurements in the current session
-  //
   // Stores the observations of infer_per_sec and latencies in a vector
   std::vector<double> infer_per_sec;
   std::vector<uint64_t> latencies;
@@ -59,7 +56,8 @@ struct LoadStatus {
   uint64_t avg_latency = 0;
 };
 
-
+/// Holds the server-side inference statisitcs of the target model and its
+/// composing models
 struct ServerSideStats {
   uint64_t request_count;
   uint64_t cumm_time_ns;
@@ -69,6 +67,7 @@ struct ServerSideStats {
   std::map<ModelIdentifier, ServerSideStats> composing_models_stat;
 };
 
+/// Holds the statistics recorded at the client side.
 struct ClientSideStats {
   // Request count and elapsed time measured by client
   uint64_t request_count;
@@ -90,14 +89,12 @@ struct ClientSideStats {
   double sequence_per_sec;
 };
 
+/// The entire statistics record.
 struct PerfStatus {
   uint32_t concurrency;
   double request_rate;
   size_t batch_size;
-
-  // Request count and elapsed time measured by server
   ServerSideStats server_stats;
-  // Measurements on the client side
   ClientSideStats client_stats;
 
   bool on_sequence_model;
@@ -144,8 +141,13 @@ class InferenceProfiler {
   /// average latency will be reported and used as stable criteria.
   /// \param latency_threshold_ms The threshold on the latency measurements in
   /// microseconds.
-  /// \param factory The ContextFactory object used to create InferContext.
-  /// \param manager Returns a new InferenceProfiler object.
+  /// \param parser The ModelParse object which holds all the details about the
+  /// model.
+  /// \param profile_client The TritonClientWrapper object used to communicate
+  /// with the server by profiler.
+  /// \param manager The LoadManager object that will produce load on the
+  /// server.
+  /// \param profiler Returns a new InferenceProfiler object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const bool verbose, const double stability_threshold,
@@ -277,7 +279,8 @@ class InferenceProfiler {
   /// \return Error object indicating success or failure.
   nic::Error Measure(PerfStatus& status_summary);
 
-  /// \param server_status Returns the status of the models provided by
+  /// Gets the server side statistics
+  /// \param model_status Returns the status of the models provided by
   /// the server. If the model being profiled is non-ensemble model,
   /// only its status will be returned. Otherwise, the status of the composing
   /// models will also be returned.
@@ -307,6 +310,7 @@ class InferenceProfiler {
       const nic::InferStat& start_stat, const nic::InferStat& end_stat,
       PerfStatus& summary);
 
+  /// A helper function to get the start and end of a measurement window.
   /// \param timestamps The timestamps collected for the measurement.
   /// \return the start and end timestamp of the measurement window.
   std::pair<uint64_t, uint64_t> MeasurementTimestamp(
@@ -331,8 +335,8 @@ class InferenceProfiler {
   nic::Error SummarizeLatency(
       const std::vector<uint64_t>& latencies, PerfStatus& summary);
 
-  /// \param start_stat The accumulated context status at the start.
-  /// \param end_stat The accumulated context status at the end.
+  /// \param start_stat The accumulated client statistics at the start.
+  /// \param end_stat The accumulated client statistics at the end.
   /// \param duration_ns The duration of the measurement in nsec.
   /// \param valid_request_count The number of completed requests recorded.
   /// \param valid_sequence_count The number of completed sequences recorded.
@@ -347,6 +351,8 @@ class InferenceProfiler {
       const size_t delayed_request_count, const size_t valid_sequence_count,
       PerfStatus& summary);
 
+  /// \param model_identifier A pair of model_name and model_version to identify
+  /// a specific model.
   /// \param start_status The model status at the start of the measurement.
   /// \param end_status The model status at the end of the measurement.
   /// \param server_stats Returns the summary that the fields recorded by server
@@ -358,6 +364,8 @@ class InferenceProfiler {
       const std::map<ModelIdentifier, ModelStatistics>& end_status,
       ServerSideStats* server_stats);
 
+  /// \param model_identifier A pair of model_name and model_version to identify
+  /// a specific model.
   /// \param start_status The model status at the start of the measurement.
   /// \param end_status The model status at the end of the measurement.
   /// \param server_stats Returns the summary that the fields recorded by server

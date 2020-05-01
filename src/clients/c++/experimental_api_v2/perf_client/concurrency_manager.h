@@ -50,19 +50,21 @@ class ConcurrencyManager : public LoadManager {
   /// load on inference server.
   /// \param async Whether to use asynchronous or synchronous API for infer
   /// request.
+  /// \param streaming Whether to use gRPC streaming API for infer request
   /// \param batch_size The batch size used for each request.
   /// \param max_threads The maximum number of working threads to be spawned.
   /// \param max_concurrency The maximum concurrency which will be requested.
   /// \param sequence_length The base length of each sequence.
+  /// \param string_length The length of the string to create for input.
+  /// \param string_data The data to use for generating string input.
   /// \param zero_input Whether to fill the input tensors with zero.
-  /// \param input_shapes The shape of the input tensors.
   /// \param user_data The vector containing path/paths to user-provided data
   /// that can be a directory or path to a json data file.
   /// \param shared_memory_type The type of shared memory to use for inputs.
   /// \param output_shm_size The size in bytes of the shared memory to
   /// allocate for the output.
-  /// \param factory The ContextFactory object used to create
-  /// InferContext.
+  /// \param factory The TritonClientFactory object used to create
+  /// client to the server.
   /// \param manager Returns a new ConcurrencyManager object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(

@@ -415,7 +415,7 @@ LoadManager::InitSharedMemory()
 }
 
 nic::Error
-LoadManager::PrepareInfer(InferContextMetaData* ctx)
+LoadManager::PrepareInfer(InferContext* ctx)
 {
   // Initialize inputs
   for (const auto& input : *(parser_->Inputs())) {
@@ -451,7 +451,7 @@ LoadManager::PrepareInfer(InferContextMetaData* ctx)
 
 
 nic::Error
-LoadManager::PrepareSharedMemoryInfer(InferContextMetaData* ctx)
+LoadManager::PrepareSharedMemoryInfer(InferContext* ctx)
 {
   for (const auto& input : *(parser_->Inputs())) {
     std::string region_name(

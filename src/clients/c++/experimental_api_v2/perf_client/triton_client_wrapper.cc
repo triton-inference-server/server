@@ -27,10 +27,13 @@
 
 #include "src/clients/c++/experimental_api_v2/perf_client/triton_client_wrapper.h"
 
+
+//==============================================================================
+
 nic::Error
 TritonClientFactory::Create(
     const std::string& url, const ProtocolType protocol,
-    const nic::Headers& http_headers, const bool verbose,
+    std::shared_ptr<nic::Headers> http_headers, const bool verbose,
     std::shared_ptr<TritonClientFactory>* factory)
 {
   factory->reset(new TritonClientFactory(url, protocol, http_headers, verbose));
@@ -51,7 +54,7 @@ TritonClientFactory::CreateTritonClient(
 nic::Error
 TritonClientWrapper::Create(
     const std::string& url, const ProtocolType protocol,
-    const nic::Headers& http_headers, const bool verbose,
+    std::shared_ptr<nic::Headers> http_headers, const bool verbose,
     std::unique_ptr<TritonClientWrapper>* triton_client_wrapper)
 {
   triton_client_wrapper->reset(new TritonClientWrapper(protocol, http_headers));
@@ -72,7 +75,7 @@ TritonClientWrapper::ModelMetadata(
 {
   if (protocol_ == ProtocolType::HTTP) {
     RETURN_IF_ERROR(client_.http_client_->ModelMetadata(
-        model_metadata, model_name, model_version, http_headers_));
+        model_metadata, model_name, model_version, *http_headers_));
   } else {
     return nic::Error("gRPC can not return model metadata as json");
   }
@@ -89,11 +92,10 @@ TritonClientWrapper::ModelMetadata(
   std::cout << model_version << std::endl;
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_ERROR(client_.grpc_client_->ModelMetadata(
-        model_metadata, model_name, model_version, http_headers_));
+        model_metadata, model_name, model_version, *http_headers_));
   } else {
     return nic::Error("HTTP can not return model metadata as protobuf message");
   }
-  std::cout << model_metadata->DebugString() << std::endl;
 
   return nic::Error::Success;
 }
@@ -106,7 +108,7 @@ TritonClientWrapper::ModelConfig(
 {
   if (protocol_ == ProtocolType::HTTP) {
     RETURN_IF_ERROR(client_.http_client_->ModelConfig(
-        model_config, model_name, model_version, http_headers_));
+        model_config, model_name, model_version, *http_headers_));
   } else {
     return nic::Error("gRPC can not return model config as json");
   }
@@ -120,11 +122,10 @@ TritonClientWrapper::ModelConfig(
 {
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_ERROR(client_.grpc_client_->ModelConfig(
-        model_config, model_name, model_version, http_headers_));
+        model_config, model_name, model_version, *http_headers_));
   } else {
     return nic::Error("HTTP can not return model config as protobuf message");
   }
-  std::cout << model_config->DebugString() << std::endl;
   return nic::Error::Success;
 }
 
@@ -136,10 +137,10 @@ TritonClientWrapper::Infer(
 {
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_ERROR(client_.grpc_client_->Infer(
-        result, options, inputs, outputs, http_headers_));
+        result, options, inputs, outputs, *http_headers_));
   } else {
     RETURN_IF_ERROR(client_.http_client_->Infer(
-        result, options, inputs, outputs, http_headers_));
+        result, options, inputs, outputs, *http_headers_));
   }
 
   return nic::Error::Success;
@@ -154,10 +155,10 @@ TritonClientWrapper::AsyncInfer(
 {
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_ERROR(client_.grpc_client_->AsyncInfer(
-        callback, options, inputs, outputs, http_headers_));
+        callback, options, inputs, outputs, *http_headers_));
   } else {
     RETURN_IF_ERROR(client_.http_client_->AsyncInfer(
-        callback, options, inputs, outputs, http_headers_));
+        callback, options, inputs, outputs, *http_headers_));
   }
 
   return nic::Error::Success;
@@ -169,14 +170,13 @@ TritonClientWrapper::StartStream(
 {
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_ERROR(
-        client_.grpc_client_->StartStream(callback, true, http_headers_));
+        client_.grpc_client_->StartStream(callback, true/*enable_stats*/, *http_headers_));
   } else {
     return nic::Error("HTTP does not support starting streams");
   }
 
   return nic::Error::Success;
 }
-
 
 nic::Error
 TritonClientWrapper::AsyncStreamInfer(
@@ -213,12 +213,12 @@ TritonClientWrapper::ModelInferenceStatistics(
   if (protocol_ == ProtocolType::GRPC) {
     ni::ModelStatisticsResponse infer_stat;
     RETURN_IF_ERROR(client_.grpc_client_->ModelInferenceStatistics(
-        &infer_stat, model_name, model_version, http_headers_));
+        &infer_stat, model_name, model_version, *http_headers_));
     ParseStatistics(infer_stat, model_stats);
   } else {
     rapidjson::Document infer_stat;
     RETURN_IF_ERROR(client_.http_client_->ModelInferenceStatistics(
-        &infer_stat, model_name, model_version, http_headers_));
+        &infer_stat, model_name, model_version, *http_headers_));
     ParseStatistics(infer_stat, model_stats);
   }
 
@@ -230,14 +230,14 @@ TritonClientWrapper::UnregisterAllSharedMemory()
 {
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_ERROR(
-        client_.grpc_client_->UnregisterSystemSharedMemory("", http_headers_));
+        client_.grpc_client_->UnregisterSystemSharedMemory("", *http_headers_));
     RETURN_IF_ERROR(
-        client_.grpc_client_->UnregisterCudaSharedMemory("", http_headers_));
+        client_.grpc_client_->UnregisterCudaSharedMemory("", *http_headers_));
   } else {
     RETURN_IF_ERROR(
-        client_.http_client_->UnregisterSystemSharedMemory("", http_headers_));
+        client_.http_client_->UnregisterSystemSharedMemory("", *http_headers_));
     RETURN_IF_ERROR(
-        client_.http_client_->UnregisterCudaSharedMemory("", http_headers_));
+        client_.http_client_->UnregisterCudaSharedMemory("", *http_headers_));
   }
 
   return nic::Error::Success;
@@ -249,11 +249,11 @@ TritonClientWrapper::RegisterSystemSharedMemory(
 {
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_ERROR(client_.grpc_client_->RegisterSystemSharedMemory(
-        name, key, byte_size, 0 /* offset */, http_headers_));
+        name, key, byte_size, 0 /* offset */, *http_headers_));
 
   } else {
     RETURN_IF_ERROR(client_.http_client_->RegisterSystemSharedMemory(
-        name, key, byte_size, 0 /* offset */, http_headers_));
+        name, key, byte_size, 0 /* offset */, *http_headers_));
   }
 
   return nic::Error::Success;
@@ -266,11 +266,11 @@ TritonClientWrapper::RegisterCudaSharedMemory(
 {
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_ERROR(client_.grpc_client_->RegisterCudaSharedMemory(
-        name, handle, 0 /*device id*/, byte_size, http_headers_));
+        name, handle, 0 /*device id*/, byte_size, *http_headers_));
 
   } else {
     RETURN_IF_ERROR(client_.http_client_->RegisterCudaSharedMemory(
-        name, handle, 0 /*device id*/, byte_size, http_headers_));
+        name, handle, 0 /*device id*/, byte_size, *http_headers_));
   }
 
   return nic::Error::Success;
@@ -325,3 +325,5 @@ TritonClientWrapper::ParseStatistics(
         this_stat["inference_stats"]["compute_output"]["ns"].GetUint64();
   }
 }
+
+//==============================================================================

@@ -114,14 +114,19 @@ bool IsDirectory(const std::string& path);
 // To check whether the path points to a valid system file
 bool IsFile(const std::string& complete_path);
 
+// Calculates the byte size tensor for given shape and datatype.
 int64_t ByteSize(
     const std::vector<int64_t>& shape, const std::string& datatype);
 
+// Get the number of elements in the tensor for given shape.
 int64_t ElementCount(const std::vector<int64_t>& shape);
 
+// Serializes the string tensor to length prepended bytes.
 void SerializeStringTensor(
     std::vector<std::string> string_tensor, std::vector<char>* serialized_data);
 
+// Serializes an explicit tensor read from the data file to the
+// raw bytes.
 nic::Error SerializeExplicitTensor(
     const rapidjson::Value& tensor, const std::string& dt,
     std::vector<char>* decoded_data);

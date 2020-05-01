@@ -52,16 +52,17 @@ class DataLoader {
   }
 
 
-  /// Reads the input data from the specified data directory
-  /// \param inputs The vector of inputs to the target model.
+  /// Reads the input data from the specified data directory.
+  /// \param inputs The pointer to the map holding the information about
+  /// input tensors of a model
   /// \param data_directory The path to the directory containing the data
   nic::Error ReadDataFromDir(
       std::shared_ptr<ModelTensorMap> inputs,
       const std::string& data_directory);
 
-  /// Reads the input data from the specified json file and append to the
-  /// stream buffers.
-  /// \param inputs The vector of inputs to the target model.
+  /// Reads the input data from the specified json file.
+  /// \param inputs The pointer to the map holding the information about
+  /// input tensors of a model
   /// \param json_file The json file containing the user-provided input
   /// data.
   /// Returns error object indicating status
@@ -69,7 +70,8 @@ class DataLoader {
       std::shared_ptr<ModelTensorMap> inputs, const std::string& json_file);
 
   /// Generates the input data to use with the inference requests
-  /// \param inputs The vector of inputs to the target model.
+  /// \param inputs The pointer to the map holding the information about
+  /// input tensors of a model
   /// \param zero_input Whether or not to use zero value for buffer
   /// initialization.
   /// \param string_length The length of the string to generate for
@@ -82,7 +84,7 @@ class DataLoader {
       const size_t string_length, const std::string& string_data);
 
   /// Helper function to access data for the specified input
-  /// \param input The target input
+  /// \param input The target model input tensor
   /// \param stream_id The data stream_id to use for retrieving input data.
   /// \param step_id The data step_id to use for retrieving input data.
   /// \param data Returns the pointer to the data for the requested input.
@@ -93,7 +95,7 @@ class DataLoader {
       const uint8_t** data_ptr, size_t* batch1_size);
 
   /// Helper function to get the shape values to the input
-  /// \param input The target input
+  /// \param input The target model input tensor
   /// \param stream_id The data stream_id to use for retrieving input shape.
   /// \param step_id The data step_id to use for retrieving input shape.
   /// \param shape returns the pointer to the vector containing the shape
@@ -106,7 +108,8 @@ class DataLoader {
  private:
   /// Helper function to read data for the specified input from json
   /// \param step the DOM for current step
-  /// \param inputs The inputs to the model
+  /// \param inputs The pointer to the map holding the information about
+  /// input tensors of a model
   /// \param stream_index the stream index the data should be exported to.
   /// \param step_index the step index the data should be exported to.
   /// Returns error object indicating status

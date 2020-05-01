@@ -62,11 +62,13 @@ class LoadManager {
         "resetting worker threads not supported for this load manager.");
   }
 
-  struct InferContextMetaData {
-    explicit InferContextMetaData() : inflight_request_cnt_(0) {}
-    InferContextMetaData(InferContextMetaData&&) = delete;
-    InferContextMetaData(const InferContextMetaData&) = delete;
-    ~InferContextMetaData()
+  /// Wraps the information required to send an inference to the
+  /// server
+  struct InferContext {
+    explicit InferContext() : inflight_request_cnt_(0) {}
+    InferContext(InferContext&&) = delete;
+    InferContext(const InferContext&) = delete;
+    ~InferContext()
     {
       for (const auto input : inputs_) {
         delete input;
@@ -75,18 +77,31 @@ class LoadManager {
         delete output;
       }
     }
-
+    // The triton client to communicate with the server
     std::unique_ptr<TritonClientWrapper> infer_client_;
+    // The vector of pointers to InferInput objects to be
+    // used for inference request.
     std::vector<nic::InferInput*> inputs_;
+    // The vector of pointers to InferRequestedOutput objects
+    // to be used with the inference request.
     std::vector<const nic::InferRequestedOutput*> outputs_;
+    // The InferOptions object holding the details of the
+    // inference.
     std::unique_ptr<nic::InferOptions> options_;
+    // The total number of inference in-flight.
     std::atomic<size_t> inflight_request_cnt_;
   };
 
+  /// The properties of an asynchronous request required in
+  /// the callback to effectively interpret the response.
   struct AsyncRequestProperties {
     AsyncRequestProperties() : sequence_end_(false) {}
+    // The id of in the inference context which was used to
+    // send this request.
     uint32_t ctx_id_;
+    // The timestamp of when the request was started.
     struct timespec start_time_;
+    // Whether or not the request is at the end of a sequence.
     bool sequence_end_;
   };
 
@@ -117,23 +132,20 @@ class LoadManager {
   nic::Error InitSharedMemory();
 
   /// Helper function to prepare the InferContext for sending inference request.
-  /// \param ctx Returns a new InferContext.
-  /// \param options Returns the options used by 'ctx'.
+  /// \param ctx The target InferContext object.
   /// \return Error object indicating success or failure.
-  nic::Error PrepareInfer(InferContextMetaData* ctx);
+  nic::Error PrepareInfer(InferContext* ctx);
 
 
   /// Helper function to prepare the InferContext for sending inference
-  /// request
-  /// in shared memory.
-  /// \param ctx Returns a new InferContext.
-  /// \param options
-  /// Returns the options used by 'ctx'.
-  nic::Error PrepareSharedMemoryInfer(InferContextMetaData* ctx);
+  /// request in shared memory.
+  /// \param ctx The target InferContext object.
+  /// \return Error object indicating success or failure.
+  nic::Error PrepareSharedMemoryInfer(InferContext* ctx);
 
 
   /// Updates the input data to use for inference request
-  /// \param inputs The inputs to the model
+  /// \param inputs The vector of pointers to InferInput objects
   /// \param stream_index The data stream to use for next data
   /// \param step_index The step index to use for next data
   /// \return Error object indicating success or failure.
@@ -153,7 +165,7 @@ class LoadManager {
 
  private:
   /// Helper function to update the inputs
-  /// \param inputs The inputs to the model
+  /// \param inputs The vector of pointers to InferInput objects
   /// \param stream_index The data stream to use for next data
   /// \param step_index The step index to use for next data
   /// \return Error object indicating success or failure.
@@ -162,7 +174,7 @@ class LoadManager {
       const int step_index);
 
   /// Helper function to update the shared memory inputs
-  /// \param inputs The inputs to the model
+  /// \param inputs The vector of pointers to InferInput objects
   /// \param stream_index The data stream to use for next data
   /// \param step_index The step index to use for next data
   /// \return Error object indicating success or failure.

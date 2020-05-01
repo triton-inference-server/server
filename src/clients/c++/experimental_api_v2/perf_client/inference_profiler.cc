@@ -376,8 +376,7 @@ InferenceProfiler::ProfileHelper(
         load_status.infer_per_sec.back() / load_parameters_.stability_window;
     load_status.avg_latency +=
         load_status.latencies.back() / load_parameters_.stability_window;
-    // Tanmay: Revert
-    if (!verbose_) {
+    if (verbose_) {
       if (error.back().IsOk()) {
         std::cout << "  Pass [" << (completed_trials + 1)
                   << "] throughput: " << load_status.infer_per_sec.back()

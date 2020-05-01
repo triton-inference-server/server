@@ -39,6 +39,13 @@ struct ModelTensor {
 using ModelTensorMap = std::map<std::string, ModelTensor>;
 using ComposingModelMap = std::map<std::string, std::set<ModelIdentifier>>;
 
+//==============================================================================
+/// ModelParser is a helper class to parse the information about the target
+/// model from the metadata and configuration returned by the server.
+///
+/// Perf Client depends upon the various properties of the model to correctly
+/// generate and issue inference request for the model. The object of this
+/// class will provide these necessary details.
 class ModelParser {
  public:
   enum ModelSchedulerType {
@@ -57,24 +64,65 @@ class ModelParser {
   {
   }
 
+  /// Initializes the ModelParser with the metadata and config messages
+  /// for the target model
+  /// \param metadata The metadata of the target model.
+  /// \param config The config of the target model.
+  /// \param model_version The version of target model.
+  /// \param input_shapes The user provided default shapes which will be use
+  /// if a certain input has wildcard in its dimension.
+  /// \param client_wrapper The wrapped triton client object.
+  /// \return Error object indicating success or failure.
   nic::Error Init(
       const ni::ModelMetadataResponse& metadata, const ni::ModelConfig& config,
       const std::string& model_version,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       std::unique_ptr<TritonClientWrapper>& client_wrapper);
+
+  /// Initializes the ModelParser with the metadata and config rapidjson DOM
+  /// for the target model
+  /// \param metadata The metadata of the target model.
+  /// \param config The config of the target model.
+  /// \param model_version The version of target model.
+  /// \param input_shapes The user provided default shapes which will be use
+  /// if a certain input has wildcard in its dimension.
+  /// \param client_wrapper The wrapped triton client object.
+  /// \return Error object indicating success or failure.
   nic::Error Init(
       const rapidjson::Document& metadata, const rapidjson::Document& config,
       const std::string& model_version,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       std::unique_ptr<TritonClientWrapper>& client_wrapper);
 
+  /// Get the name of the target model
+  /// \return Model name as string
   std::string ModelName() const { return model_name_; }
+
+  /// Get the version of target model
+  /// \return Model version as string
   std::string ModelVersion() const { return model_version_; }
+
+  /// Get the scheduler type for the model
   ModelSchedulerType SchedulerType() const { return scheduler_type_; }
+
+  /// Get the max batch size supported by the model. Returns 0 if the model
+  /// does not support batching.
+  /// \return The maximum supported batch size.
   size_t MaxBatchSize() const { return max_batch_size_; }
 
+  /// Get the details about the model inputs.
+  /// \return The map with tensor_name and the tensor details
+  /// stored as key-value pair.
   std::shared_ptr<ModelTensorMap> Inputs() { return inputs_; }
+
+  /// Get the details about the model outputs.
+  /// \return The map with tensor_name and the tensor details
+  /// stored as key-value pair.
   std::shared_ptr<ModelTensorMap> Outputs() { return outputs_; }
+
+  /// Get the composing maps for the target model.
+  /// \return The pointer to the nested map descriping the
+  /// nested flow in the target model.
   std::shared_ptr<ComposingModelMap> GetComposingModelMap()
   {
     return composing_models_map_;
