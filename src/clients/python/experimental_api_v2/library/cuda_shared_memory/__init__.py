@@ -174,8 +174,7 @@ def set_shared_memory_region(cuda_shm_handle, input_values):
     for input_value in input_values:
         if not isinstance(input_value, (np.ndarray,)):
             _raise_error(
-                "input_values must be specified as a list/tuple of numpy arrays"
-            )
+                "input_values must be specified as a list/tuple of numpy arrays")
 
     offset_current = 0
     for input_value in input_values:
