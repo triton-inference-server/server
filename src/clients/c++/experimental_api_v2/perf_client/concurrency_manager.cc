@@ -169,6 +169,53 @@ ConcurrencyManager::Infer(
   std::condition_variable cb_cv;
 
   std::atomic<int> total_ongoing_requests(0);
+  uint64_t request_id = 0;
+
+  // request_id to start timestamp map
+  std::map<std::string, AsyncRequestProperties> async_req_map;
+
+  // Callback function for handling asynchronous requests
+  const auto callback_func = [&](nic::InferResult* result) {
+    thread_stat->cb_status_ = result->RequestStatus();
+    std::string request_id;
+    thread_stat->cb_status_ = result->Id(&request_id);
+    std::cout << "request id " << request_id << std::endl;
+    delete result;
+    if (thread_stat->cb_status_.IsOk()) {
+      struct timespec end_time_async;
+      clock_gettime(CLOCK_MONOTONIC, &end_time_async);
+      const auto& it = async_req_map.find(request_id);
+      uint32_t ctx_id;
+      bool skip_stat = false;
+      {
+        // Add the request timestamp to thread Timestamp vector with
+        // proper locking
+        std::lock_guard<std::mutex> lock(thread_stat->mu_);
+        if (it != async_req_map.end()) {
+          thread_stat->request_timestamps_.emplace_back(std::make_tuple(
+              it->second.start_time_, end_time_async, it->second.sequence_end_,
+              false /* delayed */));
+          ctx_id = it->second.ctx_id_;
+          ctxs[ctx_id]->infer_client_->ClientInferStat(
+              &(thread_stat->contexts_stat_[ctx_id]));
+          async_req_map.erase(request_id);
+          skip_stat = true;
+        }
+      }
+
+      // avoid competition over 'cb_mtx'
+      {
+        std::lock_guard<std::mutex> lk(cb_mtx);
+        if (!skip_stat) {
+          free_ctx_ids.push(ctx_id);
+        }
+        notified = true;
+      }
+    }
+    total_ongoing_requests--;
+
+    cb_cv.notify_all();
+  };
 
   // run inferencing until receiving exit signal to maintain server load.
   do {
@@ -238,46 +285,126 @@ ConcurrencyManager::Infer(
         }
       }
 
-      struct timespec start_time_sync, end_time_sync;
-      clock_gettime(CLOCK_MONOTONIC, &start_time_sync);
-      nic::InferResult* results;
-      thread_stat->status_ = ctxs[ctx_id]->infer_client_->Infer(
-          &results, *(ctxs[ctx_id]->options_), ctxs[ctx_id]->inputs_,
-          ctxs[ctx_id]->outputs_);
-      if (results != nullptr) {
-        delete results;
+      if (on_sequence_model_) {
+        size_t offset = 0;
+        for (size_t i = 0; i < thread_config->thread_id_; i++) {
+          offset += threads_config_[i]->concurrency_;
+        }
+
+        // Find the next available context id to use for this request
+        {
+          std::lock_guard<std::mutex> lk(cb_mtx);
+          ctx_id = free_ctx_ids.front();
+          free_ctx_ids.pop();
+        }
+        seq_id = offset + ctx_id;
+
+        {
+          std::lock_guard<std::mutex> guard(sequence_stat_[seq_id]->mtx_);
+          if (sequence_stat_[seq_id]->remaining_queries_ == 0) {
+            ctxs[ctx_id]->options_->sequence_start_ = true;
+            InitNewSequence(seq_id);
+          }
+          if (sequence_stat_[seq_id]->remaining_queries_ == 1) {
+            ctxs[ctx_id]->options_->sequence_end_ = true;
+          }
+
+          // Set the sequence id in the options.
+          ctxs[ctx_id]->options_->sequence_id_ =
+              sequence_stat_[seq_id]->seq_id_;
+
+          // Update the inputs if required
+          if (using_json_data_) {
+            int step_id = data_loader_->GetTotalSteps(
+                              sequence_stat_[seq_id]->data_stream_id_) -
+                          sequence_stat_[seq_id]->remaining_queries_;
+
+            thread_stat->status_ = UpdateInputs(
+                ctxs[ctx_id]->inputs_, sequence_stat_[seq_id]->data_stream_id_,
+                step_id);
+            if (!thread_stat->status_.IsOk()) {
+              return;
+            }
+          }
+          sequence_stat_[seq_id]->remaining_queries_--;
+        }
       }
-      if (!thread_stat->status_.IsOk()) {
-        return;
-      }
-      clock_gettime(CLOCK_MONOTONIC, &end_time_sync);
-      {
-        // Add the request timestamp to thread Timestamp vector with proper
-        // locking
-        std::lock_guard<std::mutex> lock(thread_stat->mu_);
-        thread_stat->request_timestamps_.emplace_back(std::make_tuple(
-            start_time_sync, end_time_sync, 0, false /* delayed */));
-        thread_stat->status_ = ctxs[ctx_id]->infer_client_->ClientInferStat(
-            &(thread_stat->contexts_stat_[ctx_id]));
+      if (async_) {
+        ctxs[ctx_id]->options_->request_id_ = std::to_string(request_id++);
+        {
+          std::lock_guard<std::mutex> lock(thread_stat->mu_);
+          auto it = async_req_map
+                        .emplace(
+                            ctxs[ctx_id]->options_->request_id_,
+                            AsyncRequestProperties())
+                        .first;
+          clock_gettime(CLOCK_MONOTONIC, &(it->second.start_time_));
+          it->second.ctx_id_ = ctx_id;
+          it->second.sequence_end_ = ctxs[ctx_id]->options_->sequence_end_;
+        }
+        thread_stat->status_ = ctxs[ctx_id]->infer_client_->AsyncInfer(
+            callback_func, *(ctxs[ctx_id]->options_), ctxs[ctx_id]->inputs_,
+            ctxs[ctx_id]->outputs_);
         if (!thread_stat->status_.IsOk()) {
           return;
         }
+      } else {
+        struct timespec start_time_sync, end_time_sync;
+        clock_gettime(CLOCK_MONOTONIC, &start_time_sync);
+        nic::InferResult* results;
+        thread_stat->status_ = ctxs[ctx_id]->infer_client_->Infer(
+            &results, *(ctxs[ctx_id]->options_), ctxs[ctx_id]->inputs_,
+            ctxs[ctx_id]->outputs_);
+        if (results != nullptr) {
+          delete results;
+        }
+        if (!thread_stat->status_.IsOk()) {
+          return;
+        }
+        clock_gettime(CLOCK_MONOTONIC, &end_time_sync);
+        {
+          // Add the request timestamp to thread Timestamp vector with proper
+          // locking
+          std::lock_guard<std::mutex> lock(thread_stat->mu_);
+          thread_stat->request_timestamps_.emplace_back(std::make_tuple(
+              start_time_sync, end_time_sync,
+              ctxs[ctx_id]->options_->sequence_end_, false /* delayed */));
+          thread_stat->status_ = ctxs[ctx_id]->infer_client_->ClientInferStat(
+              &(thread_stat->contexts_stat_[ctx_id]));
+          if (!thread_stat->status_.IsOk()) {
+            return;
+          }
+        }
+        free_ctx_ids.push(ctx_id);
       }
-      free_ctx_ids.push(ctx_id);
+      total_ongoing_requests++;
     }
-    total_ongoing_requests++;
-    //  }
 
-    total_ongoing_requests = 0;
+    if (async_) {
+      {
+        // If async, then wait for signal from callback.
+        std::unique_lock<std::mutex> lk(cb_mtx);
+        cb_cv.wait(lk, [&notified] {
+          if (notified) {
+            notified = false;
+            return true;
+          }
+          return false;
+        });
+      }
+    } else {
+      // If synchronous, then all the requests have already been completed.
+      total_ongoing_requests = 0;
+    }
 
     if (early_exit || (!thread_stat->cb_status_.IsOk())) {
-      // if (async_) {
-      // Wait for all callbacks to complete.
-      // Loop to ensure all the inflight requests have been completed.
-      //  while (total_ongoing_requests != 0) {
-      //    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-      //  }
-      //}
+      if (async_) {
+        // Wait for all callbacks to complete.
+        // Loop to ensure all the inflight requests have been completed.
+        while (total_ongoing_requests != 0) {
+          std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+      }
       // end loop
       break;
     }

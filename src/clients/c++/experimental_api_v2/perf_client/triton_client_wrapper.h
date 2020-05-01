@@ -77,6 +77,12 @@ class TritonClientWrapper {
       const std::vector<nic::InferInput*>& inputs,
       const std::vector<const nic::InferRequestedOutput*>& outputs);
 
+  nic::Error AsyncInfer(
+      nic::InferenceServerClient::OnCompleteFn callback,
+      const nic::InferOptions& options,
+      const std::vector<nic::InferInput*>& inputs,
+      const std::vector<const nic::InferRequestedOutput*>& outputs);
+
   nic::Error ClientInferStat(nic::InferStat* infer_stat);
 
   nic::Error ModelInferenceStatistics(

@@ -146,6 +146,24 @@ TritonClientWrapper::Infer(
 }
 
 nic::Error
+TritonClientWrapper::AsyncInfer(
+    nic::InferenceServerClient::OnCompleteFn callback,
+    const nic::InferOptions& options,
+    const std::vector<nic::InferInput*>& inputs,
+    const std::vector<const nic::InferRequestedOutput*>& outputs)
+{
+  if (protocol_ == ProtocolType::GRPC) {
+    RETURN_IF_ERROR(client_.grpc_client_->AsyncInfer(
+        callback, options, inputs, outputs, http_headers_));
+  } else {
+    RETURN_IF_ERROR(client_.http_client_->AsyncInfer(
+        callback, options, inputs, outputs, http_headers_));
+  }
+
+  return nic::Error::Success;
+}
+
+nic::Error
 TritonClientWrapper::ClientInferStat(nic::InferStat* infer_stat)
 {
   if (protocol_ == ProtocolType::GRPC) {

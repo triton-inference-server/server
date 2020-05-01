@@ -83,6 +83,13 @@ class LoadManager {
     std::atomic<size_t> inflight_request_cnt_;
   };
 
+  struct AsyncRequestProperties {
+    AsyncRequestProperties() : sequence_end_(false) {}
+    uint32_t ctx_id_;
+    struct timespec start_time_;
+    bool sequence_end_;
+  };
+
 
  protected:
   LoadManager(
