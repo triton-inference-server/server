@@ -159,7 +159,7 @@ def triton_to_np_dtype(dtype):
     elif dtype == "FP64":
         return np.float64
     elif dtype == "BYTES":
-        return np.bytes_
+        return np.object
     return None
 
 
@@ -192,8 +192,7 @@ def serialize_byte_tensor(input_tensor):
     # a 1-dimensional array containing the 4-byte byte size followed by the
     # actual element bytes. All elements are concatenated together in "C"
     # order.
-    if (input_tensor.dtype == np.object) or (
-            input_tensor.dtype.type == np.bytes_):
+    if (input_tensor.dtype == np.object) or (input_tensor.dtype.type == np.bytes_):
         flattened = bytes()
         for obj in np.nditer(input_tensor, flags=["refs_ok"], order='C'):
             # If directly passing bytes to BYTES type,
