@@ -133,7 +133,7 @@ def set_shared_memory_region(shm_handle, input_values):
     ----------
     shm_handle : c_void_p
         The handle for the shared memory region.
-    input_values : np.array
+    input_values : list
         The list of numpy arrays to be copied into the shared memory region.
 
     Raises
@@ -188,7 +188,7 @@ def get_contents_as_numpy(shm_handle, datatype, shape):
             c_int(_cshm_get_shared_memory_handle_info(shm_handle, byref(shm_addr), byref(shm_key), byref(shm_fd), \
                                     byref(offset), byref(byte_size))))
     start_pos = offset.value
-    if datatype != np.object:
+    if (datatype != np.object) and (datatype != np.bytes_):
         requested_byte_size = np.prod(shape) * np.dtype(datatype).itemsize
         cval_len = start_pos + requested_byte_size
         if byte_size.value < cval_len:
