@@ -452,7 +452,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                                 False, "unexpected class result {}".format(result_name))
 
     # Unregister system/cuda shared memory regions if they exist
-    su.unregister_cleanup_shm_regions(shm_regions, precreated_shm_regions, outputs,
+    su.unregister_cleanup_shm_regions(shm_regions, shm_handles, precreated_shm_regions, outputs,
                                       use_system_shared_memory, use_cuda_shared_memory)
 
     return results

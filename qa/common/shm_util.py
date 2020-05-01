@@ -175,7 +175,8 @@ def register_add_shm_regions(inputs, outputs, shm_region_names, precreated_shm_r
         inputs[1].set_shared_memory(shm_region_names[1]+'_data', input1_byte_size)
 
 
-def unregister_cleanup_shm_regions(shm_regions, precreated_shm_regions, outputs, use_system_shared_memory, use_cuda_shared_memory):
+def unregister_cleanup_shm_regions(shm_regions, shm_handles, precreated_shm_regions,
+                                   outputs, use_system_shared_memory, use_cuda_shared_memory):
     if not (use_system_shared_memory or use_cuda_shared_memory):
         return None
 
@@ -184,9 +185,13 @@ def unregister_cleanup_shm_regions(shm_regions, precreated_shm_regions, outputs,
     if use_cuda_shared_memory:
         triton_client.unregister_cuda_shared_memory(shm_regions[0]+'_data')
         triton_client.unregister_cuda_shared_memory(shm_regions[1]+'_data')
+        cudashm.destroy_shared_memory_region(shm_handles[0])
+        cudashm.destroy_shared_memory_region(shm_handles[1])
     else:
         triton_client.unregister_system_shared_memory(shm_regions[0]+'_data')
         triton_client.unregister_system_shared_memory(shm_regions[1]+'_data')
+        shm.destroy_shared_memory_region(shm_handles[0])
+        shm.destroy_shared_memory_region(shm_handles[1])
 
     if precreated_shm_regions is None:
         i = 0
@@ -194,14 +199,19 @@ def unregister_cleanup_shm_regions(shm_regions, precreated_shm_regions, outputs,
             if use_cuda_shared_memory:
                 triton_client.unregister_cuda_shared_memory(
                     shm_regions[2]+'_data')
+                cudashm.destroy_shared_memory_region(shm_handles[2])
             else:
                 triton_client.unregister_system_shared_memory(
                     shm_regions[2]+'_data')
+                shm.destroy_shared_memory_region(shm_handles[2])
             i += 1
         if "OUTPUT1" in outputs:
             if use_cuda_shared_memory:
                 triton_client.unregister_cuda_shared_memory(
                     shm_regions[2+i]+'_data')
+                cudashm.destroy_shared_memory_region(shm_handles[3])
             else:
                 triton_client.unregister_system_shared_memory(
                     shm_regions[2+i]+'_data')
+                shm.destroy_shared_memory_region(shm_handles[3])
+
