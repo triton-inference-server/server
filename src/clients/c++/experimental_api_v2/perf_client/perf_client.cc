@@ -1093,6 +1093,14 @@ main(int argc, char** argv)
     }
   }
 
+  if (streaming) {
+    if (forced_sync) {
+      std::cerr << "can not use streaming with synchronous API" << std::endl;
+      return 1;
+    }
+    async = true;
+  }
+
   std::unique_ptr<LoadManager> manager;
 
   if (target_concurrency) {

@@ -169,8 +169,8 @@ TritonClientWrapper::StartStream(
     nic::InferenceServerClient::OnCompleteFn callback)
 {
   if (protocol_ == ProtocolType::GRPC) {
-    RETURN_IF_ERROR(
-        client_.grpc_client_->StartStream(callback, true/*enable_stats*/, *http_headers_));
+    RETURN_IF_ERROR(client_.grpc_client_->StartStream(
+        callback, true /*enable_stats*/, *http_headers_));
   } else {
     return nic::Error("HTTP does not support starting streams");
   }
