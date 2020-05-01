@@ -164,6 +164,37 @@ TritonClientWrapper::AsyncInfer(
 }
 
 nic::Error
+TritonClientWrapper::StartStream(
+    nic::InferenceServerClient::OnCompleteFn callback)
+{
+  if (protocol_ == ProtocolType::GRPC) {
+    RETURN_IF_ERROR(
+        client_.grpc_client_->StartStream(callback, true, http_headers_));
+  } else {
+    return nic::Error("HTTP does not support starting streams");
+  }
+
+  return nic::Error::Success;
+}
+
+
+nic::Error
+TritonClientWrapper::AsyncStreamInfer(
+    const nic::InferOptions& options,
+    const std::vector<nic::InferInput*>& inputs,
+    const std::vector<const nic::InferRequestedOutput*>& outputs)
+{
+  if (protocol_ == ProtocolType::GRPC) {
+    RETURN_IF_ERROR(
+        client_.grpc_client_->AsyncStreamInfer(options, inputs, outputs));
+  } else {
+    return nic::Error("HTTP does not support streaming inferences");
+  }
+
+  return nic::Error::Success;
+}
+
+nic::Error
 TritonClientWrapper::ClientInferStat(nic::InferStat* infer_stat)
 {
   if (protocol_ == ProtocolType::GRPC) {

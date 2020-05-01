@@ -93,9 +93,10 @@ class LoadManager {
 
  protected:
   LoadManager(
-      const bool async, const int32_t batch_size, const size_t max_threads,
-      const size_t sequence_length, const SharedMemoryType shared_memory_type,
-      const size_t output_shm_size, const std::shared_ptr<ModelParser>& parser,
+      const bool async, const bool streaming, const int32_t batch_size,
+      const size_t max_threads, const size_t sequence_length,
+      const SharedMemoryType shared_memory_type, const size_t output_shm_size,
+      const std::shared_ptr<ModelParser>& parser,
       const std::shared_ptr<TritonClientFactory>& factory);
 
   /// Helper funtion to retrieve the input data for the inferences
@@ -171,6 +172,7 @@ class LoadManager {
 
  protected:
   bool async_;
+  bool streaming_;
   size_t batch_size_;
   size_t max_threads_;
   size_t sequence_length_;

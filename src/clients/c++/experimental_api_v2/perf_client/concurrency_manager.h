@@ -66,10 +66,11 @@ class ConcurrencyManager : public LoadManager {
   /// \param manager Returns a new ConcurrencyManager object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
-      const bool async, const int32_t batch_size, const size_t max_threads,
-      const size_t max_concurrency, const size_t sequence_length,
-      const size_t string_length, const std::string& string_data,
-      const bool zero_input, std::vector<std::string>& user_data,
+      const bool async, const bool streaming, const int32_t batch_size,
+      const size_t max_threads, const size_t max_concurrency,
+      const size_t sequence_length, const size_t string_length,
+      const std::string& string_data, const bool zero_input,
+      std::vector<std::string>& user_data,
       const SharedMemoryType shared_memory_type, const size_t output_shm_size,
       const std::shared_ptr<ModelParser>& parser,
       const std::shared_ptr<TritonClientFactory>& factory,
@@ -83,10 +84,10 @@ class ConcurrencyManager : public LoadManager {
 
  private:
   ConcurrencyManager(
-      const bool async, const int32_t batch_size, const size_t max_threads,
-      const size_t max_concurrency, const size_t sequence_length,
-      const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-      const std::shared_ptr<ModelParser>& parser,
+      const bool async, const bool streaming, const int32_t batch_size,
+      const size_t max_threads, const size_t max_concurrency,
+      const size_t sequence_length, const SharedMemoryType shared_memory_type,
+      const size_t output_shm_size, const std::shared_ptr<ModelParser>& parser,
       const std::shared_ptr<TritonClientFactory>& factory);
 
   struct ThreadConfig {

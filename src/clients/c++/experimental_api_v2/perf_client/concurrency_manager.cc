@@ -36,18 +36,19 @@ ConcurrencyManager::~ConcurrencyManager()
 
 nic::Error
 ConcurrencyManager::Create(
-    const bool async, const int32_t batch_size, const size_t max_threads,
-    const size_t max_concurrency, const size_t sequence_length,
-    const size_t string_length, const std::string& string_data,
-    const bool zero_input, std::vector<std::string>& user_data,
+    const bool async, const bool streaming, const int32_t batch_size,
+    const size_t max_threads, const size_t max_concurrency,
+    const size_t sequence_length, const size_t string_length,
+    const std::string& string_data, const bool zero_input,
+    std::vector<std::string>& user_data,
     const SharedMemoryType shared_memory_type, const size_t output_shm_size,
     const std::shared_ptr<ModelParser>& parser,
     const std::shared_ptr<TritonClientFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<ConcurrencyManager> local_manager(new ConcurrencyManager(
-      async, batch_size, max_threads, max_concurrency, sequence_length,
-      shared_memory_type, output_shm_size, parser, factory));
+      async, streaming, batch_size, max_threads, max_concurrency,
+      sequence_length, shared_memory_type, output_shm_size, parser, factory));
 
   local_manager->threads_config_.reserve(max_threads);
 
@@ -65,14 +66,14 @@ ConcurrencyManager::Create(
 }
 
 ConcurrencyManager::ConcurrencyManager(
-    const bool async, const int32_t batch_size, const size_t max_threads,
-    const size_t max_concurrency, const size_t sequence_length,
-    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
-    const std::shared_ptr<ModelParser>& parser,
+    const bool async, const bool streaming, const int32_t batch_size,
+    const size_t max_threads, const size_t max_concurrency,
+    const size_t sequence_length, const SharedMemoryType shared_memory_type,
+    const size_t output_shm_size, const std::shared_ptr<ModelParser>& parser,
     const std::shared_ptr<TritonClientFactory>& factory)
     : LoadManager(
-          async, batch_size, max_threads, sequence_length, shared_memory_type,
-          output_shm_size, parser, factory),
+          async, streaming, batch_size, max_threads, sequence_length,
+          shared_memory_type, output_shm_size, parser, factory),
       execute_(true), max_concurrency_(max_concurrency)
 {
   if (on_sequence_model_) {
@@ -179,7 +180,6 @@ ConcurrencyManager::Infer(
     thread_stat->cb_status_ = result->RequestStatus();
     std::string request_id;
     thread_stat->cb_status_ = result->Id(&request_id);
-    std::cout << "request id " << request_id << std::endl;
     delete result;
     if (thread_stat->cb_status_.IsOk()) {
       struct timespec end_time_async;
@@ -265,6 +265,10 @@ ConcurrencyManager::Infer(
       if (!thread_stat->status_.IsOk()) {
         return;
       }
+      if (streaming_) {
+        thread_stat->status_ =
+            ctxs.back()->infer_client_->StartStream(callback_func);
+      }
     }
 
     // Create async requests such that the number of ongoing requests
@@ -342,9 +346,15 @@ ConcurrencyManager::Infer(
           it->second.ctx_id_ = ctx_id;
           it->second.sequence_end_ = ctxs[ctx_id]->options_->sequence_end_;
         }
-        thread_stat->status_ = ctxs[ctx_id]->infer_client_->AsyncInfer(
-            callback_func, *(ctxs[ctx_id]->options_), ctxs[ctx_id]->inputs_,
-            ctxs[ctx_id]->outputs_);
+        if (streaming_) {
+          thread_stat->status_ = ctxs[ctx_id]->infer_client_->AsyncStreamInfer(
+              *(ctxs[ctx_id]->options_), ctxs[ctx_id]->inputs_,
+              ctxs[ctx_id]->outputs_);
+        } else {
+          thread_stat->status_ = ctxs[ctx_id]->infer_client_->AsyncInfer(
+              callback_func, *(ctxs[ctx_id]->options_), ctxs[ctx_id]->inputs_,
+              ctxs[ctx_id]->outputs_);
+        }
         if (!thread_stat->status_.IsOk()) {
           return;
         }

@@ -1138,8 +1138,8 @@ main(int argc, char** argv)
     }
     FAIL_IF_ERR(
         ConcurrencyManager::Create(
-            async, batch_size, max_threads, max_concurrency, sequence_length,
-            string_length, string_data, zero_input, user_data,
+            async, streaming, batch_size, max_threads, max_concurrency,
+            sequence_length, string_length, string_data, zero_input, user_data,
             shared_memory_type, output_shm_size, parser, factory, &manager),
         "failed to create concurrency manager");
 

@@ -1057,6 +1057,14 @@ main(int argc, char** argv)
     }
   }
 
+  if (streaming) {
+    if (forced_sync) {
+      std::cerr << "can not use streaming with synchronous API" << std::endl;
+      return 1;
+    }
+    async = true;
+  }
+
   if (target_concurrency) {
     if ((factory->SchedulerType() == ContextFactory::SEQUENCE) ||
         (factory->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE)) {

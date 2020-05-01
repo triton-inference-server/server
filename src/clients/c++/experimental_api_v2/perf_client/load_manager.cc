@@ -186,12 +186,13 @@ LoadManager::GetAccumulatedClientStat(nic::InferStat* contexts_stat)
 
 
 LoadManager::LoadManager(
-    const bool async, const int32_t batch_size, const size_t max_threads,
-    const size_t sequence_length, const SharedMemoryType shared_memory_type,
-    const size_t output_shm_size, const std::shared_ptr<ModelParser>& parser,
+    const bool async, const bool streaming, const int32_t batch_size,
+    const size_t max_threads, const size_t sequence_length,
+    const SharedMemoryType shared_memory_type, const size_t output_shm_size,
+    const std::shared_ptr<ModelParser>& parser,
     const std::shared_ptr<TritonClientFactory>& factory)
-    : async_(async), batch_size_(batch_size), max_threads_(max_threads),
-      sequence_length_(sequence_length),
+    : async_(async), streaming_(streaming), batch_size_(batch_size),
+      max_threads_(max_threads), sequence_length_(sequence_length),
       shared_memory_type_(shared_memory_type),
       output_shm_size_(output_shm_size), parser_(parser), factory_(factory),
       using_json_data_(false), next_seq_id_(1)

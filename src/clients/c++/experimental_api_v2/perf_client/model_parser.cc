@@ -125,14 +125,16 @@ ModelParser::GetEnsembleSchedulerType(
   if (config.platform() == "ensemble") {
     for (const auto& step : config.ensemble_scheduling().step()) {
       ni::ModelConfigResponse model_config;
-      std::string step_version(std::to_string(step.model_version()));
+      std::string step_version;
+      if (step.model_version() != -1) {
+        step_version = std::to_string(step.model_version());
+      }
       (*composing_models_map_)[config.name()].emplace(
           step.model_name(), step_version);
       RETURN_IF_ERROR(client_wrapper->ModelConfig(
           &model_config, step.model_name(), step_version));
       RETURN_IF_ERROR(GetEnsembleSchedulerType(
-          model_config.config(), std::to_string(step.model_version()),
-          client_wrapper, is_sequential));
+          model_config.config(), step_version, client_wrapper, is_sequential));
     }
   }
 
@@ -260,17 +262,19 @@ ModelParser::GetEnsembleSchedulerType(
   if (std::string(config["platform"].GetString()).compare("ensemble") == 0) {
     const auto step_itr = config["ensembleScheduling"].FindMember("step");
     for (const auto& step : step_itr->value.GetArray()) {
+      std::string step_model_version(step["modelVersion"].GetString());
+      int64_t model_version_int = std::stol(step_model_version);
+      if (model_version_int == -1) {
+        step_model_version = "";
+      }
       (*composing_models_map_)[config["name"].GetString()].emplace(
-          std::string(step["model_name"].GetString()),
-          std::string(step["model_version"].GetString()));
+          std::string(step["modelName"].GetString()), step_model_version);
 
       rapidjson::Document model_config;
       RETURN_IF_ERROR(client_wrapper->ModelConfig(
-          &model_config, step["model_name"].GetString(),
-          step["model_version"].GetString()));
+          &model_config, step["modelName"].GetString(), step_model_version));
       RETURN_IF_ERROR(GetEnsembleSchedulerType(
-          model_config, std::to_string(step["model_version"].GetInt()),
-          client_wrapper, is_sequential));
+          model_config, step_model_version, client_wrapper, is_sequential));
     }
   }
 
