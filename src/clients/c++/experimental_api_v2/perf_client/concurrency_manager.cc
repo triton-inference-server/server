@@ -228,16 +228,15 @@ ConcurrencyManager::Infer(
     while (total_ongoing_requests < (int)num_reqs) {
       // Update the inputs if required for non-sequence
       if (using_json_data_ && (!on_sequence_model_)) {
-        //        int step_id = (thread_config->non_sequence_data_step_id_ %
-        //                       data_loader_->GetTotalStepsNonSequence()) *
-        //                      batch_size_;
-        //        thread_config->non_sequence_data_step_id_ += active_threads_;
-        //        // There will be only one ctx in non-sequence case
-        //       thread_stat->status_ =
-        //            UpdateInputs(ctxs[0]->ctx_->Inputs(), 0, step_id);
-        //        if (!thread_stat->status_.IsOk()) {
-        //          return;
-        //        }
+        int step_id = (thread_config->non_sequence_data_step_id_ %
+                       data_loader_->GetTotalStepsNonSequence()) *
+                      batch_size_;
+        thread_config->non_sequence_data_step_id_ += active_threads_;
+        // There will be only one ctx in non-sequence case
+        thread_stat->status_ = UpdateInputs(ctxs[ctx_id]->inputs_, 0, step_id);
+        if (!thread_stat->status_.IsOk()) {
+          return;
+        }
       }
 
       struct timespec start_time_sync, end_time_sync;

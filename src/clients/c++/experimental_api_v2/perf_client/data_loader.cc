@@ -256,19 +256,21 @@ DataLoader::GetInputData(
 nic::Error
 DataLoader::GetInputShape(
     const ModelTensor& input, const int stream_id, const int step_id,
-    const std::vector<int64_t>** provided_shape)
+    std::vector<int64_t>* provided_shape)
 {
   std::string key_name(
       input.name_ + "_" + std::to_string(stream_id) + "_" +
       std::to_string(step_id));
 
+  provided_shape->clear();
+
   // Prefer the values read from file over the ones provided from
   // CLI
   auto it = input_shapes_.find(key_name);
   if (it != input_shapes_.end()) {
-    *provided_shape = &it->second;
+    *provided_shape = it->second;
   } else {
-    *provided_shape = &input.shape_;
+    *provided_shape = input.shape_;
   }
   return nic::Error::Success;
 }
@@ -332,7 +334,8 @@ DataLoader::ReadInputTensorData(
                 D.decode(encoded.c_str(), encoded.length(), &it->second[0]);
             it->second.resize(size);
 
-            int64_t batch1_byte = ByteSize(input.second.shape_, input.second.datatype_);;
+            int64_t batch1_byte =
+                ByteSize(input.second.shape_, input.second.datatype_);
             if (batch1_byte > 0 && (size_t)batch1_byte != it->second.size()) {
               return nic::Error(
                   "mismatch in the data provided. "

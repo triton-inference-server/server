@@ -132,8 +132,7 @@ class LoadManager {
   /// \param step_index The step index to use for next data
   /// \return Error object indicating success or failure.
   nic::Error UpdateInputs(
-      const std::vector<nic::InferInput*>& inputs, int stream_index,
-      int step_index);
+      std::vector<nic::InferInput*>& inputs, int stream_index, int step_index);
 
   void InitNewSequence(int sequence_id);
 

@@ -221,18 +221,18 @@ LoadManager::InitManagerInputs(
       RETURN_IF_ERROR(
           data_loader_->ReadDataFromDir(parser_->Inputs(), user_data[0]));
     } else {
-       using_json_data_ = true;
-       for (const auto& json_file : user_data) {
-         RETURN_IF_ERROR(
-             data_loader_->ReadDataFromJSON(parser_->Inputs(), json_file));
-       }
-       std::cout << " Successfully read data for "
-                 << data_loader_->GetDataStreamsCount() << " stream/streams";
-       if (data_loader_->GetDataStreamsCount() == 1) {
-         std::cout << " with " << data_loader_->GetTotalSteps(0)
-                   << " step/steps";
-       }
-       std::cout << "." << std::endl;
+      using_json_data_ = true;
+      for (const auto& json_file : user_data) {
+        RETURN_IF_ERROR(
+            data_loader_->ReadDataFromJSON(parser_->Inputs(), json_file));
+      }
+      std::cout << " Successfully read data for "
+                << data_loader_->GetDataStreamsCount() << " stream/streams";
+      if (data_loader_->GetDataStreamsCount() == 1) {
+        std::cout << " with " << data_loader_->GetTotalSteps(0)
+                  << " step/steps";
+      }
+      std::cout << "." << std::endl;
     }
   } else {
     RETURN_IF_ERROR(data_loader_->GenerateData(
@@ -452,13 +452,11 @@ LoadManager::PrepareInfer(InferContextMetaData* ctx)
     const uint8_t* data_ptr;
     size_t batch1_bytesize;
     // Set input shape before getting the input data
-    std::vector<int64_t>* shape = nullptr;
-    RETURN_IF_ERROR(data_loader_->GetInputShape(
-        input.second, 0, 0,
-        (const_cast<const std::vector<int64_t>**>(&shape))));
-    if (shape != nullptr) {
+    std::vector<int64_t> shape;
+    RETURN_IF_ERROR(data_loader_->GetInputShape(input.second, 0, 0, &shape));
+    if (!shape.empty()) {
       if ((parser_->MaxBatchSize() != 0) && (!input.second.is_shape_tensor_)) {
-        shape->insert(shape->begin(), (int64_t)batch_size_);
+        shape.insert(shape.begin(), (int64_t)batch_size_);
       }
     } else {
       return nic::Error("unable to set shape for the input");
@@ -466,7 +464,7 @@ LoadManager::PrepareInfer(InferContextMetaData* ctx)
 
     nic::InferInput* infer_input;
     RETURN_IF_ERROR(nic::InferInput::Create(
-        &infer_input, input.first, *shape, input.second.datatype_));
+        &infer_input, input.first, shape, input.second.datatype_));
 
     RETURN_IF_ERROR(data_loader_->GetInputData(
         input.second, 0, 0, &data_ptr, &batch1_bytesize));
@@ -546,11 +544,10 @@ LoadManager::PrepareSharedMemoryInfer(
 }
 */
 
-#if 0
+
 nic::Error
 LoadManager::UpdateInputs(
-    const std::vector<nic::InferInput*>& inputs, int stream_index,
-    int step_index)
+    std::vector<nic::InferInput*>& inputs, int stream_index, int step_index)
 {
   // Validate update parameters here
   size_t data_stream_count = data_loader_->GetDataStreamsCount();
@@ -586,41 +583,46 @@ LoadManager::SetInputs(
   for (const auto& input : inputs) {
     RETURN_IF_ERROR(input->Reset());
 
+    const auto& model_input = (*(parser_->Inputs()))[input->Name()];
+
     const uint8_t* data_ptr;
     size_t batch1_bytesize;
     const int* set_shape_values = nullptr;
     int set_shape_value_cnt = 0;
 
     for (size_t i = 0; i < batch_size_; ++i) {
-      const std::vector<int64_t>* shape = nullptr;
+      std::vector<int64_t> shape;
       RETURN_IF_ERROR(data_loader_->GetInputShape(
-          input, stream_index,
+          model_input, stream_index,
           (step_index + i) % data_loader_->GetTotalSteps(stream_index),
           &shape));
-      if (shape != nullptr) {
+      if (!shape.empty()) {
         if (i == 0) {
-          input->SetShape(*shape);
+          if ((parser_->MaxBatchSize() != 0) &&
+              (!model_input.is_shape_tensor_)) {
+            shape.insert(shape.begin(), (int64_t)batch_size_);
+          }
+          input->SetShape(shape);
         } else {
-          if (!std::equal(
-                  shape->begin(), shape->end(), input->Shape().begin())) {
+          if (!std::equal(shape.begin(), shape.end(), input->Shape().begin())) {
             return nic::Error(
                 "can not batch tensors with different shapes together "
                 "(input '" +
                 input->Name() + "' expected shape " +
                 ShapeVecToString(input->Shape()) + " and received " +
-                ShapeVecToString(*shape));
+                ShapeVecToString(shape));
           }
         }
       }
       RETURN_IF_ERROR(data_loader_->GetInputData(
-          input, 0, (step_index + i) % data_loader_->GetTotalSteps(0),
+          model_input, 0, (step_index + i) % data_loader_->GetTotalSteps(0),
           &data_ptr, &batch1_bytesize));
-      if (!input->IsShapeTensor()) {
-        RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
+      if (!model_input.is_shape_tensor_) {
+        RETURN_IF_ERROR(input->AppendRaw(data_ptr, batch1_bytesize));
       } else {
         if (i == 0) {
           // Set data only once for shape tensors
-          RETURN_IF_ERROR(input->SetRaw(data_ptr, batch1_bytesize));
+          RETURN_IF_ERROR(input->AppendRaw(data_ptr, batch1_bytesize));
           set_shape_values = (const int*)data_ptr;
           set_shape_value_cnt = batch1_bytesize / sizeof(int);
         } else {
@@ -665,7 +667,8 @@ LoadManager::SetInputsSharedMemory(
     RETURN_IF_ERROR(input->Reset());
 
     std::string region_name(
-        TensorToRegionName(input->Name()) + '_' + std::to_string(stream_index) +
+        TensorToRegionName(input->Name()) + '_' + std::to_string(stream_index)
++
         "_" + std::to_string(step_index));
 
     const std::vector<int64_t>* shape = nullptr;
@@ -700,7 +703,6 @@ LoadManager::InitNewSequence(int sequence_id)
             sequence_stat_[sequence_id]->data_stream_id_);
   }
 }
-#endif
 
 size_t
 LoadManager::GetRandomLength(double offset_ratio)

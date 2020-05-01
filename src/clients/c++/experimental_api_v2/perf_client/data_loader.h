@@ -101,7 +101,7 @@ class DataLoader {
   /// Returns error object indicating status
   nic::Error GetInputShape(
       const ModelTensor& input, const int stream_id, const int step_id,
-      const std::vector<int64_t>** shape);
+      std::vector<int64_t>* shape);
 
  private:
   /// Helper function to read data for the specified input from json
@@ -111,8 +111,7 @@ class DataLoader {
   /// \param step_index the step index the data should be exported to.
   /// Returns error object indicating status
   nic::Error ReadInputTensorData(
-      const rapidjson::Value& step,
-      std::shared_ptr<ModelTensorMap> inputs,
+      const rapidjson::Value& step, std::shared_ptr<ModelTensorMap> inputs,
       int stream_index, int step_index);
 
 
