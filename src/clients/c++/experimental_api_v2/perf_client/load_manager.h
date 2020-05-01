@@ -114,17 +114,15 @@ class LoadManager {
   /// \return Error object indicating success or failure.
   nic::Error PrepareInfer(InferContextMetaData* ctx);
 
-  /*
-    /// Helper function to prepare the InferContext for sending inference
-    request
-    /// in shared memory.
-    /// \param ctx Returns a new InferContext.
-    /// \param options
-    /// Returns the options used by 'ctx'.
-    nic::Error PrepareSharedMemoryInfer(
-        std::unique_ptr<nic::InferContext>* ctx,
-        std::unique_ptr<nic::InferContext::Options>* options);
-  */
+
+  /// Helper function to prepare the InferContext for sending inference
+  /// request
+  /// in shared memory.
+  /// \param ctx Returns a new InferContext.
+  /// \param options
+  /// Returns the options used by 'ctx'.
+  nic::Error PrepareSharedMemoryInfer(InferContextMetaData* ctx);
+
 
   /// Updates the input data to use for inference request
   /// \param inputs The inputs to the model
@@ -154,16 +152,15 @@ class LoadManager {
   nic::Error SetInputs(
       const std::vector<nic::InferInput*>& inputs, const int stream_index,
       const int step_index);
-  /*
-    /// Helper function to update the shared memory inputs
-    /// \param inputs The inputs to the model
-    /// \param stream_index The data stream to use for next data
-    /// \param step_index The step index to use for next data
-    /// \return Error object indicating success or failure.
-    nic::Error SetInputsSharedMemory(
-        const std::vector<nic::InferInput*>& inputs,
-        const int stream_index, const int step_index);
-  */
+
+  /// Helper function to update the shared memory inputs
+  /// \param inputs The inputs to the model
+  /// \param stream_index The data stream to use for next data
+  /// \param step_index The step index to use for next data
+  /// \return Error object indicating success or failure.
+  nic::Error SetInputsSharedMemory(
+      const std::vector<nic::InferInput*>& inputs, const int stream_index,
+      const int step_index);
 
  protected:
   bool async_;

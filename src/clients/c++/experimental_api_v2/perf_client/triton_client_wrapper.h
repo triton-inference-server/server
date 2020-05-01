@@ -84,6 +84,16 @@ class TritonClientWrapper {
       const std::string& model_name = "",
       const std::string& model_version = "");
 
+  // Implement these
+  nic::Error UnregisterAllSharedMemory();
+
+  nic::Error RegisterSystemSharedMemory(
+      const std::string& name, const std::string& key, const size_t byte_size);
+
+  nic::Error RegisterCudaSharedMemory(
+      const std::string& name, const cudaIpcMemHandle_t& handle,
+      const size_t byte_size);
+
  private:
   TritonClientWrapper(
       const ProtocolType protocol, const nic::Headers& http_headers)

@@ -54,10 +54,10 @@ ConcurrencyManager::Create(
   RETURN_IF_ERROR(local_manager->InitManagerInputs(
       string_length, string_data, zero_input, user_data));
 
-  // if (local_manager->shared_memory_type_ !=
-  //    SharedMemoryType::NO_SHARED_MEMORY) {
-  //  RETURN_IF_ERROR(local_manager->InitSharedMemory());
-  //}
+  if (local_manager->shared_memory_type_ !=
+      SharedMemoryType::NO_SHARED_MEMORY) {
+    RETURN_IF_ERROR(local_manager->InitSharedMemory());
+  }
 
   *manager = std::move(local_manager);
 
@@ -213,8 +213,7 @@ ConcurrencyManager::Infer(
       if (shared_memory_type_ == SharedMemoryType::NO_SHARED_MEMORY) {
         thread_stat->status_ = PrepareInfer(ctxs.back().get());
       } else {
-        // thread_stat->status_ =
-        //    PrepareSharedMemoryInfer(&(ctxs.back()->ctx_), &options);
+        thread_stat->status_ = PrepareSharedMemoryInfer(ctxs.back().get());
       }
       if (!thread_stat->status_.IsOk()) {
         return;

@@ -176,6 +176,57 @@ TritonClientWrapper::ModelInferenceStatistics(
   return nic::Error::Success;
 }
 
+nic::Error
+TritonClientWrapper::UnregisterAllSharedMemory()
+{
+  if (protocol_ == ProtocolType::GRPC) {
+    RETURN_IF_ERROR(
+        client_.grpc_client_->UnregisterSystemSharedMemory("", http_headers_));
+    RETURN_IF_ERROR(
+        client_.grpc_client_->UnregisterCudaSharedMemory("", http_headers_));
+  } else {
+    RETURN_IF_ERROR(
+        client_.http_client_->UnregisterSystemSharedMemory("", http_headers_));
+    RETURN_IF_ERROR(
+        client_.http_client_->UnregisterCudaSharedMemory("", http_headers_));
+  }
+
+  return nic::Error::Success;
+}
+
+nic::Error
+TritonClientWrapper::RegisterSystemSharedMemory(
+    const std::string& name, const std::string& key, const size_t byte_size)
+{
+  if (protocol_ == ProtocolType::GRPC) {
+    RETURN_IF_ERROR(client_.grpc_client_->RegisterSystemSharedMemory(
+        name, key, byte_size, 0 /* offset */, http_headers_));
+
+  } else {
+    RETURN_IF_ERROR(client_.http_client_->RegisterSystemSharedMemory(
+        name, key, byte_size, 0 /* offset */, http_headers_));
+  }
+
+  return nic::Error::Success;
+}
+
+nic::Error
+TritonClientWrapper::RegisterCudaSharedMemory(
+    const std::string& name, const cudaIpcMemHandle_t& handle,
+    const size_t byte_size)
+{
+  if (protocol_ == ProtocolType::GRPC) {
+    RETURN_IF_ERROR(client_.grpc_client_->RegisterCudaSharedMemory(
+        name, handle, 0 /*device id*/, byte_size, http_headers_));
+
+  } else {
+    RETURN_IF_ERROR(client_.http_client_->RegisterCudaSharedMemory(
+        name, handle, 0 /*device id*/, byte_size, http_headers_));
+  }
+
+  return nic::Error::Success;
+}
+
 void
 TritonClientWrapper::ParseStatistics(
     ni::ModelStatisticsResponse& infer_stat,
