@@ -81,7 +81,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-grep "plan_float32_float32_float32_max" $SERVER_LOG | grep "stream priority -1"
+grep "plan_float32_float32_float32_max" $SERVER_LOG | grep "stream priority -2"
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected MAX priority -1\n***"
     RET=1
@@ -101,6 +101,7 @@ wait $SERVER_PID
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
+    cat $SERVER_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
