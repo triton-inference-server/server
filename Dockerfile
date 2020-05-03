@@ -356,18 +356,20 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
 RUN apt-get update && \
     if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
+                libb64-0d \
                 libcurl3-dev \
+                libgoogle-glog0v5 \
                 libre2-1v5; \
     elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
+                libb64-0d \
                 libcurl4-openssl-dev \
+                libgoogle-glog0v5 \
                 libre2-4; \
     else \
         echo "Ubuntu version must be either 16.04 or 18.04" && \
         exit 1; \
     fi && \
-    # Install common libraries for 18.04 and 16.04 (Including h2o dependencies)
-    apt-get install -y --no-install-recommends libgoogle-glog0v5 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/tritonserver

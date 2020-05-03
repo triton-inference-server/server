@@ -262,7 +262,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               curl \
                               jmeter \
                               jmeter-http \
-                              libb64-dev \
                               libopencv-dev \
                               libopencv-core-dev \
                               libzmq3-dev \
