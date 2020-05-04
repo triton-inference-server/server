@@ -760,7 +760,8 @@ CommonHandler::SetUpAllRequests()
             infer_stats_json["compute_infer"]["ns"].GetUint64());
         statistics->mutable_inference_stats()
             ->mutable_compute_output()
-            ->set_count(infer_stats_json["compute_output"]["count"].GetUint64());
+            ->set_count(
+                infer_stats_json["compute_output"]["count"].GetUint64());
         statistics->mutable_inference_stats()->mutable_compute_output()->set_ns(
             infer_stats_json["compute_output"]["ns"].GetUint64());
       }
