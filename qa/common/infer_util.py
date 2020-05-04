@@ -646,8 +646,9 @@ def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input
 
 # Perform inference using a "nop" model that expects some form or
 # zero-sized input/output tensor.
+# Turn on gRPC once zero size tensors support is fixed.
 def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes,
-               model_version=None, use_http=True, use_grpc=True,
+               model_version=None, use_http=True, use_grpc=False,
                use_http_json_tensors=True, use_streaming=False, shm_region_name_prefix=None,
                use_system_shared_memory=False, use_cuda_shared_memory=False,
                priority=0, timeout_us=0):
