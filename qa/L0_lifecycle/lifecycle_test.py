@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,30 +36,30 @@ import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
-from tensorrtserver.api import *
-import tensorrtserver.api.server_status_pb2 as server_status
+import tritongrpcclient.core as grpcclient
+import tritongrpcclient.utils as grpcclientutils
+import tritonhttpclient.core as httpclient
+import tritonhttpclient.utils as httpclientutils
 
 class LifeCycleTest(unittest.TestCase):
-    def _infer_unaffected_models(self, model_base_names, tensor_shape):
-        try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                for base_name in model_base_names:
-                    model_name = tu.get_model_name(base_name, np.float32, np.float32, np.float32)
-                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                    ss = ctx.get_server_status()
+    def _infer_success_models(self, model_base_names, versions, tensor_shape, swap=False):
+        for base_name in model_base_names:
+            try:
+                model_name = tu.get_model_name(base_name, np.float32, np.float32, np.float32)
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                        self.assertTrue(triton_client.is_server_live())
+                        # FIXME is_server_ready should be true here DLIS-1296
+                        # self.assertTrue(triton_client.is_server_ready())
+                        for v in versions:
+                            self.assertTrue(triton_client.is_model_ready(model_name, str(v)))
 
-                    self.assertEqual(len(ss.model_status), 1)
-                    self.assertTrue(model_name in ss.model_status,
-                                    "expected status for model " + model_name)
-                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
-
+                for v in versions:
                     iu.infer_exact(self, base_name, tensor_shape, 1,
                                    np.float32, np.float32, np.float32,
-                                   model_version=1)
-
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+                                   model_version=v, swap=(swap or (v == 3)))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_parse_error_noexit(self):
         # Server was started with invalid args and
@@ -67,394 +67,288 @@ class LifeCycleTest(unittest.TestCase):
         # SERVER_FAILED_TO_INITIALIZE status.
         # --strict-readiness=false so server is not live and not ready
         try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], None, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_FAILED_TO_INITIALIZE, ss.ready_state)
-                self.assertEqual(len(ss.model_status), 0)
-                uptime = ss.uptime_ns
-                self.assertGreater(uptime, 0)
-
-                hctx = ServerHealthContext(pair[0], pair[1], True)
-                self.assertFalse(hctx.is_ready())
-                self.assertFalse(hctx.is_live())
-
-        except InferenceServerException as ex:
+            triton_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
+            self.assertFalse(triton_client.is_server_live())
+            self.assertFalse(triton_client.is_server_ready())
+            md = triton_client.get_server_metadata()
+            self.assertEqual(os.environ["TRITON_SERVER_VERSION"], md.version)
+            self.assertEqual("inference:0", md.name)
+        except grpcclientutils.InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-    def test_parse_error_noexit_strict(self):
-        # Server was started with invalid args and
-        # --exit-on-error=false so expect it to be running with
-        # SERVER_FAILED_TO_INITIALIZE status.
-        # --strict-readiness=false so server is not live and not ready
         try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], None, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_FAILED_TO_INITIALIZE, ss.ready_state)
-                self.assertEqual(len(ss.model_status), 0)
-                uptime = ss.uptime_ns
-                self.assertGreater(uptime, 0)
-
-                hctx = ServerHealthContext(pair[0], pair[1], True)
-                self.assertFalse(hctx.is_ready())
-                self.assertFalse(hctx.is_live())
-
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
-
-    def test_parse_error_no_model_config(self):
-        # --strict-readiness=true so server is live but not ready
-        input_size = 16
-        tensor_shape = (input_size,)
-
-        # Server was started but with a model that fails to be polled
-        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-            try:
-                model_name = tu.get_model_name('graphdef', np.float32, np.float32, np.float32)
-
-                hctx = ServerHealthContext(pair[0], pair[1], True)
-                # Server is ready which is different from other modelfail tests
-                # as the models failed to be polled will be ignored
-                self.assertTrue(hctx.is_ready())
-                self.assertTrue(hctx.is_live())
-
-                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                ss = ctx.get_server_status()
-
-                self.assertTrue(False,
-                                 "expected model '" + model_name + "' to be ignored due to polling failure")
-
-            except InferenceServerException as ex:
-                self.assertEqual("inference:0", ex.server_id())
-                self.assertTrue(
-                    ex.message().startswith(
-                        "no status available for unknown model 'graphdef_float32_float32_float32'"))
-
-        # And other models should be loaded successfully
-        try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                for base_name in ["savedmodel", 'netdef']:
-                    model_name = tu.get_model_name(base_name, np.float32, np.float32, np.float32)
-                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                    ss = ctx.get_server_status()
-
-                    self.assertEqual(len(ss.model_status), 1)
-                    self.assertTrue(model_name in ss.model_status,
-                                    "expected status for model " + model_name)
-                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
-
-                    iu.infer_exact(self, base_name, tensor_shape, 1,
-                                   np.float32, np.float32, np.float32,
-                                   model_version=1)
-
-        except InferenceServerException as ex:
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            self.assertFalse(triton_client.is_server_live())
+            self.assertFalse(triton_client.is_server_ready())
+            md = triton_client.get_server_metadata()
+            self.assertEqual(os.environ["TRITON_SERVER_VERSION"], md['version'])
+            self.assertEqual("inference:0", md['name'])
+        except httpclientutils.InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_parse_error_modelfail(self):
         # --strict-readiness=true so server is live but not ready
-        input_size = 16
-        tensor_shape = (input_size,)
+        tensor_shape = (1, 16)
 
         # Server was started but with a model that fails to load
         try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                model_name = tu.get_model_name('graphdef', np.float32, np.float32, np.float32)
-                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                uptime = ss.uptime_ns
-                self.assertGreater(uptime, 0)
+            model_name = tu.get_model_name('graphdef', np.float32, np.float32, np.float32)
 
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(model_name in ss.model_status,
-                                "expected status for model " + model_name)
-                for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                    self.assertEqual(v.ready_state, server_status.MODEL_UNAVAILABLE)
-                    self.assertNotEqual(len(v.ready_state_reason.message), 0,
-                        "expected non-empty message for load failure")
+            triton_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
+            self.assertTrue(triton_client.is_server_live())
+            self.assertFalse(triton_client.is_server_ready())
+            self.assertFalse(triton_client.is_model_ready(model_name, "1"))
 
-                hctx = ServerHealthContext(pair[0], pair[1], True)
-                self.assertFalse(hctx.is_ready())
-                self.assertTrue(hctx.is_live())
-
-        except InferenceServerException as ex:
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            self.assertTrue(triton_client.is_server_live())
+            self.assertFalse(triton_client.is_server_ready())
+            self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
+        # Inferencing with the missing model should fail.
         try:
-            iu.infer_exact(self, 'graphdef', tensor_shape, 1,
-                           np.float32, np.float32, np.float32)
+            iu.infer_exact(self, 'graphdef', tensor_shape, 1, np.float32, np.float32, np.float32)
             self.assertTrue(False, "expected error for unavailable model " + model_name)
-        except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
+        except Exception as ex:
             self.assertTrue(
                 ex.message().startswith(
                     "Request for unknown model 'graphdef_float32_float32_float32'"))
 
         # And other models should be loaded successfully
         try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                for base_name in ["savedmodel", 'netdef']:
+            for base_name in ["savedmodel", 'netdef']:
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                     model_name = tu.get_model_name(base_name, np.float32, np.float32, np.float32)
-                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                    ss = ctx.get_server_status()
+                    self.assertTrue(triton_client.is_model_ready(model_name, "1"))
 
-                    self.assertEqual(len(ss.model_status), 1)
-                    self.assertTrue(model_name in ss.model_status,
-                                    "expected status for model " + model_name)
-                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
+                iu.infer_exact(self, base_name, tensor_shape, 1,
+                               np.float32, np.float32, np.float32,
+                               model_version=1)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
-                    iu.infer_exact(self, base_name, tensor_shape, 1,
-                                   np.float32, np.float32, np.float32,
-                                   model_version=1)
+    def test_parse_error_no_model_config(self):
+        tensor_shape = (1, 16)
 
-        except InferenceServerException as ex:
+        # Server was started but with a model that fails to be polled
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+            try:
+                model_name = tu.get_model_name('graphdef', np.float32, np.float32, np.float32)
+
+                # expecting ready because not strict readiness
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+
+                md = triton_client.get_model_metadata(model_name, "1")
+                self.assertTrue(False,
+                                "expected model '" + model_name + "' to be ignored due to polling failure")
+
+            except Exception as ex:
+                self.assertTrue(
+                    ex.message().startswith(
+                        "Request for unknown model 'graphdef_float32_float32_float32'"))
+
+        # And other models should be loaded successfully
+        try:
+            for base_name in ["savedmodel", 'netdef']:
+                model_name = tu.get_model_name(base_name, np.float32, np.float32, np.float32)
+                self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+
+                iu.infer_exact(self, base_name, tensor_shape, 1,
+                               np.float32, np.float32, np.float32,
+                               model_version=1)
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_init_error_modelfail(self):
         # --strict-readiness=true so server is live but not ready
 
         # Server was started but with models that fail to load
-        try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+            try:
+                self.assertTrue(triton_client.is_server_live())
+                self.assertFalse(triton_client.is_server_ready())
+
                 # one model uses sequence batcher while the other uses dynamic batcher
                 model_names = ["custom_sequence_int32", "custom_int32_int32_int32"]
                 for model_name in model_names:
-                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                    ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                    self.assertEqual("inference:0", ss.id)
-                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                    uptime = ss.uptime_ns
-                    self.assertGreater(uptime, 0)
+                    self.assertFalse(triton_client.is_model_ready(model_name))
 
-                    self.assertEqual(len(ss.model_status), 1)
-                    self.assertTrue(model_name in ss.model_status,
-                                    "expected status for model " + model_name)
-                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                        self.assertEqual(v.ready_state, server_status.MODEL_UNAVAILABLE)
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
-                hctx = ServerHealthContext(pair[0], pair[1], True)
-                self.assertFalse(hctx.is_ready())
-                self.assertTrue(hctx.is_live())
-
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
-
-        # And other models should be loaded successfully
-        input_size = 16
-        tensor_shape = (input_size,)
-        try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+            # And other models should be loaded successfully
+            try:
                 for base_name in ["graphdef", "savedmodel", 'netdef']:
                     model_name = tu.get_model_name(base_name, np.float32, np.float32, np.float32)
-                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                    ss = ctx.get_server_status()
+                    self.assertTrue(triton_client.is_model_ready(model_name))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
-                    self.assertEqual(len(ss.model_status), 1)
-                    self.assertTrue(model_name in ss.model_status,
-                                    "expected status for model " + model_name)
-                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
-
-                    iu.infer_exact(self, base_name, tensor_shape, 1,
-                                   np.float32, np.float32, np.float32,
-                                   model_version=1)
-
-        except InferenceServerException as ex:
+        try:
+            tensor_shape = (1, 16)
+            for base_name in ["graphdef", "savedmodel", 'netdef']:
+                iu.infer_exact(self, base_name, tensor_shape, 1,
+                               np.float32, np.float32, np.float32,
+                               model_version=1)
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_parse_error_model_no_version(self):
         # --strict-readiness=true so server is live but not ready
-        input_size = 16
-        tensor_shape = (input_size,)
+        tensor_shape = (1, 16)
 
         # Server was started but with a model that fails to load
-        try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+            try:
+                self.assertTrue(triton_client.is_server_live())
+                self.assertFalse(triton_client.is_server_ready())
+
                 model_name = tu.get_model_name('graphdef', np.float32, np.float32, np.float32)
-                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                uptime = ss.uptime_ns
-                self.assertGreater(uptime, 0)
+                self.assertFalse(triton_client.is_model_ready(model_name))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(model_name in ss.model_status,
-                                "expected status for model " + model_name)
-                self.assertEqual(len(ss.model_status[model_name].version_status), 0,
-                                "expected no version for model " + model_name)
+            # Sanity check that other models are loaded properly
+            try:
+                for base_name in ["savedmodel", "netdef"]:
+                    model_name = tu.get_model_name(base_name, np.float32, np.float32, np.float32)
+                    self.assertTrue(triton_client.is_model_ready(model_name))
+                for version in ["1", "3"]:
+                    model_name = tu.get_model_name("plan", np.float32, np.float32, np.float32)
+                    self.assertTrue(triton_client.is_model_ready(model_name, version))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
-                hctx = ServerHealthContext(pair[0], pair[1], True)
-                self.assertFalse(hctx.is_ready())
-                self.assertTrue(hctx.is_live())
-
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
-
-        # Sanity check that other models are loaded properly
         try:
-            for model_name in ["savedmodel", "netdef"]:
-                iu.infer_exact(self, model_name, tensor_shape, 1,
+            for base_name in ["savedmodel", "netdef"]:
+                iu.infer_exact(self, base_name, tensor_shape, 1,
                                np.float32, np.float32, np.float32, swap=True)
             for version in [1, 3]:
-                iu.infer_exact(self, 'plan', (input_size,), 1,
+                iu.infer_exact(self, 'plan', tensor_shape, 1,
                                np.float32, np.float32, np.float32,
                                swap=(version == 3), model_version=version)
-        except InferenceServerException as ex:
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         try:
             iu.infer_exact(self, 'graphdef', tensor_shape, 1,
                            np.float32, np.float32, np.float32)
             self.assertTrue(False, "expected error for unavailable model " + model_name)
-        except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
+        except Exception as ex:
             self.assertTrue(
                 ex.message().startswith(
                     "Request for unknown model 'graphdef_float32_float32_float32'"))
 
     def test_parse_ignore_zero_prefixed_version(self):
-        input_size = 16
-        tensor_shape = (input_size,)
+        tensor_shape = (1, 16)
 
         # Server was started but only version 1 is loaded
-        try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                model_name = tu.get_model_name('savedmodel', np.float32, np.float32, np.float32)
-                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                uptime = ss.uptime_ns
-                self.assertGreater(uptime, 0)
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+            try:
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
 
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(model_name in ss.model_status,
-                                "expected status for model " + model_name)
-                self.assertEqual(len(ss.model_status[model_name].version_status), 1,
-                                "expected only one version for model " + model_name)
-                version_status = ss.model_status[model_name].version_status[1]
-                self.assertEqual(version_status.ready_state, server_status.MODEL_READY)
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+                model_name = tu.get_model_name('savedmodel', np.float32, np.float32, np.float32)
+                self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
         try:
             # swap=False for version 1
             iu.infer_exact(self, 'savedmodel', tensor_shape, 1,
                            np.float32, np.float32, np.float32, swap=False)
-        except InferenceServerException as ex:
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_dynamic_model_load_unload(self):
-        input_size = 16
-        tensor_shape = (input_size,)
+        tensor_shape = (1, 16)
         savedmodel_name = tu.get_model_name('savedmodel', np.float32, np.float32, np.float32)
         netdef_name = tu.get_model_name('netdef', np.float32, np.float32, np.float32)
 
         # Make sure savedmodel model is not in the status (because
         # initially it is not in the model repository)
-        try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
-                ss = ctx.get_server_status()
-                self.assertTrue(False, "expected status failure for " + savedmodel_name)
-        except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
-            self.assertTrue(
-                ex.message().startswith("no status available for unknown model"))
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+            try:
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Add savedmodel model to the model repository and give it time to
         # load. Make sure that it has a status and is ready.
         try:
             shutil.copytree(savedmodel_name, "models/" + savedmodel_name)
             time.sleep(5) # wait for model to load
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(savedmodel_name in ss.model_status,
-                                "expected status for model " + savedmodel_name)
-                for (k, v) in iteritems(ss.model_status[savedmodel_name].version_status):
-                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
-        except InferenceServerException as ex:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_model_ready(savedmodel_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(savedmodel_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "3"))
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Run inference on the just loaded model
         try:
             iu.infer_exact(self, 'savedmodel', tensor_shape, 1,
                            np.float32, np.float32, np.float32, swap=True)
-        except InferenceServerException as ex:
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Make sure savedmodel has execution stats in the status.
-        expected_exec_cnt = 0
-        expected_last_timestamp = 0
+        # Make sure savedmodel has execution stats
         try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            stats = triton_client.get_inference_statistics(savedmodel_name)
+            self.assertEqual(len(stats["model_stats"]), 2)
+            for idx in range(len(stats["model_stats"])):
+                self.assertEqual(stats["model_stats"][idx]["name"], savedmodel_name)
+                if stats["model_stats"][idx]["version"] == "1":
+                    self.assertEqual(stats["model_stats"][idx]["inference_stats"]["success"]["count"], 0)
+                else:
+                    self.assertNotEqual(stats["model_stats"][idx]["inference_stats"]["success"]["count"], 0)
 
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(savedmodel_name in ss.model_status,
-                                "expected status for model " + savedmodel_name)
-                self.assertTrue(3 in ss.model_status[savedmodel_name].version_status,
-                                "expected status for version 3 of model " + savedmodel_name)
+            triton_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
+            stats = triton_client.get_inference_statistics(savedmodel_name)
+            self.assertEqual(len(stats.model_stats), 2)
+            for idx in range(len(stats.model_stats)):
+                self.assertEqual(stats.model_stats[idx].name, savedmodel_name)
+                if stats.model_stats[idx].version == "1":
+                    self.assertEqual(stats.model_stats[idx].inference_stats.success.count, 0)
+                else:
+                    self.assertNotEqual(stats.model_stats[idx].inference_stats.success.count, 0)
 
-                version_status = ss.model_status[savedmodel_name].version_status[3]
-                self.assertEqual(version_status.ready_state, server_status.MODEL_READY)
-                self.assertGreater(version_status.model_execution_count, 0)
-                self.assertGreater(version_status.last_inference_timestamp_milliseconds, 0)
-                expected_exec_cnt = version_status.model_execution_count
-                expected_last_timestamp = version_status.last_inference_timestamp_milliseconds
-        except InferenceServerException as ex:
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Remove savedmodel model from the model repository and give it
-        # time to unload. Make sure that it has a status but is
-        # unavailable.
+        # time to unload. Make sure that it is no longer available.
         try:
             shutil.rmtree("models/" + savedmodel_name)
             time.sleep(5) # wait for model to unload
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(savedmodel_name in ss.model_status,
-                                "expected status for model " + savedmodel_name)
-                self.assertTrue(3 in ss.model_status[savedmodel_name].version_status,
-                                "expected status for version 3 of model " + savedmodel_name)
-
-                version_status = ss.model_status[savedmodel_name].version_status[3]
-                self.assertEqual(version_status.ready_state, server_status.MODEL_UNAVAILABLE)
-                self.assertEqual(version_status.ready_state_reason.message, "unloaded",
-                                "expected message \"unloaded\" for unloaded model version")
-                self.assertEqual(version_status.model_execution_count, expected_exec_cnt)
-                self.assertEqual(version_status.last_inference_timestamp_milliseconds,
-                                 expected_last_timestamp)
-        except InferenceServerException as ex:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                # FIXME is_server_ready should be true here DLIS-1296
+                # self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "3"))
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Model is removed so inference should fail
@@ -462,8 +356,7 @@ class LifeCycleTest(unittest.TestCase):
             iu.infer_exact(self, 'savedmodel', tensor_shape, 1,
                            np.float32, np.float32, np.float32, swap=True)
             self.assertTrue(False, "expected error for unavailable model " + savedmodel_name)
-        except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
+        except Exception as ex:
             self.assertTrue(
                 ex.message().startswith(
                     "Request for unknown model 'savedmodel_float32_float32_float32'"))
@@ -472,44 +365,49 @@ class LifeCycleTest(unittest.TestCase):
         try:
             shutil.copytree(savedmodel_name, "models/" + savedmodel_name)
             time.sleep(5) # wait for model to load
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_model_ready(savedmodel_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(savedmodel_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "3"))
 
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(savedmodel_name in ss.model_status,
-                                "expected status for model " + savedmodel_name)
-                for (k, v) in iteritems(ss.model_status[savedmodel_name].version_status):
-                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
-                    self.assertEqual(v.model_execution_count, 0)
-        except InferenceServerException as ex:
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            stats = triton_client.get_inference_statistics(savedmodel_name)
+            self.assertEqual(len(stats["model_stats"]), 2)
+            self.assertEqual(stats["model_stats"][0]["name"], savedmodel_name)
+            self.assertEqual(stats["model_stats"][1]["name"], savedmodel_name)
+            self.assertEqual(stats["model_stats"][0]["inference_stats"]["success"]["count"], 0)
+            self.assertEqual(stats["model_stats"][1]["inference_stats"]["success"]["count"], 0)
+
+            triton_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
+            stats = triton_client.get_inference_statistics(savedmodel_name)
+            self.assertEqual(len(stats.model_stats), 2)
+            self.assertEqual(stats.model_stats[0].name, savedmodel_name)
+            self.assertEqual(stats.model_stats[1].name, savedmodel_name)
+            self.assertEqual(stats.model_stats[0].inference_stats.success.count, 0)
+            self.assertEqual(stats.model_stats[1].inference_stats.success.count, 0)
+
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Remove original model from the model repository and give it time
-        # to unload. Make sure that it has a status but is
-        # unavailable.
+        # Remove netdef model from the model repository and give it
+        # time to unload. Make sure that it is unavailable.
         try:
             shutil.rmtree("models/" + netdef_name)
             time.sleep(5) # wait for model to unload
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], netdef_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(netdef_name in ss.model_status,
-                                "expected status for model " + netdef_name)
-                self.assertTrue(3 in ss.model_status[netdef_name].version_status,
-                                "expected status for version 3 of model " + netdef_name)
-
-                version_status = ss.model_status[netdef_name].version_status[3]
-                self.assertEqual(version_status.ready_state, server_status.MODEL_UNAVAILABLE)
-        except InferenceServerException as ex:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                # FIXME is_server_ready should be true here DLIS-1296
+                # self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_model_ready(savedmodel_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(savedmodel_name, "3"))
+                self.assertFalse(triton_client.is_model_ready(netdef_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(netdef_name, "3"))
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Model is removed so inference should fail
@@ -517,79 +415,70 @@ class LifeCycleTest(unittest.TestCase):
             iu.infer_exact(self, 'netdef', tensor_shape, 1,
                            np.float32, np.float32, np.float32, swap=True)
             self.assertTrue(False, "expected error for unavailable model " + netdef_name)
-        except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
+        except Exception as ex:
             self.assertTrue(
                 ex.message().startswith(
                     "Request for unknown model 'netdef_float32_float32_float32'"))
 
     def test_dynamic_model_load_unload_disabled(self):
-        input_size = 16
-        tensor_shape = (input_size,)
+        tensor_shape = (1,16)
         savedmodel_name = tu.get_model_name('savedmodel', np.float32, np.float32, np.float32)
         netdef_name = tu.get_model_name('netdef', np.float32, np.float32, np.float32)
 
         # Make sure savedmodel model is not in the status (because
         # initially it is not in the model repository)
-        try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
-                ss = ctx.get_server_status()
-                self.assertTrue(False, "expected status failure for " + savedmodel_name)
-        except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
-            self.assertGreater(ex.request_id(), 0)
-            self.assertTrue(
-                ex.message().startswith("no status available for unknown model"))
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+            try:
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Add savedmodel model to the model repository and give it time to
         # load. But it shouldn't load because dynamic loading is disabled.
         try:
             shutil.copytree(savedmodel_name, "models/" + savedmodel_name)
             time.sleep(5) # wait for model to load
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
-                ss = ctx.get_server_status()
-                self.assertTrue(False, "expected status failure for " + savedmodel_name)
-        except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
-            self.assertGreater(ex.request_id(), 0)
-            self.assertTrue(
-                ex.message().startswith("no status available for unknown model"))
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "3"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Run inference which should fail because the model isn't there
         try:
             iu.infer_exact(self, 'savedmodel', tensor_shape, 1,
                            np.float32, np.float32, np.float32, swap=True)
             self.assertTrue(False, "expected error for unavailable model " + savedmodel_name)
-        except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
-            self.assertGreater(ex.request_id(), 0)
+        except Exception as ex:
             self.assertTrue(
-                ex.message().startswith("no status available for unknown model"))
+                ex.message().startswith(
+                    "Request for unknown model 'savedmodel_float32_float32_float32'"))
 
         # Remove one of the original models from the model repository.
         # Unloading is disabled so it should remain available in the status.
         try:
             shutil.rmtree("models/" + netdef_name)
             time.sleep(5) # wait for model to unload (but it shouldn't)
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], netdef_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(netdef_name in ss.model_status,
-                                "expected status for model " + netdef_name)
-                self.assertTrue(3 in ss.model_status[netdef_name].version_status,
-                                "expected status for version 3 of model " + netdef_name)
-
-                version_status = ss.model_status[netdef_name].version_status[3]
-                self.assertEqual(version_status.ready_state, server_status.MODEL_READY)
-
-        except InferenceServerException as ex:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(netdef_name, "3"))
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Run inference to make sure model still being served even
@@ -597,31 +486,24 @@ class LifeCycleTest(unittest.TestCase):
         try:
             iu.infer_exact(self, 'netdef', tensor_shape, 1,
                            np.float32, np.float32, np.float32, swap=True)
-        except InferenceServerException as ex:
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_dynamic_version_load_unload(self):
-        input_size = 16
-        tensor_shape = (input_size,)
+        tensor_shape = (1,16)
         graphdef_name = tu.get_model_name('graphdef', np.int32, np.int32, np.int32)
 
         # There are 3 versions. Make sure that all have status and are
         # ready.
         try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(graphdef_name in ss.model_status,
-                                "expected status for model " + graphdef_name)
-                self.assertEqual(len(ss.model_status[graphdef_name].version_status), 3)
-                for (k, v) in iteritems(ss.model_status[graphdef_name].version_status):
-                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
-        except InferenceServerException as ex:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "3"))
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Run inference on version 1 to make sure it is available
@@ -629,59 +511,48 @@ class LifeCycleTest(unittest.TestCase):
             iu.infer_exact(self, 'graphdef', tensor_shape, 1,
                            np.int32, np.int32, np.int32, swap=False,
                            model_version=1)
-        except InferenceServerException as ex:
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Make sure version 1 has execution stats in the status.
-        expected_exec_cnt = 0
-        expected_last_timestamp = 0
+        # Make sure only version 1 has execution stats in the status.
         try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            stats = triton_client.get_inference_statistics(graphdef_name)
+            self.assertEqual(len(stats["model_stats"]), 3)
+            for idx in range(len(stats["model_stats"])):
+                self.assertEqual(stats["model_stats"][idx]["name"], graphdef_name)
+                if stats["model_stats"][idx]["version"] == "1":
+                    self.assertNotEqual(stats["model_stats"][idx]["inference_stats"]["success"]["count"], 0)
+                else:
+                    self.assertEqual(stats["model_stats"][idx]["inference_stats"]["success"]["count"], 0)
 
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(graphdef_name in ss.model_status,
-                                "expected status for model " + graphdef_name)
-                self.assertTrue(1 in ss.model_status[graphdef_name].version_status,
-                                "expected status for version 1 of model " + graphdef_name)
+            triton_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
+            stats = triton_client.get_inference_statistics(graphdef_name)
+            self.assertEqual(len(stats.model_stats), 3)
+            for idx in range(len(stats.model_stats)):
+                self.assertEqual(stats.model_stats[idx].name, graphdef_name)
+                if stats.model_stats[idx].version == "1":
+                    self.assertNotEqual(stats.model_stats[idx].inference_stats.success.count, 0)
+                else:
+                    self.assertEqual(stats.model_stats[idx].inference_stats.success.count, 0)
 
-                version_status = ss.model_status[graphdef_name].version_status[1]
-                self.assertEqual(version_status.ready_state, server_status.MODEL_READY)
-                self.assertGreater(version_status.model_execution_count, 0)
-                self.assertGreater(version_status.last_inference_timestamp_milliseconds, 0)
-                expected_exec_cnt = version_status.model_execution_count
-                expected_last_timestamp = version_status.last_inference_timestamp_milliseconds
-        except InferenceServerException as ex:
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Remove version 1 from the model repository and give it time to
-        # unload. Make sure that it has a status but is unavailable.
+        # unload. Make sure that it is unavailable.
         try:
             shutil.rmtree("models/" + graphdef_name + "/1")
             time.sleep(5) # wait for version to unload
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(graphdef_name in ss.model_status,
-                                "expected status for model " + graphdef_name)
-                self.assertTrue(1 in ss.model_status[graphdef_name].version_status,
-                                "expected status for version 1 of model " + graphdef_name)
-
-                version_status = ss.model_status[graphdef_name].version_status[1]
-                self.assertEqual(version_status.ready_state, server_status.MODEL_UNAVAILABLE)
-                self.assertEqual(version_status.model_execution_count, expected_exec_cnt)
-                self.assertEqual(version_status.last_inference_timestamp_milliseconds,
-                                 expected_last_timestamp)
-        except InferenceServerException as ex:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                # FIXME is_server_ready should be true here DLIS-1296
+                # self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(triton_client.is_model_ready(graphdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "3"))
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Version is removed so inference should fail
@@ -690,69 +561,30 @@ class LifeCycleTest(unittest.TestCase):
                            np.int32, np.int32, np.int32, swap=False,
                            model_version=1)
             self.assertTrue(False, "expected error for unavailable model " + graphdef_name)
-        except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
+        except Exception as ex:
             self.assertTrue(
                 ex.message().startswith(
                     "Request for unknown model 'graphdef_int32_int32_int32'"))
 
-        # Add back the same version. The status/stats should be
-        # retained for versions (note that this is different behavior
-        # than if a model is removed and then added back).
-        try:
-            shutil.copytree("models/" + graphdef_name + "/2",
-                            "models/" + graphdef_name + "/1")
-            time.sleep(5) # wait for model to load
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(graphdef_name in ss.model_status,
-                                "expected status for model " + graphdef_name)
-                self.assertEqual(len(ss.model_status[graphdef_name].version_status), 3)
-                for (k, v) in iteritems(ss.model_status[graphdef_name].version_status):
-                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
-                    if k == 1:
-                        self.assertEqual(v.model_execution_count, expected_exec_cnt)
-                        self.assertEqual(v.last_inference_timestamp_milliseconds,
-                                         expected_last_timestamp)
-                    else:
-                        self.assertEqual(v.model_execution_count, 0)
-                        self.assertEqual(v.last_inference_timestamp_milliseconds, 0)
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
-
-        # Add another version from the model repository.
+        # Add another version to the model repository.
         try:
             shutil.copytree("models/" + graphdef_name + "/2",
                             "models/" + graphdef_name + "/7")
             time.sleep(5) # wait for version to load
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(graphdef_name in ss.model_status,
-                                "expected status for model " + graphdef_name)
-                self.assertTrue(7 in ss.model_status[graphdef_name].version_status,
-                                "expected status for version 7 of model " + graphdef_name)
-
-                self.assertEqual(len(ss.model_status[graphdef_name].version_status), 4)
-                for (k, v) in iteritems(ss.model_status[graphdef_name].version_status):
-                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
-        except InferenceServerException as ex:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                # FIXME is_server_ready should be true here DLIS-1296
+                # self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(triton_client.is_model_ready(graphdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "7"))
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_dynamic_version_load_unload_disabled(self):
-        input_size = 16
-        tensor_shape = (input_size,)
+        tensor_shape = (1,16)
         graphdef_name = tu.get_model_name('graphdef', np.int32, np.int32, np.int32)
 
         # Add a new version to the model repository and give it time to
@@ -762,20 +594,15 @@ class LifeCycleTest(unittest.TestCase):
             shutil.copytree("models/" + graphdef_name + "/2",
                             "models/" + graphdef_name + "/7")
             time.sleep(5) # wait for model to load
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(graphdef_name in ss.model_status,
-                                "expected status for model " + graphdef_name)
-                self.assertFalse(7 in ss.model_status[graphdef_name].version_status,
-                                "unexpected status for version 7 of model " + graphdef_name)
-                self.assertEqual(len(ss.model_status[graphdef_name].version_status), 3)
-        except InferenceServerException as ex:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "3"))
+                self.assertFalse(triton_client.is_model_ready(graphdef_name, "7"))
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Remove one of the original versions from the model repository.
@@ -784,23 +611,15 @@ class LifeCycleTest(unittest.TestCase):
         try:
             shutil.rmtree("models/" + graphdef_name + "/1")
             time.sleep(5) # wait for version to unload (but it shouldn't)
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(graphdef_name in ss.model_status,
-                                "expected status for model " + graphdef_name)
-                self.assertTrue(1 in ss.model_status[graphdef_name].version_status,
-                                "expected status for version 1 of model " + graphdef_name)
-
-                self.assertEqual(len(ss.model_status[graphdef_name].version_status), 3)
-                for (k, v) in iteritems(ss.model_status[graphdef_name].version_status):
-                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
-        except InferenceServerException as ex:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(graphdef_name, "3"))
+                self.assertFalse(triton_client.is_model_ready(graphdef_name, "7"))
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Run inference to make sure model still being served even
@@ -809,13 +628,12 @@ class LifeCycleTest(unittest.TestCase):
             iu.infer_exact(self, 'graphdef', tensor_shape, 1,
                            np.int32, np.int32, np.int32, swap=False,
                            model_version=1)
-        except InferenceServerException as ex:
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_dynamic_model_modify(self):
-        input_size = 16
         models_base = ('savedmodel', 'plan')
-        models_shape = ((input_size,), (input_size,))
+        models_shape = ((1, 16), (1, 16))
         models = list()
         for m in models_base:
             models.append(tu.get_model_name(m, np.float32, np.float32, np.float32))
@@ -823,19 +641,13 @@ class LifeCycleTest(unittest.TestCase):
         # Make sure savedmodel and plan are in the status
         for model_name in models:
             try:
-                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                    ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                    self.assertEqual("inference:0", ss.id)
-                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                    self.assertEqual(len(ss.model_status), 1)
-                    self.assertTrue(model_name in ss.model_status,
-                                    "expected status for model " + model_name)
-                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
-            except InferenceServerException as ex:
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+                    self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Run inference on the model, both versions 1 and 3
@@ -845,7 +657,7 @@ class LifeCycleTest(unittest.TestCase):
                     iu.infer_exact(self, model_name, model_shape, 1,
                                    np.float32, np.float32, np.float32, swap=(version == 3),
                                    model_version=version)
-                except InferenceServerException as ex:
+                except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Change the model configuration to use wrong label file
@@ -871,24 +683,14 @@ class LifeCycleTest(unittest.TestCase):
         time.sleep(5) # wait for models to reload
         for model_name in models:
             try:
-                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                    ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                    self.assertEqual("inference:0", ss.id)
-                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                    self.assertEqual(len(ss.model_status), 1)
-                    self.assertTrue(model_name in ss.model_status,
-                                    "expected status for model " + model_name)
-                    self.assertTrue(1 in ss.model_status[model_name].version_status,
-                                    "expected status for version 1 of model " + model_name)
-                    self.assertTrue(3 in ss.model_status[model_name].version_status,
-                                    "expected status for version 3 of model " + model_name)
-                    self.assertEqual(ss.model_status[model_name].version_status[1].ready_state,
-                                     server_status.MODEL_UNAVAILABLE)
-                    self.assertEqual(ss.model_status[model_name].version_status[3].ready_state,
-                                     server_status.MODEL_READY)
-            except InferenceServerException as ex:
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    # FIXME is_server_ready should be true here DLIS-1296
+                    # self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                    self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Attempt inferencing using version 1, should fail since
@@ -899,8 +701,7 @@ class LifeCycleTest(unittest.TestCase):
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1)
                 self.assertTrue(False, "expected error for unavailable model " + model_name)
-            except InferenceServerException as ex:
-                self.assertEqual("inference:0", ex.server_id())
+            except Exception as ex:
                 self.assertTrue(
                     ex.message().startswith("Request for unknown model"))
 
@@ -910,13 +711,12 @@ class LifeCycleTest(unittest.TestCase):
                 iu.infer_exact(self, model_name, model_shape, 1,
                                np.float32, np.float32, np.float32, swap=True,
                                model_version=3)
-            except InferenceServerException as ex:
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_dynamic_file_delete(self):
-        input_size = 16
-        models_base = ('savedmodel',)
-        models_shape = ((input_size,),)
+        models_base = ('savedmodel', 'plan')
+        models_shape = ((1, 16), (1, 16))
         models = list()
         for m in models_base:
             models.append(tu.get_model_name(m, np.float32, np.float32, np.float32))
@@ -924,21 +724,13 @@ class LifeCycleTest(unittest.TestCase):
         # Make sure savedmodel and plan are in the status
         for model_name in models:
             try:
-                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                    ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                    self.assertEqual("inference:0", ss.id)
-                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                    self.assertEqual(len(ss.model_status), 1)
-                    self.assertTrue(model_name in ss.model_status,
-                                    "expected status for model " + model_name)
-                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                        # Only version 1 and 3 are loaded
-                        self.assertTrue(k in (1,3))
-                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
-            except InferenceServerException as ex:
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+                    self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Run inference on the model, both versions 1 and 3
@@ -948,639 +740,411 @@ class LifeCycleTest(unittest.TestCase):
                     iu.infer_exact(self, model_name, model_shape, 1,
                                    np.float32, np.float32, np.float32, swap=(version == 3),
                                    model_version=version)
-                except InferenceServerException as ex:
+                except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Delete model configuration, which cause model to be re-loaded and use autofilled config
+        # Delete model configuration, which cause model to be
+        # re-loaded and use autofilled config, which means that
+        # version policy will be latest and so only version 3 will be
+        # available
         for model_name in models:
             os.remove("models/" + model_name + "/config.pbtxt")
 
         time.sleep(5) # wait for models to reload
         for model_name in models:
             try:
-                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                    ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                    self.assertEqual("inference:0", ss.id)
-                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                    self.assertEqual(len(ss.model_status), 1)
-                    self.assertTrue(model_name in ss.model_status,
-                                    "expected status for model " + model_name)
-                    self.assertTrue(1 in ss.model_status[model_name].version_status,
-                                    "expected status for version 1 of model " + model_name)
-                    self.assertTrue(3 in ss.model_status[model_name].version_status,
-                                    "expected status for version 3 of model " + model_name)
-                    self.assertEqual(ss.model_status[model_name].version_status[1].ready_state,
-                                     server_status.MODEL_UNAVAILABLE)
-                    self.assertEqual(ss.model_status[model_name].version_status[3].ready_state,
-                                     server_status.MODEL_READY)
-            except InferenceServerException as ex:
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    # FIXME is_server_ready should be true here DLIS-1296
+                    # self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                    self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Only version 3 (latest) should work...
-        for version in (3,):
-            for model_name, model_shape in zip(models_base, models_shape):
-                try:
-                    iu.infer_exact(self, model_name, model_shape, 1,
-                                np.float32, np.float32, np.float32, swap=(version != 1),
-                                model_version=version)
-                except InferenceServerException as ex:
-                    self.assertTrue(False, "unexpected error {}".format(ex))
+        for model_name, model_shape in zip(models_base, models_shape):
+            try:
+                iu.infer_exact(self, model_name, model_shape, 1,
+                               np.float32, np.float32, np.float32, swap=True,
+                               model_version=3)
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+            try:
+                iu.infer_exact(self, model_name, model_shape, 1,
+                               np.float32, np.float32, np.float32, swap=False,
+                               model_version=1)
+                self.assertTrue(False, "expected error for unavailable model " + graphdef_name)
+            except Exception as ex:
+                self.assertTrue(ex.message().startswith("Request for unknown model"))
 
     def test_multiple_model_repository_polling(self):
-        input_size = 16
-        model_shape = (input_size,)
-        model_base = 'savedmodel'
-        model_name = tu.get_model_name(model_base, np.float32, np.float32, np.float32)
+        model_shape = (1, 16)
+        savedmodel_name = tu.get_model_name('savedmodel', np.float32, np.float32, np.float32)
 
-        # Make sure savedmodel is in the status
-        try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(model_name in ss.model_status,
-                                "expected status for model " + model_name)
-                for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                    # Only version 1 is loaded
-                    self.assertTrue(k in (1,))
-                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
-
-        # Run inference on the savedmodel
-        try:
-            iu.infer_exact(self, model_base, model_shape, 1,
-                           np.float32, np.float32, np.float32,
-                           model_version=1)
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
-
-        # And other models should be loaded successfully
-        self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
+        # Models should be loaded successfully and infer
+        # successfully. Initially savedmodel only has version 1.
+        self._infer_success_models(["savedmodel",], (1,), model_shape)
+        self._infer_success_models(["graphdef", 'netdef'], (1, 3), model_shape)
 
         # Add the savedmodel to the second model repository, should cause
         # it to be unloaded due to duplication
-        shutil.copytree(model_name, "models_0/" + model_name)
+        shutil.copytree(savedmodel_name, "models_0/" + savedmodel_name)
         time.sleep(5) # wait for models to reload
         try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(model_name in ss.model_status,
-                                "expected status for model " + model_name)
-                for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                    self.assertTrue(k in (1,))
-                    self.assertEqual(v.ready_state, server_status.MODEL_UNAVAILABLE)
-        except InferenceServerException as ex:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                # FIXME is_server_ready should be true here DLIS-1296
+                # self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
+        self._infer_success_models(["graphdef", 'netdef'], (1, 3), model_shape)
 
-        # Remove the savedmodel from the first model repository, the model from
-        # the second model repository should be loaded properly
-        shutil.rmtree("models/" + model_name)
+        # Remove the savedmodel from the first model repository, the
+        # model from the second model repository should be loaded
+        # properly. In the second model repository savedmodel should
+        # have versions 1 and 3.
+        shutil.rmtree("models/" + savedmodel_name)
         time.sleep(5) # wait for model to unload
-        try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(model_name in ss.model_status,
-                                "expected status for model " + model_name)
-                for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                    # Both version 1 and 3 are loaded
-                    self.assertTrue(k in (1,3))
-                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
-
-        # Both version 1 and 3 should work...
-        for version in (1, 3):
-            try:
-                iu.infer_exact(self, model_base, model_shape, 1,
-                            np.float32, np.float32, np.float32, swap=(version != 1),
-                            model_version=version)
-            except InferenceServerException as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-
-        self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
+        self._infer_success_models(["savedmodel", "graphdef", 'netdef'], (1, 3), model_shape)
 
     def test_multiple_model_repository_control(self):
-        # similar to test_multiple_model_repository_control, but the model
-        # polling is controlled by the API
-        input_size = 16
-        model_shape = (input_size,)
-        model_base = 'savedmodel'
-        model_name = tu.get_model_name(model_base, np.float32, np.float32, np.float32)
+        # similar to test_multiple_model_repository_polling, but the
+        # model load/unload is controlled by the API
+        model_shape = (1, 16)
+        savedmodel_name = tu.get_model_name("savedmodel", np.float32, np.float32, np.float32)
         model_bases = ['savedmodel', "graphdef", 'netdef']
 
-        # Make sure the models are not in the status at first and load them
+        # Initially models are not loaded
         for base in model_bases:
-            name = tu.get_model_name(base, np.float32, np.float32, np.float32)
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                try:
-                    ctx = ServerStatusContext(pair[0], pair[1], name, True)
-                    ss = ctx.get_server_status()
-                    self.assertTrue(False, "expected unknown model failure")
-                except InferenceServerException as ex:
-                    self.assertEqual("inference:0", ex.server_id())
-                    self.assertGreater(ex.request_id(), 0)
-                    self.assertTrue(
-                        ex.message().startswith("no status available for unknown model"))
             try:
-                ctx = ModelControlContext("localhost:8000", ProtocolType.HTTP, True)
-                ctx.load(name)
-            except InferenceServerException as ex:
+                model_name = tu.get_model_name(base, np.float32, np.float32, np.float32)
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Add the savedmodel to the second model repository, which doesn't
-        # affect the model state, savedmodel from the first model is still
-        # available
-        shutil.copytree(model_name, "models_0/" + model_name)
-        # Make sure savedmodel is in the status
+        # Load all models, here we use GRPC
+        for base in model_bases:
+            try:
+                model_name = tu.get_model_name(base, np.float32, np.float32, np.float32)
+                triton_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
+                triton_client.load_model(model_name)
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Models should be loaded successfully and infer
+        # successfully. Initially savedmodel only has version 1.
+        self._infer_success_models(["savedmodel",], (1,), model_shape)
+        self._infer_success_models(["graphdef", 'netdef'], (1, 3), model_shape)
+
+        # Add the savedmodel to the second model repository. Because
+        # not polling this doesn't change any model state, all models
+        # are still loaded and available.
+        shutil.copytree(savedmodel_name, "models_0/" + savedmodel_name)
+        self._infer_success_models(["savedmodel",], (1,), model_shape)
+        self._infer_success_models(["graphdef", 'netdef'], (1, 3), model_shape)
+
+        # Reload savedmodel which will cause it to unload because it
+        # is in 2 model repositories. Use HTTP here.
         try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(model_name in ss.model_status,
-                                "expected status for model " + model_name)
-                for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                    # Only version 1 is loaded
-                    self.assertTrue(k in (1,))
-                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
-
-        # Run inference on the savedmodel
-        try:
-            iu.infer_exact(self, model_base, model_shape, 1,
-                           np.float32, np.float32, np.float32,
-                           model_version=1)
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
-
-        # And other models should be loaded successfully
-        self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
-
-        # reload the model which cause the model fails to load
-        try:
-            ctx = ModelControlContext("localhost:8000", ProtocolType.HTTP, True)
-            ctx.load(model_name)
-            self.assertTrue(False, "expected error for loading duplicated model")
-        except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            triton_client.load_model(savedmodel_name)
+        except Exception as ex:
             self.assertTrue(
-                ex.message().startswith("failed to load '{}'".format(model_name)))
+                ex.message().startswith("failed to load '{}'".format(savedmodel_name)))
 
         try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(model_name in ss.model_status,
-                                "expected status for model " + model_name)
-                for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                    self.assertTrue(k in (1,))
-                    self.assertEqual(v.ready_state, server_status.MODEL_UNAVAILABLE)
-        except InferenceServerException as ex:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                # FIXME is_server_ready should be true here DLIS-1296
+                # self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
+        self._infer_success_models(["graphdef", 'netdef'], (1, 3), model_shape)
 
-        # Remove the savedmodel from the first model repository and load again,
-        # the model from the second model repository should be loaded properly
-        shutil.rmtree("models/" + model_name)
+        # Remove the savedmodel from the first model repository and
+        # explicitly load savedmodel. The savedmodel from the second
+        # model repository should be loaded properly. In the second
+        # model repository savedmodel should have versions 1 and 3.
+        shutil.rmtree("models/" + savedmodel_name)
         try:
-            ctx = ModelControlContext("localhost:8000", ProtocolType.HTTP, True)
-            ctx.load(model_name)
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
-        try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(model_name in ss.model_status,
-                                "expected status for model " + model_name)
-                for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                    # Both version 1 and 3 are loaded
-                    self.assertTrue(k in (1,3))
-                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            triton_client.load_model(savedmodel_name)
+        except Exception as ex:
+            self.assertTrue(
+                ex.message().startswith("failed to load '{}'".format(savedmodel_name)))
 
-        # Both version 1 and 3 should work...
-        for version in (1, 3):
-            try:
-                iu.infer_exact(self, model_base, model_shape, 1,
-                            np.float32, np.float32, np.float32, swap=(version != 1),
-                            model_version=version)
-            except InferenceServerException as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-
-        self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
+        self._infer_success_models(["savedmodel", "graphdef", 'netdef'], (1, 3), model_shape)
 
     def test_model_control(self):
-        input_size = 16
-        models_base = ('graphdef',)
-        models_shape = ((input_size,),)
-        models = list()
+        model_shape = (1, 16)
+        savedmodel_name = tu.get_model_name('savedmodel', np.float32, np.float32, np.float32)
+
         ensemble_prefix = "simple_"
-        ensemble_models = list()
-        for m in models_base:
-            model_name = tu.get_model_name(m, np.float32, np.float32, np.float32)
-            models.append(model_name)
-            ensemble_models.append(ensemble_prefix + model_name)
+        ensemble_name = ensemble_prefix + savedmodel_name
 
-        # Make sure the models are not in the status
-        for model_name in (models + ensemble_models):
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                try:
-                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                    ss = ctx.get_server_status()
-                    self.assertTrue(False, "expected unknown model failure")
-                except InferenceServerException as ex:
-                    self.assertEqual("inference:0", ex.server_id())
-                    self.assertGreater(ex.request_id(), 0)
-                    self.assertTrue(
-                        ex.message().startswith("no status available for unknown model"))
-
-        # Load non-existing model
-        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+        # Make sure no models are loaded
+        for model_name in (savedmodel_name, ensemble_name):
             try:
-                ctx = ModelControlContext(pair[0], pair[1], True)
-                ctx.load("unknown_model")
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Load non-existent model
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+            try:
+                triton_client.load_model("unknown_model")
                 self.assertTrue(False, "expected unknown model failure")
-            except InferenceServerException as ex:
-                self.assertEqual("inference:0", ex.server_id())
-                self.assertGreater(ex.request_id(), 0)
+            except Exception as ex:
                 self.assertTrue(
                     ex.message().startswith("failed to load 'unknown_model', no version is available"))
 
-        # Load ensemble model first, the dependent model will be polled and loaded
-        for model_name in models:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                try:
-                    ctx = ModelControlContext(pair[0], pair[1], True)
-                    ctx.load(ensemble_prefix + model_name)
+        # Load ensemble model, the dependent model should be polled and loaded
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            triton_client.load_model(ensemble_name)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
-                    for model in [model_name, ensemble_prefix + model_name]:
-                        ctx = ServerStatusContext(pair[0], pair[1], model, True)
-                        ss = ctx.get_server_status()
-                        self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                        self.assertEqual("inference:0", ss.id)
-                        self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                        self.assertEqual(len(ss.model_status), 1)
-                        self.assertTrue(model in ss.model_status,
-                                        "expected status for model " + model)
-                        self.assertTrue(1 in ss.model_status[model].version_status,
-                                        "expected status for version 1 of model " + model)
-                        self.assertTrue(3 in ss.model_status[model].version_status,
-                                        "expected status for version 3 of model " + model)
-                        self.assertEqual(ss.model_status[model].version_status[1].ready_state,
-                                        server_status.MODEL_READY)
-                        self.assertEqual(ss.model_status[model].version_status[3].ready_state,
-                                        server_status.MODEL_READY)
-                except InferenceServerException as ex:
-                    self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_models(["savedmodel",], (1, 3), model_shape)
+        self._infer_success_models(["simple_savedmodel",], (1, 3), model_shape, swap=True)
 
-        # Delete model configuration, which cause only version 3 to be available
-        # if the models are re-loaded
-        for model_name in models:
+        # Delete model configuration for savedmodel, which will cause
+        # the autofiller to use the latest version policy so that only
+        # version 3 will be available if the models are re-loaded
+        for model_name in (savedmodel_name,):
             os.remove("models/" + model_name + "/config.pbtxt")
 
-        # Run inference on the model, both versions 1 and 3
-        for version in (1, 3):
-            for model_name, model_shape in zip(models_base, models_shape):
-                try:
-                    iu.infer_exact(self, model_name, model_shape, 1,
-                                   np.float32, np.float32, np.float32, swap=(version == 3),
-                                   model_version=version)
-                    # ensemble always swap because it uses latest version (v3)
-                    # of the composing model
-                    iu.infer_exact(self, ensemble_prefix + model_name, model_shape, 1,
-                                   np.float32, np.float32, np.float32, swap=True,
-                                   model_version=version)
-                except InferenceServerException as ex:
-                    self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_models(["savedmodel",], (1, 3), model_shape)
+        self._infer_success_models(["simple_savedmodel",], (1, 3), model_shape, swap=True)
 
-        # Reload models, only version 3 should be available
-        for model_name in models:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                try:
-                    ctx = ModelControlContext(pair[0], pair[1], True)
-                    ctx.load(model_name)
+        # Reload models, only version 3 should be available for savedmodel
+        for model_name in (savedmodel_name, ensemble_name):
+            try:
+                triton_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
+                triton_client.load_model(model_name)
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
-                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                    ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                    self.assertEqual("inference:0", ss.id)
-                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                    self.assertEqual(len(ss.model_status), 1)
-                    self.assertTrue(model_name in ss.model_status,
-                                    "expected status for model " + model_name)
-                    self.assertTrue(1 in ss.model_status[model_name].version_status,
-                                    "expected status for version 1 of model " + model_name)
-                    self.assertTrue(3 in ss.model_status[model_name].version_status,
-                                    "expected status for version 3 of model " + model_name)
-                    self.assertEqual(ss.model_status[model_name].version_status[1].ready_state,
-                                    server_status.MODEL_UNAVAILABLE)
-                    self.assertEqual(ss.model_status[model_name].version_status[3].ready_state,
-                                    server_status.MODEL_READY)
-                except InferenceServerException as ex:
-                    self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_models(["savedmodel",], (3,), model_shape)
+        self._infer_success_models(["simple_savedmodel",], (1, 3), model_shape, swap=True)
+
+        for model_name in (savedmodel_name,):
+            try:
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    # FIXME is_server_ready should be true here DLIS-1296
+                    # self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Unload non-existing model, nothing should happen
-        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
             try:
-                ctx = ModelControlContext(pair[0], pair[1], True)
-                ctx.unload("unknown_model")
-            except InferenceServerException as ex:
+                triton_client.unload_model("unknown_model")
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Unload the depending model, as side effect, the ensemble model will be
         # forced to be unloaded
-        for model_name in models:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                try:
-                    ctx = ModelControlContext(pair[0], pair[1], True)
-                    ctx.unload(model_name)
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            triton_client.unload_model(savedmodel_name)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
-                    for model in [model_name, ensemble_prefix + model_name]:
-                        ctx = ServerStatusContext(pair[0], pair[1], model, True)
-                        ss = ctx.get_server_status()
-                        self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                        self.assertEqual("inference:0", ss.id)
-                        self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                        self.assertEqual(len(ss.model_status), 1)
-                        self.assertTrue(model in ss.model_status,
-                                        "expected status for model " + model)
-                        self.assertTrue(1 in ss.model_status[model].version_status,
-                                        "expected status for version 1 of model " + model)
-                        self.assertTrue(3 in ss.model_status[model].version_status,
-                                        "expected status for version 3 of model " + model)
-                        self.assertEqual(ss.model_status[model].version_status[1].ready_state,
-                                        server_status.MODEL_UNAVAILABLE)
-                        self.assertEqual(ss.model_status[model].version_status[3].ready_state,
-                                        server_status.MODEL_UNAVAILABLE)
-                except InferenceServerException as ex:
-                    self.assertTrue(False, "unexpected error {}".format(ex))
+        for model_name in (savedmodel_name, ensemble_name):
+            try:
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    # FIXME is_server_ready should be true here DLIS-1296
+                    # self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Unload ensemble model, and load the depending model, ensemble should
-        # not be re-evaluated as it is unloaded explicitly
-        for model_name in models:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                try:
-                    ctx = ModelControlContext(pair[0], pair[1], True)
-                    ctx.unload(ensemble_prefix + model_name)
-                    ctx.load(model_name)
+        # Explicitly unload the ensemble and load the depending
+        # model. The ensemble model should not be reloaded because it
+        # was explicitly unloaded.
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            triton_client.unload_model(ensemble_name)
+            triton_client.load_model(savedmodel_name)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
-                    for model in [model_name, ensemble_prefix + model_name]:
-                        ctx = ServerStatusContext(pair[0], pair[1], model, True)
-                        ss = ctx.get_server_status()
-                        self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                        self.assertEqual("inference:0", ss.id)
-                        self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                        self.assertEqual(len(ss.model_status), 1)
-                        self.assertTrue(model in ss.model_status,
-                                        "expected status for model " + model)
-                        # Because the depending model is re-added, the status
-                        # for it will be reset. As a result, version 1 will be
-                        # missing due to version policy becoming latest
-                        if ensemble_prefix not in model:
-                            self.assertFalse(1 in ss.model_status[model].version_status,
-                                            "unexpected status for version 1 of re-added model " + model)
-                        else:
-                            self.assertTrue(1 in ss.model_status[model].version_status,
-                                            "expected status for version 1 of model " + model)
-                            self.assertEqual(ss.model_status[model].version_status[1].ready_state,
-                                            server_status.MODEL_UNAVAILABLE)
+        self._infer_success_models(["savedmodel",], (3,), model_shape)
 
-                        self.assertTrue(3 in ss.model_status[model].version_status,
-                                        "expected status for version 3 of model " + model)
-                        model_status = server_status.MODEL_UNAVAILABLE if ensemble_prefix in model \
-                                            else server_status.MODEL_READY
-                        self.assertEqual(ss.model_status[model].version_status[3].ready_state,
-                                        model_status)
-                except InferenceServerException as ex:
-                    self.assertTrue(False, "unexpected error {}".format(ex))
+        try:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                # FIXME is_server_ready should be true here DLIS-1296
+                # self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(triton_client.is_model_ready(ensemble_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(ensemble_name, "3"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_multiple_model_repository_control_startup_models(self):
-        input_size = 16
-        model_shape = (input_size,)
-        # Model that is used to test control API
-        model_base = 'graphdef'
+        model_shape = (1, 16)
+        savedmodel_name = tu.get_model_name('savedmodel', np.float32, np.float32, np.float32)
+        graphdef_name = tu.get_model_name('graphdef', np.float32, np.float32, np.float32)
+
         ensemble_prefix = "simple_"
-        model_name = tu.get_model_name(model_base, np.float32, np.float32, np.float32)
-        ensemble_name = ensemble_prefix + model_name
+        savedmodel_ensemble_name = ensemble_prefix + savedmodel_name
+        graphdef_ensemble_name = ensemble_prefix + graphdef_name
 
-        loaded_models = ['savedmodel', ensemble_prefix + 'savedmodel']
-        unloaded_models = [ensemble_prefix + model_base, 'netdef']
-
-        # Make sure the models are not in the status
-        for base in unloaded_models:
-            name = tu.get_model_name(base, np.float32, np.float32, np.float32)
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                try:
-                    ctx = ServerStatusContext(pair[0], pair[1], name, True)
-                    ss = ctx.get_server_status()
-                    self.assertTrue(False, "expected unknown model failure")
-                except InferenceServerException as ex:
-                    self.assertEqual("inference:0", ex.server_id())
-                    self.assertGreater(ex.request_id(), 0)
-                    self.assertTrue(
-                        ex.message().startswith("no status available for unknown model"))
+        # Make sure unloaded models are not in the status
+        for base in ("netdef",):
+            model_name = tu.get_model_name(base, np.float32, np.float32, np.float32)
+            try:
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
         # And loaded models work properly
-        self._infer_unaffected_models(loaded_models + [model_base], model_shape)
+        self._infer_success_models(["savedmodel",], (1, 3), model_shape)
+        self._infer_success_models(["simple_savedmodel",], (1, 3), model_shape, swap=True)
+        self._infer_success_models(["graphdef",], (1, 3), model_shape)
 
         # Load non-existing model
-        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
             try:
-                ctx = ModelControlContext(pair[0], pair[1], True)
-                ctx.load("unknown_model")
+                triton_client.load_model("unknown_model")
                 self.assertTrue(False, "expected unknown model failure")
-            except InferenceServerException as ex:
-                self.assertEqual("inference:0", ex.server_id())
-                self.assertGreater(ex.request_id(), 0)
+            except Exception as ex:
                 self.assertTrue(
                     ex.message().startswith("failed to load 'unknown_model', no version is available"))
 
-        # Load ensemble model first, the dependent model will be polled and loaded
-        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-            try:
-                ctx = ModelControlContext(pair[0], pair[1], True)
-                ctx.load(ensemble_name)
+        # Load graphdef ensemble model, the dependent model is already
+        # loaded via command-line
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            triton_client.load_model(graphdef_ensemble_name)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
-                for model in [model_name, ensemble_name]:
-                    ctx = ServerStatusContext(pair[0], pair[1], model, True)
-                    ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                    self.assertEqual("inference:0", ss.id)
-                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                    self.assertEqual(len(ss.model_status), 1)
-                    self.assertTrue(model in ss.model_status,
-                                    "expected status for model " + model)
-                    self.assertTrue(1 in ss.model_status[model].version_status,
-                                    "expected status for version 1 of model " + model)
-                    self.assertTrue(3 in ss.model_status[model].version_status,
-                                    "expected status for version 3 of model " + model)
-                    self.assertEqual(ss.model_status[model].version_status[1].ready_state,
-                                    server_status.MODEL_READY)
-                    self.assertEqual(ss.model_status[model].version_status[3].ready_state,
-                                    server_status.MODEL_READY)
-            except InferenceServerException as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_models(["graphdef",], (1, 3), model_shape)
+        self._infer_success_models(["simple_graphdef",], (1, 3), model_shape, swap=True)
 
-        # Delete model configuration, which cause only version 3 to be available
-        # if the models are re-loaded
-        os.remove("models/" + model_name + "/config.pbtxt")
+        # Delete model configuration, which will cause the autofiller
+        # to use the latest version policy so that only version 3 will
+        # be available if the models are re-loaded
+        os.remove("models/" + savedmodel_name + "/config.pbtxt")
 
-        # Run inference on the model, both versions 1 and 3
-        for version in (1, 3):
-            try:
-                iu.infer_exact(self, model_base, model_shape, 1,
-                                np.float32, np.float32, np.float32, swap=(version == 3),
-                                model_version=version)
-                # ensemble always swap because it uses latest version (v3)
-                # of the composing model
-                iu.infer_exact(self, ensemble_prefix + model_base, model_shape, 1,
-                                np.float32, np.float32, np.float32, swap=True,
-                                model_version=version)
-            except InferenceServerException as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_models(["graphdef",], (1, 3), model_shape)
+        self._infer_success_models(["simple_graphdef",], (1, 3), model_shape, swap=True)
 
-        # Reload models, only version 3 should be available
-        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-            try:
-                ctx = ModelControlContext(pair[0], pair[1], True)
-                ctx.load(model_name)
+        # Reload savedmodel, only version 3 should be available
+        try:
+            triton_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
+            triton_client.load_model(savedmodel_name)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
-                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                self.assertEqual(len(ss.model_status), 1)
-                self.assertTrue(model_name in ss.model_status,
-                                "expected status for model " + model_name)
-                self.assertTrue(1 in ss.model_status[model_name].version_status,
-                                "expected status for version 1 of model " + model_name)
-                self.assertTrue(3 in ss.model_status[model_name].version_status,
-                                "expected status for version 3 of model " + model_name)
-                self.assertEqual(ss.model_status[model_name].version_status[1].ready_state,
-                                server_status.MODEL_UNAVAILABLE)
-                self.assertEqual(ss.model_status[model_name].version_status[3].ready_state,
-                                server_status.MODEL_READY)
-            except InferenceServerException as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
+        self._infer_success_models(["savedmodel",], (3,), model_shape)
+        self._infer_success_models(["simple_savedmodel",], (1, 3), model_shape, swap=True)
 
-        self._infer_unaffected_models(loaded_models, model_shape)
+        try:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                # FIXME is_server_ready should be true here DLIS-1296
+                # self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Unload non-existing model, nothing should happen
-        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
             try:
-                ctx = ModelControlContext(pair[0], pair[1], True)
-                ctx.unload("unknown_model")
-            except InferenceServerException as ex:
+                triton_client.unload_model("unknown_model")
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Unload the depending model, as side effect, the ensemble model will be
-        # forced to be unloaded
-        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-            try:
-                ctx = ModelControlContext(pair[0], pair[1], True)
-                ctx.unload(model_name)
+        # Unload the savedmodel, as side effect, the ensemble model
+        # will be forced to be unloaded
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            triton_client.unload_model(savedmodel_name)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
-                for model in [model_name, ensemble_name]:
-                    ctx = ServerStatusContext(pair[0], pair[1], model, True)
-                    ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                    self.assertEqual("inference:0", ss.id)
-                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                    self.assertEqual(len(ss.model_status), 1)
-                    self.assertTrue(model in ss.model_status,
-                                    "expected status for model " + model)
-                    self.assertTrue(1 in ss.model_status[model].version_status,
-                                    "expected status for version 1 of model " + model)
-                    self.assertTrue(3 in ss.model_status[model].version_status,
-                                    "expected status for version 3 of model " + model)
-                    self.assertEqual(ss.model_status[model].version_status[1].ready_state,
-                                    server_status.MODEL_UNAVAILABLE)
-                    self.assertEqual(ss.model_status[model].version_status[3].ready_state,
-                                    server_status.MODEL_UNAVAILABLE)
-            except InferenceServerException as ex:
+        for model_name in [savedmodel_name, savedmodel_ensemble_name]:
+            try:
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    # FIXME is_server_ready should be true here DLIS-1296
+                    # self.assertTrue(triton_client.is_server_ready())
+                    self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Unload ensemble model, and load the depending model, ensemble should
-        # not be re-evaluated as it is unloaded explicitly
-        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-            try:
-                ctx = ModelControlContext(pair[0], pair[1], True)
-                ctx.unload(ensemble_name)
-                ctx.load(model_name)
+        # Explicitly unload the savedmodel ensemble and load the
+        # depending model. The ensemble model should not be reloaded
+        # because it was explicitly unloaded.
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            triton_client.unload_model(savedmodel_ensemble_name)
+            triton_client.load_model(savedmodel_name)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
-                for model in [model_name, ensemble_name]:
-                    ctx = ServerStatusContext(pair[0], pair[1], model, True)
-                    ss = ctx.get_server_status()
-                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                    self.assertEqual("inference:0", ss.id)
-                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                    self.assertEqual(len(ss.model_status), 1)
-                    self.assertTrue(model in ss.model_status,
-                                    "expected status for model " + model)
-                    # Because the depending model is re-added, the status
-                    # for it will be reset. As a result, version 1 will be
-                    # missing due to version policy becoming latest
-                    if ensemble_prefix not in model:
-                        self.assertFalse(1 in ss.model_status[model].version_status,
-                                        "unexpected status for version 1 of re-added model " + model)
-                    else:
-                        self.assertTrue(1 in ss.model_status[model].version_status,
-                                        "expected status for version 1 of model " + model)
-                        self.assertEqual(ss.model_status[model].version_status[1].ready_state,
-                                        server_status.MODEL_UNAVAILABLE)
+        self._infer_success_models(["savedmodel",], (3,), model_shape)
+        self._infer_success_models(["graphdef",], (1, 3), model_shape)
+        self._infer_success_models(["simple_graphdef",], (1, 3), model_shape, swap=True)
 
-                    self.assertTrue(3 in ss.model_status[model].version_status,
-                                    "expected status for version 3 of model " + model)
-                    model_status = server_status.MODEL_UNAVAILABLE if ensemble_prefix in model \
-                                        else server_status.MODEL_READY
-                    self.assertEqual(ss.model_status[model].version_status[3].ready_state,
-                                    model_status)
-            except InferenceServerException as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-
-        self._infer_unaffected_models(loaded_models, model_shape)
+        try:
+            for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                # FIXME is_server_ready should be true here DLIS-1296
+                # self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(triton_client.is_model_ready(savedmodel_ensemble_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(savedmodel_ensemble_name, "3"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_model_repository_index(self):
         # use model control EXPLIT and --load-model to load a subset of models
         # in model repository
-        input_size = 16
-        tensor_shape = (input_size,)
+        tensor_shape = (1, 16)
         model_bases = ["graphdef", "savedmodel", "simple_savedmodel"]
 
         # Sanity check on loaded models
@@ -1588,33 +1152,16 @@ class LifeCycleTest(unittest.TestCase):
         #     simple_savedmodel_float32_float32_float32
         #     savedmodel_float32_float32_float32
         #     graphdef_float32_float32_float32
-        try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                hctx = ServerHealthContext(pair[0], pair[1], True)
-                self.assertTrue(hctx.is_ready())
-                self.assertTrue(hctx.is_live())
-
-                ctx = ServerStatusContext(pair[0], pair[1], verbose=True)
-                ss = ctx.get_server_status()
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-                self.assertEqual("inference:0", ss.id)
-                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
-                uptime = ss.uptime_ns
-                self.assertGreater(uptime, 0)
-                self.assertEqual(len(ss.model_status), 3)
-
-                for model_base in model_bases:
-                    model_name = tu.get_model_name(model_base, np.float32, np.float32, np.float32)
-
-                    self.assertTrue(model_name in ss.model_status,
-                                    "expected status for model " + model_name)
-                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
-                        self.assertEqual(len(v.ready_state_reason.message), 0,
-                            "expected empty message for successful load")
-
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+        for model_base in model_bases:
+            try:
+                model_name = tu.get_model_name(model_base, np.float32, np.float32, np.float32)
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_model_ready(model_name))
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Check model repository index
         # 4 models should be shown:
@@ -1624,19 +1171,27 @@ class LifeCycleTest(unittest.TestCase):
         #     graphdef_float32_float32_float32
         model_bases.append("simple_graphdef")
         try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                ctx = ModelRepositoryContext(pair[0], pair[1], True)
-                index = ctx.get_model_repository_index()
-                self.assertEqual(len(index.models), 4)
-                model_names = []
-                for model_base in model_bases:
-                    model_names.append(tu.get_model_name(model_base, np.float32, np.float32, np.float32))
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            index = triton_client.get_model_repository_index()
+            indexed = list()
+            self.assertEqual(len(index), 4)
+            for i in index:
+                indexed.append(i["name"])
+            for model_base in model_bases:
+                model_name = tu.get_model_name(model_base, np.float32, np.float32, np.float32)
+                self.assertTrue(model_name in indexed)
 
-                for model_info in index.models:
-                    self.assertTrue(model_info.name in model_names,
-                                    "unexpected index for model " + model_info.name)
+            triton_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
+            index = triton_client.get_model_repository_index()
+            indexed = list()
+            self.assertEqual(len(index.models), 4)
+            for i in index.models:
+                indexed.append(i.name)
+            for model_base in model_bases:
+                model_name = tu.get_model_name(model_base, np.float32, np.float32, np.float32)
+                self.assertTrue(model_name in indexed)
 
-        except InferenceServerException as ex:
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
 if __name__ == '__main__':
