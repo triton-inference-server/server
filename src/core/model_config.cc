@@ -469,10 +469,8 @@ ProtocolStringToDataType(const char* dtype, size_t len)
       if (!strcmp(dtype + 2, "TES")) {
         return TYPE_STRING;
       }
-    } else if (dtype[1] == 'O') {
-      if (!strcmp(dtype + 2, "OL")) {
-        return TYPE_BOOL;
-      }
+    } else if (!strcmp(dtype + 1, "OOL")) {
+      return TYPE_BOOL;
     }
   }
 
