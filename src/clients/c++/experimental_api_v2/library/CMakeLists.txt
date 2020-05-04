@@ -156,12 +156,12 @@ if(${TRTIS_ENABLE_HTTP_V2})
   # libhttpclient object build
   set(
     REQUEST_SRCS
-    http_client.cc common.cc
+    http_client.cc common.cc cencode.c
   )
 
   set(
     REQUEST_HDRS
-    http_client.h common.h
+    http_client.h common.h cencode.h
   )
 
   add_library(
@@ -197,7 +197,6 @@ if(${TRTIS_ENABLE_HTTP_V2})
   target_link_libraries(
     httpclient_static
     PRIVATE CURL::libcurl
-    PRIVATE -lb64
     PUBLIC Threads::Threads
   )
 
@@ -230,7 +229,6 @@ if(${TRTIS_ENABLE_HTTP_V2})
   target_link_libraries(
     httpclient
     PRIVATE CURL::libcurl
-    PRIVATE -lb64
     PUBLIC Threads::Threads
   )
 
