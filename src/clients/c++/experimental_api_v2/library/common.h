@@ -29,6 +29,7 @@
 
 #include "src/core/constants.h"
 
+#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <cstring>
