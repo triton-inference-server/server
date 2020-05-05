@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -46,7 +46,7 @@ for i in \
         test_mixed_raw_shm \
         test_unregisterall; do
     for client_type in http grpc; do
-        SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+        SERVER_ARGS="--model-repository=`pwd`/models --api-version=2 --log-verbose=1"
         SERVER_LOG="./$i.$client_type.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -71,15 +71,15 @@ for i in \
     done
 done
 
-if [ `grep -c "localhost:8000" $CLIENT_LOG` != "46" ]; then
-    echo -e "\n***\n*** Failed. Expected 46 Host: localhost:8000 headers for client\n***"
+if [ `grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG` != "36" ]; then
+    echo -e "\n***\n*** Failed. Expected 36 HTTPSocketPoolResponse status=200 headers for client\n***"
     RET=1
 fi
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $CLIENT_LOG
+    # cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
 fi
 
