@@ -1654,15 +1654,14 @@ HTTPAPIServerV2::EVBufferToInput(
     uint32_t flags = TRITONSERVER_REQUEST_FLAG_NONE;
     {
       const auto& itr = params.FindMember("sequence_start");
-      if (itr != params.MemberEnd()) {
-        flags |=
-            itr->value.GetBool() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
+      if ((itr != params.MemberEnd()) && (itr->value.GetBool())) {
+        flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
       }
     }
     {
       const auto& itr = params.FindMember("sequence_end");
-      if (itr != params.MemberEnd()) {
-        flags |= itr->value.GetBool() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
+      if ((itr != params.MemberEnd()) && (itr->value.GetBool())) {
+        flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
       }
     }
     RETURN_IF_TRITON_ERR(
@@ -2004,7 +2003,6 @@ HTTPAPIServerV2::HandleInfer(
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(irequest),
         "deleting inference request");
-
   }
 }
 
