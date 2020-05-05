@@ -2083,6 +2083,12 @@ evhtp_res
 HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     TRITONSERVER_InferenceRequest* request)
 {
+  auto err = TRITONSERVER_InferenceRequestError(request);
+  if (err != nullptr) {
+    EVBufferAddErrorJson(req_->buffer_out, err);
+    TRITONSERVER_ErrorDelete(err);
+    return EVHTP_RES_BADREQ;
+  }
   rapidjson::Document& response_json = response_meta_data_.response_json_;
   rapidjson::Document::AllocatorType& allocator = response_json.GetAllocator();
 
@@ -2093,7 +2099,6 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     response_json.AddMember("id", id_val, allocator);
   }
 
-  TRITONSERVER_Error* err;
   bool has_binary = false;
   struct evbuffer* binary_buf = evbuffer_new();
   auto output_itr = response_meta_data_.request_json_.FindMember("outputs");
