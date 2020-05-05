@@ -1069,6 +1069,9 @@ HTTPAPIServerV2::HandleModelMetadata(
   }
 
   if (model_name.empty()) {
+    std::string message_json =
+        "{ \"error\" : \"missing model name in ModelMetadata request\" }";
+    evbuffer_add(req->buffer_out, message_json.c_str(), message_json.size());
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
   }
@@ -1109,6 +1112,9 @@ HTTPAPIServerV2::HandleModelConfig(
   }
 
   if (model_name.empty()) {
+    std::string message_json =
+        "{ \"error\" : \"missing model name in ModelConfig request\" }";
+    evbuffer_add(req->buffer_out, message_json.c_str(), message_json.size());
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
   }
@@ -1992,13 +1998,13 @@ HTTPAPIServerV2::HandleInfer(
   if (err != nullptr) {
     LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
     EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
     TRITONSERVER_ErrorDelete(err);
 
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(irequest),
         "deleting inference request");
 
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
   }
 }
 
