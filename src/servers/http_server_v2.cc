@@ -936,6 +936,8 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
   LOG_VERBOSE(1) << "HTTP V2 error: " << req->method << " "
                  << req->uri->path->full << " - "
                  << static_cast<int>(EVHTP_RES_BADREQ);
+
+  evhtp_send_reply(req, EVHTP_RES_BADREQ);
 }
 
 void
@@ -2301,4 +2303,5 @@ HTTPServerV2::CreateMetricsServer(
   return nullptr;
 #endif  // TRTIS_ENABLE_METRICS
 }
+
 }}  // namespace nvidia::inferenceserver
