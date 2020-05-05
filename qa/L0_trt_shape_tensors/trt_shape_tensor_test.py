@@ -39,8 +39,6 @@ import test_util as tu
 import sequence_util as su
 
 import tritongrpcclient.core as grpcclient
-import tritongrpcclient.utils as grpcutils
-import tritonhttpclient.utils as httputils
 import os
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
@@ -317,8 +315,6 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
         dtype = np.float32
         try:
             model_name = tu.get_sequence_model_name("plan", dtype)
-            protocol = "streaming"
-
             self.check_setup(model_name)
 
             # Need scheduler to wait for queue to contain all
@@ -349,11 +345,9 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         (("start", 2, 1, None), (None, 4, 2, None), ("end", 8,
                                                                      3, None)),
                         self.get_expected_result(6, 3, "end"),
-                        protocol,
                         precreated_shm0_handles),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, protocol)
+                        'sequence_name': "{}".format(self._testMethodName)
                     }))
             threads.append(
                 threading.Thread(
@@ -367,11 +361,9 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         (("start", 2, 11, None), (None, 4, 12, None),
                          ("end", 8, 13, None)),
                         self.get_expected_result(36, 13, "end"),
-                        protocol,
                         precreated_shm1_handles),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, protocol)
+                        'sequence_name': "{}".format(self._testMethodName)
                     }))
             threads.append(
                 threading.Thread(
@@ -385,11 +377,9 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         (("start", 2, 111, None), (None, 4, 112, None),
                          ("end", 8, 113, None)),
                         self.get_expected_result(336, 113, "end"),
-                        protocol,
                         precreated_shm2_handles),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, protocol)
+                        'sequence_name': "{}".format(self._testMethodName)
                     }))
             threads.append(
                 threading.Thread(
@@ -403,11 +393,9 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         (("start", 2, 1111, None), (None, 4, 1112, None),
                          ("end", 8, 1113, None)),
                         self.get_expected_result(3336, 1113, "end"),
-                        protocol,
                         precreated_shm3_handles),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, protocol)
+                        'sequence_name': "{}".format(self._testMethodName)
                     }))
 
             for t in threads:
@@ -445,8 +433,6 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
             ((1, 1111), (1, 1112), (1, 1113)), dtype, 3)
         try:
             model_name = tu.get_sequence_model_name("plan", dtype)
-            protocol = "streaming"
-
             self.check_setup(model_name)
 
             # Need scheduler to wait for queue to contain all
@@ -470,11 +456,9 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         (("start", 1, 1, None), (None, 1, 2, None), ("end", 1,
                                                                      3, None)),
                         self.get_expected_result(6, 3, "end"),
-                        protocol,
                         precreated_shm0_handles),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, protocol)
+                        'sequence_name': "{}".format(self._testMethodName)
                     }))
             threads.append(
                 threading.Thread(
@@ -488,11 +472,9 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         (("start", 32, 11, None), (None, 32, 12, None),
                          ("end", 32, 13, None)),
                         self.get_expected_result(36, 13, "end"),
-                        protocol,
                         precreated_shm1_handles),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, protocol)
+                        'sequence_name': "{}".format(self._testMethodName)
                     }))
             threads.append(
                 threading.Thread(
@@ -506,11 +488,9 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         (("start", 16, 111, None), (None, 16, 112, None),
                          ("end", 16, 113, None)),
                         self.get_expected_result(336, 113, "end"),
-                        protocol,
                         precreated_shm2_handles),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, protocol)
+                        'sequence_name': "{}".format(self._testMethodName)
                     }))
             threads.append(
                 threading.Thread(
@@ -524,11 +504,9 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                         (("start", 1, 1111, None), (None, 1, 1112, None),
                          ("end", 1, 1113, None)),
                         self.get_expected_result(3336, 1113, "end"),
-                        protocol,
                         precreated_shm3_handles),
                     kwargs={
-                        'sequence_name':
-                            "{}_{}".format(self._testMethodName, protocol)
+                        'sequence_name': "{}".format(self._testMethodName)
                     }))
 
             for t in threads:
@@ -575,8 +553,6 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
 
         try:
             model_name = tu.get_dyna_sequence_model_name("plan", dtype)
-            protocol = "streaming"
-
             self.check_setup(model_name)
             self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
             self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
@@ -596,12 +572,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                                                                       3, None)),
                         self.get_expected_result(4 + corrids[0], corrids[0], 3,
                                                  "end"),
-                        protocol,
                         precreated_shm0_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}_{}".format(self._testMethodName, protocol,
-                                              corrids[0]),
+                            "{}_{}".format(self._testMethodName, corrids[0]),
                         'using_dynamic_batcher':
                             True
                     }))
@@ -618,12 +592,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                          ("end", 5, 13, None)),
                         self.get_expected_result(36 + corrids[1], corrids[1],
                                                  13, "end"),
-                        protocol,
                         precreated_shm1_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}_{}".format(self._testMethodName, protocol,
-                                              corrids[1]),
+                            "{}_{}".format(self._testMethodName, corrids[1]),
                         'using_dynamic_batcher':
                             True
                     }))
@@ -640,12 +612,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                          ("end", 8, 113, None)),
                         self.get_expected_result(336 + corrids[2], corrids[2],
                                                  113, "end"),
-                        protocol,
                         precreated_shm2_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}_{}".format(self._testMethodName, protocol,
-                                              corrids[2]),
+                            "{}_{}".format(self._testMethodName, corrids[2]),
                         'using_dynamic_batcher':
                             True
                     }))
@@ -662,12 +632,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                          ("end", 11, 1113, None)),
                         self.get_expected_result(3336 + corrids[3], corrids[3],
                                                  1113, "end"),
-                        protocol,
                         precreated_shm3_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}_{}".format(self._testMethodName, protocol,
-                                              corrids[3]),
+                            "{}_{}".format(self._testMethodName, corrids[3]),
                         'using_dynamic_batcher':
                             True
                     }))
@@ -704,7 +672,6 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
 
         try:
             model_name = tu.get_dyna_sequence_model_name("plan", dtype)
-            protocol = "streaming"
 
             self.check_setup(model_name)
             self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
@@ -725,12 +692,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                                                                      3, None)),
                         self.get_expected_result(4 + corrids[0], corrids[0], 3,
                                                  "end"),
-                        protocol,
                         precreated_shm0_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}_{}".format(self._testMethodName, protocol,
-                                              corrids[0]),
+                            "{}_{}".format(self._testMethodName, corrids[0]),
                         'using_dynamic_batcher':
                             True
                     }))
@@ -747,12 +712,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                          ("end", 8, 13, None)),
                         self.get_expected_result(36 + corrids[1], corrids[1],
                                                  13, "end"),
-                        protocol,
                         precreated_shm1_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}_{}".format(self._testMethodName, protocol,
-                                              corrids[1]),
+                            "{}_{}".format(self._testMethodName, corrids[1]),
                         'using_dynamic_batcher':
                             True
                     }))
@@ -769,12 +732,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                          ("end", 8, 113, None)),
                         self.get_expected_result(336 + corrids[2], corrids[2],
                                                  113, "end"),
-                        protocol,
                         precreated_shm2_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}_{}".format(self._testMethodName, protocol,
-                                              corrids[2]),
+                            "{}_{}".format(self._testMethodName, corrids[2]),
                         'using_dynamic_batcher':
                             True
                     }))
@@ -791,12 +752,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                          ("end", 8, 1113, None)),
                         self.get_expected_result(3336 + corrids[3], corrids[3],
                                                  1113, "end"),
-                        protocol,
                         precreated_shm3_handles),
                     kwargs={
                         'sequence_name':
-                            "{}_{}_{}".format(self._testMethodName, protocol,
-                                              corrids[3]),
+                            "{}_{}".format(self._testMethodName, corrids[3]),
                         'using_dynamic_batcher':
                             True
                     }))
