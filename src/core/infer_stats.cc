@@ -36,10 +36,11 @@ namespace nvidia { namespace inferenceserver {
 
 void
 InferenceStatsAggregator::UpdateFailure(
-    const uint64_t request_start_ns, const uint64_t request_end_ns)
+    const size_t batch_size, const uint64_t request_start_ns,
+    const uint64_t request_end_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
-  infer_stats_.failure_count_++;
+  infer_stats_.failure_count_ += batch_size;
   infer_stats_.failure_duration_ns_ += (request_end_ns - request_start_ns);
 
 #ifdef TRTIS_ENABLE_METRICS
@@ -51,14 +52,14 @@ InferenceStatsAggregator::UpdateFailure(
 
 void
 InferenceStatsAggregator::UpdateSuccess(
-    const uint64_t request_start_ns, const uint64_t queue_start_ns,
-    const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
-    const uint64_t compute_output_start_ns, const uint64_t compute_end_ns,
-    const uint64_t request_end_ns)
+    const size_t batch_size, const uint64_t request_start_ns,
+    const uint64_t queue_start_ns, const uint64_t compute_start_ns,
+    const uint64_t compute_input_end_ns, const uint64_t compute_output_start_ns,
+    const uint64_t compute_end_ns, const uint64_t request_end_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
 
-  infer_stats_.success_count_++;
+  infer_stats_.success_count_ += batch_size;
   infer_stats_.request_duration_ns_ += (request_end_ns - request_start_ns);
   infer_stats_.queue_duration_ns_ += (compute_start_ns - queue_start_ns);
   infer_stats_.compute_input_duration_ns_ +=
@@ -92,7 +93,7 @@ InferenceStatsAggregator::UpdateSuccess(
 
 void
 InferenceStatsAggregator::UpdateInferBatchStats(
-    size_t batch_size, const uint64_t compute_start_ns,
+    const size_t batch_size, const uint64_t compute_start_ns,
     const uint64_t compute_input_end_ns, const uint64_t compute_output_start_ns,
     const uint64_t compute_end_ns)
 {

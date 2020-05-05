@@ -94,12 +94,14 @@ class InferenceStatsAggregator {
 
   // Add durations to Infer stats for a failed inference request.
   void UpdateFailure(
-      const uint64_t request_start_ns, const uint64_t request_end_ns);
+      const size_t batch_size, const uint64_t request_start_ns,
+      const uint64_t request_end_ns);
 
   // Add durations to infer stats for a successful inference request.
   void UpdateSuccess(
-      const uint64_t request_start_ns, const uint64_t queue_start_ns,
-      const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
+      const size_t batch_size, const uint64_t request_start_ns,
+      const uint64_t queue_start_ns, const uint64_t compute_start_ns,
+      const uint64_t compute_input_end_ns,
       const uint64_t compute_output_start_ns, const uint64_t compute_end_ns,
       const uint64_t request_end_ns);
 
@@ -107,7 +109,7 @@ class InferenceStatsAggregator {
   // 'success_request_count' is the number of sucess requests in the
   // batch that have infer_stats attached.
   void UpdateInferBatchStats(
-      size_t batch_size, const uint64_t compute_start_ns,
+      const size_t batch_size, const uint64_t compute_start_ns,
       const uint64_t compute_input_end_ns,
       const uint64_t compute_output_start_ns, const uint64_t compute_end_ns);
 
