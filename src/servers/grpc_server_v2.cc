@@ -760,7 +760,8 @@ CommonHandler::SetUpAllRequests()
             infer_stats_json["compute_infer"]["ns"].GetUint64());
         statistics->mutable_inference_stats()
             ->mutable_compute_output()
-            ->set_count(infer_stats_json["compute_output"]["count"].GetUint64());
+            ->set_count(
+                infer_stats_json["compute_output"]["count"].GetUint64());
         statistics->mutable_inference_stats()->mutable_compute_output()->set_ns(
             infer_stats_json["compute_output"]["ns"].GetUint64());
       }
@@ -2507,14 +2508,14 @@ ModelInferHandler::InferComplete(
       }
       output.set_datatype(datatype);
 
-      // Check if the output is classification results
+      // Check if the output can be classification results
       // (no raw_contents and not using shared memory)
       if (output.contents().raw_contents().size() == 0) {
         if ((state->alloc_payload_.shm_map_ == nullptr) ||
             (state->alloc_payload_.shm_map_->find(output.name()) ==
              state->alloc_payload_.shm_map_->end())) {
           size_t element_cnt = shape[0] * shape[1];
-          const char* base;
+          const char* base = nullptr;
           size_t byte_size;
           TRITONSERVER_Memory_Type mem_type;
           int64_t mem_id;
@@ -2525,11 +2526,15 @@ ModelInferHandler::InferComplete(
             break;
           }
           size_t offset = 0;
-          for (size_t idx = 0; idx < element_cnt; idx++) {
-            size_t length = *(reinterpret_cast<const uint32_t*>(base + offset));
-            offset += sizeof(uint32_t);
-            output.mutable_contents()->add_byte_contents(base + offset, length);
-            offset += length;
+          if (base != nullptr) {
+            for (size_t idx = 0; idx < element_cnt; idx++) {
+              size_t length =
+                  *(reinterpret_cast<const uint32_t*>(base + offset));
+              offset += sizeof(uint32_t);
+              output.mutable_contents()->add_byte_contents(
+                  base + offset, length);
+              offset += length;
+            }
           }
         }
       }
