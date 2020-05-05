@@ -317,7 +317,7 @@ ServerStatusManager::UpdateSuccessInferStats(
 void
 ServerStatusManager::UpdateSuccessInferStats(
     const std::string& model_name, const int64_t model_version,
-    uint32_t execution_cnt, uint64_t last_timestamp_ms,
+    size_t batch_size, uint32_t execution_cnt, uint64_t last_timestamp_ms,
     uint64_t request_duration_ns, uint64_t queue_duration_ns,
     uint64_t compute_input_duration_ns, uint64_t compute_infer_duration_ns,
     uint64_t compute_output_duration_ns)
@@ -362,37 +362,37 @@ ServerStatusManager::UpdateSuccessInferStats(
     }
 
     if (new_stats != nullptr) {
-      new_stats->mutable_success()->set_count(1);
+      new_stats->mutable_success()->set_count(batch_size);
       new_stats->mutable_success()->set_total_time_ns(request_duration_ns);
-      new_stats->mutable_compute_input()->set_count(1);
+      new_stats->mutable_compute_input()->set_count(batch_size);
       new_stats->mutable_compute_input()->set_total_time_ns(
           compute_input_duration_ns);
-      new_stats->mutable_compute_infer()->set_count(1);
+      new_stats->mutable_compute_infer()->set_count(batch_size);
       new_stats->mutable_compute_infer()->set_total_time_ns(
           compute_infer_duration_ns);
-      new_stats->mutable_compute_output()->set_count(1);
+      new_stats->mutable_compute_output()->set_count(batch_size);
       new_stats->mutable_compute_output()->set_total_time_ns(
           compute_output_duration_ns);
-      new_stats->mutable_queue()->set_count(1);
+      new_stats->mutable_queue()->set_count(batch_size);
       new_stats->mutable_queue()->set_total_time_ns(queue_duration_ns);
     } else if (existing_stats != nullptr) {
       InferRequestStats& stats = *existing_stats;
-      stats.mutable_success()->set_count(stats.success().count() + 1);
+      stats.mutable_success()->set_count(stats.success().count() + batch_size);
       stats.mutable_success()->set_total_time_ns(
           stats.success().total_time_ns() + request_duration_ns);
       stats.mutable_compute_input()->set_count(
-          stats.compute_input().count() + 1);
+          stats.compute_input().count() + batch_size);
       stats.mutable_compute_input()->set_total_time_ns(
           stats.compute_input().total_time_ns() + compute_input_duration_ns);
       stats.mutable_compute_infer()->set_count(
-          stats.compute_infer().count() + 1);
+          stats.compute_infer().count() + batch_size);
       stats.mutable_compute_infer()->set_total_time_ns(
           stats.compute_infer().total_time_ns() + compute_infer_duration_ns);
       stats.mutable_compute_output()->set_count(
-          stats.compute_output().count() + 1);
+          stats.compute_output().count() + batch_size);
       stats.mutable_compute_output()->set_total_time_ns(
           stats.compute_output().total_time_ns() + compute_output_duration_ns);
-      stats.mutable_queue()->set_count(stats.queue().count() + 1);
+      stats.mutable_queue()->set_count(stats.queue().count() + batch_size);
       stats.mutable_queue()->set_total_time_ns(
           stats.queue().total_time_ns() + queue_duration_ns);
     } else {
@@ -511,9 +511,10 @@ ModelInferStats::Report()
               TimestampKind::kComputeOutputStart, TimestampKind::kComputeEnd);
 
       status_manager_->UpdateSuccessInferStats(
-          model_name_, model_version, execution_count_, last_timestamp_ms,
-          request_duration_ns, queue_duration_ns, compute_input_duration_ns,
-          compute_infer_duration_ns, compute_output_duration_ns);
+          model_name_, model_version, batch_size_, execution_count_,
+          last_timestamp_ms, request_duration_ns, queue_duration_ns,
+          compute_input_duration_ns, compute_infer_duration_ns,
+          compute_output_duration_ns);
     } else {
       status_manager_->UpdateSuccessInferStats(
           model_name_, model_version, batch_size_, execution_count_,
