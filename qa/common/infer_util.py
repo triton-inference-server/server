@@ -200,10 +200,10 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
     input0_byte_size = sum([i0.nbytes for i0 in input0_list_tmp])
     input1_byte_size = sum([i1.nbytes for i1 in input1_list_tmp])
 
-    # Create and register system/cuda shared memory regions if needed
+    # Create system/cuda shared memory regions if needed
     shm_regions, shm_handles = su.create_set_shm_regions(input0_list_tmp, input1_list_tmp, output0_byte_size,
-                                                                    output1_byte_size, outputs, shm_region_names, precreated_shm_regions,
-                                                                    use_system_shared_memory, use_cuda_shared_memory)
+                                                        output1_byte_size, outputs, shm_region_names, precreated_shm_regions,
+                                                        use_system_shared_memory, use_cuda_shared_memory)
 
     # Run inference and check results for each config
     for config in configs:
@@ -239,6 +239,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 inputs[0].set_data_from_numpy(input0_array)
                 inputs[1].set_data_from_numpy(input1_array)
         else:
+            # Register necessary shared memory regions/handles
             su.register_add_shm_regions(inputs, outputs, shm_regions, precreated_shm_regions, shm_handles,
                                 input0_byte_size, input1_byte_size, output0_byte_size, output1_byte_size,
                                 use_system_shared_memory, use_cuda_shared_memory, triton_client)
@@ -333,9 +334,6 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                                           request_id=str(_unique_request_id()))
 
         last_response = results.get_response()
-        if config[1] == "http":
-            if 'error' in last_response:
-                raise InferenceServerException(msg=last_response['error'])
 
         if not skip_request_id_check:
             global _seen_request_ids
@@ -349,21 +347,20 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
         if config[1] == "http":
             response_model_name = last_response["model_name"]
+            if model_version != "":
+                response_model_version = last_response["model_version"]
+            response_outputs = last_response["outputs"]
         else:
             response_model_name = last_response.model_name
+            if model_version != "":
+                response_model_version = last_response.model_version
+            response_outputs = last_response.outputs
+
         tester.assertEqual(response_model_name, model_name)
 
         if model_version != "":
-            if config[1] == "http":
-                response_model_version = last_response["model_version"]
-            else:
-                response_model_version = last_response.model_version
             tester.assertEqual(response_model_version, model_version)
 
-        if config[1] == "http":
-            response_outputs = last_response["outputs"]
-        else:
-            response_outputs = last_response.outputs
         tester.assertEqual(len(response_outputs), len(outputs))
 
         for result in response_outputs:
@@ -648,7 +645,7 @@ def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input
 # zero-sized input/output tensor.
 # Turn on gRPC once zero size tensors support is fixed.
 def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes,
-               model_version=None, use_http=True, use_grpc=False,
+               model_version=None, use_http=True, use_grpc=True,
                use_http_json_tensors=True, use_streaming=False, shm_region_name_prefix=None,
                use_system_shared_memory=False, use_cuda_shared_memory=False,
                priority=0, timeout_us=0):
@@ -709,17 +706,27 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         expected_array = expected_array.reshape(output_shape)
         expected_dict[output_name] = expected_array
 
-        input_byte_size = tu.shape_element_count(input_shape) *\
-            np.dtype(tensor_dtype).itemsize
-        output_byte_size = tu.shape_element_count(output_shape) *\
-            np.dtype(tensor_dtype).itemsize
+        output_byte_size = expected_array.nbytes
+
+        if batch_size == 1:
+            input_list = [input_array]
+        else:
+            input_list = [x for x in input_array]
+
+        # Serialization of string tensors in the case of shared memory must be done manually
+        if tensor_dtype == np.object:
+            input_list_tmp = _serialize_byte_tensor_list(input_list)
+        else:
+            input_list_tmp = input_list
+
+        input_byte_size = sum([ip.nbytes for ip in input_list_tmp])
 
         # create and register shared memory region for inputs and outputs
-        shm_io_handles = []
-        # shm_io_handles = su.create_register_set_either_shm_region([shm_region_name_prefix[0]+str(io_num),
-        #                                                            shm_region_name_prefix[1]+str(io_num)], input_array,
-        #                                                           input_byte_size, output_byte_size, shm_client,
-        #                                                           use_system_shared_memory, use_cuda_shared_memory)
+        shm_io_handles = su.create_set_either_shm_region([shm_region_name_prefix[0]+str(io_num),
+                                                        shm_region_name_prefix[1]+str(io_num)],
+                                                        input_list_tmp, input_byte_size, output_byte_size,
+                                                        use_system_shared_memory, use_cuda_shared_memory)
+
         if len(shm_io_handles) != 0:
             shm_ip_handles.append(shm_io_handles[0])
             shm_op_handles.append(shm_io_handles[1])
@@ -738,29 +745,32 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
                 config[0], verbose=True)
     
         inputs = []
-        for io_num, input_name in enumerate(input_dict):
+        output_req = []
+        for io_num, (input_name, output_name) in enumerate(zip(input_dict.keys(), expected_dict.keys())):
             input_data = input_dict[input_name]
+            input_byte_size = input_data.nbytes
+            output_byte_size = expected_dict[output_name].nbytes
             if config[1] == "http":
                 inputs.append(httpclient.InferInput(
                     input_name, input_data.shape, np_to_triton_dtype(tensor_dtype)))
+                output_req.append(httpclient.InferRequestedOutput(
+                    output_name, binary_data=config[3]))
             else:
                 inputs.append(grpcclient.InferInput(
                     input_name, input_data.shape, np_to_triton_dtype(tensor_dtype)))
+                output_req.append(
+                    grpcclient.InferRequestedOutput(output_name))
 
             if not (use_cuda_shared_memory or use_system_shared_memory):
                 if config[1] == "http":
                     inputs[-1].set_data_from_numpy(input_data, binary_data=config[3])
                 else:
                     inputs[-1].set_data_from_numpy(input_data)
-
-        output_req = []
-        for output_name in expected_dict:
-            if config[1] == "http":
-                output_req.append(httpclient.InferRequestedOutput(
-                    output_name, binary_data=config[3]))
             else:
-                output_req.append(
-                    grpcclient.InferRequestedOutput(output_name))
+                # Register necessary shared memory regions/handles
+                su.register_add_either_shm_regions(inputs, output_req, shm_region_name_prefix,
+                    shm_io_handles, io_num, input_byte_size, output_byte_size,
+                    use_system_shared_memory, use_cuda_shared_memory, triton_client)
 
         if config[2]:
             # TODO fix for streaming case
@@ -779,30 +789,26 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
                                           priority=priority, timeout=timeout_us)
 
         last_response = results.get_response()
-        if config[1] == "http":
-            if 'error' in last_response:
-                raise InferenceServerException(msg=last_response['error'])
 
         if config[1] == "http":
             response_model_name = last_response["model_name"]
+            if model_version != "":
+                response_model_version = last_response["model_version"]
+            response_outputs = last_response["outputs"]
         else:
             response_model_name = last_response.model_name
+            if model_version != "":
+                response_model_version = last_response.model_version
+            response_outputs = last_response.outputs
+
         tester.assertEqual(response_model_name, model_name)
 
         if model_version != "":
-            if config[1] == "http":
-                response_model_version = last_response["model_version"]
-            else:
-                response_model_version = last_response.model_version
             tester.assertEqual(response_model_version, model_version)
 
-        if config[1] == "http":
-            response_outputs = last_response["outputs"]
-        else:
-            response_outputs = last_response.outputs
         tester.assertEqual(len(response_outputs), io_cnt)
 
-        for idx, result in enumerate(response_outputs):
+        for result in response_outputs:
             if config[1] == "http":
                 result_name = result["name"]
             else:
@@ -810,7 +816,11 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
 
             tester.assertTrue(result_name in expected_dict)
             if use_system_shared_memory or use_cuda_shared_memory:
-                shm_handle = shm_op_handles[idx]
+                if pf == "libtorch" or pf == "libtorch_nobatch":
+                    io_num = int(result_name.split("OUTPUT__")[1])
+                else:
+                    io_num = int(result_name.split("OUTPUT")[1])
+                shm_handle = shm_op_handles[io_num]
 
                 output = results.get_output(result_name)
                 if config[1] == "http":
