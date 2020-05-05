@@ -1403,6 +1403,8 @@ class InferResult:
                             dtype=triton_to_np_dtype(datatype))
                 elif len(output.contents.byte_contents) != 0:
                     np_array = np.array(output.contents.byte_contents)
+                else:
+                    np_array = np.empty(0)
                 np_array = np.resize(np_array, shape)
                 return np_array
         return None

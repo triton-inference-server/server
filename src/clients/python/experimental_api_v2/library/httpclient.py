@@ -1475,6 +1475,8 @@ class InferResult:
                                     np_array = np.frombuffer(
                                         self._buffer[start_index:end_index],
                                         dtype=triton_to_np_dtype(datatype))
+                            else:
+                                np_array = np.empty(0)
                     if not has_binary_data:
                         np_array = np.array(output['data'],
                                             dtype=triton_to_np_dtype(datatype))
