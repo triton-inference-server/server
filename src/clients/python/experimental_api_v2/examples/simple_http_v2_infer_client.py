@@ -30,7 +30,7 @@ import numpy as np
 import sys
 
 import tritonhttpclient.core as httpclient
-
+from tritonhttpclient.utils import InferenceServerException
 
 def test_infer(model_name, input0_data, input1_data):
     inputs = []
@@ -93,7 +93,7 @@ if __name__ == '__main__':
                                                          verbose=FLAGS.verbose)
     except Exception as e:
         print("channel creation failed: " + str(e))
-        sys.exit()
+        sys.exit(1)
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
@@ -146,12 +146,13 @@ if __name__ == '__main__':
             sys.exit(1)
 
     # Infer with incorrect model name
-    response = test_infer("wrong_model_name", input0_data,
-                          input1_data).get_response()
-    print(response)
-    if "error" not in response.keys():
-        print("improper error message for wrong model name")
+    try:
+        response = test_infer("wrong_model_name", input0_data,
+                            input1_data).get_response()
+        print("expected error message for wrong model name")
         sys.exit(1)
-    if not response['error'].startswith("Request for unknown model"):
-        print("improper error message for wrong model name")
-        sys.exit(1)
+    except InferenceServerException as ex:
+        print(ex)
+        if not (ex.message().startswith("Request for unknown model")):
+            print("improper error message for wrong model name")
+            sys.exit(1)

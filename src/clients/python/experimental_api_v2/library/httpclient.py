@@ -1033,6 +1033,7 @@ class InferenceServerClient:
                               request_body=request_body,
                               headers=headers,
                               query_params=query_params)
+        _raise_if_error(response)
 
         return InferResult(response, self._verbose)
 
