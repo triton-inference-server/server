@@ -41,6 +41,8 @@ set(
   load_manager.cc
   data_loader.cc
   concurrency_manager.cc
+  request_rate_manager.cc
+  custom_load_manager.cc
   triton_client_wrapper.cc
   inference_profiler.cc
   ../examples/shm_utils.cc
@@ -53,6 +55,8 @@ set(
   load_manager.h
   data_loader.h
   concurrency_manager.h
+  request_rate_manager.h
+  custom_load_manager.h
   triton_client_wrapper.h
   inference_profiler.h
  ../examples/shm_utils.h

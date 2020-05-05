@@ -95,7 +95,7 @@ class LoadManager {
   /// The properties of an asynchronous request required in
   /// the callback to effectively interpret the response.
   struct AsyncRequestProperties {
-    AsyncRequestProperties() : sequence_end_(false) {}
+    AsyncRequestProperties() : sequence_end_(false), delayed_(true) {}
     // The id of in the inference context which was used to
     // send this request.
     uint32_t ctx_id_;
@@ -103,6 +103,8 @@ class LoadManager {
     struct timespec start_time_;
     // Whether or not the request is at the end of a sequence.
     bool sequence_end_;
+    // Whether or not the request is delayed as per schedule.
+    bool delayed_;
   };
 
 

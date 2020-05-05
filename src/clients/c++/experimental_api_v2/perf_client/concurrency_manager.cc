@@ -177,13 +177,13 @@ ConcurrencyManager::Infer(
 
   // Callback function for handling asynchronous requests
   const auto callback_func = [&](nic::InferResult* result) {
-    thread_stat->cb_status_ = result->RequestStatus();
-    std::string request_id;
-    thread_stat->cb_status_ = result->Id(&request_id);
-    delete result;
+    std::shared_ptr<nic::InferResult> result_ptr(result);
+    thread_stat->cb_status_ = result_ptr->RequestStatus();
     if (thread_stat->cb_status_.IsOk()) {
       struct timespec end_time_async;
       clock_gettime(CLOCK_MONOTONIC, &end_time_async);
+      std::string request_id;
+      thread_stat->cb_status_ = result_ptr->Id(&request_id);
       const auto& it = async_req_map.find(request_id);
       uint32_t ctx_id;
       bool skip_stat = false;
@@ -268,6 +268,9 @@ ConcurrencyManager::Infer(
       if (streaming_) {
         thread_stat->status_ =
             ctxs.back()->infer_client_->StartStream(callback_func);
+        if (!thread_stat->status_.IsOk()) {
+          return;
+        }
       }
     }
 

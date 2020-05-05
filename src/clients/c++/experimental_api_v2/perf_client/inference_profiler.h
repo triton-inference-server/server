@@ -27,10 +27,9 @@
 
 #include <thread>
 #include "src/clients/c++/experimental_api_v2/perf_client/concurrency_manager.h"
+#include "src/clients/c++/experimental_api_v2/perf_client/custom_load_manager.h"
 #include "src/clients/c++/experimental_api_v2/perf_client/model_parser.h"
-// #include "src/clients/c++/experimental_v2//perf_client/custom_load_manager.h"
-// #include
-// "src/clients/c++/experimental_v2//perf_client/request_rate_manager.h"
+#include "src/clients/c++/experimental_api_v2/perf_client/request_rate_manager.h"
 
 
 /// Constant parameters that determine the whether stopping criteria has met
@@ -244,7 +243,6 @@ class InferenceProfiler {
       const size_t concurrent_request_count, std::vector<PerfStatus>& summary,
       bool* meets_threshold);
 
-#if 0
   /// Similar to above function, but instead of setting the concurrency, it sets
   /// the specified request rate for measurements.
   /// \param request_rate The request rate for inferences.
@@ -263,7 +261,6 @@ class InferenceProfiler {
   /// \return Error object indicating success
   /// or failure.
   nic::Error Profile(std::vector<PerfStatus>& summary, bool* meets_threshold);
-#endif
 
   /// A helper function for profiling functions.
   /// \param clean_starts Whether or not to reset load cycle with every

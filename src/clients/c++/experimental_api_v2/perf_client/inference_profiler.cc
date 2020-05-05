@@ -253,7 +253,6 @@ InferenceProfiler::Profile(
   return nic::Error::Success;
 }
 
-#if 0
 nic::Error
 InferenceProfiler::Profile(
     const double request_rate, std::vector<PerfStatus>& summary,
@@ -337,9 +336,6 @@ InferenceProfiler::Profile(
 
   return nic::Error::Success;
 }
-
-
-#endif
 
 nic::Error
 InferenceProfiler::ProfileHelper(

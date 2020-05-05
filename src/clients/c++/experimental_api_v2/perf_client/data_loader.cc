@@ -307,7 +307,6 @@ DataLoader::ReadInputTensorData(
             }
             shape_it->second.push_back(value.GetInt());
           }
-          const auto& dims = shape_it->second;
         }
 
         if (!tensor.HasMember("content")) {

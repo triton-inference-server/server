@@ -27,9 +27,11 @@
 #include <getopt.h>
 
 #include "src/clients/c++/experimental_api_v2/perf_client/concurrency_manager.h"
+#include "src/clients/c++/experimental_api_v2/perf_client/custom_load_manager.h"
 #include "src/clients/c++/experimental_api_v2/perf_client/inference_profiler.h"
 #include "src/clients/c++/experimental_api_v2/perf_client/model_parser.h"
 #include "src/clients/c++/experimental_api_v2/perf_client/perf_utils.h"
+#include "src/clients/c++/experimental_api_v2/perf_client/request_rate_manager.h"
 
 volatile bool early_exit = false;
 
@@ -1148,26 +1150,22 @@ main(int argc, char** argv)
         "failed to create concurrency manager");
 
   } else if (using_request_rate_range) {
-    /*
     FAIL_IF_ERR(
         RequestRateManager::Create(
-            protocol, async, measurement_window_ms, request_distribution,
+            async, streaming, measurement_window_ms, request_distribution,
             batch_size, max_threads, num_of_sequences, sequence_length,
-            string_length, string_data, zero_input, input_shapes, user_data,
-            shared_memory_type, output_shm_size, parser, &manager),
+            string_length, string_data, zero_input, user_data,
+            shared_memory_type, output_shm_size, parser, factory, &manager),
         "failed to create request rate manager");
-    */
 
   } else {
-    /*
     FAIL_IF_ERR(
         CustomLoadManager::Create(
-            protocol, async, measurement_window_ms, request_intervals_file,
+            async, streaming, measurement_window_ms, request_intervals_file,
             batch_size, max_threads, num_of_sequences, sequence_length,
-            string_length, string_data, zero_input, input_shapes, user_data,
-            shared_memory_type, output_shm_size, parser, &manager),
+            string_length, string_data, zero_input, user_data,
+            shared_memory_type, output_shm_size, parser, factory, &manager),
         "failed to create custom load manager");
-    */
   }
 
   std::unique_ptr<InferenceProfiler> profiler;

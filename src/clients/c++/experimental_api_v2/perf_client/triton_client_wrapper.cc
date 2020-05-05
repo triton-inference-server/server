@@ -88,8 +88,6 @@ TritonClientWrapper::ModelMetadata(
     ni::ModelMetadataResponse* model_metadata, const std::string& model_name,
     const std::string& model_version)
 {
-  std::cout << model_name << std::endl;
-  std::cout << model_version << std::endl;
   if (protocol_ == ProtocolType::GRPC) {
     RETURN_IF_ERROR(client_.grpc_client_->ModelMetadata(
         model_metadata, model_name, model_version, *http_headers_));
@@ -304,7 +302,6 @@ TritonClientWrapper::ParseStatistics(
     std::map<ModelIdentifier, ModelStatistics>* model_stats)
 {
   model_stats->clear();
-  std::cout << "debug " << nic::GetJsonText(infer_stat) << std::endl;
   for (const auto& this_stat : infer_stat["model_stats"].GetArray()) {
     auto it = model_stats
                   ->emplace(
