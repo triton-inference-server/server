@@ -712,12 +712,12 @@ void
 WriteDataToJsonHelper(
     rapidjson::Value* response_output_val,
     rapidjson::Document::AllocatorType& allocator,
-    const rapidjson::Value& shape, int shape_index, T* base, int* counter,
+    const rapidjson::Value& shape, size_t shape_index, T* base, int* counter,
     const DataType dtype)
 {
-  if (shape_index == (int)shape.Size()) {
+  if (shape_index == shape.Size()) {
     if (dtype != TYPE_STRING) {
-      rapidjson::Value data_val((T)(base[*counter]));
+      rapidjson::Value data_val(base[*counter]);
       response_output_val->PushBack(data_val, allocator);
       *counter += 1;
     } else {
@@ -729,7 +729,7 @@ WriteDataToJsonHelper(
     }
   } else {
     for (int i = 0; i < shape[shape_index].GetInt(); i++) {
-      if ((shape_index + 1) != (int)shape.Size()) {
+      if ((shape_index + 1) != shape.Size()) {
         rapidjson::Value response_output_array(rapidjson::kArrayType);
         WriteDataToJsonHelper(
             &response_output_array, allocator, shape, shape_index + 1, base,
@@ -737,7 +737,7 @@ WriteDataToJsonHelper(
         response_output_val->PushBack(response_output_array, allocator);
       } else {
         if (dtype != TYPE_STRING) {
-          rapidjson::Value data_val((T)(base[*counter]));
+          rapidjson::Value data_val(base[*counter]);
           response_output_val->PushBack(data_val, allocator);
           *counter += 1;
         } else {
@@ -764,7 +764,7 @@ WriteDataToJson(
 
   rapidjson::Value data_array(rapidjson::kArrayType);
   int counter = 0;
-  for (int i = 0; i < shape[0].GetInt(); i++) {
+  for (size_t i = 0; i < size_t(shape[0].GetInt()); i++) {
     rapidjson::Value data_val(rapidjson::kArrayType);
     switch (dtype) {
       case TYPE_BOOL: {
