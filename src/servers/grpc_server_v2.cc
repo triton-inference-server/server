@@ -760,7 +760,8 @@ CommonHandler::SetUpAllRequests()
             infer_stats_json["compute_infer"]["ns"].GetUint64());
         statistics->mutable_inference_stats()
             ->mutable_compute_output()
-            ->set_count(infer_stats_json["compute_output"]["count"].GetUint64());
+            ->set_count(
+                infer_stats_json["compute_output"]["count"].GetUint64());
         statistics->mutable_inference_stats()->mutable_compute_output()->set_ns(
             infer_stats_json["compute_output"]["ns"].GetUint64());
       }
@@ -2190,8 +2191,9 @@ SetInferenceRequestMetadata(
             "invalid value type for 'sequence_start' parameter, expected "
             "bool_param.");
       }
-      flags |=
-          infer_param.bool_param() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
+      if (infer_param.bool_param()) {
+        flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
+      }
     }
     const auto& sequence_end_it = request.parameters().find("sequence_end");
     if (sequence_end_it != request.parameters().end()) {
@@ -2203,8 +2205,9 @@ SetInferenceRequestMetadata(
             "invalid value type for 'sequence_end' parameter, expected "
             "bool_param.");
       }
-      flags |=
-          infer_param.bool_param() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
+      if (infer_param.bool_param()) {
+        flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
+      }
     }
     RETURN_IF_TRITON_ERR(
         TRITONSERVER_InferenceRequestSetFlags(inference_request, flags));
