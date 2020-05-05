@@ -207,17 +207,17 @@ RequestRateManager::Infer(
   // Callback function for handling asynchronous requests
   const auto callback_func = [&](nic::InferResult* result) {
     std::shared_ptr<nic::InferResult> result_ptr(result);
-    thread_stat->cb_status_ = result_ptr->RequestStatus();
     if (thread_stat->cb_status_.IsOk()) {
-      struct timespec end_time_async;
-      clock_gettime(CLOCK_MONOTONIC, &end_time_async);
-      std::string request_id;
-      thread_stat->cb_status_ = result_ptr->Id(&request_id);
-      const auto& it = async_req_map->find(request_id);
-      {
-        // Add the request timestamp to thread Timestamp vector with
-        // proper locking
-        std::lock_guard<std::mutex> lock(thread_stat->mu_);
+      // Add the request timestamp to thread Timestamp vector with
+      // proper locking
+      std::lock_guard<std::mutex> lock(thread_stat->mu_);
+      thread_stat->cb_status_ = result_ptr->RequestStatus();
+      if (thread_stat->cb_status_.IsOk()) {
+        struct timespec end_time_async;
+        clock_gettime(CLOCK_MONOTONIC, &end_time_async);
+        std::string request_id;
+        thread_stat->cb_status_ = result_ptr->Id(&request_id);
+        const auto& it = async_req_map->find(request_id);
         if (it != async_req_map->end()) {
           thread_stat->request_timestamps_.emplace_back(std::make_tuple(
               it->second.start_time_, end_time_async, it->second.sequence_end_,

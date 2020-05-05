@@ -177,20 +177,20 @@ ConcurrencyManager::Infer(
 
   // Callback function for handling asynchronous requests
   const auto callback_func = [&](nic::InferResult* result) {
+    bool skip_stat = false;
+    uint32_t ctx_id;
     std::shared_ptr<nic::InferResult> result_ptr(result);
-    thread_stat->cb_status_ = result_ptr->RequestStatus();
     if (thread_stat->cb_status_.IsOk()) {
-      struct timespec end_time_async;
-      clock_gettime(CLOCK_MONOTONIC, &end_time_async);
-      std::string request_id;
-      thread_stat->cb_status_ = result_ptr->Id(&request_id);
-      const auto& it = async_req_map.find(request_id);
-      uint32_t ctx_id;
-      bool skip_stat = false;
-      {
-        // Add the request timestamp to thread Timestamp vector with
-        // proper locking
-        std::lock_guard<std::mutex> lock(thread_stat->mu_);
+      // Add the request timestamp to thread Timestamp vector with
+      // proper locking
+      std::lock_guard<std::mutex> lock(thread_stat->mu_);
+      thread_stat->cb_status_ = result_ptr->RequestStatus();
+      if (thread_stat->cb_status_.IsOk()) {
+        struct timespec end_time_async;
+        clock_gettime(CLOCK_MONOTONIC, &end_time_async);
+        std::string request_id;
+        thread_stat->cb_status_ = result_ptr->Id(&request_id);
+        const auto& it = async_req_map.find(request_id);
         if (it != async_req_map.end()) {
           thread_stat->request_timestamps_.emplace_back(std::make_tuple(
               it->second.start_time_, end_time_async, it->second.sequence_end_,
@@ -202,16 +202,16 @@ ConcurrencyManager::Infer(
           skip_stat = true;
         }
       }
-
-      // avoid competition over 'cb_mtx'
-      {
-        std::lock_guard<std::mutex> lk(cb_mtx);
-        if (!skip_stat) {
-          free_ctx_ids.push(ctx_id);
-        }
-        notified = true;
+      if (!skip_stat) {
+        free_ctx_ids.push(ctx_id);
       }
     }
+    // avoid competition over 'cb_mtx'
+    {
+      std::lock_guard<std::mutex> lk(cb_mtx);
+      notified = true;
+    }
+
     total_ongoing_requests--;
 
     cb_cv.notify_all();
@@ -250,7 +250,10 @@ ConcurrencyManager::Infer(
     size_t active_ctx_cnt = on_sequence_model_ ? num_reqs : 1;
 
     while (active_ctx_cnt > ctxs.size()) {
-      free_ctx_ids.push(ctxs.size());
+      {
+        std::lock_guard<std::mutex> lock(thread_stat->mu_);
+        free_ctx_ids.push(ctxs.size());
+      }
       ctxs.emplace_back(new InferContext());
       thread_stat->status_ =
           factory_->CreateTritonClient(&(ctxs.back()->infer_client_));
@@ -300,7 +303,7 @@ ConcurrencyManager::Infer(
 
         // Find the next available context id to use for this request
         {
-          std::lock_guard<std::mutex> lk(cb_mtx);
+          std::lock_guard<std::mutex> lk(thread_stat->mu_);
           ctx_id = free_ctx_ids.front();
           free_ctx_ids.pop();
         }
@@ -388,7 +391,10 @@ ConcurrencyManager::Infer(
             return;
           }
         }
-        free_ctx_ids.push(ctx_id);
+        {
+          std::lock_guard<std::mutex> lock(thread_stat->mu_);
+          free_ctx_ids.push(ctx_id);
+        }
       }
       total_ongoing_requests++;
     }

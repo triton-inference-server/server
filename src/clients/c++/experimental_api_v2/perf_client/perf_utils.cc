@@ -162,15 +162,29 @@ ByteSize(const std::vector<int64_t>& shape, const std::string& datatype)
     return -1;
   }
 
-  return (one_element_size * ElementCount(shape));
+  int64_t count = ElementCount(shape);
+  if (count < 0) {
+    return count;
+  }
+
+  return (one_element_size * count);
 }
 
 int64_t
 ElementCount(const std::vector<int64_t>& shape)
 {
   int64_t count = 1;
+  bool is_dynamic = false;
   for (const auto dim : shape) {
-    count *= dim;
+    if (dim == -1) {
+      is_dynamic = true;
+    } else {
+      count *= dim;
+    }
+  }
+
+  if (is_dynamic) {
+    count = -1;
   }
   return count;
 }
