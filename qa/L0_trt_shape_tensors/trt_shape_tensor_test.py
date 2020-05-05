@@ -139,7 +139,8 @@ class InferShapeTensorTest(unittest.TestCase):
                         "expected model-inference-count {}, got {}".format(
                                 infer_cnt, actual_infer_cnt))
 
-        # FIXME Uncomment below after syncing with 'response'.
+        # FIXME Uncomment below after updated V2 statistics schema from
+        # 'response' branch.
         # Before that, batch stats is not reported
 
         # batch_stats = stats.model_stats[0].batch_stats
@@ -254,7 +255,7 @@ class InferShapeTensorTest(unittest.TestCase):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(model_name, {3: 2}, 2)
+            self.check_status(model_name, {3: 2}, 6)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -291,7 +292,7 @@ class InferShapeTensorTest(unittest.TestCase):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(model_name, {6: 1}, 2)
+            self.check_status(model_name, {6: 1}, 6)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 

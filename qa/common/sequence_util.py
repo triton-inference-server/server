@@ -768,7 +768,8 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                         "expected model-inference-count {}, got {}".format(
                                 infer_cnt, actual_infer_cnt))
 
-        # FIXME Uncomment below after syncing with 'response'.
+        # FIXME Uncomment below after updated V2 statistics schema from
+        # 'response' branch.
         # Before that, batch stats is not reported
 
         # config = self.triton_client_.get_model_config(model_name).config
