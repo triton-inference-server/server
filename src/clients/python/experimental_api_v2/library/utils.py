@@ -186,7 +186,7 @@ def serialize_byte_tensor(input_tensor):
         """
 
     if input_tensor.size == 0:
-        raise_error("input cannot be empty")
+        return np.empty([0])
 
     # If the input is a tensor of string/bytes objects, then must flatten those into
     # a 1-dimensional array containing the 4-byte byte size followed by the
