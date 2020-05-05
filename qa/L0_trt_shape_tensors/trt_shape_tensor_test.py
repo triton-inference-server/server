@@ -38,13 +38,13 @@ import infer_util as iu
 import test_util as tu
 import sequence_util as su
 
-from tensorrtserver.api import *
+import tritongrpcclient.core as grpcclient
+import tritongrpcclient.utils as grpcutils
+import tritonhttpclient.utils as httputils
 import os
 
-TEST_SYSTEM_SHARED_MEMORY = bool(
-    int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
-                                                  0)))
+TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
+TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',0)))
 
 _model_instances = 1
 _max_queue_delay_ms = 10000
@@ -57,8 +57,14 @@ _deferred_exceptions = []
 class InferShapeTensorTest(unittest.TestCase):
 
     def setUp(self):
+        # The helper client for setup will be GRPC for simplicity.
+        self.triton_client_ = grpcclient.InferenceServerClient("localhost:8001")
         global _deferred_exceptions
         _deferred_exceptions = []
+
+    def tearDown(self):
+        self.triton_client_.unregister_system_shared_memory()
+        self.triton_client_.unregister_cuda_shared_memory()
 
     def add_deferred_exception(self, ex):
         global _deferred_exceptions
@@ -80,12 +86,14 @@ class InferShapeTensorTest(unittest.TestCase):
                        precreated_shm_regions=None,
                        shm_suffix=""):
         try:
+            # Add batch size to shape as full shape is expected
+            for i in range(len(dummy_input_shapes)):
+                dummy_input_shapes[i] = [bs,] + dummy_input_shapes[i]
             start_ms = int(round(time.time() * 1000))
 
             iu.infer_shape_tensor(
                 self,
                 'plan',
-                bs,
                 np.float32,
                 shape_values,
                 dummy_input_shapes,
@@ -93,7 +101,8 @@ class InferShapeTensorTest(unittest.TestCase):
                 use_streaming=False,
                 shm_suffix=shm_suffix,
                 use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                batch_size=bs)
 
             end_ms = int(round(time.time() * 1000))
 
@@ -112,88 +121,83 @@ class InferShapeTensorTest(unittest.TestCase):
         except Exception as ex:
             self.add_deferred_exception(ex)
 
-    def check_setup(self, url, protocol, model_name):
+    def check_setup(self, model_name):
         # Make sure test.sh set up the correct batcher settings
-        ctx = ServerStatusContext(url, protocol, model_name, True)
-        ss = ctx.get_server_status()
-        self.assertEqual(len(ss.model_status), 1)
-        self.assertTrue(model_name in ss.model_status,
-                        "expected status for model " + model_name)
-        bconfig = ss.model_status[model_name].config.dynamic_batching
+        config = self.triton_client_.get_model_config(model_name).config
+        bconfig = config.dynamic_batching
         self.assertTrue(2 in bconfig.preferred_batch_size)
         self.assertTrue(6 in bconfig.preferred_batch_size)
-        self.assertEqual(bconfig.max_queue_delay_microseconds,
-                         _max_queue_delay_ms * 1000)  # 10 secs
+        self.assertEqual(bconfig.max_queue_delay_microseconds, _max_queue_delay_ms * 1000) # 10 secs
 
-    def check_status(self, url, protocol, model_name, static_bs, exec_cnt,
-                     infer_cnt):
-        ctx = ServerStatusContext(url, protocol, model_name, True)
-        ss = ctx.get_server_status()
-        self.assertEqual(len(ss.model_status), 1)
-        self.assertTrue(model_name in ss.model_status,
-                        "expected status for model " + model_name)
-        vs = ss.model_status[model_name].version_status
-        self.assertEqual(len(vs), 1)
-        self.assertTrue(1 in vs, "expected status for version 1")
-        infer = vs[1].infer_stats
-        self.assertEqual(
-            len(infer), len(static_bs), "expected batch-sizes (" +
-            ",".join(str(b) for b in static_bs) + "), got " + str(vs[1]))
-        for b in static_bs:
-            self.assertTrue(
-                b in infer,
-                "expected batch-size " + str(b) + ", got " + str(vs[1]))
-        self.assertEqual(
-            vs[1].model_execution_count, exec_cnt,
-            "expected model-execution-count " + str(exec_cnt) + ", got " +
-            str(vs[1].model_execution_count))
-        self.assertEqual(
-            vs[1].model_inference_count, infer_cnt,
-            "expected model-inference-count " + str(infer_cnt) + ", got " +
-            str(vs[1].model_inference_count))
+    def check_status(self, model_name, batch_exec, infer_cnt):
+        stats = self.triton_client_.get_inference_statistics(model_name, "1")
+        self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
+        self.assertEqual(stats.model_stats[0].name, model_name,
+                         "expect model stats for model {}".format(model_name))
+        self.assertEqual(stats.model_stats[0].version, "1",
+                         "expect model stats for model {} version 1".format(model_name))
+        actual_infer_cnt = stats.model_stats[0].inference_stats.success.count
+        self.assertEqual(actual_infer_cnt, infer_cnt,
+                        "expected model-inference-count {}, got {}".format(
+                                infer_cnt, actual_infer_cnt))
+
+        # FIXME Uncomment below after syncing with 'response'.
+        # Before that, batch stats is not reported
+
+        # batch_stats = stats.model_stats[0].batch_stats
+        # self.assertEqual(len(batch_stats), len(batch_exec),
+        #                  "expected {} different batch-sizes, got {}".format(
+        #                         len(batch_exec), len(batch_stats)))
+
+        # for batch_stat in batch_stats:
+        #     bs = batch_stat.batch_size
+        #     self.assertTrue(bs in batch_exec,
+        #                     "unexpected batch-size {}".format(bs))
+        #     # Get count from one of the stats
+        #     self.assertEqual(batch_stat.compute_infer.count, batch_exec[bs],
+        #                     "expected model-execution-count {} for batch size {}, got {}".format(
+        #                             batch_exec[bs], bs, batch_stat.compute_infer.count))
+
 
     def test_static_batch(self):
         iu.infer_shape_tensor(
             self,
             'plan',
-            8,
-            np.float32, [[32, 32]], [[4, 4]],
+            np.float32, [[32, 32]], [[8, 4, 4]],
             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+            batch_size=8)
         iu.infer_shape_tensor(
             self,
             'plan',
-            8,
-            np.float32, [[4, 4]], [[32, 32]],
+            np.float32, [[4, 4]], [[8, 32, 32]],
             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+            batch_size=8)
         iu.infer_shape_tensor(
             self,
             'plan',
-            8,
-            np.float32, [[4, 4]], [[4, 4]],
+            np.float32, [[4, 4]], [[8, 4, 4]],
             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+            batch_size=8)
 
     def test_nobatch(self):
         iu.infer_shape_tensor(
             self,
             'plan_nobatch',
-            1,
             np.float32, [[32, 32]], [[4, 4]],
             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
             use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
         iu.infer_shape_tensor(
             self,
             'plan_nobatch',
-            1,
             np.float32, [[4, 4]], [[32, 32]],
             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
             use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
         iu.infer_shape_tensor(
             self,
             'plan_nobatch',
-            1,
             np.float32, [[4, 4]], [[4, 4]],
             use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
             use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
@@ -204,13 +208,14 @@ class InferShapeTensorTest(unittest.TestCase):
             iu.infer_shape_tensor(
                 self,
                 'plan',
-                8,
                 np.float32,
-                over_shape_values, [[4, 4]],
+                over_shape_values, [[8, 4, 4]],
                 use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-        except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
+                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                batch_size=8)
+        # InferenceServerException will be raised from different namespace,
+        # use dynamic type characteristic to catch both ex
+        except Exception as ex:
             self.assertTrue(
                 "The shape value at index 2 is expected to be in range from 1 to 32, Got: 33"
                 in ex.message())
@@ -223,10 +228,8 @@ class InferShapeTensorTest(unittest.TestCase):
         # response will come back immediately and the second
         # delayed by the max batch queue delay
         try:
-            url = "localhost:8000"
-            protocol = ProtocolType.HTTP
             model_name = tu.get_zero_model_name("plan", 1, np.float32)
-            self.check_setup(url, protocol, model_name)
+            self.check_setup(model_name)
             self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
             threads = []
@@ -253,8 +256,8 @@ class InferShapeTensorTest(unittest.TestCase):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(url, protocol, model_name, (3,), 2, 6)
-        except InferenceServerException as ex:
+            self.check_status(model_name, {3: 2}, 2)
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_dynamic_identical_shape_values(self):
@@ -263,10 +266,8 @@ class InferShapeTensorTest(unittest.TestCase):
         # should cause the requests to get batched. Both
         # responses should come back immediately.
         try:
-            url = "localhost:8000"
-            protocol = ProtocolType.HTTP
             model_name = tu.get_zero_model_name("plan", 1, np.float32)
-            self.check_setup(url, protocol, model_name)
+            self.check_setup(model_name)
             self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
             threads = []
@@ -292,8 +293,8 @@ class InferShapeTensorTest(unittest.TestCase):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(url, protocol, model_name, (4, 2), 1, 6)
-        except InferenceServerException as ex:
+            self.check_status(model_name, {6: 1}, 2)
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
 
@@ -414,8 +415,8 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(model_name, (1,), 3 * _model_instances, 12)
-        except InferenceServerException as ex:
+            self.check_status(model_name, {4: 3}, 12)
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
             if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -536,8 +537,8 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                 t.join()
 
             self.check_deferred_exception()
-            self.check_status(model_name, (1,), 9, 12)
-        except InferenceServerException as ex:
+            self.check_status(model_name, {2: 3, 1: 6}, 12)
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
             if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -678,8 +679,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(model_name, (1,), 12, 12)
-        except InferenceServerException as ex:
+            self.check_status(model_name, {1: 12}, 12)
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
             if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -807,8 +808,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(model_name, (1,), 3, 12)
-        except InferenceServerException as ex:
+            self.check_status(model_name, {4: 3}, 12)
+        except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
             if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
