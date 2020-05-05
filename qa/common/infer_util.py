@@ -113,11 +113,6 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
     num_classes = 3
 
-    if model_version is not None:
-        model_version = str(model_version)
-    else:
-        model_version = ""
-
     input0_array = np.random.randint(low=val_min, high=val_max,
                                      size=tensor_shape, dtype=rinput_dtype)
     input1_array = np.random.randint(low=val_min, high=val_max,
@@ -204,6 +199,11 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
     shm_regions, shm_handles = su.create_set_shm_regions(input0_list_tmp, input1_list_tmp, output0_byte_size,
                                                         output1_byte_size, outputs, shm_region_names, precreated_shm_regions,
                                                         use_system_shared_memory, use_cuda_shared_memory)
+
+    if model_version is not None:
+        model_version = str(model_version)
+    else:
+        model_version = ""
 
     # Run inference and check results for each config
     for config in configs:
@@ -643,7 +643,8 @@ def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input
 
 # Perform inference using a "nop" model that expects some form or
 # zero-sized input/output tensor.
-# Turn on gRPC once zero size tensors support is fixed.
+# FIXME Support for empty tensors using non-empty shared memory regions.
+# Currently shared memory support is broken for empty input/outputs tensors.
 def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes,
                model_version=None, use_http=True, use_grpc=True,
                use_http_json_tensors=True, use_streaming=False, shm_region_name_prefix=None,
@@ -665,11 +666,6 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
 
     if shm_region_name_prefix is None:
         shm_region_name_prefix = ["input", "output"]
-
-    if model_version is not None:
-        model_version = str(model_version)
-    else:
-        model_version = ""
 
     input_dict = {}
     expected_dict = {}
@@ -732,6 +728,11 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
             shm_op_handles.append(shm_io_handles[1])
         else:
             input_dict[input_name] = input_array
+
+    if model_version is not None:
+        model_version = str(model_version)
+    else:
+        model_version = ""
 
     # Run inference and check results for each config
     for config in configs:
