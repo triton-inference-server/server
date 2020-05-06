@@ -786,6 +786,9 @@ EnsembleContext::ScheduleSteps(
             // composing model
             context->stats_->IncrementQueueDuration(*infer_stats);
             context->stats_->IncrementComputeDuration(*infer_stats);
+            context->stats_->IncrementComputeInputDuration(*infer_stats);
+            context->stats_->IncrementComputeInferDuration(*infer_stats);
+            context->stats_->IncrementComputeOutputDuration(*infer_stats);
           }
 #endif  // TRTIS_ENABLE_STATS
 

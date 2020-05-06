@@ -166,6 +166,18 @@ class ModelInferStats {
   // time.
   void IncrementComputeDuration(const ModelInferStats& other);
 
+  // Include compute input time from another stat into this stat's compute
+  // input time.
+  void IncrementComputeInputDuration(const ModelInferStats& other);
+
+  // Include compute infer time from another stat into this stat's compute
+  // infer time.
+  void IncrementComputeInferDuration(const ModelInferStats& other);
+
+  // Include compute output time from another stat into this stat's compute
+  // output time.
+  void IncrementComputeOutputDuration(const ModelInferStats& other);
+
 #else
   // Start model-specific timer for 'model_name' and a given status
   // 'kind'.
