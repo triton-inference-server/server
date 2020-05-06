@@ -292,7 +292,7 @@ InferRequestedOutput::SetSharedMemory(
 
 InferRequestedOutput::InferRequestedOutput(
     const std::string& name, const size_t class_count)
-    : name_(name), class_count_(class_count)
+    : name_(name), class_count_(class_count), io_type_(NONE)
 {
 }
 
