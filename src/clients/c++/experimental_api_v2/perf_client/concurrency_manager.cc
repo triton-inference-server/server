@@ -177,8 +177,7 @@ ConcurrencyManager::Infer(
 
   // Callback function for handling asynchronous requests
   const auto callback_func = [&](nic::InferResult* result) {
-    bool skip_stat = false;
-    uint32_t ctx_id;
+    uint32_t ctx_id = 0;
     std::shared_ptr<nic::InferResult> result_ptr(result);
     if (thread_stat->cb_status_.IsOk()) {
       // Add the request timestamp to thread Timestamp vector with
@@ -199,16 +198,13 @@ ConcurrencyManager::Infer(
           ctxs[ctx_id]->infer_client_->ClientInferStat(
               &(thread_stat->contexts_stat_[ctx_id]));
           async_req_map.erase(request_id);
-          skip_stat = true;
         }
-      }
-      if (!skip_stat) {
-        free_ctx_ids.push(ctx_id);
       }
     }
     // avoid competition over 'cb_mtx'
     {
       std::lock_guard<std::mutex> lk(cb_mtx);
+      free_ctx_ids.push(ctx_id);
       notified = true;
     }
 
@@ -251,7 +247,7 @@ ConcurrencyManager::Infer(
 
     while (active_ctx_cnt > ctxs.size()) {
       {
-        std::lock_guard<std::mutex> lock(thread_stat->mu_);
+        std::lock_guard<std::mutex> lock(cb_mtx);
         free_ctx_ids.push(ctxs.size());
       }
       ctxs.emplace_back(new InferContext());
@@ -303,7 +299,7 @@ ConcurrencyManager::Infer(
 
         // Find the next available context id to use for this request
         {
-          std::lock_guard<std::mutex> lk(thread_stat->mu_);
+          std::lock_guard<std::mutex> lk(cb_mtx);
           ctx_id = free_ctx_ids.front();
           free_ctx_ids.pop();
         }
@@ -392,7 +388,7 @@ ConcurrencyManager::Infer(
           }
         }
         {
-          std::lock_guard<std::mutex> lock(thread_stat->mu_);
+          std::lock_guard<std::mutex> lock(cb_mtx);
           free_ctx_ids.push(ctx_id);
         }
       }
