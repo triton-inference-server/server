@@ -80,11 +80,11 @@ class InferenceServerClient:
     Parameters
     ----------
     url : str
-        The inference server URL, e.g. 'localhost:8001'.     
+        The inference server URL, e.g. 'localhost:8001'.
 
     verbose : bool
         If True generate verbose output. Default value is False.
-    
+
     Raises
     ------
     Exception
@@ -144,6 +144,8 @@ class InferenceServerClient:
             metadata = ()
         try:
             request = grpc_service_v2_pb2.ServerLiveRequest()
+            if self._verbose:
+                print("is_server_live, metadata {}\n{}".format(metadata, request))
             response = self._client_stub.ServerLive(request=request,
                                                     metadata=metadata)
             if self._verbose:
@@ -178,6 +180,8 @@ class InferenceServerClient:
             metadata = ()
         try:
             request = grpc_service_v2_pb2.ServerReadyRequest()
+            if self._verbose:
+                print("is_server_ready, metadata {}\n{}".format(metadata, request))
             response = self._client_stub.ServerReady(request=request,
                                                      metadata=metadata)
             if self._verbose:
@@ -219,6 +223,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.ModelReadyRequest(
                 name=model_name, version=model_version)
+            if self._verbose:
+                print("is_model_ready, metadata {}\n{}".format(metadata, request))
             response = self._client_stub.ModelReady(request=request,
                                                     metadata=metadata)
             if self._verbose:
@@ -257,6 +263,8 @@ class InferenceServerClient:
             metadata = ()
         try:
             request = grpc_service_v2_pb2.ServerMetadataRequest()
+            if self._verbose:
+                print("get_server_metadata, metadata {}\n{}".format(metadata, request))
             response = self._client_stub.ServerMetadata(request=request,
                                                         metadata=metadata)
             if self._verbose:
@@ -292,7 +300,7 @@ class InferenceServerClient:
 
         Returns
         -------
-        dict or protobuf message 
+        dict or protobuf message
             The JSON dict or ModelMetadataResponse message holding
             the metadata.
 
@@ -309,6 +317,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.ModelMetadataRequest(
                 name=model_name, version=model_version)
+            if self._verbose:
+                print("get_model_metadata, metadata {}\n{}".format(metadata, request))
             response = self._client_stub.ModelMetadata(request=request,
                                                        metadata=metadata)
             if self._verbose:
@@ -344,7 +354,7 @@ class InferenceServerClient:
 
         Returns
         -------
-        dict or protobuf message 
+        dict or protobuf message
             The JSON dict or ModelConfigResponse message holding
             the metadata.
 
@@ -361,6 +371,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.ModelConfigRequest(
                 name=model_name, version=model_version)
+            if self._verbose:
+                print("get_model_config, metadata {}\n{}".format(metadata, request))
             response = self._client_stub.ModelConfig(request=request,
                                                      metadata=metadata)
             if self._verbose:
@@ -387,7 +399,7 @@ class InferenceServerClient:
 
         Returns
         -------
-        dict or protobuf message 
+        dict or protobuf message
             The JSON dict or RepositoryIndexResponse message holding
             the model repository index.
 
@@ -398,6 +410,8 @@ class InferenceServerClient:
             metadata = ()
         try:
             request = grpc_service_v2_pb2.RepositoryIndexRequest()
+            if self._verbose:
+                print("get_model_repository_index, metadata {}\n{}".format(metadata, request))
             response = self._client_stub.RepositoryIndex(request=request,
                                                          metadata=metadata)
             if self._verbose:
@@ -433,6 +447,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.RepositoryModelLoadRequest(
                 model_name=model_name)
+            if self._verbose:
+                print("load_model, metadata {}\n{}".format(metadata, request))
             self._client_stub.RepositoryModelLoad(request=request,
                                                   metadata=metadata)
             if self._verbose:
@@ -464,6 +480,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.RepositoryModelUnloadRequest(
                 model_name=model_name)
+            if self._verbose:
+                print("unload_model, metadata {}\n{}".format(metadata, request))
             self._client_stub.RepositoryModelUnload(request=request,
                                                     metadata=metadata)
             if self._verbose:
@@ -510,6 +528,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.ModelStatisticsRequest(
                 name=model_name, version=model_version)
+            if self._verbose:
+                print("get_inference_statistics, metadata {}\n{}".format(metadata, request))
             response = self._client_stub.ModelStatistics(request=request,
                                                          metadata=metadata)
             if self._verbose:
@@ -537,13 +557,13 @@ class InferenceServerClient:
             Optional dictionary specifying additional HTTP
             headers to include in the request.
         as_json : bool
-            If True then returns system shared memory status as a 
+            If True then returns system shared memory status as a
             json dict, otherwise as a protobuf message. Default
             value is False.
 
         Returns
         -------
-        dict or protobuf message 
+        dict or protobuf message
             The JSON dict or SystemSharedMemoryStatusResponse message holding
             the system shared memory status.
 
@@ -560,6 +580,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.SystemSharedMemoryStatusRequest(
                 name=region_name)
+            if self._verbose:
+                print("get_system_shared_memory_status, metadata {}\n{}".format(metadata, request))
             response = self._client_stub.SystemSharedMemoryStatus(
                 request=request, metadata=metadata)
             if self._verbose:
@@ -584,7 +606,7 @@ class InferenceServerClient:
         ----------
         name : str
             The name of the region to register.
-        key : str 
+        key : str
             The key of the underlying memory object that contains the
             system shared memory region.
         byte_size : int
@@ -600,7 +622,7 @@ class InferenceServerClient:
         Raises
         ------
         InferenceServerException
-            If unable to register the specified system shared memory.     
+            If unable to register the specified system shared memory.
 
         """
         if headers is not None:
@@ -610,6 +632,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.SystemSharedMemoryRegisterRequest(
                 name=name, key=key, offset=offset, byte_size=byte_size)
+            if self._verbose:
+                print("register_system_shared_memory, metadata {}\n{}".format(metadata, request))
             self._client_stub.SystemSharedMemoryRegister(request=request,
                                                          metadata=metadata)
             if self._verbose:
@@ -631,7 +655,7 @@ class InferenceServerClient:
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
-        
+
         Raises
         ------
         InferenceServerException
@@ -645,6 +669,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.SystemSharedMemoryUnregisterRequest(
                 name=name)
+            if self._verbose:
+                print("unregister_system_shared_memory, metadata {}\n{}".format(metadata, request))
             self._client_stub.SystemSharedMemoryUnregister(request=request,
                                                            metadata=metadata)
             if self._verbose:
@@ -672,13 +698,13 @@ class InferenceServerClient:
             Optional dictionary specifying additional HTTP
             headers to include in the request.
         as_json : bool
-            If True then returns cuda shared memory status as a 
+            If True then returns cuda shared memory status as a
             json dict, otherwise as a protobuf message. Default
             value is False.
 
         Returns
         -------
-        dict or protobuf message 
+        dict or protobuf message
             The JSON dict or CudaSharedMemoryStatusResponse message holding
             the cuda shared memory status.
 
@@ -696,6 +722,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.CudaSharedMemoryStatusRequest(
                 name=region_name)
+            if self._verbose:
+                print("get_cuda_shared_memory_status, metadata {}\n{}".format(metadata, request))
             response = self._client_stub.CudaSharedMemoryStatus(
                 request=request, metadata=metadata)
             if self._verbose:
@@ -720,7 +748,7 @@ class InferenceServerClient:
         ----------
         name : str
             The name of the region to register.
-        raw_handle : bytes 
+        raw_handle : bytes
             The raw serialized cudaIPC handle in base64 encoding.
         device_id : int
             The GPU device ID on which the cudaIPC handle was created.
@@ -733,7 +761,7 @@ class InferenceServerClient:
         Raises
         ------
         InferenceServerException
-            If unable to register the specified cuda shared memory.     
+            If unable to register the specified cuda shared memory.
 
         """
         if headers is not None:
@@ -746,6 +774,8 @@ class InferenceServerClient:
                 raw_handle=base64.b64decode(raw_handle),
                 device_id=device_id,
                 byte_size=byte_size)
+            if self._verbose:
+                print("register_cuda_shared_memory, metadata {}\n{}".format(metadata, request))
             self._client_stub.CudaSharedMemoryRegister(request=request,
                                                        metadata=metadata)
             if self._verbose:
@@ -767,7 +797,7 @@ class InferenceServerClient:
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
-        
+
         Raises
         ------
         InferenceServerException
@@ -781,6 +811,8 @@ class InferenceServerClient:
         try:
             request = grpc_service_v2_pb2.CudaSharedMemoryUnregisterRequest(
                 name=name)
+            if self._verbose:
+                print("unregister_cuda_shared_memory, metadata {}\n{}".format(metadata, request))
             self._client_stub.CudaSharedMemoryUnregister(request=request,
                                                          metadata=metadata)
             if self._verbose:
@@ -832,11 +864,11 @@ class InferenceServerClient:
             object. Default value is 0 which means that the request does not
             belong to a sequence.
         sequence_start : bool
-            Indicates whether the request being added marks the start of the 
+            Indicates whether the request being added marks the start of the
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
         sequence_end : bool
-            Indicates whether the request being added marks the end of the 
+            Indicates whether the request being added marks the end of the
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
         priority : int
@@ -884,6 +916,8 @@ class InferenceServerClient:
                                          sequence_end=sequence_end,
                                          priority=priority,
                                          timeout=timeout)
+        if self._verbose:
+            print("infer, metadata {}\n{}".format(metadata, request))
 
         try:
             response = self._client_stub.ModelInfer(request=request,
@@ -942,11 +976,11 @@ class InferenceServerClient:
             object. Default value is 0 which means that the request does not
             belong to a sequence.
         sequence_start: bool
-            Indicates whether the request being added marks the start of the 
+            Indicates whether the request being added marks the start of the
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
         sequence_end: bool
-            Indicates whether the request being added marks the end of the 
+            Indicates whether the request being added marks the end of the
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
         priority : int
@@ -966,7 +1000,7 @@ class InferenceServerClient:
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
-    
+
         Raises
         ------
         InferenceServerException
@@ -999,6 +1033,8 @@ class InferenceServerClient:
                                          sequence_end=sequence_end,
                                          priority=priority,
                                          timeout=timeout)
+        if self._verbose:
+            print("async_infer, metadata {}\n{}".format(metadata, request))
 
         try:
             self._call_future = self._client_stub.ModelInfer.future(
@@ -1031,7 +1067,7 @@ class InferenceServerClient:
         headers: dict
             Optional dictionary specifying additional HTTP
             headers to include in the request.
-        
+
         Raises
         ------
         InferenceServerException
@@ -1107,11 +1143,11 @@ class InferenceServerClient:
             object. Default value is 0 which means that the request does not
             belong to a sequence.
         sequence_start: bool
-            Indicates whether the request being added marks the start of the 
+            Indicates whether the request being added marks the start of the
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
         sequence_end: bool
-            Indicates whether the request being added marks the end of the 
+            Indicates whether the request being added marks the end of the
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
         priority : int
@@ -1128,7 +1164,7 @@ class InferenceServerClient:
             model-specific action such as terminating the request. If not
             provided, the server will handle the request using default setting
             for the model.
-    
+
         Raises
         ------
         InferenceServerException
@@ -1150,6 +1186,8 @@ class InferenceServerClient:
                                          sequence_end=sequence_end,
                                          priority=priority,
                                          timeout=timeout)
+        if self._verbose:
+            print("async_stream_infer\n{}".format(request))
         # Enqueues the request to the stream
         self._stream._enqueue_request(request)
         if self._verbose:
@@ -1227,7 +1265,7 @@ class InferInput:
         ----------
         input_tensor : numpy array
             The tensor data in numpy array format
-        
+
         Raises
         ------
         InferenceServerException
@@ -1269,7 +1307,7 @@ class InferInput:
         offset : int
             The offset, in bytes, into the region where the data for
             the tensor starts. The default value is 0.
-        
+
         """
 
         self._input.parameters[
@@ -1283,7 +1321,7 @@ class InferInput:
         """Retrieve the underlying InferInputTensor message.
         Returns
         -------
-        protobuf message 
+        protobuf message
             The underlying InferInputTensor protobuf message.
         """
         return self._input
@@ -1299,7 +1337,7 @@ class InferRequestedOutput:
         The name of output tensor to associate with this object
     class_count : int
         The number of classifications to be requested. The default
-        value is 0 which means the classification results are not 
+        value is 0 which means the classification results are not
         requested.
     """
 
@@ -1333,7 +1371,7 @@ class InferRequestedOutput:
         offset : int
             The offset, in bytes, into the region where the data for
             the tensor starts. The default value is 0.
-        
+
         """
 
         self._output.parameters[
@@ -1347,7 +1385,7 @@ class InferRequestedOutput:
         """Retrieve the underlying InferRequestedOutputTensor message.
         Returns
         -------
-        protobuf message 
+        protobuf message
             The underlying InferRequestedOutputTensor protobuf message.
         """
         return self._output
@@ -1375,7 +1413,7 @@ class InferResult:
         ----------
         name : str
             The name of the output tensor whose result is to be retrieved.
-    
+
         Returns
         -------
         numpy array
@@ -1421,13 +1459,13 @@ class InferResult:
         as_json : bool
             If True then returns response as a json dict, otherwise
             as a protobuf message. Default value is False.
-    
+
         Returns
         -------
         protobuf message or dict
             If a InferOutputTensor with specified name is present in
             ModelInferResponse then returns it as a protobuf messsage
-            or dict, otherwise returns None. 
+            or dict, otherwise returns None.
         """
         for output in self._result.outputs:
             if output.name == name:
@@ -1447,7 +1485,7 @@ class InferResult:
         as_json : bool
             If True then returns response as a json dict, otherwise
             as a protobuf message. Default value is False.
-    
+
         Returns
         -------
         protobuf message or dict
@@ -1546,14 +1584,14 @@ class _InferStream:
 
     def _process_response(self, responses):
         """Worker thread function to iterate through the response stream and
-        executes the provided callbacks. 
+        executes the provided callbacks.
 
         Parameters
         ----------
         responses : iterator
             The iterator to the response from the server for the
             requests in the stream.
-        
+
         """
         try:
             for response in responses:
