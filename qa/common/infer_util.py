@@ -456,3 +456,187 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                                       use_system_shared_memory, use_cuda_shared_memory)
 
     return results
+# resize the dummy tensor with the provided values in the shape tensor and finally
+# return the shape of the resized tensor.
+def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input_shapes,
+               use_http=True, use_grpc=True,
+               use_streaming=True, shm_suffix="", use_system_shared_memory=False,
+               use_cuda_shared_memory=False, priority=0, timeout_us=0,
+               batch_size=1):
+    tester.assertTrue(use_http or use_grpc or use_streaming)
+    tester.assertTrue(pf == "plan" or pf == "plan_nobatch")
+    tester.assertEqual(len(input_shape_values), len(dummy_input_shapes))
+    if use_system_shared_memory and use_cuda_shared_memory:
+        raise ValueError("Cannot set both System and CUDA shared memory flags to 1")
+
+    configs = []
+    if use_http:
+        configs.append(("localhost:8000", "http", False))
+    if use_grpc:
+        configs.append(("localhost:8001", "grpc", False))
+    if use_streaming:
+        configs.append(("localhost:8001", "grpc", True))
+
+    io_cnt = len(input_shape_values)
+
+    # FIXME wrap up shm handle cleanup
+    # For (cuda) shared memory, it's only set for shape tensor for simplicity.
+    # Regular tensor with (cuda) shared memory should be well-tested in other
+    # tests.
+    # item is (handle, byte_size, is_cuda)
+    input_shm_handle_list = []
+    output_shm_handle_list= []
+    dummy_input_list = []
+    input_list = []
+    expected_dict = dict()
+    # Prepare IO in advance
+    for io_num in range(io_cnt):
+        dummy_input_name = "DUMMY_INPUT{}".format(io_num)
+        input_name = "INPUT{}".format(io_num)
+        dummy_output_name = "DUMMY_OUTPUT{}".format(io_num)
+        output_name = "OUTPUT{}".format(io_num)
+
+        # Prepare the dummy tensor
+        rtensor_dtype = _range_repr_dtype(tensor_dtype)
+        if (rtensor_dtype != np.bool):
+            dummy_in0 = np.random.randint(low=np.iinfo(rtensor_dtype).min,
+                                    high=np.iinfo(rtensor_dtype).max,
+                                    size=dummy_input_shapes[io_num], dtype=rtensor_dtype)
+        else:
+            dummy_in0 = np.random.choice(a=[False, True], size=dummy_input_shapes[io_num])
+        if tensor_dtype != np.object:
+            dummy_in0 = dummy_in0.astype(tensor_dtype)
+        else:
+            dummy_in0 = np.array([str(x) for x in dummy_in0.flatten()],
+                            dtype=object).reshape(dummy_in0.shape)
+        dummy_input_list.append(dummy_in0)
+
+        # Prepare shape input tensor
+        in0 = np.asarray(input_shape_values[io_num], dtype=np.int32)
+        input_list.append(in0)
+
+        # Prepare the expected value for the output. Skip dummy output as we
+        # only care about its shape (== value of OUTPUT*)
+        expected_dict[output_name] = np.ndarray.copy(in0)
+
+        # Only need to create region once
+        input_byte_size = in0.size * np.dtype(np.int32).itemsize
+        output_byte_size = input_byte_size * batch_size
+        if use_system_shared_memory:
+            input_shm_handle_list.append((shm.create_shared_memory_region(input_name+shm_suffix,
+                                                            '/'+input_name+shm_suffix, input_byte_size), input_byte_size, False))
+            output_shm_handle_list.append((shm.create_shared_memory_region(output_name+shm_suffix,
+                                                            '/'+output_name+shm_suffix, output_byte_size), output_byte_size, False))
+            shm.set_shared_memory_region(input_shm_handle_list[-1][0], [in0,])
+        elif use_cuda_shared_memory:
+            input_shm_handle_list.append((cudashm.create_shared_memory_region(input_name+shm_suffix,
+                                                            input_byte_size, 0), input_byte_size, True))
+            output_shm_handle_list.append((cudashm.create_shared_memory_region(output_name+shm_suffix,
+                                                            output_byte_size, 0), output_byte_size, True))
+            cudashm.set_shared_memory_region(input_shm_handle_list[-1][0], [in0,])
+
+    model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
+    # Run inference and check results for each config
+    for config in configs:
+        client_utils = grpcclient if config[1] == "grpc" else httpclient
+        triton_client = client_utils.InferenceServerClient(config[0], verbose=True)
+
+        inputs = []
+        outputs = []
+
+        # Set IOs
+        for io_num in range(io_cnt):
+            dummy_input_name = "DUMMY_INPUT{}".format(io_num)
+            input_name = "INPUT{}".format(io_num)
+            dummy_output_name = "DUMMY_OUTPUT{}".format(io_num)
+            output_name = "OUTPUT{}".format(io_num)
+
+            inputs.append(client_utils.InferInput(
+                dummy_input_name, dummy_input_shapes[io_num],
+                np_to_triton_dtype(tensor_dtype)))
+            inputs.append(client_utils.InferInput(
+                input_name, input_list[io_num].shape, "INT32"))
+            outputs.append(client_utils.InferRequestedOutput(
+                dummy_output_name))
+            outputs.append(client_utils.InferRequestedOutput(
+                output_name))
+
+            # -2: dummy; -1: input
+            inputs[-2].set_data_from_numpy(dummy_input_list[io_num])
+            if (not use_system_shared_memory) and (not use_cuda_shared_memory):
+                inputs[-1].set_data_from_numpy(input_list[io_num])
+            else:
+                input_byte_size = input_shm_handle_list[io_num][1]
+                output_byte_size = output_shm_handle_list[io_num][1]
+                if use_system_shared_memory:
+                    triton_client.register_system_shared_memory(input_name+shm_suffix, "/"+input_name+shm_suffix, input_byte_size)
+                    triton_client.register_system_shared_memory(output_name+shm_suffix, "/"+output_name+shm_suffix, output_byte_size)
+                else:
+                    triton_client.register_cuda_shared_memory(input_name+shm_suffix, cudashm.get_raw_handle(input_shm_handle_list[io_num][0]), 0, input_byte_size)
+                    triton_client.register_cuda_shared_memory(output_name+shm_suffix, cudashm.get_raw_handle(output_shm_handle_list[io_num][0]), 0, output_byte_size)
+                inputs[-1].set_shared_memory(input_name+shm_suffix, input_byte_size)
+                outputs[-1].set_shared_memory(output_name+shm_suffix, output_byte_size)
+            
+        # FIXME streaming needs async handling
+        results = triton_client.infer(model_name, inputs,
+                                      outputs=outputs,
+                                      priority=priority, timeout=timeout_us)
+
+        for io_num in range(io_cnt):
+            output_name = "OUTPUT{}".format(io_num)
+            dummy_output_name = "DUMMY_OUTPUT{}".format(io_num)
+            expected = expected_dict[output_name]
+
+            # get outputs as numpy array
+            dummy_out = results.as_numpy(dummy_output_name)
+            if (not use_system_shared_memory) and (not use_cuda_shared_memory):
+                out = results.as_numpy(output_name)
+            else:
+                output = results.get_output(output_name)
+                if config[1] == "grpc":
+                    output_shape = output.shape
+                else:
+                    output_shape = output["shape"]
+                if use_system_shared_memory:
+                    out = shm.get_contents_as_numpy(output_shm_handle_list[io_num][0], np.int32, output_shape)
+                else:
+                    out = cudashm.get_contents_as_numpy(output_shm_handle_list[io_num][0], np.int32, output_shape)
+
+            # if out shape is 2D, it is batched
+            if (len(out.shape) == 2):
+                # The shape of the dummy output should be equal to the shape values
+                # specified in the shape tensor
+                tester.assertTrue(np.array_equal(dummy_out.shape[1:], out[0]),
+                                  "{}, {} shape, expected: {}, got {}".format(
+                                      model_name, dummy_output_name, out[0], dummy_out.shape[1:]))
+                for b in range(1, out.shape[0]):
+                    tester.assertTrue(np.array_equal(out[b-1], out[b]),
+                                      "expect shape tensor has consistent value, "
+                                      "expected: {}, got {}".format(out[b-1], out[b]))
+                out = out[0]
+            else:
+                tester.assertTrue(np.array_equal(dummy_out.shape, out),
+                                  "{}, {} shape, expected: {}, got {}".format(
+                                      model_name, dummy_output_name, out, dummy_out.shape))
+            tester.assertTrue(np.array_equal(out, expected),
+                              "{}, {}, expected: {}, got {}".format(
+                              model_name, output_name, expected, out))
+
+            # unregister shared memory region for next config
+            if use_system_shared_memory:
+                triton_client.unregister_system_shared_memory(input_name+shm_suffix)
+                triton_client.unregister_system_shared_memory(output_name+shm_suffix)
+            elif use_cuda_shared_memory:
+                triton_client.unregister_cuda_shared_memory(input_name+shm_suffix)
+                triton_client.unregister_cuda_shared_memory(output_name+shm_suffix)
+
+    for handle in input_shm_handle_list:
+        if (handle[2]):
+            cudashm.destroy_shared_memory_region(handle[0])
+        else:
+            shm.destroy_shared_memory_region(handle[0])
+    for handle in output_shm_handle_list:
+        if (handle[2]):
+            cudashm.destroy_shared_memory_region(handle[0])
+        else:
+            shm.destroy_shared_memory_region(handle[0])
