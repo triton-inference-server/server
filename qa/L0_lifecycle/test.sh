@@ -51,7 +51,8 @@ rm -fr *.log
 LOG_IDX=0
 
 # LifeCycleTest.test_parse_error_noexit_strict
-SERVER_ARGS="--model-repository=/tmp/xyzx --strict-readiness=true --exit-on-error=false"
+SERVER_ARGS="--api-version=2 --model-repository=/tmp/xyzx --strict-readiness=true \
+             --exit-on-error=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_nowait
 if [ "$SERVER_PID" == "0" ]; then
@@ -63,7 +64,7 @@ sleep 10
 
 rm -f $CLIENT_LOG
 set +e
-python $LC_TEST LifeCycleTest.test_parse_error_noexit_strict >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_parse_error_noexit >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -76,7 +77,8 @@ wait $SERVER_PID
 LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_parse_error_noexit
-SERVER_ARGS="--model-repository=/tmp/xyzx --strict-readiness=false --exit-on-error=false"
+SERVER_ARGS="--api-version=2 --model-repository=/tmp/xyzx --strict-readiness=false \
+             --exit-on-error=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_nowait
 if [ "$SERVER_PID" == "0" ]; then
@@ -103,7 +105,8 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_parse_error_noexit_strict (multiple model repositories)
 rm -rf models
 mkdir models
-SERVER_ARGS="--model-repository=/tmp/xyzx --model-repository=`pwd`/models --strict-readiness=true --exit-on-error=false"
+SERVER_ARGS="--api-version=2 --model-repository=/tmp/xyzx --model-repository=`pwd`/models \
+             --strict-readiness=true --exit-on-error=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_nowait
 if [ "$SERVER_PID" == "0" ]; then
@@ -115,7 +118,7 @@ sleep 10
 
 rm -f $CLIENT_LOG
 set +e
-python $LC_TEST LifeCycleTest.test_parse_error_noexit_strict >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_parse_error_noexit >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -130,7 +133,8 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_parse_error_noexit (multiple model repositories)
 rm -rf models
 mkdir models
-SERVER_ARGS="--model-repository=`pwd`/models --model-repository=/tmp/xyzx --strict-readiness=false --exit-on-error=false"
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=/tmp/xyzx \
+             --strict-readiness=false --exit-on-error=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_nowait
 if [ "$SERVER_PID" == "0" ]; then
@@ -165,7 +169,7 @@ for i in netdef plan ; do
 done
 rm models/graphdef_float32_float32_float32/*/*
 
-SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --exit-on-error=false --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
@@ -202,7 +206,7 @@ for i in netdef plan ; do
 done
 rm models/graphdef_float32_float32_float32/config.pbtxt
 
-SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --exit-on-error=false --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
@@ -242,7 +246,7 @@ for i in netdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
 
-SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --exit-on-error=false --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
@@ -278,7 +282,8 @@ mkdir -p models/graphdef_float32_float32_float32
 cp $DATADIR/qa_model_repository/graphdef_float32_float32_float32/config.pbtxt \
     models/graphdef_float32_float32_float32/.
 
-SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --exit-on-error=false \
+             --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
 if [ "$SERVER_PID" == "0" ]; then
@@ -311,7 +316,8 @@ for i in savedmodel ; do
     mv models/${i}_float32_float32_float32/3 models/${i}_float32_float32_float32/003
 done
 
-SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --exit-on-error=false \
+             --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -347,7 +353,8 @@ for i in graphdef netdef plan ; do
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 
-SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --repository-poll-secs=1 \
+             --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -377,7 +384,7 @@ for i in graphdef netdef plan ; do
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 
-SERVER_ARGS="--model-repository=`pwd`/models --allow-poll-model-repository=false \
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --allow-poll-model-repository=false \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -407,7 +414,8 @@ for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
-SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --repository-poll-secs=1 \
+             --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -437,7 +445,7 @@ for i in graphdef ; do
 done
 
 # Show model control mode will override deprecated model control options
-SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=none \
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-control-mode=none \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -474,7 +482,8 @@ for i in savedmodel plan ; do
         models/${i}_float32_float32_float32/wrong_output0_labels.txt
 done
 
-SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --repository-poll-secs=1 \
+             --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -499,9 +508,12 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_dynamic_file_delete
 rm -fr models config.pbtxt.*
 mkdir models
-cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/.
+for i in savedmodel plan ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+done
 
-SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5 --strict-model-config=false"
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --repository-poll-secs=1 \
+             --exit-timeout-secs=5 --strict-model-config=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -536,7 +548,7 @@ cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/. && \
     rm -rf models/savedmodel_float32_float32_float32/3
 
-SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --repository-poll-secs=1 --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -548,48 +560,6 @@ fi
 
 set +e
 python $LC_TEST LifeCycleTest.test_multiple_model_repository_polling >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-LOG_IDX=$((LOG_IDX+1))
-
-# LifeCycleTest.test_model_control
-# enable explicit model control, no model in the repository should be loaded
-rm -fr models config.pbtxt.*
-mkdir models
-for i in graphdef savedmodel ; do
-    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
-    cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models/.
-done
-
-SERVER_ARGS="--model-repository=`pwd`/models --allow-model-control=true \
-             --allow-poll-model-repository=false --exit-timeout-secs=5 \
-             --strict-model-config=false"
-SERVER_LOG="./inference_server_$LOG_IDX.log"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-# no model should be loaded
-set +e
-model_count=`curl -s localhost:8000/api/status | grep "MODEL_" | wc -l`
-set -e
-if [ "$model_count" != "0" ]; then
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-set +e
-python $LC_TEST LifeCycleTest.test_model_control >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -615,7 +585,7 @@ cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/. &
     rm -rf models/savedmodel_float32_float32_float32/3
 
 # Show model control mode will override deprecated model control options
-SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --model-control-mode=explicit \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
@@ -639,6 +609,40 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
+# LifeCycleTest.test_model_control
+rm -fr models config.pbtxt.*
+mkdir models
+for i in savedmodel ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models/.
+    sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
+    sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/simple_${i}_float32_float32_float32/config.pbtxt
+done
+
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --allow-model-control=true \
+             --allow-poll-model-repository=false --exit-timeout-secs=5 \
+             --strict-model-config=false"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_model_control >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
 # LifeCycleTest.test_multiple_model_repository_control_startup_models
 rm -fr models models_0 config.pbtxt.*
 mkdir models models_0
@@ -646,15 +650,17 @@ mkdir models models_0
 for i in graphdef savedmodel ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models_0/.
+    sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
+    sed -i "s/max_batch_size:.*/max_batch_size: 1/" models_0/simple_${i}_float32_float32_float32/config.pbtxt
 done
-rm -r models/savedmodel_float32_float32_float32/3
 
+# netdef doesn't load because it is duplicated in 2 repositories
 for i in netdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
 
-SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --allow-model-control=true --allow-poll-model-repository=false \
              --strict-model-config=false --exit-on-error=false \
              --load-model=netdef_float32_float32_float32 \
@@ -666,19 +672,6 @@ if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
-fi
-
-# 3 models should be loaded:
-#     simple_savedmodel_float32_float32_float32
-#     savedmodel_float32_float32_float32 (due to load above)
-#     graphdef_float32_float32_float32
-# netdef_float32_float32_float32 is asked to be loaded but failed
-set +e
-model_count=`curl -s localhost:8000/api/status | grep "model_status" | wc -l`
-set -e
-if [ "$model_count" != "3" ]; then
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
 fi
 
 set +e
@@ -702,14 +695,14 @@ for i in graphdef savedmodel ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models_0/.
 done
-rm -r models/savedmodel_float32_float32_float32/3
 
+# netdef doesn't load because it is duplicated in 2 repositories
 for i in netdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
 
-SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --allow-model-control=true --allow-poll-model-repository=false \
              --strict-model-config=false --exit-on-error=false \
              --load-model=netdef_float32_float32_float32 \
@@ -745,7 +738,8 @@ done
 
 # Polling enabled (default), control API should not work
 # This test also keeps using "--model-store" to ensure backward compatibility
-SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=0 --exit-timeout-secs=5 --strict-model-config=false"
+SERVER_ARGS="--api-version=2 --model-store=`pwd`/models --repository-poll-secs=0 \
+             --exit-timeout-secs=5 --strict-model-config=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -756,18 +750,18 @@ fi
 
 # unload API should return bad request
 set +e
-code=`curl -s -w %{http_code} -X POST localhost:8000/api/modelcontrol/unload/graphdef_float32_float32_float32`
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/model/graphdef_float32_float32_float32/unload`
 set -e
 if [ "$code" != "400" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-# the model should not be unloaded
+# the model should be available/ready
 set +e
-unavailable_count=`curl -s localhost:8000/api/status/graphdef_float32_float32_float32 | grep "MODEL_UNAVAILABLE" | wc -l`
+code=`curl -s -w %{http_code} localhost:8000/v2/models/graphdef_float32_float32_float32/ready`
 set -e
-if [ "$unavailable_count" != "0" ]; then
+if [ "$code" != "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -777,27 +771,18 @@ rm models/graphdef_float32_float32_float32/*/*
 
 # load API should return bad request
 set +e
-code=`curl -s -w %{http_code} -X POST localhost:8000/api/modelcontrol/load/graphdef_float32_float32_float32`
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/model/graphdef_float32_float32_float32/load`
 set -e
 if [ "$code" != "400" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-# the model should still be available
+# the model should be available/ready
 set +e
-unavailable_count=`curl -s localhost:8000/api/status/graphdef_float32_float32_float32 | grep "MODEL_UNAVAILABLE" | wc -l`
+code=`curl -s -w %{http_code} localhost:8000/v2/models/graphdef_float32_float32_float32/ready`
 set -e
-if [ "$unavailable_count" != "0" ]; then
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-# Infer request with no 'NV-InferRequest' header should return 400 error and not crash server.
-set +e
-code=`curl -s -w %{http_code} -X POST localhost:8000/api/infer/graphdef_float32_float32_float32`
-set -e
-if [[ "$code" != *"400" ]]; then
+if [ "$code" != "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -807,14 +792,15 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-# Send HTTP request to invalid endpoints
+# Send HTTP request to invalid endpoints. This should be replaced by
+# some more comprehensive fuzz attacks.
 rm -fr models
 mkdir models
 for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
-SERVER_ARGS="--model-repository=`pwd`/models --allow-poll-model-repository=false \
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --allow-poll-model-repository=false \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -825,7 +811,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} localhost:8000/noanapi/health/ready`
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/notapi/v2`
 set -e
 if [ "$code" != "400" ]; then
     echo -e "\n***\n*** Test Failed\n***"
@@ -833,7 +819,15 @@ if [ "$code" != "400" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} localhost:8000/api/notanendpoint`
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/notapi`
+set -e
+if [ "$code" != "400" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/notapi/foo`
 set -e
 if [ "$code" != "400" ]; then
     echo -e "\n***\n*** Test Failed\n***"
@@ -849,7 +843,7 @@ LOG_IDX=$((LOG_IDX+1))
 # code. So need to explicitly check CLIENT_LOG to make sure we see
 # some running tests
 set +e
-grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed To Run\n***"
