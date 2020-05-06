@@ -127,17 +127,17 @@ class InferShapeTensorTest(unittest.TestCase):
         self.assertTrue(6 in bconfig.preferred_batch_size)
         self.assertEqual(bconfig.max_queue_delay_microseconds, _max_queue_delay_ms * 1000) # 10 secs
 
-    def check_status(self, model_name, batch_exec, infer_cnt):
+    def check_status(self, model_name, batch_exec, request_cnt, infer_cnt):
         stats = self.triton_client_.get_inference_statistics(model_name, "1")
         self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
         self.assertEqual(stats.model_stats[0].name, model_name,
                          "expect model stats for model {}".format(model_name))
         self.assertEqual(stats.model_stats[0].version, "1",
                          "expect model stats for model {} version 1".format(model_name))
-        actual_infer_cnt = stats.model_stats[0].inference_stats.success.count
-        self.assertEqual(actual_infer_cnt, infer_cnt,
-                        "expected model-inference-count {}, got {}".format(
-                                infer_cnt, actual_infer_cnt))
+        actual_request_cnt = stats.model_stats[0].inference_stats.success.count
+        self.assertEqual(actual_request_cnt, request_cnt,
+                        "expected model-request-count {}, got {}".format(
+                                request_cnt, actual_request_cnt))
 
         # FIXME Uncomment below after updated V2 statistics schema from
         # 'response' branch.
@@ -148,14 +148,22 @@ class InferShapeTensorTest(unittest.TestCase):
         #                  "expected {} different batch-sizes, got {}".format(
         #                         len(batch_exec), len(batch_stats)))
 
+        # FIXME check if infer count is provided in inference statistics. If not,
+        # below calculates it via batch stats
+        # actual_infer_cnt = 0
         # for batch_stat in batch_stats:
         #     bs = batch_stat.batch_size
+        #     bc = batch_stat.compute_infer.count
         #     self.assertTrue(bs in batch_exec,
         #                     "unexpected batch-size {}".format(bs))
         #     # Get count from one of the stats
-        #     self.assertEqual(batch_stat.compute_infer.count, batch_exec[bs],
+        #     self.assertEqual(bc, batch_exec[bs],
         #                     "expected model-execution-count {} for batch size {}, got {}".format(
-        #                             batch_exec[bs], bs, batch_stat.compute_infer.count))
+        #                             batch_exec[bs], bs, bc))
+        #     actual_infer_cnt += bs * bc
+        # self.assertEqual(actual_infer_cnt, infer_cnt,
+        #                 "expected model-inference-count {}, got {}".format(
+        #                         infer_cnt, actual_infer_cnt))
 
 
     def test_static_batch(self):
@@ -255,7 +263,7 @@ class InferShapeTensorTest(unittest.TestCase):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(model_name, {3: 2}, 6)
+            self.check_status(model_name, {3: 2}, 2, 6)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -292,7 +300,7 @@ class InferShapeTensorTest(unittest.TestCase):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(model_name, {6: 1}, 6)
+            self.check_status(model_name, {6: 1}, 2, 6)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -404,7 +412,7 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(model_name, {4: 3}, 12)
+            self.check_status(model_name, {4: 3}, 12, 12)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
@@ -516,7 +524,7 @@ class SequenceBatcherShapeTensorTest(su.SequenceBatcherTestUtil):
                 t.join()
 
             self.check_deferred_exception()
-            self.check_status(model_name, {2: 3, 1: 6}, 12)
+            self.check_status(model_name, {2: 3, 1: 6}, 12, 12)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
@@ -648,7 +656,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(model_name, {1: 12}, 12)
+            self.check_status(model_name, {1: 12}, 12, 12)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
@@ -768,7 +776,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(model_name, {4: 3}, 12)
+            self.check_status(model_name, {4: 3}, 12, 12)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
         finally:
