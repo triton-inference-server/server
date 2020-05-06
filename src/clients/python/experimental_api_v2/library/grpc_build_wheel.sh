@@ -53,10 +53,9 @@ function main() {
     "${WHLDIR}/tritongrpcclient/."
   
   cp grpcclient.py \
-    "${WHLDIR}/tritongrpcclient/grpcclient.py"
+    "${WHLDIR}/tritongrpcclient/__init__.py"
 
   cp grpc_setup.py "${WHLDIR}"
-  touch ${WHLDIR}/tritongrpcclient/__init__.py
 
   # Use 'sed' command to fix protoc compiled imports (see
   # https://github.com/google/protobuf/issues/1491).

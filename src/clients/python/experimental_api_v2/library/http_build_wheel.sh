@@ -46,10 +46,9 @@ function main() {
   mkdir -p ${WHLDIR}/tritonhttpclient/
 
   cp httpclient.py \
-    "${WHLDIR}/tritonhttpclient/httpclient.py"
+    "${WHLDIR}/tritonhttpclient/__init__.py"
 
   cp http_setup.py "${WHLDIR}"
-  touch ${WHLDIR}/tritonhttpclient/__init__.py
 
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"

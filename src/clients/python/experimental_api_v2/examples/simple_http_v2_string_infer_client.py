@@ -29,7 +29,7 @@ import argparse
 import numpy as np
 import sys
 
-import tritonhttpclient.httpclient as httpclient
+import tritonhttpclient
 
 
 def TestIdentityInference(np_array, binary_data):
@@ -37,11 +37,11 @@ def TestIdentityInference(np_array, binary_data):
     inputs = []
     outputs = []
 
-    inputs.append(httpclient.InferInput('INPUT0', np_array.shape, "BYTES"))
+    inputs.append(tritonhttpclient.InferInput('INPUT0', np_array.shape, "BYTES"))
     inputs[0].set_data_from_numpy(np_array, binary_data=binary_data)
 
     outputs.append(
-        httpclient.InferRequestedOutput('OUTPUT0', binary_data=binary_data))
+        tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=binary_data))
 
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        triton_client = httpclient.InferenceServerClient(url=FLAGS.url,
+        triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
                                                          verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))
@@ -84,8 +84,8 @@ if __name__ == '__main__':
 
     inputs = []
     outputs = []
-    inputs.append(httpclient.InferInput('INPUT0', [1, 16], "BYTES"))
-    inputs.append(httpclient.InferInput('INPUT1', [1, 16], "BYTES"))
+    inputs.append(tritonhttpclient.InferInput('INPUT0', [1, 16], "BYTES"))
+    inputs.append(tritonhttpclient.InferInput('INPUT1', [1, 16], "BYTES"))
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
@@ -104,8 +104,8 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data, binary_data=True)
     inputs[1].set_data_from_numpy(input1_data, binary_data=False)
 
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT1',
+    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1',
                                                    binary_data=False))
 
     results = triton_client.infer(model_name=model_name,

@@ -31,7 +31,7 @@ import numpy as np
 import sys
 import queue
 
-import tritongrpcclient.grpcclient as grpcclient
+import tritongrpcclient
 from tritonclientutils.utils import InferenceServerException
 
 FLAGS = None
@@ -45,7 +45,7 @@ class UserData:
 
 # Define the callback function. Note the last two parameters should be
 # result and error. InferenceServerClient would povide the results of an
-# inference as tritongrpcclient.grpcclient.InferResult in result. For successful
+# inference as tritongrpcclient.InferResult in result. For successful
 # inference, error will be None, otherwise it will be an object of
 # tritonclientutils.utils.InferenceServerException holding the error details
 def callback(user_data, result, error):
@@ -65,11 +65,11 @@ def async_stream_send(triton_client, values, batch_size, sequence_id,
                              fill_value=value,
                              dtype=np.int32)
         inputs = []
-        inputs.append(grpcclient.InferInput('INPUT', value_data.shape, "INT32"))
+        inputs.append(tritongrpcclient.InferInput('INPUT', value_data.shape, "INT32"))
         # Initialize the data
         inputs[0].set_data_from_numpy(value_data)
         outputs = []
-        outputs.append(grpcclient.InferRequestedOutput('OUTPUT'))
+        outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT'))
         # Issue the asynchronous sequence inference.
         triton_client.async_stream_infer(model_name=model_name,
                                          inputs=inputs,
@@ -136,7 +136,7 @@ if __name__ == '__main__':
     # It is advisable to use client object within with..as clause
     # when sending streaming requests. This ensures the client
     # is closed when the block inside with exits.
-    with grpcclient.InferenceServerClient(
+    with tritongrpcclient.InferenceServerClient(
             url=FLAGS.url, verbose=FLAGS.verbose) as triton_client:
         try:
             # Establish stream
