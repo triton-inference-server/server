@@ -25,7 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-SIMPLE_CLIENT=../clients/simple_client
+SIMPLE_HTTP_CLIENT=../clients/simple_http_v2_infer_client
+SIMPLE_GRPC_CLIENT=../clients/simple_grpc_v2_infer_client
 TRACE_SUMMARY=../common/trace_summary.py
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
@@ -53,7 +54,7 @@ rm -fr $MODELSDIR && cp -r models $MODELSDIR
 RET=0
 
 # trace-level=OFF make sure no tracing
-SERVER_ARGS="--trace-file=trace_off.log --trace-level=OFF --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-file=trace_off.log --trace-level=OFF --trace-rate=1 --model-repository=$MODELSDIR --api-version=2"
 SERVER_LOG="./inference_server_off.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -65,12 +66,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_CLIENT >> client_off.log 2>&1
+    $SIMPLE_HTTP_CLIENT >> client_off.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_CLIENT -i grpc -u localhost:8001 >> client_off.log 2>&1
+    $SIMPLE_GRPC_CLIENT >> client_off.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -91,7 +92,7 @@ fi
 set -e
 
 # trace-rate == 1, trace-level=MIN make sure every request is traced
-SERVER_ARGS="--trace-file=trace_1.log --trace-level=MIN --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-file=trace_1.log --trace-level=MIN --trace-rate=1 --model-repository=$MODELSDIR --api-version=2"
 SERVER_LOG="./inference_server_1.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -103,12 +104,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_CLIENT >> client_1.log 2>&1
+    $SIMPLE_HTTP_CLIENT >> client_1.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_CLIENT -i grpc -u localhost:8001 >> client_1.log 2>&1
+    $SIMPLE_GRPC_CLIENT >> client_1.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -138,7 +139,7 @@ fi
 set -e
 
 # trace-rate == 6, trace-level=MIN
-SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_6.log --trace-level=MIN --trace-rate=6 --model-repository=$MODELSDIR"
+SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_6.log --trace-level=MIN --trace-rate=6 --model-repository=$MODELSDIR --api-version=2"
 SERVER_LOG="./inference_server_6.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -150,12 +151,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_CLIENT >> client_6.log 2>&1
+    $SIMPLE_HTTP_CLIENT >> client_6.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_CLIENT -i grpc -u localhost:8001 >> client_6.log 2>&1
+    $SIMPLE_GRPC_CLIENT >> client_6.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -185,7 +186,7 @@ fi
 set -e
 
 # trace-rate == 9, trace-level=MAX
-SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_9.log --trace-level=MAX --trace-rate=9 --model-repository=$MODELSDIR"
+SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_9.log --trace-level=MAX --trace-rate=9 --model-repository=$MODELSDIR --api-version=2"
 SERVER_LOG="./inference_server_9.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -197,12 +198,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_CLIENT >> client_9.log 2>&1
+    $SIMPLE_HTTP_CLIENT >> client_9.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_CLIENT -i grpc -u localhost:8001 >> client_9.log 2>&1
+    $SIMPLE_GRPC_CLIENT >> client_9.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -256,7 +257,7 @@ cp -r $ENSEMBLEDIR/nop_TYPE_INT32_-1 $MODELSDIR/. && \
     cp libidentity.so $MODELSDIR/nop_TYPE_INT32_-1/1/.
 
 # trace-rate == 1, trace-level=MAX
-SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_ensemble.log --trace-level=MAX --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_ensemble.log --trace-level=MAX --trace-rate=1 --model-repository=$MODELSDIR --api-version=2"
 SERVER_LOG="./inference_server_ensemble.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -267,7 +268,7 @@ fi
 
 set +e
 
-$SIMPLE_CLIENT >> client_ensemble.log 2>&1
+$SIMPLE_HTTP_CLIENT >> client_ensemble.log 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
