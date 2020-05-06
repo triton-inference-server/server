@@ -519,9 +519,12 @@ InferenceProfiler::Summarize(
   size_t delayed_request_count = 0;
 
   // Get measurement from requests that fall within the time interval
-  std::pair<uint64_t, uint64_t> valid_range = MeasurementTimestamp(timestamps);
-  std::vector<uint64_t> latencies = ValidLatencyMeasurement(
-      timestamps, valid_range, valid_sequence_count, delayed_request_count);
+  std::pair<uint64_t, uint64_t> valid_range;
+  MeasurementTimestamp(timestamps, &valid_range);
+  std::vector<uint64_t> latencies;
+  ValidLatencyMeasurement(
+      timestamps, valid_range, valid_sequence_count, delayed_request_count,
+      &latencies);
 
   RETURN_IF_ERROR(SummarizeLatency(latencies, summary));
   RETURN_IF_ERROR(SummarizeClientStat(
@@ -534,8 +537,10 @@ InferenceProfiler::Summarize(
   return nic::Error::Success;
 }
 
-std::pair<uint64_t, uint64_t>
-InferenceProfiler::MeasurementTimestamp(const TimestampVector& timestamps)
+void
+InferenceProfiler::MeasurementTimestamp(
+    const TimestampVector& timestamps,
+    std::pair<uint64_t, uint64_t>* valid_range)
 {
   // finding the start time of the first request
   // and the end time of the last request in the timestamp queue
@@ -564,16 +569,17 @@ InferenceProfiler::MeasurementTimestamp(const TimestampVector& timestamps)
   uint64_t start_ns = first_request_start_ns + offset;
   uint64_t end_ns = start_ns + measurement_window_ns;
 
-  return std::make_pair(start_ns, end_ns);
+  *valid_range = std::make_pair(start_ns, end_ns);
 }
 
-std::vector<uint64_t>
+void
 InferenceProfiler::ValidLatencyMeasurement(
     const TimestampVector& timestamps,
     const std::pair<uint64_t, uint64_t>& valid_range,
-    size_t& valid_sequence_count, size_t& delayed_request_count)
+    size_t& valid_sequence_count, size_t& delayed_request_count,
+    std::vector<uint64_t>* valid_latencies)
 {
-  std::vector<uint64_t> valid_latencies;
+  valid_latencies->clear();
   valid_sequence_count = 0;
   for (auto& timestamp : timestamps) {
     uint64_t request_start_ns = TIMESPEC_TO_NANOS(std::get<0>(timestamp));
@@ -583,7 +589,7 @@ InferenceProfiler::ValidLatencyMeasurement(
       // Only counting requests that end within the time interval
       if ((request_end_ns >= valid_range.first) &&
           (request_end_ns <= valid_range.second)) {
-        valid_latencies.push_back(request_end_ns - request_start_ns);
+        valid_latencies->push_back(request_end_ns - request_start_ns);
         // Just add the sequence_end flag here.
         if (std::get<2>(timestamp)) {
           valid_sequence_count++;
@@ -596,9 +602,7 @@ InferenceProfiler::ValidLatencyMeasurement(
   }
 
   // Always sort measured latencies as percentile will be reported as default
-  std::sort(valid_latencies.begin(), valid_latencies.end());
-
-  return valid_latencies;
+  std::sort(valid_latencies->begin(), valid_latencies->end());
 }
 
 nic::Error

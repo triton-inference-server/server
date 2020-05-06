@@ -309,21 +309,24 @@ class InferenceProfiler {
 
   /// A helper function to get the start and end of a measurement window.
   /// \param timestamps The timestamps collected for the measurement.
-  /// \return the start and end timestamp of the measurement window.
-  std::pair<uint64_t, uint64_t> MeasurementTimestamp(
-      const TimestampVector& timestamps);
+  /// \param valid_range Returns the start and end timestamp of the measurement
+  /// window.
+  void MeasurementTimestamp(
+      const TimestampVector& timestamps,
+      std::pair<uint64_t, uint64_t>* valid_range);
 
   /// \param timestamps The timestamps collected for the measurement.
   /// \param valid_range The start and end timestamp of the measurement window.
   /// \param valid_sequence_count Returns the number of completed sequences
   /// during the measurement. A sequence is a set of correlated requests sent to
   /// sequence model.
-  /// \return the vector of request latencies where the requests are completed
-  /// within the measurement window.
-  std::vector<uint64_t> ValidLatencyMeasurement(
+  /// \param latencies Returns the vector of request latencies where the
+  /// requests are completed within the measurement window.
+  void ValidLatencyMeasurement(
       const TimestampVector& timestamps,
       const std::pair<uint64_t, uint64_t>& valid_range,
-      size_t& valid_sequence_count, size_t& delayed_request_count);
+      size_t& valid_sequence_count, size_t& delayed_request_count,
+      std::vector<uint64_t>* latencies);
 
   /// \param latencies The vector of request latencies collected.
   /// \param summary Returns the summary that the latency related fields are

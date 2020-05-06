@@ -96,11 +96,11 @@ class ModelParser {
 
   /// Get the name of the target model
   /// \return Model name as string
-  std::string ModelName() const { return model_name_; }
+  const std::string& ModelName() const { return model_name_; }
 
   /// Get the version of target model
   /// \return Model version as string
-  std::string ModelVersion() const { return model_version_; }
+  const std::string& ModelVersion() const { return model_version_; }
 
   /// Get the scheduler type for the model
   ModelSchedulerType SchedulerType() const { return scheduler_type_; }
@@ -113,17 +113,17 @@ class ModelParser {
   /// Get the details about the model inputs.
   /// \return The map with tensor_name and the tensor details
   /// stored as key-value pair.
-  std::shared_ptr<ModelTensorMap> Inputs() { return inputs_; }
+  const std::shared_ptr<ModelTensorMap>& Inputs() { return inputs_; }
 
   /// Get the details about the model outputs.
   /// \return The map with tensor_name and the tensor details
   /// stored as key-value pair.
-  std::shared_ptr<ModelTensorMap> Outputs() { return outputs_; }
+  const std::shared_ptr<ModelTensorMap>& Outputs() { return outputs_; }
 
   /// Get the composing maps for the target model.
   /// \return The pointer to the nested map descriping the
   /// nested flow in the target model.
-  std::shared_ptr<ComposingModelMap> GetComposingModelMap()
+  const std::shared_ptr<ComposingModelMap>& GetComposingModelMap()
   {
     return composing_models_map_;
   }
