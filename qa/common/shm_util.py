@@ -75,14 +75,16 @@ def create_set_shm_regions(input0_list, input1_list, output0_byte_size,
         if "OUTPUT0" in outputs:
             if precreated_shm_regions is None:
                 shm_op0_handle = shm.create_shared_memory_region(shm_region_names[2]+'_data',
-                                                                 '/'+shm_region_names[2], output0_byte_size)
+                                                                 '/'+shm_region_names[2],
+                                                                 output0_byte_size)
             else:
                 shm_op0_handle = precreated_shm_regions[0]
             i += 1
         if "OUTPUT1" in outputs:
             if precreated_shm_regions is None:
                 shm_op1_handle = shm.create_shared_memory_region(shm_region_names[2+i]+'_data',
-                                                                 '/'+shm_region_names[2+i], output1_byte_size)
+                                                                 '/'+shm_region_names[2+i],
+                                                                 output1_byte_size)
             else:
                 shm_op1_handle = precreated_shm_regions[i]
 
@@ -135,14 +137,16 @@ def register_add_shm_regions(inputs, outputs, shm_region_names, precreated_shm_r
                     triton_client.unregister_system_shared_memory(
                         shm_region_names[2]+'_data')
                     triton_client.register_system_shared_memory(shm_region_names[2]+'_data',
-                                                                '/'+shm_region_names[2], output0_byte_size)
+                                                                '/'+shm_region_names[2],
+                                                                output0_byte_size)
                 i += 1
             if "OUTPUT1" in outputs:
                 if precreated_shm_regions is None:
                     triton_client.unregister_system_shared_memory(
                         shm_region_names[2+i]+'_data')
                     triton_client.register_system_shared_memory(shm_region_names[2+i]+'_data',
-                                                                '/'+shm_region_names[2+i], output1_byte_size)
+                                                                '/'+shm_region_names[2+i],
+                                                                output1_byte_size)
 
         if use_cuda_shared_memory:
             triton_client.unregister_cuda_shared_memory(
@@ -150,25 +154,27 @@ def register_add_shm_regions(inputs, outputs, shm_region_names, precreated_shm_r
             triton_client.unregister_cuda_shared_memory(
                 shm_region_names[1]+'_data')
             triton_client.register_cuda_shared_memory(shm_region_names[0]+'_data',
-                                                      cudashm.get_raw_handle(shm_handles[0]), 0, input0_byte_size)
+                                                      cudashm.get_raw_handle(shm_handles[0]),
+                                                      0, input0_byte_size)
             triton_client.register_cuda_shared_memory(shm_region_names[1]+'_data',
-                                                      cudashm.get_raw_handle(shm_handles[1]), 0, input1_byte_size)
+                                                      cudashm.get_raw_handle(shm_handles[1]),
+                                                      0, input1_byte_size)
             i = 0
             if "OUTPUT0" in outputs:
                 if precreated_shm_regions is None:
                     triton_client.unregister_cuda_shared_memory(
                         shm_region_names[2]+'_data')
                     triton_client.register_cuda_shared_memory(shm_region_names[2]+'_data',
-                                                              cudashm.get_raw_handle(shm_handles[2]), 0,
-                                                              output0_byte_size)
+                                                              cudashm.get_raw_handle(shm_handles[2]),
+                                                              0, output0_byte_size)
                 i += 1
             if "OUTPUT1" in outputs:
                 if precreated_shm_regions is None:
                     triton_client.unregister_cuda_shared_memory(
                         shm_region_names[2+i]+'_data')
                     triton_client.register_cuda_shared_memory(shm_region_names[2+i]+'_data',
-                                                              cudashm.get_raw_handle(shm_handles[3]), 0,
-                                                              output1_byte_size)
+                                                              cudashm.get_raw_handle(shm_handles[3]),
+                                                              0, output1_byte_size)
 
         # Add shared memory regions to inputs
         inputs[0].set_shared_memory(shm_region_names[0]+'_data', input0_byte_size)
@@ -215,3 +221,58 @@ def unregister_cleanup_shm_regions(shm_regions, shm_handles, precreated_shm_regi
                     shm_regions[2+i]+'_data')
                 shm.destroy_shared_memory_region(shm_handles[3])
 
+
+def create_set_either_shm_region(shm_region_names, input_list, input_byte_size,
+                                output_byte_size, use_system_shared_memory,
+                                use_cuda_shared_memory):
+    if use_cuda_shared_memory and use_system_shared_memory:
+        raise ValueError(
+            "Cannot set both System and CUDA shared memory flags to 1")
+
+    if not (use_system_shared_memory or use_cuda_shared_memory):
+        return []
+
+    if use_cuda_shared_memory:
+        shm_ip_handle = cudashm.create_shared_memory_region(shm_region_names[0]+"_data",
+                                                            input_byte_size, 0)
+        shm_op_handle = cudashm.create_shared_memory_region(shm_region_names[1]+"_data",
+                                                            output_byte_size, 0)
+        cudashm.set_shared_memory_region(shm_ip_handle, input_list)
+    elif use_system_shared_memory:
+        shm_ip_handle = shm.create_shared_memory_region(shm_region_names[0]+"_data",
+                                                        "/"+shm_region_names[0], input_byte_size)
+        shm_op_handle = shm.create_shared_memory_region(shm_region_names[1]+"_data",
+                                                        "/"+shm_region_names[1], output_byte_size)
+        shm.set_shared_memory_region(shm_ip_handle, input_list)
+
+    return [shm_ip_handle, shm_op_handle]
+
+
+def register_add_either_shm_regions(inputs, outputs, shm_region_prefix, shm_handles, io_num,
+                                    input_byte_size, output_byte_size, use_system_shared_memory,
+                                    use_cuda_shared_memory, triton_client):
+    if use_system_shared_memory or use_cuda_shared_memory:
+        # Unregister then register required shared memory regions
+        input_shm_name = shm_region_prefix[0]+str(io_num)
+        output_shm_name = shm_region_prefix[1]+str(io_num)
+        if use_system_shared_memory:
+            triton_client.unregister_system_shared_memory(input_shm_name+'_data')
+            triton_client.unregister_system_shared_memory(output_shm_name+'_data')
+            triton_client.register_system_shared_memory(input_shm_name+'_data',
+                                                        '/'+input_shm_name, input_byte_size)
+            triton_client.register_system_shared_memory(output_shm_name+'_data',
+                                                        '/'+output_shm_name, output_byte_size)
+
+        if use_cuda_shared_memory:
+            triton_client.unregister_cuda_shared_memory(input_shm_name+'_data')
+            triton_client.unregister_cuda_shared_memory(output_shm_name+'_data')
+            triton_client.register_cuda_shared_memory(input_shm_name+'_data',
+                                                      cudashm.get_raw_handle(shm_handles[io_num][0]),
+                                                      0, input_byte_size)
+            triton_client.register_cuda_shared_memory(output_shm_name+'_data',
+                                                      cudashm.get_raw_handle(shm_handles[io_num][1]),
+                                                      0, output_byte_size)
+
+        # Add shared memory regions to inputs
+        inputs[io_num].set_shared_memory(input_shm_name+'_data', input_byte_size)
+        outputs[io_num].set_shared_memory(output_shm_name+'_data', output_byte_size)
