@@ -126,6 +126,11 @@ function wait_for_server_live() {
 function wait_for_model_stable() {
     local wait_time_secs="${1:--1}"; shift
 
+    # DLIS-1295. Need enhanced model index API to do this
+    # correctly. So for now just wait some time...
+    sleep 20
+    return
+
     local wait_secs=$wait_time_secs
     until test $wait_secs -eq 0 ; do
         sleep 1;
