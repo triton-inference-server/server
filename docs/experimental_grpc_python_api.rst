@@ -35,7 +35,7 @@ This module contains most of the core functionality of the library
 including setting up a connection, sending requests and receiving
 response to/from an active Triton server.
 
-.. automodule:: tritongrpcclient.core
+.. automodule:: tritongrpcclient
    :members:
 
 Client Utils
@@ -43,5 +43,5 @@ Client Utils
 
 This module exposes additional supporting utilities.
 
-.. automodule:: tritongrpcclient.utils
+.. automodule:: tritonclientutils.utils
    :members:

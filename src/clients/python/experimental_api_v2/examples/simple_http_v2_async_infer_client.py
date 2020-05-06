@@ -31,8 +31,8 @@ import numpy as np
 import sys
 import gevent
 
-import tritonhttpclient.core as httpclient
-from tritonhttpclient.utils import InferenceServerException
+import tritonhttpclient
+from tritonclientutils.utils import InferenceServerException
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        triton_client = httpclient.InferenceServerClient(url=FLAGS.url,
+        triton_client = tritonhttpclient.InferenceServerClient(url=FLAGS.url,
                                                          verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))
@@ -62,8 +62,8 @@ if __name__ == '__main__':
     # Infer
     inputs = []
     outputs = []
-    inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
-    inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
+    inputs.append(tritonhttpclient.InferInput('INPUT0', [1, 16], "INT32"))
+    inputs.append(tritonhttpclient.InferInput('INPUT1', [1, 16], "INT32"))
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
@@ -76,16 +76,16 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data, binary_data=False)
     inputs[1].set_data_from_numpy(input1_data, binary_data=False)
 
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT0',
+    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0',
                                                    binary_data=False))
-    outputs.append(httpclient.InferRequestedOutput('OUTPUT1',
+    outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT1',
                                                    binary_data=False))
 
     # Define the callback function. Note the last two parameters should be
     # result and error. InferenceServerClient would povide the results of an
-    # inference as tritongrpcclient.core.InferResult in result. For successful
+    # inference as tritongrpcclient.InferResult in result. For successful
     # inference, error will be None, otherwise it will be an object of
-    # tritongrpcclient.utils.InferenceServerException holding the error details.
+    # tritonclientutils.utils.InferenceServerException holding the error details.
     def callback(user_data, result, error):
         if not error:
             user_data.append(result)
