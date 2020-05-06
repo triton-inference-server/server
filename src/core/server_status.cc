@@ -561,6 +561,27 @@ ModelInferStats::IncrementComputeDuration(const ModelInferStats& other)
       other.Duration(TimestampKind::kComputeStart, TimestampKind::kComputeEnd);
 }
 
+void
+ModelInferStats::IncrementComputeInputDuration(const ModelInferStats& other)
+{
+  extra_compute_input_duration_ += other.Duration(
+      TimestampKind::kComputeStart, TimestampKind::kComputeInputEnd);
+}
+
+void
+ModelInferStats::IncrementComputeInferDuration(const ModelInferStats& other)
+{
+  extra_compute_infer_duration_ += other.Duration(
+      TimestampKind::kComputeInputEnd, TimestampKind::kComputeOutputStart);
+}
+
+void
+ModelInferStats::IncrementComputeOutputDuration(const ModelInferStats& other)
+{
+  extra_compute_output_duration_ += other.Duration(
+      TimestampKind::kComputeOutputStart, TimestampKind::kComputeEnd);
+}
+
 uint64_t
 ModelInferStats::Duration(
     ModelInferStats::TimestampKind start_kind,
