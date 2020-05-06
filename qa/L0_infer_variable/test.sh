@@ -43,7 +43,7 @@ INFER_TEST=infer_variable_test.py
 DATADIR=`pwd`/models
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --api-version=2"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 
@@ -95,7 +95,7 @@ for TARGET in cpu gpu; do
         RET=1
     fi
 
-    grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+    grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed To Run\n***"
