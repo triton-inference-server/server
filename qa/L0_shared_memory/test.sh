@@ -71,15 +71,15 @@ for i in \
     done
 done
 
-if [ `grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG` != "36" ]; then
-    echo -e "\n***\n*** Failed. Expected 36 HTTPSocketPoolResponse status=200 headers for client\n***"
+if [ `grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG` != "40" ]; then
+    echo -e "\n***\n*** Failed. Expected 40 HTTPSocketPoolResponse status=200 headers for client\n***"
     RET=1
 fi
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    # cat $CLIENT_LOG
+    cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
 fi
 
