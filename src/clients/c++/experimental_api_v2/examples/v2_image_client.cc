@@ -193,6 +193,11 @@ Postprocess(
     const std::vector<std::string>& filenames, const size_t batch_size,
     const std::string& output_name, const size_t topk)
 {
+  if (!result->RequestStatus().IsOk()) {
+    std::cerr << "inference  failed with error: " << result->RequestStatus()
+              << std::endl;
+    exit(1);
+  }
   if (filenames.size() != batch_size) {
     std::cerr << "expected " << batch_size << " filenames, got "
               << filenames.size() << std::endl;

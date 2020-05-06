@@ -1199,7 +1199,6 @@ TRITONSERVER_ServerModelStatistics(
 
   rapidjson::Value model_stats_json(rapidjson::kArrayType);
   for (const auto& m : server_status.model_status()) {
-    std::cout << m.first << std::endl;
     if (model_name_string.empty() ||
         (m.first.compare(model_name_string) == 0)) {
       if ((model_version_int != -1) &&

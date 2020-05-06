@@ -222,6 +222,18 @@ class InferInput {
       InferInput** infer_input, const std::string& name,
       const std::vector<int64_t>& dims, const std::string& datatype);
 
+  /// Gets name of the associated input tensor.
+  /// \return The name of the tensor.
+  const std::string& Name() const { return name_; }
+
+  /// Gets datatype of the associated input tensor.
+  /// \return The datatype of the tensor.
+  const std::string& Datatype() const { return datatype_; }
+
+  /// Gets the shape of the input tensor.
+  /// \return The shape of the tensor.
+  const std::vector<int64_t>& Shape() const { return shape_; }
+
   /// Set the shape of input associated with this object.
   /// \param dims the vector of dims representing the new shape
   /// of input.
@@ -301,9 +313,6 @@ class InferInput {
       const std::string& name, const std::vector<int64_t>& dims,
       const std::string& datatype);
 
-  const std::string& Name() const { return name_; }
-  const std::string& Datatype() const { return datatype_; }
-  const std::vector<int64_t>& Shape() const { return shape_; }
   bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
   Error SharedMemoryInfo(
       std::string* name, size_t* batch_byte_size, size_t* offset) const;
@@ -353,6 +362,10 @@ class InferRequestedOutput {
       InferRequestedOutput** infer_output, const std::string& name,
       const size_t class_count = 0);
 
+  /// Gets name of the associated output tensor.
+  /// \return The name of the tensor.
+  const std::string& Name() const { return name_; }
+
   /// Set the output tensor data to be written to specified shared
   /// memory region.
   /// \param region_name The name of the shared memory region.
@@ -374,8 +387,6 @@ class InferRequestedOutput {
  private:
   explicit InferRequestedOutput(
       const std::string& name, const size_t class_count = 0);
-
-  const std::string& Name() const { return name_; }
   size_t ClassCount() const { return class_count_; }
   bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
   Error SharedMemoryInfo(
