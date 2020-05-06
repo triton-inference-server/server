@@ -33,7 +33,6 @@ import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
-from tensorrtserver.api import *
 import os
 
 np_dtype_string = np.dtype(object)
@@ -50,9 +49,10 @@ class InferZeroTest(unittest.TestCase):
         if tu.validate_for_tf_model(dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_zero(self, 'graphdef', bs, dtype, shapes, shapes,
+                batch_shapes = [[bs,] + shape for shape in shapes]
+                iu.infer_zero(self, 'graphdef', bs, dtype, batch_shapes, batch_shapes,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-                iu.infer_zero(self, 'savedmodel', bs, dtype, shapes, shapes,
+                iu.infer_zero(self, 'savedmodel', bs, dtype, batch_shapes, batch_shapes,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             # model that does not support batching
             iu.infer_zero(self, 'graphdef_nobatch', 1, dtype, shapes, shapes,
@@ -63,7 +63,8 @@ class InferZeroTest(unittest.TestCase):
         if tu.validate_for_c2_model(dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_zero(self, 'netdef', bs, dtype, shapes, shapes,
+                batch_shapes = [[bs, ] + shape for shape in shapes]
+                iu.infer_zero(self, 'netdef', bs, dtype, batch_shapes, batch_shapes,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             # model that does not support batching
             iu.infer_zero(self, 'netdef_nobatch', 1, dtype, shapes, shapes,
@@ -72,7 +73,8 @@ class InferZeroTest(unittest.TestCase):
         if tu.validate_for_onnx_model(dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_zero(self, 'onnx', bs, dtype, shapes, shapes,
+                batch_shapes = [[bs, ] + shape for shape in shapes]
+                iu.infer_zero(self, 'onnx', bs, dtype, batch_shapes, batch_shapes,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             # model that does not support batching
             iu.infer_zero(self, 'onnx_nobatch', 1, dtype, shapes, shapes,
@@ -83,7 +85,8 @@ class InferZeroTest(unittest.TestCase):
                                         shapes[0], shapes[0], shapes[0]):
                 # model that supports batching
                 for bs in (1, 8):
-                    iu.infer_zero(self, name, bs, dtype, shapes, shapes,
+                    batch_shapes = [[bs, ] + shape for shape in shapes]
+                    iu.infer_zero(self, name, bs, dtype, batch_shapes, batch_shapes,
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
                 # model that does not support batching
                 iu.infer_zero(self, name + '_nobatch', 1, dtype, shapes, shapes,
