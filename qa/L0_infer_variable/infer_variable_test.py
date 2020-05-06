@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,13 +27,11 @@
 import sys
 sys.path.append("../common")
 
-from builtins import range
-from future.utils import iteritems
+import os
 import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
-from tensorrtserver.api import *
 
 np_dtype_string = np.dtype(object)
 
@@ -64,7 +62,7 @@ class InferVariableTest(unittest.TestCase):
                                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
                 # model that supports batching
-                iu.infer_exact(tester, pf, tensor_shape, bs,
+                iu.infer_exact(tester, pf, (bs,) + tensor_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
                                output0_raw, output1_raw,
                                model_version, swap,
