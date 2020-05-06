@@ -196,7 +196,7 @@ for model_trial in v 0 1 2 4; do
             test_no_sequence_start2 \
             test_no_sequence_end \
             test_no_correlation_id ; do
-        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
+        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR --api-version=2"
         SERVER_LOG="./$i.$MODEL_DIR.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -243,7 +243,7 @@ for model_trial in v 0 1 2 4; do
             [[ "$i" != "test_backlog_same_correlation_id_no_end" ]] && export TRTSERVER_DELAY_SCHEDULER=8 &&
             [[ "$i" != "test_half_batch" ]] && export TRTSERVER_DELAY_SCHEDULER=4 &&
             [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRTSERVER_DELAY_SCHEDULER=12
-        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
+        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR --api-version=2"
         SERVER_LOG="./$i.$MODEL_DIR.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -290,7 +290,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
       export TRTSERVER_BACKLOG_DELAY_SCHEDULER=3
       export TRTSERVER_DELAY_SCHEDULER=12
 
-      SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
+      SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR --api-version=2"
       SERVER_LOG="./$i.$MODEL_DIR.serverlog"
       run_server
       if [ "$SERVER_PID" == "0" ]; then
@@ -320,7 +320,7 @@ fi
 # python unittest seems to swallow ImportError and still return 0 exit
 # code. So need to explicitly check CLIENT_LOG to make sure we see
 # some running tests
-grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed To Run\n***"
     RET=1
