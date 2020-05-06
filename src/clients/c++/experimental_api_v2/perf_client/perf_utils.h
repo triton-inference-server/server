@@ -136,7 +136,8 @@ nic::Error SerializeExplicitTensor(
 std::string GetRandomString(const int string_length);
 
 // Returns the shape string containing the values provided in the vector
-std::string ShapeVecToString(const std::vector<int64_t> shape_vec);
+std::string ShapeVecToString(
+    const std::vector<int64_t> shape_vec, bool skip_first = false);
 
 // Returns the string containing the shape tensor values
 std::string ShapeTensorValuesToString(const int* data_ptr, const int count);

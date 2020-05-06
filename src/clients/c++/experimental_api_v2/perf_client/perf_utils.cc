@@ -327,11 +327,15 @@ GetRandomString(const int string_length)
 }
 
 std::string
-ShapeVecToString(const std::vector<int64_t> shape_vec)
+ShapeVecToString(const std::vector<int64_t> shape_vec, bool skip_first)
 {
   bool first = true;
   std::string str("[");
   for (const auto& value : shape_vec) {
+    if (skip_first) {
+      skip_first = false;
+      continue;
+    }
     if (!first) {
       str += ",";
     }

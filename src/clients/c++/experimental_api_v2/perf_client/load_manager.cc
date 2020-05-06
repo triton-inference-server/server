@@ -303,9 +303,29 @@ LoadManager::InitSharedMemory()
         size_t alloc_size = 0;
         size_t count = 0;
         size_t max_count = input.second.is_shape_tensor_ ? 1 : batch_size_;
+        std::vector<int64_t> shape;
+        std::vector<int64_t> prev_shape;
         while (count < max_count) {
           const uint8_t* data_ptr;
           size_t batch1_bytesize;
+
+          RETURN_IF_ERROR(data_loader_->GetInputShape(
+              input.second, i, (j + count) % data_loader_->GetTotalSteps(i),
+              &shape));
+          if (!shape.empty()) {
+            if (count == 0) {
+              prev_shape = shape;
+            } else {
+              if (!std::equal(shape.begin(), shape.end(), prev_shape.begin())) {
+                return nic::Error(
+                    "can not batch tensors with different shapes together "
+                    "(input '" +
+                    input.first + "' expected shape " +
+                    ShapeVecToString(prev_shape) + " and received " +
+                    ShapeVecToString(shape));
+              }
+            }
+          }
 
           RETURN_IF_ERROR(data_loader_->GetInputData(
               input.second, i, (j + count) % data_loader_->GetTotalSteps(i),
@@ -542,12 +562,11 @@ LoadManager::SetInputs(
           model_input, stream_index,
           (step_index + i) % data_loader_->GetTotalSteps(stream_index),
           &shape));
+      if ((parser_->MaxBatchSize() != 0) && (!model_input.is_shape_tensor_)) {
+        shape.insert(shape.begin(), (int64_t)batch_size_);
+      }
       if (!shape.empty()) {
         if (i == 0) {
-          if ((parser_->MaxBatchSize() != 0) &&
-              (!model_input.is_shape_tensor_)) {
-            shape.insert(shape.begin(), (int64_t)batch_size_);
-          }
           input->SetShape(shape);
         } else {
           if (!std::equal(shape.begin(), shape.end(), input->Shape().begin())) {
@@ -555,8 +574,9 @@ LoadManager::SetInputs(
                 "can not batch tensors with different shapes together "
                 "(input '" +
                 input->Name() + "' expected shape " +
-                ShapeVecToString(input->Shape()) + " and received " +
-                ShapeVecToString(shape));
+                ShapeVecToString(input->Shape(), true /* skip_first */) +
+                " and received " +
+                ShapeVecToString(shape, true /* skip_first */));
           }
         }
       }
@@ -619,9 +639,6 @@ LoadManager::SetInputsSharedMemory(
     RETURN_IF_ERROR(data_loader_->GetInputShape(
         model_input, stream_index, step_index, &shape));
     if (!shape.empty()) {
-      if ((parser_->MaxBatchSize() != 0) && (!model_input.is_shape_tensor_)) {
-        shape.insert(shape.begin(), (int64_t)batch_size_);
-      }
       input->SetShape(shape);
     }
     RETURN_IF_ERROR(input->SetSharedMemory(
