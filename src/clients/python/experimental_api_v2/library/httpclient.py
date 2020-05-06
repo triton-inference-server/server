@@ -33,7 +33,7 @@ import numpy as np
 import gevent.pool
 import struct
 
-from tritonhttpclient.utils import *
+from tritonclientutils.utils import *
 
 
 def _get_error(response):

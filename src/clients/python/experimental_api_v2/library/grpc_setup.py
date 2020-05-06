@@ -33,7 +33,10 @@ if 'VERSION' not in os.environ:
 
 VERSION = os.environ['VERSION']
 
-REQUIRED = ['numpy', 'python-rapidjson', 'protobuf>=3.5.0', 'grpcio']
+REQUIRED = [
+    'numpy', 'python-rapidjson', 'protobuf>=3.5.0', 'grpcio',
+    'tritonclientutils'
+]
 
 try:
     from wheel.bdist_wheel import bdist_wheel as _bdist_wheel

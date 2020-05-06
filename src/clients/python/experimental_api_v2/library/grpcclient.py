@@ -35,7 +35,7 @@ from google.protobuf.json_format import MessageToJson
 
 from tritongrpcclient import grpc_service_v2_pb2
 from tritongrpcclient import grpc_service_v2_pb2_grpc
-from tritongrpcclient.utils import *
+from tritonclientutils.utils import *
 
 
 def get_error_grpc(rpc_error):

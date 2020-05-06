@@ -29,8 +29,8 @@ import argparse
 import time
 import sys
 
-import tritongrpcclient.core as grpcclient
-from tritongrpcclient.utils import InferenceServerException
+import tritongrpcclient
+from tritonclientutils.utils import InferenceServerException
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        triton_client = grpcclient.InferenceServerClient(url=FLAGS.url,
+        triton_client = tritongrpcclient.InferenceServerClient(url=FLAGS.url,
                                                          verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))

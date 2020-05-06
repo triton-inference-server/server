@@ -30,11 +30,11 @@ import numpy as np
 from PIL import Image
 import sys
 
-import tritongrpcclient.core as grpcclient
+import tritongrpcclient
 import tritongrpcclient.model_config_pb2 as mc
-import tritonhttpclient.core as httpclient
-from tritonhttpclient.utils import triton_to_np_dtype
-from tritonhttpclient.utils import InferenceServerException
+import tritonhttpclient
+from tritonclientutils.utils import triton_to_np_dtype
+from tritonclientutils.utils import InferenceServerException
 
 FLAGS = None
 
@@ -245,21 +245,21 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
     inputs = []
     if FLAGS.protocol.lower() == "grpc":
         inputs.append(
-            grpcclient.InferInput(input_name, batched_image_data.shape, dtype))
+            tritongrpcclient.InferInput(input_name, batched_image_data.shape, dtype))
         inputs[0].set_data_from_numpy(batched_image_data)
     else:
         inputs.append(
-            httpclient.InferInput(input_name, batched_image_data.shape, dtype))
+            tritonhttpclient.InferInput(input_name, batched_image_data.shape, dtype))
         inputs[0].set_data_from_numpy(batched_image_data, binary_data=False)
 
     outputs = []
     if FLAGS.protocol.lower() == "grpc":
         outputs.append(
-            grpcclient.InferRequestedOutput(output_name,
+            tritongrpcclient.InferRequestedOutput(output_name,
                                             class_count=FLAGS.classes))
     else:
         outputs.append(
-            httpclient.InferRequestedOutput(output_name,
+            tritonhttpclient.InferRequestedOutput(output_name,
                                             binary_data=False,
                                             class_count=FLAGS.classes))
 
@@ -325,11 +325,11 @@ if __name__ == '__main__':
     try:
         if FLAGS.protocol.lower() == "grpc":
             # Create gRPC client for communicating with the server
-            triton_client = grpcclient.InferenceServerClient(
+            triton_client = tritongrpcclient.InferenceServerClient(
                 url=FLAGS.url, verbose=FLAGS.verbose)
         else:
             # Create HTTP client for communicating with the server
-            triton_client = httpclient.InferenceServerClient(
+            triton_client = tritonhttpclient.InferenceServerClient(
                 url=FLAGS.url, verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))

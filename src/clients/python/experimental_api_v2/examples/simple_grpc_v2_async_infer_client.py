@@ -31,8 +31,8 @@ import numpy as np
 import time
 import sys
 
-import tritongrpcclient.core as grpcclient
-from tritongrpcclient.utils import InferenceServerException
+import tritongrpcclient
+from tritonclientutils.utils import InferenceServerException
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     try:
-        triton_client = grpcclient.InferenceServerClient(url=FLAGS.url,
+        triton_client = tritongrpcclient.InferenceServerClient(url=FLAGS.url,
                                                          verbose=FLAGS.verbose)
     except Exception as e:
         print("context creation failed: " + str(e))
@@ -62,8 +62,8 @@ if __name__ == '__main__':
     # Infer
     inputs = []
     outputs = []
-    inputs.append(grpcclient.InferInput('INPUT0', [1, 16], "INT32"))
-    inputs.append(grpcclient.InferInput('INPUT1', [1, 16], "INT32"))
+    inputs.append(tritongrpcclient.InferInput('INPUT0', [1, 16], "INT32"))
+    inputs.append(tritongrpcclient.InferInput('INPUT1', [1, 16], "INT32"))
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
@@ -75,14 +75,14 @@ if __name__ == '__main__':
     inputs[0].set_data_from_numpy(input0_data)
     inputs[1].set_data_from_numpy(input1_data)
 
-    outputs.append(grpcclient.InferRequestedOutput('OUTPUT0'))
-    outputs.append(grpcclient.InferRequestedOutput('OUTPUT1'))
+    outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT0'))
+    outputs.append(tritongrpcclient.InferRequestedOutput('OUTPUT1'))
 
     # Define the callback function. Note the last two parameters should be
     # result and error. InferenceServerClient would povide the results of an
-    # inference as tritongrpcclient.core.InferResult in result. For successful
+    # inference as tritongrpcclient.InferResult in result. For successful
     # inference, error will be None, otherwise it will be an object of
-    # tritongrpcclient.utils.InferenceServerException holding the error details
+    # tritonclientutils.utils.InferenceServerException holding the error details
     def callback(user_data, result, error):
         if error:
             user_data.append(error)
