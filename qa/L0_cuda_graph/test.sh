@@ -46,7 +46,7 @@ rm -rf ${DATADIR}
 mkdir -p ${DATADIR}
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--log-verbose=1 --model-repository=$DATADIR"
+SERVER_ARGS="--log-verbose=1 --model-repository=$DATADIR --api-version=2"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
