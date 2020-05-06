@@ -189,8 +189,23 @@ ModelParser::Init(
           inputs_->emplace(input["name"].GetString(), ModelTensor()).first;
       it->second.name_ = input["name"].GetString();
       it->second.datatype_ = input["datatype"].GetString();
+      bool is_dynamic = false;
       for (const auto& dim : input["shape"].GetArray()) {
+        if (dim.GetInt() == -1) {
+          is_dynamic = true;
+        }
         it->second.shape_.push_back(dim.GetInt());
+      }
+
+      if (is_dynamic) {
+        const auto user_shape_it = input_shapes.find(it->second.name_);
+        if (user_shape_it != input_shapes.end()) {
+          // Update the default shape to be used.
+          it->second.shape_.clear();
+          for (const auto dim : user_shape_it->second) {
+            it->second.shape_.push_back(dim);
+          }
+        }
       }
     }
   }
