@@ -30,11 +30,11 @@ import numpy as np
 from PIL import Image
 import sys
 
-import tritongrpcclient.core as grpcclient
+import tritongrpcclient.grpcclient as grpcclient
 import tritongrpcclient.model_config_pb2 as mc
-import tritonhttpclient.core as httpclient
-from tritonhttpclient.utils import triton_to_np_dtype
-from tritonhttpclient.utils import InferenceServerException
+import tritonhttpclient.httpclient as httpclient
+from tritonclientutils.utils import triton_to_np_dtype
+from tritonclientutils.utils import InferenceServerException
 
 FLAGS = None
 

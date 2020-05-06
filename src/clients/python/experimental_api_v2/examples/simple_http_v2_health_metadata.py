@@ -28,8 +28,8 @@
 import argparse
 import sys
 
-import tritonhttpclient.core as httpclient
-from tritonhttpclient.utils import InferenceServerException
+import tritonhttpclient.httpclient as httpclient
+from tritonclientutils.utils import InferenceServerException
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

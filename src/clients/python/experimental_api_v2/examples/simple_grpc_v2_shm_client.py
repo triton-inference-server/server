@@ -30,9 +30,9 @@ import numpy as np
 import os
 import sys
 from builtins import range
-import tritongrpcclient.core as grpcclient
-import tritonsharedmemoryutils.shared_memory as shm
-import tritongrpcclient.utils as utils
+import tritongrpcclient.grpcclient as grpcclient
+import tritonclientutils.shared_memory as shm
+import tritonclientutils.utils as utils
 from ctypes import *
 
 FLAGS = None

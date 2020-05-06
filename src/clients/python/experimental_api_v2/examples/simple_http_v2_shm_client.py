@@ -29,9 +29,9 @@ import argparse
 import numpy as np
 import sys
 from builtins import range
-import tritonhttpclient.core as httpclient
-import tritonsharedmemoryutils.shared_memory as shm
-import tritonhttpclient.utils as utils
+import tritonhttpclient.httpclient as httpclient
+import tritonclientutils.shared_memory as shm
+import tritonclientutils.utils as utils
 
 FLAGS = None
 

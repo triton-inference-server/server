@@ -29,9 +29,9 @@ import argparse
 import numpy as np
 import sys
 from builtins import range
-import tritonhttpclient.core as httpclient
-import tritonsharedmemoryutils.cuda_shared_memory as cudashm
-import tritonhttpclient.utils as utils
+import tritonhttpclient.httpclient as httpclient
+import tritonclientutils.cuda_shared_memory as cudashm
+import tritonclientutils.utils as utils
 
 FLAGS = None
 

@@ -29,7 +29,7 @@ import argparse
 import numpy as np
 import sys
 
-import tritonhttpclient.core as httpclient
+import tritonhttpclient.httpclient as httpclient
 
 
 def TestIdentityInference(np_array, binary_data):

@@ -53,10 +53,7 @@ function main() {
     "${WHLDIR}/tritongrpcclient/."
   
   cp grpcclient.py \
-    "${WHLDIR}/tritongrpcclient/core.py"
-
-  cp utils.py \
-    "${WHLDIR}/tritongrpcclient/."
+    "${WHLDIR}/tritongrpcclient/grpcclient.py"
 
   cp grpc_setup.py "${WHLDIR}"
   touch ${WHLDIR}/tritongrpcclient/__init__.py

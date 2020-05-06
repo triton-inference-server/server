@@ -29,8 +29,8 @@ import argparse
 import numpy as np
 import sys
 
-import tritonhttpclient.core as httpclient
-from tritonhttpclient.utils import InferenceServerException
+import tritonhttpclient.httpclient as httpclient
+from tritonclientutils.utils import InferenceServerException
 
 def test_infer(model_name, input0_data, input1_data):
     inputs = []

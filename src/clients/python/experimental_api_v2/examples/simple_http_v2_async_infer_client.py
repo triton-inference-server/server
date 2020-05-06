@@ -31,8 +31,8 @@ import numpy as np
 import sys
 import gevent
 
-import tritonhttpclient.core as httpclient
-from tritonhttpclient.utils import InferenceServerException
+import tritonhttpclient.httpclient as httpclient
+from tritonclientutils.utils import InferenceServerException
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -83,9 +83,9 @@ if __name__ == '__main__':
 
     # Define the callback function. Note the last two parameters should be
     # result and error. InferenceServerClient would povide the results of an
-    # inference as tritongrpcclient.core.InferResult in result. For successful
+    # inference as tritongrpcclient.grpcclient.InferResult in result. For successful
     # inference, error will be None, otherwise it will be an object of
-    # tritongrpcclient.utils.InferenceServerException holding the error details.
+    # tritonclientutils.utils.InferenceServerException holding the error details.
     def callback(user_data, result, error):
         if not error:
             user_data.append(result)

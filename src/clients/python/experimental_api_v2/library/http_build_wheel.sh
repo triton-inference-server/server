@@ -46,10 +46,7 @@ function main() {
   mkdir -p ${WHLDIR}/tritonhttpclient/
 
   cp httpclient.py \
-    "${WHLDIR}/tritonhttpclient/core.py"
-
-  cp utils.py \
-    "${WHLDIR}/tritonhttpclient/."
+    "${WHLDIR}/tritonhttpclient/httpclient.py"
 
   cp http_setup.py "${WHLDIR}"
   touch ${WHLDIR}/tritonhttpclient/__init__.py

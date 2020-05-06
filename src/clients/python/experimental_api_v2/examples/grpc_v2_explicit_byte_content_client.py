@@ -32,7 +32,7 @@ import numpy as np
 import grpc
 from tritongrpcclient import grpc_service_v2_pb2
 from tritongrpcclient import grpc_service_v2_pb2_grpc
-from tritongrpcclient import utils
+from tritonclientutils import utils
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

@@ -30,8 +30,8 @@ import numpy as np
 import sys
 import queue
 
-import tritongrpcclient.core as grpcclient
-from tritongrpcclient.utils import InferenceServerException
+import tritongrpcclient.grpcclient as grpcclient
+from tritonclientutils.utils import InferenceServerException
 
 FLAGS = None
 

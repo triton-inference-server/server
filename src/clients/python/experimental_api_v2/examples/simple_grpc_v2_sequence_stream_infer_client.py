@@ -31,8 +31,8 @@ import numpy as np
 import sys
 import queue
 
-import tritongrpcclient.core as grpcclient
-from tritongrpcclient.utils import InferenceServerException
+import tritongrpcclient.grpcclient as grpcclient
+from tritonclientutils.utils import InferenceServerException
 
 FLAGS = None
 
@@ -45,9 +45,9 @@ class UserData:
 
 # Define the callback function. Note the last two parameters should be
 # result and error. InferenceServerClient would povide the results of an
-# inference as tritongrpcclient.core.InferResult in result. For successful
+# inference as tritongrpcclient.grpcclient.InferResult in result. For successful
 # inference, error will be None, otherwise it will be an object of
-# tritongrpcclient.utils.InferenceServerException holding the error details
+# tritonclientutils.utils.InferenceServerException holding the error details
 def callback(user_data, result, error):
     if error:
         user_data._completed_requests.put(error)
