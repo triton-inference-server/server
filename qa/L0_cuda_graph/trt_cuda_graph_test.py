@@ -27,17 +27,10 @@
 import sys
 sys.path.append("../common")
 
-from builtins import range
-from future.utils import iteritems
-import os
-import shutil
-import time
 import unittest
 import numpy as np
 import infer_util as iu
-import test_util as tu
-from tensorrtserver.api import *
-import tensorrtserver.api.server_status_pb2 as server_status
+from tritonhttpclient.utils import *
 
 class TrtCudaGraphTest(unittest.TestCase):
     def setUp(self):
@@ -46,9 +39,10 @@ class TrtCudaGraphTest(unittest.TestCase):
 
     def _check_infer(self, tensor_shape, batch_size=1):
         try:
-            iu.infer_exact(self, self.model_name_, tensor_shape, batch_size,
-                            self.dtype_, self.dtype_, self.dtype_, 
-                            model_version=1, use_grpc=False, use_streaming=False)
+            iu.infer_exact(self, self.model_name_, (batch_size,) + tensor_shape,
+                            batch_size, self.dtype_, self.dtype_, self.dtype_, 
+                            model_version=1, use_http_json_tensors=False,
+                            use_grpc=False, use_streaming=False)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
