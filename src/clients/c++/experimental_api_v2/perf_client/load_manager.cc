@@ -639,6 +639,9 @@ LoadManager::SetInputsSharedMemory(
     RETURN_IF_ERROR(data_loader_->GetInputShape(
         model_input, stream_index, step_index, &shape));
     if (!shape.empty()) {
+      if ((parser_->MaxBatchSize() != 0) && (!model_input.is_shape_tensor_)) {
+        shape.insert(shape.begin(), (int64_t)batch_size_);
+      }
       input->SetShape(shape);
     }
     RETURN_IF_ERROR(input->SetSharedMemory(
