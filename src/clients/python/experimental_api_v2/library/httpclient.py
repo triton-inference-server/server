@@ -97,7 +97,7 @@ def _get_inference_request(inputs, request_id, outputs, sequence_id,
 
     if parameters:
         infer_request['parameters'] = parameters
-    
+
     request_body = json.dumps(infer_request)
     json_size = len(request_body)
     binary_data = None
@@ -203,6 +203,10 @@ class InferenceServerClient:
         """
         if query_params is not None:
             request_uri = request_uri + "?" + _get_query_string(query_params)
+
+        if self._verbose:
+            print("GET {}, headers {}".format(request_uri, headers))
+
         if headers is not None:
             response = self._client_stub.get(request_uri, headers=headers)
         else:
@@ -235,6 +239,9 @@ class InferenceServerClient:
         """
         if query_params is not None:
             request_uri = request_uri + "?" + _get_query_string(query_params)
+
+        if self._verbose:
+            print("POST {}, headers {}\n{}".format(request_uri, headers, request_body))
 
         if headers is not None:
             response = self._client_stub.post(request_uri=request_uri,
@@ -653,7 +660,7 @@ class InferenceServerClient:
             value is an empty string, which means that the status
             of all active system shared memory will be returned.
         headers: dict
-            Optional dictionary specifying additional HTTP 
+            Optional dictionary specifying additional HTTP
             headers to include in the request
         query_params: dict
             Optional url query parameters to use in network
@@ -701,7 +708,7 @@ class InferenceServerClient:
         ----------
         name : str
             The name of the region to register.
-        key : str 
+        key : str
             The key of the underlying memory object that contains the
             system shared memory region.
         byte_size : int
@@ -720,7 +727,7 @@ class InferenceServerClient:
         Raises
         ------
         InferenceServerException
-            If unable to register the specified system shared memory.     
+            If unable to register the specified system shared memory.
 
         """
         request_uri = "v2/systemsharedmemory/region/{}/register".format(
@@ -806,7 +813,7 @@ class InferenceServerClient:
 
         Returns
         -------
-        dict 
+        dict
             The JSON dict holding cuda shared memory status.
 
         Raises
@@ -846,7 +853,7 @@ class InferenceServerClient:
         ----------
         name : str
             The name of the region to register.
-        raw_handle : bytes 
+        raw_handle : bytes
             The raw serialized cudaIPC handle in base64 encoding.
         device_id : int
             The GPU device ID on which the cudaIPC handle was created.
@@ -862,7 +869,7 @@ class InferenceServerClient:
         Raises
         ------
         InferenceServerException
-            If unable to register the specified cuda shared memory.     
+            If unable to register the specified cuda shared memory.
 
         """
         request_uri = "v2/cudasharedmemory/region/{}/register".format(
@@ -969,11 +976,11 @@ class InferenceServerClient:
             object. Default value is 0 which means that the request does not
             belong to a sequence.
         sequence_start: bool
-            Indicates whether the request being added marks the start of the 
+            Indicates whether the request being added marks the start of the
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
         sequence_end: bool
-            Indicates whether the request being added marks the end of the 
+            Indicates whether the request being added marks the end of the
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
         priority : int
@@ -1085,11 +1092,11 @@ class InferenceServerClient:
             object. Default value is 0 which means that the request does not
             belong to a sequence.
         sequence_start: bool
-            Indicates whether the request being added marks the start of the 
+            Indicates whether the request being added marks the start of the
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
         sequence_end: bool
-            Indicates whether the request being added marks the end of the 
+            Indicates whether the request being added marks the end of the
             sequence. Default value is False. This argument is ignored if
             'sequence_id' is 0.
         priority : int
@@ -1341,7 +1348,7 @@ class InferRequestedOutput:
         binary data in the HTTP body after JSON object.
     class_count : int
         The number of classifications to be requested. The default
-        value is 0 which means the classification results are not 
+        value is 0 which means the classification results are not
         requested.
     """
 
@@ -1497,8 +1504,8 @@ class InferResult:
         -------
         Dict
             If an output tensor with specified name is present in
-            the infer resonse then returns it as a json dict, 
-            otherwise returns None. 
+            the infer resonse then returns it as a json dict,
+            otherwise returns None.
         """
         for output in self._result['outputs']:
             if output['name'] == name:
