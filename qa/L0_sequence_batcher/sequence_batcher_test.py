@@ -145,8 +145,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                             self._testMethodName, protocol))
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, (1,), 9 * (idx + 1), 9 * (idx + 1))
-                except InferenceServerException as ex:
+                    self.check_status(model_name, {1: 9 * (idx + 1)}, 9 * (idx + 1), 9 * (idx + 1))
+                except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_length1_sequence(self):
@@ -173,8 +173,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                             self._testMethodName, protocol))
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, (1,), (idx + 1), (idx + 1))
-                except InferenceServerException as ex:
+                    self.check_status(model_name, {1: idx + 1}, (idx + 1), (idx + 1))
+                except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_batch_size(self):
@@ -210,8 +210,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
-                except InferenceServerException as ex:
-                    self.assertEqual("inference:0", ex.server_id())
+                except Exception as ex:
                     for prefix in ENSEMBLE_PREFIXES:
                         if model_name.startswith(prefix):
                             base_model_name = model_name[(len(prefix)):]
@@ -253,8 +252,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
-                except InferenceServerException as ex:
-                    self.assertEqual("inference:0", ex.server_id())
+                except Exception as ex:
                     for prefix in ENSEMBLE_PREFIXES:
                         if model_name.startswith(prefix):
                             base_model_name = model_name[(len(prefix)):]
@@ -296,9 +294,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
-                except InferenceServerException as ex:
+                except Exception as ex:
                     print(model_name + "-> " + ex.message())
-                    self.assertEqual("inference:0", ex.server_id())
                     for prefix in ENSEMBLE_PREFIXES:
                         if model_name.startswith(prefix):
                             base_model_name = model_name[(len(prefix)):]
@@ -342,11 +339,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                         protocol, sequence_name="{}_{}".format(
                                             self._testMethodName, protocol))
 
-                    self.check_status(model_name, (1,), 3 * (idx + 1), 3 * (idx + 1))
+                    self.check_status(model_name, {1: 3 * (idx + 1)}, 3 * (idx + 1), 3 * (idx + 1))
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
-                except InferenceServerException as ex:
-                    self.assertEqual("inference:0", ex.server_id())
+                except Exception as ex:
                     for prefix in ENSEMBLE_PREFIXES:
                         if model_name.startswith(prefix):
                             base_model_name = model_name[(len(prefix)):]
@@ -391,8 +387,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                             self._testMethodName, protocol))
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, (1,), 4 * (idx + 1), 4 * (idx + 1))
-                except InferenceServerException as ex:
+                    self.check_status(model_name, {1: 4 * (idx + 1)}, 4 * (idx + 1), 4 * (idx + 1))
+                except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_half_batch(self):
@@ -407,8 +403,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm1_handles = self.precreate_register_regions((0,9,5,13), dtype, 1)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
-                protocol = "streaming"
-
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain all
@@ -429,8 +423,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 3, None),
                            ("end", 4, None)),
                           self.get_expected_result(10, 4, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 988,
@@ -441,16 +435,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 5, None),
                            ("end", 13, None)),
                           self.get_expected_result(27, 13, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 for t in threads:
                     t.start()
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), 4 * min(2, MODEL_INSTANCES), 8)
-            except InferenceServerException as ex:
+                stats_batch_size = 1 if MODEL_INSTANCES > 2 else 2
+                self.check_status(model_name, {stats_batch_size: 4 * min(2, MODEL_INSTANCES)}, 8, 8)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -471,8 +466,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113,1114), dtype, 3)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
-                protocol = "streaming"
-
+                
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain all
@@ -491,8 +485,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 1, None),
                            ("end", 3, None)),
                           self.get_expected_result(4, 3, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -503,8 +497,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 13, None),
                            ("end", 14, None)),
                           self.get_expected_result(50, 14, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -513,8 +507,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 111, None),
                            ("end", 113, None)),
                           self.get_expected_result(224, 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -525,8 +519,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1113, None),
                            ("end", 1114, None)),
                           self.get_expected_result(4450, 1114, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 threads[1].start()
                 threads[3].start()
@@ -536,13 +530,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
+                # Batch size is always 4 as the batch will be padded for
+                # execution
                 if MODEL_INSTANCES == 1:
-                    self.check_status(model_name, (1,), 4, 12)
+                    self.check_status(model_name, {4: 4}, 12, 12)
                 elif MODEL_INSTANCES == 2:
-                    self.check_status(model_name, (1,), 8, 12)
+                    self.check_status(model_name, {2: 8}, 12, 12)
                 elif MODEL_INSTANCES == 4:
-                    self.check_status(model_name, (1,), 12, 12)
-            except InferenceServerException as ex:
+                    self.check_status(model_name, {1: 12}, 12, 12)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -565,8 +561,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
-                protocol = "streaming"
-
+                
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain all
@@ -586,8 +581,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 2, None),
                            ("end", 3, None)),
                           self.get_expected_result(6, 3, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -597,8 +592,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 12, None),
                            ("end", 13, None)),
                           self.get_expected_result(36, 13, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -608,8 +603,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 112, None),
                            ("end", 113, None)),
                           self.get_expected_result(336, 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -619,16 +614,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1112, None),
                            ("end", 1113, None)),
                           self.get_expected_result(3336, 1113, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 for t in threads:
                     t.start()
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), 3 * MODEL_INSTANCES, 12)
-            except InferenceServerException as ex:
+                self.check_status(model_name, {(4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES)}, 12, 12)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -662,8 +657,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                                                       tensor_shape=(3,))
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
-                protocol = "streaming"
-
+                
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain all
@@ -683,8 +677,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 2, None),
                            ("end", 3, None)),
                           self.get_expected_result(6*2, 3, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
                             'tensor_shape' : (2,) }))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
@@ -695,8 +689,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 12, None),
                            ("end", 13, None)),
                           self.get_expected_result(36*2, 13, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
                             'tensor_shape' : (2,) }))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
@@ -707,8 +701,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 112, None),
                            ("end", 113, None)),
                           self.get_expected_result(336, 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
                             'tensor_shape' : (1,) }))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
@@ -719,8 +713,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1112, None),
                            ("end", 1113, None)),
                           self.get_expected_result(3336*3, 1113, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
                             'tensor_shape' : (3,) }))
 
                 for t in threads:
@@ -728,8 +722,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), 9, 12)
-            except InferenceServerException as ex:
+                self.check_status(model_name, {2: 3, 1: 6}, 12, 12)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -763,8 +757,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                                                       tensor_shape=(3,))
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
-                protocol = "streaming"
-
+                
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain all
@@ -784,8 +777,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 2, None),
                            ("end", 3, None)),
                           self.get_expected_result(6*2, 3, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
                             'tensor_shape' : (2,) }))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
@@ -796,8 +789,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 12, None),
                            ("end", 13, None)),
                           self.get_expected_result(36*2, 13, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
                             'tensor_shape' : (2,) }))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
@@ -808,8 +801,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 112, None),
                            ("end", 113, None)),
                           self.get_expected_result(336, 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
                             'tensor_shape' : (1,) }))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
@@ -820,8 +813,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1112, None),
                            ("end", 1113, None)),
                           self.get_expected_result(3336*3, 1113, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName),
                             'tensor_shape' : (3,) }))
 
                 for t in threads:
@@ -829,8 +822,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), 3, 12)
-            except InferenceServerException as ex:
+                self.check_status(model_name, {4: 3}, 12, 12)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -854,7 +847,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3)
             precreated_shm4_handles = self.precreate_register_regions((11111,11112,11113), dtype, 4)
             try:
-                protocol = "streaming"
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
@@ -876,8 +868,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 2, None),
                            ("end", 3, None)),
                           self.get_expected_result(6, 3, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -887,8 +879,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 12, None),
                            ("end", 13, None)),
                           self.get_expected_result(36, 13, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -898,8 +890,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 112, None),
                            ("end", 113, None)),
                           self.get_expected_result(336, 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -909,8 +901,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1112, None),
                            ("end", 1113, None)),
                           self.get_expected_result(3336, 1113, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1005,
@@ -920,16 +912,20 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 11112, None),
                            ("end", 11113, None)),
                           self.get_expected_result(33336, 11113, trial, "end"),
-                          protocol, precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm4_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 for t in threads:
                     t.start()
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), (3 * MODEL_INSTANCES) + 3, 15)
-            except InferenceServerException as ex:
+                if MODEL_INSTANCES != 4:
+                    batch_exec = {(4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES), 1: 3}
+                else:
+                    batch_exec = {1: (3 * MODEL_INSTANCES) + 3}
+                self.check_status(model_name, batch_exec, 15, 15)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -962,7 +958,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm4_handles = self.precreate_register_regions((11111,), dtype, 4)
             precreated_shm5_handles = self.precreate_register_regions((22222,), dtype, 5)
             try:
-                protocol = "streaming"
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
@@ -984,8 +979,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 2, None),
                            ("end", 3, None)),
                           self.get_expected_result(6, 3, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -994,8 +989,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 11, None),
                            ("end", 13, None)),
                           self.get_expected_result(24, 13, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -1004,8 +999,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 111, None),
                            ("end", 113, None)),
                           self.get_expected_result(224, 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -1015,8 +1010,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1112, None),
                            ("end", 1113, None)),
                           self.get_expected_result(3336, 1113, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1005,
@@ -1024,8 +1019,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           # (flag_str, value, pre_delay_ms)
                           (("start,end", 11111, None),),
                           self.get_expected_result(11111, 11111, trial, "start,end"),
-                          protocol, precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm4_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1006,
@@ -1033,8 +1028,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           # (flag_str, value, pre_delay_ms)
                           (("start,end", 22222, None),),
                           self.get_expected_result(22222, 22222, trial, "start,end"),
-                          protocol, precreated_shm5_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm5_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 threads[0].start()
                 threads[1].start()
@@ -1046,8 +1041,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), (3 * MODEL_INSTANCES), 12)
-            except InferenceServerException as ex:
+                self.check_status(model_name, {4: 3}, 12, 12)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -1082,7 +1077,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm4_handles = self.precreate_register_regions((11111,), dtype, 4)
             precreated_shm5_handles = self.precreate_register_regions((22222,22223,22224), dtype, 5)
             try:
-                protocol = "streaming"
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
@@ -1104,8 +1098,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 2, None),
                            ("end", 3, None)),
                           self.get_expected_result(6, 3, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -1114,8 +1108,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 11, None),
                            ("end", 13, None)),
                           self.get_expected_result(24, 13, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -1124,8 +1118,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 111, None),
                            ("end", 113, None)),
                           self.get_expected_result(224, 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -1135,8 +1129,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1112, None),
                            ("end", 1113, None)),
                           self.get_expected_result(3336, 1113, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1005,
@@ -1144,8 +1138,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           # (flag_str, value, pre_delay_ms)
                           (("start,end", 11111, None),),
                           self.get_expected_result(11111, 11111, trial, "start,end"),
-                          protocol, precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm4_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1006,
@@ -1155,8 +1149,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 22223, None),
                            ("end", 22224, 2000),),
                           self.get_expected_result(66669, 22224, trial, "end"),
-                          protocol, precreated_shm5_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm5_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 threads[0].start()
                 threads[1].start()
@@ -1168,8 +1162,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), (3 * MODEL_INSTANCES) + 2, 14)
-            except InferenceServerException as ex:
+                self.check_status(model_name, {4: 3, 1: 2}, 14, 14)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -1195,7 +1189,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3)
             precreated_shm4_handles = self.precreate_register_regions((11111,11113), dtype, 4)
             try:
-                protocol = "streaming"
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
@@ -1217,8 +1210,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 2, None),
                            ("end", 3, None)),
                           self.get_expected_result(6, 3, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -1228,8 +1221,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 12, None),
                            ("end", 13, None)),
                           self.get_expected_result(36, 13, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -1239,8 +1232,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 112, None),
                            ("end", 113, None)),
                           self.get_expected_result(336, 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -1250,8 +1243,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1112, None),
                            ("end", 1113, None)),
                           self.get_expected_result(3336, 1113, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -1260,8 +1253,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 11111, None),
                            ("end", 11113, None)),
                           self.get_expected_result(22224, 11113, trial, "end"),
-                          protocol, precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm4_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 threads[0].start()
                 threads[1].start()
@@ -1272,8 +1265,12 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), (3 * MODEL_INSTANCES) + 2, 14)
-            except InferenceServerException as ex:
+                if MODEL_INSTANCES != 4:
+                    batch_exec = {(4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES), 1: 2}
+                else:
+                    batch_exec = {1: (3 * MODEL_INSTANCES) + 2}
+                self.check_status(model_name, batch_exec, 14, 14)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -1309,7 +1306,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm3_handles = self.precreate_register_regions((1111,1112,1112,1113), dtype, 3)
             precreated_shm4_handles = self.precreate_register_regions((11111,11113), dtype, 4)
             try:
-                protocol = "streaming"
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
@@ -1330,8 +1326,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 1, None),
                            (None, 3, None)),
                           self.get_expected_result(4, 3, trial, None),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -1342,8 +1338,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 12, None),
                            ("end", 13, None)),
                           self.get_expected_result(48, 13, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -1354,8 +1350,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 112, None),
                            ("end", 113, None)),
                           self.get_expected_result(448, 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -1366,8 +1362,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1112, None),
                            ("end", 1113, None)),
                           self.get_expected_result(4448, 1113, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1001,
@@ -1376,8 +1372,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 11111, None),
                            ("end", 11113, None)),
                           self.get_expected_result(22224, 11113, trial, "end"),
-                          protocol, precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm4_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 threads[0].start()
                 threads[1].start()
@@ -1388,8 +1384,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), 4 * MODEL_INSTANCES, 16)
-            except InferenceServerException as ex:
+                self.check_status(model_name, {4: 4}, 16, 16)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
@@ -1424,7 +1420,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm3_handles = self.precreate_register_regions((1111,1112,1112,1113), dtype, 3)
             precreated_shm4_handles = self.precreate_register_regions((11111,11113), dtype, 4)
             try:
-                protocol = "streaming"
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
@@ -1445,8 +1440,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 1, None),
                            (None, 3, _max_sequence_idle_ms + 1000)),
                           self.get_expected_result(4, 3, trial, None),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -1457,8 +1452,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 12, _max_sequence_idle_ms / 2),
                            ("end", 13, _max_sequence_idle_ms / 2)),
                           self.get_expected_result(48, 13, trial, None),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -1469,8 +1464,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 112, _max_sequence_idle_ms / 2),
                            ("end", 113, _max_sequence_idle_ms / 2)),
                           self.get_expected_result(448, 113, trial, None),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -1481,8 +1476,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1112, _max_sequence_idle_ms / 2),
                            ("end", 1113, _max_sequence_idle_ms / 2)),
                           self.get_expected_result(4448, 1113, trial, None),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1005,
@@ -1491,8 +1486,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 11111, None),
                            ("end", 11113, None)),
                           self.get_expected_result(22224, 11113, trial, "end"),
-                          protocol, precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm4_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 threads[0].start()
                 threads[1].start()
@@ -1505,8 +1500,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 self.check_deferred_exception()
                 self.assertTrue(False, "expected error")
-            except InferenceServerException as ex:
-                self.assertEqual("inference:0", ex.server_id())
+            except Exception as ex:
                 for prefix in ENSEMBLE_PREFIXES:
                     if model_name.startswith(prefix):
                         base_model_name = model_name[(len(prefix)):]
