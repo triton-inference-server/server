@@ -41,7 +41,7 @@ CLIENT_LOG="./client.log"
 SHAPE_TENSOR_TEST=trt_shape_tensor_test.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -132,7 +132,6 @@ for i in \
         wait $SERVER_PID
     done
 
-
 for i in \
             test_sequence_different_shape_values \
             test_sequence_identical_shape_values ; do
@@ -176,7 +175,7 @@ for i in \
     test_dynaseq_different_shape_values_series \
     test_dynaseq_different_shape_values_parallel \
     ;do
-    SERVER_ARGS="--model-repository=`pwd`/models"
+    SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
     SERVER_LOG="./$i.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -200,7 +199,7 @@ for i in \
     wait $SERVER_PID
 done
 
-grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed To Run\n***"
