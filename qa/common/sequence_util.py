@@ -96,8 +96,6 @@ class SequenceBatcherTestUtil(unittest.TestCase):
     def precreate_register_regions(self, value_list, dtype, i,
                                 batch_size=1, tensor_shape=(1,)):
         if _test_system_shared_memory or _test_cuda_shared_memory:
-            shared_memory_ctx = SharedMemoryControlContext("localhost:8000",
-                                                           ProtocolType.HTTP, verbose=True)
             shm_region_handles = []
             for j, value in enumerate(value_list):
                 # For string we can't know the size of the output
@@ -121,7 +119,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                         output_byte_size += np.dtype(dtype).itemsize * in0.size
                     input_list.append(in0)
 
-                input_list_tmp = iu._prepend_string_size(input_list) if (dtype == np.object) else input_list
+                input_list_tmp = iu.serialize_byte_tensor_list(input_list) if (dtype == np.object) else input_list
                 input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
 
                 # create shared memory regions and copy data for input values
@@ -170,7 +168,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 # Only one shape tensor input per batch
                 shape_input_list.append(np.full(tensor_shape, shape_value, dtype=np.int32))
 
-                input_list_tmp = iu._prepend_string_size(input_list) if (dtype == np.object) else input_list
+                input_list_tmp = iu.serialize_byte_tensor_list(input_list) if (dtype == np.object) else input_list
                 input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
                 shape_input_byte_size = sum([i0.nbytes for i0 in shape_input_list])
                 shape_output_byte_size = shape_input_byte_size
@@ -232,8 +230,6 @@ class SequenceBatcherTestUtil(unittest.TestCase):
     def precreate_register_dynaseq_shape_tensor_regions(self, value_list, dtype, i,
                                             batch_size=1, tensor_shape=(1,)):
         if _test_system_shared_memory or _test_cuda_shared_memory:
-            shared_memory_ctx = SharedMemoryControlContext("localhost:8000",
-                                                           ProtocolType.HTTP, verbose=True)
             shm_region_handles = []
             for j, (shape_value, value) in enumerate(value_list):
                 input_list = list()
@@ -254,7 +250,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 # Only one shape tensor input per batch
                 shape_input_list.append(np.full(tensor_shape, shape_value, dtype=np.int32))
 
-                input_list_tmp = iu._prepend_string_size(input_list) if (dtype == np.object) else input_list
+                input_list_tmp = iu.serialize_byte_tensor_list(input_list) if (dtype == np.object) else input_list
                 input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
                 shape_input_byte_size = sum([i0.nbytes for i0 in shape_input_list])
                 dummy_input_byte_size = sum([i0.nbytes for i0 in dummy_input_list])
@@ -363,6 +359,8 @@ class SequenceBatcherTestUtil(unittest.TestCase):
 
         self.assertEqual(len(configs), 1)
 
+        full_shape = tensor_shape if "nobatch" in trial else (batch_size,) + tensor_shape
+
         # create and register shared memory output region in advance,
         # knowing that this function will not be called concurrently.
         if _test_system_shared_memory or _test_cuda_shared_memory:
@@ -391,7 +389,6 @@ class SequenceBatcherTestUtil(unittest.TestCase):
 
                 INPUT = "INPUT__0" if trial.startswith("libtorch") else "INPUT"
                 OUTPUT = "OUTPUT__0" if trial.startswith("libtorch") else "OUTPUT"
-                full_shape = (batch_size,) + tensor_shape
                 for flag_str, value, thresholds, delay_ms in values:
                     if delay_ms is not None:
                         time.sleep(delay_ms[0] / 1000.0)
@@ -417,7 +414,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
 
                     # create input shared memory and copy input data values into it
                     if _test_system_shared_memory or _test_cuda_shared_memory:
-                        input_list_tmp = iu._prepend_string_size(input_list) if (input_dtype == np.object) else input_list
+                        input_list_tmp = iu.serialize_byte_tensor_list([in0]) if (input_dtype == np.object) else [in0]
                         input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
                         ip_name = "ip{}".format(len(shm_ip_handles))
                         if _test_system_shared_memory:
@@ -456,14 +453,16 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                         out = results.as_numpy(OUTPUT)
                     else:
                         output = results.get_output(OUTPUT)
-                        offset = 2*processed_count+1
-                        output_shape = output.shape
-                        output_type = np.int32
-                        if _test_system_shared_memory:
-                            out = shm.get_contents_as_numpy(shm_region_handles[output_offset][2], output_type, output_shape)
+                        if config[1] == "http":
+                            output_shape = output["shape"]
                         else:
-                            out = cudashm.get_contents_as_numpy(shm_region_handles[output_offset][2], output_type, output_shape)
-                    result = out[0][0]
+                            output_shape = output.shape
+                        output_type = input_dtype
+                        if _test_system_shared_memory:
+                            out = shm.get_contents_as_numpy(shm_op_handle, output_type, output_shape)
+                        else:
+                            out = cudashm.get_contents_as_numpy(shm_op_handle, output_type, output_shape)
+                    result = out[0] if "nobatch" in trial else out[0][0]
                     print("{}: {}".format(sequence_name, result))
 
                     if thresholds is not None:
@@ -500,19 +499,16 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                                         "ms response time, got " + str(seq_end_ms - seq_start_ms) + " ms")
             except Exception as ex:
                 self.add_deferred_exception(ex)
+            if config[2]:
+                triton_client.stop_stream()
 
         if _test_system_shared_memory or _test_cuda_shared_memory:
             self.triton_client_.unregister_system_shared_memory()
             self.triton_client_.unregister_cuda_shared_memory()
-            if _test_system_shared_memory:
-                shm.destroy_shared_memory_region(shm_op_handle)
-                for shm_ip_handle in shm_ip_handles:
-                    shm.destroy_shared_memory_region(shm_ip_handle)
-            elif _test_cuda_shared_memory:
-                cudashm.destroy_shared_memory_region(shm_op_handle)
-                for shm_ip_handle in shm_ip_handles:
-                    cudashm.destroy_shared_memory_region(shm_ip_handle)
-
+            destroy_func = shm.destroy_shared_memory_region if _test_system_shared_memory else cudashm.destroy_shared_memory_region
+            destroy_func(shm_op_handle)
+            for shm_ip_handle in shm_ip_handles:
+                destroy_func(shm_ip_handle)
 
     def check_sequence_async(self, trial, model_name, input_dtype, correlation_id,
                              sequence_thresholds, values, expected_result,
@@ -533,6 +529,8 @@ class SequenceBatcherTestUtil(unittest.TestCase):
         self.assertFalse(_test_system_shared_memory and _test_cuda_shared_memory,
                         "Cannot set both System and CUDA shared memory flags to 1")
 
+        full_shape = tensor_shape if "nobatch" in trial else (batch_size,) + tensor_shape
+
         client_utils = grpcclient
         triton_client = client_utils.InferenceServerClient("localhost:8001", verbose=True)
         user_data = UserData()
@@ -543,7 +541,6 @@ class SequenceBatcherTestUtil(unittest.TestCase):
 
             INPUT = "INPUT__0" if trial.startswith("libtorch") else "INPUT"
             OUTPUT = "OUTPUT__0" if trial.startswith("libtorch") else "OUTPUT"
-            full_shape = (batch_size,) + tensor_shape
             sent_count = 0
             for flag_str, value, pre_delay_ms in values:
                 seq_start = False
@@ -595,12 +592,12 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                     output = results.get_output(OUTPUT)
                     offset = 2*processed_count+1
                     output_shape = output.shape
-                    output_type = np.int32
+                    output_type = input_dtype
                     if _test_system_shared_memory:
-                        out = shm.get_contents_as_numpy(shm_region_handles[output_offset][2], output_type, output_shape)
+                        out = shm.get_contents_as_numpy(shm_region_handles[offset][2], output_type, output_shape)
                     else:
-                        out = cudashm.get_contents_as_numpy(shm_region_handles[output_offset][2], output_type, output_shape)
-                result = out[0][0]
+                        out = cudashm.get_contents_as_numpy(shm_region_handles[offset][2], output_type, output_shape)
+                result = out[0] if "nobatch" in trial else out[0][0]
                 print("{}: {}".format(sequence_name, result))
                 processed_count+=1
 
