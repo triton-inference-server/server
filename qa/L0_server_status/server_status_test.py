@@ -35,9 +35,9 @@ import unittest
 import json
 import requests
 import infer_util as iu
-import tritonhttpclient.core as httpclient
-import tritongrpcclient.core as grpcclient
-from tritonhttpclient.utils import *
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+from tritonclientutils.utils import *
 
 class ServerMetadataTest(unittest.TestCase):
 
@@ -91,17 +91,16 @@ class ServerMetadataTest(unittest.TestCase):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
                 server_metadata = triton_client.get_server_metadata()
-                model_metadata = triton_client.get_model_metadata(model_name)
                 if pair[1] == "http":
                     self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
                                      server_metadata['version'])
                     self.assertEqual("inference:0", server_metadata['name'])
-                    self.assertEqual(model_name, model_metadata['name'])
                 else:
                     self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
                                      server_metadata.version)
                     self.assertEqual("inference:0", server_metadata.name)
-                    self.assertEqual(model_name, model_metadata.name)
+
+                model_metadata = triton_client.get_model_metadata(model_name)
                 self.assertTrue(False, "expected unknown model failure")
         except InferenceServerException as ex:
             self.assertTrue(
@@ -129,19 +128,31 @@ class ServerMetadataTest(unittest.TestCase):
                     self.assertTrue(triton_client.is_server_live())
                     self.assertTrue(triton_client.is_server_ready())
                     model_metadata = triton_client.get_model_metadata(model_name)
-                    model_metadata = triton_client.get_model_metadata(
-                        model_name, model_version="1")
-                    model_metadata = triton_client.get_model_metadata(
-                        model_name, model_version="2")
-
+                    # verify all versions are reported when no model version is specified
                     if pair[1] == "http":
                         self.assertEqual(model_name, model_metadata['name'])
+                        self.assertEqual(len(model_metadata['versions']), 3)
+                        for v in (1, 2, 3):
+                            self.assertTrue(str(v) in model_metadata['versions'])
                     else:
                         self.assertEqual(model_name, model_metadata.name)
-    
+                        self.assertEqual(len(model_metadata.versions), 3)
+                        for v in (1, 2, 3):
+                            self.assertTrue(str(v) in model_metadata.versions)
+
                     for v in (1, 2, 3):
                         self.assertTrue(triton_client.is_model_ready(
                             model_name, model_version=str(v)))
+                        model_metadata = triton_client.get_model_metadata(
+                            model_name, model_version=str(v))
+                        if pair[1] == "http":
+                            self.assertEqual(model_name, model_metadata['name'])
+                            self.assertEqual(len(model_metadata['versions']), 1)
+                            self.assertEqual(str(v), model_metadata['versions'][0])
+                        else:
+                            self.assertEqual(model_name, model_metadata.name)
+                            self.assertEqual(len(model_metadata.versions), 1)
+                            self.assertEqual(str(v), model_metadata.versions[0])
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -161,47 +172,49 @@ class ServerMetadataTest(unittest.TestCase):
 
                     self.assertTrue(triton_client.is_server_live())
                     self.assertTrue(triton_client.is_server_ready())
-                    model_metadata = triton_client.get_model_metadata(
-                        model_name)
-
-                    if pair[1] == "http":
-                        self.assertEqual(model_name, model_metadata['name'])
-                    else:
-                        self.assertEqual(model_name, model_metadata.name)
-
                     for v in (1, 2, 3):
                         self.assertTrue(triton_client.is_model_ready(
                             model_name, model_version=str(v)))
+                        model_metadata = triton_client.get_model_metadata(
+                            model_name, model_version=str(v))
+                        if pair[1] == "http":
+                            self.assertEqual(model_name, model_metadata['name'])
+                            self.assertEqual(len(model_metadata['versions']), 1)
+                            self.assertEqual(str(v), model_metadata['versions'][0])
+                        else:
+                            self.assertEqual(model_name, model_metadata.name)
+                            self.assertEqual(len(model_metadata.versions), 1)
+                            self.assertEqual(str(v), model_metadata.versions[0])
 
                     # Only version 3 should have infer stats
-                    for v in (1, 2, 3):
-                        infer_stats = triton_client.get_inference_statistics(model_name, model_version=str(v))
-                        if v == 3:
+                    infer_stats = triton_client.get_inference_statistics(model_name)
+                    if pair[1] == "http":
+                        stats = infer_stats['model_stats']
+                    else:
+                        stats = infer_stats.model_stats
+                    self.assertEqual(len(stats), 3,
+                                        "expected 3 infer stats for model " + model_name)
+                    for s in stats:
+                        if pair[1] == "http":
+                            v = s['version']
+                            stat = s['inference_stats']
+                        else:
+                            v = s.version
+                            stat = s.inference_stats
+
+                        if v == "3":
                             if pair[1] == "http":
-                                self.assertEqual(len(infer_stats['model_stats']), 1,
-                                                "expected 1 infer stats for version " + str(v) +
-                                                 " of model " + model_name)
-                                stats = infer_stats['model_stats'][0]['inference_stats']
-                                self.assertEqual(len(stats), 6,
-                                                "expected 6 infer stats for version " + str(v) +
-                                                 " of model " + model_name)
-                                self.assertTrue(stats['success']['count'], 3)
+                                self.assertTrue(stat['success']['count'], 3)
                             else:
-                                self.assertEqual(len(infer_stats.model_stats), 1,
-                                                "expected 1 infer stats for version " + str(v) +
-                                                 " of model " + model_name)
-                                stats = infer_stats.model_stats[0].inference_stats
-                                self.assertTrue(stats.success.count, 3)
+                                self.assertTrue(stat.success.count, 3)
                         else:
                             if pair[1] == "http":
-                                stats = infer_stats['model_stats'][0]['inference_stats']
-                                self.assertEqual(stats['success']['count'], 0,
-                                                 "unexpected infer stats for version " + str(v) +
+                                self.assertEqual(stat['success']['count'], 0,
+                                                 "unexpected infer success counts for version " + str(v) +
                                                   " of model " + model_name)
                             else:
-                                stats = infer_stats.model_stats[0].inference_stats
-                                self.assertEqual(stats.success.count, 0,
-                                                 "unexpected infer stats for version " + str(v) +
+                                self.assertEqual(stat.success.count, 0,
+                                                 "unexpected infer success counts for version " + str(v) +
                                                   " of model " + model_name)
 
             except InferenceServerException as ex:
@@ -229,16 +242,12 @@ class ServerMetadataTest(unittest.TestCase):
 
                     self.assertTrue(triton_client.is_server_live())
                     self.assertTrue(triton_client.is_server_ready())
-                    model_metadata = triton_client.get_model_metadata(model_name)
-
-                    if pair[1] == "http":
-                        self.assertEqual(model_name, model_metadata['name'])
-                    else:
-                        self.assertEqual(model_name, model_metadata.name)
-    
-                    for v in (1, 3):
-                        self.assertTrue(triton_client.is_model_ready(
-                            model_name, model_version=str(v)))
+                    self.assertTrue(triton_client.is_model_ready(
+                        model_name, model_version="1"))
+                    self.assertFalse(triton_client.is_model_ready(
+                        model_name, model_version="2"))
+                    self.assertTrue(triton_client.is_model_ready(
+                        model_name, model_version="3"))
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -258,16 +267,12 @@ class ServerMetadataTest(unittest.TestCase):
 
                     self.assertTrue(triton_client.is_server_live())
                     self.assertTrue(triton_client.is_server_ready())
-                    model_metadata = triton_client.get_model_metadata(model_name)
-
-                    if pair[1] == "http":
-                        self.assertEqual(model_name, model_metadata['name'])
-                    else:
-                        self.assertEqual(model_name, model_metadata.name)
-
-                    for v in (1, 3):
-                        self.assertTrue(triton_client.is_model_ready(
-                            model_name, model_version=str(v)))
+                    self.assertTrue(triton_client.is_model_ready(
+                        model_name, model_version="1"))
+                    self.assertFalse(triton_client.is_model_ready(
+                        model_name, model_version="2"))
+                    self.assertTrue(triton_client.is_model_ready(
+                        model_name, model_version="3"))
 
                     # Only version 1 should have infer stats
                     for v in (1, 3):

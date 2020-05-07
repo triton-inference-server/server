@@ -28,9 +28,9 @@ import argparse
 import os
 import sys
 import json
-import tritonhttpclient.core as httpclient
-import tritongrpcclient.core as grpcclient
-from tritonhttpclient.utils import *
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+from tritonclientutils.utils import *
 from google.protobuf import text_format
 from google.protobuf import json_format
 import tritongrpcclient.model_config_pb2 as mc
@@ -45,7 +45,6 @@ if __name__ == '__main__':
                      help='Model name')
    FLAGS, unparsed = parser.parse_known_args()
 
-   # TODO Test HTTP as well. Requires additional handling since it is reported as Json. 
    for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
       model_name = FLAGS.model
       if pair[1] == "http":
