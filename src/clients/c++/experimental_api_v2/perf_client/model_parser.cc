@@ -152,7 +152,7 @@ ModelParser::Init(
   model_version_ = model_version;
   // Get the scheduler type for the model
   scheduler_type_ = NONE;
-  const auto& ensemble_itr = config.FindMember("ensembleScheduling");
+  const auto& ensemble_itr = config.FindMember("ensemble_scheduling");
   if (ensemble_itr != config.MemberEnd()) {
     bool is_sequential = false;
     RETURN_IF_ERROR(GetEnsembleSchedulerType(
@@ -163,11 +163,11 @@ ModelParser::Init(
       scheduler_type_ = ENSEMBLE;
     }
   } else {
-    const auto& sequence_itr = config.FindMember("sequenceBatching");
+    const auto& sequence_itr = config.FindMember("sequence_batching");
     if (sequence_itr != config.MemberEnd()) {
       scheduler_type_ = SEQUENCE;
     } else {
-      const auto& dynamic_itr = config.FindMember("dynamicBatching");
+      const auto& dynamic_itr = config.FindMember("dynamic_batching");
       if (dynamic_itr != config.MemberEnd()) {
         scheduler_type_ = DYNAMIC;
       }
@@ -175,7 +175,7 @@ ModelParser::Init(
   }
 
   max_batch_size_ = 0;
-  const auto bs_itr = config.FindMember("maxBatchSize");
+  const auto bs_itr = config.FindMember("max_batch_size");
   if (bs_itr != config.MemberEnd()) {
     max_batch_size_ = bs_itr->value.GetInt();
   }
@@ -269,25 +269,25 @@ ModelParser::GetEnsembleSchedulerType(
     const rapidjson::Document& config, const std::string& model_version,
     std::unique_ptr<TritonClientWrapper>& client_wrapper, bool* is_sequential)
 {
-  const auto& sequence_itr = config.FindMember("sequenceBatching");
+  const auto& sequence_itr = config.FindMember("sequence_batching");
   if (sequence_itr != config.MemberEnd()) {
     *is_sequential = true;
   }
 
   if (std::string(config["platform"].GetString()).compare("ensemble") == 0) {
-    const auto step_itr = config["ensembleScheduling"].FindMember("step");
+    const auto step_itr = config["ensemble_scheduling"].FindMember("step");
     for (const auto& step : step_itr->value.GetArray()) {
-      std::string step_model_version(step["modelVersion"].GetString());
+      std::string step_model_version(step["model_version"].GetString());
       int64_t model_version_int = std::stol(step_model_version);
       if (model_version_int == -1) {
         step_model_version = "";
       }
       (*composing_models_map_)[config["name"].GetString()].emplace(
-          std::string(step["modelName"].GetString()), step_model_version);
+          std::string(step["model_name"].GetString()), step_model_version);
 
       rapidjson::Document model_config;
       RETURN_IF_ERROR(client_wrapper->ModelConfig(
-          &model_config, step["modelName"].GetString(), step_model_version));
+          &model_config, step["model_name"].GetString(), step_model_version));
       RETURN_IF_ERROR(GetEnsembleSchedulerType(
           model_config, step_model_version, client_wrapper, is_sequential));
     }

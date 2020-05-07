@@ -1310,8 +1310,10 @@ TRITONSERVER_ServerModelConfig(
       lserver->GetInferenceBackend(model_name, model_version_int, &backend));
 
   std::string model_config_json;
+  ::google::protobuf::util::JsonPrintOptions options;
+  options.preserve_proto_field_names = true;
   ::google::protobuf::util::MessageToJsonString(
-      backend->Config(), &model_config_json);
+      backend->Config(), &model_config_json, options);
 
   // Extra copies.. But this simplify TritonServerMessage class
   rapidjson::Document document;
