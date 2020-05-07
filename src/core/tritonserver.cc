@@ -1099,10 +1099,16 @@ TRITONSERVER_ServerModelMetadata(
   metadata.AddMember("name", rapidjson::StringRef(model_name), allocator);
 
   rapidjson::Value versions(rapidjson::kArrayType);
-  for (const auto v : ready_versions) {
-    auto version_str = std::to_string(v);
+  if (model_version_int != -1) {
+    auto version_str = std::to_string(model_version_int);
     rapidjson::Value version_val(version_str.c_str(), allocator);
     versions.PushBack(version_val, allocator);
+  } else {
+    for (const auto v : ready_versions) {
+      auto version_str = std::to_string(v);
+      rapidjson::Value version_val(version_str.c_str(), allocator);
+      versions.PushBack(version_val, allocator);
+    }
   }
   metadata.AddMember("versions", versions, allocator);
 
