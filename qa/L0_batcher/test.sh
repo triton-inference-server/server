@@ -121,7 +121,7 @@ for model_type in FIXED VARIABLE; do
             test_multi_same_output1 \
             test_multi_different_outputs \
             test_multi_different_output_order ; do
-        SERVER_ARGS="--model-repository=`pwd`/$MODEL_PATH"
+        SERVER_ARGS="--model-repository=`pwd`/$MODEL_PATH --api-version=2"
         SERVER_LOG="./$i.$model_type.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -153,7 +153,7 @@ for model_type in FIXED VARIABLE; do
         export TRTSERVER_DELAY_SCHEDULER=6 &&
             [[ "$i" != "test_multi_batch_use_biggest_preferred" ]] && export TRTSERVER_DELAY_SCHEDULER=3 &&
             [[ "$i" != "test_multi_batch_use_best_preferred" ]] && export TRTSERVER_DELAY_SCHEDULER=2
-        SERVER_ARGS="--model-repository=`pwd`/$MODEL_PATH"
+        SERVER_ARGS="--model-repository=`pwd`/$MODEL_PATH --api-version=2"
         SERVER_LOG="./$i.$model_type.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -184,7 +184,7 @@ for i in \
         test_multi_batch_preferred_different_shape \
         test_multi_batch_different_shape_allow_ragged \
         test_multi_batch_different_shape ; do
-    SERVER_ARGS="--model-repository=`pwd`/var_models"
+    SERVER_ARGS="--model-repository=`pwd`/var_models --api-version=2"
     SERVER_LOG="./$i.VARIABLE.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -214,7 +214,7 @@ export BATCHER_TYPE=VARIABLE
 for i in \
         test_multi_batch_delayed_preferred_different_shape ; do
     export TRTSERVER_DELAY_SCHEDULER=4
-    SERVER_ARGS="--model-repository=`pwd`/var_models"
+    SERVER_ARGS="--model-repository=`pwd`/var_models --api-version=2"
     SERVER_LOG="./$i.VARIABLE.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -271,7 +271,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
     export TRTSERVER_DELAY_SCHEDULER=12
 
     # not preserve
-    SERVER_ARGS="--trace-file=not_preserve.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/custom_models"
+    SERVER_ARGS="--trace-file=not_preserve.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/custom_models --api-version=2"
     SERVER_LOG="./not_preserve.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -305,7 +305,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
     (cd custom_models/custom_zero_1_float32 && \
             sed -i "s/dynamic_batching.*/dynamic_batching { preferred_batch_size: [ 4 ] preserve_ordering: true }/g" config.pbtxt)
 
-    SERVER_ARGS="--trace-file=preserve.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/custom_models"
+    SERVER_ARGS="--trace-file=preserve.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/custom_models --api-version=2"
     SERVER_LOG="./preserve.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -340,7 +340,7 @@ fi
 # python unittest seems to swallow ImportError and still return 0 exit
 # code. So need to explicitly check CLIENT_LOG to make sure we see
 # some running tests
-grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed To Run\n***"
     RET=1
