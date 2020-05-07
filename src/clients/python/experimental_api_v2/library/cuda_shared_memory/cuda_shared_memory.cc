@@ -27,7 +27,7 @@
 #include "src/clients/python/experimental_api_v2/library/cuda_shared_memory/cuda_shared_memory.h"
 
 extern "C" {
-#include <b64/cencode.h>
+#include <src/clients/c++/experimental_api_v2/library/cencode.h>
 }
 #include <cuda_runtime_api.h>
 #include <cstring>
@@ -114,6 +114,13 @@ CudaSharedMemoryGetRawHandle(
       (char*)((void*)&handle->cuda_shm_handle_), handle_size,
       *serialized_raw_handle, &es);
   base64_encode_blockend(*serialized_raw_handle + offset, &es);
+  int padding_size =
+      base64_encode_blockend(*serialized_raw_handle + offset, &es);
+  offset += (padding_size - 1);
+  // The base64_encode_blockend does not null-terminate the string but adds
+  // the new line character. Adding the null character here for proper
+  // termination of ctypes.
+  (*serialized_raw_handle)[offset] = '\0';
 
   return 0;
 }
