@@ -240,11 +240,13 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
     # Send requests of FLAGS.batch_size images.
     input_bytes = None
     for idx in range(FLAGS.batch_size):
-        input_filenames.append(filenames[idx])
+        # wrap over if requested batch size exceeds number of provided images
+        img_idx = idx % len(filenames)
+        input_filenames.append(filenames[img_idx])
         if input_bytes is None:
-            input_bytes = image_data[idx].tobytes()
+            input_bytes = image_data[img_idx].tobytes()
         else:
-            input_bytes += image_data[idx].tobytes()
+            input_bytes += image_data[img_idx].tobytes()
 
     input_contents = grpc_service_v2_pb2.InferTensorContents()
     input_contents.raw_contents = input_bytes
