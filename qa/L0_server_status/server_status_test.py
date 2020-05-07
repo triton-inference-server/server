@@ -275,32 +275,30 @@ class ServerMetadataTest(unittest.TestCase):
                         model_name, model_version="3"))
 
                     # Only version 1 should have infer stats
-                    for v in (1, 3):
-                        infer_stats = triton_client.get_inference_statistics(model_name, model_version=str(v))
-                        if v == 1:
-                            if pair[1] == "http":
-                                self.assertEqual(len(infer_stats['model_stats']), 1,
-                                                "expected 1 infer stats for version " + str(v) + 
-                                                " of model " + model_name)
-                                stats = infer_stats['model_stats'][0]['inference_stats']
-                                self.assertTrue(stats['success']['count'], 3)
-                            else:
-                                self.assertEqual(len(infer_stats.model_stats), 1,
-                                                "expected 1 infer stats for version " + str(v) +
-                                                " of model " + model_name)
-                                stats = infer_stats.model_stats[0].inference_stats
-                                self.assertTrue(stats.success.count, 3)
-                        else:
-                            if pair[1] == "http":
-                                stats = infer_stats['model_stats'][0]['inference_stats']
-                                self.assertEqual(stats['success']['count'], 0,
-                                                 "unexpected infer stats for version " + str(v) +
-                                                 " of model " + model_name)
-                            else:
-                                stats = infer_stats.model_stats[0].inference_stats
-                                self.assertEqual(stats.success.count, 0,
-                                                 "unexpected infer stats for version " + str(v) +
-                                                 " of model " + model_name)
+                    infer_stats = triton_client.get_inference_statistics(model_name, model_version='1')
+                    if pair[1] == "http":
+                        self.assertEqual(len(infer_stats['model_stats']), 1,
+                                        "expected 1 infer stats for version 1"
+                                        " of model " + model_name)
+                        stats = infer_stats['model_stats'][0]['inference_stats']
+                        self.assertTrue(stats['success']['count'], 3)
+                    else:
+                        self.assertEqual(len(infer_stats.model_stats), 1,
+                                        "expected 1 infer stats for version 1"
+                                        " of model " + model_name)
+                        stats = infer_stats.model_stats[0].inference_stats
+                        self.assertTrue(stats.success.count, 3)
+                    infer_stats = triton_client.get_inference_statistics(model_name, model_version='3')
+                    if pair[1] == "http":
+                        stats = infer_stats['model_stats'][0]['inference_stats']
+                        self.assertEqual(stats['success']['count'], 0,
+                                            "unexpected infer stats for version 3"
+                                            " of model " + model_name)
+                    else:
+                        stats = infer_stats.model_stats[0].inference_stats
+                        self.assertEqual(stats.success.count, 0,
+                                            "unexpected infer stats for version 3"
+                                            " of model " + model_name)
 
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
