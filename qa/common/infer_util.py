@@ -27,13 +27,13 @@
 import sys
 import os
 import numpy as np
-import tritongrpcclient.core as grpcclient
-import tritonhttpclient.core as httpclient
-from tritonhttpclient.utils import *
-import tritonsharedmemoryutils.shared_memory as shm
-import tritonsharedmemoryutils.cuda_shared_memory as cudashm
 import test_util as tu
 import shm_util as su
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+import tritonclientutils.shared_memory as shm
+import tritonclientutils.cuda_shared_memory as cudashm
+from tritonclientutils.utils import *
 
 # unicode() doesn't exist on python3, for how we use it the
 # corresponding function is bytes()
@@ -567,7 +567,7 @@ def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input
                     triton_client.register_cuda_shared_memory(output_name+shm_suffix, cudashm.get_raw_handle(output_shm_handle_list[io_num][0]), 0, output_byte_size)
                 inputs[-1].set_shared_memory(input_name+shm_suffix, input_byte_size)
                 outputs[-1].set_shared_memory(output_name+shm_suffix, output_byte_size)
-            
+
         # FIXME streaming needs async handling
         results = triton_client.infer(model_name, inputs,
                                       outputs=outputs,
@@ -674,7 +674,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
 
         input_shape = input_shapes[io_num]
         output_shape = output_shapes[io_num]
-            
+
         rtensor_dtype = _range_repr_dtype(tensor_dtype)
         if (rtensor_dtype != np.bool):
             input_array = np.random.randint(low=np.iinfo(rtensor_dtype).min,
@@ -735,7 +735,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         else:
             triton_client = grpcclient.InferenceServerClient(
                 config[0], verbose=True)
-    
+
         inputs = []
         output_req = []
         for io_num, (input_name, output_name) in enumerate(zip(input_dict.keys(), expected_dict.keys())):
