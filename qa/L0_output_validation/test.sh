@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,7 +42,7 @@ LIBTORCH_OP_VAL_CLIENT=lt_op_val_client.py
 DATADIR=/data/inferenceserver/${REPO_VERSION}/libtorch_model_store2
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR --exit-on-error=false"
+SERVER_ARGS="--model-repository=$DATADIR --exit-on-error=false --api-version=2"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
