@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,8 +38,8 @@ import traceback
 import numpy as np
 import test_util as tu
 from functools import partial
-from tensorrtserver.api import *
-import tensorrtserver.api.server_status_pb2 as server_status
+import tritongrpcclient as grpcclient
+from tritonclientutils.utils import np_to_triton_dtype
 
 if sys.version_info >= (3, 0):
   import queue
@@ -59,15 +59,16 @@ class UserData:
     def __init__(self):
         self._completed_requests = queue.Queue()
 
-# Callback function used for async_run()
-def completion_callback(value, expected_result, user_data, infer_ctx, request_id):
-    user_data._completed_requests.put((request_id, value, expected_result))
+# Callback function used for async_stream_infer()
+def completion_callback(user_data, result, error):
+    # passing error raise and handling out
+    user_data._completed_requests.put((result, error))
 
 class TimeoutException(Exception):
     pass
 
-def check_sequence_async(ctx, trial, model_name, input_dtype, steps,
-                         timeout_ms=DEFAULT_TIMEOUT_MS, batch_size=1, sequence_name="<unknown>"):
+def check_sequence_async(client_metadata, trial, model_name, input_dtype, steps,
+                         timeout_ms=DEFAULT_TIMEOUT_MS, sequence_name="<unknown>"):
     """Perform sequence of inferences using async run. The 'steps' holds
     a list of tuples, one for each inference with format:
 
@@ -77,36 +78,41 @@ def check_sequence_async(ctx, trial, model_name, input_dtype, steps,
     if (("savedmodel" in trial) or ("graphdef" in trial) or
         ("netdef" in trial) or ("custom" in trial) or
         ("plan" in trial)):
-        tensor_shape = (1,)
+        tensor_shape = (1, 1,)
     else:
         assert False, "unknown trial type: " + trial
+
+    triton_client = client_metadata[0]
+    sequence_id = client_metadata[1]
 
     # Execute the sequence of inference...
     seq_start_ms = int(round(time.time() * 1000))
     user_data = UserData()
+    # Ensure there is no running stream
+    triton_client.stop_stream()
+    triton_client.start_stream(partial(completion_callback, user_data))
 
     sent_count=0
     for flag_str, value, expected_result, delay_ms in steps:
-        flags = InferRequestHeader.FLAG_NONE
+        seq_start = False
+        seq_end = False
         if flag_str is not None:
-            if "start" in flag_str:
-                flags = flags | InferRequestHeader.FLAG_SEQUENCE_START
-            if "end" in flag_str:
-                flags = flags | InferRequestHeader.FLAG_SEQUENCE_END
+            seq_start = ("start" in flag_str)
+            seq_end = ("end" in flag_str)
 
-        input_list = list()
-        for b in range(batch_size):
-            if input_dtype == np.object:
-                in0 = np.full(tensor_shape, value, dtype=np.int32)
-                in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
-                in0 = in0n.reshape(tensor_shape)
-            else:
-                in0 = np.full(tensor_shape, value, dtype=input_dtype)
-            input_list.append(in0)
-
-        ctx.async_run(partial(completion_callback, value, expected_result, user_data), 
-                            { 'INPUT' :input_list }, { 'OUTPUT' : InferContext.ResultFormat.RAW},
-                               batch_size=batch_size, flags=flags)
+        if input_dtype == np.object:
+            in0 = np.full(tensor_shape, value, dtype=np.int32)
+            in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+            in0 = in0n.reshape(tensor_shape)
+        else:
+            in0 = np.full(tensor_shape, value, dtype=input_dtype)
+        inputs = [grpcclient.InferInput("INPUT", tensor_shape,
+                            np_to_triton_dtype(input_dtype)),]
+        inputs[0].set_data_from_numpy(in0)
+        
+        triton_client.async_stream_infer(model_name, inputs,
+                            sequence_id=sequence_id,
+                            sequence_start=seq_start, sequence_end=seq_end)
         sent_count += 1
 
         if delay_ms is not None:
@@ -116,23 +122,20 @@ def check_sequence_async(ctx, trial, model_name, input_dtype, steps,
     result = None
     processed_count = 0
     while processed_count < sent_count:
-        (id, value, expected) = user_data._completed_requests.get()
+        (results, error) = user_data._completed_requests.get()
+        if error is not None:
+            raise error
+        
+        (_, value, expected, _) = steps[processed_count]
         processed_count += 1
-        results = None
-        while results == None:
-            results = ctx.get_async_run_results(id)
-            if results == None:
-                if timeout_ms != None:
-                    now_ms = int(round(time.time() * 1000))
-                    if (now_ms - seq_start_ms) > timeout_ms:
-                        raise TimeoutException("Timeout expired for {}".format(sequence_name))
-                time.sleep(10.0 / 1000.0) # 10ms
+        if timeout_ms != None:
+            now_ms = int(round(time.time() * 1000))
+            if (now_ms - seq_start_ms) > timeout_ms:
+                raise TimeoutException("Timeout expired for {}".format(sequence_name))
 
-        assert len(results) == 1
-        assert "OUTPUT" in results
-        result = results["OUTPUT"][0][0]
+        result = results.as_numpy("OUTPUT")[0][0]
         if FLAGS.verbose:
-            print("{} {}: + {} = {}".format(sequence_name, ctx.correlation_id(), value, result))
+            print("{} {}: + {} = {}".format(sequence_name, sequence_id, value, result))
 
         if expected is not None:
             if input_dtype == np.object:
@@ -141,6 +144,7 @@ def check_sequence_async(ctx, trial, model_name, input_dtype, steps,
             else:
                 assert result == expected, "{}: expected result {}, got {}".format(
                     sequence_name, expected, result)
+    triton_client.stop_stream()
 
 def get_datatype(trial):
     # Get the datatype to use based on what models are available (see test.sh)
@@ -150,10 +154,10 @@ def get_datatype(trial):
         return np.dtype(object)
     return np.int32
 
-def sequence_valid(ctx, rng, trial, model_name, dtype, len_mean, len_stddev, sequence_name):
+def sequence_valid(client_metadata, rng, trial, model_name, dtype, len_mean, len_stddev, sequence_name):
     # Create a variable length sequence with "start" and "end" flags.
     seqlen = max(1, int(rng.normal(len_mean, len_stddev)))
-    print("{} {}: valid seqlen = {}".format(sequence_name, ctx.correlation_id(), seqlen))
+    print("{} {}: valid seqlen = {}".format(sequence_name, client_metadata[1], seqlen))
 
     values = rng.randint(0, 1024*1024, size=seqlen, dtype=dtype)
 
@@ -174,17 +178,17 @@ def sequence_valid(ctx, rng, trial, model_name, dtype, len_mean, len_stddev, seq
         # (flag_str, value, expected_result, delay_ms)
         steps.append((flags, val, expected_result, delay_ms),)
 
-    check_sequence_async(ctx, trial, model_name, dtype, steps,
+    check_sequence_async(client_metadata, trial, model_name, dtype, steps,
                          sequence_name=sequence_name)
 
-def sequence_valid_valid(ctx, rng, trial, model_name, dtype, len_mean, len_stddev, sequence_name):
+def sequence_valid_valid(client_metadata, rng, trial, model_name, dtype, len_mean, len_stddev, sequence_name):
     # Create two variable length sequences with "start" and "end"
     # flags, where both sequences use the same correlation ID and are
     # sent back-to-back.
     seqlen = [ max(1, int(rng.normal(len_mean, len_stddev))),
                max(1, int(rng.normal(len_mean, len_stddev))) ]
     print("{} {}: valid-valid seqlen[0] = {}, seqlen[1] = {}".format(
-        sequence_name, ctx.correlation_id(), seqlen[0], seqlen[1]))
+        sequence_name, client_metadata[1], seqlen[0], seqlen[1]))
 
     values = [ rng.randint(0, 1024*1024, size=seqlen[0], dtype=dtype),
                rng.randint(0, 1024*1024, size=seqlen[1], dtype=dtype) ]
@@ -207,17 +211,17 @@ def sequence_valid_valid(ctx, rng, trial, model_name, dtype, len_mean, len_stdde
             # (flag_str, value, expected_result, delay_ms)
             steps.append((flags, val, expected_result, delay_ms),)
 
-    check_sequence_async(ctx, trial, model_name, dtype, steps,
+    check_sequence_async(client_metadata, trial, model_name, dtype, steps,
                          sequence_name=sequence_name)
 
-def sequence_valid_no_end(ctx, rng, trial, model_name, dtype, len_mean, len_stddev, sequence_name):
+def sequence_valid_no_end(client_metadata, rng, trial, model_name, dtype, len_mean, len_stddev, sequence_name):
     # Create two variable length sequences, the first with "start" and
     # "end" flags and the second with no "end" flag, where both
     # sequences use the same correlation ID and are sent back-to-back.
     seqlen = [ max(1, int(rng.normal(len_mean, len_stddev))),
                max(1, int(rng.normal(len_mean, len_stddev))) ]
     print("{} {}: valid-no-end seqlen[0] = {}, seqlen[1] = {}".format(
-        sequence_name, ctx.correlation_id(), seqlen[0], seqlen[1]))
+        sequence_name, client_metadata[1], seqlen[0], seqlen[1]))
 
     values = [ rng.randint(0, 1024*1024, size=seqlen[0], dtype=dtype),
                rng.randint(0, 1024*1024, size=seqlen[1], dtype=dtype) ]
@@ -240,14 +244,14 @@ def sequence_valid_no_end(ctx, rng, trial, model_name, dtype, len_mean, len_stdd
             # (flag_str, value, expected_result, delay_ms)
             steps.append((flags, val, expected_result, delay_ms),)
 
-    check_sequence_async(ctx, trial, model_name, dtype, steps,
+    check_sequence_async(client_metadata, trial, model_name, dtype, steps,
                          sequence_name=sequence_name)
 
-def sequence_no_start(ctx, rng, trial, model_name, dtype, sequence_name):
+def sequence_no_start(client_metadata, rng, trial, model_name, dtype, sequence_name):
     # Create a sequence without a "start" flag. Sequence should get an
     # error from the server.
     seqlen = 1
-    print("{} {}: no-start seqlen = {}".format(sequence_name, ctx.correlation_id(), seqlen))
+    print("{} {}: no-start seqlen = {}".format(sequence_name, client_metadata[1], seqlen))
 
     values = rng.randint(0, 1024*1024, size=seqlen, dtype=dtype)
 
@@ -262,19 +266,19 @@ def sequence_no_start(ctx, rng, trial, model_name, dtype, sequence_name):
         steps.append((flags, val, None, delay_ms),)
 
     try:
-        check_sequence_async(ctx, trial, model_name, dtype, steps,
+        check_sequence_async(client_metadata, trial, model_name, dtype, steps,
                              sequence_name=sequence_name)
         assert False, "expected inference failure from missing START flag"
-    except InferenceServerException as ex:
+    except Exception as ex:
         if "must specify the START flag" not in ex.message():
             raise
 
-def sequence_no_end(ctx, rng, trial, model_name, dtype, len_mean, len_stddev, sequence_name):
+def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean, len_stddev, sequence_name):
     # Create a variable length sequence with "start" flag but that
     # never ends. The sequence should be aborted by the server and its
     # slot reused for another sequence.
     seqlen = max(1, int(rng.normal(len_mean, len_stddev)))
-    print("{} {}: no-end seqlen = {}".format(sequence_name, ctx.correlation_id(), seqlen))
+    print("{} {}: no-end seqlen = {}".format(sequence_name, client_metadata[1], seqlen))
 
     values = rng.randint(0, 1024*1024, size=seqlen, dtype=dtype)
 
@@ -293,7 +297,7 @@ def sequence_no_end(ctx, rng, trial, model_name, dtype, len_mean, len_stddev, se
         # (flag_str, value, expected_result, delay_ms)
         steps.append((flags, val, expected_result, delay_ms),)
 
-    check_sequence_async(ctx, trial, model_name, dtype, steps,
+    check_sequence_async(client_metadata, trial, model_name, dtype, steps,
                          sequence_name=sequence_name)
 
 def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name, dtype):
@@ -316,14 +320,13 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name, 
         # results not expected. See below for details.
         common_cnt = 2
         rare_cnt = 8
-        ctxs = []
+        client_metadata_list = []
         last_choices = []
 
         for c in range(common_cnt + rare_cnt):
-            ctxs.append(
-                InferContext("localhost:8001", ProtocolType.GRPC, model_name,
-                             correlation_id=correlation_id_base + c, streaming=True,
-                             verbose=FLAGS.verbose))
+            client_metadata_list.append(
+                (grpcclient.InferenceServerClient("localhost:8001", FLAGS.verbose),
+                    correlation_id_base + c))
             last_choices.append(None)
 
         rare_idx = 0
@@ -332,34 +335,34 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name, 
             if rng.rand() < 0.1:
                 # Rare context...
                 choice = rng.rand()
-                ctx_idx = common_cnt + rare_idx
+                client_idx = common_cnt + rare_idx
 
                 # Send a no-end, valid-no-end or valid-valid
                 # sequence... because it is a rare context this should
                 # exercise the idle sequence path of the sequence
                 # scheduler
                 if choice < 0.33:
-                    sequence_no_end(ctxs[ctx_idx], rng, trial, model_name, dtype,
+                    sequence_no_end(client_metadata_list[client_idx], rng, trial, model_name, dtype,
                                     SEQUENCE_LENGTH_MEAN, SEQUENCE_LENGTH_STDEV,
                                     sequence_name=name)
-                    last_choices[ctx_idx] = "no-end"
+                    last_choices[client_idx] = "no-end"
                 elif choice < 0.66:
-                    sequence_valid_no_end(ctxs[ctx_idx], rng, trial, model_name, dtype,
+                    sequence_valid_no_end(client_metadata_list[client_idx], rng, trial, model_name, dtype,
                                    SEQUENCE_LENGTH_MEAN, SEQUENCE_LENGTH_STDEV,
                                    sequence_name=name)
-                    last_choices[ctx_idx] = "valid-no-end"
+                    last_choices[client_idx] = "valid-no-end"
                 else:
-                    sequence_valid_valid(ctxs[ctx_idx], rng, trial, model_name, dtype,
+                    sequence_valid_valid(client_metadata_list[client_idx], rng, trial, model_name, dtype,
                                    SEQUENCE_LENGTH_MEAN, SEQUENCE_LENGTH_STDEV,
                                    sequence_name=name)
-                    last_choices[ctx_idx] = "valid-valid"
+                    last_choices[client_idx] = "valid-valid"
 
                 rare_idx = (rare_idx + 1) % rare_cnt
             else:
                 # Common context...
-                ctx_idx = 0 if rng.rand() < 0.5 else 1
-                ctx = ctxs[ctx_idx]
-                last_choice = last_choices[ctx_idx]
+                client_idx = 0 if rng.rand() < 0.5 else 1
+                client_metadata = client_metadata_list[client_idx]
+                last_choice = last_choices[client_idx]
 
                 choice = rng.rand()
 
@@ -370,29 +373,29 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name, 
                 if ((last_choice != "no-end") and
                     (last_choice != "valid-no-end") and
                     (choice < 0.01)):
-                    sequence_no_start(ctx, rng, trial, model_name, dtype,
+                    sequence_no_start(client_metadata, rng, trial, model_name, dtype,
                                       sequence_name=name)
-                    last_choices[ctx_idx] = "no-start"
+                    last_choices[client_idx] = "no-start"
                 elif choice < 0.05:
-                    sequence_no_end(ctx, rng, trial, model_name, dtype,
+                    sequence_no_end(client_metadata, rng, trial, model_name, dtype,
                                     SEQUENCE_LENGTH_MEAN, SEQUENCE_LENGTH_STDEV,
                                     sequence_name=name)
-                    last_choices[ctx_idx] = "no-end"
+                    last_choices[client_idx] = "no-end"
                 elif choice < 0.10:
-                    sequence_valid_no_end(ctx, rng, trial, model_name, dtype,
+                    sequence_valid_no_end(client_metadata, rng, trial, model_name, dtype,
                                    SEQUENCE_LENGTH_MEAN, SEQUENCE_LENGTH_STDEV,
                                    sequence_name=name)
-                    last_choices[ctx_idx] = "valid-no-end"
+                    last_choices[client_idx] = "valid-no-end"
                 elif choice < 0.15:
-                    sequence_valid_valid(ctx, rng, trial, model_name, dtype,
+                    sequence_valid_valid(client_metadata, rng, trial, model_name, dtype,
                                    SEQUENCE_LENGTH_MEAN, SEQUENCE_LENGTH_STDEV,
                                    sequence_name=name)
-                    last_choices[ctx_idx] = "valid-valid"
+                    last_choices[client_idx] = "valid-valid"
                 else:
-                    sequence_valid(ctx, rng, trial, model_name, dtype,
+                    sequence_valid(client_metadata, rng, trial, model_name, dtype,
                                    SEQUENCE_LENGTH_MEAN, SEQUENCE_LENGTH_STDEV,
                                    sequence_name=name)
-                    last_choices[ctx_idx] = "valid"
+                    last_choices[client_idx] = "valid"
 
     except Exception as ex:
         _thread_exceptions_mutex.acquire()
@@ -403,9 +406,9 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name, 
     print("Exiting thread {}".format(name))
 
 def check_status(model_name):
-    ctx = ServerStatusContext("localhost:8000", ProtocolType.HTTP, model_name, FLAGS.verbose)
-    ss = ctx.get_server_status()
-    print(ss)
+    client = grpcclient.InferenceServerClient("localhost:8001", FLAGS.verbose)
+    stats = client.get_inference_statistics(model_name)
+    print(stats)
 
 
 if __name__ == '__main__':

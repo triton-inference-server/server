@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -64,7 +64,7 @@ done
 # Stress-test each model repository
 for model_trial in 1 2 4 ; do
     MODEL_DIR=models${model_trial}
-    SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
+    SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR --api-version=2"
     SERVER_LOG="./$MODEL_DIR.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
