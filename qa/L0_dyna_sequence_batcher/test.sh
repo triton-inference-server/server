@@ -70,7 +70,7 @@ for i in \
         test_length1_sequence \
          ; do
     SERVER_LOG="./$i.serverlog"
-    SERVER_ARGS="--model-repository=`pwd`/models"
+    SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -113,7 +113,7 @@ for i in \
     ; do
 
     SERVER_LOG="./$i.serverlog"
-    SERVER_ARGS="--model-repository=`pwd`/models"
+    SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -151,7 +151,7 @@ for i in \
     ; do
 
     SERVER_LOG="./$i.serverlog"
-    SERVER_ARGS="--model-repository=`pwd`/ragged_models"
+    SERVER_ARGS="--model-repository=`pwd`/ragged_models --api-version=2"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -177,7 +177,7 @@ done
 # python unittest seems to swallow ImportError and still return 0 exit
 # code. So need to explicitly check CLIENT_LOG to make sure we see
 # some running tests
-grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed To Run\n***"
     RET=1
