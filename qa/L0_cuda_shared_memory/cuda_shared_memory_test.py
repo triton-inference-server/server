@@ -24,13 +24,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import tritonsharedmemoryutils.cuda_shared_memory as cshm
-import tritonhttpclient.core as httpclient
-import tritongrpcclient.core as grpcclient
-from tritonhttpclient.utils import *
 import numpy as np
 import unittest
 import os
+
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+import tritonclientutils.cuda_shared_memory as cshm
+from tritonclientutils.utils import *
 
 class CudaSharedMemoryTest(unittest.TestCase):
     def test_invalid_create_shm(self):
