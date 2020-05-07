@@ -34,11 +34,13 @@ import unittest
 import numpy as np
 import infer_util as iu
 from functools import partial
-from tritongrpcclient.utils import *
-import tritongrpcclient.core as grpcclient
-import tritonhttpclient.core as httpclient
-import tritonsharedmemoryutils.shared_memory as shm
-import tritonsharedmemoryutils.cuda_shared_memory as cudashm
+
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+import tritonclientutils.shared_memory as shm
+import tritonclientutils.cuda_shared_memory as cudashm
+from tritonclientutils.utils import *
+
 if sys.version_info >= (3, 0):
   import queue
 else:
@@ -374,7 +376,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 shm_op_handle = cudashm.create_shared_memory_region("output_data", output_byte_size, 0)
                 self.triton_client_.register_cuda_shared_memory("output_data", cudashm.get_raw_handle(shm_op_handle), 0, output_byte_size)
             shm_ip_handles = []
-            
+
 
         for config in configs:
             client_utils = grpcclient if config[1] == "grpc" else httpclient
@@ -556,7 +558,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                 inputs.append(client_utils.InferInput(INPUT, full_shape,
                         np_to_triton_dtype(input_dtype)))
                 outputs.append(client_utils.InferRequestedOutput(OUTPUT))
-                
+
                 if not (_test_system_shared_memory or _test_cuda_shared_memory):
                     if input_dtype == np.object:
                         in0 = np.full(full_shape, value, dtype=np.int32)
@@ -693,7 +695,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                             in0 = in0n.reshape(tensor_shape)
                         else:
                             in0 = np.full(tensor_shape, value, dtype=input_dtype)
-                    
+
                     inputs[0].set_data_from_numpy(in0)
                     inputs[1].set_data_from_numpy(shape_values[-1])
                     if using_dynamic_batcher:

@@ -35,9 +35,10 @@ import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
-import tritongrpcclient.core as grpcclient
-import tritonsharedmemoryutils.shared_memory as shm
-import tritonsharedmemoryutils.cuda_shared_memory as cudashm
+
+import tritongrpcclient as grpcclient
+import tritonclientutils.shared_memory as shm
+import tritonclientutils.cuda_shared_memory as cudashm
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
@@ -428,9 +429,9 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(model_name, {1: 1, 4: 1}, 3, 5)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
-        
-        
-        
+
+
+
 
     def test_multi_batch_preferred_different_shape(self):
         # Send two requests with total static batch size in between
