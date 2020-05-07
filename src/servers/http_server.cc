@@ -619,8 +619,10 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
         } else {
           if (format == "json") {
             std::string server_status_json;
+            ::google::protobuf::util::JsonPrintOptions options;
+            options.preserve_proto_field_names = true;
             ::google::protobuf::util::MessageToJsonString(
-                server_status, &server_status_json);
+                server_status, &server_status_json, options);
             evbuffer_add(
                 req->buffer_out, server_status_json.c_str(),
                 server_status_json.size());
