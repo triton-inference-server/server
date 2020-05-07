@@ -110,8 +110,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                                             self._testMethodName, protocol))
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, (1,), 9 * (idx + 1), 9 * (idx + 1))
-                except InferenceServerException as ex:
+                    self.check_status(model_name, {1: 9 * (idx + 1)}, 9 * (idx + 1), 9 * (idx + 1))
+                except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_length1_sequence(self):
@@ -140,15 +140,15 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                                             self._testMethodName, protocol))
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, (1,), (idx + 1), (idx + 1))
-                except InferenceServerException as ex:
+                    self.check_status(model_name, {1: (idx + 1)}, (idx + 1), (idx + 1))
+                except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
-    def _multi_sequence_impl(self, trials, expected_exec_cnt, sleep_secs, tensor_shapes):
+    def _multi_sequence_impl(self, trials, expected_batch_exec, sleep_secs, tensor_shapes):
         for trial in trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,2,3), dtype, 0,
+            precreated_shm0_handles = self.precreate_register_regions((1,3), dtype, 0,
                                                                       tensor_shape=(tensor_shapes[0],))
             precreated_shm1_handles = self.precreate_register_regions((11,12,13), dtype, 1,
                                                                       tensor_shape=(tensor_shapes[1],))
@@ -158,7 +158,6 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                                                                       tensor_shape=(tensor_shapes[3],))
             try:
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
-                protocol = "streaming"
 
                 self.check_setup(model_name)
                 self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
@@ -175,9 +174,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            ("end", 3, None)),
                           self.get_expected_result(4*tensor_shapes[0] + corrids[0],
                                                    corrids[0], 3, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}_{}".format(
-                        self._testMethodName, protocol, corrids[0]),
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}_{}".format(
+                        self._testMethodName, corrids[0]),
                             'tensor_shape' : (tensor_shapes[0],) }))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
@@ -189,9 +188,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            ("end", 13, None)),
                           self.get_expected_result(36*tensor_shapes[1] + corrids[1],
                                                    corrids[1], 13, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}_{}".format(
-                        self._testMethodName, protocol, corrids[1]),
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}_{}".format(
+                        self._testMethodName, corrids[1]),
                             'tensor_shape' : (tensor_shapes[1],) }))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
@@ -203,9 +202,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            ("end", 113, None)),
                           self.get_expected_result(336*tensor_shapes[2] + corrids[2],
                                                    corrids[2], 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}_{}".format(
-                        self._testMethodName, protocol, corrids[2]),
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}_{}".format(
+                        self._testMethodName, corrids[2]),
                             'tensor_shape' : (tensor_shapes[2],) }))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
@@ -217,9 +216,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            ("end", 1113, None)),
                           self.get_expected_result(3336*tensor_shapes[3] + corrids[3],
                                                    corrids[3], 1113, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}_{}".format(
-                        self._testMethodName, protocol, corrids[3]),
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}_{}".format(
+                        self._testMethodName, corrids[3]),
                             'tensor_shape' : (tensor_shapes[3],) }))
 
                 for t in threads:
@@ -229,8 +228,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), expected_exec_cnt, 11)
-            except InferenceServerException as ex:
+                self.check_status(model_name, expected_batch_exec, 11, 11)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if _test_system_shared_memory or _test_cuda_shared_memory:
@@ -242,25 +241,25 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
     def test_multi_sequence(self):
         # Send four sequences in series and make sure they get
         # completely batched into batch-size 4 inferences.
-        self._multi_sequence_impl(_trials, 3, 1, (1, 1, 1, 1))
+        self._multi_sequence_impl(_trials, {4: 3}, 1, (1, 1, 1, 1))
 
     def test_multi_parallel_sequence(self):
         # Send four sequences in parallel and make sure they get
         # completely batched into batch-size 4 inferences.
-        self._multi_sequence_impl(_trials, 3, 0, (1, 1, 1, 1))
+        self._multi_sequence_impl(_trials, {4: 3}, 0, (1, 1, 1, 1))
 
     def test_multi_sequence_different_shape(self):
         # Send four sequences in parallel where the requests in each
         # sequence have different shape. Sequence should not be
         # (completely) batched due to input tensor size differences.
-        self._multi_sequence_impl(_ragged_batch_supported_trials, 11, 0, (4, 3, 1, 2))
+        self._multi_sequence_impl(_ragged_batch_supported_trials, {1: 11}, 0, (4, 3, 1, 2))
 
     def test_multi_sequence_different_shape_allow_ragged(self):
         # Send four sequences in parallel where the requests in each
         # sequence have different shape. Input is marked as allowing
         # ragged and so sequences should be batched even with input
         # tensor size differences.
-        self._multi_sequence_impl(_ragged_batch_supported_trials, 3, 0, (4, 3, 1, 2))
+        self._multi_sequence_impl(_ragged_batch_supported_trials, {4: 3}, 0, (4, 3, 1, 2))
 
     def test_backlog(self):
         # Test model instances together are configured with
@@ -277,7 +276,6 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3)
             precreated_shm4_handles = self.precreate_register_regions((11111,11112,11113), dtype, 4)
             try:
-                protocol = "streaming"
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
@@ -295,8 +293,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 2, None),
                            ("end", 3, None)),
                           self.get_expected_result(6 + corrids[0], corrids[0], 3, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[1],
@@ -306,8 +304,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 12, None),
                            ("end", 13, None)),
                           self.get_expected_result(36 + corrids[1], corrids[1], 13, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[2],
@@ -317,8 +315,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 112, None),
                            ("end", 113, None)),
                           self.get_expected_result(336 + corrids[2], corrids[2], 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[3],
@@ -328,8 +326,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1112, None),
                            ("end", 1113, None)),
                           self.get_expected_result(3336 + corrids[3], corrids[3], 1113, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[4],
@@ -339,16 +337,16 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 11112, None),
                            ("end", 11113, None)),
                           self.get_expected_result(33336 + corrids[4], corrids[4], 11113, trial, "end"),
-                          protocol, precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm4_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 for t in threads:
                     t.start()
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), 6, 15)
-            except InferenceServerException as ex:
+                self.check_status(model_name, {4: 3, 1: 3}, 15, 15)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if _test_system_shared_memory or _test_cuda_shared_memory:
@@ -374,7 +372,6 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm4_handles = self.precreate_register_regions((11111,), dtype, 4)
             precreated_shm5_handles = self.precreate_register_regions((22222,), dtype, 5)
             try:
-                protocol = "streaming"
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
@@ -392,8 +389,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 2, None),
                            ("end", 3, None)),
                           self.get_expected_result(6 + corrids[0], corrids[0], 3, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[1],
@@ -402,8 +399,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 11, None),
                            ("end", 13, None)),
                           self.get_expected_result(24 + corrids[1], corrids[1], 13, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[2],
@@ -412,8 +409,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 111, None),
                            ("end", 113, None)),
                           self.get_expected_result(224 + corrids[2], corrids[2], 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[3],
@@ -423,8 +420,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1112, 3000),
                            ("end", 1113, None)),
                           self.get_expected_result(3336 + corrids[3], corrids[3], 1113, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[4],
@@ -433,8 +430,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start,end", 11111, None),),
                           self.get_expected_result(11111 + corrids[4], corrids[4], 11111,
                                                    trial, "start,end"),
-                          protocol, precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm4_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[5],
@@ -443,8 +440,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start,end", 22222, None),),
                           self.get_expected_result(22222 + corrids[5], corrids[5], 22222,
                                                    trial, "start,end"),
-                          protocol, precreated_shm5_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm5_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 threads[0].start()
                 threads[1].start()
@@ -456,8 +453,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), 3, 12)
-            except InferenceServerException as ex:
+                self.check_status(model_name, {4: 3}, 12, 12)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if _test_system_shared_memory or _test_cuda_shared_memory:
@@ -483,7 +480,6 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm4_handles = self.precreate_register_regions((11111,), dtype, 4)
             precreated_shm5_handles = self.precreate_register_regions((22222,22223,22224), dtype, 5)
             try:
-                protocol = "streaming"
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
@@ -501,8 +497,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 2, None),
                            ("end", 3, None)),
                           self.get_expected_result(6 + corrids[0], corrids[0], 3, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[1],
@@ -511,8 +507,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 11, None),
                            ("end", 13, None)),
                           self.get_expected_result(24 + corrids[1], corrids[1], 13, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[2],
@@ -521,8 +517,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 111, None),
                            ("end", 113, None)),
                           self.get_expected_result(224 + corrids[2], corrids[2], 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[3],
@@ -532,8 +528,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1112, 3000),
                            ("end", 1113, None)),
                           self.get_expected_result(3336 + corrids[3], corrids[3], 1113, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[4],
@@ -542,8 +538,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start,end", 11111, None),),
                           self.get_expected_result(11111 + corrids[4], corrids[4], 11111,
                                                    trial, "start,end"),
-                          protocol, precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm4_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[5],
@@ -553,8 +549,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 22223, None),
                            ("end", 22224, 2000),),
                           self.get_expected_result(66669 + corrids[5], corrids[5], 22224, trial, "end"),
-                          protocol, precreated_shm5_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm5_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 threads[0].start()
                 threads[1].start()
@@ -566,8 +562,11 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, (1,), 5, 14)
-            except InferenceServerException as ex:
+                # Expecting the requests of the same sequence to be in the same
+                # slot, so the execution for thelast long sequence will be
+                # padded to a batch.
+                self.check_status(model_name, {4: 3, 3: 2}, 14, 14)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if _test_system_shared_memory or _test_cuda_shared_memory:
@@ -595,7 +594,6 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm3_handles = self.precreate_register_regions((1111,1112,1112,1113), dtype, 3)
             precreated_shm4_handles = self.precreate_register_regions((11111,11113), dtype, 4)
             try:
-                protocol = "streaming"
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
@@ -612,8 +610,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 1, None),
                            (None, 3, _max_sequence_idle_ms + 1000)),
                           self.get_expected_result(4 + corrids[0], corrids[0], 3, trial, None),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[1],
@@ -624,8 +622,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 12, _max_sequence_idle_ms / 2),
                            ("end", 13, _max_sequence_idle_ms / 2)),
                           self.get_expected_result(48 + corrids[1], corrids[1], 13, trial, None),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[2],
@@ -636,8 +634,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 112, _max_sequence_idle_ms / 2),
                            ("end", 113, _max_sequence_idle_ms / 2)),
                           self.get_expected_result(448 + corrids[2], corrids[2], 113, trial, None),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[3],
@@ -648,8 +646,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1112, _max_sequence_idle_ms / 2),
                            ("end", 1113, _max_sequence_idle_ms / 2)),
                           self.get_expected_result(4448 + corrids[3], corrids[3], 1113, trial, None),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[4],
@@ -658,8 +656,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 11111, None),
                            ("end", 11113, None)),
                           self.get_expected_result(22224 + corrids[4], corrids[4], 11113, trial, "end"),
-                          protocol, precreated_shm4_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm4_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 threads[0].start()
                 threads[1].start()
@@ -672,8 +670,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 self.check_deferred_exception()
                 self.assertTrue(False, "expected error")
-            except InferenceServerException as ex:
-                self.assertEqual("inference:0", ex.server_id())
+            except Exception as ex:
                 self.assertTrue(
                     ex.message().startswith(
                         str("inference request for sequence 1001 to " +
