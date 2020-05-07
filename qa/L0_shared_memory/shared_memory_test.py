@@ -24,13 +24,13 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import tritonsharedmemoryutils.shared_memory as shm
-import tritonhttpclient.core as httpclient
-import tritongrpcclient.core as grpcclient
-from tritonhttpclient.utils import *
 import numpy as np
 import unittest
 import os
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+import tritonclientutils.shared_memory as shm
+from tritonclientutils.utils import *
 
 class SharedMemoryTest(unittest.TestCase):
     def test_invalid_create_shm(self):
@@ -166,16 +166,16 @@ class SharedMemoryTest(unittest.TestCase):
                 grpcclient.InferInput("INPUT1", [1, 16], "INT32"))
             outputs.append(grpcclient.InferRequestedOutput('OUTPUT0'))
             outputs.append(grpcclient.InferRequestedOutput('OUTPUT1'))
-    
+
         inputs[0].set_shared_memory("input0_data", 64)
-    
+
         if type(shm_ip1_handle) == np.array:
             inputs[1].set_data_from_numpy(input0_data, binary_data=False)
         elif big_shm_name != "":
             inputs[1].set_shared_memory(big_shm_name, big_shm_size)
         else:
             inputs[1].set_shared_memory("input1_data", 64)
-    
+
         outputs[0].set_shared_memory("output0_data", 64)
         outputs[1].set_shared_memory("output1_data", 64)
 

@@ -30,7 +30,7 @@ sys.path.append("../common")
 import unittest
 import numpy as np
 import infer_util as iu
-from tritonhttpclient.utils import *
+from tritonclientutils.utils import *
 
 class TrtCudaGraphTest(unittest.TestCase):
     def setUp(self):
@@ -40,7 +40,7 @@ class TrtCudaGraphTest(unittest.TestCase):
     def _check_infer(self, tensor_shape, batch_size=1):
         try:
             iu.infer_exact(self, self.model_name_, (batch_size,) + tensor_shape,
-                            batch_size, self.dtype_, self.dtype_, self.dtype_, 
+                            batch_size, self.dtype_, self.dtype_, self.dtype_,
                             model_version=1, use_http_json_tensors=False,
                             use_grpc=False, use_streaming=False)
         except InferenceServerException as ex:
@@ -57,7 +57,7 @@ class TrtCudaGraphTest(unittest.TestCase):
         self._check_infer(tensor_shape)
         # Inference that should not have CUDA graph captured
         self._check_infer(tensor_shape, 5)
-        
+
 
 if __name__ == '__main__':
     unittest.main()

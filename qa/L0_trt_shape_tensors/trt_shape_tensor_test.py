@@ -29,6 +29,7 @@ sys.path.append("../common")
 
 from builtins import range
 from future.utils import iteritems
+import os
 import unittest
 import time
 import threading
@@ -38,8 +39,7 @@ import infer_util as iu
 import test_util as tu
 import sequence_util as su
 
-import tritongrpcclient.core as grpcclient
-import os
+import tritongrpcclient as grpcclient
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',0)))
