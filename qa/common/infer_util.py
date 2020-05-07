@@ -62,7 +62,7 @@ def _range_repr_dtype(dtype):
     return dtype
 
 
-def _serialize_byte_tensor_list(tensor_values):
+def serialize_byte_tensor_list(tensor_values):
     tensor_list = []
     for tensor_value in tensor_values:
         tensor_list.append(serialize_byte_tensor(tensor_value))
@@ -150,17 +150,17 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
     # prepend size of string to output string data
     if output0_dtype == np.object:
         if batch_size == 1:
-            output0_array_tmp = _serialize_byte_tensor_list([output0_array])
+            output0_array_tmp = serialize_byte_tensor_list([output0_array])
         else:
-            output0_array_tmp = _serialize_byte_tensor_list(output0_array)
+            output0_array_tmp = serialize_byte_tensor_list(output0_array)
     else:
         output0_array_tmp = output0_array
 
     if output1_dtype == np.object:
         if batch_size == 1:
-            output1_array_tmp = _serialize_byte_tensor_list([output1_array])
+            output1_array_tmp = serialize_byte_tensor_list([output1_array])
         else:
-            output1_array_tmp = _serialize_byte_tensor_list(output1_array)
+            output1_array_tmp = serialize_byte_tensor_list(output1_array)
     else:
         output1_array_tmp = output1_array
 
@@ -186,8 +186,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
     # Serialization of string tensors in the case of shared memory must be done manually
     if input_dtype == np.object:
-        input0_list_tmp = _serialize_byte_tensor_list(input0_list)
-        input1_list_tmp = _serialize_byte_tensor_list(input1_list)
+        input0_list_tmp = serialize_byte_tensor_list(input0_list)
+        input1_list_tmp = serialize_byte_tensor_list(input1_list)
     else:
         input0_list_tmp = input0_list
         input1_list_tmp = input1_list
@@ -703,7 +703,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
 
         # Serialization of string tensors in the case of shared memory must be done manually
         if tensor_dtype == np.object:
-            input_list_tmp = _serialize_byte_tensor_list(input_list)
+            input_list_tmp = serialize_byte_tensor_list(input_list)
         else:
             input_list_tmp = input_list
 
