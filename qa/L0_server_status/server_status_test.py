@@ -106,6 +106,26 @@ class ServerMetadataTest(unittest.TestCase):
             self.assertTrue(
                 ex.message().startswith("Request for unknown model 'foo'"))
 
+    def test_unknown_model_version(self):
+        try:
+            for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
+                model_name = "graphdef_int32_int8_int8"
+                if pair[1] == "http":
+                    triton_client = httpclient.InferenceServerClient(
+                        url=pair[0], verbose=True)
+                else:
+                    triton_client = grpcclient.InferenceServerClient(
+                        url=pair[0], verbose=True)
+
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+
+                model_metadata = triton_client.get_model_metadata(model_name, model_version="99")
+                self.assertTrue(False, "expected unknown model version failure")
+        except InferenceServerException as ex:
+            self.assertTrue(
+                ex.message().startswith("Request for unknown model 'graphdef_int32_int8_int8'"))
+
     def test_model_latest_infer(self):
         input_size = 16
         tensor_shape = (1, input_size)
