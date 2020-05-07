@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -66,7 +66,7 @@ if __name__ == '__main__':
             config = text_format.Parse(f.read(), mc.ModelConfig())
 
          if pair[1] == "http":
-            config_json = json.loads(json_format.MessageToJson(config))
+            config_json = json.loads(json_format.MessageToJson(config, preserving_proto_field_name=True))
             if config_json == model_config:
                sys.exit(0)
          else:
