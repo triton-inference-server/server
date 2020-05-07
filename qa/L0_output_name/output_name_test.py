@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,52 +31,52 @@ import os
 from builtins import range
 from functools import partial
 from PIL import Image
+import unittest
 
 import grpc
-from tensorrtserver.api import api_pb2
-from tensorrtserver.api import grpc_service_pb2
-from tensorrtserver.api import grpc_service_pb2_grpc
-import tensorrtserver.api.model_config_pb2 as model_config
+from tritongrpcclient import grpc_service_v2_pb2
+from tritongrpcclient import grpc_service_v2_pb2_grpc
 
-import unittest
-FLAGS = None
 _trials = ("graphdef", "libtorch", "netdef", "onnx", "plan", "savedmodel")
 
 class OutputNameValidationTest(unittest.TestCase):
-    def TestGRPC(self):
-        channel = grpc.insecure_channel(self.url)
-        grpc_stub = grpc_service_pb2_grpc.GRPCServiceStub(channel)
+    def requestGenerator(self, model_name, output_name):
+        request = grpc_service_v2_pb2.ModelInferRequest()
+        request.model_name = model_name
+        request.id = "output name validation"
 
-        request_ = self.requestGenerator("DUMMY", FLAGS)
-        # Send request
-        response_ = grpc_stub.Infer(request_)
-        return response_.request_status.code==5
+        input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
+        input.name = "INPUT0"
+        input.datatype = "FP32"
+        input.shape.extend([1])
 
-    def requestGenerator(self, output_name, FLAGS):
-        # Prepare request for Infer gRPC
-        # The meta data part can be reused across requests
-        request = grpc_service_pb2.InferRequest()
-        request.model_name = self.model_name
-        request.model_version = -1
+        input_contents = grpc_service_v2_pb2.InferTensorContents()
+        input_contents.raw_contents = bytes(4 * 'a', 'utf-8')
+        input.contents.CopyFrom(input_contents)
 
-        request.meta_data.batch_size = 1
-        output_message = api_pb2.InferRequestHeader.Output()
-        output_message.name = output_name
-        request.meta_data.output.extend([output_message])
+        request.inputs.extend([input])
 
-        input0_data = np.arange(start=0, stop=16, dtype=np.int32)
-        input_bytes = input0_data.tobytes()
-        request.meta_data.input.add(name="INPUT0", dims=[16])
+        output = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
+        output.name = output_name
+        request.outputs.extend([output])
 
-        del request.raw_input[:]
-        request.raw_input.extend([input_bytes])
         return request
 
     def test_grpc(self):
+        channel = grpc.insecure_channel("localhost:8001")
+        grpc_stub = grpc_service_v2_pb2_grpc.GRPCInferenceServiceStub(channel)
+
+        # Send request with invalid output name
         for trial in _trials:
-            self.model_name = "{}_nobatch_zero_1_float32".format(trial)
-            self.url = "localhost:8001"
-            self.assertTrue(self.TestGRPC())
+            model_name = "{}_nobatch_zero_1_float32".format(trial)
+            request = self.requestGenerator(model_name, "DUMMY")
+            try:
+                response = grpc_stub.ModelInfer(request)
+                self.assertTrue(False, "unexpected success for unknown output " + model_name)
+            except grpc.RpcError as rpc_error:
+                msg=rpc_error.details()
+                self.assertTrue(
+                    msg.startswith("unexpected inference output 'DUMMY' for model"))
 
 if __name__ == '__main__':
     unittest.main()
