@@ -26,49 +26,55 @@
 
 import argparse
 import os
-import os.path
 import sys
-from tensorrtserver.api import *
-import tensorrtserver.api.server_status_pb2 as server_status
-import tensorrtserver.api.model_config_pb2 as model_config
+import tritonhttpclient.core as httpclient
+import tritongrpcclient.core as grpcclient
+from tritonhttpclient.utils import *
 from google.protobuf import text_format
+import tritongrpcclient.model_config_pb2 as mc
 
 FLAGS = None
 
-def _get_server_status(url="localhost:8000", protocol=ProtocolType.HTTP, model_name=None):
-   ctx = ServerStatusContext(url, protocol, model_name, False)
-   return ctx.get_server_status()
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--expected_dir', type=str, required=True,
-                        help='Directory containing expected output files')
-    parser.add_argument('--model', type=str, required=True,
-                        help='Model name')
-    FLAGS, unparsed = parser.parse_known_args()
+   parser = argparse.ArgumentParser()
+   parser.add_argument('--expected_dir', type=str, required=True,
+                     help='Directory containing expected output files')
+   parser.add_argument('--model', type=str, required=True,
+                     help='Model name')
+   FLAGS, unparsed = parser.parse_known_args()
 
-    status = _get_server_status(model_name=FLAGS.model)
-    status_config = status.model_status[FLAGS.model].config
+   # TODO Test HTTP as well. Requires additional handling since it is reported as Json. 
+   # for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
+   for pair in [("localhost:8001", "grpc")]:
+      model_name = FLAGS.model
+      if pair[1] == "http":
+         triton_client = httpclient.InferenceServerClient(
+               url=pair[0], verbose=False)
+         model_config = triton_client.get_model_config(model_name)
+         print(model_config)
+      else:
+         triton_client = grpcclient.InferenceServerClient(
+               url=pair[0], verbose=False)
+         model_config = triton_client.get_model_config(model_name)
 
-    nonmatch = list()
-
-    expected_files = [f for f in os.listdir(FLAGS.expected_dir)
+   nonmatch = list()
+   expected_files = [f for f in os.listdir(FLAGS.expected_dir)
                       if (os.path.isfile(os.path.join(FLAGS.expected_dir, f)) and
                           (f.startswith("expected")))]
-    for efile in expected_files:
-       with open(os.path.join(FLAGS.expected_dir, efile)) as f:
-          config = text_format.Parse(f.read(), model_config.ModelConfig())
+   for efile in expected_files:
+      with open(os.path.join(FLAGS.expected_dir, efile)) as f:
+         config = text_format.Parse(f.read(), mc.ModelConfig())
 
-       if config == status_config:
-          sys.exit(0)
+      if config == model_config.config:
+         sys.exit(0)
 
-       nonmatch.append(config)
+      nonmatch.append(config)
 
-    print("Model config doesn't match any expected output:")
-    print("Model config:")
-    print(status_config)
-    for nm in nonmatch:
-       print("Non-matching:")
-       print(nm)
+   print("Model config doesn't match any expected output:")
+   print("Model config:")
+   print(model_config)
+   for nm in nonmatch:
+      print("Non-matching:")
+      print(nm)
 
-    sys.exit(1)
+   sys.exit(1)
