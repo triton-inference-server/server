@@ -1916,6 +1916,7 @@ HTTPAPIServerV2::HandleInfer(
       evhtp_header_new("Content-Type", "application/json", 1, 1));
 
   TRITONSERVER_Error* err = nullptr;
+  bool connection_paused = false;
 #ifdef TRTIS_ENABLE_TRACING
 
   // Timestamps from evhtp are capture in 'req'. We record here since
@@ -1957,6 +1958,7 @@ HTTPAPIServerV2::HandleInfer(
   }
 
   if (err == nullptr) {
+    connection_paused = true;
     std::unique_ptr<InferRequestClass> infer_request(
         new InferRequestClass(req, server_id_, unique_id));
 
@@ -2012,7 +2014,9 @@ HTTPAPIServerV2::HandleInfer(
     LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
     EVBufferAddErrorJson(req->buffer_out, err);
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    evhtp_request_resume(req);
+    if (connection_paused) {
+      evhtp_request_resume(req);
+    }
     TRITONSERVER_ErrorDelete(err);
 
     LOG_TRITONSERVER_ERROR(
