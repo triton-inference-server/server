@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,7 +47,7 @@ mkdir $DATADIR
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/*_nobatch_zero_1_float32 $DATADIR
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR"
+SERVER_ARGS="--model-repository=$DATADIR --api-version=2"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
