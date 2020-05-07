@@ -52,11 +52,11 @@ _trials = ()
 if NO_BATCHING:
     for backend in BACKENDS.split(' '):
         if (backend != "libtorch") and (backend != 'custom'):
-            _trials + (backend + "_nobatch",)
+            _trials += (backend + "_nobatch",)
 elif os.environ['BATCHER_TYPE'] == "VARIABLE":
     for backend in BACKENDS.split(' '):
         if (backend != "libtorch") and (backend != 'custom') and (backend != 'plan'):
-            _trials + (backend,)
+            _trials += (backend,)
 else:
     _trials = BACKENDS.split(' ')
 
@@ -1162,7 +1162,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 3, 1: 2}, 14, 14)
+                # Expecting the requests of the same sequence to be in the same
+                # slot, so the execution for thelast long sequence will be
+                # padded to a batch.
+                self.check_status(model_name, {4: 3, 3: 2}, 14, 14)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
