@@ -1044,22 +1044,21 @@ TRITONSERVER_ServerMetadata(
 #endif  // TRTIS_ENABLE_STATS
 
   rapidjson::Document metadata;
+  auto& allocator = metadata.GetAllocator();
   metadata.SetObject();
   // Just store string reference in JSON object since it will be serialized to
   // another buffer.
   metadata.AddMember(
-      "name", rapidjson::StringRef(lserver->Id().c_str()),
-      metadata.GetAllocator());
+      "name", rapidjson::StringRef(lserver->Id().c_str()), allocator);
   metadata.AddMember(
-      "version", rapidjson::StringRef(lserver->Version().c_str()),
-      metadata.GetAllocator());
+      "version", rapidjson::StringRef(lserver->Version().c_str()), allocator);
 
   rapidjson::Value extensions(rapidjson::kArrayType);
   const std::vector<const char*>& exts = lserver->Extensions();
   for (const auto ext : exts) {
-    extensions.PushBack(rapidjson::StringRef(ext), metadata.GetAllocator());
+    extensions.PushBack(rapidjson::StringRef(ext), allocator);
   }
-  metadata.AddMember("extensions", extensions, metadata.GetAllocator());
+  metadata.AddMember("extensions", extensions, allocator);
 
   *server_metadata = reinterpret_cast<TRITONSERVER_Message*>(
       new TritonServerMessage(metadata));
@@ -1093,69 +1092,72 @@ TRITONSERVER_ServerModelMetadata(
       lserver->ModelReadyVersions(model_name, &ready_versions));
 
   rapidjson::Document metadata;
+  auto& allocator = metadata.GetAllocator();
   metadata.SetObject();
   // Just store string reference in JSON object since it will be serialized to
   // another buffer.
-  metadata.AddMember(
-      "name", rapidjson::StringRef(model_name), metadata.GetAllocator());
+  metadata.AddMember("name", rapidjson::StringRef(model_name), allocator);
 
   rapidjson::Value versions(rapidjson::kArrayType);
-  for (const auto v : ready_versions) {
-    auto version_str = std::to_string(v);
-    versions.PushBack(
-        rapidjson::Value(version_str.c_str(), version_str.size()),
-        metadata.GetAllocator());
+  if (model_version_int != -1) {
+    auto version_str = std::to_string(model_version_int);
+    rapidjson::Value version_val(version_str.c_str(), allocator);
+    versions.PushBack(version_val, allocator);
+  } else {
+    for (const auto v : ready_versions) {
+      auto version_str = std::to_string(v);
+      rapidjson::Value version_val(version_str.c_str(), allocator);
+      versions.PushBack(version_val, allocator);
+    }
   }
-  metadata.AddMember("versions", versions, metadata.GetAllocator());
+  metadata.AddMember("versions", versions, allocator);
 
   const auto& model_config = backend->Config();
   metadata.AddMember(
       "platform", rapidjson::StringRef(model_config.platform().c_str()),
-      metadata.GetAllocator());
+      allocator);
 
   rapidjson::Value inputs(rapidjson::kArrayType);
   for (const auto& io : model_config.input()) {
     rapidjson::Value io_metadata;
     io_metadata.SetObject();
     io_metadata.AddMember(
-        "name", rapidjson::StringRef(io.name().c_str()),
-        metadata.GetAllocator());
+        "name", rapidjson::StringRef(io.name().c_str()), allocator);
     io_metadata.AddMember(
         "datatype",
         rapidjson::StringRef(ni::DataTypeToProtocolString(io.data_type())),
-        metadata.GetAllocator());
+        allocator);
 
     rapidjson::Value io_metadata_shape(rapidjson::kArrayType);
     for (const auto d : io.dims()) {
-      io_metadata_shape.PushBack(d, metadata.GetAllocator());
+      io_metadata_shape.PushBack(d, allocator);
     }
-    io_metadata.AddMember("shape", io_metadata_shape, metadata.GetAllocator());
+    io_metadata.AddMember("shape", io_metadata_shape, allocator);
 
-    inputs.PushBack(io_metadata, metadata.GetAllocator());
+    inputs.PushBack(io_metadata, allocator);
   }
-  metadata.AddMember("inputs", inputs, metadata.GetAllocator());
+  metadata.AddMember("inputs", inputs, allocator);
 
   rapidjson::Value outputs(rapidjson::kArrayType);
   for (const auto& io : model_config.output()) {
     rapidjson::Value io_metadata;
     io_metadata.SetObject();
     io_metadata.AddMember(
-        "name", rapidjson::StringRef(io.name().c_str()),
-        metadata.GetAllocator());
+        "name", rapidjson::StringRef(io.name().c_str()), allocator);
     io_metadata.AddMember(
         "datatype",
         rapidjson::StringRef(ni::DataTypeToProtocolString(io.data_type())),
-        metadata.GetAllocator());
+        allocator);
 
     rapidjson::Value io_metadata_shape(rapidjson::kArrayType);
     for (const auto d : io.dims()) {
-      io_metadata_shape.PushBack(d, metadata.GetAllocator());
+      io_metadata_shape.PushBack(d, allocator);
     }
-    io_metadata.AddMember("shape", io_metadata_shape, metadata.GetAllocator());
+    io_metadata.AddMember("shape", io_metadata_shape, allocator);
 
-    outputs.PushBack(io_metadata, metadata.GetAllocator());
+    outputs.PushBack(io_metadata, allocator);
   }
-  metadata.AddMember("outputs", outputs, metadata.GetAllocator());
+  metadata.AddMember("outputs", outputs, allocator);
 
   *model_metadata = reinterpret_cast<TRITONSERVER_Message*>(
       new TritonServerMessage(metadata));
