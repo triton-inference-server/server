@@ -88,7 +88,6 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113,1114), dtype, 3)
             try:
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
-                protocol = "streaming"
 
                 self.check_setup(model_name)
 
@@ -109,8 +108,8 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 1, None),
                            ("end", 3, None)),
                           self.get_expected_result(4 + corrids[0], corrids[0], 3, trial, "end"),
-                          protocol, precreated_shm0_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm0_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[1],
@@ -121,8 +120,8 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 13, None),
                            ("end", 14, None)),
                           self.get_expected_result(50 + corrids[1], corrids[1], 14, trial, "end"),
-                          protocol, precreated_shm1_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm1_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[2],
@@ -131,8 +130,8 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                           (("start", 111, None),
                            ("end", 113, None)),
                           self.get_expected_result(224 + corrids[2], corrids[2], 113, trial, "end"),
-                          protocol, precreated_shm2_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm2_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, corrids[3],
@@ -143,8 +142,8 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                            (None, 1113, None),
                            ("end", 1114, None)),
                           self.get_expected_result(4450 + corrids[3], corrids[3], 1114, trial, "end"),
-                          protocol, precreated_shm3_handles),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                          precreated_shm3_handles),
+                    kwargs={'sequence_name' : "{}".format(self._testMethodName)}))
 
                 threads[1].start()
                 threads[3].start()
@@ -155,12 +154,12 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                     t.join()
                 self.check_deferred_exception()
                 if _model_instances == 1:
-                    self.check_status(model_name, (1,), 4, 12)
+                    self.check_status(model_name, {4: 4}, 12, 12)
                 elif _model_instances == 2:
-                    self.check_status(model_name, (1,), 8, 12)
+                    self.check_status(model_name, {2: 8}, 12, 12)
                 elif _model_instances == 4:
-                    self.check_status(model_name, (1,), 12, 12)
-            except InferenceServerException as ex:
+                    self.check_status(model_name, {1: 12}, 12, 12)
+            except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
             finally:
                 if _test_system_shared_memory or _test_cuda_shared_memory:
