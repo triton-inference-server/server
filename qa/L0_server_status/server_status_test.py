@@ -226,7 +226,7 @@ class ServerStatusTest(unittest.TestCase):
         url = "http://localhost:8000/api/status/" + model_name + "?format=json"
         r = requests.get(url, headers = {"Accept": "application/json"})
         tmp_data = json.loads(r.content)
-        self.assertEqual(tmp_data['modelStatus']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
+        self.assertEqual(tmp_data['model_status']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
 
     def test_json_format(self):
         # get server status as json
@@ -234,7 +234,7 @@ class ServerStatusTest(unittest.TestCase):
         url = "http://localhost:8000/api/status/" + model_name + "?format=json"
         r = requests.get(url)
         tmp_data = json.loads(r.content)
-        self.assertEqual(tmp_data['modelStatus']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
+        self.assertEqual(tmp_data['model_status']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
 
     def test_json_header(self):
         # get server status as json
@@ -242,7 +242,7 @@ class ServerStatusTest(unittest.TestCase):
         url = "http://localhost:8000/api/status/" + model_name
         r = requests.get(url, headers = {"Accept": "application/json"})
         tmp_data = json.loads(r.content)
-        self.assertEqual(tmp_data['modelStatus']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
+        self.assertEqual(tmp_data['model_status']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
 
     def test_text_format(self):
         # get server status as json
