@@ -27,12 +27,13 @@
 import sys
 import os
 import numpy as np
-import tritonsharedmemoryutils.shared_memory as shm
-import tritonsharedmemoryutils.cuda_shared_memory as cudashm
-import tritonhttpclient.core as httpclient
-import tritongrpcclient.core as grpcclient
-from tritonhttpclient.utils import *
 from ctypes import *
+
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+import tritonclientutils.shared_memory as shm
+import tritonclientutils.cuda_shared_memory as cudashm
+from tritonclientutils.utils import *
 
 def _range_repr_dtype(dtype):
     if dtype == np.float64:
