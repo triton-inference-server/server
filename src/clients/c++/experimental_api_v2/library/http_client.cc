@@ -95,14 +95,14 @@ GetQueryString(const Headers& query_params)
 // encoded size to get the right contents.
 void
 Base64Encode(
-    char* raw_ptr, size_t raw_size, char** encoded_ptr, size_t* encoded_size)
+    char* raw_ptr, size_t raw_size, char** encoded_ptr, int* encoded_size)
 {
   // Encode the handle object to base64
   base64_encodestate es;
   base64_init_encodestate(&es);
   *encoded_ptr = (char*)malloc(raw_size * 2); /* ~4/3 x raw_size */
   *encoded_size = base64_encode_block(raw_ptr, raw_size, *encoded_ptr, &es);
-  size_t padding_size =
+  int padding_size =
       base64_encode_blockend(*encoded_ptr + *encoded_size, &es);
   *encoded_size += padding_size;
 }
@@ -842,7 +842,7 @@ InferenceServerHttpClient::RegisterCudaSharedMemory(
     rapidjson::Value raw_handle_json(rapidjson::kObjectType);
     {
       char* encoded_handle = nullptr;
-      size_t encoded_size;
+      int encoded_size;
       Base64Encode(
           (char*)((void*)&raw_handle), sizeof(cudaIpcMemHandle_t),
           &encoded_handle, &encoded_size);
