@@ -266,12 +266,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 else:
                     output_req.append(grpcclient.InferRequestedOutput(OUTPUT0))
 
-                if precreated_shm_regions is None:
-                    output_req[-1].set_shared_memory(
-                        shm_regions[2]+'_data', output0_byte_size)
-                else:
-                    output_req[-1].set_shared_memory(
-                        precreated_shm_regions[0], output0_byte_size)
+                output_req[-1].set_shared_memory(
+                    shm_regions[2]+'_data', output0_byte_size)
             else:
                 if output0_raw:
                     if config[1] == "http":
@@ -296,12 +292,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 else:
                     output_req.append(grpcclient.InferRequestedOutput(OUTPUT1))
 
-                if precreated_shm_regions is None:
-                    output_req[-1].set_shared_memory(
-                        shm_regions[2+i]+'_data', output1_byte_size)
-                else:
-                    output_req[-1].set_shared_memory(
-                        precreated_shm_regions[i], output1_byte_size)
+                output_req[-1].set_shared_memory(
+                    shm_regions[2+i]+'_data', output1_byte_size)
             else:
                 if output1_raw:
                     if config[1] == "http":
@@ -726,8 +718,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         if len(shm_io_handles) != 0:
             shm_ip_handles.append(shm_io_handles[0])
             shm_op_handles.append(shm_io_handles[1])
-        else:
-            input_dict[input_name] = input_array
+        input_dict[input_name] = input_array
 
     if model_version is not None:
         model_version = str(model_version)
