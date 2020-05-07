@@ -270,7 +270,7 @@ class InferenceServerClient:
             if self._verbose:
                 print(response)
             if as_json:
-                return json.loads(MessageToJson(response), preserving_proto_field_nam=True)
+                return json.loads(MessageToJson(response, preserving_proto_field_name=True))
             else:
                 return response
         except grpc.RpcError as rpc_error:
@@ -324,7 +324,7 @@ class InferenceServerClient:
             if self._verbose:
                 print(response)
             if as_json:
-                return json.loads(MessageToJson(response), preserving_proto_field_nam=True)
+                return json.loads(MessageToJson(response, preserving_proto_field_name=True))
             else:
                 return response
         except grpc.RpcError as rpc_error:
@@ -378,7 +378,7 @@ class InferenceServerClient:
             if self._verbose:
                 print(response)
             if as_json:
-                return json.loads(MessageToJson(response), preserving_proto_field_nam=True)
+                return json.loads(MessageToJson(response, preserving_proto_field_name=True))
             else:
                 return response
         except grpc.RpcError as rpc_error:
@@ -417,7 +417,7 @@ class InferenceServerClient:
             if self._verbose:
                 print(response)
             if as_json:
-                return json.loads(MessageToJson(response), preserving_proto_field_nam=True)
+                return json.loads(MessageToJson(response, preserving_proto_field_name=True))
             else:
                 return response
         except grpc.RpcError as rpc_error:
@@ -535,7 +535,7 @@ class InferenceServerClient:
             if self._verbose:
                 print(response)
             if as_json:
-                return json.loads(MessageToJson(response), preserving_proto_field_nam=True)
+                return json.loads(MessageToJson(response, preserving_proto_field_name=True))
             else:
                 return response
         except grpc.RpcError as rpc_error:
@@ -587,7 +587,7 @@ class InferenceServerClient:
             if self._verbose:
                 print(response)
             if as_json:
-                return json.loads(MessageToJson(response), preserving_proto_field_nam=True)
+                return json.loads(MessageToJson(response, preserving_proto_field_name=True))
             else:
                 return response
         except grpc.RpcError as rpc_error:
@@ -729,7 +729,7 @@ class InferenceServerClient:
             if self._verbose:
                 print(response)
             if as_json:
-                return json.loads(MessageToJson(response), preserving_proto_field_nam=True)
+                return json.loads(MessageToJson(response, preserving_proto_field_name=True))
             else:
                 return response
         except grpc.RpcError as rpc_error:
@@ -1470,7 +1470,7 @@ class InferResult:
         for output in self._result.outputs:
             if output.name == name:
                 if as_json:
-                return json.loads(MessageToJson(response), preserving_proto_field_nam=True)
+                    return json.loads(MessageToJson(output, preserving_proto_field_name=True))
                 else:
                     return output
 
@@ -1492,7 +1492,7 @@ class InferResult:
             The underlying ModelInferResponse as a protobuf message or dict.
         """
         if as_json:
-            return json.loads(MessageToJson(response), preserving_proto_field_nam=True)
+            return json.loads(MessageToJson(self._result, preserving_proto_field_name=True))
         else:
             return self._result
 
