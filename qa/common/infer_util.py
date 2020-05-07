@@ -718,8 +718,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         if len(shm_io_handles) != 0:
             shm_ip_handles.append(shm_io_handles[0])
             shm_op_handles.append(shm_io_handles[1])
-        else:
-            input_dict[input_name] = input_array
+        input_dict[input_name] = input_array
 
     if model_version is not None:
         model_version = str(model_version)
