@@ -2012,6 +2012,7 @@ HTTPAPIServerV2::HandleInfer(
     LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
     EVBufferAddErrorJson(req->buffer_out, err);
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    evhtp_request_resume(req);
     TRITONSERVER_ErrorDelete(err);
 
     LOG_TRITONSERVER_ERROR(
