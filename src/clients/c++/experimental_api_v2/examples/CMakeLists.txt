@@ -188,7 +188,6 @@ else()
         simple_grpc_v2_cudashm_client
         PRIVATE TRTIS::grpcclient_static
         PRIVATE ${CUDA_LIBRARIES}
-        PRIVATE -lb64
       )
       install(
         TARGETS simple_grpc_v2_cudashm_client
@@ -317,7 +316,6 @@ else()
         simple_http_v2_cudashm_client
         PRIVATE TRTIS::httpclient_static
         PRIVATE ${CUDA_LIBRARIES}
-        PRIVATE -lb64
       )
       install(
         TARGETS simple_http_v2_cudashm_client

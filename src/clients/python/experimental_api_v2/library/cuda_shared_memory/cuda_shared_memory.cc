@@ -27,7 +27,7 @@
 #include "src/clients/python/experimental_api_v2/library/cuda_shared_memory/cuda_shared_memory.h"
 
 extern "C" {
-#include <b64/cencode.h>
+#include <src/clients/c++/experimental_api_v2/library/cencode.h>
 }
 #include <cuda_runtime_api.h>
 #include <cstring>
