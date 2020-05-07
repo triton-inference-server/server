@@ -120,7 +120,7 @@ CudaSharedMemoryGetRawHandle(
   // The base64_encode_blockend does not null-terminate the string but adds
   // the new line character. Adding the null character here for proper
   // termination of ctypes.
-  *serialized_raw_handle[offset] = '\0';
+  (*serialized_raw_handle)[offset] = '\0';
 
   return 0;
 }
