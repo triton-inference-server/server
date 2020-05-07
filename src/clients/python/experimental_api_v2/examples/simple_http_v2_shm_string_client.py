@@ -29,9 +29,10 @@ import argparse
 import numpy as np
 import sys
 from builtins import range
-import tritonhttpclient.core as httpclient
-import tritonsharedmemoryutils.shared_memory as shm
-import tritonhttpclient.utils as utils
+
+import tritonhttpclient as httpclient
+import tritonclientutils.shared_memory as shm
+import tritonclientutils.utils as utils
 
 FLAGS = None
 
@@ -123,7 +124,7 @@ if __name__ == '__main__':
     # Put input data values into shared memory
     shm.set_shared_memory_region(shm_ip0_handle, [input0_data_serialized])
     shm.set_shared_memory_region(shm_ip1_handle, [input1_data_serialized])
-    
+
     # Register Input0 and Input1 shared memory with Triton Server
     triton_client.register_system_shared_memory("input0_data", "/input0_simple",
                                                 input0_byte_size)

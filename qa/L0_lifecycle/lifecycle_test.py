@@ -36,10 +36,10 @@ import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
-import tritongrpcclient.core as grpcclient
-import tritongrpcclient.utils as grpcclientutils
-import tritonhttpclient.core as httpclient
-import tritonhttpclient.utils as httpclientutils
+
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+from tritonclientutils.utils import InferenceServerException
 
 class LifeCycleTest(unittest.TestCase):
     def _infer_success_models(self, model_base_names, versions, tensor_shape, swap=False):
@@ -73,7 +73,7 @@ class LifeCycleTest(unittest.TestCase):
             md = triton_client.get_server_metadata()
             self.assertEqual(os.environ["TRITON_SERVER_VERSION"], md.version)
             self.assertEqual("inference:0", md.name)
-        except grpcclientutils.InferenceServerException as ex:
+        except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         try:
@@ -83,7 +83,7 @@ class LifeCycleTest(unittest.TestCase):
             md = triton_client.get_server_metadata()
             self.assertEqual(os.environ["TRITON_SERVER_VERSION"], md['version'])
             self.assertEqual("inference:0", md['name'])
-        except httpclientutils.InferenceServerException as ex:
+        except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_parse_error_modelfail(self):
