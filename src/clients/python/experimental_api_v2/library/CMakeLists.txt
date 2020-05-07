@@ -41,11 +41,13 @@ if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_GRPC_V2})
     # libccudashmv2.so
     #
     if(${TRTIS_ENABLE_GPU})
-      add_library(ccudashmv2 SHARED cuda_shared_memory/cuda_shared_memory.cc)
+      add_library(ccudashmv2 SHARED
+        cuda_shared_memory/cuda_shared_memory.cc
+        ../../../c++/experimental_api_v2/library/cencode.c
+        ../../../c++/experimental_api_v2/library/cencode.h)
       target_include_directories(ccudashmv2 PUBLIC ${CUDA_INCLUDE_DIRS})
       target_link_libraries(ccudashmv2
-        PRIVATE ${CUDA_LIBRARIES}
-        PRIVATE -lb64)
+        PRIVATE ${CUDA_LIBRARIES})
     endif() # TRTIS_ENABLE_GPU
   endif() # NOT WIN32
 

@@ -90,15 +90,21 @@ GetQueryString(const Headers& query_params)
   return query_string;
 }
 
+// Encodes the contents of the provided buffer into base64 string. Note the
+// string is not guaranteed to be null-terminated. Must rely on the returned
+// encoded size to get the right contents.
 void
-Base64Encode(char* raw_ptr, size_t raw_size, char** encoded_ptr)
+Base64Encode(
+    char* raw_ptr, size_t raw_size, char** encoded_ptr, int* encoded_size)
 {
   // Encode the handle object to base64
   base64_encodestate es;
   base64_init_encodestate(&es);
   *encoded_ptr = (char*)malloc(raw_size * 2); /* ~4/3 x raw_size */
-  int offset = base64_encode_block(raw_ptr, raw_size, *encoded_ptr, &es);
-  base64_encode_blockend(*encoded_ptr + offset, &es);
+  *encoded_size = base64_encode_block(raw_ptr, raw_size, *encoded_ptr, &es);
+  int padding_size =
+      base64_encode_blockend(*encoded_ptr + *encoded_size, &es);
+  *encoded_size += padding_size;
 }
 
 }  // namespace
@@ -836,13 +842,16 @@ InferenceServerHttpClient::RegisterCudaSharedMemory(
     rapidjson::Value raw_handle_json(rapidjson::kObjectType);
     {
       char* encoded_handle = nullptr;
+      int encoded_size;
       Base64Encode(
           (char*)((void*)&raw_handle), sizeof(cudaIpcMemHandle_t),
-          &encoded_handle);
+          &encoded_handle, &encoded_size);
       if (encoded_handle == nullptr) {
         return Error("Failed to base64 encode the cudaIpcMemHandle_t");
       }
-      rapidjson::Value b64_json(encoded_handle, allocator);
+      const auto encoded_handle_str = std::string(encoded_handle, encoded_size);
+      rapidjson::Value b64_json(
+          rapidjson::StringRef(encoded_handle_str.c_str()), allocator);
       delete encoded_handle;
       raw_handle_json.AddMember("b64", b64_json, allocator);
     }
