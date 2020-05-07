@@ -109,6 +109,7 @@ class ServerMetadataTest(unittest.TestCase):
     def test_model_latest_infer(self):
         input_size = 16
         tensor_shape = (1, input_size)
+        platform_name = {'graphdef':'tensorflow_graphdef', 'netdef':'caffe2_netdef'}
 
         # There are 3 versions of *_int32_int32_int32 and all
         # should be available.
@@ -140,19 +141,46 @@ class ServerMetadataTest(unittest.TestCase):
                         for v in (1, 2, 3):
                             self.assertTrue(str(v) in model_metadata.versions)
 
-                    for v in (1, 2, 3):
-                        self.assertTrue(triton_client.is_model_ready(
-                            model_name, model_version=str(v)))
-                        model_metadata = triton_client.get_model_metadata(
-                            model_name, model_version=str(v))
+                    # verify contents of model metadata
+                    if pair[1] == "http":
+                        model_platform = model_metadata['platform']
+                        model_inputs = model_metadata['inputs']
+                        model_outputs = model_metadata['outputs']
+                    else:
+                        model_platform = model_metadata.platform
+                        model_inputs = model_metadata.inputs
+                        model_outputs = model_metadata.outputs
+
+                    self.assertEqual(platform_name[platform], model_platform)
+                    self.assertEqual(len(model_inputs), 2)
+                    self.assertEqual(len(model_outputs), 2)
+
+                    for model_input in model_inputs:
                         if pair[1] == "http":
-                            self.assertEqual(model_name, model_metadata['name'])
-                            self.assertEqual(len(model_metadata['versions']), 1)
-                            self.assertEqual(str(v), model_metadata['versions'][0])
+                            input_dtype = model_input['datatype']
+                            input_shape = model_input['shape']
+                            input_name = model_input['name']
                         else:
-                            self.assertEqual(model_name, model_metadata.name)
-                            self.assertEqual(len(model_metadata.versions), 1)
-                            self.assertEqual(str(v), model_metadata.versions[0])
+                            input_dtype = model_input.datatype
+                            input_shape = model_input.shape
+                            input_name = model_input.name
+                        self.assertTrue(input_name in ["INPUT0", "INPUT1"])
+                        self.assertEqual(input_dtype, "INT32")
+                        self.assertEqual(input_shape, [16])
+
+                    for model_output in model_outputs:
+                        if pair[1] == "http":
+                            output_dtype = model_output['datatype']
+                            output_shape = model_output['shape']
+                            output_name = model_output['name']
+                        else:
+                            output_dtype = model_output.datatype
+                            output_shape = model_output.shape
+                            output_name = model_output.name
+                        self.assertTrue(output_name in ["OUTPUT0", "OUTPUT1"])
+                        self.assertEqual(output_dtype, "INT32")
+                        self.assertEqual(output_shape, [16])
+
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -175,16 +203,6 @@ class ServerMetadataTest(unittest.TestCase):
                     for v in (1, 2, 3):
                         self.assertTrue(triton_client.is_model_ready(
                             model_name, model_version=str(v)))
-                        model_metadata = triton_client.get_model_metadata(
-                            model_name, model_version=str(v))
-                        if pair[1] == "http":
-                            self.assertEqual(model_name, model_metadata['name'])
-                            self.assertEqual(len(model_metadata['versions']), 1)
-                            self.assertEqual(str(v), model_metadata['versions'][0])
-                        else:
-                            self.assertEqual(model_name, model_metadata.name)
-                            self.assertEqual(len(model_metadata.versions), 1)
-                            self.assertEqual(str(v), model_metadata.versions[0])
 
                     # Only version 3 should have infer stats
                     infer_stats = triton_client.get_inference_statistics(model_name)
