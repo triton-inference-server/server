@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,7 +38,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./perf_client.log"
-PERF_CLIENT=../clients/perf_client
+PERF_CLIENT=../clients/perf_client_v2
 
 DATADIR=`pwd`/models
 TESTDATADIR=`pwd`/test_data
@@ -53,7 +53,7 @@ SHAPETENSORADTAFILE=`pwd`/json_input_data_files/shape_tensor_data.json
 IMAGE_JSONDATAFILE=`pwd`/json_input_data_files/image_data.json
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=${DATADIR} --model-repository=ensemble_model_repository"
+SERVER_ARGS="--model-repository=${DATADIR} --model-repository=ensemble_model_repository --api-version=2"
 SERVER_LOG="./inference_server.log"
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec\|: 0 usec"
@@ -117,280 +117,43 @@ fi
 
 # Sanity check on measurements are not all zero
 
-# Testing simple configurations with different shared memory types
-for SHARED_MEMORY_TYPE in none system cuda; do
-    set +e
-    $PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 \
---shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
+for PROTOCOL in grpc http; do
 
-    $PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 -a \
---shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
-done
-
-set +e
-# Testing with preprocess_resnet50_ensemble model
-$PERF_CLIENT -v -i grpc -m preprocess_resnet50_ensemble --input-data=$IMAGE_JSONDATAFILE \
--p2000 >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-set -e
-
-# Testing with inception model
-for SHARED_MEMORY_TYPE in none system cuda; do
-    set +e
-    $PERF_CLIENT -v -m inception_v1_graphdef -t 1 -p2000 -b 1 \
---shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-
-    $PERF_CLIENT -v -m inception_v1_graphdef -t 1 -p2000 -b 1 -a \
---shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
-done
-
-# Testing with resnet50 models with large batch sizes
-for SHARED_MEMORY_TYPE in none system cuda; do
-    set +e
-    $PERF_CLIENT -v -m inception_v1_graphdef -t 2 -p2000 -b 64 \
---shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-
-    $PERF_CLIENT -i grpc -v -m inception_v1_graphdef -t 2 -p2000 -b 64 \
---shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
-done
-
-# Test perf client behavior on different model with different batch size
-for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
-    # Valid batch size
-    set +e
-    $PERF_CLIENT -v -i grpc -m $MODEL -t 1 -p2000 -b 1 >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
-
-    # Invalid batch sizes
-    for STATIC_BATCH in 0 10; do
+    # Testing simple configurations with different shared memory types
+    for SHARED_MEMORY_TYPE in none system cuda; do
         set +e
-        $PERF_CLIENT -v -i grpc -m $MODEL -t 1 -p2000 -b $STATIC_BATCH >$CLIENT_LOG 2>&1
-        if [ $? -eq 0 ]; then
+        $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 \
+    --shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+
+        $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 -a \
+    --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         fi
         set -e
     done
-done
 
-# Testing with the new arguments
-set +e
-$PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-$PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 --concurrency-range 1:5:2 >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG | grep "error | Request count: 0 | : 0 infer/sec\|: 0 usec|Request concurrency: 2" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-$PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 --concurrency-range 1:5:2 \
---input-data=${INT_JSONDATAFILE} >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG | grep "error | Request count: 0 | : 0 infer/sec\|: 0 usec|Request concurrency: 2" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-$PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 \
--p1000 -b 1 -a>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-$PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 \
---input-data=${INT_JSONDATAFILE} -p1000 -b 1 -a>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-$PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:100 -p1000 -b 1 \
--a --binary-search --request-distribution "poisson" -l 10 >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-set -e
-
-set -e
-
-# Testing with combinations of string input and shared memory types
-for SHARED_MEMORY_TYPE in none system cuda; do
     set +e
-    $PERF_CLIENT -v -i grpc -m graphdef_object_object_object --string-data=1 -p2000 \
---shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
-done
-
-# Testing with combinations of file inputs and shared memory types
-for SHARED_MEMORY_TYPE in none system cuda; do
-    set +e
-    $PERF_CLIENT -v -i grpc -m graphdef_object_object_object --input-data=$TESTDATADIR -p2000 \
---shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
-done
-
-for SHARED_MEMORY_TYPE in none system cuda; do
-    set +e
-    $PERF_CLIENT -v -i grpc -m graphdef_object_object_object --input-data=$STRING_JSONDATAFILE \
---input-data=$STRING_JSONDATAFILE -p2000 --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
-done
-
-# Testing with combinations of variable inputs and shared memory types
-for SHARED_MEMORY_TYPE in none system cuda; do
-    set +e
-    $PERF_CLIENT -v -i grpc -m graphdef_object_int32_int32 --input-data=$TESTDATADIR \
---shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 --shared-memory=$SHARED_MEMORY_TYPE \
->$CLIENT_LOG 2>&1
+    # Testing with preprocess_resnet50_ensemble model
+    $PERF_CLIENT -v -i $PROTOCOL -m preprocess_resnet50_ensemble --input-data=$IMAGE_JSONDATAFILE \
+    -p2000 >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -402,13 +165,161 @@ for SHARED_MEMORY_TYPE in none system cuda; do
         RET=1
     fi
     set -e
-done
 
-for SHARED_MEMORY_TYPE in none system cuda; do
+    # Testing with inception model
+    for SHARED_MEMORY_TYPE in none system cuda; do
+        set +e
+        $PERF_CLIENT -v -i $PROTOCOL -m inception_v1_graphdef -t 1 -p2000 -b 1 \
+    --shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+
+        $PERF_CLIENT -v -i $PROTOCOL -m inception_v1_graphdef -t 1 -p2000 -b 1 -a \
+    --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+    done
+
+    # Testing with resnet50 models with large batch sizes
+    for SHARED_MEMORY_TYPE in none system cuda; do
+        set +e
+        $PERF_CLIENT -v -i $PROTOCOL -m inception_v1_graphdef -t 2 -p2000 -b 64 \
+    --shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+
+        $PERF_CLIENT -v -i $PROTOCOL -m inception_v1_graphdef -t 2 -p2000 -b 64 \
+    --shared-memory=$SHARED_MEMORY_TYPE -a >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+    done
+
+    # Test perf client behavior on different model with different batch size
+    for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
+        # Valid batch size
+        set +e
+        $PERF_CLIENT -v -i $PROTOCOL -m $MODEL -t 1 -p2000 -b 1 >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+
+        # Invalid batch sizes
+        for STATIC_BATCH in 0 10; do
+            set +e
+            $PERF_CLIENT -v -i $PROTOCOL -m $MODEL -t 1 -p2000 -b $STATIC_BATCH >$CLIENT_LOG 2>&1
+            if [ $? -eq 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Failed\n***"
+                RET=1
+            fi
+            set -e
+        done
+    done
+
+    # Testing with the new arguments
     set +e
-    $PERF_CLIENT -v -i grpc -m graphdef_object_int32_int32 --input-data=$STRING_WITHSHAPE_JSONDATAFILE \
---shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 --shared-memory=$SHARED_MEMORY_TYPE \
->$CLIENT_LOG 2>&1
+    $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 --concurrency-range 1:5:2 >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG | grep "error | Request count: 0 | : 0 infer/sec\|: 0 usec|Request concurrency: 2" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 --concurrency-range 1:5:2 \
+    --input-data=${INT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG | grep "error | Request count: 0 | : 0 infer/sec\|: 0 usec|Request concurrency: 2" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 --request-rate-range 100:200:50 \
+    -p1000 -b 1 -a>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 --request-rate-range 100:200:50 \
+    --input-data=${INT_JSONDATAFILE} -p1000 -b 1 -a>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_int32 --request-rate-range 100:200:10 -p1000 -b 1 \
+    -a --binary-search --request-distribution "poisson" -l 10 >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -420,58 +331,212 @@ for SHARED_MEMORY_TYPE in none system cuda; do
         RET=1
     fi
     set -e
-done
 
-set +e
-$PERF_CLIENT -v -i grpc -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 \
---shape INPUT1:2,8,2 -p2000 >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-set -e
-
-# Trying to batch tensors with different shape
-for SHARED_MEMORY_TYPE in none system cuda; do
-    set +e
-    $PERF_CLIENT -v -i grpc -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 --shape INPUT1:2,8,2 -p2000 -b 4 \
---shared-memory=$SHARED_MEMORY_TYPE --input-data=$INT_DIFFSHAPE_JSONDATAFILE >$CLIENT_LOG 2>&1
-    if [ $? -eq 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if [ $(cat $CLIENT_LOG | grep "can not batch tensors with different shapes together" | wc -l) -eq 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
     set -e
-done
 
-# Shape tensor I/O model
-for SHARED_MEMORY_TYPE in none system cuda; do
+    # Testing with combinations of string input and shared memory types
+    for SHARED_MEMORY_TYPE in none system cuda; do
+        set +e
+        $PERF_CLIENT -v -i $PROTOCOL -m graphdef_object_object_object --string-data=1 -p2000 \
+    --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+    done
+
+    # Testing with combinations of file inputs and shared memory types
+    for SHARED_MEMORY_TYPE in none system cuda; do
+        set +e
+        $PERF_CLIENT -v -i $PROTOCOL -m graphdef_object_object_object --input-data=$TESTDATADIR -p2000 \
+    --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+    done
+
+    for SHARED_MEMORY_TYPE in none system cuda; do
+        set +e
+        $PERF_CLIENT -v -i $PROTOCOL -m graphdef_object_object_object --input-data=$STRING_JSONDATAFILE \
+    --input-data=$STRING_JSONDATAFILE -p2000 --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+    done
+
+    # Testing with combinations of variable inputs and shared memory types
+    for SHARED_MEMORY_TYPE in none system cuda; do
+        set +e
+        $PERF_CLIENT -v -i $PROTOCOL -m graphdef_object_int32_int32 --input-data=$TESTDATADIR \
+    --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 --shared-memory=$SHARED_MEMORY_TYPE \
+    >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG | grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+    done
+
+    for SHARED_MEMORY_TYPE in none system cuda; do
+        set +e
+        $PERF_CLIENT -v -i $PROTOCOL -m graphdef_object_int32_int32 --input-data=$STRING_WITHSHAPE_JSONDATAFILE \
+    --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 --shared-memory=$SHARED_MEMORY_TYPE \
+    >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+    done
+
     set +e
-    $PERF_CLIENT -v -i grpc -m plan_zero_1_float32 --input-data=$SHAPETENSORADTAFILE \
---shape DUMMY_INPUT0:4,4 -p2000 --shared-memory=$SHARED_MEMORY_TYPE -b 8 \
->$CLIENT_LOG 2>&1
+    $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 \
+    --shape INPUT1:2,8,2 -p2000 >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
-    if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+    if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
     set -e
+
+    # Trying to batch tensors with different shape
+    for SHARED_MEMORY_TYPE in none system cuda; do
+        set +e
+        $PERF_CLIENT -v -i $PROTOCOL -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 --shape INPUT1:2,8,2 -p2000 -b 4 \
+    --shared-memory=$SHARED_MEMORY_TYPE --input-data=$INT_DIFFSHAPE_JSONDATAFILE >$CLIENT_LOG 2>&1
+        if [ $? -eq 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG | grep "can not batch tensors with different shapes together" | wc -l) -eq 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+    done
+
+    # Shape tensor I/O model
+    for SHARED_MEMORY_TYPE in none system cuda; do
+        set +e
+        $PERF_CLIENT -v -i $PROTOCOL -m plan_zero_1_float32 --input-data=$SHAPETENSORADTAFILE \
+    --shape DUMMY_INPUT0:4,4 -p2000 --shared-memory=$SHARED_MEMORY_TYPE -b 8 \
+    >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+    done
+
+    $PERF_CLIENT -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
+    --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    $PERF_CLIENT -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
+    --input-data=$SEQ_JSONDATAFILE  >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    $PERF_CLIENT -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 10:20:5 --sync \
+    --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    set -e
+
+
+    # Testing with variable ensemble model. This unit specifies different shape values
+    # for different inferences.
+    for SHARED_MEMORY_TYPE in none system cuda; do
+        set +e
+        # FIXME: Enable HTTP when the server is able to correctly return the complex error messages.
+        $PERF_CLIENT -v -i grpc -m graphdef_sequence_float32 --shape INPUT:2 --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \
+    --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 --shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
+        if [ $? -eq 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        if [ $(cat $CLIENT_LOG |  grep "Inputs to operation Select of type Select must have the same size and shape." | wc -l) -eq 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+    done
+
 done
 
 set +e
@@ -488,79 +553,6 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-
-$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
---input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
---input-data=$SEQ_JSONDATAFILE  >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-$PERF_CLIENT -v -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
---input-data=$SEQ_JSONDATAFILE  >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-$PERF_CLIENT -v -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 100:200:50 --sync \
---input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-set -e
-
-
-# Testing with variable ensemble model. This unit specifies different shape values
-# for different inferences.
-for SHARED_MEMORY_TYPE in none system cuda; do
-    set +e
-    $PERF_CLIENT -v -i grpc -m graphdef_sequence_float32 --shape INPUT:2 --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \
---input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 --shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
-    if [ $? -eq 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    if [ $(cat $CLIENT_LOG |  grep "Inputs to operation Select of type Select must have the same size and shape." | wc -l) -eq 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
-done
 
 # Fix me: Uncomment after fixing DLIS-1054 
 ## Testing with very large concurrencies and large dataset
