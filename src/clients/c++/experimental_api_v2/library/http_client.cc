@@ -90,6 +90,9 @@ GetQueryString(const Headers& query_params)
   return query_string;
 }
 
+// Encodes the contents of the provided buffer into base64 string. Note the
+// string is not guaranteed to be null-terminated. Must rely on the returned
+// encoded size to get the right contents.
 void
 Base64Encode(
     char* raw_ptr, size_t raw_size, char** encoded_ptr, size_t* encoded_size)

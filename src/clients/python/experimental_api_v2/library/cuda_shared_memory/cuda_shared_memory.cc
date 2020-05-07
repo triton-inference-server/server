@@ -110,10 +110,17 @@ CudaSharedMemoryGetRawHandle(
   base64_init_encodestate(&es);
   size_t handle_size = sizeof(cudaIpcMemHandle_t);
   *serialized_raw_handle = (char*)malloc(handle_size * 2); /* ~4/3 x input */
-  int offset = base64_encode_block(
+  size_t offset = base64_encode_block(
       (char*)((void*)&handle->cuda_shm_handle_), handle_size,
       *serialized_raw_handle, &es);
   base64_encode_blockend(*serialized_raw_handle + offset, &es);
+  size_t padding_size =
+      base64_encode_blockend(*serialized_raw_handle + offset, &es);
+  offset += (padding_size - 1);
+  // The base64_encode_blockend does not null-terminate the string but adds
+  // the new line character. Adding the null character here for proper
+  // termination of ctypes.
+  *serialized_raw_handle[offset] = '\0';
 
   return 0;
 }
