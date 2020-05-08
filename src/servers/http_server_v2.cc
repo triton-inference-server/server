@@ -1468,7 +1468,7 @@ CheckBinaryInputData(const rapidjson::Value& request_input, size_t* byte_size)
     rapidjson::Value::ConstMemberIterator iter =
         params.FindMember("binary_data_size");
     if (iter != params.MemberEnd()) {
-      *byte_size = iter->value.GetInt();
+      *byte_size = iter->value.GetInt64();
       binary_input = true;
     }
   }
