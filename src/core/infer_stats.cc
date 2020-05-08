@@ -28,6 +28,7 @@
 
 #include <time.h>
 #include "src/core/logging.h"
+#include "src/core/metric_model_reporter.h"
 #include "src/core/metrics.h"
 
 namespace nvidia { namespace inferenceserver {
