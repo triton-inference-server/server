@@ -328,16 +328,19 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         if config[2]:
             user_data = UserData()
             triton_client.start_stream(partial(completion_callback, user_data))
-            triton_client.async_stream_infer(model_name,
-                                             inputs,
-                                             model_version=model_version,
-                                             outputs=output_req,
-                                             request_id=str(_unique_request_id()))
+            try:
+                results = triton_client.async_stream_infer(model_name,
+                                          inputs,
+                                          model_version=model_version,
+                                          outputs=output_req,
+                                          request_id=str(_unique_request_id()))
+            except Exception as e:
+                triton_client.stop_stream()
+                raise e
+            triton_client.stop_stream()
             (results, error) = user_data._completed_requests.get()
             if error is not None:
-                triton_client.stop_stream()
                 raise error
-            triton_client.stop_stream()
         else:
             results = triton_client.infer(model_name,
                                           inputs,
@@ -591,16 +594,17 @@ def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input
         if config[2]:
             user_data = UserData()
             triton_client.start_stream(partial(completion_callback, user_data))
-            triton_client.async_stream_infer(model_name,
-                                             inputs,
-                                             outputs=outputs,
-                                             priority=priority,
-                                             timeout=timeout_us)
+            try:
+                results = triton_client.async_stream_infer(model_name, inputs,
+                                    outputs=outputs,
+                                    priority=priority, timeout=timeout_us)
+            except Exception as e:
+                triton_client.stop_stream()
+                raise e
+            triton_client.stop_stream()
             (results, error) = user_data._completed_requests.get()
             if error is not None:
-                triton_client.stop_stream()
                 raise error
-            triton_client.stop_stream()
         else:
             results = triton_client.infer(model_name, inputs,
                                     outputs=outputs,
@@ -800,16 +804,20 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         if config[2]:
             user_data = UserData()
             triton_client.start_stream(partial(completion_callback, user_data))
-            triton_client.async_stream_infer(model_name,
-                                             inputs,
-                                             model_version=model_version,
-                                             outputs=output_req,
-                                             request_id=str(_unique_request_id()))
+            try:
+                results = triton_client.async_stream_infer(model_name,
+                                          inputs,
+                                          model_version=model_version,
+                                          outputs=output_req,
+                                          request_id=str(_unique_request_id()),
+                                          priority=priority, timeout=timeout_us)
+            except Exception as e:
+                triton_client.stop_stream()
+                raise e
+            triton_client.stop_stream()
             (results, error) = user_data._completed_requests.get()
             if error is not None:
-                triton_client.stop_stream()
                 raise error
-            triton_client.stop_stream()
         else:
             results = triton_client.infer(model_name,
                                           inputs,
