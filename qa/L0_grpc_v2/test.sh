@@ -46,6 +46,7 @@ SIMPLE_STRING_INFER_CLIENT_PY=../clients/simple_grpc_v2_string_infer_client.py
 SIMPLE_STREAM_INFER_CLIENT_PY=../clients/simple_grpc_v2_sequence_stream_infer_client.py
 SIMPLE_SEQUENCE_INFER_CLIENT_PY=../clients/simple_grpc_v2_sequence_sync_infer_client.py
 V2_IMAGE_CLIENT_PY=../clients/v2_image_client.py
+SIMPLE_SHM_STRING_CLIENT_PY=../clients/simple_grpc_v2_shm_string_client.py
 SIMPLE_SHM_CLIENT_PY=../clients/simple_grpc_v2_shm_client.py
 SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_grpc_v2_cudashm_client.py
 SIMPLE_MODEL_CONTROL_PY=../clients/simple_grpc_v2_model_control.py
@@ -107,6 +108,7 @@ for i in \
         $V2_IMAGE_CLIENT_PY \
         $SIMPLE_STREAM_INFER_CLIENT_PY \
         $SIMPLE_SEQUENCE_INFER_CLIENT_PY \
+        $SIMPLE_SHM_STRING_CLIENT_PY \
         $SIMPLE_SHM_CLIENT_PY \
         $SIMPLE_CUDASHM_CLIENT_PY \
         $EXPLICIT_BYTE_CONTENT_CLIENT_PY \

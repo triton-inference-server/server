@@ -160,7 +160,7 @@ def set_shared_memory_region(cuda_shm_handle, input_values):
     ----------
     cuda_shm_handle : c_void_p
         The handle for the cuda shared memory region.
-    input_values : np.array
+    input_values : list
         The list of numpy arrays to be copied into the shared memory region.
 
     Raises
@@ -218,7 +218,7 @@ def get_contents_as_numpy(cuda_shm_handle, datatype, shape):
                                                     byref(offset),
                                                     byref(byte_size))))
         start_pos = offset.value
-        if datatype != np.object:
+        if(datatype != np.object) and (datatype != np.bytes_):
             requested_byte_size = np.prod(shape) * np.dtype(datatype).itemsize
             cval_len = start_pos + requested_byte_size
             if byte_size.value < cval_len:
