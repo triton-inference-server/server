@@ -868,9 +868,17 @@ WriteDataToJson(
 void
 EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err)
 {
+  rapidjson::Document response;
+  response.SetObject();
   std::string message = std::string(TRITONSERVER_ErrorMessage(err));
-  std::string message_json = "{ \"error\" : \"" + message + "\" }";
-  evbuffer_add(buffer, message_json.c_str(), message_json.size());
+  rapidjson::Value message_json(
+      rapidjson::StringRef(message.c_str(), message.size()),
+      response.GetAllocator());
+  response.AddMember("error", message_json, response.GetAllocator());
+  rapidjson::StringBuffer buffer_json;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer_json);
+  response.Accept(writer);
+  evbuffer_add(buffer, buffer_json.GetString(), buffer_json.GetSize());
 }
 
 void
