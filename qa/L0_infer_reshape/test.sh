@@ -41,7 +41,7 @@ CLIENT_LOG="./client.log"
 INFER_TEST=infer_reshape_test.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS=--model-repository=`pwd`/models
+SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -96,7 +96,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG	
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed To Run\n***"
