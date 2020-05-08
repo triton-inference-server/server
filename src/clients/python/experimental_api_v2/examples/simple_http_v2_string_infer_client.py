@@ -46,14 +46,22 @@ def TestIdentityInference(np_array, binary_data):
     results = triton_client.infer(model_name=model_name,
                                   inputs=inputs,
                                   outputs=outputs)
-    if np_array.dtype == np.object:
-        if not np.array_equal(np_array,
-                              np.char.decode(results.as_numpy('OUTPUT0'))):
-            print(results.as_numpy('OUTPUT0'))
-            sys.exit(1)
+    if (np_array.dtype == np.object):
+        if binary_data:
+            if not np.array_equal(np_array,
+                        np.char.decode(results.as_numpy('OUTPUT0'))):
+                print(results.as_numpy('OUTPUT0'))
+                sys.exit(1)
+        else:
+            if not np.array_equal(np_array, results.as_numpy('OUTPUT0')):
+                print(results.as_numpy('OUTPUT0'))
+                sys.exit(1)
     else:
-        if not np.array_equal(np_array, results.as_numpy('OUTPUT0')):
-            print(results.as_numpy('OUTPUT0'))
+        encoded_results = np.char.encode(
+            results.as_numpy('OUTPUT0').astype(str)
+            )
+        if not np.array_equal(np_array, encoded_results):
+            print(encoded_results)
             sys.exit(1)
 
 
