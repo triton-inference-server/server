@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,108 +30,83 @@ sys.path.append("../common")
 import math
 import unittest
 import numpy as np
-from tensorrtserver.api import *
 import test_util as tu
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+from tritonclientutils.utils import np_to_triton_dtype, InferenceServerException
 
 class LargePayLoadTest(unittest.TestCase):
     def setUp(self):
         self.data_type_ = np.float32
-        # n GB divided by element size
-        self.input_size_ = math.trunc(6 * (1024 * 1024 * 1024) / np.dtype(self.data_type_).itemsize)
-        self.protocols_ = ((ProtocolType.HTTP, 'localhost:8000'),
-                        (ProtocolType.GRPC, 'localhost:8001'))
+        # n GB divided by element size as tensor shape
+        tensor_shape = (math.trunc(6 * (1024 * 1024 * 1024) / np.dtype(self.data_type_).itemsize),)
+        self.in0_ = np.random.random(tensor_shape).astype(self.data_type_)
 
-    def _test_helper(self, ctx, tensor_shape, small_tensor_shape,
-                     input_name='INPUT0', output_name='OUTPUT0'):
+        small_tensor_shape = (1,)
+        self.sin0_ = np.random.random(small_tensor_shape).astype(self.data_type_)
+
+        self.clients_ = ((httpclient, httpclient.InferenceServerClient('localhost:8000')),
+                        (grpcclient, grpcclient.InferenceServerClient('localhost:8001')))
+
+    def _test_helper(self, client, model_name, input_name='INPUT0', output_name='OUTPUT0'):
         try:
-            in0 = np.random.random(tensor_shape).astype(self.data_type_)
-            results = ctx.run({ input_name : (in0,)},
-                            { output_name : InferContext.ResultFormat.RAW},
-                            1)
+            inputs = [client[0].InferInput(input_name, self.in0_.shape, np_to_triton_dtype(self.data_type_))]
+            inputs[0].set_data_from_numpy(self.in0_)
+            results = client[1].infer(model_name, inputs)
             # if the inference is completed, examine results to ensure that
             # the framework and protocol do support large payload
-            self.assertTrue(np.array_equal(in0, results[output_name][0]), "output is different from input")
+            self.assertTrue(np.array_equal(self.in0_, results.as_numpy(output_name)), "output is different from input")
 
         except InferenceServerException as ex:
             # if the inference failed, inference server should return error
             # gracefully. In addition to this, send a small payload to
             # verify if the server is still functional
-            sin0 = np.random.random(small_tensor_shape).astype(self.data_type_)
-            results = ctx.run({ input_name : (sin0,)},
-                            { output_name : InferContext.ResultFormat.RAW},
-                            1)
-            self.assertTrue(np.array_equal(sin0, results[output_name][0]), "output is different from input")
+            inputs = [client[0].InferInput(input_name, self.sin0_.shape, np_to_triton_dtype(self.data_type_))]
+            inputs[0].set_data_from_numpy(self.sin0_)
+            results = client[1].infer(model_name, inputs)
+            self.assertTrue(np.array_equal(self.sin0_, results.as_numpy(output_name)), "output is different from input")
 
     def test_graphdef(self):
-        tensor_shape = (self.input_size_,)
-        small_tensor_shape = (1,)
-
         # graphdef_nobatch_zero_1_float32 is identity model with input shape [-1]
-        for protocol, url in self.protocols_:
+        for client in self.clients_:
             model_name = tu.get_zero_model_name("graphdef_nobatch", 1, self.data_type_)
-            ctx = InferContext(url, protocol, model_name, None, True)
-            self._test_helper(ctx, tensor_shape, small_tensor_shape)
+            self._test_helper(client, model_name)
 
     def test_savedmodel(self):
-        tensor_shape = (self.input_size_,)
-        small_tensor_shape = (1,)
-
         # savedmodel_nobatch_zero_1_float32 is identity model with input shape [-1]
-        for protocol, url in self.protocols_:
+        for client in self.clients_:
             model_name = tu.get_zero_model_name("savedmodel_nobatch", 1, self.data_type_)
-            ctx = InferContext(url, protocol, model_name, None, True)
-            self._test_helper(ctx, tensor_shape, small_tensor_shape)
+            self._test_helper(client, model_name)
 
     def test_netdef(self):
-        tensor_shape = (self.input_size_,)
-        small_tensor_shape = (1,)
-
         # netdef_nobatch_zero_1_float32 is identity model with input shape [-1]
-        for protocol, url in self.protocols_:
+        for client in self.clients_:
             model_name = tu.get_zero_model_name("netdef_nobatch", 1, self.data_type_)
-            ctx = InferContext(url, protocol, model_name, None, True)
-            self._test_helper(ctx, tensor_shape, small_tensor_shape)
+            self._test_helper(client, model_name)
 
     def test_onnx(self):
-        tensor_shape = (self.input_size_,)
-        small_tensor_shape = (1,)
-
         # onnx_nobatch_zero_1_float32 is identity model with input shape [-1]
-        for protocol, url in self.protocols_:
+        for client in self.clients_:
             model_name = tu.get_zero_model_name("onnx_nobatch", 1, self.data_type_)
-            ctx = InferContext(url, protocol, model_name, None, True)
-            self._test_helper(ctx, tensor_shape, small_tensor_shape)
+            self._test_helper(client, model_name)
 
     def test_plan(self):
-        tensor_shape = (self.input_size_,)
-        small_tensor_shape = (1,)
-
         # plan_nobatch_zero_1_float32 is identity model with input shape [-1]
-        for protocol, url in self.protocols_:
+        for client in self.clients_:
             model_name = tu.get_zero_model_name("plan_nobatch", 1, self.data_type_)
-            ctx = InferContext(url, protocol, model_name, None, True)
-            self._test_helper(ctx, tensor_shape, small_tensor_shape)
+            self._test_helper(client, model_name)
 
     def test_libtorch(self):
-        tensor_shape = (self.input_size_,)
-        small_tensor_shape = (1,)
-
         # libtorch_nobatch_zero_1_float32 is identity model with input shape [-1]
-        for protocol, url in self.protocols_:
+        for client in self.clients_:
             model_name = tu.get_zero_model_name("libtorch_nobatch", 1, self.data_type_)
-            ctx = InferContext(url, protocol, model_name, None, True)
-            self._test_helper(ctx, tensor_shape, small_tensor_shape,
-                              'INPUT__0', 'OUTPUT__0')
+            self._test_helper(client, model_name, 'INPUT__0', 'OUTPUT__0')
 
     def test_custom(self):
-        tensor_shape = (self.input_size_,)
-        small_tensor_shape = (1,)
-
         # custom_zero_1_float32 is identity model with input shape [-1]
-        for protocol, url in self.protocols_:
+        for client in self.clients_:
             model_name = tu.get_zero_model_name("custom", 1, self.data_type_)
-            ctx = InferContext(url, protocol, model_name, None, True)
-            self._test_helper(ctx, tensor_shape, small_tensor_shape)
+            self._test_helper(client, model_name)
 
 
 if __name__ == '__main__':

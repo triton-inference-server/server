@@ -27,9 +27,10 @@
 
 import argparse
 import numpy as np
-import os
-from builtins import range
-from tensorrtserver.api import *
+
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+from tritonclientutils.utils import np_to_triton_dtype
 
 FLAGS = None
 
@@ -46,16 +47,19 @@ if __name__ == '__main__':
                         'communicate with inference service. Default is "http".')
 
     FLAGS = parser.parse_args()
-    protocol = ProtocolType.from_str(FLAGS.protocol)
+
+    if (FLAGS.protocol != "http") and (FLAGS.protocol != "grpc"):
+        print("unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(FLAGS.protocol))
+        exit(1)
+
+    client_util = httpclient if FLAGS.protocol == "http" else grpcclient
+    # Create the inference context for the model.
+    client = client_util.InferenceServerClient(FLAGS.url, FLAGS.verbose)
 
     # We use identity string models that takes 1 input tensor of a single string
     # and returns 1 output tensor of a single string. The output tensor is the
     # same as the input tensor.
-    model_version = -1
     batch_size = 1
-
-    # Create the inference context for the model.
-    ctx = InferContext(FLAGS.url, protocol, FLAGS.model_name, model_version, FLAGS.verbose)
 
     # Create the data for the input tensor. It contains a null character in
     # the middle of the string.
@@ -64,14 +68,18 @@ if __name__ == '__main__':
 
     # Send inference request to the inference server. Get results for
     # output tensor.
-    result = ctx.run({ 'INPUT0' : (input0_data,) },
-                     { 'OUTPUT0' : InferContext.ResultFormat.RAW },
-                     batch_size)
+    inputs = [client_util.InferInput(
+                "INPUT0", input0_data.shape, np_to_triton_dtype(np.object))]
+    inputs[0].set_data_from_numpy(input0_data)
+
+    results = client.infer(FLAGS.model_name, inputs)
 
     # We expect there to be 1 result (with batch-size 1). Compare the input
     # and output tensor calculated by the model. They must be the same.
-    output0_data = result['OUTPUT0'][0]
-    output0_data2 = np.array([output0_data[0].decode('utf8')], dtype=object)
+    output0_data = results.as_numpy('OUTPUT0')
+    # Element type returned is different between HTTP and GRPC client.
+    # The former is str and the latter is bytes
+    output0_data2 = np.array([output0_data[0] if type(output0_data[0]) == str else output0_data[0].decode('utf8')], dtype=object)
 
     print(input0_data,"?=?",output0_data2)
     assert np.equal(input0_data,output0_data2).all()
