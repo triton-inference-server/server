@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,80 +29,107 @@ sys.path.append("../common")
 
 from builtins import range
 from future.utils import iteritems
+import numpy as np
 import os
-import infer_util as iu
 import unittest
-from google.protobuf import text_format
 import json
 import requests
-from tensorrtserver.api import *
-import tensorrtserver.api.server_status_pb2 as server_status
+import infer_util as iu
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+from tritonclientutils.utils import *
 
-
-def _get_server_status(url="localhost:8000", protocol=ProtocolType.HTTP, model_name=None):
-   ctx = ServerStatusContext(url, protocol, model_name, True)
-   return (ctx.get_server_status(), ctx.get_last_request_id())
-
-
-class ServerStatusTest(unittest.TestCase):
+class ServerMetadataTest(unittest.TestCase):
 
     def test_basic(self):
         try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                model_name0 = "graphdef_int32_int8_int8"
-                server_status0, req_id0 = _get_server_status(pair[0], pair[1], model_name0)
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
-                                server_status0.version)
-                self.assertEqual("inference:0", server_status0.id)
-                uptime0 = server_status0.uptime_ns
-                self.assertGreater(uptime0, 0)
-                self.assertEqual(len(server_status0.model_status), 1)
-                self.assertTrue(model_name0 in server_status0.model_status,
-                                "expected status for model " + model_name0)
+            for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
+                model_name = "graphdef_int32_int8_int8"
+                extensions = ['classification', 'sequence', 'model_repository', 'schedule_policy',
+                            'model_configuration', 'system_shared_memory', 'cuda_shared_memory',
+                            'binary_tensor_data', 'statistics']
+                if pair[1] == "http":
+                    triton_client = httpclient.InferenceServerClient(url=pair[0], verbose=True)
+                else:
+                    triton_client = grpcclient.InferenceServerClient(url=pair[0], verbose=True)
 
-                model_name1 = "graphdef_float32_float32_float32"
-                server_status1, req_id1 = _get_server_status(pair[0], pair[1], model_name1)
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
-                                server_status1.version)
-                self.assertEqual("inference:0", server_status1.id)
-                uptime1 = server_status1.uptime_ns
-                self.assertEqual(len(server_status1.model_status), 1)
-                self.assertTrue(model_name1 in server_status1.model_status,
-                                "expected status for model " + model_name1)
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                server_metadata = triton_client.get_server_metadata()
+                model_metadata = triton_client.get_model_metadata(model_name)
 
-                self.assertGreater(uptime1, uptime0)
-                self.assertNotEqual(req_id0, req_id1)
+                if pair[1] == "http":
+                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
+                                server_metadata['version'])
+                    self.assertEqual("inference:0", server_metadata['name'])
+                    for ext in extensions:
+                        self.assertTrue(ext in server_metadata['extensions'])
 
-                server_status2, req_id2 = _get_server_status(pair[0], pair[1])
-                self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
-                                server_status2.version)
-                self.assertEqual("inference:0", server_status2.id)
-                uptime2 = server_status2.uptime_ns
-                for mn in (model_name0, model_name1, "netdef_float32_float32_float32",
-                        "plan_float32_float32_float32"):
-                    self.assertTrue(mn in server_status2.model_status,
-                                    "expected status for model " + model_name1)
+                    self.assertEqual(model_name, model_metadata['name'])
+                else:
+                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
+                                     server_metadata.version)
+                    self.assertEqual("inference:0", server_metadata.name)
+                    for ext in extensions:
+                        self.assertTrue(ext in server_metadata.extensions)
 
-                self.assertGreater(uptime2, uptime1)
-                self.assertEqual(req_id2, req_id1 + 1)
-
+                    self.assertEqual(model_name, model_metadata.name)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_unknown_model(self):
         try:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                server_status = _get_server_status(pair[0], pair[1], "foo")
+            for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
+                model_name = "foo"
+                if pair[1] == "http":
+                    triton_client = httpclient.InferenceServerClient(
+                        url=pair[0], verbose=True)
+                else:
+                    triton_client = grpcclient.InferenceServerClient(
+                        url=pair[0], verbose=True)
+
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                server_metadata = triton_client.get_server_metadata()
+                if pair[1] == "http":
+                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
+                                     server_metadata['version'])
+                    self.assertEqual("inference:0", server_metadata['name'])
+                else:
+                    self.assertEqual(os.environ["TRITON_SERVER_VERSION"],
+                                     server_metadata.version)
+                    self.assertEqual("inference:0", server_metadata.name)
+
+                model_metadata = triton_client.get_model_metadata(model_name)
                 self.assertTrue(False, "expected unknown model failure")
         except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
-            self.assertGreater(ex.request_id(), 0)
             self.assertTrue(
-                ex.message().startswith("no status available for unknown model"))
+                ex.message().startswith("Request for unknown model 'foo'"))
+
+    def test_unknown_model_version(self):
+        try:
+            for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
+                model_name = "graphdef_int32_int8_int8"
+                if pair[1] == "http":
+                    triton_client = httpclient.InferenceServerClient(
+                        url=pair[0], verbose=True)
+                else:
+                    triton_client = grpcclient.InferenceServerClient(
+                        url=pair[0], verbose=True)
+
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+
+                model_metadata = triton_client.get_model_metadata(model_name, model_version="99")
+                self.assertTrue(False, "expected unknown model version failure")
+        except InferenceServerException as ex:
+            self.assertTrue(
+                ex.message().startswith("Request for unknown model 'graphdef_int32_int8_int8'"))
 
     def test_model_latest_infer(self):
         input_size = 16
-        tensor_shape = (input_size,)
+        tensor_shape = (1, input_size)
+        platform_name = {'graphdef':'tensorflow_graphdef', 'netdef':'caffe2_netdef'}
 
         # There are 3 versions of *_int32_int32_int32 and all
         # should be available.
@@ -111,17 +138,69 @@ class ServerStatusTest(unittest.TestCase):
 
             # Initially there should be no version stats..
             try:
-                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                    server_status0, req_id0 = _get_server_status(pair[0], pair[1], model_name)
-                    self.assertTrue(model_name in server_status0.model_status,
-                                    "expected status for model " + model_name)
-                    self.assertEqual(len(server_status0.model_status[model_name].version_status), 3,
-                                    "expected status for 3 versions for model " + model_name)
-                    for v in (1, 2, 3):
-                        self.assertTrue(v in server_status0.model_status[model_name].version_status,
-                                        "expected version " + str(v) + " status for model " + model_name)
-                        self.assertEqual(server_status0.model_status[model_name].version_status[v].ready_state,
-                                        server_status.MODEL_READY)
+                for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
+                    if pair[1] == "http":
+                        triton_client = httpclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
+                    else:
+                        triton_client = grpcclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
+
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    model_metadata = triton_client.get_model_metadata(model_name)
+                    # verify all versions are reported when no model version is specified
+                    if pair[1] == "http":
+                        self.assertEqual(model_name, model_metadata['name'])
+                        self.assertEqual(len(model_metadata['versions']), 3)
+                        for v in (1, 2, 3):
+                            self.assertTrue(str(v) in model_metadata['versions'])
+                    else:
+                        self.assertEqual(model_name, model_metadata.name)
+                        self.assertEqual(len(model_metadata.versions), 3)
+                        for v in (1, 2, 3):
+                            self.assertTrue(str(v) in model_metadata.versions)
+
+                    # verify contents of model metadata
+                    if pair[1] == "http":
+                        model_platform = model_metadata['platform']
+                        model_inputs = model_metadata['inputs']
+                        model_outputs = model_metadata['outputs']
+                    else:
+                        model_platform = model_metadata.platform
+                        model_inputs = model_metadata.inputs
+                        model_outputs = model_metadata.outputs
+
+                    self.assertEqual(platform_name[platform], model_platform)
+                    self.assertEqual(len(model_inputs), 2)
+                    self.assertEqual(len(model_outputs), 2)
+
+                    for model_input in model_inputs:
+                        if pair[1] == "http":
+                            input_dtype = model_input['datatype']
+                            input_shape = model_input['shape']
+                            input_name = model_input['name']
+                        else:
+                            input_dtype = model_input.datatype
+                            input_shape = model_input.shape
+                            input_name = model_input.name
+                        self.assertTrue(input_name in ["INPUT0", "INPUT1"])
+                        self.assertEqual(input_dtype, "INT32")
+                        self.assertEqual(input_shape, [16])
+
+                    for model_output in model_outputs:
+                        if pair[1] == "http":
+                            output_dtype = model_output['datatype']
+                            output_shape = model_output['shape']
+                            output_name = model_output['name']
+                        else:
+                            output_dtype = model_output.datatype
+                            output_shape = model_output.shape
+                            output_name = model_output.name
+                        self.assertTrue(output_name in ["OUTPUT0", "OUTPUT1"])
+                        self.assertEqual(output_dtype, "INT32")
+                        self.assertEqual(output_shape, [16])
+
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -131,57 +210,82 @@ class ServerStatusTest(unittest.TestCase):
                            model_version=None, swap=True)
 
             try:
-                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                    server_status1, req_id1 = _get_server_status(pair[0], pair[1], model_name)
-                    self.assertTrue(model_name in server_status1.model_status,
-                                    "expected status for model " + model_name)
-                    self.assertEqual(len(server_status1.model_status[model_name].version_status), 3,
-                                    "expected status for 3 versions for model " + model_name)
+                for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
+                    if pair[1] == "http":
+                        triton_client = httpclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
+                    else:
+                        triton_client = grpcclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
+
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
                     for v in (1, 2, 3):
-                        self.assertTrue(v in server_status1.model_status[model_name].version_status,
-                                        "expected version " + str(v) + " status for model " + model_name)
-                        self.assertEqual(server_status1.model_status[model_name].version_status[v].ready_state,
-                                        server_status.MODEL_READY)
+                        self.assertTrue(triton_client.is_model_ready(
+                            model_name, model_version=str(v)))
 
                     # Only version 3 should have infer stats
-                    for v in (1, 2, 3):
-                        version_status = server_status1.model_status[model_name].version_status[v]
-                        if v == 3:
-                            self.assertEqual(len(version_status.infer_stats), 1,
-                                            "expected 1 infer stats for v" + str(v) + " model " + model_name)
-                            self.assertTrue(1 in version_status.infer_stats,
-                                            "expected batch 1 status for v" + str(v) + " model " + model_name)
-                            infer_stats = version_status.infer_stats[1]
-                            self.assertTrue(infer_stats.success.count, 1)
+                    infer_stats = triton_client.get_inference_statistics(model_name)
+                    if pair[1] == "http":
+                        stats = infer_stats['model_stats']
+                    else:
+                        stats = infer_stats.model_stats
+                    self.assertEqual(len(stats), 3,
+                                        "expected 3 infer stats for model " + model_name)
+                    for s in stats:
+                        if pair[1] == "http":
+                            v = s['version']
+                            stat = s['inference_stats']
                         else:
-                            self.assertEqual(len(version_status.infer_stats), 0,
-                                            "unexpected infer stats for v" + str(v) + " model " + model_name)
+                            v = s.version
+                            stat = s.inference_stats
+
+                        if v == "3":
+                            if pair[1] == "http":
+                                self.assertTrue(stat['success']['count'], 3)
+                            else:
+                                self.assertTrue(stat.success.count, 3)
+                        else:
+                            if pair[1] == "http":
+                                self.assertEqual(stat['success']['count'], 0,
+                                                 "unexpected infer success counts for version " + str(v) +
+                                                  " of model " + model_name)
+                            else:
+                                self.assertEqual(stat.success.count, 0,
+                                                 "unexpected infer success counts for version " + str(v) +
+                                                  " of model " + model_name)
 
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_model_specific_infer(self):
         input_size = 16
+        tensor_shape = (1, input_size)
 
         # There are 3 versions of *_float32_float32_float32 but only
         # versions 1 and 3 should be available.
         for platform in ('graphdef', 'netdef', 'plan'):
-            tensor_shape = (input_size,)
+            tensor_shape = (1, input_size)
             model_name = platform + "_float32_float32_float32"
 
             # Initially there should be no version status...
             try:
-                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                    server_status0, req_id0 = _get_server_status(pair[0], pair[1], model_name)
-                    self.assertTrue(model_name in server_status0.model_status,
-                                    "expected status for model " + model_name)
-                    self.assertEqual(len(server_status0.model_status[model_name].version_status), 2,
-                                    "expected status for 2 versions for model " + model_name)
-                    for v in (1, 3):
-                        self.assertTrue(v in server_status0.model_status[model_name].version_status,
-                                        "expected version " + str(v) + " status for model " + model_name)
-                        self.assertEqual(server_status0.model_status[model_name].version_status[v].ready_state,
-                                        server_status.MODEL_READY)
+                for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
+                    if pair[1] == "http":
+                        triton_client = httpclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
+                    else:
+                        triton_client = grpcclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
+
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_model_ready(
+                        model_name, model_version="1"))
+                    self.assertFalse(triton_client.is_model_ready(
+                        model_name, model_version="2"))
+                    self.assertTrue(triton_client.is_model_ready(
+                        model_name, model_version="3"))
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -191,71 +295,55 @@ class ServerStatusTest(unittest.TestCase):
                            model_version=1, swap=False)
 
             try:
-                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                    server_status1, req_id1 = _get_server_status(pair[0], pair[1], model_name)
-                    self.assertTrue(model_name in server_status1.model_status,
-                                    "expected status for model " + model_name)
-                    self.assertEqual(len(server_status1.model_status[model_name].version_status), 2,
-                                    "expected status for 2 versions for model " + model_name)
-                    for v in (1, 3):
-                        self.assertTrue(v in server_status1.model_status[model_name].version_status,
-                                        "expected version " + str(v) + " status for model " + model_name)
-                        self.assertEqual(server_status1.model_status[model_name].version_status[v].ready_state,
-                                        server_status.MODEL_READY)
+                for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
+                    if pair[1] == "http":
+                        triton_client = httpclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
+                    else:
+                        triton_client = grpcclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
+
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_model_ready(
+                        model_name, model_version="1"))
+                    self.assertFalse(triton_client.is_model_ready(
+                        model_name, model_version="2"))
+                    self.assertTrue(triton_client.is_model_ready(
+                        model_name, model_version="3"))
 
                     # Only version 1 should have infer stats
-                    for v in (1, 3):
-                        version_status = server_status1.model_status[model_name].version_status[v]
-                        if v == 1:
-                            self.assertEqual(len(version_status.infer_stats), 1,
-                                            "expected 1 infer stats for v" + str(v) + " model " + model_name)
-                            self.assertTrue(1 in version_status.infer_stats,
-                                            "expected batch 1 status for v" + str(v) + " model " + model_name)
-                            infer_stats = version_status.infer_stats[1]
-                            self.assertTrue(infer_stats.success.count, 1)
-                        else:
-                            self.assertEqual(len(version_status.infer_stats), 0,
-                                            "unexpected infer stats for v" + str(v) + " model " + model_name)
+                    infer_stats = triton_client.get_inference_statistics(model_name, model_version='1')
+                    if pair[1] == "http":
+                        self.assertEqual(len(infer_stats['model_stats']), 1,
+                                        "expected 1 infer stats for version 1"
+                                        " of model " + model_name)
+                        stats = infer_stats['model_stats'][0]['inference_stats']
+                        self.assertTrue(stats['success']['count'], 3)
+                    else:
+                        self.assertEqual(len(infer_stats.model_stats), 1,
+                                        "expected 1 infer stats for version 1"
+                                        " of model " + model_name)
+                        stats = infer_stats.model_stats[0].inference_stats
+                        self.assertTrue(stats.success.count, 3)
+                    infer_stats = triton_client.get_inference_statistics(model_name, model_version='3')
+                    if pair[1] == "http":
+                        stats = infer_stats['model_stats'][0]['inference_stats']
+                        self.assertEqual(stats['success']['count'], 0,
+                                            "unexpected infer stats for version 3"
+                                            " of model " + model_name)
+                    else:
+                        stats = infer_stats.model_stats[0].inference_stats
+                        self.assertEqual(stats.success.count, 0,
+                                            "unexpected infer stats for version 3"
+                                            " of model " + model_name)
 
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
-    def test_json_format_header(self):
-        # get server status as json
-        model_name = "graphdef_float32_float32_float32"
-        url = "http://localhost:8000/api/status/" + model_name + "?format=json"
-        r = requests.get(url, headers = {"Accept": "application/json"})
-        tmp_data = json.loads(r.content)
-        self.assertEqual(tmp_data['modelStatus']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
-
-    def test_json_format(self):
-        # get server status as json
-        model_name = "graphdef_float32_float32_float32"
-        url = "http://localhost:8000/api/status/" + model_name + "?format=json"
-        r = requests.get(url)
-        tmp_data = json.loads(r.content)
-        self.assertEqual(tmp_data['modelStatus']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
-
-    def test_json_header(self):
-        # get server status as json
-        model_name = "graphdef_float32_float32_float32"
-        url = "http://localhost:8000/api/status/" + model_name
-        r = requests.get(url, headers = {"Accept": "application/json"})
-        tmp_data = json.loads(r.content)
-        self.assertEqual(tmp_data['modelStatus']['graphdef_float32_float32_float32']['config']['platform'],'tensorflow_graphdef')
-
-    def test_text_format(self):
-        # get server status as json
-        model_name = "graphdef_float32_float32_float32"
-        url = "http://localhost:8000/api/status/" + model_name + "?format=text"
-        r = requests.get(url)
-        server_status1 = ServerStatus()
-        text_format.Parse(r.content, server_status1)
-        self.assertTrue(model_name in server_status1.model_status,"expected status for model " + model_name)
-
-class ModelStatusTest(unittest.TestCase):
+class ModelMetadataTest(unittest.TestCase):
     '''
-    These tests must be run after the ServerStatusTest. See test.sh
+    These tests must be run after the ServerMetadataTest. See test.sh
     file for correct test running.
     '''
     def test_model_versions_deleted(self):
@@ -267,34 +355,58 @@ class ModelStatusTest(unittest.TestCase):
             model_name = platform + "_int32_int32_int32"
 
             try:
-                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                    server_status1, req_id1 = _get_server_status(pair[0], pair[1], model_name)
-                    self.assertTrue(model_name in server_status1.model_status,
-                                    "expected status for model " + model_name)
-                    self.assertEqual(len(server_status1.model_status[model_name].version_status), 3,
-                                    "expected status for 3 versions for model " + model_name)
+                for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
+                    if pair[1] == "http":
+                        triton_client = httpclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
+                    else:
+                        triton_client = grpcclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
+
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertFalse(triton_client.is_server_ready())
+                    model_metadata = triton_client.get_model_metadata(model_name)
+                    if pair[1] == "http":
+                        self.assertEqual(model_name, model_metadata['name'])
+                        self.assertEqual(len(model_metadata['versions']), 1)
+                        self.assertEqual("1", model_metadata['versions'][0])
+                    else:
+                        self.assertEqual(model_name, model_metadata.name)
+                        self.assertEqual(len(model_metadata.versions), 1)
+                        self.assertEqual("1", model_metadata.versions[0])
 
                     # Only version 3 should have infer stats, only 1 is ready
                     for v in (1, 2, 3):
-                        self.assertTrue(v in server_status1.model_status[model_name].version_status,
-                                        "expected version " + str(v) + " status for model " + model_name)
-                        version_status = server_status1.model_status[model_name].version_status[v]
+                        infer_stats = triton_client.get_inference_statistics(model_name, model_version=str(v))
                         if v == 1:
-                            self.assertEqual(version_status.ready_state, server_status.MODEL_READY)
-                            self.assertEqual(len(version_status.infer_stats), 0,
-                                            "unexpected infer stats for v" + str(v) + " model " + model_name)
+                            self.assertTrue(triton_client.is_model_ready(model_name, model_version=str(v)))
                         else:
-                            self.assertEqual(version_status.ready_state, server_status.MODEL_UNAVAILABLE)
-                            if v == 2:
-                                self.assertEqual(len(version_status.infer_stats), 0,
-                                                "unexpected infer stats for v" + str(v) + " model " + model_name)
+                            self.assertFalse(triton_client.is_model_ready(model_name, model_version=str(v)))
+
+                        if v != 3:
+                            if pair[1] == "http":
+                                stats = infer_stats['model_stats'][0]['inference_stats']
+                                self.assertEqual(stats['success']['count'], 0,
+                                                 "unexpected infer stats for version " + str(v) +
+                                                 " of model " + model_name)
                             else:
-                                self.assertEqual(len(version_status.infer_stats), 1,
-                                                "expected 1 infer stats for v" + str(v) + " model " + model_name)
-                                self.assertTrue(1 in version_status.infer_stats,
-                                            "expected batch 1 status for v" + str(v) + " model " + model_name)
-                                infer_stats = version_status.infer_stats[1]
-                                self.assertTrue(infer_stats.success.count, 1)
+                                stats = infer_stats.model_stats[0].inference_stats
+                                self.assertEqual(stats.success.count, 0,
+                                                 "unexpected infer stats for version " + str(v) +
+                                                 " of model " + model_name)
+                        else:
+                            if pair[1] == "http":
+                                self.assertEqual(len(infer_stats['model_stats']), 1,
+                                                 "expected 1 infer stats for version " + str(v) +
+                                                 " of model " + model_name)
+                                stats = infer_stats['model_stats'][0]['inference_stats']
+                                self.assertTrue(stats['success']['count'], 3)
+                            else:
+                                self.assertEqual(len(infer_stats.model_stats), 1,
+                                                 "expected 1 infer stats for version " + str(v) +
+                                                 " of model " + model_name)
+                                stats = infer_stats.model_stats[0].inference_stats
+                                self.assertTrue(stats.success.count, 3)
 
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
@@ -306,32 +418,151 @@ class ModelStatusTest(unittest.TestCase):
             model_name = platform + "_float16_float32_float32"
 
             try:
-                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                    server_status1, req_id1 = _get_server_status(pair[0], pair[1], model_name)
-                    self.assertTrue(model_name in server_status1.model_status,
-                                    "expected status for model " + model_name)
-                    self.assertEqual(len(server_status1.model_status[model_name].version_status), 2,
-                                    "expected status for 2 versions for model " + model_name)
+                for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
+                    if pair[1] == "http":
+                        triton_client = httpclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
+                    else:
+                        triton_client = grpcclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
 
-                    for v in (1,):
-                        self.assertTrue(v in server_status1.model_status[model_name].version_status,
-                                        "expected version " + str(v) + " status for model " + model_name)
-                        version_status = server_status1.model_status[model_name].version_status[v]
-                        self.assertEqual(version_status.ready_state, server_status.MODEL_UNAVAILABLE)
-                        self.assertEqual(len(version_status.infer_stats), 0,
-                                        "unexpected infer stats for v" + str(v) + " model " + model_name)
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertFalse(triton_client.is_server_ready())
+                    model_metadata = triton_client.get_model_metadata(
+                        model_name)
+                    if pair[1] == "http":
+                        self.assertEqual(
+                            model_name, model_metadata['name'], "expected status for model " + model_name)
+                        self.assertEqual(len(model_metadata['versions']), 1,
+                            "expected status for 1 versions for model " + model_name)
+                        self.assertEqual("7", model_metadata['versions'][0])
+                    else:
+                        self.assertEqual(
+                            model_name, model_metadata.name, "expected status for model " + model_name)
+                        self.assertEqual(len(model_metadata.versions), 1,
+                            "expected status for 1 versions for model " + model_name)
+                        self.assertEqual("7", model_metadata.versions[0])
 
-                    for v in (7,):
-                        self.assertTrue(v in server_status1.model_status[model_name].version_status,
-                                        "expected version " + str(v) + " status for model " + model_name)
-                        version_status = server_status1.model_status[model_name].version_status[v]
-                        self.assertEqual(version_status.ready_state, server_status.MODEL_READY)
-                        self.assertEqual(len(version_status.infer_stats), 0,
-                                        "unexpected infer stats for v" + str(v) + " model " + model_name)
+                    # Only version 7 should be ready. Neither should have infer stats
+                    for v in (1, 7):
+                        infer_stats = triton_client.get_inference_statistics(model_name, model_version=str(v))
+                        if v == 7:
+                            self.assertTrue(triton_client.is_model_ready(model_name, model_version=str(v)))
+                        else:
+                            self.assertFalse(triton_client.is_model_ready(model_name, model_version=str(v)))
+
+                        if pair[1] == "http":
+                            stats = infer_stats['model_stats'][0]['inference_stats']
+                            self.assertEqual(stats['success']['count'], 0,
+                                                "unexpected infer stats for version " + str(v) +
+                                                " of model " + model_name)
+                        else:
+                            stats = infer_stats.model_stats[0].inference_stats
+                            self.assertEqual(stats.success.count, 0,
+                                                "unexpected infer stats for version " + str(v) +
+                                                " of model " + model_name)
 
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_infer_stats_no_model_version(self):
+        # Originally There were 3 versions of *_int32_int32_int32 and
+        # version 3 was executed once. Version 2 and 3 models were
+        # deleted from the model repository so now only expect version 1 to
+        # be ready and version 3 to show stats but not be ready.
+        for platform in ('graphdef', 'netdef'):
+            model_name = platform + "_int32_int32_int32"
+
+            try:
+                for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
+                    if pair[1] == "http":
+                        triton_client = httpclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
+                    else:
+                        triton_client = grpcclient.InferenceServerClient(
+                            url=pair[0], verbose=True)
+
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertFalse(triton_client.is_server_ready())
+                    model_metadata = triton_client.get_model_metadata(
+                        model_name)
+                    if pair[1] == "http":
+                        self.assertEqual(model_name, model_metadata['name'])
+                        self.assertEqual(len(model_metadata['versions']), 1)
+                        self.assertEqual("1", model_metadata['versions'][0])
+                    else:
+                        self.assertEqual(model_name, model_metadata.name)
+                        self.assertEqual(len(model_metadata.versions), 1)
+                        self.assertEqual("1", model_metadata.versions[0])
+
+                    # Only version 3 should have infer stats, only 1 is ready
+                    for v in (1, 2, 3):
+                        if v == 1:
+                            self.assertTrue(triton_client.is_model_ready(
+                                model_name, model_version=str(v)))
+                        else:
+                            self.assertFalse(triton_client.is_model_ready(
+                                model_name, model_version=str(v)))
+
+                    infer_stats = triton_client.get_inference_statistics(model_name)
+                    if pair[1] == "http":
+                        stats = infer_stats['model_stats']
+                    else:
+                        stats = infer_stats.model_stats
+                    self.assertEqual(len(stats), 3,
+                                        "expected 3 infer stats for model " + model_name)
+                    
+                    for s in stats:
+                        if pair[1] == "http":
+                            version = s['version']
+                            stat = s['inference_stats']
+                        else:
+                            version = s.version
+                            stat = s.inference_stats
+
+                        if version != "3":
+                            if pair[1] == "http":
+                                self.assertEqual(stat['success']['count'], 0,
+                                                    "unexpected infer stats for version " + str(v) +
+                                                    " of model " + model_name)
+                            else:
+                                self.assertEqual(stat.success.count, 0,
+                                                    "unexpected infer stats for version " + str(v) +
+                                                    " of model " + model_name)
+                        else:
+                            if pair[1] == "http":
+                                self.assertTrue(stat['success']['count'], 3)
+                            else:
+                                self.assertTrue(stat.success.count, 3)
+
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_infer_stats_no_model(self):
+        # Test get_inference_statistics when no model/model_version is passed.
+        try:
+            for pair in [("localhost:8000", "http"), ("localhost:8001", "grpc")]:
+                if pair[1] == "http":
+                    triton_client = httpclient.InferenceServerClient(
+                        url=pair[0], verbose=True)
+                else:
+                    triton_client = grpcclient.InferenceServerClient(
+                        url=pair[0], verbose=True)
+
+                self.assertTrue(triton_client.is_server_live())
+                self.assertFalse(triton_client.is_server_ready())
+
+                # Returns infer stats for ALL models + versions 
+                infer_stats = triton_client.get_inference_statistics()
+                if pair[1] == "http":
+                    stats = infer_stats['model_stats']
+                else:
+                    stats = infer_stats.model_stats
+                self.assertEqual(len(stats), 205,
+                                    "expected 205 infer stats for all versions of all model")
+
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
 if __name__ == '__main__':
     unittest.main()
