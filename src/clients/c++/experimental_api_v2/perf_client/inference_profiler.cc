@@ -709,7 +709,7 @@ InferenceProfiler::SummarizeServerStatsHelper(
 {
   // If model_version is an empty string then look in the end status to find the
   // latest (highest valued version) and use that as the version.
-  int64_t status_model_version = 0;
+  int64_t status_model_version = -1;
   if (model_identifier.second.empty()) {
     for (const auto& id : end_status) {
       // Model name should match
@@ -722,7 +722,7 @@ InferenceProfiler::SummarizeServerStatsHelper(
     status_model_version = std::stoll(model_identifier.second);
   }
 
-  if (status_model_version == 0) {
+  if (status_model_version == -1) {
     return nic::Error("failed to determine the requested model version");
   }
 
