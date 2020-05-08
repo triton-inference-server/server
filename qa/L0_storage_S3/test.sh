@@ -98,7 +98,7 @@ for ENV_VAR in "env" "env_dummy" "config"; do
 
         # perform empty repo tests
 
-        SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120"
+        SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120 --api-version=2"
 
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -126,7 +126,7 @@ for ENV_VAR in "env" "env_dummy" "config"; do
             rm ~/.aws/credentials && rm ~/.aws/config
         fi
 
-        SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
+        SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120 --api-version=2"
 
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -186,10 +186,10 @@ for ENV_VAR in "env" "env_dummy" "config"; do
 
             if [ "$src" == "." ]; then
                 # set server arguments
-                SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
+                SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120 --api-version=2"
             else
                 # set server arguments
-                SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120"
+                SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120 --api-version=2"
             fi
 
             run_server

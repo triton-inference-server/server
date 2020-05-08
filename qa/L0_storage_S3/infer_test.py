@@ -33,7 +33,6 @@ import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
-from tensorrtserver.api import *
 import os
 
 np_dtype_string = np.dtype(object)
@@ -49,7 +48,7 @@ class InferTest(unittest.TestCase):
                 skip_request_id_check=False, use_streaming=True,
                 correlation_id=0):
             for bs in (1, batch_size):
-                iu.infer_exact(tester, pf, tensor_shape, bs,
+                iu.infer_exact(tester, pf, (bs,) + tensor_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
                                output0_raw, output1_raw,
                                model_version, swap, outputs, use_http, use_grpc,
