@@ -100,7 +100,8 @@ def parse_model_grpc(model_metadata, model_config):
         h = input_metadata.shape[1]
         w = input_metadata.shape[2]
 
-    return (input_metadata.name, output_metadata.name, c, h, w,
+    return (model_config.max_batch_size,
+            input_metadata.name, output_metadata.name, c, h, w,
             input_config.format, input_metadata.datatype)
 
 
@@ -161,7 +162,12 @@ def parse_model_http(model_metadata, model_config):
         h = input_metadata['shape'][1]
         w = input_metadata['shape'][2]
 
-    return (input_metadata['name'], output_metadata['name'], c, h, w,
+    max_batch_size = 0
+    if 'max_batch_size' in model_config:
+        max_batch_size = model_config['max_batch_size']
+
+    return (max_batch_size,
+            input_metadata['name'], output_metadata['name'], c, h, w,
             input_config['format'], input_metadata['datatype'])
 
 
@@ -232,13 +238,17 @@ def postprocess(results, output_name, batch_size):
             print("    {} ({}) = {}".format(cls[0], cls[1], cls[2]))
 
 
-def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
+def requestGenerator(supports_batching, input_name, output_name, c, h, w, format, dtype, FLAGS):
     # Preprocess image into input data according to model requirements
     image_data = None
     with Image.open(FLAGS.image_filename) as img:
         image_data = preprocess(img, format, dtype, c, h, w, FLAGS.scaling)
 
-    repeated_image_data = [image_data for _ in range(FLAGS.batch_size)]
+    if not supports_batching:
+        repeated_image_data = image_data
+    else:
+        repeated_image_data = [image_data for _ in range(FLAGS.batch_size)]
+
     batched_image_data = np.stack(repeated_image_data, axis=0)
 
     # Set the input data
@@ -352,10 +362,10 @@ if __name__ == '__main__':
         sys.exit()
 
     if FLAGS.protocol.lower() == "grpc":
-        input_name, output_name, c, h, w, format, dtype = parse_model_grpc(
+        max_batch_size, input_name, output_name, c, h, w, format, dtype = parse_model_grpc(
             model_metadata, model_config.config)
     else:
-        input_name, output_name, c, h, w, format, dtype = parse_model_http(
+        max_batch_size, input_name, output_name, c, h, w, format, dtype = parse_model_http(
             model_metadata, model_config)
 
     # Send requests of FLAGS.batch_size images. If the number of
@@ -367,7 +377,7 @@ if __name__ == '__main__':
     # Send request
     try:
         for inputs, outputs, model_name, model_version in requestGenerator(
-                input_name, output_name, c, h, w, format, dtype, FLAGS):
+                max_batch_size > 0, input_name, output_name, c, h, w, format, dtype, FLAGS):
             responses.append(
                 triton_client.infer(FLAGS.model_name,
                                     inputs,
