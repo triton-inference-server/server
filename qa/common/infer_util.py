@@ -33,7 +33,13 @@ import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
 import tritonclientutils.shared_memory as shm
 import tritonclientutils.cuda_shared_memory as cudashm
+from functools import partial
 from tritonclientutils.utils import *
+
+if sys.version_info >= (3, 0):
+  import queue
+else:
+  import Queue as queue
 
 # unicode() doesn't exist on python3, for how we use it the
 # corresponding function is bytes()
@@ -67,6 +73,15 @@ def serialize_byte_tensor_list(tensor_values):
     for tensor_value in tensor_values:
         tensor_list.append(serialize_byte_tensor(tensor_value))
     return tensor_list
+
+class UserData:
+    def __init__(self):
+        self._completed_requests = queue.Queue()
+
+# Callback function used for async_stream_infer()
+def completion_callback(user_data, result, error):
+    # passing error raise and handling out
+    user_data._completed_requests.put((result, error))
 
 # Perform inference using an "addsum" type verification backend.
 def infer_exact(tester, pf, tensor_shape, batch_size,
@@ -311,13 +326,21 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                             OUTPUT1, class_count=num_classes))
 
         if config[2]:
-            # TODO fix for streaming case
-            continue
-            # results = triton_client.async_stream_infer(model_name,
-            #                                  inputs,
-            #                                  model_version=model_version,
-            #                                  stream=stream,
-            #                                  outputs=output_req)
+            user_data = UserData()
+            triton_client.start_stream(partial(completion_callback, user_data))
+            try:
+                results = triton_client.async_stream_infer(model_name,
+                                          inputs,
+                                          model_version=model_version,
+                                          outputs=output_req,
+                                          request_id=str(_unique_request_id()))
+            except Exception as e:
+                triton_client.stop_stream()
+                raise e
+            triton_client.stop_stream()
+            (results, error) = user_data._completed_requests.get()
+            if error is not None:
+                raise error
         else:
             results = triton_client.infer(model_name,
                                           inputs,
@@ -568,10 +591,24 @@ def infer_shape_tensor(tester, pf, tensor_dtype, input_shape_values, dummy_input
                 inputs[-1].set_shared_memory(input_name+shm_suffix, input_byte_size)
                 outputs[-1].set_shared_memory(output_name+shm_suffix, output_byte_size)
 
-        # FIXME streaming needs async handling
-        results = triton_client.infer(model_name, inputs,
-                                      outputs=outputs,
-                                      priority=priority, timeout=timeout_us)
+        if config[2]:
+            user_data = UserData()
+            triton_client.start_stream(partial(completion_callback, user_data))
+            try:
+                results = triton_client.async_stream_infer(model_name, inputs,
+                                    outputs=outputs,
+                                    priority=priority, timeout=timeout_us)
+            except Exception as e:
+                triton_client.stop_stream()
+                raise e
+            triton_client.stop_stream()
+            (results, error) = user_data._completed_requests.get()
+            if error is not None:
+                raise error
+        else:
+            results = triton_client.infer(model_name, inputs,
+                                    outputs=outputs,
+                                    priority=priority, timeout=timeout_us)
 
         for io_num in range(io_cnt):
             output_name = "OUTPUT{}".format(io_num)
@@ -765,13 +802,22 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
                     use_system_shared_memory, use_cuda_shared_memory, triton_client)
 
         if config[2]:
-            # TODO fix for streaming case
-            continue
-            # results = triton_client.async_stream_infer(model_name,
-            #                                  inputs,
-            #                                  model_version=model_version,
-            #                                  stream=stream,
-            #                                  outputs=output_req)
+            user_data = UserData()
+            triton_client.start_stream(partial(completion_callback, user_data))
+            try:
+                results = triton_client.async_stream_infer(model_name,
+                                          inputs,
+                                          model_version=model_version,
+                                          outputs=output_req,
+                                          request_id=str(_unique_request_id()),
+                                          priority=priority, timeout=timeout_us)
+            except Exception as e:
+                triton_client.stop_stream()
+                raise e
+            triton_client.stop_stream()
+            (results, error) = user_data._completed_requests.get()
+            if error is not None:
+                raise error
         else:
             results = triton_client.infer(model_name,
                                           inputs,
