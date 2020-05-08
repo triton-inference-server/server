@@ -37,7 +37,7 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-CLIENT=../clients/image_client
+CLIENT=../clients/v2_image_client
 CLIENT_LOG="./client.log"
 
 IMAGE="../images/vulture.jpeg"
@@ -48,7 +48,7 @@ DATADIR=`pwd`/models
 BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1 --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1 --exit-timeout-secs=120 --api-version=2"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -325,13 +325,13 @@ for BACKEND in ${BACKENDS}; do
         fi
 
         # Time the first inference for both models
-        time $CLIENT -m inception_v3_graphdef -s INCEPTION $IMAGE >>$CLIENT_LOG 2>&1
+        time $CLIENT -m inception_v3_graphdef -s INCEPTION $IMAGE -i grpc -u localhost:8001 >>$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Test Failed\n***"
             cat $CLIENT_LOG
             RET=1
         fi
-        time $CLIENT -m inception_v3_warmup -s INCEPTION $IMAGE >>$CLIENT_LOG 2>&1
+        time $CLIENT -m inception_v3_warmup -s INCEPTION $IMAGE -i grpc -u localhost:8001 >>$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Test Failed\n***"
             cat $CLIENT_LOG
