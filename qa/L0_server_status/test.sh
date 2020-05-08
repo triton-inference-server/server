@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,7 +43,7 @@ SERVER_STATUS_TEST=server_status_test.py
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--repository-poll-secs=1 --model-repository=`pwd`/models"
+SERVER_ARGS="--repository-poll-secs=1 --api-version=2 --model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -62,7 +62,7 @@ RET=0
 set +e
 
 rm -f $CLIENT_LOG
-python $SERVER_STATUS_TEST ServerStatusTest >>$CLIENT_LOG 2>&1
+python $SERVER_STATUS_TEST ServerMetadataTest >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -78,7 +78,7 @@ sleep 3
 
 set +e
 
-python $SERVER_STATUS_TEST ModelStatusTest >>$CLIENT_LOG 2>&1
+python $SERVER_STATUS_TEST ModelMetadataTest >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -88,7 +88,7 @@ fi
 # python unittest seems to swallow ImportError and still return 0 exit
 # code. So need to explicitly check CLIENT_LOG to make sure we see
 # some running tests
-grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed To Run\n***"
