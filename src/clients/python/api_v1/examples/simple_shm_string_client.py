@@ -89,7 +89,6 @@ if __name__ == '__main__':
     input0_byte_size = input0_data_serialized.size * input0_data_serialized.itemsize
     input1_byte_size = input1_data_serialized.size * input1_data_serialized.itemsize
     output_byte_size = max(input0_byte_size, input1_byte_size) + 1
-    output_byte_size = max(input0_byte_size, input1_byte_size) + 1
 
     # Create Output0 and Output1 in Shared Memory and store shared memory handles
     shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0_simple", output_byte_size)
@@ -134,11 +133,11 @@ if __name__ == '__main__':
         r0 = int(output0_data[i])
         r1 = int(output1_data[i])
         if expected_sum[i] != r0:
-            print("error: incorrect sum");
-            sys.exit(1);
+            print("error: incorrect sum")
+            sys.exit(1)
         if expected_diff[i] != r1:
-            print("error: incorrect difference");
-            sys.exit(1);
+            print("error: incorrect difference")
+            sys.exit(1)
 
     print(shared_memory_ctx.get_shared_memory_status())
     shared_memory_ctx.unregister_all()
