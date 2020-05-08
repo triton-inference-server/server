@@ -783,7 +783,7 @@ CommonHandler::SetUpAllRequests()
             ->set_count(
                 infer_stats_json["compute_output"]["count"].GetUint64());
         statistics->mutable_inference_stats()->mutable_compute_output()->set_ns(
-            infer_stats_json["compute_output"]["ns"].GetUInt64());
+            infer_stats_json["compute_output"]["ns"].GetUint64());
 
         for (const auto& batch_stat : model_stat["batch_stats"].GetArray()) {
           auto batch_statistics = statistics->add_batch_stats();
