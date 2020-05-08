@@ -30,8 +30,8 @@ Custom Operations
 
 Modeling frameworks that allow custom operations are partially
 supported by the Triton Inference Server. Custom operations can be
-added to the server at build time or at server startup and are made
-available to all models loaded by the server.
+added to Triton at build time or at startup and are made available to
+all loaded models.
 
 TensorRT
 --------
@@ -39,16 +39,14 @@ TensorRT
 TensorRT allows a user to create `custom layers
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-developer-guide/index.html#extending>`_
 which can then be used in TensorRT models. For those models to run in
-the inference server the custom layers must be available to the
-server.
+Triton the custom layers must be made available.
 
-To make the custom layers available to the server, the TensorRT custom
+To make the custom layers available to Triton, the TensorRT custom
 layer implementations must be compiled into one or more shared
-libraries which are then loaded into the inference server using
-LD_PRELOAD. For example, assuming your TensorRT custom layers are
-compiled into libtrtcustom.so, starting the inference server with the
-following command makes those custom layers available to all TensorRT
-models loaded into the server::
+libraries which must then be loaded into Triton using LD_PRELOAD. For
+example, assuming your TensorRT custom layers are compiled into
+libtrtcustom.so, starting Triton with the following command makes
+those custom layers available to all TensorRT models::
 
   $ LD_PRELOAD=libtrtcustom.so tritonserver --model-repository=/tmp/models ...
 
@@ -63,13 +61,22 @@ TensorFlow
 Tensorflow allows users to `add custom operations
 <https://www.tensorflow.org/guide/extend/op>`_ which can then be used
 in TensorFlow models. By using LD_PRELOAD you can load your custom
-TensorFlow operations into the inference server. For example,
-assuming your TensorFlow custom operations are compiled into
-libtfcustom.so, starting the inference server with the following
-command makes those operations available to all TensorFlow models
-loaded into the server::
+TensorFlow operations into Triton. For example, assuming your
+TensorFlow custom operations are compiled into libtfcustom.so,
+starting Triton with the following command makes those operations
+available to all TensorFlow models::
 
   $ LD_PRELOAD=libtfcustom.so tritonserver --model-repository=/tmp/models ...
+
+All TensorFlow custom operations depend on a TensorFlow shared library
+that must be available to the custom shared library when it is
+loading. In practice this means that you must make sure that
+/opt/tritonserver/lib/tensorflow is on the library path before issuing
+the above command. There are several ways to control the library path
+and a common one is to use the LD_LIBRARY_PATH. You can set
+LD_LIBRARY_PATH in the "docker run" command or inside the container::
+
+  $ export LD_LIBRARY_PATH=/opt/tritonserver/lib/tensorflow:$LD_LIBRARY_PATH
 
 A limitation of this approach is that the custom operations must be
 managed separately from the model repository itself. And more
@@ -82,18 +89,27 @@ PyTorch
 Torchscript allows users to `add custom operations
 <https://pytorch.org/tutorials/advanced/torch_script_custom_ops.html>`_
 which can then be used in Torchscript models. By using LD_PRELOAD you
-can load your custom C++ operations into the inference server. For example,
-if you follow the instructions in the `pytorch/extension-script
-<https://github.com/pytorch/extension-script>`_ repository and
-your Torchscript custom operations are compiled into (say)
-libpytcustom.so, starting the inference server with the following
-command makes those operations available to all PyTorch models
-loaded into the server::
+can load your custom C++ operations into Triton. For example, if you
+follow the instructions in the `pytorch/extension-script
+<https://github.com/pytorch/extension-script>`_ repository and your
+Torchscript custom operations are compiled into libpytcustom.so,
+starting the inference server with the following command makes those
+operations available to all PyTorch models::
 
   $ LD_PRELOAD=libpytcustom.so tritonserver --model-repository=/tmp/models ...
+
+All PyTorch custom operations depend on one or more PyTorch shared
+libraries that must be available to the custom shared library when it
+is loading. In practice this means that you must make sure that
+/opt/tritonserver/lib/pytorch is on the library path before issuing
+the above command. There are several ways to control the library path
+and a common one is to use the LD_LIBRARY_PATH. You can set
+LD_LIBRARY_PATH in the "docker run" command or inside the container::
+
+  $ export LD_LIBRARY_PATH=/opt/tritonserver/lib/pytorch:$LD_LIBRARY_PATH
 
 A limitation of this approach is that the custom operations must be
 managed separately from the model repository itself. And more
 seriously, if there are custom layer name conflicts across multiple
-shared libraries or the handles used to register them in PyTorch
-there is currently no way to handle it.
+shared libraries or the handles used to register them in PyTorch there
+is currently no way to handle it.
