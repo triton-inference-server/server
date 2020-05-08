@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,7 +38,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
-PERF_CLIENT=../clients/perf_client
+PERF_CLIENT=../clients/perf_client_v2
 TRT_OP_TEST=trt_dynamic_shape_test.py
 
 DATADIR="./models"
@@ -48,7 +48,7 @@ mkdir -p ${DATADIR}
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_float32_float32_float32-4-32 ${DATADIR}/
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS=--model-repository=$DATADIR
+SERVER_ARGS="--model-repository=$DATADIR --api-version=2"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -168,7 +168,7 @@ wait $SERVER_PID
 #
 # finding OP that best fit the input shape:
 #     load OP 0, 1, 2, 3, send [4 16] and 3 should be used
-SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1"
+SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1 --api-version=2"
 CLIENT_LOG="./test_select_optimization_profile.client.best.log"
 SERVER_LOG="./test_select_optimization_profile.inference_server.best.log"
 (cp config.pbtxt ${DATADIR}/plan_float32_float32_float32/config.pbtxt && \
@@ -237,7 +237,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # TrtDynamicShapeTest.test_load_wrong_optimization_profile
-SERVER_ARGS="--model-repository=$DATADIR --exit-on-error=false"
+SERVER_ARGS="--model-repository=$DATADIR --exit-on-error=false --api-version=2"
 CLIENT_LOG="./test_load_wrong_optimization_profile.client.log"
 SERVER_LOG="./test_load_wrong_optimization_profile.inference_server.log"
 cp config.pbtxt ${DATADIR}/plan_float32_float32_float32/config.pbtxt && \
