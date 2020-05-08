@@ -36,8 +36,8 @@ import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
-from tensorrtserver.api import *
-import tensorrtserver.api.server_status_pb2 as server_status
+import tritonhttpclient
+from tritonclientutils.utils import InferenceServerException
 
 class TrtDynamicShapeTest(unittest.TestCase):
     def setUp(self):
@@ -48,15 +48,14 @@ class TrtDynamicShapeTest(unittest.TestCase):
         # Only OP 5 should be available, which only allow batch size 8
         tensor_shape = (1,)
         try:
-            iu.infer_exact(self, self.model_name_, tensor_shape, 1,
+            iu.infer_exact(self, self.model_name_, (1,) + tensor_shape, 1,
                             self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
               "model expected the shape of dimension 0 to be between 6 and 8 but received 1" in ex.message())
 
         try:
-            iu.infer_exact(self, self.model_name_, tensor_shape, 8,
+            iu.infer_exact(self, self.model_name_, (8,) + tensor_shape, 8,
                             self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -66,17 +65,16 @@ class TrtDynamicShapeTest(unittest.TestCase):
         tensor_shape = (33,)
 
         try:
-            iu.infer_exact(self, self.model_name_, tensor_shape, 8,
+            iu.infer_exact(self, self.model_name_, (8,) + tensor_shape, 8,
                             self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         over_tensor_shape = (34,)
         try:
-            iu.infer_exact(self, self.model_name_, over_tensor_shape, 8,
+            iu.infer_exact(self, self.model_name_, (8,) + over_tensor_shape, 8,
                             self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
                     "model expected the shape of dimension 1 to be between 1 and 33 but received 34" in ex.message())
 
@@ -85,30 +83,16 @@ class TrtDynamicShapeTest(unittest.TestCase):
         batch_size = 4
         tensor_shape = (16,)
         try:
-            iu.infer_exact(self, self.model_name_, tensor_shape, batch_size,
+            iu.infer_exact(self, self.model_name_, (batch_size,) + tensor_shape, batch_size,
                             self.dtype_, self.dtype_, self.dtype_)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_load_wrong_optimization_profile(self):
-        try:
-            model_name = tu.get_model_name(self.model_name_, self.dtype_, self.dtype_, self.dtype_)
-            ctx = ServerStatusContext("localhost:8000", ProtocolType.HTTP, model_name, True)
-            ss = ctx.get_server_status()
-            self.assertEqual(os.environ["TRITON_SERVER_VERSION"], ss.version)
-            self.assertEqual("inference:0", ss.id)
-            self.assertEqual(len(ss.model_status), 1)
-            self.assertTrue(model_name in ss.model_status,
-                            "expected status for model " + model_name)
-            self.assertTrue(1 in ss.model_status[model_name].version_status,
-                            "expected status for version 1 of model " + model_name)
-            v = ss.model_status[model_name].version_status[1]
-            self.assertEqual(v.ready_state, server_status.MODEL_UNAVAILABLE)
-            self.assertNotEqual(len(v.ready_state_reason.message), 0,
-                        "expected non-empty message for load failure")
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
-
+        client = tritonhttpclient.InferenceServerClient("localhost:8000")
+        model_name = tu.get_model_name(self.model_name_, self.dtype_, self.dtype_, self.dtype_)
+        model_status = client.is_model_ready(model_name, "1")
+        self.assertFalse(model_status, "expected model to be not ready")
 
 
 if __name__ == '__main__':
