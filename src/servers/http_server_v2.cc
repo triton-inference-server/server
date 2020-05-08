@@ -243,25 +243,25 @@ ReadDataFromJsonHelper(
         }
         case TRITONSERVER_TYPE_UINT8: {
           uint8_t* data_vec = reinterpret_cast<uint8_t*>(base);
-          data_vec[*counter] = (uint8_t)tensor_data[i].GetUInt();
+          data_vec[*counter] = (uint8_t)tensor_data[i].GetUint();
           *counter += 1;
           break;
         }
         case TRITONSERVER_TYPE_UINT16: {
           uint16_t* data_vec = reinterpret_cast<uint16_t*>(base);
-          data_vec[*counter] = (uint16_t)tensor_data[i].GetUInt();
+          data_vec[*counter] = (uint16_t)tensor_data[i].GetUint();
           *counter += 1;
           break;
         }
         case TRITONSERVER_TYPE_UINT32: {
           uint32_t* data_vec = reinterpret_cast<uint32_t*>(base);
-          data_vec[*counter] = (uint32_t)tensor_data[i].GetUInt();
+          data_vec[*counter] = (uint32_t)tensor_data[i].GetUint();
           *counter += 1;
           break;
         }
         case TRITONSERVER_TYPE_UINT64: {
           uint64_t* data_vec = reinterpret_cast<uint64_t*>(base);
-          data_vec[*counter] = (uint64_t)tensor_data[i].GetUInt64();
+          data_vec[*counter] = (uint64_t)tensor_data[i].GetUint64();
           *counter += 1;
           break;
         }
