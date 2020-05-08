@@ -27,11 +27,11 @@
 
 export CUDA_VISIBLE_DEVICES=0
 
-SIMPLE_CLIENT=../clients/simple_client
-SIMPLE_CLIENT_PY=../clients/simple_client.py
+SIMPLE_CLIENT=../clients/simple_http_v2_infer_client
+SIMPLE_CLIENT_PY=../clients/simple_http_v2_infer_client.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS=--model-repository=`pwd`/models
+SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -54,8 +54,8 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-if [ `grep -c "localhost:8000" client_c++.log` != "5" ]; then
-    echo -e "\n***\n*** Failed. Expected 5 Host:localhost:8000 headers for C++ client\n***"
+if [ `grep -c "localhost:8000" client_c++.log` != "2" ]; then
+    echo -e "\n***\n*** Failed. Expected 2 Host:localhost:8000 headers for C++ client\n***"
     RET=1
 fi
 
@@ -64,8 +64,8 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-if [ `grep -c "localhost:8000" client_py.log` != "5" ]; then
-    echo -e "\n***\n*** Failed. Expected 5 Host:localhost:8000 headers for Python client\n***"
+if [ `grep -c "HTTPSocketPoolResponse status=200" client_py.log` != "3" ]; then
+    echo -e "\n***\n*** Failed. Expected 3 Host:HTTPSocketPoolResponse status=200 headers for Python client\n***"
     RET=1
 fi
 
@@ -75,8 +75,8 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-if [ `grep -c my_host_ client_c++_host.log` != "5" ]; then
-    echo -e "\n***\n*** Failed. Expected 5 Host:my_host_ headers for C++ client\n***"
+if [ `grep -c my_host_ client_c++_host.log` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected 1 Host:my_host_ headers for C++ client\n***"
     RET=1
 fi
 
@@ -85,23 +85,23 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-if [ `grep -c my_host_ client_py_host.log` != "5" ]; then
-    echo -e "\n***\n*** Failed. Expected 5 Host:my_host_ headers for Python client\n***"
+if [ `grep -c my_host_ client_py_host.log` != "3" ]; then
+    echo -e "\n***\n*** Failed. Expected 3 Host:my_host_ headers for Python client\n***"
     RET=1
 fi
 
-# Run with multiple headers...
+Run with multiple headers...
 $SIMPLE_CLIENT -v -H"abc:xyz" -H"123:456" >>client_c++_multi.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
 
-if [ `grep -c "abc: xyz" client_c++_multi.log` != "5" ]; then
-    echo -e "\n***\n*** Failed. Expected 5 abc:xyz headers for C++ client\n***"
+if [ `grep -c "abc: xyz" client_c++_multi.log` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected 1 abc:xyz headers for C++ client\n***"
     RET=1
 fi
-if [ `grep -c "123: 456" client_c++_multi.log` != "5" ]; then
-    echo -e "\n***\n*** Failed. Expected 5 123:456 headers for C++ client\n***"
+if [ `grep -c "123: 456" client_c++_multi.log` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected 1 123:456 headers for C++ client\n***"
     RET=1
 fi
 
@@ -110,12 +110,12 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-if [ `grep -c "abc: xyz" client_py_multi.log` != "5" ]; then
-    echo -e "\n***\n*** Failed. Expected 5 abc:xyz headers for Python client\n***"
+if [ `grep -c "'abc': 'xyz'" client_py_multi.log` != "3" ]; then
+    echo -e "\n***\n*** Failed. Expected 3 abc:xyz headers for Python client\n***"
     RET=1
 fi
-if [ `grep -c "123: 456" client_py_multi.log` != "5" ]; then
-    echo -e "\n***\n*** Failed. Expected 5 123:456 headers for Python client\n***"
+if [ `grep -c "'123': '456'" client_py_multi.log` != "3" ]; then
+    echo -e "\n***\n*** Failed. Expected 3 123:456 headers for Python client\n***"
     RET=1
 fi
 
