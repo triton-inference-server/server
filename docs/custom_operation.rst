@@ -43,7 +43,7 @@ Triton the custom layers must be made available.
 
 To make the custom layers available to Triton, the TensorRT custom
 layer implementations must be compiled into one or more shared
-libraries which are then loaded into Triton using LD_PRELOAD. For
+libraries which must then be loaded into Triton using LD_PRELOAD. For
 example, assuming your TensorRT custom layers are compiled into
 libtrtcustom.so, starting Triton with the following command makes
 those custom layers available to all TensorRT models::
