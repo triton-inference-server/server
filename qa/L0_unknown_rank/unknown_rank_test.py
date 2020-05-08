@@ -26,17 +26,19 @@
 
 import unittest
 import numpy as np
-from tensorrtserver.api import *
+import tritonhttpclient
+from tritonclientutils.utils import *
 
 class UnknownRankTest(unittest.TestCase):
     # helper function to generate requests to the server
     def infer_unknown(self, model_name, tensor_shape):
         print("About to run the test")
         input_data = np.random.random_sample(tensor_shape).astype(np.float32)
-        ctx = InferContext("localhost:8000", ProtocolType.HTTP, model_name, None, verbose=True)
-        result = ctx.run({"INPUT":(input_data,)}, { 'OUTPUT' : InferContext.ResultFormat.RAW}, 1)
-        output_data = result['OUTPUT'][0]
-        self.assertTrue(np.array_equal(output_data, input_data))
+        client = tritonhttpclient.InferenceServerClient('localhost:8000')
+        inputs = [tritonhttpclient.InferInput("INPUT", input_data.shape, np_to_triton_dtype(input_data.dtype))]
+        inputs[0].set_data_from_numpy(input_data)
+        results = client.infer(model_name, inputs)
+        self.assertTrue(np.array_equal(results.as_numpy('OUTPUT'), input_data))
 
 
     def test_success(self):
@@ -53,7 +55,6 @@ class UnknownRankTest(unittest.TestCase):
         try:
             self.infer_unknown(model_name, tensor_shape)
         except InferenceServerException as ex:
-            self.assertEqual("inference:0", ex.server_id())
             self.assertTrue("tensor \'OUTPUT\': the model expects 1 dimensions " \
                 "(shape [1]) but the model configuration specifies 2 dimensions " \
                 "(shape [1,1])" in ex.message())
