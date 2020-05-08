@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,7 +42,7 @@ CLIENT_LOG_BASE="./client.log"
 DATADIR=`pwd`/models
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS=--model-repository=$DATADIR
+SERVER_ARGS="--model-repository=$DATADIR --api-version=2"
 SERVER_LOG_BASE="./inference_server.log"
 source ../common/util.sh
 
@@ -62,13 +62,11 @@ cp -r ../custom_models/custom_zero_1_float32 models/. && \
     (cd models/custom_zero_1_float32 && \
             echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
             echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt && \
+            sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
             sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt)
 
 # Restart server before every test to make sure server state
 # is invariant to previous test
-#
-# Skipping TensorRT Plan model for now as it only supports fixed size
-# tensor and it fails to generate layer with large dimension size
 for TARGET in graphdef savedmodel netdef onnx libtorch custom plan; do
     SERVER_LOG=$SERVER_LOG_BASE.$TARGET
     CLIENT_LOG=$CLIENT_LOG_BASE.$TARGET
@@ -86,13 +84,6 @@ for TARGET in graphdef savedmodel netdef onnx libtorch custom plan; do
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-
-    grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed To Run\n***"
         RET=1
     fi
 
