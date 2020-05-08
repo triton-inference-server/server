@@ -41,7 +41,7 @@ DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH_SIZES:=1}
 INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
 CONCURRENCY=${CONCURRENCY:=1}
 
-PERF_CLIENT=../clients/perf_client
+PERF_CLIENT=../clients/perf_client_v2
 PERF_CLIENT_PROTOCOL=${PERF_CLIENT_PROTOCOL:=grpc}
 PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE:=95}
 PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW:=5000}
@@ -52,7 +52,7 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}
 RESULTDIR=${RESULTDIR:=.}
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS=--model-repository=`pwd`/models
+SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
 source ../common/util.sh
 
 # Select the single GPU that will be available to the inference server

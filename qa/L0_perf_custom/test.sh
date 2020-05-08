@@ -35,7 +35,7 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-PERF_CLIENT=../clients/perf_client
+PERF_CLIENT=../clients/perf_client_v2
 REPORTER=../common/reporter.py
 
 PROTOCOLS="grpc http"
@@ -65,7 +65,7 @@ rm -fr $REPO_DIR && mkdir $REPO_DIR && \
 sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
                 echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
 
-SERVER_ARGS=--model-repository=$REPO_DIR
+SERVER_ARGS="--model-repository=$REPO_DIR --api-version=2"
 SERVER_LOG="inferenceserver.log"
 
 run_server
