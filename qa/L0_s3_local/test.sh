@@ -94,7 +94,7 @@ fi
 
 set +e
 for BACKEND in $BACKENDS; do
-    code=`curl -s -w %{http_code} -X POST localhost:8000/api/modelcontrol/load/${BACKEND}_float32_float32_float32`
+    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/model/${BACKEND}_float32_float32_float32/load`
     if [ "$code" != "200" ]; then
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
@@ -128,7 +128,7 @@ fi
 
 set +e
 for BACKEND in $BACKENDS; do
-    code=`curl -s -w %{http_code} -X POST localhost:8000/api/modelcontrol/load/${BACKEND}_float32_float32_float32`
+    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/model/${BACKEND}_float32_float32_float32/load`
     if [ "$code" != "200" ]; then
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
