@@ -151,10 +151,10 @@ file and some other dependencies::
   $ apt-get install python python-pip
   $ pip install --user --upgrade python/tensorrtserver*.whl numpy pillow
 
-The C++ image_client example uses OpenCV for image manipulation so for
+The image_client examples uses OpenCV for image manipulation so for
 that example you must install the following::
 
-  $ apt-get install libopencv-dev libopencv-core-dev
+  $ apt-get install python3-opencv
 
 Download Docker Image From NGC
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

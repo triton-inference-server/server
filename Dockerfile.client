@@ -42,14 +42,13 @@ RUN apt-get update && \
             curl \
             git \
             libb64-dev \
-            libopencv-dev \
-            libopencv-core-dev \
             libssl-dev \
             libtool \
             pkg-config \
             python3 \
             python3-pip \
             python3-dev \
+            python3-opencv \
             rapidjson-dev && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools
