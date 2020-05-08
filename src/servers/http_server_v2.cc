@@ -874,6 +874,7 @@ EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err)
   rapidjson::Value message_json(
       rapidjson::StringRef(message.c_str(), message.size()),
       response.GetAllocator());
+  response.AddMember("error", message_json, response.GetAllocator());
   rapidjson::StringBuffer buffer_json;
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer_json);
   response.Accept(writer);
