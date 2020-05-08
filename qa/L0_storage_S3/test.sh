@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -211,7 +211,7 @@ for ENV_VAR in "env" "env_dummy" "config"; do
                 RET=1
             fi
 
-            grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+            grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
                 echo -e "\n***\n*** Test Failed To Run\n***"
