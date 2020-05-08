@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,9 +53,11 @@ class InferReshapeTest(unittest.TestCase):
                                     input_shapes[0], input_shapes[0], input_shapes[0]):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_zero(self, 'graphdef', bs, dtype, input_shapes, output_shapes,
+                full_shapes = [[bs, ] + input_shape for input_shape in input_shapes]
+                full_output_shapes = [[bs, ] + output_shape for output_shape in output_shapes]
+                iu.infer_zero(self, 'graphdef', bs, dtype, full_shapes, full_output_shapes,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-                iu.infer_zero(self, 'savedmodel', bs, dtype, input_shapes, output_shapes,
+                iu.infer_zero(self, 'savedmodel', bs, dtype, full_shapes, full_output_shapes,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             # model that does not support batching
             if no_batch:
@@ -68,7 +70,9 @@ class InferReshapeTest(unittest.TestCase):
                                     input_shapes[0], input_shapes[0], input_shapes[0]):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_zero(self, 'netdef', bs, dtype, input_shapes, output_shapes,
+                full_shapes = [[bs, ] + input_shape for input_shape in input_shapes]
+                full_output_shapes = [[bs, ] + output_shape for output_shape in output_shapes]
+                iu.infer_zero(self, 'netdef', bs, dtype, full_shapes, full_output_shapes,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             # model that does not support batching
             if no_batch:
@@ -79,7 +83,9 @@ class InferReshapeTest(unittest.TestCase):
                                     input_shapes[0], input_shapes[0], input_shapes[0]):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_zero(self, 'custom', bs, dtype, input_shapes, output_shapes,
+                full_shapes = [[bs, ] + input_shape for input_shape in input_shapes]
+                full_output_shapes = [[bs, ] + output_shape for output_shape in output_shapes]
+                iu.infer_zero(self, 'custom', bs, dtype, full_shapes, full_output_shapes,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             # model that does not support batching
             if no_batch:
@@ -90,7 +96,9 @@ class InferReshapeTest(unittest.TestCase):
                                     input_shapes[0], input_shapes[0], input_shapes[0]):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_zero(self, 'onnx', bs, dtype, input_shapes, output_shapes,
+                full_shapes = [[bs, ] + input_shape for input_shape in input_shapes]
+                full_output_shapes = [[bs, ] + output_shape for output_shape in output_shapes]
+                iu.infer_zero(self, 'onnx', bs, dtype, full_shapes, full_output_shapes,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             # model that does not support batching
             if no_batch:
@@ -104,7 +112,9 @@ class InferReshapeTest(unittest.TestCase):
             if dtype != np.int32:
                 # model that supports batching
                 for bs in (1, 8):
-                    iu.infer_zero(self, 'libtorch', bs, dtype, input_shapes, output_shapes,
+                    full_shapes = [[bs, ] + input_shape for input_shape in input_shapes]
+                    full_output_shapes = [[bs, ] + output_shape for output_shape in output_shapes]
+                    iu.infer_zero(self, 'libtorch', bs, dtype, full_shapes, full_output_shapes,
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
                 # model that does not support batching
                 if no_batch:
@@ -120,7 +130,9 @@ class InferReshapeTest(unittest.TestCase):
                                         input_shapes[0], input_shapes[0], input_shapes[0]):
                 # model that supports batching
                 for bs in (1, 8):
-                    iu.infer_zero(self, name, bs, dtype, input_shapes, output_shapes,
+                    full_shapes = [[bs, ] + input_shape for input_shape in input_shapes]
+                    full_output_shapes = [[bs, ] + output_shape for output_shape in output_shapes]
+                    iu.infer_zero(self, name, bs, dtype, full_shapes, full_output_shapes,
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
                 # model that does not support batching
                 if no_batch:
@@ -136,7 +148,9 @@ class InferReshapeTest(unittest.TestCase):
                                      input_shapes[0], input_shapes[0], input_shapes[0]):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_zero(self, 'plan', bs, dtype, input_shapes, output_shapes,
+                full_shapes = [[bs, ] + input_shape for input_shape in input_shapes]
+                full_output_shapes = [[bs, ] + output_shape for output_shape in output_shapes]
+                iu.infer_zero(self, 'plan', bs, dtype, full_shapes, full_output_shapes,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY, use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
             # model that does not support batching
             if no_batch:

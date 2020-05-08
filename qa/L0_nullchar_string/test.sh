@@ -42,7 +42,7 @@ NULLCHAR_CLIENT_PY=nullchar_string_client.py
 CLIENT_LOG="./client.log"
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS=--model-repository=$DATADIR
+SERVER_ARGS="--model-repository=$DATADIR --api-version=2"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -64,6 +64,11 @@ set +e
 # https://github.com/microsoft/onnxruntime/issues/2284
 for MODEL in graphdef_nobatch_zero_1_object savedmodel_nobatch_zero_1_object; do
   python $NULLCHAR_CLIENT_PY -m $MODEL -v >>$CLIENT_LOG 2>&1
+  if [ $? -ne 0 ]; then
+      RET=1
+  fi
+
+  python $NULLCHAR_CLIENT_PY -m $MODEL -i grpc -u localhost:8001 -v >>$CLIENT_LOG 2>&1
   if [ $? -ne 0 ]; then
       RET=1
   fi
