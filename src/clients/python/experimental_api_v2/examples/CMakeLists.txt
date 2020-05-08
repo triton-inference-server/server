@@ -36,6 +36,7 @@ if(${TRTIS_ENABLE_HTTP_V2})
       simple_http_v2_sequence_sync_infer_client.py
       simple_http_v2_cudashm_client.py
       simple_http_v2_shm_client.py
+      simple_http_v2_shm_string_client.py
       simple_http_v2_model_control.py
     DESTINATION python
   )
@@ -57,6 +58,7 @@ if(${TRTIS_ENABLE_GRPC_V2})
       simple_grpc_v2_sequence_sync_infer_client.py
       simple_grpc_v2_string_infer_client.py
       simple_grpc_v2_shm_client.py
+      simple_grpc_v2_shm_string_client.py
       simple_grpc_v2_model_control.py
     DESTINATION python
   )
