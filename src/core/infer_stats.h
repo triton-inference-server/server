@@ -27,13 +27,15 @@
 
 #include <time.h>
 #include <map>
+#include <memory>
 #include <mutex>
 #include "src/core/constants.h"
-#include "src/core/metric_model_reporter.h"
 #include "src/core/status.h"
 #include "src/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
+
+class MetricModelReporter;
 
 #ifdef TRTIS_ENABLE_STATS
 
