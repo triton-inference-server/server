@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,7 +40,7 @@ export CUDA_VISIBLE_DEVICES=0
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS=--model-repository=`pwd`/models
+SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -83,7 +83,7 @@ fi
 
 grep "plan_float32_float32_float32_max" $SERVER_LOG | grep "stream priority -2"
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected MAX priority -1\n***"
+    echo -e "\n***\n*** Failed. Expected MAX priority -2\n***"
     RET=1
 fi
 
