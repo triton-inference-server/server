@@ -1465,6 +1465,7 @@ HTTPAPIServerV2::HandleCudaSharedMemory(
   }
 }
 
+namespace {
 bool
 CheckBinaryInputData(const rapidjson::Value& request_input, size_t* byte_size)
 {
@@ -1551,6 +1552,74 @@ CheckClassificationOutput(
 
   return use_classification;
 }
+
+TRITONSERVER_Error*
+ValidateInputContentType(const rapidjson::Value& io)
+{
+  auto has_data = (io.FindMember("data") != io.MemberEnd());
+  bool has_binary = false;
+  bool has_shared_memory = false;
+  rapidjson::Value::ConstMemberIterator itr = io.FindMember("parameters");
+  if (itr != io.MemberEnd()) {
+    const rapidjson::Value& params = itr->value;
+    has_binary = (params.FindMember("binary_data_size") != params.MemberEnd());
+    has_shared_memory =
+        (params.FindMember("shared_memory_region") != params.MemberEnd());
+  }
+  int set_count = has_data + has_binary + has_shared_memory;
+  if (set_count != 1) {
+    std::string err_str =
+        "Input must set only one of the following fields: 'data', "
+        "'binary_data_size' in 'parameters', 'shared_memory_region' in "
+        "'parameters'. But";
+    if (set_count == 0) {
+      err_str += " no field is set";
+    } else {
+      err_str += " set";
+      if (has_data) {
+        err_str += " 'data'";
+      }
+      if (has_binary) {
+        err_str += " 'binary_data_size'";
+      }
+      if (has_shared_memory) {
+        err_str += " 'shared_memory_region'";
+      }
+    }
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG, err_str.c_str());
+  }
+  return nullptr;
+}
+
+TRITONSERVER_Error*
+ValidateOutputParameter(const rapidjson::Value& io)
+{
+  rapidjson::Value::ConstMemberIterator itr = io.FindMember("parameters");
+  if (itr != io.MemberEnd()) {
+    const rapidjson::Value& params = itr->value;
+    if (params.FindMember("shared_memory_region") != params.MemberEnd()) {
+      // Currently shared memory can't set with classification because
+      // cls results are not stored in shared memory, internally it is computed
+      // based on results in shared memory.
+      if (params.FindMember("classification") != params.MemberEnd()) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "Output can't set both 'shared_memory_region' and "
+            "'classification'");
+      }
+      const auto& itr =params.FindMember("binary_data");
+      if ((itr != params.MemberEnd()) && (itr->value.GetBool())) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "Output can't set both 'shared_memory_region' and 'binary_data'");
+      }
+    }
+  }
+  return nullptr;
+}
+
+}  // namespace
 
 TRITONSERVER_Error*
 HTTPAPIServerV2::EVBufferToJson(
@@ -1703,6 +1772,8 @@ HTTPAPIServerV2::EVBufferToInput(
   infer_req->response_meta_data_.request_buffer_.resize(inputs.Size());
   for (size_t i = 0; i < inputs.Size(); i++) {
     const rapidjson::Value& request_input = inputs[i];
+    RETURN_IF_TRITON_ERR(ValidateInputContentType(request_input));
+
     const auto& name_itr = request_input.FindMember("name");
     if (name_itr == request_input.MemberEnd()) {
       return TRITONSERVER_ErrorNew(
@@ -1790,14 +1861,6 @@ HTTPAPIServerV2::EVBufferToInput(
       const char* shm_region = nullptr;
       if (CheckSharedMemoryData(
               request_input, &shm_region, &offset, &byte_size)) {
-        // Uncomment after client fix (Don't send data in case of shared memory)
-        // if (request_input.FindMember("data") != request_input.MemberEnd()) {
-        //   return TRITONSERVER_ErrorNew(
-        //       TRITONSERVER_ERROR_INVALID_ARG,
-        //       "must not specify 'data' field in request input when using "
-        //       "shared memory");
-        // }
-
         void* base;
         TRITONSERVER_Memory_Type memory_type;
         int64_t memory_type_id;
@@ -1823,16 +1886,8 @@ HTTPAPIServerV2::EVBufferToInput(
               irequest, input_name, nullptr, 0 /* byte_size */,
               TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
         } else {
-          const auto& itr = request_input.FindMember("data");
-          if (itr == request_input.MemberEnd()) {
-            return TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INVALID_ARG,
-                std::string(
-                    "Input tensor '" + std::string(input_name) +
-                    "' has no 'data' field")
-                    .c_str());
-          }
-          const rapidjson::Value& tensor_data = itr->value;
+          const rapidjson::Value& tensor_data =
+              request_input.FindMember("data")->value;
 
           size_t dtype_size = GetDataTypeByteSize(dtype);
           if (dtype_size == 0) {
@@ -1868,6 +1923,8 @@ HTTPAPIServerV2::EVBufferToInput(
     rapidjson::Value& outputs_array = itr->value;
     for (size_t i = 0; i < outputs_array.Size(); i++) {
       rapidjson::Value& output = outputs_array[i];
+      RETURN_IF_TRITON_ERR(ValidateOutputParameter(output));
+
       const auto& name_itr = output.FindMember("name");
       if (name_itr == output.MemberEnd()) {
         return TRITONSERVER_ErrorNew(
