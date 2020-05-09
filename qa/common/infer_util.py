@@ -798,7 +798,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
             else:
                 # Register necessary shared memory regions/handles
                 su.register_add_either_shm_regions(inputs, output_req, shm_region_name_prefix,
-                    shm_io_handles, io_num, input_byte_size, output_byte_size,
+                    (shm_ip_handles, shm_op_handles), io_num, input_byte_size, output_byte_size,
                     use_system_shared_memory, use_cuda_shared_memory, triton_client)
 
         if config[2]:
