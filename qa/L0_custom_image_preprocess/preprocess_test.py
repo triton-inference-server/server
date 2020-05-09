@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,8 +29,11 @@
 import argparse
 import numpy as np
 import os
+import sys
 from builtins import range
-from tensorrtserver.api import *
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+from tritonclientutils.utils import np_to_triton_dtype
 
 FLAGS = None
 
@@ -49,37 +52,42 @@ if __name__ == '__main__':
                         help='Input image.')
 
    FLAGS = parser.parse_args()
-   protocol = ProtocolType.from_str(FLAGS.protocol)
+   if (FLAGS.protocol != "http") and (FLAGS.protocol != "grpc"):
+      print("unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(FLAGS.protocol))
+      exit(1)
+
+   client_util = httpclient if FLAGS.protocol == "http" else grpcclient
 
    model_name = "image_preprocess_nhwc_224x224x3"
-   model_version = -1
-   batch_size = 1
 
    # Create the inference context for the model.
-   ctx = InferContext(FLAGS.url, protocol, model_name, model_version, FLAGS.verbose)
+   client = client_util.InferenceServerClient(FLAGS.url, FLAGS.verbose)
 
    # Input tensor will be raw content from image file
    image_path = FLAGS.image_filename
    with open(image_path, "rb") as fd:
-      input_data = np.array([fd.read()], dtype=bytes)
+      input_data = np.array([[fd.read()]], dtype=bytes)
 
    expected_res_path = FLAGS.preprocessed_filename
    with open(expected_res_path, "r") as fd:
       expected_data = np.fromfile(fd, np.float32)
 
-   result = ctx.run({ 'INPUT' : (input_data,) },
-                    { 'OUTPUT' : InferContext.ResultFormat.RAW },
-                    batch_size)
+   inputs = [client_util.InferInput(
+                  "INPUT", input_data.shape, np_to_triton_dtype(input_data.dtype))]
+   inputs[0].set_data_from_numpy(input_data)
 
-   if "OUTPUT" not in result:
+   results = client.infer(model_name, inputs)
+
+   output = results.as_numpy("OUTPUT")
+   if output is None:
       print("error: expected 'OUTPUT'")
       sys.exit(1)
 
-   if len(result["OUTPUT"]) != 1:
+   if output.shape[0] != 1:
       print("error: expected 1 output result, got {}".format(len(result["OUTPUT"])))
       sys.exit(1)
 
-   res_data = result["OUTPUT"][0].reshape([-1])
+   res_data = output[0].reshape([-1])
    if not np.array_equal(res_data, expected_data):
       print("error: result does not match expected data")
       sys.exit(1)

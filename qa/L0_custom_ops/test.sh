@@ -55,7 +55,7 @@ RET=0
 LD_LIBRARY_PATH=/opt/tritonserver/lib/tensorflow:/opt/tritonserver/lib/pytorch:$LD_LIBRARY_PATH
 
 # Tensorflow
-SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops"
+SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops --api-version=2"
 SERVER_LD_PRELOAD="/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libzeroout.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libcudaop.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libbusyop.so"
 
 run_server
@@ -67,28 +67,28 @@ fi
 
 set +e
 
-python $ZERO_OUT_TEST -m graphdef_zeroout >>$CLIENT_LOG 2>&1
+python $ZERO_OUT_TEST -v -m graphdef_zeroout >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-python $ZERO_OUT_TEST -m savedmodel_zeroout >>$CLIENT_LOG 2>&1
+python $ZERO_OUT_TEST -v -m savedmodel_zeroout >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-python $CUDA_OP_TEST -m graphdef_cudaop >>$CLIENT_LOG 2>&1
+python $CUDA_OP_TEST -v -m graphdef_cudaop >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-python $CUDA_OP_TEST -m savedmodel_cudaop >>$CLIENT_LOG 2>&1
+python $CUDA_OP_TEST -v -m savedmodel_cudaop >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -101,7 +101,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Pytorch
-SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops"
+SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops --api-version=2"
 SERVER_LD_PRELOAD="/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops/libtorch_modulo/custom_modulo.so"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -112,7 +112,7 @@ fi
 
 set +e
 
-python $MOD_OP_TEST -m libtorch_modulo >>$CLIENT_LOG 2>&1
+python $MOD_OP_TEST -v -m libtorch_modulo >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
