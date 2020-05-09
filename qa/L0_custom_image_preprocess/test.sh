@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@ TEST_PY=./preprocess_test.py
 CLIENT_LOG="./client.log"
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS=--model-repository=`pwd`/models
+SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
 SERVER_LOG="./inference_server.log"
 
 EXPECTED_RES=preprocessed_mug_image
