@@ -1266,12 +1266,20 @@ class InferInput:
                 "got unexpected numpy array shape [{}], expected [{}]".format(
                     str(input_tensor.shape)[1:-1],
                     str(self._shape)[1:-1]))
+        
+        self._parameters.pop('shared_memory_region', None)
+        self._parameters.pop('shared_memory_byte_size', None)
+        self._parameters.pop('shared_memory_offset', None)
+
         if not binary_data:
+            self._parameters.pop('binary_data_size', None)
+            self._raw_data = None
             if self._datatype == "BYTES":
                 self._data = [val for val in input_tensor.flatten()]
             else:
                 self._data = [val.item() for val in input_tensor.flatten()]
         else:
+            self._data = None
             if self._datatype == "BYTES":
                 self._raw_data = serialize_byte_tensor(input_tensor).tobytes()
             else:
@@ -1292,6 +1300,10 @@ class InferInput:
             the tensor starts. The default value is 0.
 
         """
+        self._data = None
+        self._raw_data = None
+        self._parameters.pop('binary_data_size', None)
+
         self._parameters['shared_memory_region'] = region_name
         self._parameters['shared_memory_byte_size'] = byte_size
         if offset != 0:
@@ -1345,7 +1357,8 @@ class InferRequestedOutput:
         Indicates whether to return result data for the output in
         binary format or explicit tensor within JSON. The default
         value is True, which means the data will be delivered as
-        binary data in the HTTP body after JSON object.
+        binary data in the HTTP body after JSON object. This field
+        will be unset if shared memory is set for the output.
     class_count : int
         The number of classifications to be requested. The default
         value is 0 which means the classification results are not
@@ -1357,6 +1370,7 @@ class InferRequestedOutput:
         self._parameters = {}
         if class_count != 0:
             self._parameters['classification'] = class_count
+        self._binary = binary_data
         self._parameters['binary_data'] = binary_data
 
     def name(self):
@@ -1384,6 +1398,10 @@ class InferRequestedOutput:
             the tensor starts. The default value is 0.
 
         """
+        if 'classification' in self._parameters:
+            raise_error("shared memory can't be set on classification output")
+        if self._binary:
+            self._parameters['binary_data'] = False
 
         self._parameters['shared_memory_region'] = region_name
         self._parameters['shared_memory_byte_size'] = byte_size

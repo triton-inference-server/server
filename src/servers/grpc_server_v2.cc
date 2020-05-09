@@ -1983,6 +1983,15 @@ InferGRPCToInput(
             io, &has_shared_memory, &region_name, &offset, &byte_size));
 
     if (has_shared_memory) {
+      if (io.has_contents()) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "when shared memory is used, expected 'content' is not set for "
+                "input tensor '" +
+                io.name() + "' for model '" + request.model_name() + "'")
+                .c_str());
+      }
       void* tmp;
       RETURN_IF_TRITON_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, &tmp, &memory_type, &memory_type_id));
@@ -2253,6 +2262,13 @@ SetInferenceRequestMetadata(
 
     const auto& class_it = output.parameters().find("classification");
     if (class_it != output.parameters().end()) {
+      if (output.parameters().find("shared_memory_region") !=
+          output.parameters().end()) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "Output can't set both 'shared_memory_region' and "
+            "'classification'");
+      }
       const auto& infer_param = class_it->second;
       if (infer_param.parameter_choice_case() !=
           InferParameter::ParameterChoiceCase::kInt64Param) {

@@ -1289,6 +1289,11 @@ class InferInput:
                 "got unexpected numpy array shape [{}], expected [{}]".format(
                     str(input_tensor.shape)[1:-1],
                     str(self._input.shape)[1:-1]))
+
+        self._input.parameters.pop('shared_memory_region', None)
+        self._input.parameters.pop('shared_memory_byte_size', None)
+        self._input.parameters.pop('shared_memory_offset', None)
+
         if self._input.datatype == "BYTES":
             self._input.contents.raw_contents = serialize_byte_tensor(
                 input_tensor).tobytes()
@@ -1309,6 +1314,7 @@ class InferInput:
             the tensor starts. The default value is 0.
 
         """
+        self._input.ClearField("contents")
 
         self._input.parameters[
             'shared_memory_region'].string_param = region_name
@@ -1372,7 +1378,13 @@ class InferRequestedOutput:
             The offset, in bytes, into the region where the data for
             the tensor starts. The default value is 0.
 
+        Raises
+        ------
+        InferenceServerException
+            If failed to set shared memory for the tensor.
         """
+        if 'classification' in self._output.parameters:
+            raise_error("shared memory can't be set on classification output")
 
         self._output.parameters[
             'shared_memory_region'].string_param = region_name
