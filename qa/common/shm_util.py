@@ -268,10 +268,10 @@ def register_add_either_shm_regions(inputs, outputs, shm_region_prefix, shm_hand
             triton_client.unregister_cuda_shared_memory(input_shm_name+'_data')
             triton_client.unregister_cuda_shared_memory(output_shm_name+'_data')
             triton_client.register_cuda_shared_memory(input_shm_name+'_data',
-                                                      cudashm.get_raw_handle(shm_handles[io_num][0]),
+                                                      cudashm.get_raw_handle(shm_handles[0][io_num]),
                                                       0, input_byte_size)
             triton_client.register_cuda_shared_memory(output_shm_name+'_data',
-                                                      cudashm.get_raw_handle(shm_handles[io_num][1]),
+                                                      cudashm.get_raw_handle(shm_handles[1][io_num]),
                                                       0, output_byte_size)
 
         # Add shared memory regions to inputs
