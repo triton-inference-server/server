@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,8 +29,11 @@
 import argparse
 import numpy as np
 import os
+import sys
 from builtins import range
-from tensorrtserver.api import *
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+from tritonclientutils.utils import np_to_triton_dtype
 
 FLAGS = None
 
@@ -45,64 +48,68 @@ if __name__ == '__main__':
                        'communicate with inference service. Default is "http".')
 
    FLAGS = parser.parse_args()
-   protocol = ProtocolType.from_str(FLAGS.protocol)
+   if (FLAGS.protocol != "http") and (FLAGS.protocol != "grpc"):
+      print("unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(FLAGS.protocol))
+      exit(1)
+
+   client_util = httpclient if FLAGS.protocol == "http" else grpcclient
 
    model_name = "param"
-   model_version = -1
-   batch_size = 1
 
    # Create the inference context for the model.
-   ctx = InferContext(FLAGS.url, protocol, model_name, model_version, FLAGS.verbose)
+   client = client_util.InferenceServerClient(FLAGS.url, FLAGS.verbose)
 
    # Input tensor can be any size int32 vector...
    input_data = np.zeros(shape=1, dtype=np.int32)
 
-   result = ctx.run({ 'INPUT' : (input_data,) },
-                    { 'OUTPUT' : InferContext.ResultFormat.RAW },
-                    batch_size)
-   print(result)
+   inputs = [client_util.InferInput(
+                  "INPUT", input_data.shape, np_to_triton_dtype(input_data.dtype))]
+   inputs[0].set_data_from_numpy(input_data)
 
-   if "OUTPUT" not in result:
-      print("error: expected 'OUTPUT'");
-      sys.exit(1);
+   results = client.infer(model_name, inputs)
 
-   if len(result["OUTPUT"]) != 1:
-      print("error: expected 1 output result, got {}".format(len(result["OUTPUT"])));
-      sys.exit(1);
+   print(results)
 
-   params = result["OUTPUT"][0]
+   params = results.as_numpy("OUTPUT")
+   if params is None:
+      print("error: expected 'OUTPUT'")
+      sys.exit(1)
+
    if params.size != 5:
-      print("error: expected 5 output strings, got {}".format(params.size));
-      sys.exit(1);
+      print("error: expected 5 output strings, got {}".format(params.size))
+      sys.exit(1)
 
-   p0 = params[0].decode("utf-8")
+   # Element type returned is different between HTTP and GRPC client.
+   # The former is str and the latter is bytes
+   params = [p if type(p) == str else p.decode('utf8') for p in params]
+   p0 = params[0]
    if not p0.startswith("INPUT=0"):
-      print("error: expected INPUT=0 string, got {}".format(p0));
-      sys.exit(1);
+      print("error: expected INPUT=0 string, got {}".format(p0))
+      sys.exit(1)
 
-   p1 = params[1].decode("utf-8")
+   p1 = params[1]
    if not p1.startswith("server_0="):
-      print("error: expected server_0 parameter, got {}".format(p1));
-      sys.exit(1);
+      print("error: expected server_0 parameter, got {}".format(p1))
+      sys.exit(1)
 
-   p2 = params[2].decode("utf-8")
+   p2 = params[2]
    if not p2.startswith("server_1="):
-      print("error: expected server_1 parameter, got {}".format(p2));
-      sys.exit(1);
+      print("error: expected server_1 parameter, got {}".format(p2))
+      sys.exit(1)
    if not p2.endswith("L0_custom_backend/models"):
       print("error: expected model-repository to end with L0_custom_backend/models, got {}".format(p2));
-      sys.exit(1);
+      sys.exit(1)
 
    # configuration param values can be returned in any order.
-   p3 = params[3].decode("utf-8")
-   p4 = params[4].decode("utf-8")
+   p3 = params[3]
+   p4 = params[4]
    if p3.startswith("param1"):
       p3, p4 = p4, p3
 
    if p3 != "param0=value0":
       print("error: expected param0=value0, got {}".format(p3));
-      sys.exit(1);
+      sys.exit(1)
 
    if p4 != "param1=value1":
       print("error: expected param1=value1, got {}".format(p4));
-      sys.exit(1);
+      sys.exit(1)
