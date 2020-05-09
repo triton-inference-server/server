@@ -61,7 +61,7 @@ function main() {
   else
     cp Release/crequest.dll \
       "${WHLDIR}/tensorrtserver/api/."
-    cp ../../../c++/Release/request.dll \
+    cp ../../../c++/api_v1/library/Release/request.dll \
       "${WHLDIR}/tensorrtserver/api/."
   fi
 
