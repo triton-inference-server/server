@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,41 +31,43 @@ from builtins import range
 from future.utils import iteritems
 import unittest
 import numpy as np
-from tensorrtserver.api import *
 import os
+import tritonhttpclient as httpclient
+from tritonclientutils.utils import InferenceServerException
 
 class PluginModelTest(unittest.TestCase):
-    def _full_exact(self, batch_size, input_dtype, output_dtype, model_name,
-                    plugin_name):
-        input_list = list()
-        for b in range(batch_size):
-            in0 = np.random.randn(16).astype(input_dtype)
-            input_list.append(in0)
+    def _full_exact(self, batch_size, model_name, plugin_name):
+        triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
 
-        ctx = InferContext("localhost:8000", ProtocolType.HTTP, model_name + '_' + plugin_name,
-                           correlation_id=0, streaming=False, verbose=True)
-        results = ctx.run(
-            { "INPUT0" : input_list }, { "OUTPUT0" : InferContext.ResultFormat.RAW},
-            batch_size=batch_size)
+        inputs = []
+        outputs = []
+        inputs.append(httpclient.InferInput('INPUT0', [batch_size, 16], "FP32"))
 
-        self.assertEqual(len(results), 1)
-        self.assertTrue("OUTPUT0" in results)
-        result = results["OUTPUT0"]
+        input0_data = np.random.randn(batch_size, 16).astype(np.float32)
+        inputs[0].set_data_from_numpy(input0_data, binary_data=False)
+
+        outputs.append(httpclient.InferRequestedOutput('OUTPUT0', binary_data=True))
+
+        results = triton_client.infer(model_name + '_' + plugin_name,
+                                      inputs,
+                                      outputs=outputs)
+
+        output0_data = results.as_numpy('OUTPUT0')
 
         # Verify values of Leaky RELU (it uses 0.1 instead of the default 0.01)
         # and for CustomClipPlugin min_clip = 0.1, max_clip = 0.5
         for b in range(batch_size):
             if plugin_name == 'LReLU_TRT':
-                test_input = np.where(input_list[b] > 0, input_list[b], input_list[b] * 0.1)
-                self.assertTrue(all(np.isclose(result[b], test_input)))
+                test_input = np.where(input0_data > 0, input0_data, input0_data * 0.1)
+                self.assertTrue(np.isclose(output0_data, test_input).all())
             else:
                 # [TODO] Add test for CustomClip output
-                test_input = np.clip(input_list[b], 0.1, 0.5)
+                test_input = np.clip(input0_data, 0.1, 0.5)
 
     def test_raw_fff_lrelu(self):
         # model that supports batching
         for bs in (1, 8):
-            self._full_exact(bs, np.float32, np.float32, 'plan_float32_float32_float32', 'LReLU_TRT')
+            self._full_exact(bs, 'plan_float32_float32_float32', 'LReLU_TRT')
 
     # add test for CustomClipPlugin after model is fixed
 
