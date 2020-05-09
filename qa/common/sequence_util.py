@@ -424,7 +424,7 @@ class SequenceBatcherTestUtil(unittest.TestCase):
                         elif _test_cuda_shared_memory:
                             shm_ip_handles.append(cudashm.create_shared_memory_region(ip_name, input_byte_size, 0))
                             cudashm.set_shared_memory_region(shm_ip_handles[-1], input_list_tmp)
-                            triton_client_.register_cuda_shared_memory(ip_name, cudashm.get_raw_handle(shm_ip_handles[-1]), 0, input_byte_size)
+                            triton_client.register_cuda_shared_memory(ip_name, cudashm.get_raw_handle(shm_ip_handles[-1]), 0, input_byte_size)
 
                         inputs[0].set_shared_memory(ip_name, input_byte_size)
                         outputs[0].set_shared_memory("output_data", output_byte_size)
