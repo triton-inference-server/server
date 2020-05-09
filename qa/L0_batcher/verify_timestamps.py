@@ -42,8 +42,8 @@ def verify_timestamps(traces, preserve):
             continue
         filtered_traces.append(trace)
 
-    # First find the latest send end timestamp for the batch with large delay
-    large_delay_send_end = 0
+    # First find the latest request end timestamp for the batch with large delay
+    large_delay_request_end = 0
     small_delay_traces = []
     for trace in filtered_traces:
         timestamps = dict()
@@ -54,35 +54,29 @@ def verify_timestamps(traces, preserve):
         # If the 3rd batch is also processed by large delay instance, we don't
         # want to use its responses as baseline
         if trace["id"] <= 7 and compute_span >= 400 * 1000 * 1000:
-            if "grpc send end" in timestamps:
-                send_end = timestamps["grpc send end"]
-            else:
-                send_end = timestamps["http send end"]
-            large_delay_send_end = max(large_delay_send_end, send_end)
+            request_end = timestamps["request handler end"]
+            large_delay_request_end = max(large_delay_request_end, request_end)
         else:
             small_delay_traces.append(trace)
 
-    response_send_after_large_delay_count = 0
+    response_request_after_large_delay_count = 0
     for trace in small_delay_traces:
         timestamps = dict()
         for ts in trace["timestamps"]:
             timestamps[ts["name"]] = ts["ns"]
-        if "grpc send start" in timestamps:
-            send_start = timestamps["grpc send start"]
-        else:
-            send_start = timestamps["http send start"]
-        if send_start > large_delay_send_end:
-            response_send_after_large_delay_count += 1
+        request_end = timestamps["request handler end"]
+        if request_end > large_delay_request_end:
+            response_request_after_large_delay_count += 1
     
     # Hardcoded expected count here
     if preserve:
         # If preserve ordering, there must be large delay batch followed by
         # small delay batch and thus at least 4 responses are sent after
-        return 0 if response_send_after_large_delay_count >= 4 else 1
+        return 0 if response_request_after_large_delay_count >= 4 else 1
     else:
         # If not preserve ordering, the small delay batches should all be done
         # before large delay batch regardless of the ordering in scheduler
-        return 0 if response_send_after_large_delay_count == 0 else 1
+        return 0 if response_request_after_large_delay_count == 0 else 1
 
     return 0
 
