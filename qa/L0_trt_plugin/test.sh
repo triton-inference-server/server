@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,7 +43,7 @@ PLUGIN_TEST=trt_plugin_test.py
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --api-version=2"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -70,7 +70,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed To Run\n***"
