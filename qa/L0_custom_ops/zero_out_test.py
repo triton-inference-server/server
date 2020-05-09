@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,8 +29,11 @@
 import argparse
 import numpy as np
 import os
+import sys
 from builtins import range
-from tensorrtserver.api import *
+import tritongrpcclient as grpcclient
+import tritonhttpclient as httpclient
+from tritonclientutils.utils import np_to_triton_dtype
 
 FLAGS = None
 
@@ -47,33 +50,38 @@ if __name__ == '__main__':
                         help='Name of model.')
 
     FLAGS = parser.parse_args()
-    protocol = ProtocolType.from_str(FLAGS.protocol)
+    if (FLAGS.protocol != "http") and (FLAGS.protocol != "grpc"):
+        print("unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(FLAGS.protocol))
+        exit(1)
+
+    client_util = httpclient if FLAGS.protocol == "http" else grpcclient
 
     # Run the zero-out model, which depends on a custom operation
     model_name = FLAGS.model
-    model_version = -1
-    batch_size = 1
     elements = 8
 
     # Create the inference context for the model.
-    ctx = InferContext(FLAGS.url, protocol, model_name, model_version, FLAGS.verbose)
+    client = client_util.InferenceServerClient(FLAGS.url, FLAGS.verbose)
 
     # Create the data for one input tensor.
-    input0_data = np.arange(start=42, stop=42+elements, dtype=np.int32)
+    input_data = np.arange(start=42, stop=42+elements, dtype=np.int32)
 
-    result = ctx.run({ 'to_zero' : (input0_data,) },
-                     { 'zeroed' : InferContext.ResultFormat.RAW },
-                     batch_size)
+    inputs = [client_util.InferInput(
+                "to_zero", input_data.shape, np_to_triton_dtype(input_data.dtype))]
+    inputs[0].set_data_from_numpy(input_data)
+    results = client.infer(model_name, inputs)
 
     # We expect 1 result with all inputs except first to be zeroed.
-    print(result)
-    output0_data = result['zeroed'][0]
+    output_data = results.as_numpy("zeroed")
+    if output_data is None:
+        print("error: expected 'zeroed'")
+        sys.exit(1)
 
     for i in range(elements):
-        print(str(i) + ": input " + str(input0_data[i]) + ", output " + str(output0_data[i]))
-        if (i == 0) and (input0_data[i] != output0_data[i]):
-            print("error: incorrect value");
-            sys.exit(1);
-        if (i != 0) and (output0_data[i] != 0):
-            print("error: expected 0");
-            sys.exit(1);
+        print(str(i) + ": input " + str(input_data[i]) + ", output " + str(output_data[i]))
+        if (i == 0) and (input_data[i] != output_data[i]):
+            print("error: incorrect value")
+            sys.exit(1)
+        if (i != 0) and (output_data[i] != 0):
+            print("error: expected 0")
+            sys.exit(1)
