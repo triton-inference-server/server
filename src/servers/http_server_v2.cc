@@ -1820,7 +1820,7 @@ HTTPAPIServerV2::EVBufferToInput(
   const rapidjson::Value& inputs = itr->value;
   for (size_t i = 0; i < inputs.Size(); i++) {
     const rapidjson::Value& request_input = inputs[i];
-    RETURN_IF_TRITON_ERR(ValidateInputContentType(request_input));
+    RETURN_IF_ERR(ValidateInputContentType(request_input));
 
     const auto& name_itr = request_input.FindMember("name");
     if (name_itr == request_input.MemberEnd()) {
@@ -1984,7 +1984,7 @@ HTTPAPIServerV2::EVBufferToInput(
     rapidjson::Value& outputs_array = itr->value;
     for (size_t i = 0; i < outputs_array.Size(); i++) {
       rapidjson::Value& output = outputs_array[i];
-      RETURN_IF_TRITON_ERR(ValidateOutputParameter(output));
+      RETURN_IF_ERR(ValidateOutputParameter(output));
 
       const auto& name_itr = output.FindMember("name");
       if (name_itr == output.MemberEnd()) {
