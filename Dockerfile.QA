@@ -260,8 +260,6 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
                               curl \
-                              jmeter \
-                              jmeter-http \
                               libopencv-dev \
                               libopencv-core-dev \
                               libzmq3-dev \
