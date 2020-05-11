@@ -117,9 +117,7 @@ under-development version)::
 Prerequisites
 .............
 
-Python 3.5 or greater is required to build the wheel file. The build script 
-expects ``python3`` in Ubuntu 16.04, Ubuntu 18.04, or ``python3.exe`` in Windows to 
-be available on the path.
+Python 3.5 or greater is required to build and/or install the wheel file.
 
 Ubuntu 16.04 / Ubuntu 18.04
 ...........................
