@@ -114,6 +114,13 @@ under-development version)::
 
   $ git checkout r20.03
 
+Prerequisites
+.............
+
+Python 3.5 or greater is required to build the wheel file. The build script 
+expects ``python3`` in Ubuntu 16.04, Ubuntu 18.04, or ``python3.exe`` in Windows to 
+be available on the path.
+
 Ubuntu 16.04 / Ubuntu 18.04
 ...........................
 
@@ -145,7 +152,7 @@ using them, and you can also install the dependencies in other ways that you
 prefer::
 
   > .\vcpkg.exe install openssl:x64-windows zlib:x64-windows rapidjson:x64-windows
-  > .\pip.exe install grpcio-tools wheel
+  > .\pip.exe install --upgrade setuptools grpcio-tools wheel
 
 The vcpkg step above installs openssl and zlib, ":x64-windows" specifies the
 target and it is optional. The path to the libraries should be added to
@@ -173,6 +180,14 @@ build does not include the C++ examples.
 
 The MSBuild.exe may need to be invoked twice for a successfull
 build.
+
+A wheel file may fail to generate if the python environment is not set up 
+correctly. The windows build environment will not fail correctly if there is a 
+failure when running the python script. To verify that wheel file is executed
+correctly, run the following in a bash window in the 
+trtis-clients\\python\\api_v1\\library::
+
+  > VERSION=0.0.0 python3 setup.py bdist_wheel
 
 .. build-client-end-marker-do-not-remove
 
