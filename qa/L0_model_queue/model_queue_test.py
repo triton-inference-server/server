@@ -33,7 +33,7 @@ import threading
 import unittest
 import numpy as np
 import infer_util as iu
-from tensorrtserver.api import *
+from tritonclientutils.utils import InferenceServerException
 from ctypes import *
 
 _max_queue_delay_ms = 10000
@@ -59,11 +59,15 @@ class ModelQueueTest(unittest.TestCase):
                 _deferred_exceptions.pop(0)
                 raise first_exception
 
-    def check_response(self, bs, dtype, shape, priority, timeout_us, thresholds):
+    def check_response(self, bs, dtype, shapes, priority, timeout_us, thresholds,
+        is_http_trial=True):
+        full_shapes = [[bs, ] + shape for shape in shapes]
         try:
             start_ms = int(round(time.time() * 1000))
-            iu.infer_zero(self, "custom", bs, dtype, shape, shape,
-                            model_version=1, use_grpc=False, use_streaming=False,
+            iu.infer_zero(self, "custom", bs, dtype, full_shapes, full_shapes,
+                            model_version=1, use_http_json_tensors=False,
+                            use_http=is_http_trial, use_grpc=(not is_http_trial),
+                            use_streaming=False,
                             priority=priority, timeout_us=timeout_us)
 
             end_ms = int(round(time.time() * 1000))
@@ -88,34 +92,35 @@ class ModelQueueTest(unittest.TestCase):
         dtype = np.float32
         shapes = ([16],)
 
-        preceding_thread = threading.Thread(target=self.check_response,
-                                        args=(8, dtype, shapes, 0, 0, (1999, 1000))
-                                            )
-        threads = []
-        for i in range(10):
-            threads.append(threading.Thread(target=self.check_response,
-                                            args=(1, dtype, shapes, 0, 0, (None, None))
-                                            ))
-        preceding_thread.start()
-        time.sleep(0.5)
-        for t in threads:
-            t.start()
-        
-        preceding_thread.join()
-        for t in threads:
-            t.join()
+        for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
+            preceding_thread = threading.Thread(target=self.check_response,
+                                            args=(8, dtype, shapes, 0, 0, (1999, 1000)),
+                                                )
+            threads = []
+            for i in range(10):
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(1, dtype, shapes, 0, 0, (None, None)),
+                                                kwargs=trial))
+            preceding_thread.start()
+            time.sleep(0.5)
+            for t in threads:
+                t.start()
+            
+            preceding_thread.join()
+            for t in threads:
+                t.join()
 
-        # Expect at most two exception with exceeding max queue size error
-        for i in range(2):
+            # Expect at most two exception with exceeding max queue size error
+            for i in range(2):
+                try:
+                    self.check_deferred_exception()
+                except InferenceServerException as ex:
+                    self.assertTrue(ex.message().startswith(
+                            "Exceeds maximum queue size"), "Expected error message \"Exceeds maximum queue size\", got: {}".format(ex))
             try:
                 self.check_deferred_exception()
             except InferenceServerException as ex:
-                self.assertTrue(ex.message().startswith(
-                        "Exceeds maximum queue size"), "Expected error message \"Exceeds maximum queue size\", got: {}".format(ex))
-        try:
-            self.check_deferred_exception()
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+                self.assertTrue(False, "unexpected error {}".format(ex))
     
     def test_policy_delay(self):
         # Send requests with batch sizes 1, 1, 3 where the second and third
@@ -126,27 +131,28 @@ class ModelQueueTest(unittest.TestCase):
         # can be executed.
         dtype = np.float32
         shapes = ([16],)
-        try:
-            threads = []
-            threads.append(threading.Thread(target=self.check_response,
-                                            args=(1, dtype, shapes, 0, 0, (15000, 10000))
-                                            ))
-            threads.append(threading.Thread(target=self.check_response,
-                                            args=(2, dtype, shapes, 0, 0, (100, 0))
-                                            ))
-            threads.append(threading.Thread(target=self.check_response,
-                                            args=(2, dtype, shapes, 0, 0, (100, 0))
-                                            ))
-            threads[0].start()
-            time.sleep(0.2)
-            threads[1].start()
-            threads[2].start()
+        for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
+            try:
+                threads = []
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(1, dtype, shapes, 0, 0, (15000, 10000)),
+                                                kwargs=trial))
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(2, dtype, shapes, 0, 0, (100, 0)),
+                                                kwargs=trial))
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(2, dtype, shapes, 0, 0, (100, 0)),
+                                                kwargs=trial))
+                threads[0].start()
+                time.sleep(0.2)
+                threads[1].start()
+                threads[2].start()
 
-            for t in threads:
-                t.join()
-            self.check_deferred_exception()
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+                for t in threads:
+                    t.join()
+                self.check_deferred_exception()
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_policy_reject(self):
         # Send requests with batch sizes 1, 1, 3 where the second and third
@@ -155,35 +161,36 @@ class ModelQueueTest(unittest.TestCase):
         # second and third request be batched together and executed.
         dtype = np.float32
         shapes = ([16],)
-        threads = []
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(1, dtype, shapes, 0, 0, (None, None))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(2, dtype, shapes, 0, 0, (100, 0))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(2, dtype, shapes, 0, 0, (100, 0))
-                                        ))
-        threads[0].start()
-        time.sleep(0.2)
-        threads[1].start()
-        threads[2].start()
-        
-        for t in threads:
-            t.join()
+        for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
+            threads = []
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(1, dtype, shapes, 0, 0, (None, None)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(2, dtype, shapes, 0, 0, (100, 0)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(2, dtype, shapes, 0, 0, (100, 0)),
+                                            kwargs=trial))
+            threads[0].start()
+            time.sleep(0.2)
+            threads[1].start()
+            threads[2].start()
+            
+            for t in threads:
+                t.join()
 
-        # Expect only one error for rejection
-        try:
-            self.check_deferred_exception()
-        except InferenceServerException as ex:
-            self.assertTrue(ex.message().startswith(
-                    "Request timeout expired"), "Expected error message \"Request timeout expired\", got: {}".format(ex))
+            # Expect only one error for rejection
+            try:
+                self.check_deferred_exception()
+            except InferenceServerException as ex:
+                self.assertTrue(ex.message().startswith(
+                        "Request timeout expired"), "Expected error message \"Request timeout expired\", got: {}".format(ex))
 
-        try:
-            self.check_deferred_exception()
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+            try:
+                self.check_deferred_exception()
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_timeout_override(self):
         # Send requests with batch sizes 1, 1, 3 where the first request
@@ -196,100 +203,101 @@ class ModelQueueTest(unittest.TestCase):
         
         dtype = np.float32
         shapes = ([16],)
-        threads = []
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(1, dtype, shapes, 0, 100000, (None, None))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(2, dtype, shapes, 0, 0, (100, 0))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(2, dtype, shapes, 0, 0, (100, 0))
-                                        ))
-        threads[0].start()
-        time.sleep(0.2)
-        threads[1].start()
-        threads[2].start()
-        
-        for t in threads:
-            t.join()
+        for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
+            threads = []
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(1, dtype, shapes, 0, 100000, (None, None)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(2, dtype, shapes, 0, 0, (100, 0)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(2, dtype, shapes, 0, 0, (100, 0)),
+                                            kwargs=trial))
+            threads[0].start()
+            time.sleep(0.2)
+            threads[1].start()
+            threads[2].start()
+            
+            for t in threads:
+                t.join()
 
-        # Expect only one error for rejection
-        try:
-            self.check_deferred_exception()
-        except InferenceServerException as ex:
-            self.assertTrue(ex.message().startswith(
-                    "Request timeout expired"), "Expected error message \"Request timeout expired\", got: {}".format(ex))
+            # Expect only one error for rejection
+            try:
+                self.check_deferred_exception()
+            except InferenceServerException as ex:
+                self.assertTrue(ex.message().startswith(
+                        "Request timeout expired"), "Expected error message \"Request timeout expired\", got: {}".format(ex))
 
-        try:
-            self.check_deferred_exception()
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+            try:
+                self.check_deferred_exception()
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Check that timeout larger than 'default_timeout_microseconds' will not
-        # override, the last two requests will be processed only after
-        # 'default_timeout_microseconds' and before queue delay.
-        threads = []
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(1, dtype, shapes, 0, 10000000, (None, None))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(2, dtype, shapes, 0, 0, (1100, 700))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(2, dtype, shapes, 0, 0, (1100, 700))
-                                        ))
-        threads[0].start()
-        time.sleep(0.2)
-        threads[1].start()
-        threads[2].start()
-        
-        for t in threads:
-            t.join()
+            # Check that timeout larger than 'default_timeout_microseconds' will not
+            # override, the last two requests will be processed only after
+            # 'default_timeout_microseconds' and before queue delay.
+            threads = []
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(1, dtype, shapes, 0, 10000000, (None, None)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(2, dtype, shapes, 0, 0, (1100, 700)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(2, dtype, shapes, 0, 0, (1100, 700)),
+                                            kwargs=trial))
+            threads[0].start()
+            time.sleep(0.2)
+            threads[1].start()
+            threads[2].start()
+            
+            for t in threads:
+                t.join()
 
-        # Expect only one error for rejection
-        try:
-            self.check_deferred_exception()
-        except InferenceServerException as ex:
-            self.assertTrue(ex.message().startswith(
-                    "Request timeout expired"), "Expected error message \"Request timeout expired\", got: {}".format(ex))
+            # Expect only one error for rejection
+            try:
+                self.check_deferred_exception()
+            except InferenceServerException as ex:
+                self.assertTrue(ex.message().startswith(
+                        "Request timeout expired"), "Expected error message \"Request timeout expired\", got: {}".format(ex))
 
-        try:
-            self.check_deferred_exception()
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+            try:
+                self.check_deferred_exception()
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Sanity check that without override, the last two requests will be
-        # processed only after 'default_timeout_microseconds'
-        threads = []
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(1, dtype, shapes, 0, 0, (None, None))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(2, dtype, shapes, 0, 0, (1100, 700))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(2, dtype, shapes, 0, 0, (1100, 700))
-                                        ))
-        threads[0].start()
-        time.sleep(0.2)
-        threads[1].start()
-        threads[2].start()
-        
-        for t in threads:
-            t.join()
+            # Sanity check that without override, the last two requests will be
+            # processed only after 'default_timeout_microseconds'
+            threads = []
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(1, dtype, shapes, 0, 0, (None, None)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(2, dtype, shapes, 0, 0, (1100, 700)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(2, dtype, shapes, 0, 0, (1100, 700)),
+                                            kwargs=trial))
+            threads[0].start()
+            time.sleep(0.2)
+            threads[1].start()
+            threads[2].start()
+            
+            for t in threads:
+                t.join()
 
-        # Expect only one error for rejection
-        try:
-            self.check_deferred_exception()
-        except InferenceServerException as ex:
-            self.assertTrue(ex.message().startswith(
-                    "Request timeout expired"), "Expected error message \"Request timeout expired\", got: {}".format(ex))
+            # Expect only one error for rejection
+            try:
+                self.check_deferred_exception()
+            except InferenceServerException as ex:
+                self.assertTrue(ex.message().startswith(
+                        "Request timeout expired"), "Expected error message \"Request timeout expired\", got: {}".format(ex))
 
-        try:
-            self.check_deferred_exception()
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+            try:
+                self.check_deferred_exception()
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_priority_levels(self):
         # Send 2 requests with batch sizes 2, 1 in default priority. Then send
@@ -298,30 +306,31 @@ class ModelQueueTest(unittest.TestCase):
         # first request.
         dtype = np.float32
         shapes = ([16],)
-        threads = []
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(2, dtype, shapes, 0, 0, (500, 200))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(1, dtype, shapes, 0, 0, (15000, 10000))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(2, dtype, shapes, 1, 0, (100, 0))
-                                        ))
-        threads[0].start()
-        # wait to make sure the order is correct
-        time.sleep(0.1)
-        threads[1].start()
-        time.sleep(0.2)
-        threads[2].start()
-        
-        for t in threads:
-            t.join()
+        for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
+            threads = []
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(2, dtype, shapes, 0, 0, (500, 200)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(1, dtype, shapes, 0, 0, (15000, 10000)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(2, dtype, shapes, 1, 0, (100, 0)),
+                                            kwargs=trial))
+            threads[0].start()
+            # wait to make sure the order is correct
+            time.sleep(0.1)
+            threads[1].start()
+            time.sleep(0.2)
+            threads[2].start()
+            
+            for t in threads:
+                t.join()
 
-        try:
-            self.check_deferred_exception()
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+            try:
+                self.check_deferred_exception()
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_priority_with_policy(self):
         # Two set of requests are being sent at different priority levels
@@ -348,45 +357,46 @@ class ModelQueueTest(unittest.TestCase):
         
         dtype = np.float32
         shapes = ([16],)
-        threads = []
-        # The expected ranges may not be rounded to accommodate
-        # the sleep between sending requests
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(2, dtype, shapes, 1, 0, (2000, 1000))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(1, dtype, shapes, 1, 1000000, (3400, 2400))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(2, dtype, shapes, 1, 0, (1700, 700))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(2, dtype, shapes, 2, 2000000, (None, None))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(3, dtype, shapes, 2, 0, (2700, 1700))
-                                        ))
-        threads.append(threading.Thread(target=self.check_response,
-                                        args=(6, dtype, shapes, 2, 0, (15000, 10000))
-                                        ))
-        for t in threads:
-            t.start()
-            time.sleep(0.2)
-        
-        for t in threads:
-            t.join()
+        for trial in [{'is_http_trial': True}, {'is_http_trial': False}]:
+            threads = []
+            # The expected ranges may not be rounded to accommodate
+            # the sleep between sending requests
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(2, dtype, shapes, 1, 0, (2000, 1000)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(1, dtype, shapes, 1, 1000000, (3400, 2400)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(2, dtype, shapes, 1, 0, (1700, 700)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(2, dtype, shapes, 2, 2000000, (None, None)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(3, dtype, shapes, 2, 0, (2700, 1700)),
+                                            kwargs=trial))
+            threads.append(threading.Thread(target=self.check_response,
+                                            args=(6, dtype, shapes, 2, 0, (15000, 10000)),
+                                            kwargs=trial))
+            for t in threads:
+                t.start()
+                time.sleep(0.2)
+            
+            for t in threads:
+                t.join()
 
-        # Expect only one error for rejection
-        try:
-            self.check_deferred_exception()
-        except InferenceServerException as ex:
-            self.assertTrue(ex.message().startswith(
-                    "Request timeout expired"), "Expected error message \"Request timeout expired\", got: {}".format(ex))
+            # Expect only one error for rejection
+            try:
+                self.check_deferred_exception()
+            except InferenceServerException as ex:
+                self.assertTrue(ex.message().startswith(
+                        "Request timeout expired"), "Expected error message \"Request timeout expired\", got: {}".format(ex))
 
-        try:
-            self.check_deferred_exception()
-        except InferenceServerException as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
+            try:
+                self.check_deferred_exception()
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
 if __name__ == '__main__':
     unittest.main()
