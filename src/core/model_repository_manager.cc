@@ -1408,7 +1408,7 @@ ModelRepositoryManager::GetInferenceBackend(
     backend->reset();
     status = Status(
         Status::Code::UNAVAILABLE,
-        "Request for unknown model '" + model_name + "'");
+        "Request for unknown model: " + status.Message());
   }
   return status;
 }

@@ -196,7 +196,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
                 ex.message().startswith(
-                    "Request for unknown model 'graphdef_float32_float32_float32'"))
+                    "Request for unknown model: 'graphdef_float32_float32_float32' is not found"))
 
         # And other models should be loaded successfully
         try:
@@ -322,7 +322,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
                 ex.message().startswith(
-                    "Request for unknown model 'graphdef_float32_float32_float32'"))
+                    "Request for unknown model: 'graphdef_float32_float32_float32' is not found"))
 
     def test_parse_ignore_zero_prefixed_version(self):
         input_size = 16
@@ -466,7 +466,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
                 ex.message().startswith(
-                    "Request for unknown model 'savedmodel_float32_float32_float32'"))
+                    "Request for unknown model: 'savedmodel_float32_float32_float32' is not found"))
 
         # Add back the same model. The status/stats should be reset.
         try:
@@ -521,7 +521,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
                 ex.message().startswith(
-                    "Request for unknown model 'netdef_float32_float32_float32'"))
+                    "Request for unknown model: 'netdef_float32_float32_float32' is not found"))
 
     def test_dynamic_model_load_unload_disabled(self):
         input_size = 16
@@ -694,7 +694,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual("inference:0", ex.server_id())
             self.assertTrue(
                 ex.message().startswith(
-                    "Request for unknown model 'graphdef_int32_int32_int32'"))
+                    "Request for unknown model: 'graphdef_int32_int32_int32' version 1 is not found"))
 
         # Add back the same version. The status/stats should be
         # retained for versions (note that this is different behavior
