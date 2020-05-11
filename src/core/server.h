@@ -80,9 +80,11 @@ class InferenceServer {
   // based on those changes.
   Status PollModelRepository();
 
-  // Server and model health
+  // Server health
   Status IsLive(bool* live);
   Status IsReady(bool* ready);
+
+  // Model health
   Status ModelIsReady(
       const std::string& model_name, const int64_t model_version, bool* ready);
 
@@ -94,15 +96,19 @@ class InferenceServer {
   Status ModelReadyVersions(
       std::map<std::string, std::vector<int64_t>>* model_versions);
 
+  /// Get the index of all models in all repositories.
+  /// \param ready_only If true return only index of models that are ready.
+  /// \param index Returns the index.
+  /// \return error status.
+  Status RepositoryIndex(
+      const bool ready_only,
+      std::vector<ModelRepositoryManager::ModelIndex>* index);
+
   // Inference. If Status::Success is returned then this function has
   // taken ownership of the request object and so 'request' will be
   // nullptr. If non-success is returned then the caller still retains
   // ownership of 'request'.
   Status InferAsync(std::unique_ptr<InferenceRequest>& request);
-
-  // Update the ModelRepositoryIndex object with the index of the model
-  // repository.
-  Status GetModelRepositoryIndex(ModelRepositoryIndex* repository_index);
 
   // Load the corresponding model. Reload the model if it has been loaded.
   Status LoadModel(const std::string& model_name);

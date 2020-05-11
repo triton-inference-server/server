@@ -1124,6 +1124,13 @@ TRITONSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
 /// An inference server.
 ///
 
+/// Model indes flags. The enum values must be power-of-2 values.
+typedef enum tritonserver_modelindexflag_enum {
+  TRITONSERVER_INDEX_FLAG_NONE = 0,
+  TRITONSERVER_INDEX_FLAG_READY = 1
+} TRITONSERVER_ModelIndexFlag;
+
+
 /// Create a new server object. The caller takes ownership of the
 /// TRITONSERVER_Server object and must call TRITONSERVER_ServerDelete
 /// to release the object.
@@ -1251,11 +1258,14 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelConfig(
 /// the object.
 ///
 /// \param server The inference server object.
+/// \param flags TRITONSERVER_ModelIndexFlag flags that control how to
+/// collect the index.
 /// \param model_index Return the model index message that holds the
 /// index of all models contained in the server's model repository(s).
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_ServerModelIndex(
-    TRITONSERVER_Server* server, TRITONSERVER_Message** model_index);
+    TRITONSERVER_Server* server, uint32_t flags,
+    TRITONSERVER_Message** model_index);
 
 /// Load the requested model or reload the model if it is already
 /// loaded. The function does not return until the model is loaded or
