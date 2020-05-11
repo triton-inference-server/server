@@ -42,7 +42,7 @@ VERIFY_TIMESTAMPS=verify_timestamps.py
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
 
-SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
 SERVER=${OPTDIR}/tensorrtserver/bin/tritonserver
 
 source ../common/util.sh
@@ -292,7 +292,7 @@ wait $SERVER_PID
 # python unittest seems to swallow ImportError and still return 0 exit
 # code. So need to explicitly check CLIENT_LOG to make sure we see
 # some running tests
-grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed To Run\n***"
     RET=1
