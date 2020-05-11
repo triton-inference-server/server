@@ -183,11 +183,14 @@ build.
 
 A wheel file may fail to generate if the python environment is not set up 
 correctly. The windows build environment will not fail correctly if there is a 
-failure when running the python script. To verify that wheel file is executed
+failure when running the python script. To verify that wheel file is generated
 correctly, run the following in a bash window in the 
-trtis-clients\\python\\api_v1\\library::
+trtis-clients\\src\\clients\\python\\api_v1\\library::
 
   > VERSION=0.0.0 python3 setup.py bdist_wheel
+
+If successful, there will be a ``tensorrtserver-<version>-py3-none-win32.whl`` 
+file in the same directory.
 
 .. build-client-end-marker-do-not-remove
 
