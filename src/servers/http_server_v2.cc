@@ -1608,7 +1608,7 @@ ValidateOutputParameter(const rapidjson::Value& io)
             "Output can't set both 'shared_memory_region' and "
             "'classification'");
       }
-      const auto& itr =params.FindMember("binary_data");
+      const auto& itr = params.FindMember("binary_data");
       if ((itr != params.MemberEnd()) && (itr->value.GetBool())) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
@@ -1757,6 +1757,22 @@ HTTPAPIServerV2::EVBufferToInput(
     }
     RETURN_IF_TRITON_ERR(
         TRITONSERVER_InferenceRequestSetFlags(irequest, flags));
+
+    {
+      const auto& itr = params.FindMember("priority");
+      if (itr != params.MemberEnd()) {
+        RETURN_IF_TRITON_ERR(TRITONSERVER_InferenceRequestSetPriority(
+            irequest, itr->value.GetInt64()));
+      }
+    }
+    {
+      const auto& itr = params.FindMember("timeout");
+      if (itr != params.MemberEnd()) {
+        RETURN_IF_TRITON_ERR(
+            TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
+                irequest, itr->value.GetInt64()));
+      }
+    }
   }
 
   // Get the byte-size for each input and from that get the blocks
