@@ -221,6 +221,8 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
+            if type(model_version) != str:
+                raise_error("model version must be a string")
             request = grpc_service_v2_pb2.ModelReadyRequest(
                 name=model_name, version=model_version)
             if self._verbose:
@@ -315,6 +317,8 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
+            if type(model_version) != str:
+                raise_error("model version must be a string")
             request = grpc_service_v2_pb2.ModelMetadataRequest(
                 name=model_name, version=model_version)
             if self._verbose:
@@ -369,6 +373,8 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
+            if type(model_version) != str:
+                raise_error("model version must be a string")
             request = grpc_service_v2_pb2.ModelConfigRequest(
                 name=model_name, version=model_version)
             if self._verbose:
@@ -526,6 +532,8 @@ class InferenceServerClient:
         else:
             metadata = ()
         try:
+            if type(model_version) != str:
+                raise_error("model version must be a string")
             request = grpc_service_v2_pb2.ModelStatisticsRequest(
                 name=model_name, version=model_version)
             if self._verbose:
@@ -906,6 +914,9 @@ class InferenceServerClient:
         else:
             metadata = ()
 
+        if type(model_version) != str:
+            raise_error("model version must be a string")
+
         request = _get_inference_request(model_name=model_name,
                                          inputs=inputs,
                                          model_version=model_version,
@@ -1022,6 +1033,9 @@ class InferenceServerClient:
             metadata = headers.items()
         else:
             metadata = ()
+
+        if type(model_version) != str:
+            raise_error("model version must be a string")
 
         request = _get_inference_request(model_name=model_name,
                                          inputs=inputs,
@@ -1173,8 +1187,10 @@ class InferenceServerClient:
 
         if self._stream is None:
             raise_error(
-                "stream not available, use start_stream() to make one available."
-            )
+                "stream not available, use start_stream() to make one available.")
+
+        if type(model_version) != str:
+            raise_error("model version must be a string")
 
         request = _get_inference_request(model_name=model_name,
                                          inputs=inputs,
