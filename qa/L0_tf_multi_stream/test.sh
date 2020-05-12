@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -78,7 +78,7 @@ for NUM_GPUS in $(seq 1 $TOTAL_GPUS); do
 
         # Establish baseline
         echo "instance_group [ { kind: KIND_GPU, count: ${INSTANCE_CNT} } ]" >> models/${MODEL}/config.pbtxt
-        SERVER_ARGS="--model-repository=${DATADIR} --exit-timeout-secs=120"
+        SERVER_ARGS="--model-repository=${DATADIR} --exit-timeout-secs=120 --api-version=2"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -101,7 +101,7 @@ for NUM_GPUS in $(seq 1 $TOTAL_GPUS); do
         wait $SERVER_PID
 
         # Test with multi-stream
-        SERVER_ARGS="--model-repository=${DATADIR} --exit-timeout-secs=120"
+        SERVER_ARGS="--model-repository=${DATADIR} --exit-timeout-secs=120 --api-version=2"
         PER_VGPU_MEM_LIMIT_MBYTES=$(( TOTAL_MEM / INSTANCE_CNT ))
 
         for i in $(seq 0 $(( NUM_GPUS - 1 ))); do

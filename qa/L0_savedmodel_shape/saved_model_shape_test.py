@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,7 +33,6 @@ import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
-from tensorrtserver.api import *
 import os
 
 np_dtype_string = np.dtype(object)
@@ -59,7 +58,7 @@ class SavedModelShapeTest(unittest.TestCase):
                                     skip_request_id_check, use_streaming,
                                     correlation_id)
                 # model that supports batching
-                iu.infer_exact(tester, "savedmodel", tensor_shape, bs,
+                iu.infer_exact(tester, "savedmodel", (bs,) + tensor_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
                                output0_raw, output1_raw,
                                model_version, swap, outputs, use_http, use_grpc,

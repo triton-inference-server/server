@@ -43,7 +43,7 @@ CLIENT_TEST=client_test.py
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS=--model-repository=$DATADIR/qa_model_repository
+SERVER_ARGS="--model-repository=$DATADIR/qa_model_repository --api-version=2"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -69,7 +69,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed To Run\n***"
