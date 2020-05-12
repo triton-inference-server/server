@@ -96,18 +96,13 @@ if __name__ == '__main__':
     user_data = []
 
     # Inference call
-    triton_client.async_infer(model_name=model_name,
+    greenlet = triton_client.async_infer(model_name=model_name,
                               inputs=inputs,
                               callback=partial(callback, user_data),
                               outputs=outputs)
 
-    # Wait until the results are available in user_data
-    time_out = 10
-    while ((len(user_data) == 0) and time_out > 0):
-        # Note using gevent version of sleep to
-        # yield to the worker greenlets
-        gevent.sleep(1)
-        time_out = time_out - 1
+    # Wait for the inference to complete
+    greenlet.join()
 
     # Display and validate the available results
     if ((len(user_data) == 1)):

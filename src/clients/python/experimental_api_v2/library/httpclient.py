@@ -1128,6 +1128,11 @@ class InferenceServerClient:
             Optional url query parameters to use in network
             transaction.
 
+        Returns
+        -------
+        Greenlet object
+            The greenlet object running the async inference
+
         Raises
         ------
         InferenceServerException
@@ -1174,7 +1179,8 @@ class InferenceServerClient:
             if request_id is not "":
                 verbose_message = verbose_message + " '{}'".format(request_id)
             print(verbose_message)
-
+        
+        return g
 
 class InferInput:
     """An object of InferInput class is used to describe
