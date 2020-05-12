@@ -123,26 +123,27 @@ _crequest_model_control_ctx_unload = _crequest.ModelControlContextUnload
 _crequest_model_control_ctx_unload.restype = c_void_p
 _crequest_model_control_ctx_unload.argtypes = [c_void_p, _utf8]
 
-_crequest_shm_control_ctx_new = _crequest.SharedMemoryControlContextNew
-_crequest_shm_control_ctx_new.restype = c_void_p
-_crequest_shm_control_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int, c_bool]
-_crequest_shm_control_ctx_del = _crequest.SharedMemoryControlContextDelete
-_crequest_shm_control_ctx_del.argtypes = [c_void_p]
-_crequest_shm_control_ctx_register = _crequest.SharedMemoryControlContextRegister
-_crequest_shm_control_ctx_register.restype = c_void_p
-_crequest_shm_control_ctx_register.argtypes = [c_void_p, c_void_p]
-_crequest_shm_control_ctx_cuda_register = _crequest.SharedMemoryControlContextCudaRegister
-_crequest_shm_control_ctx_cuda_register.restype = c_void_p
-_crequest_shm_control_ctx_cuda_register.argtypes = [c_void_p, c_void_p]
-_crequest_shm_control_ctx_unregister = _crequest.SharedMemoryControlContextUnregister
-_crequest_shm_control_ctx_unregister.restype = c_void_p
-_crequest_shm_control_ctx_unregister.argtypes = [c_void_p, c_void_p]
-_crequest_shm_control_ctx_unregister_all = _crequest.SharedMemoryControlContextUnregisterAll
-_crequest_shm_control_ctx_unregister_all.restype = c_void_p
-_crequest_shm_control_ctx_unregister_all.argtypes = [c_void_p]
-_crequest_shm_control_ctx_get_status = _crequest.SharedMemoryControlContextGetStatus
-_crequest_shm_control_ctx_get_status.restype = c_void_p
-_crequest_shm_control_ctx_get_status.argtypes =  [c_void_p, POINTER(c_char_p), POINTER(c_uint32)]
+if os.name != 'nt':
+    _crequest_shm_control_ctx_new = _crequest.SharedMemoryControlContextNew
+    _crequest_shm_control_ctx_new.restype = c_void_p
+    _crequest_shm_control_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int, c_bool]
+    _crequest_shm_control_ctx_del = _crequest.SharedMemoryControlContextDelete
+    _crequest_shm_control_ctx_del.argtypes = [c_void_p]
+    _crequest_shm_control_ctx_register = _crequest.SharedMemoryControlContextRegister
+    _crequest_shm_control_ctx_register.restype = c_void_p
+    _crequest_shm_control_ctx_register.argtypes = [c_void_p, c_void_p]
+    _crequest_shm_control_ctx_cuda_register = _crequest.SharedMemoryControlContextCudaRegister
+    _crequest_shm_control_ctx_cuda_register.restype = c_void_p
+    _crequest_shm_control_ctx_cuda_register.argtypes = [c_void_p, c_void_p]
+    _crequest_shm_control_ctx_unregister = _crequest.SharedMemoryControlContextUnregister
+    _crequest_shm_control_ctx_unregister.restype = c_void_p
+    _crequest_shm_control_ctx_unregister.argtypes = [c_void_p, c_void_p]
+    _crequest_shm_control_ctx_unregister_all = _crequest.SharedMemoryControlContextUnregisterAll
+    _crequest_shm_control_ctx_unregister_all.restype = c_void_p
+    _crequest_shm_control_ctx_unregister_all.argtypes = [c_void_p]
+    _crequest_shm_control_ctx_get_status = _crequest.SharedMemoryControlContextGetStatus
+    _crequest_shm_control_ctx_get_status.restype = c_void_p
+    _crequest_shm_control_ctx_get_status.argtypes =  [c_void_p, POINTER(c_char_p), POINTER(c_uint32)]
 
 _crequest_infer_ctx_new = _crequest.InferContextNew
 _crequest_infer_ctx_new.restype = c_void_p
@@ -859,183 +860,184 @@ class ModelControlContext:
         return self._last_request_id
 
 
-class SharedMemoryControlContext:
-    """Performs a shared memory control request to an inference server.
+if os.name != 'nt':
+    class SharedMemoryControlContext:
+        """Performs a shared memory control request to an inference server.
 
-    Parameters
-    ----------
-    url : str
-        The inference server URL, e.g. localhost:8000.
+        Parameters
+        ----------
+        url : str
+            The inference server URL, e.g. localhost:8000.
 
-    protocol : ProtocolType
-        The protocol used to communicate with the server.
+        protocol : ProtocolType
+            The protocol used to communicate with the server.
 
-    verbose : bool
-        If True generate verbose output.
+        verbose : bool
+            If True generate verbose output.
 
-    http_headers : list of strings
-        HTTP headers to send with request. Ignored for GRPC
-        protocol. Each header must be specified as "Header:Value".
+        http_headers : list of strings
+            HTTP headers to send with request. Ignored for GRPC
+            protocol. Each header must be specified as "Header:Value".
 
-    """
-    def __init__(self, url, protocol, verbose=False, http_headers=[]):
-        self._last_request_id = 0
-        self._ctx = c_void_p()
+        """
+        def __init__(self, url, protocol, verbose=False, http_headers=[]):
+            self._last_request_id = 0
+            self._ctx = c_void_p()
 
-        b_http_headers = list()
-        if http_headers is not None:
-            for hh in http_headers:
-                b_http_headers.append(hh.encode('utf-8'))
+            b_http_headers = list()
+            if http_headers is not None:
+                for hh in http_headers:
+                    b_http_headers.append(hh.encode('utf-8'))
 
-        http_headers_arr = (c_char_p * len(b_http_headers))()
-        http_headers_arr[:] = b_http_headers
+            http_headers_arr = (c_char_p * len(b_http_headers))()
+            http_headers_arr[:] = b_http_headers
 
-        _raise_if_error(
-            c_void_p(
-                _crequest_shm_control_ctx_new(
-                    byref(self._ctx), url, int(protocol),
-                    http_headers_arr, len(b_http_headers), verbose)))
+            _raise_if_error(
+                c_void_p(
+                    _crequest_shm_control_ctx_new(
+                        byref(self._ctx), url, int(protocol),
+                        http_headers_arr, len(b_http_headers), verbose)))
 
-    def __del__(self):
-        if _crequest_shm_control_ctx_del is not None:
+        def __del__(self):
+            if _crequest_shm_control_ctx_del is not None:
+                self.close()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, type, value, traceback):
             self.close()
 
-    def __enter__(self):
-        return self
+        def close(self):
+            """Close the context. Any future calls to register() or unregister()
+            will result in an Error.
 
-    def __exit__(self, type, value, traceback):
-        self.close()
+            """
+            _crequest_shm_control_ctx_del(self._ctx)
+            self._ctx = None
 
-    def close(self):
-        """Close the context. Any future calls to register() or unregister()
-        will result in an Error.
+        def register(self, shm_handle):
+            """Request the inference server to register specified shared memory region.
 
-        """
-        _crequest_shm_control_ctx_del(self._ctx)
-        self._ctx = None
+            Parameters
+            ----------
+            shm_handle : c_void_p
+                The handle for the shared memory region.
 
-    def register(self, shm_handle):
-        """Request the inference server to register specified shared memory region.
+            Raises
+            ------
+            InferenceServerException
+                If unable to register the shared memory region.
 
-        Parameters
-        ----------
-        shm_handle : c_void_p
-            The handle for the shared memory region.
+            """
+            self._last_request_id = None
+            if self._ctx is None:
+                _raise_error("SharedMemoryControlContext is closed")
 
-        Raises
-        ------
-        InferenceServerException
-            If unable to register the shared memory region.
+            self._last_request_id = _raise_if_error(
+                c_void_p(_crequest_shm_control_ctx_register(self._ctx, shm_handle)))
+            return
 
-        """
-        self._last_request_id = None
-        if self._ctx is None:
-            _raise_error("SharedMemoryControlContext is closed")
+        def cuda_register(self, cuda_shm_handle):
+            """Request the inference server to register specified shared memory region.
 
-        self._last_request_id = _raise_if_error(
-            c_void_p(_crequest_shm_control_ctx_register(self._ctx, shm_handle)))
-        return
+            Parameters
+            ----------
+            cuda_shm_handle : c_void_p
+                The handle for the CUDA shared memory region.
 
-    def cuda_register(self, cuda_shm_handle):
-        """Request the inference server to register specified shared memory region.
+            Raises
+            ------
+            InferenceServerException
+                If unable to register the shared memory region.
 
-        Parameters
-        ----------
-        cuda_shm_handle : c_void_p
-            The handle for the CUDA shared memory region.
+            """
+            self._last_request_id = None
+            if self._ctx is None:
+                _raise_error("SharedMemoryControlContext is closed")
 
-        Raises
-        ------
-        InferenceServerException
-            If unable to register the shared memory region.
+            self._last_request_id = _raise_if_error(
+                c_void_p(_crequest_shm_control_ctx_cuda_register(self._ctx, cuda_shm_handle)))
+            return
 
-        """
-        self._last_request_id = None
-        if self._ctx is None:
-            _raise_error("SharedMemoryControlContext is closed")
+        def unregister(self, shm_handle):
+            """Request the inference server to unregister specified shared memory region.
 
-        self._last_request_id = _raise_if_error(
-            c_void_p(_crequest_shm_control_ctx_cuda_register(self._ctx, cuda_shm_handle)))
-        return
+            Parameters
+            ----------
+            shm_handle : c_void_p
+                The handle for the shared memory region.
 
-    def unregister(self, shm_handle):
-        """Request the inference server to unregister specified shared memory region.
+            Raises
+            ------
+            InferenceServerException
+                If unable to unregister the shared memory region.
 
-        Parameters
-        ----------
-        shm_handle : c_void_p
-            The handle for the shared memory region.
+            """
+            self._last_request_id = None
+            if self._ctx is None:
+                _raise_error("SharedMemoryControlContext is closed")
 
-        Raises
-        ------
-        InferenceServerException
-            If unable to unregister the shared memory region.
+            self._last_request_id = _raise_if_error(
+                c_void_p(_crequest_shm_control_ctx_unregister(self._ctx, shm_handle)))
+            return
 
-        """
-        self._last_request_id = None
-        if self._ctx is None:
-            _raise_error("SharedMemoryControlContext is closed")
+        def unregister_all(self):
+            """Request the inference server to unregister all shared memory regions.
 
-        self._last_request_id = _raise_if_error(
-            c_void_p(_crequest_shm_control_ctx_unregister(self._ctx, shm_handle)))
-        return
+            Raises
+            ------
+            InferenceServerException
+                If unable to unregister any shared memory regions.
 
-    def unregister_all(self):
-        """Request the inference server to unregister all shared memory regions.
+            """
+            self._last_request_id = None
+            if self._ctx is None:
+                _raise_error("SharedMemoryControlContext is closed")
 
-        Raises
-        ------
-        InferenceServerException
-            If unable to unregister any shared memory regions.
+            self._last_request_id = _raise_if_error(
+                c_void_p(_crequest_shm_control_ctx_unregister_all(self._ctx)))
+            return
 
-        """
-        self._last_request_id = None
-        if self._ctx is None:
-            _raise_error("SharedMemoryControlContext is closed")
+        def get_shared_memory_status(self):
+            """Contact the inference server and get status.
 
-        self._last_request_id = _raise_if_error(
-            c_void_p(_crequest_shm_control_ctx_unregister_all(self._ctx)))
-        return
+            Returns
+            -------
+            SharedMemoryStatus
+                The SharedMemoryStatus protobuf containing the status.
 
-    def get_shared_memory_status(self):
-        """Contact the inference server and get status.
+            Raises
+            ------
+            InferenceServerException
+                If unable to get status.
 
-        Returns
-        -------
-        SharedMemoryStatus
-            The SharedMemoryStatus protobuf containing the status.
+            """
+            self._last_request_id = None
+            if self._ctx is None:
+                _raise_error("SharedMemoryControlContext is closed")
 
-        Raises
-        ------
-        InferenceServerException
-            If unable to get status.
+            cstatus = c_char_p()
+            cstatus_len = c_uint32()
+            self._last_request_id = _raise_if_error(
+                c_void_p(_crequest_shm_control_ctx_get_status(
+                    self._ctx, byref(cstatus), byref(cstatus_len))))
 
-        """
-        self._last_request_id = None
-        if self._ctx is None:
-            _raise_error("SharedMemoryControlContext is closed")
+            status = text_format.Parse(cstatus.value.decode(), SharedMemoryStatus())
+            return status
 
-        cstatus = c_char_p()
-        cstatus_len = c_uint32()
-        self._last_request_id = _raise_if_error(
-            c_void_p(_crequest_shm_control_ctx_get_status(
-                self._ctx, byref(cstatus), byref(cstatus_len))))
+        def get_last_request_id(self):
+            """Get the request ID of the most recent register() or unregister()
+            request.
 
-        status = text_format.Parse(cstatus.value.decode(), SharedMemoryStatus())
-        return status
+            Returns
+            -------
+            int
+                The request ID, or None if a request has not yet been made
+                or if the last request was not successful.
 
-    def get_last_request_id(self):
-        """Get the request ID of the most recent register() or unregister()
-        request.
-
-        Returns
-        -------
-        int
-            The request ID, or None if a request has not yet been made
-            or if the last request was not successful.
-
-        """
-        return self._last_request_id
+            """
+            return self._last_request_id
 
 
 class InferContext:
@@ -1413,77 +1415,80 @@ class InferContext:
                         results[output_name].append(classes)
                 elif (isinstance(output_format, (list, tuple)) and
                     (output_format[0] == InferContext.ResultFormat.RAW) and (len(output_format) == 2)):
-                    # Get the shape of each result tensor
-                    max_shape_dims = 16
-                    shape_array = np.zeros(max_shape_dims, dtype=np.int64)
-                    shape_len = c_uint64()
-                    _raise_if_error(
-                        c_void_p(
-                            _crequest_infer_ctx_result_shape(
-                                result, c_uint64(max_shape_dims),
-                                shape_array, byref(shape_len))))
-                    shape = np.resize(shape_array, shape_len.value).tolist()
-
-                    # get info for shared memory regions and read results
-                    shm_fd = c_int()
-                    offset = c_uint64()
-                    byte_size = c_uint64()
-                    shm_addr = c_char_p()
-                    shm_key = c_char_p()
-                    try:
+                    if os.name == 'nt':
+                        _raise_error("Shared memory not supported on Windows")
+                    else:
+                        # Get the shape of each result tensor
+                        max_shape_dims = 16
+                        shape_array = np.zeros(max_shape_dims, dtype=np.int64)
+                        shape_len = c_uint64()
                         _raise_if_error(
-                            c_void_p(_crequest_get_shared_memory_handle_info(output_format[1], \
-                                    byref(shm_addr), byref(shm_key), byref(shm_fd), \
-                                    byref(offset), byref(byte_size))))
-                        if (np.prod(shape) * np.dtype(result_dtype).itemsize) < int(byte_size.value/batch_size):
-                            element_byte_size = np.prod(shape) * np.dtype(result_dtype).itemsize
-                        else:
-                            element_byte_size = int(byte_size.value/batch_size)
-                        start_pos = offset.value
-                        if result_dtype != np.object:
-                            cval = shm_addr
-                            for b in range(batch_size):
-                                cval_len = start_pos + element_byte_size
-                                if cval_len == 0:
-                                    val = np.empty(shape, dtype=result_dtype)
-                                    results[output_name].append(val)
-                                else:
-                                    val_buf = cast(cval, POINTER(c_byte * cval_len))[0]
-                                    val = np.frombuffer(val_buf, dtype=result_dtype, offset=start_pos)
-                                start_pos += element_byte_size
+                            c_void_p(
+                                _crequest_infer_ctx_result_shape(
+                                    result, c_uint64(max_shape_dims),
+                                    shape_array, byref(shape_len))))
+                        shape = np.resize(shape_array, shape_len.value).tolist()
 
-                                # Reshape the result to the appropriate shape.
-                                # This copy is only needed for CUDA shared memory
-                                # since the temporary CPU buffer is cleared later
-                                # by _crequest_shared_memory_handle_release_buffer
-                                shaped = np.reshape(np.copy(val), shape)
+                        # get info for shared memory regions and read results
+                        shm_fd = c_int()
+                        offset = c_uint64()
+                        byte_size = c_uint64()
+                        shm_addr = c_char_p()
+                        shm_key = c_char_p()
+                        try:
+                            _raise_if_error(
+                                c_void_p(_crequest_get_shared_memory_handle_info(output_format[1], \
+                                        byref(shm_addr), byref(shm_key), byref(shm_fd), \
+                                        byref(offset), byref(byte_size))))
+                            if (np.prod(shape) * np.dtype(result_dtype).itemsize) < int(byte_size.value/batch_size):
+                                element_byte_size = np.prod(shape) * np.dtype(result_dtype).itemsize
+                            else:
+                                element_byte_size = int(byte_size.value/batch_size)
+                            start_pos = offset.value
+                            if result_dtype != np.object:
+                                cval = shm_addr
+                                for b in range(batch_size):
+                                    cval_len = start_pos + element_byte_size
+                                    if cval_len == 0:
+                                        val = np.empty(shape, dtype=result_dtype)
+                                        results[output_name].append(val)
+                                    else:
+                                        val_buf = cast(cval, POINTER(c_byte * cval_len))[0]
+                                        val = np.frombuffer(val_buf, dtype=result_dtype, offset=start_pos)
+                                    start_pos += element_byte_size
 
-                                results[output_name].append(shaped)
-                        else:
-                            cval = shm_addr
-                            str_offset = start_pos
-                            val_buf = cast(cval, POINTER(c_byte * byte_size.value))[0]
-                            b = 0
-                            while b < batch_size:
-                                ii = 0
-                                strs = list()
-                                while (ii % np.prod(shape) != 0) or (ii == 0):
-                                    l = struct.unpack_from("<I", val_buf, str_offset)[0]
-                                    str_offset += 4
-                                    sb = struct.unpack_from("<{}s".format(l), val_buf, str_offset)[0]
-                                    str_offset += l
-                                    strs.append(sb)
-                                    ii+=1
-                                b+=1
-                                val = np.array(strs, dtype=object)
+                                    # Reshape the result to the appropriate shape.
+                                    # This copy is only needed for CUDA shared memory
+                                    # since the temporary CPU buffer is cleared later
+                                    # by _crequest_shared_memory_handle_release_buffer
+                                    shaped = np.reshape(np.copy(val), shape)
 
-                                # Reshape the result to the appropriate shape.
-                                shaped = np.reshape(val, shape)
+                                    results[output_name].append(shaped)
+                            else:
+                                cval = shm_addr
+                                str_offset = start_pos
+                                val_buf = cast(cval, POINTER(c_byte * byte_size.value))[0]
+                                b = 0
+                                while b < batch_size:
+                                    ii = 0
+                                    strs = list()
+                                    while (ii % np.prod(shape) != 0) or (ii == 0):
+                                        l = struct.unpack_from("<I", val_buf, str_offset)[0]
+                                        str_offset += 4
+                                        sb = struct.unpack_from("<{}s".format(l), val_buf, str_offset)[0]
+                                        str_offset += l
+                                        strs.append(sb)
+                                        ii+=1
+                                    b+=1
+                                    val = np.array(strs, dtype=object)
 
-                                results[output_name].append(shaped)
-                    finally:
-                        _raise_if_error(
-                            c_void_p(_crequest_shared_memory_handle_release_buffer(output_format[1], shm_addr)))
+                                    # Reshape the result to the appropriate shape.
+                                    shaped = np.reshape(val, shape)
+
+                                    results[output_name].append(shaped)
+                        finally:
+                            _raise_if_error(
+                                c_void_p(_crequest_shared_memory_handle_release_buffer(output_format[1], shm_addr)))
                 else:
                     _raise_error("unrecognized output format")
             finally:
