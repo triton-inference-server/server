@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,7 +29,7 @@ import argparse
 import numpy as np
 import os
 from builtins import range
-from tensorrtserver.api import *
+import tritonhttpclient
 import unittest
 
 class ClientStringTest(unittest.TestCase):
@@ -38,11 +38,10 @@ class ClientStringTest(unittest.TestCase):
         # and returns an output tensors of 8 strings. The output tensor
         # is the same as the input tensor.
         model_name = "graphdef_nobatch_zero_1_object"
-        model_version = -1
-        batch_size = 1
+        model_version = ""
 
-        # Create the inference context for the model.
-        ctx = InferContext("localhost:8000", ProtocolType.HTTP, model_name, model_version, verbose=True)
+        # Create the inference server client for the model.
+        triton_client = tritonhttpclient.InferenceServerClient("localhost:8000", verbose=True)
 
         # Create the data for the input tensor. Initialize the tensor to 8
         # byte strings. (dtype of np.bytes_)
@@ -59,13 +58,21 @@ class ClientStringTest(unittest.TestCase):
 
         # Send inference request to the inference server. Get results for
         # both output tensors.
-        result = ctx.run({ 'INPUT0' : (in0,) },
-                        { 'OUTPUT0' : InferContext.ResultFormat.RAW },
-                        batch_size)
+        inputs = []
+        outputs = []
+        inputs.append(tritonhttpclient.InferInput('INPUT0', in0.shape, "BYTES"))
+        inputs[0].set_data_from_numpy(in0)
+
+        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT0'))
+
+        results = triton_client.infer(model_name=model_name,
+                                  inputs=inputs,
+                                  outputs=outputs,
+                                  model_version=model_version)
 
         # We expect there to be 1 results (with batch-size 1). Verify
         # that all 8 result elements are the same as the input.
-        self.assertTrue(all(np.equal(in0, result['OUTPUT0'][0])))
+        self.assertTrue(np.array_equal(in0, results.as_numpy('OUTPUT0')))
 
 if __name__ == '__main__':
     unittest.main()

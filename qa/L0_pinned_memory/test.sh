@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,11 +35,9 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-CLIENT=../clients/simple_perf_client
+CLIENT=../clients/perf_client_v2
 # Only use libtorch as it accepts GPU I/O and it can handle variable shape
 BACKENDS=${BACKENDS:="libtorch"}
-WARMUP_ITERS=20
-MEASURE_ITERS=100
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
@@ -80,7 +78,7 @@ for BACKEND in $BACKENDS; do
         cp $ENSEMBLE_NAME.pbtxt models/$ENSEMBLE_NAME/config.pbtxt
 
     # With pinned memory
-    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --api-version=2"
     SERVER_LOG="${ENSEMBLE_NAME}.pinned.serverlog"
     run_server
     if (( $SERVER_PID == 0 )); then
@@ -91,7 +89,7 @@ for BACKEND in $BACKENDS; do
 
     # Sanity check that the server allocates pinned memory for large size
     set +e
-    $CLIENT -lsanity_large_size -m${ENSEMBLE_NAME} -s16777216 -n1
+    $CLIENT -m${ENSEMBLE_NAME} --shape INPUT0:16777216
     if (( $? != 0 )); then
         RET=1
     fi
@@ -107,7 +105,7 @@ for BACKEND in $BACKENDS; do
     wait $SERVER_PID
 
     # Restart the server without verbose logging
-    SERVER_ARGS="--model-repository=`pwd`/models"
+    SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
     SERVER_LOG="${ENSEMBLE_NAME}.pinned.serverlog"
     run_server
     if (( $SERVER_PID == 0 )); then
@@ -120,7 +118,7 @@ for BACKEND in $BACKENDS; do
     set +e
     for TENSOR_SIZE in 16384 1048576 2097152 4194304 8388608 16777216; do
         $CLIENT -i grpc -u localhost:8001 -m${ENSEMBLE_NAME} \
-                -lelements -s${TENSOR_SIZE} -n${MEASURE_ITERS} \
+                --shape INPUT0:${TENSOR_SIZE} \
                 >> ${BACKEND}.${TENSOR_SIZE}.pinned.log 2>&1
         if (( $? != 0 )); then
             RET=1
@@ -132,7 +130,7 @@ for BACKEND in $BACKENDS; do
     wait $SERVER_PID
 
     # Without pinned memory
-    SERVER_ARGS="--model-repository=`pwd`/models --pinned-memory-pool-byte-size=0 --log-verbose=1"
+    SERVER_ARGS="--model-repository=`pwd`/models --pinned-memory-pool-byte-size=0 --log-verbose=1 --api-version=2"
     SERVER_LOG="${ENSEMBLE_NAME}.nonpinned.serverlog"
     run_server
     if (( $SERVER_PID == 0 )); then
@@ -143,7 +141,7 @@ for BACKEND in $BACKENDS; do
 
     # Sanity check that the server allocates non-pinned memory
     set +e
-    $CLIENT -l sanity_non_pinned -m${ENSEMBLE_NAME} -s1 -n1
+    $CLIENT  -m${ENSEMBLE_NAME} --shape INPUT0:1
     if (( $? != 0 )); then
         RET=1
     fi
@@ -159,7 +157,7 @@ for BACKEND in $BACKENDS; do
     wait $SERVER_PID
 
     # Restart the server without verbose logging
-    SERVER_ARGS="--model-repository=`pwd`/models --pinned-memory-pool-byte-size=0"
+    SERVER_ARGS="--model-repository=`pwd`/models --pinned-memory-pool-byte-size=0 --api-version=2"
     SERVER_LOG="${ENSEMBLE_NAME}.nonpinned.serverlog"
     run_server
     if (( $SERVER_PID == 0 )); then
@@ -172,7 +170,7 @@ for BACKEND in $BACKENDS; do
     set +e
     for TENSOR_SIZE in 16384 1048576 2097152 4194304 8388608 16777216; do
         $CLIENT -i grpc -u localhost:8001 -m${ENSEMBLE_NAME} \
-                -lelements -s${TENSOR_SIZE} -n${MEASURE_ITERS} \
+                --shape INPUT0:${TENSOR_SIZE} \
                 >> ${BACKEND}.${TENSOR_SIZE}.nonpinned.log 2>&1
         if (( $? != 0 )); then
             RET=1

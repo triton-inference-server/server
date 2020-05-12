@@ -35,11 +35,11 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-SIMPLE_CLIENT=../clients/simple_client
-SIMPLE_SEQ_CLIENT=../clients/simple_sequence_client
+SIMPLE_CLIENT=../clients/simple_http_v2_infer_client
+SIMPLE_SEQ_CLIENT=../clients/simple_grpc_v2_sequence_stream_infer_client
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS=--model-repository=`pwd`/models
+SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
 source ../common/util.sh
 
 export CUDA_VISIBLE_DEVICES=0
@@ -118,7 +118,7 @@ fi
 
 set +e
 
-$SIMPLE_SEQ_CLIENT -v -a >> client_simple_seq.log 2>&1
+$SIMPLE_SEQ_CLIENT -v >> client_simple_seq.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
@@ -145,7 +145,7 @@ fi
 
 set +e
 
-$SIMPLE_SEQ_CLIENT -v -a >> client_simple_seq.log 2>&1
+$SIMPLE_SEQ_CLIENT -v >> client_simple_seq.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
