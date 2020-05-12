@@ -31,7 +31,11 @@ import numpy as np
 import os
 from functools import partial
 from builtins import range
-from tensorrtserver.api import *
+import gevent
+import sys
+import tritonhttpclient
+import tritongrpcclient
+from tritonclientutils.utils import InferenceServerException
 from time import time
 
 if sys.version_info >= (3, 0):
@@ -44,11 +48,14 @@ FLAGS = None
 start_time = None
 finish_times = queue.Queue()
 
-# Callback function used for async_run(), it can capture
+# Callback function used for async_infer(), it can capture
 # additional information using functools.partial as long as the last
-# two arguments are reserved for InferContext and request id
-def completion_callback(infer_ctx, request_id):
-    finish_times.put((request_id, time()-start_time))
+# two arguments are reserved for result and error
+def completion_callback(result, error):
+    if error is None:
+      finish_times.put((result, time()-start_time))
+    else:
+      finish_times.put((error, time()-start_time))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -71,37 +78,56 @@ if __name__ == '__main__':
                         'Format is -H"Header:Value".')
 
     FLAGS = parser.parse_args()
-    protocol = ProtocolType.from_str(FLAGS.protocol)
 
     # We use model that takes 1 input tensor containing the delay number of cycles
     # to occupy an SM
     model_name = FLAGS.model
-    model_version = 1
-    batch_size = 1
-
-    # Create the inference context for the model.
-    infer_ctx = InferContext(FLAGS.url, protocol, model_name, model_version,
-                             http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
+    model_version = "1"
 
     # Create the data for the input tensor.
     input_data = np.array([FLAGS.delay], dtype=np.int32)
+
+    # Create the inference context for the model.
+    if FLAGS.protocol.lower() == "grpc":
+      triton_client = tritongrpcclient.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
+      inputs = [tritongrpcclient.InferInput('in', input_data.shape, "INT32")]
+    else:
+      triton_client = tritonhttpclient.InferenceServerClient(FLAGS.url, verbose=FLAGS.verbose)
+      inputs = [tritonhttpclient.InferInput('in', input_data.shape, "INT32")]
+
+    inputs[0].set_data_from_numpy(input_data)
 
     # Send N inference requests to the inference server. Time the inference for both 
     # requests
     start_time = time()
 
     for i in range(FLAGS.count):
-        infer_ctx.async_run(partial(completion_callback), 
-            { 'in' : (input_data,) }, 
-            { 'out' : InferContext.ResultFormat.RAW }, 
-            batch_size)
+        triton_client.async_infer(model_name, inputs, partial(completion_callback),
+                                  model_version=model_version,
+                                  request_id=str(i),
+                                  headers=FLAGS.http_headers)
 
     # Wait for N requests to finish
     finished_requests = 0
     max_completion_time = 0
+    timeout = None
+    if  FLAGS.protocol.lower() != "grpc":
+      timeout=1
+
     while True:
-        request_id, finish_time = finish_times.get()
-        result = infer_ctx.get_async_run_results(request_id)
+        try:
+          result, finish_time = finish_times.get(timeout=timeout)
+        except queue.Empty as e:
+          gevent.sleep(1)
+          continue
+        
+        if type(result) == InferenceServerException:
+            print(result)
+            sys.exit(1)
+        if FLAGS.protocol.lower() == "grpc":
+            request_id = int(result.get_response().id)
+        else:
+            request_id = int(result.get_response()["id"])
         finished_requests += 1
         print("Request %d"%request_id + " finished in %f"%finish_time)
         max_completion_time = max(max_completion_time, finish_time)

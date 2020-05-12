@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,10 +37,8 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-CLIENT=../clients/simple_perf_client
+CLIENT=../clients/perf_client_v2
 BACKENDS=${BACKENDS:="graphdef savedmodel"}
-WARMUP_ITERS=20
-MEASURE_ITERS=100
 TENSOR_SIZE=16384
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
@@ -68,7 +66,7 @@ for BACKEND in $BACKENDS; do
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"gpu_io\"} ] } }" >> config.pbtxt)
 
-    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --api-version=2"
     SERVER_LOG="${MODEL_NAME}.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -79,8 +77,8 @@ for BACKEND in $BACKENDS; do
 
     set +e
 
-    $CLIENT -m${MODEL_NAME}_def -l${MODEL_NAME}_def -s${TENSOR_SIZE} \
-            -w1 -n1 >> ${BACKEND}.sanity.log 2>&1
+    $CLIENT -m${MODEL_NAME}_def --shape INPUT0:${TENSOR_SIZE} \
+                >> ${BACKEND}.sanity.log 2>&1
     if (( $? != 0 )); then
         RET=1
     fi
@@ -91,8 +89,8 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 
-    $CLIENT -m${MODEL_NAME}_gpu -l${MODEL_NAME}_gpu -s${TENSOR_SIZE} \
-            -w1 -n1 >> ${BACKEND}.gpu.sanity.log 2>&1
+    $CLIENT -m${MODEL_NAME}_gpu  --shape INPUT0:${TENSOR_SIZE} \
+             >> ${BACKEND}.gpu.sanity.log 2>&1
     if (( $? != 0 )); then
         RET=1
     fi
@@ -104,14 +102,14 @@ for BACKEND in $BACKENDS; do
     fi
 
     # Sample latency results
-    $CLIENT -m${MODEL_NAME}_def -l${MODEL_NAME}_def -s${TENSOR_SIZE} \
-            -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
+    $CLIENT -m${MODEL_NAME}_def --shape INPUT0:${TENSOR_SIZE} \
+             >> ${BACKEND}.log 2>&1
     if (( $? != 0 )); then
         RET=1
     fi
 
-    $CLIENT -m${MODEL_NAME}_gpu -l${MODEL_NAME}_gpu -s${TENSOR_SIZE} \
-            -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.gpu.log 2>&1
+    $CLIENT -m${MODEL_NAME}_gpu --shape INPUT0:${TENSOR_SIZE} \
+            >> ${BACKEND}.gpu.log 2>&1
     if (( $? != 0 )); then
         RET=1
     fi
