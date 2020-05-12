@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,7 +44,7 @@ DATADIR=`pwd`/models
 
 SERVER=/opt/tritonserver/bin/tritonserver
 # Allow more time to exit. Ensemble brings in too many models
-SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --api-version=2"
 SERVER_LOG_BASE="./server_saved_model_shape"
 source ../common/util.sh
 
@@ -78,7 +78,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed To Run\n***"
