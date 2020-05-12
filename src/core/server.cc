@@ -226,7 +226,8 @@ InferenceServer::Stop()
     if (LOG_VERBOSE_IS_ON(1)) {
       for (const auto& m : live_models) {
         for (const auto& v : m.second) {
-          LOG_VERBOSE(1) << m.first << " v" << v.first << ": " << v.second;
+          LOG_VERBOSE(1) << m.first << " v" << v.first << ": "
+                         << v.second.first;
         }
       }
     }
@@ -307,20 +308,12 @@ InferenceServer::IsReady(bool* ready)
         goto strict_done;
       }
       for (const auto& vs : mv.second) {
-        if (vs.second != ModelReadyState::MODEL_READY) {
+        // Okay if model is not ready due to unload
+        if ((vs.second.first != ModelReadyState::MODEL_READY) &&
+            (vs.second.second != "unloaded")) {
           *ready = false;
           goto strict_done;
         }
-#if 0 // FIXME
-        for (const auto& vs : ms.second.version_status()) {
-          // Okay if model is not ready due to unload
-          if ((vs.second.ready_state() != ModelReadyState::MODEL_READY) &&
-              (vs.second.ready_state_reason().message() != "unloaded")) {
-            *ready = false;
-            goto strict_done;
-          }
-        }
-#endif
       }
     }
   strict_done:;
@@ -367,7 +360,7 @@ InferenceServer::ModelReadyVersions(
   const ModelRepositoryManager::VersionStateMap version_states =
       model_repository_manager_->GetVersionStates(model_name);
   for (const auto& pr : version_states) {
-    if (pr.second == ModelReadyState::MODEL_READY) {
+    if (pr.second.first == ModelReadyState::MODEL_READY) {
       versions->push_back(pr.first);
     }
   }
@@ -379,8 +372,8 @@ Status
 InferenceServer::ModelReadyVersions(
     std::map<std::string, std::vector<int64_t>>* ready_model_versions)
 {
-  if (ready_state_ == ServerReadyState::SERVER_EXITING) {
-    return Status(Status::Code::UNAVAILABLE, "Server exiting");
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(Status::Code::UNAVAILABLE, "Server not ready");
   }
 
   ScopedAtomicIncrement inflight(inflight_request_counter_);

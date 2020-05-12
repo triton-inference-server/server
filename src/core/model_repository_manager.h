@@ -42,7 +42,8 @@ class InferenceBackend;
 /// An object to manage the model repository active in the server.
 class ModelRepositoryManager {
  public:
-  using VersionStateMap = std::map<int64_t, ModelReadyState>;
+  using VersionStateMap =
+      std::map<int64_t, std::pair<ModelReadyState, std::string>>;
   using ModelStateMap = std::map<std::string, VersionStateMap>;
 
   enum ActionType { NO_ACTION, LOAD, UNLOAD };
