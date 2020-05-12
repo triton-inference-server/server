@@ -148,9 +148,12 @@ for ENV_VAR in "env" "env_dummy" "config"; do
 
         # Now start model tests
 
-        for FW in graphdef savedmodel netdef onnx libtorch plan custom; do
+        for FW in graphdef savedmodel netdef onnx libtorch plan; do
             cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32/ models/
         done
+
+        # Copy custom model 
+        cp -r ../custom_float32_float32_float32/ models/
 
         # Copy models with string inputs and remove nobatch (bs=1) models
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object/ models/
