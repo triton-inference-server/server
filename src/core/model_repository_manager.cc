@@ -552,8 +552,7 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
   std::lock_guard<std::mutex> map_lock(map_mtx_);
   auto mit = map_.find(model_name);
   if (mit == map_.end()) {
-    return Status(
-        Status::Code::NOT_FOUND, "model '" + model_name + "' is not found");
+    return Status(Status::Code::NOT_FOUND, "'" + model_name + "' is not found");
   }
 
   auto vit = mit->second.find(version);
@@ -575,10 +574,14 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
           }
         }
       }
-    }
-    if (latest == -1) {
+      if (latest == -1) {
+        return Status(
+            Status::Code::NOT_FOUND,
+            "'" + model_name + "' has no available versions");
+      }
+    } else {
       return Status(
-          Status::Code::NOT_FOUND, "model '" + model_name + "' version " +
+          Status::Code::NOT_FOUND, "'" + model_name + "' version " +
                                        std::to_string(version) +
                                        " is not found");
     }
@@ -588,7 +591,7 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
       *backend = vit->second->backend_;
     } else {
       return Status(
-          Status::Code::UNAVAILABLE, "model '" + model_name + "' version " +
+          Status::Code::UNAVAILABLE, "'" + model_name + "' version " +
                                          std::to_string(version) +
                                          " is not at ready state");
     }
@@ -1408,7 +1411,7 @@ ModelRepositoryManager::GetInferenceBackend(
     backend->reset();
     status = Status(
         Status::Code::UNAVAILABLE,
-        "Request for unknown model '" + model_name + "'");
+        "Request for unknown model: " + status.Message());
   }
   return status;
 }
