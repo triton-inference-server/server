@@ -493,12 +493,14 @@ ModelRepositoryManager::BackendLifeCycle::GetLiveBackendStates(
           (version_backend.second->state_ !=
            ModelReadyState::MODEL_UNAVAILABLE)) {
         live = true;
-        version_map[version_backend.first] = version_backend.second->state_;
+        version_map[version_backend.first] = std::make_pair(
+            version_backend.second->state_,
+            version_backend.second->state_reason_);
       }
     }
 
     if (live) {
-      live_backend_states[model_version.first] = version_map;
+      live_backend_states[model_version.first] = std::move(version_map);
     }
   }
   return live_backend_states;
@@ -515,10 +517,12 @@ ModelRepositoryManager::BackendLifeCycle::GetBackendStates()
 
     for (auto& version_backend : model_version.second) {
       std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
-      version_map[version_backend.first] = version_backend.second->state_;
+      version_map[version_backend.first] = std::make_pair(
+          version_backend.second->state_,
+          version_backend.second->state_reason_);
     }
 
-    backend_states[model_version.first] = version_map;
+    backend_states[model_version.first] = std::move(version_map);
   }
   return backend_states;
 }
@@ -534,7 +538,9 @@ ModelRepositoryManager::BackendLifeCycle::GetVersionStates(
   if (mit != map_.end()) {
     for (auto& version_backend : mit->second) {
       std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
-      version_map[version_backend.first] = version_backend.second->state_;
+      version_map[version_backend.first] = std::make_pair(
+          version_backend.second->state_,
+          version_backend.second->state_reason_);
     }
   }
 
@@ -992,7 +998,7 @@ ModelRepositoryManager::Create(
       return Status(Status::Code::INTERNAL, "failed to load all models");
     }
     for (const auto& state : version_states) {
-      if (state.second != ModelReadyState::MODEL_READY) {
+      if (state.second.first != ModelReadyState::MODEL_READY) {
         return Status(Status::Code::INTERNAL, "failed to load all models");
       }
     }
@@ -1219,7 +1225,7 @@ ModelRepositoryManager::LoadUnloadModel(
     for (const auto version : expected_versions) {
       const auto it = version_states.find(version);
       if ((it == version_states.end()) ||
-          (it->second != ModelReadyState::MODEL_READY)) {
+          (it->second.first != ModelReadyState::MODEL_READY)) {
         not_ready_version_str += std::to_string(version);
         not_ready_version_str += ",";
       }
@@ -1234,7 +1240,7 @@ ModelRepositoryManager::LoadUnloadModel(
   } else {
     std::string ready_version_str;
     for (const auto& version_state : version_states) {
-      if (version_state.second == ModelReadyState::MODEL_READY) {
+      if (version_state.second.first == ModelReadyState::MODEL_READY) {
         ready_version_str += std::to_string(version_state.first);
         ready_version_str += ",";
       }
