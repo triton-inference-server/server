@@ -350,6 +350,8 @@ class InferenceServerClient:
             If unable to get model readiness.
 
         """
+        if type(model_version) != str:
+            raise_error("model version must be a string")
         if model_version != "":
             request_uri = "v2/models/{}/versions/{}/ready".format(
                 quote(model_name), model_version)
@@ -430,6 +432,8 @@ class InferenceServerClient:
             If unable to get model metadata.
 
         """
+        if type(model_version) != str:
+            raise_error("model version must be a string")
         if model_version != "":
             request_uri = "v2/models/{}/versions/{}".format(
                 quote(model_name), model_version)
@@ -628,6 +632,8 @@ class InferenceServerClient:
         """
 
         if model_name != "":
+            if type(model_version) != str:
+                raise_error("model version must be a string")
             if model_version != "":
                 request_uri = "v2/models/{}/versions/{}/stats".format(
                     quote(model_name), model_version)
@@ -1030,7 +1036,9 @@ class InferenceServerClient:
                 headers = {}
             headers["Inference-Header-Content-Length"] = json_size
 
-        if (model_version is not None) and (model_version != ""):
+        if type(model_version) != str:
+            raise_error("model version must be a string")
+        if model_version != "":
             request_uri = "v2/models/{}/versions/{}/infer".format(
                 quote(model_name), model_version)
         else:
@@ -1147,6 +1155,8 @@ class InferenceServerClient:
                 headers = {}
             headers["Inference-Header-Content-Length"] = json_size
 
+        if type(model_version) != str:
+            raise_error("model version must be a string")
         if model_version != "":
             request_uri = "v2/models/{}/versions/{}/infer".format(
                 quote(model_name), model_version)
