@@ -315,7 +315,9 @@ InferenceServer::IsReady(bool* ready)
           goto strict_done;
         }
         for (const auto& vs : ms.second.version_status()) {
-          if (vs.second.ready_state() != ModelReadyState::MODEL_READY) {
+          // Okay if model is not ready due to unload
+          if ((vs.second.ready_state() != ModelReadyState::MODEL_READY) &&
+          (vs.second.ready_state_reason().message() != "unloaded")) {
             *ready = false;
             goto strict_done;
           }
@@ -334,8 +336,8 @@ InferenceServer::ModelIsReady(
 {
   *ready = false;
 
-  if (ready_state_ == ServerReadyState::SERVER_EXITING) {
-    return Status(Status::Code::UNAVAILABLE, "Server exiting");
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(Status::Code::UNAVAILABLE, "Server not ready");
   }
 
   ScopedAtomicIncrement inflight(inflight_request_counter_);
@@ -357,8 +359,8 @@ Status
 InferenceServer::ModelReadyVersions(
     const std::string& model_name, std::vector<int64_t>* versions)
 {
-  if (ready_state_ == ServerReadyState::SERVER_EXITING) {
-    return Status(Status::Code::UNAVAILABLE, "Server exiting");
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(Status::Code::UNAVAILABLE, "Server not ready");
   }
 
   ScopedAtomicIncrement inflight(inflight_request_counter_);
