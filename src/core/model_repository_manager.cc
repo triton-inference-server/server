@@ -574,8 +574,12 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
           }
         }
       }
-    }
-    if (latest == -1) {
+      if (latest == -1) {
+        return Status(
+            Status::Code::NOT_FOUND,
+            "'" + model_name + "' has no available versions");
+      }
+    } else {
       return Status(
           Status::Code::NOT_FOUND, "'" + model_name + "' version " +
                                        std::to_string(version) +
