@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -184,6 +184,33 @@ wait_for_model_stable $SERVER_TIMEOUT
 
 set +e
 python $LC_TEST LifeCycleTest.test_parse_error_modelfail >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_parse_error_modelfail_nostrict
+SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+             --exit-on-error=false --exit-timeout-secs=5 --strict-readiness=false"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server_tolive
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# give plenty of time for model to load (and fail to load)
+wait_for_model_stable $SERVER_TIMEOUT
+
+set +e
+python $LC_TEST LifeCycleTest.test_parse_error_modelfail_nostrict >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1

@@ -65,7 +65,7 @@ class LifeCycleTest(unittest.TestCase):
         # Server was started with invalid args and
         # --exit-on-error=false so expect it to be running with
         # SERVER_FAILED_TO_INITIALIZE status.
-        # --strict-readiness=false so server is not live and not ready
+        # Server is not live and not ready regardless of --strict-readiness
         try:
             triton_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
             self.assertFalse(triton_client.is_server_live())
@@ -102,6 +102,49 @@ class LifeCycleTest(unittest.TestCase):
             triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
             self.assertTrue(triton_client.is_server_live())
             self.assertFalse(triton_client.is_server_ready())
+            self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Inferencing with the missing model should fail.
+        try:
+            iu.infer_exact(self, 'graphdef', tensor_shape, 1, np.float32, np.float32, np.float32)
+            self.assertTrue(False, "expected error for unavailable model " + model_name)
+        except Exception as ex:
+            self.assertTrue(
+                ex.message().startswith(
+                    "Request for unknown model 'graphdef_float32_float32_float32'"))
+
+        # And other models should be loaded successfully
+        try:
+            for base_name in ["savedmodel", 'netdef']:
+                for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                                      grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
+                    model_name = tu.get_model_name(base_name, np.float32, np.float32, np.float32)
+                    self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+
+                iu.infer_exact(self, base_name, tensor_shape, 1,
+                               np.float32, np.float32, np.float32,
+                               model_version=1)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_parse_error_modelfail_nostrict(self):
+        # --strict-readiness=false so server is live and ready
+        tensor_shape = (1, 16)
+
+        # Server was started but with a model that fails to load
+        try:
+            model_name = tu.get_model_name('graphdef', np.float32, np.float32, np.float32)
+
+            triton_client = grpcclient.InferenceServerClient("localhost:8001", verbose=True)
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+
+            triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
             self.assertFalse(triton_client.is_model_ready(model_name, "1"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -342,8 +385,7 @@ class LifeCycleTest(unittest.TestCase):
             for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                   grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
-                # FIXME is_server_ready should be true here DLIS-1296
-                # self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
                 self.assertTrue(triton_client.is_model_ready(netdef_name, "1"))
@@ -401,8 +443,7 @@ class LifeCycleTest(unittest.TestCase):
             for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                   grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
-                # FIXME is_server_ready should be true here DLIS-1296
-                # self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_server_ready())
                 self.assertTrue(triton_client.is_model_ready(savedmodel_name, "1"))
                 self.assertTrue(triton_client.is_model_ready(savedmodel_name, "3"))
                 self.assertFalse(triton_client.is_model_ready(netdef_name, "1"))
@@ -547,8 +588,7 @@ class LifeCycleTest(unittest.TestCase):
             for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                   grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
-                # FIXME is_server_ready should be true here DLIS-1296
-                # self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(graphdef_name, "1"))
                 self.assertTrue(triton_client.is_model_ready(graphdef_name, "2"))
                 self.assertTrue(triton_client.is_model_ready(graphdef_name, "3"))
@@ -574,8 +614,7 @@ class LifeCycleTest(unittest.TestCase):
             for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                   grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
-                # FIXME is_server_ready should be true here DLIS-1296
-                # self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(graphdef_name, "1"))
                 self.assertTrue(triton_client.is_model_ready(graphdef_name, "2"))
                 self.assertTrue(triton_client.is_model_ready(graphdef_name, "3"))
@@ -686,8 +725,7 @@ class LifeCycleTest(unittest.TestCase):
                 for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                       grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                     self.assertTrue(triton_client.is_server_live())
-                    # FIXME is_server_ready should be true here DLIS-1296
-                    # self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_server_ready())
                     self.assertFalse(triton_client.is_model_ready(model_name, "1"))
                     self.assertTrue(triton_client.is_model_ready(model_name, "3"))
             except Exception as ex:
@@ -756,8 +794,7 @@ class LifeCycleTest(unittest.TestCase):
                 for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                       grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                     self.assertTrue(triton_client.is_server_live())
-                    # FIXME is_server_ready should be true here DLIS-1296
-                    # self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_server_ready())
                     self.assertFalse(triton_client.is_model_ready(model_name, "1"))
                     self.assertTrue(triton_client.is_model_ready(model_name, "3"))
             except Exception as ex:
@@ -797,8 +834,7 @@ class LifeCycleTest(unittest.TestCase):
             for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                   grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
-                # FIXME is_server_ready should be true here DLIS-1296
-                # self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
         except Exception as ex:
@@ -868,8 +904,7 @@ class LifeCycleTest(unittest.TestCase):
             for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                   grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
-                # FIXME is_server_ready should be true here DLIS-1296
-                # self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "3"))
         except Exception as ex:
@@ -955,8 +990,7 @@ class LifeCycleTest(unittest.TestCase):
                 for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                       grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                     self.assertTrue(triton_client.is_server_live())
-                    # FIXME is_server_ready should be true here DLIS-1296
-                    # self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_server_ready())
                     self.assertFalse(triton_client.is_model_ready(model_name, "1"))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
@@ -982,8 +1016,7 @@ class LifeCycleTest(unittest.TestCase):
                 for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                       grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                     self.assertTrue(triton_client.is_server_live())
-                    # FIXME is_server_ready should be true here DLIS-1296
-                    # self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_server_ready())
                     self.assertFalse(triton_client.is_model_ready(model_name, "1"))
                     self.assertFalse(triton_client.is_model_ready(model_name, "3"))
             except Exception as ex:
@@ -1005,8 +1038,7 @@ class LifeCycleTest(unittest.TestCase):
             for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                   grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
-                # FIXME is_server_ready should be true here DLIS-1296
-                # self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(ensemble_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(ensemble_name, "3"))
         except Exception as ex:
@@ -1082,8 +1114,7 @@ class LifeCycleTest(unittest.TestCase):
             for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                   grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
-                # FIXME is_server_ready should be true here DLIS-1296
-                # self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(savedmodel_name, "1"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -1109,8 +1140,7 @@ class LifeCycleTest(unittest.TestCase):
                 for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                       grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                     self.assertTrue(triton_client.is_server_live())
-                    # FIXME is_server_ready should be true here DLIS-1296
-                    # self.assertTrue(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_server_ready())
                     self.assertFalse(triton_client.is_model_ready(model_name, "1"))
                     self.assertFalse(triton_client.is_model_ready(model_name, "3"))
             except Exception as ex:
@@ -1134,8 +1164,7 @@ class LifeCycleTest(unittest.TestCase):
             for triton_client in (httpclient.InferenceServerClient("localhost:8000", verbose=True),
                                   grpcclient.InferenceServerClient("localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
-                # FIXME is_server_ready should be true here DLIS-1296
-                # self.assertTrue(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_server_ready())
                 self.assertFalse(triton_client.is_model_ready(savedmodel_ensemble_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(savedmodel_ensemble_name, "3"))
         except Exception as ex:
