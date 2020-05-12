@@ -195,6 +195,9 @@ class InferenceServer {
       const std::string& model_name, const int64_t model_version,
       std::shared_ptr<InferenceBackend>* backend)
   {
+    if (ready_state_ != ServerReadyState::SERVER_READY) {
+      return Status(Status::Code::UNAVAILABLE, "Server not ready");
+    }
     return model_repository_manager_->GetInferenceBackend(
         model_name, model_version, backend);
   }
