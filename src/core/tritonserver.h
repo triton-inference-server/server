@@ -720,21 +720,6 @@ TRITONSERVER_EXPORT TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestRemoveAllRequestedOutputs(
     TRITONSERVER_InferenceRequest* inference_request);
 
-/// Set that a requested output should be returned as a tensor of
-/// classification strings instead of as the tensor defined by the model.
-///
-/// \param inference_request The request object.
-/// \param name The name of the output.
-/// \param count Indicates how many classification values should be
-/// returned for the output. The 'count' highest priority values are
-/// returned. The default is 0, indicating that the output tensor
-/// should not be returned as a classification.
-/// \return a TRITONSERVER_Error indicating success or failure.
-TRITONSERVER_EXPORT TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    uint32_t count);
-
 /// Set the release callback for an inference request. The release
 /// callback is called by Triton to return ownership of the request
 /// object.
@@ -843,7 +828,7 @@ TRITONSERVER_InferenceResponseOutputCount(
 /// values extends until 'inference_response' is deleted.
 ///
 /// \param inference_response The response object.
-/// \param index The index of the output tensors, must be 0 <= index <
+/// \param index The index of the output tensor, must be 0 <= index <
 /// count, where 'count' is the value returned by
 /// TRITONSERVER_InferenceResponseOutputCount.
 /// \param name Returns the name of the output.
@@ -851,8 +836,11 @@ TRITONSERVER_InferenceResponseOutputCount(
 /// \param shape Returns the shape of the output.
 /// \param dim_count Returns the number of dimensions of the returned
 /// shape.
+/// \param batch_size Returns the batch size of the output as
+/// understood by Triton. If the model does not support batching in a
+/// way that Triton understands the value will be 0.
 /// \param base Returns the tensor data for the output.
-/// \param byte_size Returns the size, in bytes, of the  data.
+/// \param byte_size Returns the size, in bytes, of the data.
 /// \param memory_type Returns the memory type of the data.
 /// \param memory_type_id Returns the memory type id of the data.
 /// \param userp The user-specified value associated with the buffer
@@ -861,9 +849,27 @@ TRITONSERVER_InferenceResponseOutputCount(
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_InferenceResponseOutput(
     TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
     const char** name, TRITONSERVER_DataType* datatype, const int64_t** shape,
-    uint64_t* dim_count, const void** base, size_t* byte_size,
-    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id,
-    void** userp);
+    uint64_t* dim_count, uint32_t* batch_size, const void** base,
+    size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
+    int64_t* memory_type_id, void** userp);
+
+/// Get a classification label associated with an output for a given
+/// index.  The caller does not own the returned label and must not
+/// modify or delete ot. The lifetime of all returned label extends
+/// until 'inference_response' is deleted.
+///
+/// \param inference_response The response object.
+/// \param index The index of the output tensor, must be 0 <= index <
+/// count, where 'count' is the value returned by
+/// TRITONSERVER_InferenceResponseOutputCount.
+/// \param class_index The index of the class.
+/// \param name Returns the label corresponding to 'class_index' or
+/// nullptr if no label.
+/// \return a TRITONSERVER_Error indicating success or failure.
+TRITONSERVER_EXPORT TRITONSERVER_Error*
+TRITONSERVER_InferenceResponseOutputClassificationLabel(
+    TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
+    const size_t class_index, const char** label);
 
 
 /// TRITONSERVER_ServerOptions
