@@ -39,7 +39,6 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 PERF_CLIENT=../clients/perf_client
-
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 
 MODELDIR="qa_model_repository"
@@ -106,13 +105,18 @@ for BACKEND in $BACKENDS; do
     if [ "$code" != "200" ]; then
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
-    fi
-
-    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        cat $CLIENT_LOG
-        RET=1
+    else
+        $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            cat $CLIENT_LOG
+            RET=1
+        fi
+        code=`curl -s -w %{http_code} -X POST localhost:8000/api/modelcontrol/unload/${BACKEND}_float32_float32_float32`
+        if [ "$code" != "200" ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
     fi
 done
 
@@ -147,13 +151,18 @@ for BACKEND in $BACKENDS; do
     if [ "$code" != "200" ]; then
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
-    fi
-
-    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        cat $CLIENT_LOG
-        RET=1
+    else
+        $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            cat $CLIENT_LOG
+            RET=1
+        fi
+        code=`curl -s -w %{http_code} -X POST localhost:8000/api/modelcontrol/unload/${BACKEND}_float32_float32_float32`
+        if [ "$code" != "200" ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
     fi
 done
 
