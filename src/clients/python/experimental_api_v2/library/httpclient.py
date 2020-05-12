@@ -1130,8 +1130,9 @@ class InferenceServerClient:
 
         Returns
         -------
-        Greenlet object
-            The greenlet object running the async inference
+        gevent.Greenlet object
+            The greenlet object running the async inference. For further details
+            about greenlets refer http://www.gevent.org/api/gevent.greenlet.html.
 
         Raises
         ------
