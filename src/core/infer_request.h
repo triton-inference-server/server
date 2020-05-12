@@ -198,8 +198,11 @@ class InferenceRequest {
   uint64_t CorrelationId() const { return correlation_id_; }
   void SetCorrelationId(uint64_t c) { correlation_id_ = c; }
 
-  // Batch size is not set explicitly so there is no setter for it. It
-  // is set when the request is normalized.
+  // The batch size of the request, as understood by Triton. A
+  // batch-size of 0 indicates that the model doesn't support batching
+  // in a way that Triton understands.  Batch size is not set
+  // explicitly so there is no setter for it. It is set when the
+  // request is normalized.
   uint32_t BatchSize() const { return batch_size_; }
 
   uint32_t Priority() const { return priority_; }

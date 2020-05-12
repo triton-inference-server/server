@@ -184,7 +184,7 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
   {
     std::lock_guard<std::mutex> lock(mu_);
 
-    queued_batch_size_ += request->BatchSize();
+    queued_batch_size_ += std::max(1U, request->BatchSize());
 
     // Assuming no error is returned, this call takes ownership of
     // 'request' and so we can't use it after this point.
@@ -458,7 +458,7 @@ DynamicBatchScheduler::GetDynamicBatch(const int64_t runner_id)
   size_t best_preferred_batch_size = 0;
   queued_batch_size_ -= queue_.ApplyPolicyAtCursor();
   while (!queue_.CursorEnd()) {
-    const auto batch_size = queue_.RequestAtCursor()->BatchSize();
+    const auto batch_size = std::max(1U, queue_.RequestAtCursor()->BatchSize());
 
     // If there is no pending batch, then this request is starting a
     // new batch.

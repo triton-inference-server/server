@@ -345,7 +345,7 @@ CustomBackend::Context::Run(
       return;
     }
 
-    total_batch_size += request->BatchSize();
+    total_batch_size += std::max(1U, request->BatchSize());
     total_inputs += request->ImmutableInputs().size();
     total_requested_outputs += request->ImmutableRequestedOutputs().size();
   }
@@ -409,7 +409,7 @@ CustomBackend::Context::Run(
   for (auto& irequest : requests) {
     custom_payloads.emplace_back();
     CustomPayload& custom_payload = custom_payloads.back();
-    custom_payload.batch_size = irequest->BatchSize();
+    custom_payload.batch_size = std::max(1U, irequest->BatchSize());
 
     // Inputs
     custom_payload.input_cnt = irequest->ImmutableInputs().size();
