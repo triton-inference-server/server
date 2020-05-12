@@ -41,7 +41,7 @@ CLIENT_LOG="./client.log"
 SHAPE_TENSOR_TEST=trt_shape_tensor_test.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
+SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -175,7 +175,7 @@ for i in \
     test_dynaseq_different_shape_values_series \
     test_dynaseq_different_shape_values_parallel \
     ;do
-    SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
+    SERVER_ARGS="--model-repository=`pwd`/models"
     SERVER_LOG="./$i.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then

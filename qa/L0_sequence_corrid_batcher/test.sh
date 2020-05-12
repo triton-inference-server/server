@@ -83,7 +83,7 @@ for model_trial in 4; do
     for i in test_skip_batch ; do
         export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
         export TRITONSERVER_DELAY_SCHEDULER=12
-        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR --api-version=2"
+        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
         SERVER_LOG="./$i.$MODEL_DIR.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
