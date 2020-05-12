@@ -317,7 +317,7 @@ InferenceServer::IsReady(bool* ready)
         for (const auto& vs : ms.second.version_status()) {
           // Okay if model is not ready due to unload
           if ((vs.second.ready_state() != ModelReadyState::MODEL_READY) &&
-          (vs.second.ready_state_reason().message() != "unloaded")) {
+              (vs.second.ready_state_reason().message() != "unloaded")) {
             *ready = false;
             goto strict_done;
           }
