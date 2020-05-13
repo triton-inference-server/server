@@ -576,7 +576,7 @@ ParseModelHttp(
   }
 
   int max_batch_size = 0;
-  const auto bs_itr = model_config.FindMember("maxBatchSize");
+  const auto bs_itr = model_config.FindMember("max_batch_size");
   if (bs_itr != model_config.MemberEnd()) {
     max_batch_size = bs_itr->value.GetInt();
   }
@@ -818,7 +818,7 @@ main(int argc, char** argv)
               << std::endl;
   }
 
-  // Create the context for inference of the specified model. From it
+  // Create the inference client for the server. From it
   // extract and validate that the model meets the requirements for
   // image classification.
   TritonClient triton_client;

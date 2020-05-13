@@ -45,7 +45,8 @@ SIMPLE_ASYNC_INFER_CLIENT_PY=../clients/simple_grpc_v2_async_infer_client.py
 SIMPLE_STRING_INFER_CLIENT_PY=../clients/simple_grpc_v2_string_infer_client.py
 SIMPLE_STREAM_INFER_CLIENT_PY=../clients/simple_grpc_v2_sequence_stream_infer_client.py
 SIMPLE_SEQUENCE_INFER_CLIENT_PY=../clients/simple_grpc_v2_sequence_sync_infer_client.py
-V2_IMAGE_CLIENT_PY=../clients/v2_image_client.py
+SIMPLE_IMAGE_CLIENT_PY=../clients/v2_image_client.py
+SIMPLE_ENSEMBLE_IMAGE_CLIENT_PY=../clients/v2_ensemble_image_client.py
 SIMPLE_SHM_STRING_CLIENT_PY=../clients/simple_grpc_v2_shm_string_client.py
 SIMPLE_SHM_CLIENT_PY=../clients/simple_grpc_v2_shm_client.py
 SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_grpc_v2_cudashm_client.py
@@ -66,6 +67,7 @@ SIMPLE_SEQUENCE_INFER_CLIENT=../clients/simple_grpc_v2_sequence_sync_infer_clien
 SIMPLE_SHM_CLIENT=../clients/simple_grpc_v2_shm_client
 SIMPLE_CUDASHM_CLIENT=../clients/simple_grpc_v2_cudashm_client
 SIMPLE_IMAGE_CLIENT=../clients/v2_image_client
+SIMPLE_ENSEMBLE_IMAGE_CLIENT=../clients/v2_ensemble_image_client
 
 rm -f *.log
 rm -f *.log.*
@@ -78,6 +80,17 @@ wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
 mv /tmp/inception_v3_2016_08_28_frozen.pb models/inception_graphdef/1/model.graphdef
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_int8_int32_int32 models/
 cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/resnet_v1_50_graphdef models/
+
+# Create model repository layout for ensemble image classification
+cp -r ../L0_docs/docs/examples/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception models/ && \
+cp -r ../L0_docs/docs/examples/ensemble_model_repository/preprocess_resnet50_ensemble models/ && \
+mkdir -p models/image_preprocess_nchw_3x224x224_inception/1 && \
+mkdir -p models/preprocess_resnet50_ensemble/1 && \
+
+# Obtain actual models
+cp -r /data/inferenceserver/${REPO_VERSION}/c2_model_store/resnet50_netdef models/ && \
+    cp ../L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/libimagepreprocess.so \
+        models/image_preprocess_nchw_3x224x224_inception/1/.
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
@@ -105,7 +118,8 @@ for i in \
         $SIMPLE_INFER_CLIENT_PY \
         $SIMPLE_ASYNC_INFER_CLIENT_PY \
         $SIMPLE_STRING_INFER_CLIENT_PY \
-        $V2_IMAGE_CLIENT_PY \
+        $SIMPLE_IMAGE_CLIENT_PY \
+        $SIMPLE_ENSEMBLE_IMAGE_CLIENT_PY \
         $SIMPLE_STREAM_INFER_CLIENT_PY \
         $SIMPLE_SEQUENCE_INFER_CLIENT_PY \
         $SIMPLE_SHM_STRING_CLIENT_PY \
@@ -133,6 +147,14 @@ for i in \
             cat $CLIENT_LOG.${SUFFIX}
             RET=1
         fi
+    elif [ $SUFFIX == "v2_ensemble_image_client" ]; then
+        python $i -c 1 -i grpc -u localhost:8001 ../images >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+        for result in "SPORTS CAR" "COFFEE MUG" "VULTURE"; do
+            if [ `grep -c "$result" ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
+                echo -e "\n***\n*** Failed. Expected 1 $result result\n***"
+                RET=1
+            fi
+        done
     else
         python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     fi
@@ -158,6 +180,7 @@ for i in \
    $SIMPLE_SHM_CLIENT \
    $SIMPLE_CUDASHM_CLIENT \
    $SIMPLE_IMAGE_CLIENT \
+   $SIMPLE_ENSEMBLE_IMAGE_CLIENT \
    ; do
    BASE=$(basename -- $i)
    SUFFIX="${BASE%.*}"
@@ -180,6 +203,14 @@ for i in \
             cat $CLIENT_LOG.c++.${SUFFIX}
             RET=1
         fi
+    elif [ $SUFFIX == "v2_ensemble_image_client" ]; then
+        $i -c 1 -i grpc -u localhost:8001 ../images >> "${CLIENT_LOG}.c++.${SUFFIX}" 2>&1
+        for result in "SPORTS CAR" "COFFEE MUG" "VULTURE"; do
+            if [ `grep -c "$result" ${CLIENT_LOG}.c++.${SUFFIX}` != "1" ]; then
+                echo -e "\n***\n*** Failed. Expected 1 $result result\n***"
+                RET=1
+            fi
+        done
     else
         $i -v -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
         if [ $? -ne 0 ]; then

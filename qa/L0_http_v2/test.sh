@@ -43,7 +43,8 @@ SIMPLE_HEALTH_CLIENT_PY=../clients/simple_http_v2_health_metadata.py
 SIMPLE_INFER_CLIENT_PY=../clients/simple_http_v2_infer_client.py
 SIMPLE_ASYNC_INFER_CLIENT_PY=../clients/simple_http_v2_async_infer_client.py
 SIMPLE_STRING_INFER_CLIENT_PY=../clients/simple_http_v2_string_infer_client.py
-V2_IMAGE_CLIENT_PY=../clients/v2_image_client.py
+SIMPLE_IMAGE_CLIENT_PY=../clients/v2_image_client.py
+SIMPLE_ENSEMBLE_IMAGE_CLIENT_PY=../clients/v2_ensemble_image_client.py
 SIMPLE_SHM_STRING_CLIENT_PY=../clients/simple_http_v2_shm_string_client.py
 SIMPLE_SHM_CLIENT_PY=../clients/simple_http_v2_shm_client.py
 SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_http_v2_cudashm_client.py
@@ -71,6 +72,17 @@ mv /tmp/inception_v3_2016_08_28_frozen.pb models/inception_graphdef/1/model.grap
 
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/savedmodel_zero_1_object models/
 
+# Create model repository layout for ensemble image classification
+cp -r ../L0_docs/docs/examples/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception models/ && \
+cp -r ../L0_docs/docs/examples/ensemble_model_repository/preprocess_resnet50_ensemble models/ && \
+mkdir -p models/image_preprocess_nchw_3x224x224_inception/1 && \
+mkdir -p models/preprocess_resnet50_ensemble/1 && \
+
+# Obtain actual models
+cp -r /data/inferenceserver/${REPO_VERSION}/c2_model_store/resnet50_netdef models/ && \
+    cp ../L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/libimagepreprocess.so \
+        models/image_preprocess_nchw_3x224x224_inception/1/.
+
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -97,7 +109,8 @@ IMAGE=../images/vulture.jpeg
 for i in \
         $SIMPLE_INFER_CLIENT_PY \
         $SIMPLE_ASYNC_INFER_CLIENT_PY \
-        $V2_IMAGE_CLIENT_PY \
+        $SIMPLE_IMAGE_CLIENT_PY \
+        $SIMPLE_ENSEMBLE_IMAGE_CLIENT_PY \
         $SIMPLE_SHM_STRING_CLIENT_PY \
         $SIMPLE_SHM_CLIENT_PY \
         $SIMPLE_CUDASHM_CLIENT_PY \
@@ -113,6 +126,14 @@ for i in \
             cat $CLIENT_LOG.${SUFFIX}
             RET=1
         fi
+    elif [ $SUFFIX == "v2_ensemble_image_client" ]; then
+        python $i -c 1 ../images >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+        for result in "SPORTS CAR" "COFFEE MUG" "VULTURE"; do
+            if [ `grep -c "$result" ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
+                echo -e "\n***\n*** Failed. Expected 1 $result result\n***"
+                RET=1
+            fi
+        done
     else
         python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     fi
