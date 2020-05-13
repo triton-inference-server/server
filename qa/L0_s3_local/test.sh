@@ -77,7 +77,7 @@ python -m pip install awscli-local && \
 RET=0
 
 # Test with hostname
-SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket --model-control-mode=explicit --api-version=2"
+SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket --model-control-mode=explicit"
 SERVER_LOG="./inference_server_hostname.log"
 
 BACKENDS="graphdef libtorch netdef onnx plan savedmodel"
@@ -113,7 +113,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Test with IP
-SERVER_ARGS="--model-repository=s3://127.0.0.1:4572/demo-bucket --model-control-mode=explicit --api-version=2"
+SERVER_ARGS="--model-repository=s3://127.0.0.1:4572/demo-bucket --model-control-mode=explicit"
 SERVER_LOG="./inference_server_ip.log"
 
 run_server

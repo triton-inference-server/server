@@ -95,7 +95,7 @@ cp -r /data/inferenceserver/${REPO_VERSION}/c2_model_store/resnet50_netdef model
 CLIENT_LOG=`pwd`/client.log
 DATADIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR --api-version 2"
+SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
 
 run_server
@@ -224,7 +224,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit --api-version 2"
+SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -249,7 +249,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit --api-version 2"
+SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

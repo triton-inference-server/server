@@ -78,7 +78,7 @@ for BACKEND in $BACKENDS; do
         cp $ENSEMBLE_NAME.pbtxt models/$ENSEMBLE_NAME/config.pbtxt
 
     # With pinned memory
-    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --api-version=2"
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
     SERVER_LOG="${ENSEMBLE_NAME}.pinned.serverlog"
     run_server
     if (( $SERVER_PID == 0 )); then
@@ -105,7 +105,7 @@ for BACKEND in $BACKENDS; do
     wait $SERVER_PID
 
     # Restart the server without verbose logging
-    SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
+    SERVER_ARGS="--model-repository=`pwd`/models"
     SERVER_LOG="${ENSEMBLE_NAME}.pinned.serverlog"
     run_server
     if (( $SERVER_PID == 0 )); then
@@ -130,7 +130,7 @@ for BACKEND in $BACKENDS; do
     wait $SERVER_PID
 
     # Without pinned memory
-    SERVER_ARGS="--model-repository=`pwd`/models --pinned-memory-pool-byte-size=0 --log-verbose=1 --api-version=2"
+    SERVER_ARGS="--model-repository=`pwd`/models --pinned-memory-pool-byte-size=0 --log-verbose=1"
     SERVER_LOG="${ENSEMBLE_NAME}.nonpinned.serverlog"
     run_server
     if (( $SERVER_PID == 0 )); then
@@ -157,7 +157,7 @@ for BACKEND in $BACKENDS; do
     wait $SERVER_PID
 
     # Restart the server without verbose logging
-    SERVER_ARGS="--model-repository=`pwd`/models --pinned-memory-pool-byte-size=0 --api-version=2"
+    SERVER_ARGS="--model-repository=`pwd`/models --pinned-memory-pool-byte-size=0"
     SERVER_LOG="${ENSEMBLE_NAME}.nonpinned.serverlog"
     run_server
     if (( $SERVER_PID == 0 )); then

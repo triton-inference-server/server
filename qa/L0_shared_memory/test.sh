@@ -46,7 +46,7 @@ for i in \
         test_mixed_raw_shm \
         test_unregisterall; do
     for client_type in http grpc; do
-        SERVER_ARGS="--model-repository=`pwd`/models --api-version=2 --log-verbose=1"
+        SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
         SERVER_LOG="./$i.$client_type.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
