@@ -471,9 +471,9 @@ InferenceRequest::Normalize()
 
   // Determine the batch size and shape of each input.
   if (model_config.max_batch_size() == 0) {
-    // Model does not support Triton-style batching so treat as
-    // batch-size 1 and leave the tensor shapes as they are.
-    batch_size_ = 1;
+    // Model does not support Triton-style batching so set as
+    // batch-size 0 and leave the tensor shapes as they are.
+    batch_size_ = 0;
     for (auto& pr : original_inputs_) {
       auto& input = pr.second;
       *input.MutableShape() = input.OriginalShape();
@@ -518,19 +518,9 @@ InferenceRequest::Normalize()
     }
   }
 
-  // Make sure the request has a batch-size > 0. Even for models that
-  // don't support batching the requested batch size must be 1.
-  if (batch_size_ < 1) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "inference request batch-size must be >= 1 for '" + ModelName() + "'");
-  }
-
   // Make sure request batch-size doesn't exceed what is supported by
-  // the model. For models that don't support batching the request
-  // batch-size will still be 1.
-  if ((batch_size_ != 1) &&
-      ((int)batch_size_ > model_config.max_batch_size())) {
+  // the model.
+  if ((int)batch_size_ > model_config.max_batch_size()) {
     return Status(
         Status::Code::INVALID_ARG,
         "inference request batch-size must be <= " +
