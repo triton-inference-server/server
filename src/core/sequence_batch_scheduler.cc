@@ -321,7 +321,7 @@ SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
   // For now the request must have batch-size 1 since the sequence
   // batcher does not yet support requests that are statically
   // batched.
-  if (irequest->BatchSize() != 1) {
+  if (irequest->BatchSize() > 1) {
     return Status(
         Status::Code::INVALID_ARG,
         "inference request to model '" + irequest->ModelName() +
