@@ -68,10 +68,13 @@ CustomBackendFactory::CreateBackend(
   std::unordered_map<std::string, std::string> custom_paths;
   for (const auto& filename : custom_files) {
     const auto custom_path = JoinPath({path, filename});
+    std::string local_custom_path;
 
+    RETURN_IF_ERROR(
+        DownloadFileFolder(custom_path, &local_custom_path));
     custom_paths.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(custom_path));
+        std::make_tuple(local_custom_path));
   }
 
   // Create the vector of server parameter values, indexed by the
@@ -88,6 +91,11 @@ CustomBackendFactory::CreateBackend(
       new CustomBackend(min_compute_capability));
   RETURN_IF_ERROR(local_backend->Init(path, server_params, model_config));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(custom_paths));
+
+  // Destroy local copy if exists
+  for (const auto& custom_path : custom_paths) {
+    RETURN_IF_ERROR(DestroyFileFolder(custom_path.second));
+  }
 
   *backend = std::move(local_backend);
   return Status::Success;

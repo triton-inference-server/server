@@ -28,7 +28,6 @@
 
 #include <dlfcn.h>
 
-#include "src/core/filesystem.h"
 #include "src/core/logging.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -74,27 +73,16 @@ LoadCustom(
   *ExecuteFn = nullptr;
   *ExecuteV2Fn = nullptr;
   *custom_version = 0;
-  Status status;
-
-  // Add handling for S3 path
-  // FIXME Add GCS Support
-  std::string local_path = "";
-  if (path.rfind("s3://", 0) == 0) {
-    status = DownloadFileFolder(path, &local_path);
-    if (!status.IsOk()) {
-      return status;
-    }
-  } else {
-    local_path = path;
-  }
 
   // Load the custom library
-  void* handle = dlopen(local_path.c_str(), RTLD_LAZY);
+  void* handle = dlopen(path.c_str(), RTLD_LAZY);
   if (handle == nullptr) {
     return Status(
         Status::Code::NOT_FOUND,
         "unable to load custom library: " + std::string(dlerror()));
   }
+
+  Status status;
 
   // Get shared library entrypoints.
   void* init_fn;
