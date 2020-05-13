@@ -70,8 +70,7 @@ CustomBackendFactory::CreateBackend(
     const auto custom_path = JoinPath({path, filename});
     std::string local_custom_path;
 
-    RETURN_IF_ERROR(
-        DownloadFileFolder(custom_path, &local_custom_path));
+    RETURN_IF_ERROR(DownloadFileFolder(custom_path, &local_custom_path));
     custom_paths.emplace(
         std::piecewise_construct, std::make_tuple(filename),
         std::make_tuple(local_custom_path));

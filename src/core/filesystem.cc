@@ -574,6 +574,7 @@ namespace s3 = Aws::S3;
 
 class S3FileSystem : public FileSystem {
  public:
+  S3FileSystem(const Aws::SDKOptions& options);
   S3FileSystem(const Aws::SDKOptions& options, const std::string& s3_path);
   ~S3FileSystem();
   Status FileExists(const std::string& path, bool* exists) override;
@@ -630,6 +631,11 @@ S3FileSystem::ParsePath(
   return Status::Success;
 }
 
+S3FileSystem::S3FileSystem(const Aws::SDKOptions& options)
+    : options_(options), s3_regex_("")
+{
+  // dummy constructor needed to destroy S3 temporary files
+}
 
 S3FileSystem::S3FileSystem(
     const Aws::SDKOptions& options, const std::string& s3_path)
@@ -1269,7 +1275,16 @@ Status
 DestroyFileFolder(const std::string& path)
 {
   FileSystem* fs;
-  RETURN_IF_ERROR(GetFileSystem(path, &fs));
+  std::cerr << "path: " << path;
+  // If path represents local temporary file then must be S3
+  if (path.rfind("/tmp/file", 0) == 0) {
+    Aws::SDKOptions options;
+    Aws::InitAPI(options);
+    static S3FileSystem s3_fs(options);
+    fs = &s3_fs;
+  } else {
+    RETURN_IF_ERROR(GetFileSystem(path, &fs));
+  }
   return fs->DestroyFileFolder(path);
 }
 
