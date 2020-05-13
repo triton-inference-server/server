@@ -153,7 +153,7 @@ for ENV_VAR in "env" "env_dummy" "config"; do
         done
 
         # Copy custom model 
-        cp -r /opt/tritonserver/qa/custom_float32_float32_float32/ models/
+        cp -r /opt/tritonserver/qa/custom_models/custom_float32_float32_float32/ models/
 
         # Copy models with string inputs and remove nobatch (bs=1) models
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object/ models/

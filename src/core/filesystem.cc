@@ -1319,13 +1319,16 @@ Status
 DestroyFileFolder(const std::string& path)
 {
   FileSystem* fs;
-  std::cerr << "path: " << path << "\n";
   // If path represents local temporary file then must be S3
   if (path.rfind("/tmp/file", 0) == 0) {
+#ifdef TRTIS_ENABLE_S3
     Aws::SDKOptions options;
     Aws::InitAPI(options);
     static S3FileSystem s3_fs(options);
     fs = &s3_fs;
+#else
+    RETURN_IF_ERROR(GetFileSystem(path, &fs));
+#endif  // TRTIS_ENABLE_S3
   } else {
     RETURN_IF_ERROR(GetFileSystem(path, &fs));
   }
