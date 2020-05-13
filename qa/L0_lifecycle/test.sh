@@ -51,7 +51,7 @@ rm -fr *.log
 LOG_IDX=0
 
 # LifeCycleTest.test_parse_error_noexit_strict
-SERVER_ARGS="--api-version=2 --model-repository=/tmp/xyzx --strict-readiness=true \
+SERVER_ARGS="--model-repository=/tmp/xyzx --strict-readiness=true \
              --exit-on-error=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_nowait
@@ -77,7 +77,7 @@ wait $SERVER_PID
 LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_parse_error_noexit
-SERVER_ARGS="--api-version=2 --model-repository=/tmp/xyzx --strict-readiness=false \
+SERVER_ARGS="--model-repository=/tmp/xyzx --strict-readiness=false \
              --exit-on-error=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_nowait
@@ -105,7 +105,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_parse_error_noexit_strict (multiple model repositories)
 rm -rf models
 mkdir models
-SERVER_ARGS="--api-version=2 --model-repository=/tmp/xyzx --model-repository=`pwd`/models \
+SERVER_ARGS="--model-repository=/tmp/xyzx --model-repository=`pwd`/models \
              --strict-readiness=true --exit-on-error=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_nowait
@@ -133,7 +133,7 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_parse_error_noexit (multiple model repositories)
 rm -rf models
 mkdir models
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=/tmp/xyzx \
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=/tmp/xyzx \
              --strict-readiness=false --exit-on-error=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_nowait
@@ -169,7 +169,7 @@ for i in netdef plan ; do
 done
 rm models/graphdef_float32_float32_float32/*/*
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --exit-on-error=false --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
@@ -196,7 +196,7 @@ wait $SERVER_PID
 LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_parse_error_modelfail_nostrict
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --exit-on-error=false --exit-timeout-secs=5 --strict-readiness=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
@@ -233,7 +233,7 @@ for i in netdef plan ; do
 done
 rm models/graphdef_float32_float32_float32/config.pbtxt
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --exit-on-error=false --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
@@ -273,7 +273,7 @@ for i in netdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --exit-on-error=false --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
@@ -309,7 +309,7 @@ mkdir -p models/graphdef_float32_float32_float32
 cp $DATADIR/qa_model_repository/graphdef_float32_float32_float32/config.pbtxt \
     models/graphdef_float32_float32_float32/.
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --exit-on-error=false \
+SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
@@ -343,7 +343,7 @@ for i in savedmodel ; do
     mv models/${i}_float32_float32_float32/3 models/${i}_float32_float32_float32/003
 done
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --exit-on-error=false \
+SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -380,7 +380,7 @@ for i in graphdef netdef plan ; do
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --repository-poll-secs=1 \
+SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -411,7 +411,7 @@ for i in graphdef netdef plan ; do
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --allow-poll-model-repository=false \
+SERVER_ARGS="--model-repository=`pwd`/models --allow-poll-model-repository=false \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -441,7 +441,7 @@ for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --repository-poll-secs=1 \
+SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -472,7 +472,7 @@ for i in graphdef ; do
 done
 
 # Show model control mode will override deprecated model control options
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-control-mode=none \
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=none \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -509,7 +509,7 @@ for i in savedmodel plan ; do
         models/${i}_float32_float32_float32/wrong_output0_labels.txt
 done
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --repository-poll-secs=1 \
+SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -539,7 +539,7 @@ for i in savedmodel plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --repository-poll-secs=1 \
+SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 \
              --exit-timeout-secs=5 --strict-model-config=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -575,7 +575,7 @@ cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/. && \
     rm -rf models/savedmodel_float32_float32_float32/3
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --repository-poll-secs=1 --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -612,7 +612,7 @@ cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/. &
     rm -rf models/savedmodel_float32_float32_float32/3
 
 # Show model control mode will override deprecated model control options
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --model-control-mode=explicit \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
@@ -646,7 +646,7 @@ for i in savedmodel ; do
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/simple_${i}_float32_float32_float32/config.pbtxt
 done
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --allow-model-control=true \
+SERVER_ARGS="--model-repository=`pwd`/models --allow-model-control=true \
              --allow-poll-model-repository=false --exit-timeout-secs=5 \
              --strict-model-config=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
@@ -687,7 +687,7 @@ for i in netdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --allow-model-control=true --allow-poll-model-repository=false \
              --strict-model-config=false --exit-on-error=false \
              --load-model=netdef_float32_float32_float32 \
@@ -729,7 +729,7 @@ for i in netdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
 done
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --allow-model-control=true --allow-poll-model-repository=false \
              --strict-model-config=false --exit-on-error=false \
              --load-model=netdef_float32_float32_float32 \
@@ -765,7 +765,7 @@ done
 
 # Polling enabled (default), control API should not work
 # This test also keeps using "--model-store" to ensure backward compatibility
-SERVER_ARGS="--api-version=2 --model-store=`pwd`/models --repository-poll-secs=0 \
+SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=0 \
              --exit-timeout-secs=5 --strict-model-config=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -827,7 +827,7 @@ for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
-SERVER_ARGS="--api-version=2 --model-repository=`pwd`/models --allow-poll-model-repository=false \
+SERVER_ARGS="--model-repository=`pwd`/models --allow-poll-model-repository=false \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server

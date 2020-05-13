@@ -42,7 +42,7 @@ CLIENT_LOG_BASE="./client.log"
 DATADIR=`pwd`/models
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR --api-version=2"
+SERVER_ARGS="--model-repository=$DATADIR"
 SERVER_LOG_BASE="./inference_server.log"
 source ../common/util.sh
 

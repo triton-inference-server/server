@@ -31,7 +31,7 @@ CLIENT_PY=./param_test.py
 CLIENT_LOG="./client.log"
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
+SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 

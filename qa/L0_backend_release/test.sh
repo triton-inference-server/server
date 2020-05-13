@@ -39,7 +39,7 @@ SIMPLE_CLIENT=../clients/simple_http_v2_infer_client
 SIMPLE_SEQ_CLIENT=../clients/simple_grpc_v2_sequence_stream_infer_client
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
+SERVER_ARGS="--model-repository=`pwd`/models"
 source ../common/util.sh
 
 export CUDA_VISIBLE_DEVICES=0

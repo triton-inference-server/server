@@ -34,7 +34,7 @@ PERF_CLIENT=../clients/perf_client_v2
 REPORTER=../common/reporter.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
+SERVER_ARGS="--model-repository=`pwd`/models"
 source ../common/util.sh
 
 # Select the single GPU that will be available to the inference

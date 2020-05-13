@@ -55,7 +55,7 @@ RET=0
 LD_LIBRARY_PATH=/opt/tritonserver/lib/tensorflow:/opt/tritonserver/lib/pytorch:$LD_LIBRARY_PATH
 
 # Tensorflow
-SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops --api-version=2"
+SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops"
 SERVER_LD_PRELOAD="/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libzeroout.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libcudaop.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libbusyop.so"
 
 run_server
@@ -101,7 +101,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Pytorch
-SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops --api-version=2"
+SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops"
 SERVER_LD_PRELOAD="/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops/libtorch_modulo/custom_modulo.so"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
