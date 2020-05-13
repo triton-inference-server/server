@@ -1035,10 +1035,54 @@ S3FileSystem::DownloadFileFolder(
   return Status::Success;
 }
 
+int
+IsPathDirectory(const char* path)
+{
+  struct stat s_buf;
+
+  if (stat(path, &s_buf))
+    return 0;
+
+  return S_ISDIR(s_buf.st_mode);
+}
+
+int
+DeleteFolderRecursive(const std::string& path)
+{
+  struct dirent* ep;
+  DIR* dp = opendir(path.c_str());
+
+  while ((ep = readdir(dp)) != NULL) {
+    if (strcmp(ep->d_name, ".") == 0 || strcmp(ep->d_name, "..") == 0) {
+      continue;
+    }
+    std::string tmp_path = path + "/" + std::string(ep->d_name);
+    if (IsPathDirectory(tmp_path.c_str())) {
+      DeleteFolderRecursive(tmp_path);
+    } else {
+      if (remove(tmp_path.c_str()) != 0) {
+        return -1;
+      }
+    }
+  }
+
+  closedir(dp);
+  return rmdir(path.c_str());
+}
+
 Status
 S3FileSystem::DestroyFileFolder(const std::string& path)
 {
-  remove(path.c_str());
+  if (IsPathDirectory(path.c_str())) {
+    if (DeleteFolderRecursive(path) != 0) {
+      return Status(Status::Code::INTERNAL, "Failed to delete folder: " + path);
+    }
+  } else {
+    if (remove(path.c_str()) != 0) {
+      return Status(Status::Code::INTERNAL, "Failed to delete file: " + path);
+    }
+  }
+
   return Status::Success;
 }
 
@@ -1275,7 +1319,7 @@ Status
 DestroyFileFolder(const std::string& path)
 {
   FileSystem* fs;
-  std::cerr << "path: " << path;
+  std::cerr << "path: " << path << "\n";
   // If path represents local temporary file then must be S3
   if (path.rfind("/tmp/file", 0) == 0) {
     Aws::SDKOptions options;
