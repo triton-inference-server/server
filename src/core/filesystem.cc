@@ -73,6 +73,8 @@ class FileSystem {
       const std::string& path, std::string* contents) = 0;
   virtual Status DownloadFileFolder(
       const std::string& path, std::string* local_path) = 0;
+  virtual int IsPathDirectory(const char* path) = 0;
+  virtual int DeleteFolderRecursive(const std::string& path) = 0;
   virtual Status DestroyFileFolder(const std::string& path) = 0;
   virtual Status WriteTextFile(
       const std::string& path, const std::string& contents) = 0;
@@ -93,6 +95,8 @@ class LocalFileSystem : public FileSystem {
   Status ReadTextFile(const std::string& path, std::string* contents) override;
   Status DownloadFileFolder(
       const std::string& path, std::string* local_path) override;
+  int IsPathDirectory(const char* path) override;
+  int DeleteFolderRecursive(const std::string& path) override;
   Status DestroyFileFolder(const std::string& path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
@@ -224,10 +228,54 @@ LocalFileSystem::DownloadFileFolder(
   return Status::Success;
 }
 
+int
+LocalFileSystem::IsPathDirectory(const char* path)
+{
+  struct stat s_buf;
+
+  if (stat(path, &s_buf))
+    return 0;
+
+  return S_ISDIR(s_buf.st_mode);
+}
+
+int
+LocalFileSystem::DeleteFolderRecursive(const std::string& path)
+{
+  struct dirent* ep;
+  DIR* dp = opendir(path.c_str());
+
+  while ((ep = readdir(dp)) != NULL) {
+    if (strcmp(ep->d_name, ".") == 0 || strcmp(ep->d_name, "..") == 0) {
+      continue;
+    }
+    std::string tmp_path = path + "/" + std::string(ep->d_name);
+    if (IsPathDirectory(tmp_path.c_str())) {
+      DeleteFolderRecursive(tmp_path);
+    } else {
+      if (remove(tmp_path.c_str()) != 0) {
+        return -1;
+      }
+    }
+  }
+
+  closedir(dp);
+  return rmdir(path.c_str());
+}
+
 Status
 LocalFileSystem::DestroyFileFolder(const std::string& path)
 {
-  // Do nothing
+  if (IsPathDirectory(path.c_str())) {
+    if (DeleteFolderRecursive(path) != 0) {
+      return Status(Status::Code::INTERNAL, "Failed to delete folder: " + path);
+    }
+  } else {
+    if (remove(path.c_str()) != 0) {
+      return Status(Status::Code::INTERNAL, "Failed to delete file: " + path);
+    }
+  }
+
   return Status::Success;
 }
 
@@ -282,6 +330,8 @@ class GCSFileSystem : public FileSystem {
   Status ReadTextFile(const std::string& path, std::string* contents) override;
   Status DownloadFileFolder(
       const std::string& path, std::string* local_path) override;
+  int IsPathDirectory(const char* path) override;
+  int DeleteFolderRecursive(const std::string& path) override;
   Status DestroyFileFolder(const std::string& path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
@@ -550,6 +600,20 @@ GCSFileSystem::DownloadFileFolder(
   return Status::Success;
 }
 
+int
+GCSFileSystem::IsPathDirectory(const char* path)
+{
+  // Do nothing
+  return 0;
+}
+
+int
+GCSFileSystem::DeleteFolderRecursive(const std::string& path)
+{
+  // Do nothing
+  return 0;
+}
+
 Status
 GCSFileSystem::DestroyFileFolder(const std::string& path)
 {
@@ -574,7 +638,6 @@ namespace s3 = Aws::S3;
 
 class S3FileSystem : public FileSystem {
  public:
-  S3FileSystem(const Aws::SDKOptions& options);
   S3FileSystem(const Aws::SDKOptions& options, const std::string& s3_path);
   ~S3FileSystem();
   Status FileExists(const std::string& path, bool* exists) override;
@@ -590,6 +653,8 @@ class S3FileSystem : public FileSystem {
   Status ReadTextFile(const std::string& path, std::string* contents) override;
   Status DownloadFileFolder(
       const std::string& path, std::string* local_path) override;
+  int IsPathDirectory(const char* path) override;
+  int DeleteFolderRecursive(const std::string& path) override;
   Status DestroyFileFolder(const std::string& path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
@@ -629,12 +694,6 @@ S3FileSystem::ParsePath(
   }
 
   return Status::Success;
-}
-
-S3FileSystem::S3FileSystem(const Aws::SDKOptions& options)
-    : options_(options), s3_regex_("")
-{
-  // dummy constructor needed to destroy S3 temporary files
 }
 
 S3FileSystem::S3FileSystem(
@@ -1036,53 +1095,23 @@ S3FileSystem::DownloadFileFolder(
 }
 
 int
-IsPathDirectory(const char* path)
+S3FileSystem::IsPathDirectory(const char* path)
 {
-  struct stat s_buf;
-
-  if (stat(path, &s_buf))
-    return 0;
-
-  return S_ISDIR(s_buf.st_mode);
+  // Do nothing
+  return 0;
 }
 
 int
-DeleteFolderRecursive(const std::string& path)
+S3FileSystem::DeleteFolderRecursive(const std::string& path)
 {
-  struct dirent* ep;
-  DIR* dp = opendir(path.c_str());
-
-  while ((ep = readdir(dp)) != NULL) {
-    if (strcmp(ep->d_name, ".") == 0 || strcmp(ep->d_name, "..") == 0) {
-      continue;
-    }
-    std::string tmp_path = path + "/" + std::string(ep->d_name);
-    if (IsPathDirectory(tmp_path.c_str())) {
-      DeleteFolderRecursive(tmp_path);
-    } else {
-      if (remove(tmp_path.c_str()) != 0) {
-        return -1;
-      }
-    }
-  }
-
-  closedir(dp);
-  return rmdir(path.c_str());
+  // Do nothing
+  return 0;
 }
 
 Status
 S3FileSystem::DestroyFileFolder(const std::string& path)
 {
-  if (IsPathDirectory(path.c_str())) {
-    if (DeleteFolderRecursive(path) != 0) {
-      return Status(Status::Code::INTERNAL, "Failed to delete folder: " + path);
-    }
-  } else {
-    if (remove(path.c_str()) != 0) {
-      return Status(Status::Code::INTERNAL, "Failed to delete file: " + path);
-    }
-  }
-
+  // Do nothing
   return Status::Success;
 }
 
@@ -1319,20 +1348,14 @@ Status
 DestroyFileFolder(const std::string& path)
 {
   FileSystem* fs;
-  // If path represents local temporary file then must be S3
+  // If path represents local temporary file then must be deleted
   if (path.rfind("/tmp/file", 0) == 0) {
-#ifdef TRTIS_ENABLE_S3
-    Aws::SDKOptions options;
-    Aws::InitAPI(options);
-    static S3FileSystem s3_fs(options);
-    fs = &s3_fs;
-#else
-    RETURN_IF_ERROR(GetFileSystem(path, &fs));
-#endif  // TRTIS_ENABLE_S3
-  } else {
-    RETURN_IF_ERROR(GetFileSystem(path, &fs));
+    static LocalFileSystem lfs;
+    fs = &lfs;
+    return fs->DestroyFileFolder(path);
   }
-  return fs->DestroyFileFolder(path);
+
+  return Status::Success;
 }
 
 
