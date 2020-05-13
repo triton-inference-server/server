@@ -32,7 +32,7 @@ import sys
 import tritonhttpclient
 from tritonclientutils.utils import InferenceServerException
 
-def test_infer(model_name, input0_data, input1_data):
+def test_infer(model_name, input0_data, input1_data, headers=None):
     inputs = []
     outputs = []
     inputs.append(tritonhttpclient.InferInput('INPUT0', [1, 16], "INT32"))
@@ -49,12 +49,13 @@ def test_infer(model_name, input0_data, input1_data):
     results = triton_client.infer(model_name,
                                   inputs,
                                   outputs=outputs,
-                                  query_params=query_params)
+                                  query_params=query_params,
+                                  headers=headers)
 
     return results
 
 
-def test_infer_no_outputs(model_name, input0_data, input1_data):
+def test_infer_no_outputs(model_name, input0_data, input1_data, headers=None):
     inputs = []
     inputs.append(tritonhttpclient.InferInput('INPUT0', [1, 16], "INT32"))
     inputs.append(tritonhttpclient.InferInput('INPUT1', [1, 16], "INT32"))
@@ -67,7 +68,8 @@ def test_infer_no_outputs(model_name, input0_data, input1_data):
     results = triton_client.infer(model_name,
                                   inputs,
                                   outputs=None,
-                                  query_params=query_params)
+                                  query_params=query_params,
+                                  headers=headers)
 
     return results
 
@@ -86,6 +88,10 @@ if __name__ == '__main__':
                         required=False,
                         default='localhost:8000',
                         help='Inference server URL. Default is localhost:8000.')
+    parser.add_argument('-H', dest='http_headers', metavar="HTTP_HEADER",
+                        required=False, action='append',
+                        help='HTTP headers to add to inference server requests. ' +
+                        'Format is -H"Header:Value".')
 
     FLAGS = parser.parse_args()
     try:
@@ -101,11 +107,17 @@ if __name__ == '__main__':
     input0_data = np.expand_dims(input0_data, axis=0)
     input1_data = np.full(shape=(1, 16), fill_value=-1, dtype=np.int32)
 
+    if FLAGS.http_headers is not None:
+        headers_dict = {l.split(':')[0]: l.split(':')[1]
+                        for l in FLAGS.http_headers}
+    else:
+        headers_dict = None
+
     # Infer with simple (With requested Outputs)
-    results = test_infer("simple", input0_data, input1_data)
+    results = test_infer("simple", input0_data, input1_data, headers_dict)
     print(results.get_response())
 
-    statistics = triton_client.get_inference_statistics(model_name="simple")
+    statistics = triton_client.get_inference_statistics(model_name="simple", headers=headers_dict)
     print(statistics)
     if len(statistics['model_stats']) != 1:
         print("FAILED: Inference Statistics")
@@ -127,7 +139,7 @@ if __name__ == '__main__':
             sys.exit(1)
 
     # Infer with simple (Without requested Outputs)
-    results = test_infer_no_outputs("simple", input0_data, input1_data)
+    results = test_infer_no_outputs("simple", input0_data, input1_data, headers=headers_dict)
     print(results.get_response())
 
     # Validate the results by comparing with precomputed values.
