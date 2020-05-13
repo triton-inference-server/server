@@ -156,7 +156,7 @@ class LifeCycleTest(unittest.TestCase):
         except Exception as ex:
             self.assertTrue(
                 ex.message().startswith(
-                    "Request for unknown model 'graphdef_float32_float32_float32'"))
+                    "Request for unknown model: 'graphdef_float32_float32_float32' has no available versions"))
 
         # And other models should be loaded successfully
         try:
@@ -192,7 +192,7 @@ class LifeCycleTest(unittest.TestCase):
             except Exception as ex:
                 self.assertTrue(
                     ex.message().startswith(
-                        "Request for unknown model 'graphdef_float32_float32_float32'"))
+                        "Request for unknown model: 'graphdef_float32_float32_float32' is not found"))
 
         # And other models should be loaded successfully
         try:
@@ -504,7 +504,7 @@ class LifeCycleTest(unittest.TestCase):
         except Exception as ex:
             self.assertTrue(
                 ex.message().startswith(
-                    "Request for unknown model 'savedmodel_float32_float32_float32'"))
+                    "Request for unknown model: 'savedmodel_float32_float32_float32' is not found"))
 
         # Remove one of the original models from the model repository.
         # Unloading is disabled so it should remain available in the status.
