@@ -107,7 +107,7 @@ Status DownloadFileFolder(const std::string& path, std::string* local_path);
 /// Delete the local copy of the file/folder (if needed).
 /// \param path The path of the file.
 /// \return Error status
-Status DestroyFileFolder(const std::string& path);
+Status ReleaseDownloadFileFolder(const std::string& path);
 
 /// Write a string to a file.
 /// \param path The path of the file.

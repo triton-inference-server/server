@@ -27,7 +27,6 @@
 #include "src/backends/custom/loader.h"
 
 #include <dlfcn.h>
-
 #include "src/core/logging.h"
 
 namespace nvidia { namespace inferenceserver {

@@ -93,7 +93,7 @@ CustomBackendFactory::CreateBackend(
 
   // Destroy local copy if exists
   for (const auto& custom_path : custom_paths) {
-    RETURN_IF_ERROR(DestroyFileFolder(custom_path.second));
+    RETURN_IF_ERROR(ReleaseDownloadFileFolder(custom_path.second));
   }
 
   *backend = std::move(local_backend);

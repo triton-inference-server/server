@@ -73,9 +73,8 @@ class FileSystem {
       const std::string& path, std::string* contents) = 0;
   virtual Status DownloadFileFolder(
       const std::string& path, std::string* local_path) = 0;
-  virtual int IsPathDirectory(const char* path) = 0;
-  virtual int DeleteFolderRecursive(const std::string& path) = 0;
-  virtual Status DestroyFileFolder(const std::string& path) = 0;
+  virtual Status DeleteFolderRecursive(const std::string& path) = 0;
+  virtual Status ReleaseDownloadFileFolder(const std::string& path) = 0;
   virtual Status WriteTextFile(
       const std::string& path, const std::string& contents) = 0;
 };
@@ -95,9 +94,8 @@ class LocalFileSystem : public FileSystem {
   Status ReadTextFile(const std::string& path, std::string* contents) override;
   Status DownloadFileFolder(
       const std::string& path, std::string* local_path) override;
-  int IsPathDirectory(const char* path) override;
-  int DeleteFolderRecursive(const std::string& path) override;
-  Status DestroyFileFolder(const std::string& path) override;
+  Status DeleteFolderRecursive(const std::string& path) override;
+  Status ReleaseDownloadFileFolder(const std::string& path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 };
@@ -228,18 +226,7 @@ LocalFileSystem::DownloadFileFolder(
   return Status::Success;
 }
 
-int
-LocalFileSystem::IsPathDirectory(const char* path)
-{
-  struct stat s_buf;
-
-  if (stat(path, &s_buf))
-    return 0;
-
-  return S_ISDIR(s_buf.st_mode);
-}
-
-int
+Status
 LocalFileSystem::DeleteFolderRecursive(const std::string& path)
 {
   struct dirent* ep;
@@ -250,26 +237,33 @@ LocalFileSystem::DeleteFolderRecursive(const std::string& path)
       continue;
     }
     std::string tmp_path = path + "/" + std::string(ep->d_name);
-    if (IsPathDirectory(tmp_path.c_str())) {
-      DeleteFolderRecursive(tmp_path);
+    bool is_dir;
+    RETURN_IF_ERROR(IsDirectory(path, &is_dir));
+    if (is_dir) {
+      return DeleteFolderRecursive(tmp_path);
     } else {
       if (remove(tmp_path.c_str()) != 0) {
-        return -1;
+        return Status(
+            Status::Code::INTERNAL, "Failed to delete file: " + tmp_path);
       }
     }
   }
 
   closedir(dp);
-  return rmdir(path.c_str());
+  if (rmdir(path.c_str()) != 0) {
+    return Status(Status::Code::INTERNAL, "Failed to delete folder: " + path);
+  }
+
+  return Status::Success;
 }
 
 Status
-LocalFileSystem::DestroyFileFolder(const std::string& path)
+LocalFileSystem::ReleaseDownloadFileFolder(const std::string& path)
 {
-  if (IsPathDirectory(path.c_str())) {
-    if (DeleteFolderRecursive(path) != 0) {
-      return Status(Status::Code::INTERNAL, "Failed to delete folder: " + path);
-    }
+  bool is_dir;
+  RETURN_IF_ERROR(IsDirectory(path, &is_dir));
+  if (is_dir) {
+    RETURN_IF_ERROR(DeleteFolderRecursive(path));
   } else {
     if (remove(path.c_str()) != 0) {
       return Status(Status::Code::INTERNAL, "Failed to delete file: " + path);
@@ -330,9 +324,8 @@ class GCSFileSystem : public FileSystem {
   Status ReadTextFile(const std::string& path, std::string* contents) override;
   Status DownloadFileFolder(
       const std::string& path, std::string* local_path) override;
-  int IsPathDirectory(const char* path) override;
-  int DeleteFolderRecursive(const std::string& path) override;
-  Status DestroyFileFolder(const std::string& path) override;
+  Status DeleteFolderRecursive(const std::string& path) override;
+  Status ReleaseDownloadFileFolder(const std::string& path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -600,22 +593,15 @@ GCSFileSystem::DownloadFileFolder(
   return Status::Success;
 }
 
-int
-GCSFileSystem::IsPathDirectory(const char* path)
-{
-  // Do nothing
-  return 0;
-}
-
-int
+Status
 GCSFileSystem::DeleteFolderRecursive(const std::string& path)
 {
   // Do nothing
-  return 0;
+  return Status::Success;
 }
 
 Status
-GCSFileSystem::DestroyFileFolder(const std::string& path)
+GCSFileSystem::ReleaseDownloadFileFolder(const std::string& path)
 {
   // Do nothing
   return Status::Success;
@@ -653,9 +639,8 @@ class S3FileSystem : public FileSystem {
   Status ReadTextFile(const std::string& path, std::string* contents) override;
   Status DownloadFileFolder(
       const std::string& path, std::string* local_path) override;
-  int IsPathDirectory(const char* path) override;
-  int DeleteFolderRecursive(const std::string& path) override;
-  Status DestroyFileFolder(const std::string& path) override;
+  Status DeleteFolderRecursive(const std::string& path) override;
+  Status ReleaseDownloadFileFolder(const std::string& path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -1094,22 +1079,15 @@ S3FileSystem::DownloadFileFolder(
   return Status::Success;
 }
 
-int
-S3FileSystem::IsPathDirectory(const char* path)
-{
-  // Do nothing
-  return 0;
-}
-
-int
+Status
 S3FileSystem::DeleteFolderRecursive(const std::string& path)
 {
   // Do nothing
-  return 0;
+  return Status::Success;
 }
 
 Status
-S3FileSystem::DestroyFileFolder(const std::string& path)
+S3FileSystem::ReleaseDownloadFileFolder(const std::string& path)
 {
   // Do nothing
   return Status::Success;
@@ -1344,13 +1322,13 @@ DownloadFileFolder(const std::string& path, std::string* local_path)
   return fs->DownloadFileFolder(path, local_path);
 }
 
+// Only delete file/folder if it is a local copy created from a Cloud repository
 Status
-DestroyFileFolder(const std::string& path)
+ReleaseDownloadFileFolder(const std::string& path)
 {
-  // If path represents local temporary file then must be deleted
   if (path.rfind("/tmp/file", 0) == 0) {
     static LocalFileSystem lfs;
-    return lfs.DestroyFileFolder(path);
+    return lfs.ReleaseDownloadFileFolder(path);
   }
 
   return Status::Success;

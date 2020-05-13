@@ -305,7 +305,7 @@ AutoFillSavedModel::Create(
         graphdef_backend_config->memory_limit_mb, nullptr /* tftrt_config */,
         false /* auto_mixed precision */);
 
-    RETURN_IF_ERROR(DestroyFileFolder(local_savedmodel_path));
+    RETURN_IF_ERROR(ReleaseDownloadFileFolder(local_savedmodel_path));
     if (err == nullptr) {
       savedmodel_dir = dir;
       break;

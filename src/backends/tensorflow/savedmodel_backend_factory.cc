@@ -90,7 +90,7 @@ SavedModelBackendFactory::CreateBackend(
 
   // Destroy local copy if exists
   for (const auto& model : models) {
-    RETURN_IF_ERROR(DestroyFileFolder(model.second));
+    RETURN_IF_ERROR(ReleaseDownloadFileFolder(model.second));
   }
 
   *backend = std::move(local_backend);

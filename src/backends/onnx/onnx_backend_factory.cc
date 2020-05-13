@@ -116,7 +116,7 @@ OnnxBackendFactory::CreateBackend(
   // Destroy local copy if exists
   for (const auto& model : models) {
     if (!model.second.first) {
-      RETURN_IF_ERROR(DestroyFileFolder(model.second.second));
+      RETURN_IF_ERROR(ReleaseDownloadFileFolder(model.second.second));
     }
   }
 
