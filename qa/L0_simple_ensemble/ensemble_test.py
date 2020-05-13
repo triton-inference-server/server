@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,27 +34,29 @@ import os
 import unittest
 import numpy as np
 import infer_util as iu
-from tensorrtserver.api import *
+import tritonhttpclient
 
 class EnsembleTest(unittest.TestCase):
     def _get_infer_count_per_version(self, model_name):
-        ctx = ServerStatusContext("localhost:8000", ProtocolType.HTTP, model_name)
-        ss = ctx.get_server_status()
-        self.assertEqual(len(ss.model_status), 1)
-        self.assertTrue(model_name in ss.model_status,
-                        "expected status for model " + model_name)
-        self.assertTrue(1 in ss.model_status[model_name].version_status,
-                        "expected status for version 1 of model " + model_name)
-        self.assertTrue(2 in ss.model_status[model_name].version_status,
-                        "expected status for version 2 of model " + model_name)
-        infer_count = []
-        infer_count.append(ss.model_status[model_name].version_status[1].model_inference_count)
-        infer_count.append(ss.model_status[model_name].version_status[2].model_inference_count)
+        triton_client = tritonhttpclient.InferenceServerClient("localhost:8000", verbose=True)
+        stats = triton_client.get_inference_statistics(model_name)
+        self.assertEqual(len(stats["model_stats"]), 2)
+        infer_count = [0, 0]
+        for model_stat in stats["model_stats"]:
+            self.assertEqual(model_stat["name"],
+                            model_name, "expected stats for model " + model_name)
+            model_version = model_stat['version']
+            if model_version == "1":
+                infer_count[0] = model_stat["inference_stats"]["success"]["count"]
+            elif model_version == "2":
+                infer_count[1] = model_stat["inference_stats"]["success"]["count"]
+            else:
+                self.assertTrue(False, "unexpected version {} for model {}".format(model_version, model_name))
         return infer_count
 
     def test_ensemble_add_sub(self):
         for bs in (1, 8):
-            iu.infer_exact(self, "ensemble_add_sub", (16,), bs,
+            iu.infer_exact(self, "ensemble_add_sub", (bs, 16), bs,
                                 np.int32, np.int32, np.int32)
         
         infer_count = self._get_infer_count_per_version("simple")
@@ -64,7 +66,7 @@ class EnsembleTest(unittest.TestCase):
     
     def test_ensemble_add_sub_one_output(self):
         for bs in (1, 8):
-            iu.infer_exact(self, "ensemble_add_sub", (16,), bs,
+            iu.infer_exact(self, "ensemble_add_sub", (bs, 16), bs,
                                 np.int32, np.int32, np.int32,
                                 outputs=("OUTPUT0",))
         
