@@ -54,6 +54,20 @@ else()
       TARGETS v2_image_client
       RUNTIME DESTINATION bin
     )
+
+    #
+    # v2_ensemble_image_client
+    #
+    add_executable(v2_ensemble_image_client v2_ensemble_image_client.cc)
+    target_link_libraries(
+      v2_ensemble_image_client
+      PRIVATE TRTIS::grpcclient_static
+      PRIVATE TRTIS::httpclient_static
+    )
+    install(
+      TARGETS v2_ensemble_image_client
+      RUNTIME DESTINATION bin
+    )
   endif()  # TRTIS_ENABLE_GRPC_V2 AND  # TRTIS_ENABLE_HTTP_V2
 
   if(${TRTIS_ENABLE_GRPC_V2})

@@ -102,8 +102,7 @@ Base64Encode(
   base64_init_encodestate(&es);
   *encoded_ptr = (char*)malloc(raw_size * 2); /* ~4/3 x raw_size */
   *encoded_size = base64_encode_block(raw_ptr, raw_size, *encoded_ptr, &es);
-  int padding_size =
-      base64_encode_blockend(*encoded_ptr + *encoded_size, &es);
+  int padding_size = base64_encode_blockend(*encoded_ptr + *encoded_size, &es);
   *encoded_size += padding_size;
 }
 
