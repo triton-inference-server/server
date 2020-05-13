@@ -104,7 +104,7 @@ class ServerMetadataTest(unittest.TestCase):
                 self.assertTrue(False, "expected unknown model failure")
         except InferenceServerException as ex:
             self.assertTrue(
-                ex.message().startswith("Request for unknown model 'foo'"))
+                ex.message().startswith("Request for unknown model: 'foo' is not found"))
 
     def test_unknown_model_version(self):
         try:
@@ -124,7 +124,7 @@ class ServerMetadataTest(unittest.TestCase):
                 self.assertTrue(False, "expected unknown model version failure")
         except InferenceServerException as ex:
             self.assertTrue(
-                ex.message().startswith("Request for unknown model 'graphdef_int32_int8_int8'"))
+                ex.message().startswith("Request for unknown model: 'graphdef_int32_int8_int8' version 99 is not found"))
 
     def test_model_latest_infer(self):
         input_size = 16
@@ -364,7 +364,7 @@ class ModelMetadataTest(unittest.TestCase):
                             url=pair[0], verbose=True)
 
                     self.assertTrue(triton_client.is_server_live())
-                    self.assertFalse(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_server_ready())
                     model_metadata = triton_client.get_model_metadata(model_name)
                     if pair[1] == "http":
                         self.assertEqual(model_name, model_metadata['name'])
@@ -427,7 +427,7 @@ class ModelMetadataTest(unittest.TestCase):
                             url=pair[0], verbose=True)
 
                     self.assertTrue(triton_client.is_server_live())
-                    self.assertFalse(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_server_ready())
                     model_metadata = triton_client.get_model_metadata(
                         model_name)
                     if pair[1] == "http":
@@ -483,7 +483,7 @@ class ModelMetadataTest(unittest.TestCase):
                             url=pair[0], verbose=True)
 
                     self.assertTrue(triton_client.is_server_live())
-                    self.assertFalse(triton_client.is_server_ready())
+                    self.assertTrue(triton_client.is_server_ready())
                     model_metadata = triton_client.get_model_metadata(
                         model_name)
                     if pair[1] == "http":
@@ -550,7 +550,7 @@ class ModelMetadataTest(unittest.TestCase):
                         url=pair[0], verbose=True)
 
                 self.assertTrue(triton_client.is_server_live())
-                self.assertFalse(triton_client.is_server_ready())
+                self.assertTrue(triton_client.is_server_ready())
 
                 # Returns infer stats for ALL models + versions
                 infer_stats = triton_client.get_inference_statistics()
