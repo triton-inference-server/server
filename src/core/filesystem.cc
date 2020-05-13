@@ -1347,12 +1347,10 @@ DownloadFileFolder(const std::string& path, std::string* local_path)
 Status
 DestroyFileFolder(const std::string& path)
 {
-  FileSystem* fs;
   // If path represents local temporary file then must be deleted
   if (path.rfind("/tmp/file", 0) == 0) {
     static LocalFileSystem lfs;
-    fs = &lfs;
-    return fs->DestroyFileFolder(path);
+    return lfs.DestroyFileFolder(path);
   }
 
   return Status::Success;
