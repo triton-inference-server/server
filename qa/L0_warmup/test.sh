@@ -48,7 +48,7 @@ DATADIR=`pwd`/models
 BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1 --exit-timeout-secs=120 --api-version=2"
+SERVER_ARGS="--model-repository=$DATADIR --log-verbose=1 --exit-timeout-secs=120"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 

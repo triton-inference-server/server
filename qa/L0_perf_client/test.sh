@@ -53,7 +53,7 @@ SHAPETENSORADTAFILE=`pwd`/json_input_data_files/shape_tensor_data.json
 IMAGE_JSONDATAFILE=`pwd`/json_input_data_files/image_data.json
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=${DATADIR} --model-repository=ensemble_model_repository --api-version=2"
+SERVER_ARGS="--model-repository=${DATADIR} --model-repository=ensemble_model_repository"
 SERVER_LOG="./inference_server.log"
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec\|: 0 usec"

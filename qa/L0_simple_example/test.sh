@@ -31,7 +31,7 @@ SIMPLE_CLIENT=../clients/simple_http_v2_infer_client
 SIMPLE_CLIENT_PY=../clients/simple_http_v2_infer_client.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
+SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 

@@ -65,7 +65,7 @@ rm -fr $REPO_DIR && mkdir $REPO_DIR && \
 sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
                 echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
 
-SERVER_ARGS="--model-repository=$REPO_DIR --api-version=2"
+SERVER_ARGS="--model-repository=$REPO_DIR"
 SERVER_LOG="inferenceserver.log"
 
 run_server

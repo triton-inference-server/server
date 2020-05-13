@@ -40,7 +40,7 @@ export CUDA_VISIBLE_DEVICES=0
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
+SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 

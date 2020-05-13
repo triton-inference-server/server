@@ -75,7 +75,7 @@ for MAYBE_SLASH in "" "/"; do
 
     # perform empty repo tests
 
-    SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120 --api-version=2 "
+    SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120 "
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -91,7 +91,7 @@ for MAYBE_SLASH in "" "/"; do
     touch models/dummy
     gsutil cp -r models/ "$BUCKET_URL_SLASH"
 
-    SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120 --api-version=2 "
+    SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120 "
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -139,10 +139,10 @@ for MAYBE_SLASH in "" "/"; do
 
         if [ "$repo" == "models" ]; then
             # set server arguments
-            SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120 --api-version=2 "
+            SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120 "
         else
             # set server arguments
-            SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120 --api-version=2 "
+            SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120 "
         fi
 
         run_server
