@@ -614,7 +614,7 @@ BaseBackend::Context::Run(
       return;
     }
 
-    total_batch_size += request->BatchSize();
+    total_batch_size += std::max(1U, request->BatchSize());
 
     // All requests must have equally-sized input tensors so use any
     // request as the representative for the input tensors.
@@ -762,7 +762,7 @@ BaseBackend::Context::Run(
           auto& response = responses[idx];
 
           const size_t request_element_cnt =
-              request->BatchSize() * batch1_element_cnt;
+              std::max(1U, request->BatchSize()) * batch1_element_cnt;
 
           const InferenceRequest::Input* request_input;
           Status status = request->ImmutableInput(input_name, &request_input);

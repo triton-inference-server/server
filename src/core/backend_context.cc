@@ -546,7 +546,8 @@ BackendInputCollector::ProcessTensor(
           buffer, buffer_byte_size, memory_type, memory_type_id);
     }
 
-    const size_t request_byte_size = batch1_byte_size * request->BatchSize();
+    const size_t request_byte_size =
+        batch1_byte_size * std::max(1U, request->BatchSize());
 
     const InferenceRequest::Input* request_input;
     Status status = request->ImmutableInput(name, &request_input);

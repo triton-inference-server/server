@@ -262,7 +262,7 @@ EnsembleContext::EnsembleContext(
   }
 
   if (ensemble_status_.IsOk()) {
-    batch_size_ = request_->BatchSize();
+    batch_size_ = std::max(1U, request_->BatchSize());
     correlation_id_ = request_->CorrelationId();
     flags_ = request_->Flags();
     priority_ = request_->Priority();
