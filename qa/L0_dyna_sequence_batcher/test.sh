@@ -70,7 +70,7 @@ for i in \
         test_length1_sequence \
          ; do
     SERVER_LOG="./$i.serverlog"
-    SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
+    SERVER_ARGS="--model-repository=`pwd`/models"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -113,7 +113,7 @@ for i in \
     ; do
 
     SERVER_LOG="./$i.serverlog"
-    SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
+    SERVER_ARGS="--model-repository=`pwd`/models"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -151,7 +151,7 @@ for i in \
     ; do
 
     SERVER_LOG="./$i.serverlog"
-    SERVER_ARGS="--model-repository=`pwd`/ragged_models --api-version=2"
+    SERVER_ARGS="--model-repository=`pwd`/ragged_models"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"

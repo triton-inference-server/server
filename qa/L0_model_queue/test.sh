@@ -42,7 +42,7 @@ VERIFY_TIMESTAMPS=verify_timestamps.py
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 OPTDIR=${OPTDIR:="/opt"}
 
-SERVER_ARGS="--model-repository=`pwd`/models --api-version=2"
+SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER=${OPTDIR}/tensorrtserver/bin/tritonserver
 
 source ../common/util.sh

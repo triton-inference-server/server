@@ -42,7 +42,7 @@ NULLCHAR_CLIENT_PY=nullchar_string_client.py
 CLIENT_LOG="./client.log"
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR --api-version=2"
+SERVER_ARGS="--model-repository=$DATADIR"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 

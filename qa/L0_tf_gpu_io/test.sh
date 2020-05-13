@@ -66,7 +66,7 @@ for BACKEND in $BACKENDS; do
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"gpu_io\"} ] } }" >> config.pbtxt)
 
-    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --api-version=2"
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
     SERVER_LOG="${MODEL_NAME}.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
