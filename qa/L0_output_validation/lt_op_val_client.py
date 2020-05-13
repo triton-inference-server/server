@@ -68,7 +68,7 @@ class OutputValidationTest(unittest.TestCase):
         body = '{"inputs":[{"name":"INPUT__0","shape":[1,1],"datatype":"FP32","data":[1.0]}],"outputs":[{"name":"OUTPUT__0"}]}'
         response = requests.post(url, data=body)
         msg=response.json()["error"]
-        self.assertTrue(msg.startswith("Request for unknown model 'libtorch_name_1_float32'"))
+        self.assertTrue(msg.startswith("Request for unknown model: 'libtorch_name_1_float32' has no available versions"))
 
     # successful run
     def test_success(self):
