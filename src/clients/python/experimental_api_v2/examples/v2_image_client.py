@@ -435,6 +435,11 @@ if __name__ == '__main__':
 
     sent_count = 0
 
+    if FLAGS.streaming:
+        triton_client.start_stream(
+            partial(completion_callback, user_data))
+
+
     while not last_request:
         input_filenames = []
         repeated_image_data = []
@@ -453,10 +458,6 @@ if __name__ == '__main__':
 
         # Send request
         try:
-            if FLAGS.streaming:
-                triton_client.start_stream(
-                    partial(completion_callback, user_data))
-
             for inputs, outputs, model_name, model_version in requestGenerator(
                     batched_image_data, input_name, output_name, dtype, FLAGS):
                 sent_count += 1
