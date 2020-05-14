@@ -151,9 +151,6 @@ class InferenceServerClient {
   // signal for worker thread to stop
   bool exiting_;
 
-  // Standalone request context used for synchronous request
-  std::shared_ptr<InferRequest> sync_request_;
-
   // The inference statistic of the current client
   InferStat infer_stat_;
 };
