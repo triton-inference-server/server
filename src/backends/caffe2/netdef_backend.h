@@ -78,32 +78,24 @@ class NetDefBackend : public InferenceBackend {
     Status ValidateOutputs(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
 
-    // Set an input tensor data from payloads.
-    Status SetInput(
-        const std::string& name, const DataType datatype,
-        const std::vector<int64_t>& dims, const size_t total_batch_size,
-        std::vector<Scheduler::Payload>* payloads,
+    // Set input tensors from one or more requests.
+    Status SetInputTensors(
+        size_t total_batch_size,
+        const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+        std::vector<std::unique_ptr<InferenceResponse>>* responses,
         std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
-        std::vector<InputInfo>* inputs, bool* cuda_copy);
+        bool* cuda_copy);
 
     // See BackendContext::Run()
-    Status Run(
-        const InferenceBackend* base,
-        std::vector<Scheduler::Payload>* payloads) override;
+    void Run(
+        InferenceBackend* base,
+        std::vector<std::unique_ptr<InferenceRequest>>&& requests) override;
 
-    // Set an input tensor from one or more payloads.
-    Status SetFixedSizedInputTensor(
-        const std::string& input_name, const std::vector<int64_t>& shape,
-        const Caffe2Workspace::DataType dtype, const size_t batch1_byte_size,
-        const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-        InputInfo* input, bool* cuda_copy);
-
-    // Read an output tensor into one or more payloads.
-    Status ReadFixedSizedOutputTensor(
-        const std::string& name, const Caffe2Workspace::DataType dtype,
-        const size_t dtype_byte_size, const size_t total_batch_size,
-        const DimsList& dims, std::vector<Scheduler::Payload>* payloads,
-        OutputInfo* output, bool* cuda_copy);
+    // Read output tensors to one or more requests.
+    Status ReadOutputTensors(
+        const InferenceBackend* base, size_t total_batch_size,
+        const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+        std::vector<std::unique_ptr<InferenceResponse>>* responses);
 
     // Caffe2 workspace.
     std::unique_ptr<Caffe2Workspace> workspace_;
