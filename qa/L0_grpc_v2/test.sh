@@ -148,6 +148,13 @@ for i in \
     fi
 done
 
+# Test with custom model
+$SIMPLE_INFER_CLIENT_PY -v -c >> ${CLIENT_LOG}.custom 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.custom
+    RET=1
+fi
+
 for i in \
    $SIMPLE_INFER_CLIENT \
    $SIMPLE_STRING_INFER_CLIENT \
@@ -188,6 +195,13 @@ for i in \
         fi
     fi
 done
+
+# Test with custom model
+$SIMPLE_INFER_CLIENT -v -c >> ${CLIENT_LOG}.c++.custom 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.custom
+    RET=1
+fi
 
 set -e
 kill $SERVER_PID
@@ -233,6 +247,35 @@ if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.c++.model_control
     RET=1
 fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Test with dynamic sequence models
+SERVER_ARGS="--model-repository=`pwd`/models_dyna --api-version=2"
+SERVER_LOG="./inference_server_dyna.log"
+CLIENT_LOG="./client_dyna.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+
+for client in \
+    SIMPLE_STREAM_INFER_CLIENT_PY \
+    SIMPLE_SEQUENCE_INFER_CLIENT_PY \
+    SIMPLE_STREAM_INFER_CLIENT \
+    SIMPLE_SEQUENCE_INFER_CLIENT; do
+
+    $i -v -d >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+done
+
 set -e
 
 kill $SERVER_PID

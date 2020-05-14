@@ -82,6 +82,12 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
+    parser.add_argument('-c',
+                        '--use_custom_model',
+                        action="store_true",
+                        required=False,
+                        default=False,
+                        help='Use custom model')
     parser.add_argument('-u',
                         '--url',
                         type=str,
@@ -101,6 +107,8 @@ if __name__ == '__main__':
         print("channel creation failed: " + str(e))
         sys.exit(1)
 
+    model_name = "simple_custom" if FLAGS.use_custom_model else "simple" 
+
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
     input0_data = np.arange(start=0, stop=16, dtype=np.int32)
@@ -113,11 +121,11 @@ if __name__ == '__main__':
     else:
         headers_dict = None
 
-    # Infer with simple (With requested Outputs)
-    results = test_infer("simple", input0_data, input1_data, headers_dict)
+    # Infer with requested Outputs
+    results = test_infer(model_name, input0_data, input1_data, headers_dict)
     print(results.get_response())
 
-    statistics = triton_client.get_inference_statistics(model_name="simple", headers=headers_dict)
+    statistics = triton_client.get_inference_statistics(model_name=model_name, headers=headers_dict)
     print(statistics)
     if len(statistics['model_stats']) != 1:
         print("FAILED: Inference Statistics")
@@ -138,8 +146,8 @@ if __name__ == '__main__':
             print("sync infer error: incorrect difference")
             sys.exit(1)
 
-    # Infer with simple (Without requested Outputs)
-    results = test_infer_no_outputs("simple", input0_data, input1_data, headers=headers_dict)
+    # Infer without requested Outputs
+    results = test_infer_no_outputs(model_name, input0_data, input1_data, headers=headers_dict)
     print(results.get_response())
 
     # Validate the results by comparing with precomputed values.

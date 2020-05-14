@@ -31,7 +31,6 @@ import numpy as np
 import os
 from functools import partial
 from builtins import range
-import gevent
 import sys
 import tritonhttpclient
 import tritongrpcclient
@@ -111,15 +110,10 @@ if __name__ == '__main__':
     finished_requests = 0
     max_completion_time = 0
     timeout = None
-    if  FLAGS.protocol.lower() != "grpc":
-      timeout=1
 
     while True:
         try:
-          result, finish_time = finish_times.get(timeout=timeout)
-        except queue.Empty as e:
-          gevent.sleep(1)
-          continue
+          result, finish_time = finish_times.get()
         
         if type(result) == InferenceServerException:
             print(result)
