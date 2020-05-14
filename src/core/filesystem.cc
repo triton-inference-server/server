@@ -71,10 +71,9 @@ class FileSystem {
       const std::string& path, std::set<std::string>* files) = 0;
   virtual Status ReadTextFile(
       const std::string& path, std::string* contents) = 0;
-  virtual Status DownloadFileFolder(
-      const std::string& path, std::string* local_path) = 0;
-  virtual Status DeleteFolderRecursive(const std::string& path) = 0;
-  virtual Status ReleaseDownloadFileFolder(const std::string& path) = 0;
+  virtual Status LocalizeFileFolder(
+      const std::string& path,
+      const std::shared_ptr<TemporaryDirectory>& local_path) = 0;
   virtual Status WriteTextFile(
       const std::string& path, const std::string& contents) = 0;
 };
@@ -92,10 +91,9 @@ class LocalFileSystem : public FileSystem {
   Status GetDirectoryFiles(
       const std::string& path, std::set<std::string>* files) override;
   Status ReadTextFile(const std::string& path, std::string* contents) override;
-  Status DownloadFileFolder(
-      const std::string& path, std::string* local_path) override;
-  Status DeleteFolderRecursive(const std::string& path) override;
-  Status ReleaseDownloadFileFolder(const std::string& path) override;
+  Status LocalizeFileFolder(
+      const std::string& path,
+      const std::shared_ptr<TemporaryDirectory>& local_path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 };
@@ -217,59 +215,13 @@ LocalFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 }
 
 Status
-LocalFileSystem::DownloadFileFolder(
-    const std::string& path, std::string* local_path)
+LocalFileSystem::LocalizeFileFolder(
+    const std::string& path,
+    const std::shared_ptr<TemporaryDirectory>& local_path)
 {
   // For local file system we don't actually need to download the folder. We use
   // it in place.
-  *local_path = path;
-  return Status::Success;
-}
-
-Status
-LocalFileSystem::DeleteFolderRecursive(const std::string& path)
-{
-  struct dirent* ep;
-  DIR* dp = opendir(path.c_str());
-
-  while ((ep = readdir(dp)) != NULL) {
-    if (strcmp(ep->d_name, ".") == 0 || strcmp(ep->d_name, "..") == 0) {
-      continue;
-    }
-    std::string tmp_path = path + "/" + std::string(ep->d_name);
-    bool is_dir;
-    RETURN_IF_ERROR(IsDirectory(path, &is_dir));
-    if (is_dir) {
-      return DeleteFolderRecursive(tmp_path);
-    } else {
-      if (remove(tmp_path.c_str()) != 0) {
-        return Status(
-            Status::Code::INTERNAL, "Failed to delete file: " + tmp_path);
-      }
-    }
-  }
-
-  closedir(dp);
-  if (rmdir(path.c_str()) != 0) {
-    return Status(Status::Code::INTERNAL, "Failed to delete folder: " + path);
-  }
-
-  return Status::Success;
-}
-
-Status
-LocalFileSystem::ReleaseDownloadFileFolder(const std::string& path)
-{
-  bool is_dir;
-  RETURN_IF_ERROR(IsDirectory(path, &is_dir));
-  if (is_dir) {
-    RETURN_IF_ERROR(DeleteFolderRecursive(path));
-  } else {
-    if (remove(path.c_str()) != 0) {
-      return Status(Status::Code::INTERNAL, "Failed to delete file: " + path);
-    }
-  }
-
+  local_path->model_path = path;
   return Status::Success;
 }
 
@@ -322,10 +274,9 @@ class GCSFileSystem : public FileSystem {
   Status GetDirectoryFiles(
       const std::string& path, std::set<std::string>* files) override;
   Status ReadTextFile(const std::string& path, std::string* contents) override;
-  Status DownloadFileFolder(
-      const std::string& path, std::string* local_path) override;
-  Status DeleteFolderRecursive(const std::string& path) override;
-  Status ReleaseDownloadFileFolder(const std::string& path) override;
+  Status LocalizeFileFolder(
+      const std::string& path,
+      const std::shared_ptr<TemporaryDirectory>& local_path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -584,26 +535,13 @@ GCSFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 }
 
 Status
-GCSFileSystem::DownloadFileFolder(
-    const std::string& path, std::string* local_path)
+GCSFileSystem::LocalizeFileFolder(
+    const std::string& path,
+    const std::shared_ptr<TemporaryDirectory>& local_path)
 {
-  // For GCS we don't actually need to download the folder. We use tensorflow's
-  // built in support for loading models directly from GCS.
-  *local_path = path;
-  return Status::Success;
-}
-
-Status
-GCSFileSystem::DeleteFolderRecursive(const std::string& path)
-{
-  // Do nothing
-  return Status::Success;
-}
-
-Status
-GCSFileSystem::ReleaseDownloadFileFolder(const std::string& path)
-{
-  // Do nothing
+  // For GCS we don't download the folder.
+  // FIXME We will need to fix this in the future.
+  local_path->model_path = path;
   return Status::Success;
 }
 
@@ -637,10 +575,9 @@ class S3FileSystem : public FileSystem {
   Status GetDirectoryFiles(
       const std::string& path, std::set<std::string>* files) override;
   Status ReadTextFile(const std::string& path, std::string* contents) override;
-  Status DownloadFileFolder(
-      const std::string& path, std::string* local_path) override;
-  Status DeleteFolderRecursive(const std::string& path) override;
-  Status ReleaseDownloadFileFolder(const std::string& path) override;
+  Status LocalizeFileFolder(
+      const std::string& path,
+      const std::shared_ptr<TemporaryDirectory>& local_path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -959,8 +896,9 @@ S3FileSystem::ReadTextFile(const std::string& path, std::string* contents)
 }
 
 Status
-S3FileSystem::DownloadFileFolder(
-    const std::string& path, std::string* local_path)
+S3FileSystem::LocalizeFileFolder(
+    const std::string& path,
+    const std::shared_ptr<TemporaryDirectory>& local_path)
 {
   bool exists;
   RETURN_IF_ERROR(FileExists(path, &exists));
@@ -991,13 +929,13 @@ S3FileSystem::DownloadFileFolder(
               ", errno:" + strerror(errno));
     }
 
-    *local_path = std::string(tmp_folder);
+    local_path->model_path = std::string(tmp_folder);
     RETURN_IF_ERROR(GetDirectoryContents(effective_path, &contents));
 
     for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
       bool is_subdir;
       std::string s3_fpath = JoinPath({effective_path, *iter});
-      std::string local_fpath = JoinPath({*local_path, *iter});
+      std::string local_fpath = JoinPath({local_path->model_path, *iter});
       RETURN_IF_ERROR(IsDirectory(s3_fpath, &is_subdir));
       if (is_subdir) {
         // Create local mirror of sub-directories
@@ -1038,7 +976,8 @@ S3FileSystem::DownloadFileFolder(
         auto& retrieved_file =
             get_object_outcome.GetResultWithOwnership().GetBody();
         std::string s3_removed_path = (*iter).substr(effective_path.size());
-        std::string local_file_path = JoinPath({*local_path, s3_removed_path});
+        std::string local_file_path =
+            JoinPath({local_path->model_path, s3_removed_path});
         std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
         output_file << retrieved_file.rdbuf();
         output_file.close();
@@ -1055,7 +994,7 @@ S3FileSystem::DownloadFileFolder(
           "Failed to create local temp file: " + file_template);
     }
 
-    *local_path = file_template;
+    local_path->model_path = file_template;
     std::string bucket, object;
     RETURN_IF_ERROR(ParsePath(effective_path, &bucket, &object));
 
@@ -1068,7 +1007,8 @@ S3FileSystem::DownloadFileFolder(
     if (get_object_outcome.IsSuccess()) {
       auto& retrieved_file =
           get_object_outcome.GetResultWithOwnership().GetBody();
-      std::ofstream output_file(local_path->c_str(), std::ios::binary);
+      std::ofstream output_file(
+          local_path->model_path.c_str(), std::ios::binary);
       output_file << retrieved_file.rdbuf();
       output_file.close();
     } else {
@@ -1076,20 +1016,6 @@ S3FileSystem::DownloadFileFolder(
           Status::Code::INTERNAL, "Failed to get object at " + effective_path);
     }
   }
-  return Status::Success;
-}
-
-Status
-S3FileSystem::DeleteFolderRecursive(const std::string& path)
-{
-  // Do nothing
-  return Status::Success;
-}
-
-Status
-S3FileSystem::ReleaseDownloadFileFolder(const std::string& path)
-{
-  // Do nothing
   return Status::Success;
 }
 
@@ -1315,25 +1241,14 @@ ReadTextProto(const std::string& path, google::protobuf::Message* msg)
 }
 
 Status
-DownloadFileFolder(const std::string& path, std::string* local_path)
+LocalizeFileFolder(
+    const std::string& path,
+    const std::shared_ptr<TemporaryDirectory>& local_path)
 {
   FileSystem* fs;
   RETURN_IF_ERROR(GetFileSystem(path, &fs));
-  return fs->DownloadFileFolder(path, local_path);
+  return fs->LocalizeFileFolder(path, local_path);
 }
-
-// Only delete file/folder if it is a local copy created from a Cloud repository
-Status
-ReleaseDownloadFileFolder(const std::string& path)
-{
-  if (path.rfind("/tmp/file", 0) == 0) {
-    static LocalFileSystem lfs;
-    return lfs.ReleaseDownloadFileFolder(path);
-  }
-
-  return Status::Success;
-}
-
 
 Status
 WriteTextProto(const std::string& path, const google::protobuf::Message& msg)

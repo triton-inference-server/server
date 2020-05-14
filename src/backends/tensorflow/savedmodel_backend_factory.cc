@@ -68,15 +68,22 @@ SavedModelBackendFactory::CreateBackend(
   RETURN_IF_ERROR(GetDirectorySubdirs(path, &savedmodel_subdirs));
 
   std::unordered_map<std::string, std::string> models;
+  std::vector<std::shared_ptr<TemporaryDirectory>> local_savedmodel(
+      savedmodel_subdirs.size());
+  for (size_t s = 0; s < savedmodel_subdirs.size(); s++) {
+    local_savedmodel[s] = std::make_shared<TemporaryDirectory>("");
+    std::cerr << "Test: " << local_savedmodel[s]->model_path;
+  }
+
+  int i = 0;
   for (const auto& filename : savedmodel_subdirs) {
     const auto savedmodel_path = JoinPath({path, filename});
-    std::string local_savedmodel_path;
 
-    RETURN_IF_ERROR(
-        DownloadFileFolder(savedmodel_path, &local_savedmodel_path));
+    RETURN_IF_ERROR(LocalizeFileFolder(savedmodel_path, local_savedmodel[i]));
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(local_savedmodel_path));
+        std::make_tuple(local_savedmodel[i]->model_path));
+    i++;
   }
 
   // Create the backend for the model and all the execution contexts
@@ -87,11 +94,6 @@ SavedModelBackendFactory::CreateBackend(
       path, model_config, backend_config_.get(),
       kTensorFlowSavedModelPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
-
-  // Destroy local copy if exists
-  for (const auto& model : models) {
-    RETURN_IF_ERROR(ReleaseDownloadFileFolder(model.second));
-  }
 
   *backend = std::move(local_backend);
   return Status::Success;

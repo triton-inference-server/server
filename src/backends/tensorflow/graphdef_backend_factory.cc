@@ -69,14 +69,20 @@ GraphDefBackendFactory::CreateBackend(
       GetDirectoryFiles(path, true /* skip_hidden_files */, &graphdef_files));
 
   std::unordered_map<std::string, std::string> models;
+  std::vector<std::shared_ptr<TemporaryDirectory>> local_graphdef(
+      graphdef_files.size());
+  for (size_t s = 0; s < graphdef_files.size(); s++) {
+    local_graphdef[s] = std::make_shared<TemporaryDirectory>("");
+  }
+
+  int i = 0;
   for (const auto& filename : graphdef_files) {
     const auto graphdef_path = JoinPath({path, filename});
-    std::string local_graphdef_path;
-
-    RETURN_IF_ERROR(DownloadFileFolder(graphdef_path, &local_graphdef_path));
+    RETURN_IF_ERROR(LocalizeFileFolder(graphdef_path, local_graphdef[i]));
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(local_graphdef_path));
+        std::make_tuple(local_graphdef[i]->model_path));
+    i++;
   }
 
   // Create the backend for the model and all the execution contexts
@@ -86,11 +92,6 @@ GraphDefBackendFactory::CreateBackend(
   RETURN_IF_ERROR(local_backend->Init(
       path, model_config, backend_config_.get(), kTensorFlowGraphDefPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
-
-  // Destroy local copy if exists
-  for (const auto& model : models) {
-    RETURN_IF_ERROR(ReleaseDownloadFileFolder(model.second));
-  }
 
   *backend = std::move(local_backend);
   return Status::Success;

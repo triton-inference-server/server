@@ -25,11 +25,64 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <string>
 #include "google/protobuf/message.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
+
+struct TemporaryDirectory {
+  std::string model_path;
+
+  TemporaryDirectory(std::string path) : model_path(path) {}
+
+  ~TemporaryDirectory()
+  {
+    // Only delete file/folder if it is a local copy created from a Cloud
+    // repository
+    if (model_path.rfind("/tmp/file", 0) == 0) {
+      if (IsPathDirectory(model_path.c_str())) {
+        DeleteFolderRecursive(model_path);
+      } else {
+        remove(model_path.c_str());
+      }
+    }
+  }
+
+  bool IsPathDirectory(const char* path)
+  {
+    struct stat s_buf;
+    if (stat(path, &s_buf)) {
+      return 0;
+    }
+
+    return S_ISDIR(s_buf.st_mode);
+  }
+
+  void DeleteFolderRecursive(const std::string& path)
+  {
+    struct dirent* ep;
+    DIR* dp = opendir(path.c_str());
+
+    while ((ep = readdir(dp)) != NULL) {
+      if (strcmp(ep->d_name, ".") == 0 || strcmp(ep->d_name, "..") == 0) {
+        continue;
+      }
+      std::string tmp_path = path + "/" + std::string(ep->d_name);
+      if (IsPathDirectory(tmp_path.c_str())) {
+        DeleteFolderRecursive(tmp_path);
+      } else {
+        remove(tmp_path.c_str());
+      }
+    }
+
+    closedir(dp);
+    rmdir(path.c_str());
+  }
+};
 
 /// Is a path an absolute path?
 /// \param path The path.
@@ -102,12 +155,9 @@ Status ReadTextFile(const std::string& path, std::string* contents);
 /// \param path The path of the file.
 /// \param local_path Returns the local path of the file.
 /// \return Error status
-Status DownloadFileFolder(const std::string& path, std::string* local_path);
-
-/// Delete the local copy of the file/folder (if needed).
-/// \param path The path of the file.
-/// \return Error status
-Status ReleaseDownloadFileFolder(const std::string& path);
+Status LocalizeFileFolder(
+    const std::string& path,
+    const std::shared_ptr<TemporaryDirectory>& local_path);
 
 /// Write a string to a file.
 /// \param path The path of the file.

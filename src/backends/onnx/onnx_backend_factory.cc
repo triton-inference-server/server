@@ -82,16 +82,23 @@ OnnxBackendFactory::CreateBackend(
   // or path to downloaded copy of the subdir.
   std::unordered_map<std::string, std::pair<bool, std::string>> models;
 
+  std::vector<std::shared_ptr<TemporaryDirectory>> local_onnx(
+      onnx_files.size());
+  for (size_t s = 0; s < onnx_files.size(); s++) {
+    local_onnx[s] = std::make_shared<TemporaryDirectory>("");
+  }
+
   // Download the subdirs so that relative file references in the main
   // model file work correctly.
+  int i = 0;
   for (const auto& dirname : onnx_subdirs) {
     const auto onnx_path = JoinPath({path, dirname});
-    std::string local_onnx_path;
-
-    RETURN_IF_ERROR(DownloadFileFolder(onnx_path, &local_onnx_path));
+    RETURN_IF_ERROR(LocalizeFileFolder(onnx_path, local_onnx[i]));
     models.emplace(
         std::piecewise_construct, std::make_tuple(dirname),
-        std::make_tuple(std::move(std::make_pair(false, local_onnx_path))));
+        std::make_tuple(
+            std::move(std::make_pair(false, local_onnx[i]->model_path))));
+    i++;
   }
 
   for (const auto& filename : onnx_files) {
@@ -112,13 +119,6 @@ OnnxBackendFactory::CreateBackend(
   RETURN_IF_ERROR(
       local_backend->Init(path, model_config, kOnnxRuntimeOnnxPlatform));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
-
-  // Destroy local copy if exists
-  for (const auto& model : models) {
-    if (!model.second.first) {
-      RETURN_IF_ERROR(ReleaseDownloadFileFolder(model.second.second));
-    }
-  }
 
   *backend = std::move(local_backend);
   return Status::Success;

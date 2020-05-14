@@ -66,14 +66,20 @@ CustomBackendFactory::CreateBackend(
       GetDirectoryFiles(path, true /* skip_hidden_files */, &custom_files));
 
   std::unordered_map<std::string, std::string> custom_paths;
+  std::vector<std::shared_ptr<TemporaryDirectory>> local_custom(
+      custom_files.size());
+  for (size_t s = 0; s < custom_files.size(); s++) {
+    local_custom[s] = std::make_shared<TemporaryDirectory>("");
+  }
+
+  int i = 0;
   for (const auto& filename : custom_files) {
     const auto custom_path = JoinPath({path, filename});
-    std::string local_custom_path;
-
-    RETURN_IF_ERROR(DownloadFileFolder(custom_path, &local_custom_path));
+    RETURN_IF_ERROR(LocalizeFileFolder(custom_path, local_custom[i]));
     custom_paths.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(local_custom_path));
+        std::make_tuple(local_custom[i]->model_path));
+    i++;
   }
 
   // Create the vector of server parameter values, indexed by the
@@ -90,11 +96,6 @@ CustomBackendFactory::CreateBackend(
       new CustomBackend(min_compute_capability));
   RETURN_IF_ERROR(local_backend->Init(path, server_params, model_config));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(custom_paths));
-
-  // Destroy local copy if exists
-  for (const auto& custom_path : custom_paths) {
-    RETURN_IF_ERROR(ReleaseDownloadFileFolder(custom_path.second));
-  }
 
   *backend = std::move(local_backend);
   return Status::Success;
