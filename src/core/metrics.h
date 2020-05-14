@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -38,6 +38,12 @@ namespace nvidia { namespace inferenceserver {
 
 class Metrics {
  public:
+  // Are metrics enabled?
+  static bool Enabled();
+
+  // Enable reporting of metrics
+  static void EnableMetrics();
+
   // Enable reporting of GPU metrics
   static void EnableGPUMetrics();
 
@@ -51,7 +57,6 @@ class Metrics {
   // if a UUID is found, return false if a UUID cannot be returned.
   static bool UUIDForCudaDevice(int cuda_device, std::string* uuid);
 
-#ifdef TRTIS_ENABLE_STATS
   // Metric family counting successful inference requests
   static prometheus::Family<prometheus::Counter>& FamilyInferenceSuccess()
   {
@@ -87,14 +92,6 @@ class Metrics {
     return GetSingleton()->inf_request_duration_us_family_;
   }
 
-  // Metric family of cumulative inference compute duration, in
-  // microseconds
-  static prometheus::Family<prometheus::Counter>&
-  FamilyInferenceComputeDuration()
-  {
-    return GetSingleton()->inf_compute_duration_us_family_;
-  }
-
   // Metric family of cumulative inference queuing duration, in
   // microseconds
   static prometheus::Family<prometheus::Counter>& FamilyInferenceQueueDuration()
@@ -102,12 +99,23 @@ class Metrics {
     return GetSingleton()->inf_queue_duration_us_family_;
   }
 
-  // Metric family of load-ratio histogram
-  static prometheus::Family<prometheus::Histogram>& FamilyInferenceLoadRatio()
+  // Metric family of cumulative inference compute durations, in
+  // microseconds
+  static prometheus::Family<prometheus::Counter>&
+  FamilyInferenceComputeInputDuration()
   {
-    return GetSingleton()->inf_load_ratio_family_;
+    return GetSingleton()->inf_compute_input_duration_us_family_;
   }
-#endif  // TRTIS_ENABLE_STATS
+  static prometheus::Family<prometheus::Counter>&
+  FamilyInferenceComputeInferDuration()
+  {
+    return GetSingleton()->inf_compute_infer_duration_us_family_;
+  }
+  static prometheus::Family<prometheus::Counter>&
+  FamilyInferenceComputeOutputDuration()
+  {
+    return GetSingleton()->inf_compute_output_duration_us_family_;
+  }
 
  private:
   Metrics();
@@ -118,16 +126,18 @@ class Metrics {
   std::shared_ptr<prometheus::Registry> registry_;
   std::unique_ptr<prometheus::Serializer> serializer_;
 
-#ifdef TRTIS_ENABLE_STATS
   prometheus::Family<prometheus::Counter>& inf_success_family_;
   prometheus::Family<prometheus::Counter>& inf_failure_family_;
   prometheus::Family<prometheus::Counter>& inf_count_family_;
   prometheus::Family<prometheus::Counter>& inf_count_exec_family_;
   prometheus::Family<prometheus::Counter>& inf_request_duration_us_family_;
-  prometheus::Family<prometheus::Counter>& inf_compute_duration_us_family_;
   prometheus::Family<prometheus::Counter>& inf_queue_duration_us_family_;
-  prometheus::Family<prometheus::Histogram>& inf_load_ratio_family_;
-#endif  // TRTIS_ENABLE_STATS
+  prometheus::Family<prometheus::Counter>&
+      inf_compute_input_duration_us_family_;
+  prometheus::Family<prometheus::Counter>&
+      inf_compute_infer_duration_us_family_;
+  prometheus::Family<prometheus::Counter>&
+      inf_compute_output_duration_us_family_;
 #ifdef TRTIS_ENABLE_METRICS_GPU
   prometheus::Family<prometheus::Gauge>& gpu_utilization_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_total_family_;
@@ -146,6 +156,8 @@ class Metrics {
   std::unique_ptr<std::thread> nvml_thread_;
   std::atomic<bool> nvml_thread_exit_;
 #endif  // TRTIS_ENABLE_METRICS_GPU
+
+  bool metrics_enabled_;
   bool gpu_metrics_enabled_;
 };
 

@@ -29,6 +29,7 @@
 #include "src/core/backend.h"
 #include "src/core/backend_context.h"
 #include "src/core/infer_request.h"
+#include "src/core/metric_model_reporter.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
@@ -77,7 +78,8 @@ class CustomBackend : public InferenceBackend {
 
     Context(
         const std::string& name, const int gpu_device, const int max_batch_size,
-        const bool enable_pinned_input, const bool enable_pinned_output);
+        const bool enable_pinned_input, const bool enable_pinned_output,
+        std::unique_ptr<MetricModelReporter>&& metric_reporter);
     ~Context();
 
     DISALLOW_MOVE(Context);
