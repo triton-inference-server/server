@@ -223,7 +223,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 set +e
 
-for client in \
+for i in \
     $SIMPLE_SEQUENCE_INFER_CLIENT \
     $SIMPLE_SEQUENCE_INFER_CLIENT_PY; do
 
