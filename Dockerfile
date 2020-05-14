@@ -404,11 +404,6 @@ RUN apt-get update && \
     (cd $INTEL_CVSDK_DIR/deployment_tools/model_optimizer && \
         pip3 install -r requirements_onnx.txt)
 
-# Add some links for backwards compatibility for now...
-RUN cd /opt && ln -s tritonserver tensorrtserver && \
-    cd /opt/tritonserver/bin && ln -s tritonserver trtserver && \
-    cd /opt/tritonserver/lib && ln -s libtritonserver.so libtrtserver.so
-
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
  && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \

@@ -27,11 +27,11 @@
 
 ############################################################################
 ## This script generates custom operations needed by some of the
-## tensorrtserver CI tests. Generating these custom operations
-## requires using the TensorFlow container.
+## Triton's CI tests. Generating these custom operations requires
+## using the TensorFlow container.
 ##
-## 1. Update TENSORFLOW_IMAGE and PYTORCH_IMAGE to match what is being used
-## by the tensorrtserver release being tested.
+## 1. Update TENSORFLOW_IMAGE and PYTORCH_IMAGE to match what is being
+## used by the Triton release being tested.
 ##
 ## 2. Run this script to create /tmp/qa_custom_ops.
 ##

@@ -38,7 +38,6 @@ import unittest
 import numpy as np
 import test_util as tu
 import sequence_util as su
-from tensorrtserver.api import *
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
@@ -466,7 +465,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113,1114), dtype, 3)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
-                
+
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain all
@@ -561,7 +560,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             precreated_shm3_handles = self.precreate_register_regions((1111,1112,1113), dtype, 3)
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
-                
+
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain all
@@ -657,7 +656,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                                                       tensor_shape=(3,))
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
-                
+
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain all
@@ -757,7 +756,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                                                       tensor_shape=(3,))
             try:
                 model_name = tu.get_sequence_model_name(trial, dtype)
-                
+
                 self.check_setup(model_name)
 
                 # Need scheduler to wait for queue to contain all

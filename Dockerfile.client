@@ -85,7 +85,6 @@ COPY qa/images/mug.jpg images/mug.jpg
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
 RUN pip3 install --upgrade  \
-            install/python/tensorrtserver*.whl \
             install/python/triton*.whl \
             numpy pillow
 
