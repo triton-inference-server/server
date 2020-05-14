@@ -216,8 +216,7 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
 
     filenames.sort()
 
-    output = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor(
-    )
+    output = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output.name = output_name
     output.parameters['classification'].int64_param = FLAGS.classes
     request.outputs.extend([output])
