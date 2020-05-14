@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -57,3 +57,9 @@ target_include_directories(onnxruntime-backend-library PRIVATE ${TRTIS_ONNXRUNTI
 if(${TRTIS_ENABLE_GPU})
   target_include_directories(onnxruntime-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRTIS_ENABLE_GPU
+if(${TRTIS_ENABLE_METRICS})
+  target_include_directories(
+    onnxruntime-backend-library
+    PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
+  )
+endif() # TRTIS_ENABLE_METRICS

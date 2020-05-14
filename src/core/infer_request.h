@@ -42,6 +42,7 @@ namespace nvidia { namespace inferenceserver {
 
 class InferenceBackend;
 class InferenceServer;
+class MetricModelReporter;
 
 //
 // An inference request. A request can be used multiple times for
@@ -391,8 +392,8 @@ class InferenceRequest {
   // Report the statistics to stats collectors associated with the request.
   // Duration and timestamps provide two granularities for stats collectors.
   void ReportStatistics(
-      bool success, const uint64_t compute_start_ns,
-      const uint64_t compute_input_end_ns,
+      MetricModelReporter* metric_reporter, bool success,
+      const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
       const uint64_t compute_output_start_ns, const uint64_t compute_end_ns);
 
   // Statistics for each request are aggregated into the corresponding

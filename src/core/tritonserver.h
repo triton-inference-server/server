@@ -307,7 +307,7 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_MessageSerializeToJson(
 /// Metric format types
 typedef enum tritonserver_metricformat_enum {
   TRITONSERVER_METRIC_PROMETHEUS
-} TRITONSERVER_Metric_Format;
+} TRITONSERVER_MetricFormat;
 
 /// Delete a metrics object.
 ///
@@ -337,7 +337,7 @@ TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_MetricsDelete(
 /// metrics.
 /// \return a TRITONSERVER_Error indicating success or failure.
 TRITONSERVER_EXPORT TRITONSERVER_Error* TRITONSERVER_MetricsFormatted(
-    TRITONSERVER_Metrics* metrics, TRITONSERVER_Metric_Format format,
+    TRITONSERVER_Metrics* metrics, TRITONSERVER_MetricFormat format,
     const char** base, size_t* byte_size);
 
 /// TRITONSERVER_InferenceTrace

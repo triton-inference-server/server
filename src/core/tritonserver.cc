@@ -577,7 +577,7 @@ TRITONSERVER_MetricsDelete(TRITONSERVER_Metrics* metrics)
 
 TRITONSERVER_Error*
 TRITONSERVER_MetricsFormatted(
-    TRITONSERVER_Metrics* metrics, TRITONSERVER_Metric_Format format,
+    TRITONSERVER_Metrics* metrics, TRITONSERVER_MetricFormat format,
     const char** base, size_t* byte_size)
 {
   TritonServerMetrics* lmetrics =
@@ -1389,11 +1389,16 @@ TRITONSERVER_ServerNew(
 
   NVTX_INITIALIZE;
 
+#ifdef TRTIS_ENABLE_METRICS
+  if (loptions->Metrics()) {
+    ni::Metrics::EnableMetrics();
+  }
 #ifdef TRTIS_ENABLE_METRICS_GPU
   if (loptions->Metrics() && loptions->GpuMetrics()) {
     ni::Metrics::EnableGPUMetrics();
   }
 #endif  // TRTIS_ENABLE_METRICS_GPU
+#endif  // TRTIS_ENABLE_METRICS
 
   lserver->SetId(loptions->ServerId());
   lserver->SetModelRepositoryPaths(loptions->ModelRepositoryPaths());

@@ -42,6 +42,7 @@
 namespace nvidia { namespace inferenceserver {
 
 class InferenceBackend;
+class MetricModelReporter;
 
 //
 // BackendContext
@@ -62,9 +63,13 @@ struct BackendContext {
 
   BackendContext(
       const std::string& name, const int gpu_device, const int max_batch_size,
-      const bool enable_pinned_input, const bool enable_pinned_output);
+      const bool enable_pinned_input, const bool enable_pinned_output,
+      std::unique_ptr<MetricModelReporter>&& metric_reporter);
 
   virtual ~BackendContext();
+
+  // Get the metric reporter for this model instance.
+  MetricModelReporter* MetricReporter() { return metric_reporter_.get(); }
 
   // Create the CUDA stream for data transfer operations. If 'stream' is
   // nullptr, the stream will be created on 'stream_'. Have no effect if GPU
@@ -108,8 +113,11 @@ struct BackendContext {
   const bool enable_pinned_input_;
   const bool enable_pinned_output_;
 
-  // The stream where data transfer operations are executed on.
+  // The stream that executes data transfer operations.
   cudaStream_t stream_;
+
+  // Metric reporter, nullptr if no metrics should be collected.
+  std::unique_ptr<MetricModelReporter> metric_reporter_;
 };
 
 //

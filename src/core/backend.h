@@ -36,48 +36,47 @@
 namespace nvidia { namespace inferenceserver {
 
 #ifdef TRTIS_ENABLE_STATS
-#define FAIL_ALL_AND_RETURN_IF_ERROR(REQUESTS, RESPONSES, S, LOG_MSG) \
-  do {                                                                \
-    const auto& status__ = (S);                                       \
-    if (!status__.IsOk()) {                                           \
-      for (auto& response : (RESPONSES)) {                            \
-        if (response != nullptr) {                                    \
-          LOG_STATUS_ERROR(                                           \
-              InferenceResponse::SendWithStatus(                      \
-                  std::move(response), status__),                     \
-              (LOG_MSG));                                             \
-        }                                                             \
-      }                                                               \
-      for (auto& request : (REQUESTS)) {                              \
-        request->ReportStatistics(false /* success */, 0, 0, 0, 0);   \
-        InferenceRequest::Release(std::move(request));                \
-      }                                                               \
-      return;                                                         \
-    }                                                                 \
+#define FAIL_ALL_AND_RETURN_IF_ERROR(REQUESTS, RESPONSES, MR, S, LOG_MSG) \
+  do {                                                                    \
+    const auto& status__ = (S);                                           \
+    if (!status__.IsOk()) {                                               \
+      for (auto& response : (RESPONSES)) {                                \
+        if (response != nullptr) {                                        \
+          LOG_STATUS_ERROR(                                               \
+              InferenceResponse::SendWithStatus(                          \
+                  std::move(response), status__),                         \
+              (LOG_MSG));                                                 \
+        }                                                                 \
+      }                                                                   \
+      for (auto& request : (REQUESTS)) {                                  \
+        request->ReportStatistics(MR, false /* success */, 0, 0, 0, 0);   \
+        InferenceRequest::Release(std::move(request));                    \
+      }                                                                   \
+      return;                                                             \
+    }                                                                     \
   } while (false)
 #else
-#define FAIL_ALL_AND_RETURN_IF_ERROR(REQUESTS, RESPONSES, S, LOG_MSG) \
-  do {                                                                \
-    const auto& status__ = (S);                                       \
-    if (!status__.IsOk()) {                                           \
-      for (auto& response : (RESPONSES)) {                            \
-        if (response != nullptr) {                                    \
-          LOG_STATUS_ERROR(                                           \
-              InferenceResponse::SendWithStatus(                      \
-                  std::move(response), status__),                     \
-              (LOG_MSG));                                             \
-        }                                                             \
-      }                                                               \
-      for (auto& request : (REQUESTS)) {                              \
-        InferenceRequest::Release(std::move(request));                \
-      }                                                               \
-      return;                                                         \
-    }                                                                 \
+#define FAIL_ALL_AND_RETURN_IF_ERROR(REQUESTS, RESPONSES, MR, S, LOG_MSG) \
+  do {                                                                    \
+    const auto& status__ = (S);                                           \
+    if (!status__.IsOk()) {                                               \
+      for (auto& response : (RESPONSES)) {                                \
+        if (response != nullptr) {                                        \
+          LOG_STATUS_ERROR(                                               \
+              InferenceResponse::SendWithStatus(                          \
+                  std::move(response), status__),                         \
+              (LOG_MSG));                                                 \
+        }                                                                 \
+      }                                                                   \
+      for (auto& request : (REQUESTS)) {                                  \
+        InferenceRequest::Release(std::move(request));                    \
+      }                                                                   \
+      return;                                                             \
+    }                                                                     \
   } while (false)
 #endif  // TRTIS_ENABLE_STATS
 
 class InferenceRequest;
-class MetricModelReporter;
 
 //
 // Interface for backends that handle inference requests.
@@ -98,12 +97,6 @@ class InferenceBackend {
 
   // Get the configuration of model being served.
   const ModelConfig& Config() const { return config_; }
-
-  // Get the metric reporter for the model being served.
-  const std::shared_ptr<MetricModelReporter>& MetricReporter() const
-  {
-    return metric_reporter_;
-  }
 
 #ifdef TRTIS_ENABLE_STATS
   // Get the stats collector for the model being served.
@@ -200,9 +193,6 @@ class InferenceBackend {
 
   // Version of the model that this backend represents.
   int64_t version_;
-
-  // The metric reporter for the model that this backend represents.
-  std::shared_ptr<MetricModelReporter> metric_reporter_;
 
 #ifdef TRTIS_ENABLE_STATS
   // The stats collector for the model that this backend represents.

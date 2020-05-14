@@ -33,7 +33,6 @@
 #include "src/core/filesystem.h"
 #include "src/core/infer_request.h"
 #include "src/core/logging.h"
-#include "src/core/metric_model_reporter.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/sequence_batch_scheduler.h"
 
@@ -130,14 +129,6 @@ InferenceBackend::SetModelConfig(
 {
   config_ = config;
   RETURN_IF_ERROR(GetModelVersionFromPath(path, &version_));
-
-#ifdef TRTIS_ENABLE_STATS
-  // Create the metric reporter for this backend.
-  metric_reporter_ = std::make_shared<MetricModelReporter>(
-      Name(), version_, config_.metric_tags());
-
-  stats_aggregator_.SetMetricReporter(metric_reporter_);
-#endif  // TRTIS_ENABLE_STATS
 
   // Initialize the input map
   for (const auto& io : config.input()) {

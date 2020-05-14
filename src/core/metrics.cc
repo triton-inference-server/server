@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -43,7 +43,6 @@ namespace nvidia { namespace inferenceserver {
 Metrics::Metrics()
     : registry_(std::make_shared<prometheus::Registry>()),
       serializer_(new prometheus::TextSerializer()),
-#ifdef TRTIS_ENABLE_STATS
       inf_success_family_(
           prometheus::BuildCounter()
               .Name("nv_inference_request_success")
@@ -67,20 +66,27 @@ Metrics::Metrics()
               .Name("nv_inference_request_duration_us")
               .Help("Cummulative inference request duration in microseconds")
               .Register(*registry_)),
-      inf_compute_duration_us_family_(
-          prometheus::BuildCounter()
-              .Name("nv_inference_compute_duration_us")
-              .Help("Cummulative inference compute duration in microseconds")
-              .Register(*registry_)),
       inf_queue_duration_us_family_(
           prometheus::BuildCounter()
               .Name("nv_inference_queue_duration_us")
               .Help("Cummulative inference queuing duration in microseconds")
               .Register(*registry_)),
-      inf_load_ratio_family_(prometheus::BuildHistogram()
-                                 .Name("nv_inference_load_ratio")
-                                 .Register(*registry_)),
-#endif  // TRTIS_ENABLE_STATS
+      inf_compute_input_duration_us_family_(
+          prometheus::BuildCounter()
+              .Name("nv_inference_compute_input_duration_us")
+              .Help("Cummulative compute input duration in microseconds")
+              .Register(*registry_)),
+      inf_compute_infer_duration_us_family_(
+          prometheus::BuildCounter()
+              .Name("nv_inference_compute_infer_duration_us")
+              .Help("Cummulative compute inference duration in microseconds")
+              .Register(*registry_)),
+      inf_compute_output_duration_us_family_(
+          prometheus::BuildCounter()
+              .Name("nv_inference_compute_output_duration_us")
+              .Help("Cummulative inference compute output duration in "
+                    "microseconds")
+              .Register(*registry_)),
 #ifdef TRTIS_ENABLE_METRICS_GPU
       gpu_utilization_family_(prometheus::BuildGauge()
                                   .Name("nv_gpu_utilization")
@@ -109,7 +115,7 @@ Metrics::Metrics()
                     "started")
               .Register(*registry_)),
 #endif  // TRTIS_ENABLE_METRICS_GPU
-      gpu_metrics_enabled_(false)
+      metrics_enabled_(false), gpu_metrics_enabled_(false)
 {
 }
 
@@ -122,6 +128,20 @@ Metrics::~Metrics()
     nvml_thread_->join();
   }
 #endif  // TRTIS_ENABLE_METRICS_GPU
+}
+
+bool
+Metrics::Enabled()
+{
+  auto singleton = GetSingleton();
+  return singleton->metrics_enabled_;
+}
+
+void
+Metrics::EnableMetrics()
+{
+  auto singleton = GetSingleton();
+  singleton->metrics_enabled_ = true;
 }
 
 void

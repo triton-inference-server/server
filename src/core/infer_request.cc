@@ -570,29 +570,29 @@ InferenceRequest::Normalize()
 #ifdef TRTIS_ENABLE_STATS
 void
 InferenceRequest::ReportStatistics(
-    bool success, const uint64_t compute_start_ns,
-    const uint64_t compute_input_end_ns, const uint64_t compute_output_start_ns,
-    const uint64_t compute_end_ns)
+    MetricModelReporter* metric_reporter, bool success,
+    const uint64_t compute_start_ns, const uint64_t compute_input_end_ns,
+    const uint64_t compute_output_start_ns, const uint64_t compute_end_ns)
 {
   INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 
   if (success) {
     backend_raw_->MutableStatsAggregator()->UpdateSuccess(
-        request_start_ns_, queue_start_ns_, compute_start_ns,
+        metric_reporter, request_start_ns_, queue_start_ns_, compute_start_ns,
         compute_input_end_ns, compute_output_start_ns, compute_end_ns,
         request_end_ns);
     if (secondary_stats_aggregator_ != nullptr) {
       secondary_stats_aggregator_->UpdateSuccess(
-          request_start_ns_, queue_start_ns_, compute_start_ns,
-          compute_input_end_ns, compute_output_start_ns, compute_end_ns,
-          request_end_ns);
+          nullptr /* metric_reporter */, request_start_ns_, queue_start_ns_,
+          compute_start_ns, compute_input_end_ns, compute_output_start_ns,
+          compute_end_ns, request_end_ns);
     }
   } else {
     backend_raw_->MutableStatsAggregator()->UpdateFailure(
-        request_start_ns_, request_end_ns);
+        metric_reporter, request_start_ns_, request_end_ns);
     if (secondary_stats_aggregator_ != nullptr) {
       secondary_stats_aggregator_->UpdateFailure(
-          request_start_ns_, request_end_ns);
+          nullptr /* metric_reporter */, request_start_ns_, request_end_ns);
     }
   }
 }
