@@ -358,7 +358,7 @@ if __name__ == '__main__':
                         help='Input image / Input folder.')
     FLAGS = parser.parse_args()
 
-    if FLAGS.streaming and FLAGS.protocol.lower() == "grpc":
+    if FLAGS.streaming and FLAGS.protocol.lower() != "grpc":
         raise Exception("Streaming is only allowed with gRPC protocol")
 
     try:
