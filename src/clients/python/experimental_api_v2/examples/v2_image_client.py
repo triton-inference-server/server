@@ -409,9 +409,8 @@ if __name__ == '__main__':
     responses = []
     user_data = UserData()
 
-    # Used to hold the greenlets running the intference in HTTP
-    # async operation.
-    greenlets = []
+    # Holds the handles to the ongoing HTTP async requests.
+    async_requests = []
 
     sent_count = 0
 
@@ -439,11 +438,10 @@ if __name__ == '__main__':
                                               model_version=FLAGS.model_version,
                                               outputs=outputs)
                 else:
-                    greenlets.append(
+                    async_requests.append(
                         triton_client.async_infer(
                             FLAGS.model_name,
                             inputs,
-                            partial(completion_callback, user_data),
                             model_version=FLAGS.model_version,
                             outputs=outputs))
             else:
@@ -462,18 +460,22 @@ if __name__ == '__main__':
     if FLAGS.streaming:
         triton_client.stop_stream()
 
-    if len(greenlets) != 0:
-        gevent.joinall(greenlets)
-
-    if FLAGS.streaming or FLAGS.async_set:
-        processed_count = 0
-        while processed_count < sent_count:
-            (results, error) = user_data._completed_requests.get()
-            processed_count += 1
-            if error is not None:
-                print("inference failed: " + str(error))
-                sys.exit(1)
-            responses.append(results)
+    if FLAGS.protocol.lower() == "grpc":
+        if FLAGS.streaming or FLAGS.async_set:
+            processed_count = 0
+            while processed_count < sent_count:
+                (results, error) = user_data._completed_requests.get()
+                processed_count += 1
+                if error is not None:
+                    print("inference failed: " + str(error))
+                    sys.exit(1)
+                responses.append(results)
+    else:
+        if FLAGS.async_set:
+            # Collect results from the ongoing async requests
+            # for HTTP Async requests.
+            for async_request in async_requests:
+                responses.append(async_request.get_result())
 
     for response in responses:
         postprocess(response, output_name, FLAGS.batch_size)

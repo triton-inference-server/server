@@ -30,6 +30,7 @@ from geventhttpclient.url import URL
 from urllib.parse import quote, quote_plus
 import rapidjson as json
 import numpy as np
+import gevent
 import gevent.pool
 import struct
 
@@ -241,7 +242,8 @@ class InferenceServerClient:
             request_uri = request_uri + "?" + _get_query_string(query_params)
 
         if self._verbose:
-            print("POST {}, headers {}\n{}".format(request_uri, headers, request_body))
+            print("POST {}, headers {}\n{}".format(request_uri, headers,
+                                                   request_body))
 
         if headers is not None:
             response = self._client_stub.post(request_uri=request_uri,
@@ -1013,8 +1015,7 @@ class InferenceServerClient:
         Returns
         -------
         InferResult
-            The object holding the result of the inference, including the
-            statistics.
+            The object holding the result of the inference.
 
         Raises
         ------
@@ -1022,14 +1023,15 @@ class InferenceServerClient:
             If server fails to perform inference.
         """
 
-        request_body, json_size = _get_inference_request(inputs=inputs,
-                                               request_id=request_id,
-                                               outputs=outputs,
-                                               sequence_id=sequence_id,
-                                               sequence_start=sequence_start,
-                                               sequence_end=sequence_end,
-                                               priority=priority,
-                                               timeout=timeout)
+        request_body, json_size = _get_inference_request(
+            inputs=inputs,
+            request_id=request_id,
+            outputs=outputs,
+            sequence_id=sequence_id,
+            sequence_start=sequence_start,
+            sequence_end=sequence_end,
+            priority=priority,
+            timeout=timeout)
 
         if json_size is not None:
             if headers is None:
@@ -1055,7 +1057,6 @@ class InferenceServerClient:
     def async_infer(self,
                     model_name,
                     inputs,
-                    callback,
                     model_version="",
                     outputs=None,
                     request_id="",
@@ -1076,13 +1077,6 @@ class InferenceServerClient:
         inputs : list
             A list of InferInput objects, each describing data for a input
             tensor required by the model.
-        callback : function
-            Python function that is invoked once the request is completed.
-            The function must reserve the last two arguments (result, error)
-            to hold InferResult and InferenceServerException objects
-            respectively which will be provided to the function when executing
-            the callback. The ownership of these objects will be given to the
-            user. The 'error' would be None for a successful inference.
         model_version: str
             The version of the model to run inference. The default value
             is an empty string which means then the server will choose
@@ -1130,9 +1124,8 @@ class InferenceServerClient:
 
         Returns
         -------
-        gevent.Greenlet object
-            The greenlet object running the async inference. For further details
-            about greenlets refer http://www.gevent.org/api/gevent.greenlet.html.
+        InferAsyncRequest object
+            The handle to the asynchronous inference request.
 
         Raises
         ------
@@ -1143,18 +1136,15 @@ class InferenceServerClient:
         def wrapped_post(request_uri, request_body, headers, query_params):
             return self._post(request_uri, request_body, headers, query_params)
 
-        def wrapped_callback(response):
-            callback(result=InferResult(response, self._verbose),
-                     error=_get_error(response))
-
-        request_body, json_size = _get_inference_request(inputs=inputs,
-                                               request_id=request_id,
-                                               outputs=outputs,
-                                               sequence_id=sequence_id,
-                                               sequence_start=sequence_start,
-                                               sequence_end=sequence_end,
-                                               priority=priority,
-                                               timeout=timeout)
+        request_body, json_size = _get_inference_request(
+            inputs=inputs,
+            request_id=request_id,
+            outputs=outputs,
+            sequence_id=sequence_id,
+            sequence_start=sequence_start,
+            sequence_end=sequence_end,
+            priority=priority,
+            timeout=timeout)
 
         if json_size is not None:
             if headers is None:
@@ -1170,8 +1160,7 @@ class InferenceServerClient:
             request_uri = "v2/models/{}/infer".format(quote(model_name))
 
         g = self._pool.apply_async(
-            wrapped_post, (request_uri, request_body, headers, query_params),
-            callback=wrapped_callback)
+            wrapped_post, (request_uri, request_body, headers, query_params))
 
         g.start()
 
@@ -1180,8 +1169,63 @@ class InferenceServerClient:
             if request_id is not "":
                 verbose_message = verbose_message + " '{}'".format(request_id)
             print(verbose_message)
-        
-        return g
+
+        return InferAsyncRequest(g, self._verbose)
+
+
+class InferAsyncRequest:
+    """An object of InferAsyncRequest class is used to describe
+    a handle to an ongoing asynchronous inference request.
+
+    Parameters
+    ----------
+    greenlet : gevent.Greenlet
+        The greenlet object which will provide the results.
+        For further details about greenlets refer
+        http://www.gevent.org/api/gevent.greenlet.html.
+
+    verbose : bool
+        If True generate verbose output. Default value is False.
+    """
+
+    def __init__(self, greenlet, verbose=False):
+        self._greenlet = greenlet
+        self._verbose = verbose
+
+    def get_result(self, block=True, timeout=None):
+        """Get the results of the associated asynchronous inference.
+        Parameters
+        ----------
+        block : bool
+            If block is True, the function will wait till the
+            corresponding response is received from the server.
+            Default value is True. 
+        timeout : int
+            The maximum wait time for the function. This setting is
+            ignored if the block is set False. Default is None,
+            which means the function will block indefinitely till
+            the corresponding response is received. 
+
+        Returns
+        -------
+        InferResult
+            The object holding the result of the async inference.
+
+        Raises
+        ------
+        InferenceServerException
+            If server fails to perform inference or failed to respond
+            within specified timeout.
+        """
+
+        try:
+            response = self._greenlet.get(block=block, timeout=timeout)
+        except gevent.Timeout as e:
+            raise_error("failed to obtain inference response")
+
+        _raise_if_error(response)
+        return InferResult(response, self._verbose)
+
 
 class InferInput:
     """An object of InferInput class is used to describe
@@ -1283,7 +1327,7 @@ class InferInput:
                 "got unexpected numpy array shape [{}], expected [{}]".format(
                     str(input_tensor.shape)[1:-1],
                     str(self._shape)[1:-1]))
-        
+
         self._parameters.pop('shared_memory_region', None)
         self._parameters.pop('shared_memory_byte_size', None)
         self._parameters.pop('shared_memory_offset', None)

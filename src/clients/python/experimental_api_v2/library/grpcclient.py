@@ -900,8 +900,7 @@ class InferenceServerClient:
         Returns
         -------
         InferResult
-            The object holding the result of the inference, including the
-            statistics.
+            The object holding the result of the inference.
 
         Raises
         ------
