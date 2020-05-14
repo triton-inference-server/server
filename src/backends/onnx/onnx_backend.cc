@@ -540,50 +540,6 @@ OnnxBackend::Context::ValidateOutputs(
   return Status::Success;
 }
 
-namespace {
-
-#ifdef TRTIS_ENABLE_STATS
-#define FAIL_ALL_AND_RETURN_IF_ERROR(REQUESTS, RESPONSES, S)        \
-  do {                                                              \
-    const auto& status__ = (S);                                     \
-    if (!status__.IsOk()) {                                         \
-      for (auto& response : (RESPONSES)) {                          \
-        if (response != nullptr) {                                  \
-          LOG_STATUS_ERROR(                                         \
-              InferenceResponse::SendWithStatus(                    \
-                  std::move(response), status__),                   \
-              "error sending ONNX response");                       \
-        }                                                           \
-      }                                                             \
-      for (auto& request : (REQUESTS)) {                            \
-        request->ReportStatistics(false /* success */, 0, 0, 0, 0); \
-        InferenceRequest::Release(std::move(request));              \
-      }                                                             \
-      return;                                                       \
-    }                                                               \
-  } while (false)
-#else
-#define FAIL_ALL_AND_RETURN_IF_ERROR(REQUESTS, RESPONSES, S) \
-  do {                                                       \
-    const auto& status__ = (S);                              \
-    if (!status__.IsOk()) {                                  \
-      for (auto& response : (RESPONSES)) {                   \
-        if (response != nullptr) {                           \
-          LOG_STATUS_ERROR(                                  \
-              InferenceResponse::SendWithStatus(             \
-                  std::move(response), status__),            \
-              "error sending ONNX response");                \
-        }                                                    \
-      }                                                      \
-      for (auto& request : (REQUESTS)) {                     \
-        InferenceRequest::Release(std::move(request));       \
-      }                                                      \
-      return;                                                \
-    }                                                        \
-  } while (false)
-#endif  // TRTIS_ENABLE_STATS
-}  // namespace
-
 void
 OnnxBackend::Context::Run(
     InferenceBackend* base,
@@ -612,7 +568,7 @@ OnnxBackend::Context::Run(
       return;
     }
 
-    total_batch_size += request->BatchSize();
+    total_batch_size += std::max(1U, request->BatchSize());
   }
 
   // If there are no valid payloads then no need to run the
@@ -678,7 +634,8 @@ OnnxBackend::Context::Run(
       requests, responses,
       SetInputTensors(
           total_batch_size, requests, &responses, &input_buffers, &input_names,
-          &cuda_copy));
+          &cuda_copy),
+      "error sending ONNX response");
 
   // Request to retrieve all output specified in model config
   // and reserve placeholder for output tensors
@@ -699,13 +656,15 @@ OnnxBackend::Context::Run(
 
   // Run...
   FAIL_ALL_AND_RETURN_IF_ERROR(
-      requests, responses, OrtRun(input_names, output_names));
+      requests, responses, OrtRun(input_names, output_names),
+      "error sending ONNX response");
 
   INFER_STATS_DECL_TIMESTAMP(compute_output_start_ns);
 
   FAIL_ALL_AND_RETURN_IF_ERROR(
       requests, responses,
-      ReadOutputTensors(total_batch_size, output_names, requests, &responses));
+      ReadOutputTensors(total_batch_size, output_names, requests, &responses),
+      "error sending ONNX response");
 
 #ifdef TRTIS_ENABLE_STATS
   INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
@@ -814,7 +773,7 @@ OnnxBackend::Context::SetInputTensors(
       expected_element_cnts.reserve(requests.size());
       for (size_t ridx = 0; ridx < requests.size(); ++ridx) {
         expected_element_cnts.push_back(
-            requests[ridx]->BatchSize() * batch1_element_cnt);
+            std::max(1U, requests[ridx]->BatchSize()) * batch1_element_cnt);
 
         const InferenceRequest::Input* in;
         auto status = requests[ridx]->ImmutableInput(name, &in);
@@ -1093,7 +1052,7 @@ OnnxBackend::Context::SetStringOutputBuffer(
     const auto& request = requests[ridx];
     auto& response = (*responses)[ridx];
     const size_t expected_element_cnt =
-        request->BatchSize() * batch1_element_cnt;
+        std::max(1U, request->BatchSize()) * batch1_element_cnt;
 
     // If 'request' requested this output then copy it from
     // 'content'. If it did not request this output then just
@@ -1106,7 +1065,8 @@ OnnxBackend::Context::SetStringOutputBuffer(
       }
       InferenceResponse::Output* response_output = nullptr;
       response->AddOutput(
-          name, DataType::TYPE_STRING, *batchn_shape, &response_output);
+          name, DataType::TYPE_STRING, *batchn_shape, request->BatchSize(),
+          &response_output);
       // Calculate expected byte size in advance using string offsets
       const size_t data_byte_size =
           offsets[element_idx + expected_element_cnt] - offsets[element_idx];
