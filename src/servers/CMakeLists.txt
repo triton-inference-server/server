@@ -191,6 +191,7 @@ endif() # TRTIS_ENABLE_TRACING
 #
 set(
   TRITONSERVER_SRCS
+  classification.cc
   common.cc
   main.cc
   shared_memory_manager.cc
@@ -199,6 +200,7 @@ set(
 
 set(
   TRITONSERVER_HDRS
+  classification.h
   common.h
   shared_memory_manager.h
   ../core/logging.h

@@ -130,36 +130,6 @@ class InferenceRequest {
     std::shared_ptr<Memory> data_;
   };
 
-  // Requested output tensor
-  class RequestedOutput {
-   public:
-    RequestedOutput() = default;
-    RequestedOutput(const std::string& name, const uint32_t classification_cnt);
-
-    // The name of the output tensor. There is no mutable operator for
-    // the name because it is used in a InferenceRequest map and a
-    // mutable method would allow it to get out-of-sync.
-    const std::string& Name() const { return name_; }
-
-    // The classification count for the output. If zero then the
-    // result is returned as a raw tensor. If > 0 then result is
-    // returned as a classification of the indicated number of
-    // classes.
-    uint32_t ClassificationCount() const { return classification_cnt_; }
-    void SetClassificationCount(uint32_t c) { classification_cnt_ = c; }
-
-   private:
-    DISALLOW_COPY_AND_ASSIGN(RequestedOutput);
-    friend std::ostream& operator<<(
-        std::ostream& out, const InferenceRequest::RequestedOutput& output);
-
-    std::string name_;
-
-    // If > 0 then return result as a classification with the
-    // indicated number of classes.
-    uint32_t classification_cnt_;
-  };
-
   // InferenceRequest
   //
   // The two constructors are identical except one takes backend as a
@@ -276,8 +246,7 @@ class InferenceRequest {
   // started the original requested outputs should not be modified
   // until execution completes (and those modifications will apply to
   // the next inference execution).
-  const std::unordered_map<std::string, RequestedOutput>&
-  OriginalRequestedOutputs() const
+  const std::set<std::string>& OriginalRequestedOutputs() const
   {
     return original_requested_outputs_;
   }
@@ -285,8 +254,7 @@ class InferenceRequest {
   // Get the requested outputs that should be used during
   // inference. Accessing outputs via this method is not valid until
   // after PrepareForInference is called.
-  const std::unordered_map<std::string, RequestedOutput>&
-  ImmutableRequestedOutputs() const
+  const std::set<std::string>& ImmutableRequestedOutputs() const
   {
     return (requested_outputs_.empty()) ? original_requested_outputs_
                                         : requested_outputs_;
@@ -322,8 +290,7 @@ class InferenceRequest {
   Status AddOverrideInput(const std::shared_ptr<Input>& input);
 
   // Request an original requested output.
-  Status AddOriginalRequestedOutput(
-      const std::string& name, const uint32_t classification_cnt = 0);
+  Status AddOriginalRequestedOutput(const std::string& name);
 
   // Remove a single original requested output or all requested
   // outputs.
@@ -477,12 +444,12 @@ class InferenceRequest {
   std::unordered_map<std::string, Input> original_inputs_;
   std::unordered_map<std::string, std::shared_ptr<Input>> override_inputs_;
   std::unordered_map<std::string, Input*> inputs_;
-  std::unordered_map<std::string, RequestedOutput> original_requested_outputs_;
+  std::set<std::string> original_requested_outputs_;
 
   // requested_outputs_ is to be used post-normalization. It will be
   // empty unless it differs from original_requested_outputs_, so
   // typically should access it through ImmutableRequestedOutputs.
-  std::unordered_map<std::string, RequestedOutput> requested_outputs_;
+  std::set<std::string> requested_outputs_;
 
   // The release function and user pointer for this request.
   TRITONSERVER_InferenceRequestReleaseFn_t release_fn_;
@@ -512,7 +479,5 @@ class InferenceRequest {
 std::ostream& operator<<(std::ostream& out, const InferenceRequest& request);
 std::ostream& operator<<(
     std::ostream& out, const InferenceRequest::Input& input);
-std::ostream& operator<<(
-    std::ostream& out, const InferenceRequest::RequestedOutput& output);
 
 }}  // namespace nvidia::inferenceserver

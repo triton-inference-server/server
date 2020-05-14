@@ -360,6 +360,7 @@ Check(
     TRITONSERVER_DataType datatype;
     const int64_t* shape;
     uint64_t dim_count;
+    uint32_t batch_size;
     const void* base;
     size_t byte_size;
     TRITONSERVER_MemoryType memory_type;
@@ -368,8 +369,8 @@ Check(
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseOutput(
-            response, idx, &cname, &datatype, &shape, &dim_count, &base,
-            &byte_size, &memory_type, &memory_type_id, &userp),
+            response, idx, &cname, &datatype, &shape, &dim_count, &batch_size,
+            &base, &byte_size, &memory_type, &memory_type_id, &userp),
         "getting output info");
 
     if (cname == nullptr) {

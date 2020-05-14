@@ -66,9 +66,11 @@ fi
 
 # If BACKENDS not specified, set to all
 BACKENDS=${BACKENDS:="graphdef savedmodel netdef onnx libtorch plan custom"}
+export BACKENDS
 
 # If ENSEMBLES not specified, set to 1
 ENSEMBLES=${ENSEMBLES:="1"}
+export ENSEMBLES
 
 for TARGET in cpu gpu; do
     if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
@@ -176,11 +178,11 @@ for TARGET in cpu gpu; do
         RET=1
     fi
 
-    grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG	
-    if [ $? -ne 0 ]; then	
-        cat $CLIENT_LOG	
-        echo -e "\n***\n*** Test Failed To Run\n***"	
-        RET=1	
+    grep -c "HTTPSocketPoolResponse status=200" $CLIENT_LOG
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed To Run\n***"
+        RET=1
     fi
 
     set -e
