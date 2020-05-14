@@ -76,7 +76,6 @@ Status
 OnnxBackend::CreateExecutionContexts(
     const std::unordered_map<std::string, std::pair<bool, std::string>>& models)
 {
-  // [TODO] configurable like optimization policy in Tensorflow models
   // Create a "prototype" session option, which will be cloned and set
   // context-specific option on context creation.
   OrtSessionOptions* session_options;
@@ -142,14 +141,10 @@ OnnxBackend::CreateExecutionContextsHelper(
       total_context_cnt,
       [](uint32_t runner_idx) -> Status { return Status::Success; },
       [this](
-          uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-          std::function<void(Status)> func) {
-        Run(runner_idx, payloads, func);
-      },
-      [this](
-          uint32_t runner_idx, const InferenceRequest::Input& input,
-          const Scheduler::Payload& payload,
-          std::vector<int64_t>* shape) -> Status { return Status::Success; }));
+          uint32_t runner_idx,
+          std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
+        Run(runner_idx, std::move(requests));
+      }));
 
   return Status::Success;
 }
@@ -545,49 +540,81 @@ OnnxBackend::Context::ValidateOutputs(
   return Status::Success;
 }
 
-Status
+void
 OnnxBackend::Context::Run(
-    const InferenceBackend* base, std::vector<Scheduler::Payload>* payloads)
+    InferenceBackend* base,
+    std::vector<std::unique_ptr<InferenceRequest>>&& requests)
 {
-  LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
-                 << " request payloads";
+  LOG_VERBOSE(1) << "Running " << name_ << " with " << requests.size()
+                 << " request requests";
 
-  const InferenceRequest* repr_input_request = nullptr;
+  INFER_STATS_DECL_TIMESTAMP(compute_start_ns);
 
-  // For each request in 'payloads' collect the total batch size for
+  // For each request in 'requests' collect the total batch size for
   // this inference execution. The batch-size, number of inputs, and
-  // size of each input has already been checked by each payloads
+  // size of each input has already been checked by each requests
   // request provider so don't need to do that here.
   size_t total_batch_size = 0;
-  for (auto& payload : *payloads) {
-    if (!payload.status_.IsOk()) {
-      return Status(
-          Status::Code::INTERNAL,
-          "unexpected payload with non-OK status given to runner for '" +
-              name_ + "'");
+  for (auto& request : requests) {
+    // If we get a nullptr request then something is badly wrong. Fail
+    // and release all requests.
+    if (request == nullptr) {
+      InferenceRequest::RespondIfError(
+          requests,
+          Status(
+              Status::Code::INTERNAL,
+              "null request given to TensorFlow runner for '" + name_ + "'"),
+          true /* release_requests */);
+      return;
     }
 
-    total_batch_size += payload.request_->BatchSize();
-
-    // All payloads must have equally-sized input tensors so use any
-    // payload as the representative for the input tensors.
-    repr_input_request = payload.request_.get();
+    total_batch_size += std::max(1U, request->BatchSize());
   }
 
   // If there are no valid payloads then no need to run the
   // inference. The payloads will have their error status set so can
   // just return.
   if (total_batch_size == 0) {
-    return Status::Success;
+    return;
   }
 
   // total_batch_size can be 1 for models that don't support batching
   // (i.e. max_batch_size_ == 0).
   if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size_)) {
-    return Status(
-        Status::Code::INTERNAL,
-        "dynamic batch size " + std::to_string(total_batch_size) + " for '" +
-            name_ + "', max allowed is " + std::to_string(max_batch_size_));
+    InferenceRequest::RespondIfError(
+        requests,
+        Status(
+            Status::Code::INTERNAL,
+            "dynamic batch size " + std::to_string(total_batch_size) +
+                " for '" + name_ + "', max allowed is " +
+                std::to_string(max_batch_size_)),
+        true /* release_requests */);
+    return;
+  }
+
+  // At this point we are committed to running inference with all
+  // 'requests'. Create a response for each request. During input
+  // processing if there is an error with any request that error will
+  // be sent immediately with the corresponding response (and the
+  // response unique_ptr will then be nullptr). The request object
+  // itself will not be released until after all inferencing is done
+  // (below) as we may need to access the request object when
+  // determine how to process outputs (for example, even if we don't
+  // need the outputs for a request that has an error, we do need to
+  // know the size of those outputs associated with the request so we
+  // can skip them in the output tensors).
+  std::vector<std::unique_ptr<InferenceResponse>> responses;
+  responses.reserve(requests.size());
+
+  for (auto& request : requests) {
+    std::unique_ptr<InferenceResponse> response;
+    Status status = request->ResponseFactory().CreateResponse(&response);
+    if (!status.IsOk()) {
+      InferenceRequest::RespondIfError(request, status);
+      response.reset();
+    }
+
+    responses.emplace_back(std::move(response));
   }
 
   // use Scoped wrapper to clean up Ort tensors when Run() returns
@@ -601,21 +628,14 @@ OnnxBackend::Context::Run(
   // Hold reference to each buffer of input data so that it stays
   // until the inference has completed.
   std::vector<std::unique_ptr<AllocatedMemory>> input_buffers;
-  std::vector<InputInfo> inputs;
   std::vector<const char*> input_names;
   bool cuda_copy = false;
-
-  for (const auto& pr : repr_input_request->ImmutableInputs()) {
-    const InferenceRequest::Input* input = pr.second;
-    const std::string& name = input->Name();
-
-    // Create a tensor for each input sized correctly for the total
-    // payload batch size. Concatenate input values from each payload
-    // into the corresponding tensor.
-    RETURN_IF_ERROR(SetInputTensor(
-        name, input->DType(), input->Shape(), total_batch_size, payloads,
-        &input_buffers, &inputs, &input_names, &cuda_copy));
-  }
+  FAIL_ALL_AND_RETURN_IF_ERROR(
+      requests, responses,
+      SetInputTensors(
+          total_batch_size, requests, &responses, &input_buffers, &input_names,
+          &cuda_copy),
+      "error sending ONNX response");
 
   // Request to retrieve all output specified in model config
   // and reserve placeholder for output tensors
@@ -625,165 +645,239 @@ OnnxBackend::Context::Run(
     output_tensors_.emplace_back(nullptr);
   }
 
+  // Wait for any in-flight input tensor copies to complete.
 #ifdef TRTIS_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
-  cuda_copy = false;
-  for (auto& input : inputs) {
-    for (auto& indirect_buffer : input.indirect_buffers_) {
-      bool cuda_used;
-      TRITONSERVER_MemoryType buffer_memory_type;
-      int64_t buffer_memory_id;
-      size_t buffer_byte_size;
-      auto buffer =
-          std::get<0>(indirect_buffer)
-              ->BufferAt(
-                  0, &buffer_byte_size, &buffer_memory_type, &buffer_memory_id);
-      auto status = CopyBuffer(
-          "indirect buffer", buffer_memory_type, buffer_memory_id,
-          input.memory_type_, input.memory_type_id_, buffer_byte_size, buffer,
-          input.input_buffer_ + std::get<1>(indirect_buffer), stream_,
-          &cuda_used);
-      if (!status.IsOk()) {
-        for (const auto& payload_idx : std::get<2>(indirect_buffer)) {
-          (*payloads)[payload_idx].status_ = status;
-        }
-      } else {
-        cuda_copy |= cuda_copy;
-      }
-    }
-  }
-  if (cuda_copy) {
-    cudaStreamSynchronize(stream_);
-  }
-#endif  // TRTIS_ENABLE_GPU
+#endif
 
-#ifdef TRTIS_ENABLE_STATS
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeInputEnd);
-    }
-  }
-#endif  // TRTIS_ENABLE_STATS
+  INFER_STATS_DECL_TIMESTAMP(compute_input_end_ns);
 
   // Run...
+  FAIL_ALL_AND_RETURN_IF_ERROR(
+      requests, responses, OrtRun(input_names, output_names),
+      "error sending ONNX response");
+
+  INFER_STATS_DECL_TIMESTAMP(compute_output_start_ns);
+
+  FAIL_ALL_AND_RETURN_IF_ERROR(
+      requests, responses,
+      ReadOutputTensors(total_batch_size, output_names, requests, &responses),
+      "error sending ONNX response");
+
+#ifdef TRTIS_ENABLE_STATS
+  INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
+
+  // Report stats and trace
+  for (size_t i = 0; i < requests.size(); ++i) {
+    auto& request = requests[i];
+    request->ReportStatistics(
+        (responses[i] != nullptr), compute_start_ns, compute_input_end_ns,
+        compute_output_start_ns, compute_end_ns);
+
+#ifdef TRTIS_ENABLE_TRACING
+    if (request->Trace() != nullptr) {
+      auto& trace = request->Trace();
+      trace->Report(TRITONSERVER_TRACE_COMPUTE_START, compute_start_ns);
+      trace->Report(TRITONSERVER_TRACE_COMPUTE_INPUT_END, compute_input_end_ns);
+      trace->Report(
+          TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
+      trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
+    }
+#endif  // TRTIS_ENABLE_TRACING
+  }
+
+  // Also reporting batch stats
+  base->MutableStatsAggregator()->UpdateInferBatchStats(
+      total_batch_size, compute_start_ns, compute_input_end_ns,
+      compute_output_start_ns, compute_end_ns);
+#endif  // TRTIS_ENABLE_STATS
+
+  // Send all the responses that haven't already been sent because of
+  // an earlier error.
+  for (auto& response : responses) {
+    if (response != nullptr) {
+      LOG_STATUS_ERROR(
+          InferenceResponse::Send(std::move(response)),
+          "failed to send TensorFlow backend response");
+    }
+  }
+
+  // Release all requests.
+  for (auto& request : requests) {
+    InferenceRequest::Release(std::move(request));
+  }
+}
+
+Status
+OnnxBackend::Context::SetInputTensors(
+    size_t total_batch_size,
+    const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+    std::vector<std::unique_ptr<InferenceResponse>>* responses,
+    std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
+    std::vector<const char*>* input_names, bool* cuda_copy)
+{
+  BackendInputCollector collector(
+      requests, responses, enable_pinned_input_, stream_);
+  // All requests must have equally-sized input tensors so use any
+  // request as the representative for the input tensors.
+  for (const auto& pr : requests[0]->ImmutableInputs()) {
+    const auto& name = pr.first;
+    const auto& repr_input = pr.second;
+    const auto& batch1_shape = repr_input->Shape();
+
+    input_names->emplace_back(name.c_str());
+    input_tensors_.emplace_back(nullptr);
+
+    // The shape for the entire input patch, [total_batch_size, ...]
+    std::vector<int64_t> batchn_shape;
+    batchn_shape.reserve(batch1_shape.size() + 1);
+    if (max_batch_size_ != NO_BATCHING) {
+      batchn_shape.push_back(total_batch_size);
+    }
+    batchn_shape.insert(
+        batchn_shape.end(), batch1_shape.begin(), batch1_shape.end());
+
+    const DataType datatype = repr_input->DType();
+
+    // [TODO] currently ONNX Runtime only recognize input data on CPU
+    // https://github.com/microsoft/onnxruntime/issues/1621
+    if (datatype != TYPE_STRING) {
+      input_buffers->emplace_back(new AllocatedMemory(
+          GetByteSize(datatype, batchn_shape), TRITONSERVER_MEMORY_CPU_PINNED,
+          0));
+      TRITONSERVER_MemoryType mem_type;
+      auto input_buffer = input_buffers->back()->MutableBuffer(&mem_type);
+      auto total_byte_size = input_buffers->back()->TotalByteSize();
+
+      // Create ORT Tensor
+      const OrtMemoryInfo* allocator_info;
+      RETURN_IF_ORT_ERROR(
+          ort_api->AllocatorGetInfo(allocator_, &allocator_info));
+      RETURN_IF_ORT_ERROR(ort_api->CreateTensorWithDataAsOrtValue(
+          allocator_info, (void*)input_buffer, total_byte_size,
+          batchn_shape.data(), batchn_shape.size(),
+          ConvertToOnnxDataType(datatype), &input_tensors_.back()));
+
+      collector.ProcessTensor(
+          name, datatype, batch1_shape, input_buffer, total_byte_size, mem_type,
+          0);
+    } else {
+      // For String input, we need to obtain tensor info differently
+      size_t batch1_element_cnt = GetElementCount(batch1_shape);
+      size_t total_byte_size = 0;
+      std::vector<size_t> expected_byte_sizes;
+      std::vector<size_t> expected_element_cnts;
+      expected_byte_sizes.reserve(requests.size());
+      expected_element_cnts.reserve(requests.size());
+      for (size_t ridx = 0; ridx < requests.size(); ++ridx) {
+        expected_element_cnts.push_back(
+            std::max(1U, requests[ridx]->BatchSize()) * batch1_element_cnt);
+
+        const InferenceRequest::Input* in;
+        auto status = requests[ridx]->ImmutableInput(name, &in);
+        // Skip input in this request if failed to retrieve it
+        if (!status.IsOk()) {
+          if ((*responses)[ridx] != nullptr) {
+            InferenceResponse::SendWithStatus(
+                std::move((*responses)[ridx]), status);
+          }
+          expected_byte_sizes.push_back(0);
+        } else {
+          expected_byte_sizes.push_back(in->Data()->TotalByteSize());
+        }
+        total_byte_size += expected_byte_sizes.back();
+      }
+      // For string input, the copy to contiguous buffer is needed because ORT
+      // expects elements to be C strings thus we need to modify input buffer.
+      // Reserve one more byte at the end of input_buffer to ensure last
+      // element of String data can become valid C string.
+      input_buffers->emplace_back(new AllocatedMemory(
+          total_byte_size + 1, TRITONSERVER_MEMORY_CPU_PINNED, 0));
+      TRITONSERVER_MemoryType mem_type;
+      auto input_buffer = input_buffers->back()->MutableBuffer(&mem_type);
+      size_t buffer_offset = 0;
+      bool string_cuda_copy = false;
+      for (size_t ridx = 0; ridx < requests.size(); ++ridx) {
+        const InferenceRequest::Input* in;
+        auto status = requests[ridx]->ImmutableInput(name, &in);
+        if (status.IsOk() && ((*responses)[ridx] != nullptr)) {
+          const void* src_buffer;
+          size_t src_byte_size;
+          TRITONSERVER_MemoryType src_memory_type;
+          int64_t src_memory_type_id;
+          size_t input_offset = 0;
+          for (size_t idx = 0; idx < in->DataBufferCount(); ++idx) {
+            status = in->DataBuffer(
+                idx, &src_buffer, &src_byte_size, &src_memory_type,
+                &src_memory_type_id);
+            if (status.IsOk()) {
+              if (input_offset + src_byte_size > expected_byte_sizes[ridx]) {
+                status = Status(
+                    Status::Code::INVALID_ARG,
+                    "buffer size for input '" + name +
+                        "' exceeds batch byte size " +
+                        std::to_string(expected_byte_sizes[ridx]));
+              } else {
+                bool cuda_used = false;
+                status = CopyBuffer(
+                    name, src_memory_type, src_memory_type_id, mem_type, 0,
+                    src_byte_size, src_buffer,
+                    input_buffer + buffer_offset + input_offset, stream_,
+                    &cuda_used);
+                *cuda_copy |= cuda_used;
+              }
+            }
+            if (status.IsOk()) {
+              input_offset += src_byte_size;
+            } else {
+              break;
+            }
+          }
+        }
+        if (!status.IsOk() && ((*responses)[ridx] != nullptr)) {
+          InferenceResponse::SendWithStatus(
+              std::move((*responses)[ridx]), status);
+        }
+        buffer_offset += expected_byte_sizes[ridx];
+      }
+
+#ifdef TRTIS_ENABLE_GPU
+      // Synchronize to ensure the buffer is ready to be modified
+      if (string_cuda_copy) {
+        cudaStreamSynchronize(stream_);
+      }
+#endif  // TRTIS_ENABLE_GPU
+
+      std::vector<const char*> string_data;
+      // Modify input buffer and set string expected by ORT
+      SetStringInputBuffer(
+          name, expected_byte_sizes, expected_element_cnts, responses,
+          input_buffer, &string_data);
+      input_buffer[total_byte_size] = 0;
+
+      RETURN_IF_ORT_ERROR(ort_api->CreateTensorAsOrtValue(
+          allocator_, batchn_shape.data(), batchn_shape.size(),
+          ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING, &input_tensors_.back()));
+      RETURN_IF_ORT_ERROR(ort_api->FillStringTensor(
+          input_tensors_.back(), string_data.data(), string_data.size()));
+    }
+  }
+  // Finalize...
+  *cuda_copy |= collector.Finalize();
+  return Status::Success;
+}
+
+Status
+OnnxBackend::Context::OrtRun(
+    const std::vector<const char*>& input_names,
+    const std::vector<const char*>& output_names)
+{
   RETURN_IF_ORT_ERROR(ort_api->Run(
       session_, NULL /* run options */, input_names.data(),
       (const OrtValue* const*)input_tensors_.data(), input_tensors_.size(),
       output_names.data(), output_names.size(), output_tensors_.data()));
-
-#ifdef TRTIS_ENABLE_STATS
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeOutputStart);
-    }
-  }
-#endif  // TRTIS_ENABLE_STATS
-
-  // Make sure each output is of the expected size and copy it into
-  // the payload responses.
-  return ReadOutputTensors(base, total_batch_size, output_names, payloads);
-}
-
-Status
-OnnxBackend::Context::SetInputTensor(
-    const std::string& name, const DataType data_type,
-    const std::vector<int64_t>& dims, size_t total_batch_size,
-    std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
-    std::vector<InputInfo>* inputs, std::vector<const char*>* input_names,
-    bool* cuda_used)
-{
-  input_names->emplace_back(name.c_str());
-  input_tensors_.emplace_back(nullptr);
-
-  size_t batch1_element_cnt = 1;
-  std::vector<int64_t> input_dims;
-
-  // Only add batch dimension if the model support batching
-  if (max_batch_size_ != NO_BATCHING) {
-    input_dims.push_back(total_batch_size);
-  }
-  for (const auto dim : dims) {
-    input_dims.push_back(dim);
-    batch1_element_cnt *= dim;
-  }
-
-  size_t total_byte_size = 0;
-  std::vector<size_t> expected_byte_sizes;
-  std::vector<size_t> expected_element_cnts;
-  for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_;
-
-    expected_element_cnts.push_back(irequest->BatchSize() * batch1_element_cnt);
-
-    if (data_type == TYPE_STRING) {
-      // For String data byte, obtain expected byte size from
-      // 'batch_byte_size' The request normalizer has already checked
-      // that batch_byte_size is set
-      const InferenceRequest::Input* in;
-      RETURN_IF_ERROR(irequest->ImmutableInput(name, &in));
-      expected_byte_sizes.push_back(in->BatchByteSize());
-    } else {
-      // Otherwise calculate expected byte size from 'expected_element_cnts',
-      // so that the byte size for override input (not provided in request
-      // header's input field) can also be set correctly.
-      expected_byte_sizes.push_back(
-          expected_element_cnts.back() * GetDataTypeByteSize(data_type));
-    }
-    total_byte_size += expected_byte_sizes.back();
-  }
-
-  // Reserve one more byte at the end of input_buffer to ensure last element
-  // of String data can become valid C string.
-  const size_t buffer_size =
-      total_byte_size + ((data_type != TYPE_STRING) ? 0 : 1);
-  input_buffers->emplace_back(
-      new AllocatedMemory(buffer_size, TRITONSERVER_MEMORY_CPU_PINNED, 0));
-  inputs->emplace_back();
-  auto& input = inputs->back();
-  input.input_buffer_ = input_buffers->back()->MutableBuffer(
-      &input.memory_type_, &input.memory_type_id_);
-
-  // Note that 'cuda_used' will be updated only
-  // for non-string data type. For string, the data must be ready to proceed.
-  auto tmp_cuda_used =
-      SetInputBuffer(name, expected_byte_sizes, payloads, &input);
-
-  if (data_type != TYPE_STRING) {
-    const OrtMemoryInfo* allocator_info;
-    RETURN_IF_ORT_ERROR(ort_api->AllocatorGetInfo(allocator_, &allocator_info));
-    RETURN_IF_ORT_ERROR(ort_api->CreateTensorWithDataAsOrtValue(
-        allocator_info, (void*)input.input_buffer_, total_byte_size,
-        input_dims.data(), input_dims.size(), ConvertToOnnxDataType(data_type),
-        &input_tensors_.back()));
-    *cuda_used |= tmp_cuda_used;
-  } else {
-#ifdef TRTIS_ENABLE_GPU
-    if (tmp_cuda_used) {
-      cudaStreamSynchronize(stream_);
-    }
-#endif  // TRTIS_ENABLE_GPU
-
-    std::vector<const char*> string_data;
-    // Onnx String tensor is created by passing array of C strings,
-    // set such array and modify data in input buffer to be C strings
-    SetStringInputBuffer(
-        name, expected_byte_sizes, expected_element_cnts, payloads,
-        input.input_buffer_, &string_data);
-    // Make sure to make the last string data valid C string
-    input.input_buffer_[total_byte_size] = 0;
-
-    RETURN_IF_ORT_ERROR(ort_api->CreateTensorAsOrtValue(
-        allocator_, input_dims.data(), input_dims.size(),
-        ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING, &input_tensors_.back()));
-    RETURN_IF_ORT_ERROR(ort_api->FillStringTensor(
-        input_tensors_.back(), string_data.data(), string_data.size()));
-  }
-
   return Status::Success;
 }
 
@@ -791,29 +885,30 @@ void
 OnnxBackend::Context::SetStringInputBuffer(
     const std::string& name, const std::vector<size_t>& expected_byte_sizes,
     const std::vector<size_t>& expected_element_cnts,
-    std::vector<Scheduler::Payload>* payloads, char* input_buffer,
-    std::vector<const char*>* string_data)
+    std::vector<std::unique_ptr<InferenceResponse>>* responses,
+    char* input_buffer, std::vector<const char*>* string_data)
 {
-  // offset for each payload
+  // offset for each response
   size_t buffer_copy_offset = 0;
   for (size_t idx = 0; idx < expected_byte_sizes.size(); idx++) {
-    auto& payload = (*payloads)[idx];
     const size_t expected_byte_size = expected_byte_sizes[idx];
     const size_t expected_element_cnt = expected_element_cnts[idx];
 
     size_t element_cnt = 0;
-    if (payload.status_.IsOk()) {
+    if ((*responses)[idx] != nullptr) {
       size_t remaining_bytes = expected_byte_size;
       char* data_content = input_buffer + buffer_copy_offset;
       // Continue if the remaining bytes may still contain size info
       while (remaining_bytes >= sizeof(uint32_t)) {
         if (element_cnt >= expected_element_cnt) {
-          payload.status_ = Status(
-              Status::Code::INVALID_ARG,
-              "unexpected number of string elements " +
-                  std::to_string(element_cnt + 1) + " for inference input '" +
-                  name + "', expecting " +
-                  std::to_string(expected_element_cnt));
+          InferenceResponse::SendWithStatus(
+              std::move((*responses)[idx]),
+              Status(
+                  Status::Code::INVALID_ARG,
+                  "unexpected number of string elements " +
+                      std::to_string(element_cnt + 1) +
+                      " for inference input '" + name + "', expecting " +
+                      std::to_string(expected_element_cnt)));
           break;
         }
 
@@ -824,12 +919,14 @@ OnnxBackend::Context::SetStringInputBuffer(
         *data_content = 0;
         data_content = data_content + sizeof(uint32_t);
         if (len > remaining_bytes) {
-          payload.status_ = Status(
-              Status::Code::INVALID_ARG,
-              "incomplete string data for inference input '" + name +
-                  "', expecting string of length " + std::to_string(len) +
-                  " but only " + std::to_string(remaining_bytes) +
-                  " bytes available");
+          InferenceResponse::SendWithStatus(
+              std::move((*responses)[idx]),
+              Status(
+                  Status::Code::INVALID_ARG,
+                  "incomplete string data for inference input '" + name +
+                      "', expecting string of length " + std::to_string(len) +
+                      " but only " + std::to_string(remaining_bytes) +
+                      " bytes available"));
           break;
         } else {
           string_data->push_back(data_content);
@@ -858,20 +955,18 @@ OnnxBackend::Context::FillStringData(
 
 Status
 OnnxBackend::Context::ReadOutputTensors(
-    const InferenceBackend* base, size_t total_batch_size,
-    const std::vector<const char*>& output_names,
-    std::vector<Scheduler::Payload>* payloads)
+    size_t total_batch_size, const std::vector<const char*>& output_names,
+    const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+    std::vector<std::unique_ptr<InferenceResponse>>* responses)
 {
+  BackendResponder responder(
+      requests, responses, max_batch_size_, enable_pinned_output_, stream_);
+
+  // Use to hold string output contents
   bool cuda_copy = false;
-  std::vector<OutputInfo> outputs;
   std::vector<std::vector<char>> string_buffers;
   for (size_t idx = 0; idx < output_names.size(); idx++) {
-    outputs.emplace_back();
-    auto& output = outputs.back();
     std::string name = std::string(output_names[idx]);
-
-    const ModelOutput* output_config;
-    RETURN_IF_ERROR(base->GetOutput(name, &output_config));
 
     OrtValue* output_tensor = output_tensors_[idx];
     if (output_tensor == nullptr) {
@@ -890,15 +985,13 @@ OnnxBackend::Context::ReadOutputTensors(
     RETURN_IF_ORT_ERROR(
         ort_api->CastTypeInfoToTensorInfo(typeinfo, &type_and_shape));
 
-
     size_t num_dims;
     RETURN_IF_ORT_ERROR(ort_api->GetDimensionsCount(type_and_shape, &num_dims));
 
-    output.output_shape_.resize(num_dims);
+    std::vector<int64_t> batchn_shape(num_dims);
     RETURN_IF_ORT_ERROR(ort_api->GetDimensions(
-        type_and_shape, output.output_shape_.data(),
-        output.output_shape_.size()));
-    const size_t element_count = GetElementCount(output.output_shape_);
+        type_and_shape, batchn_shape.data(), batchn_shape.size()));
+    const size_t element_count = GetElementCount(batchn_shape);
 
     ONNXTensorElementDataType type;
     RETURN_IF_ORT_ERROR(ort_api->GetTensorElementType(type_and_shape, &type));
@@ -918,91 +1011,62 @@ OnnxBackend::Context::ReadOutputTensors(
       offsets[element_count] = total_length;
 
       cuda_copy |= SetStringOutputBuffer(
-          name, batch1_element_cnt, content, output.output_shape_, offsets,
-          payloads);
+          name, batch1_element_cnt, content, offsets, &batchn_shape, requests,
+          responses);
     } else {
       // Fixed size data type...
-      const size_t actual_byte_size =
-          element_count * GetDataTypeByteSize(ConvertFromOnnxDataType(type));
-      const size_t expected_byte_size =
-          element_count * GetDataTypeByteSize(output_config->data_type());
-      const size_t batch1_byte_size = expected_byte_size / total_batch_size;
-      if (actual_byte_size != expected_byte_size) {
-        return Status(
-            Status::Code::INTERNAL,
-            "unexpected size for output '" + name + "', byte-size " +
-                std::to_string(actual_byte_size) + " does not equal " +
-                std::to_string(total_batch_size) + " * " +
-                std::to_string(batch1_byte_size));
-      }
-
-      RETURN_IF_ORT_ERROR(ort_api->GetTensorMutableData(
-          output_tensor, (void**)&output.output_buffer_));
+      char* output_buffer = nullptr;
+      RETURN_IF_ORT_ERROR(
+          ort_api->GetTensorMutableData(output_tensor, (void**)&output_buffer));
 
       // [TODO] currently ONNX output data are always on CPU
       // https://github.com/microsoft/onnxruntime/issues/1621
-      output.memory_type_ = TRITONSERVER_MEMORY_CPU;
-      output.memory_type_id_ = 0;
-      cuda_copy |=
-          SetFixedSizeOutputBuffer(name, batch1_byte_size, &output, payloads);
+      responder.ProcessTensor(
+          name, ConvertFromOnnxDataType(type), batchn_shape, output_buffer,
+          TRITONSERVER_MEMORY_CPU, 0);
     }
   }
+
+  // Finalize and wait for any pending buffer copies.
+  cuda_copy |= responder.Finalize();
 
 #ifdef TRTIS_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
-  cuda_copy = false;
-  for (auto& output : outputs) {
-    for (auto& indirect_buffer : output.indirect_buffers_) {
-      bool cuda_used;
-      TRITONSERVER_MemoryType src_memory_type;
-      int64_t src_memory_type_id;
-      // placeholder, copy byte size is determined by dst_byte_size
-      size_t src_byte_size;
-      auto src = indirect_buffer.first->BufferAt(
-          0, &src_byte_size, &src_memory_type, &src_memory_type_id);
-      TRITONSERVER_MemoryType dst_memory_type;
-      int64_t dst_memory_type_id;
-      for (auto& payload_output : indirect_buffer.second) {
-        char* dst = payload_output.second->MutableBuffer(
-            &dst_memory_type, &dst_memory_type_id);
-        auto dst_byte_size = payload_output.second->TotalByteSize();
-        (*payloads)[payload_output.first].status_ = CopyBuffer(
-            "indirect buffer", src_memory_type, src_memory_type_id,
-            dst_memory_type, dst_memory_type_id, dst_byte_size, src, dst,
-            stream_, &cuda_used);
-        cuda_copy |= cuda_used;
-        src += dst_byte_size;
-      }
-    }
-  }
-  if (cuda_copy) {
-    cudaStreamSynchronize(stream_);
-  }
 #endif  // TRTIS_ENABLE_GPU
-
   return Status::Success;
 }
 
 bool
 OnnxBackend::Context::SetStringOutputBuffer(
     const std::string& name, const size_t batch1_element_cnt,
-    const char* content, const std::vector<int64_t>& content_shape,
-    const size_t* offsets, std::vector<Scheduler::Payload>* payloads)
+    const char* content, const size_t* offsets,
+    std::vector<int64_t>* batchn_shape,
+    const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+    std::vector<std::unique_ptr<InferenceResponse>>* responses)
 {
   size_t element_idx = 0;
   bool cuda_copy = false;
-  for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_;
+  for (size_t ridx = 0; ridx < requests.size(); ++ridx) {
+    const auto& request = requests[ridx];
+    auto& response = (*responses)[ridx];
     const size_t expected_element_cnt =
-        irequest->BatchSize() * batch1_element_cnt;
+        std::max(1U, request->BatchSize()) * batch1_element_cnt;
 
-    // If 'payload' requested this output then copy it from
+    // If 'request' requested this output then copy it from
     // 'content'. If it did not request this output then just
     // skip it in the 'content'.
-    if ((payload.response_provider_ != nullptr) &&
-        payload.response_provider_->RequiresOutput(name)) {
+    if ((response != nullptr) &&
+        (request->ImmutableRequestedOutputs().find(name) !=
+         request->ImmutableRequestedOutputs().end())) {
+      if (max_batch_size_ != NO_BATCHING) {
+        (*batchn_shape)[0] = request->BatchSize();
+      }
+      InferenceResponse::Output* response_output = nullptr;
+      response->AddOutput(
+          name, DataType::TYPE_STRING, *batchn_shape, request->BatchSize(),
+          &response_output);
       // Calculate expected byte size in advance using string offsets
       const size_t data_byte_size =
           offsets[element_idx + expected_element_cnt] - offsets[element_idx];
@@ -1010,14 +1074,12 @@ OnnxBackend::Context::SetStringOutputBuffer(
           data_byte_size + sizeof(uint32_t) * expected_element_cnt;
 
       void* buffer;
-      TRITONSERVER_MemoryType preferred_memory_type =
+      TRITONSERVER_MemoryType actual_memory_type =
           TRITONSERVER_MEMORY_CPU_PINNED;
-      TRITONSERVER_MemoryType actual_memory_type;
-      int64_t actual_memory_type_id;
-      Status status = payload.response_provider_->AllocateOutputBuffer(
-          name, &buffer, expected_byte_size, content_shape,
-          preferred_memory_type, 0 /* preferred_memory_type_id */,
-          &actual_memory_type, &actual_memory_type_id);
+      int64_t actual_memory_type_id = 0;
+      Status status = response_output->AllocateDataBuffer(
+          &buffer, expected_byte_size, &actual_memory_type,
+          &actual_memory_type_id);
       if (status.IsOk()) {
         bool cuda_used = false;
         size_t copied_byte_size = 0;
@@ -1025,30 +1087,37 @@ OnnxBackend::Context::SetStringOutputBuffer(
           const uint32_t len =
               offsets[element_idx + e + 1] - offsets[element_idx + e];
           // Prepend size of the string
-          payload.status_ = CopyBuffer(
+          status = CopyBuffer(
               name, TRITONSERVER_MEMORY_CPU /* src_memory_type */,
               0 /* src_memory_type_id */, actual_memory_type,
               actual_memory_type_id, sizeof(uint32_t),
               static_cast<const void*>(&len),
               static_cast<char*>(buffer) + copied_byte_size, stream_,
               &cuda_used);
+          if (!status.IsOk()) {
+            break;
+          }
 
           cuda_copy |= cuda_used;
           copied_byte_size += sizeof(uint32_t);
 
           // Copy raw string content
-          payload.status_ = CopyBuffer(
+          status = CopyBuffer(
               name, TRITONSERVER_MEMORY_CPU /* src_memory_type */,
               0 /* src_memory_type_id */, actual_memory_type,
               actual_memory_type_id, len, content + offsets[element_idx + e],
               static_cast<char*>(buffer) + copied_byte_size, stream_,
               &cuda_used);
+          if (!status.IsOk()) {
+            break;
+          }
 
           cuda_copy |= cuda_used;
           copied_byte_size += len;
         }
-      } else {
-        payload.status_ = status;
+      }
+      if (!status.IsOk()) {
+        InferenceResponse::SendWithStatus(std::move(response), status);
       }
     }
 

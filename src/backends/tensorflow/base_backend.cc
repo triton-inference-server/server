@@ -733,19 +733,9 @@ BaseBackend::Context::Run(
                 DimsListToString(batchn_shape) + " and data type " +
                 DataType_Name(datatype) + " for '" + name_ + "'");
 
-        for (auto& response : responses) {
-          if (response != nullptr) {
-            LOG_STATUS_ERROR(
-                InferenceResponse::SendWithStatus(std::move(response), status),
-                "error creating TensorFlow input tensor");
-          }
-        }
-
-        for (auto& request : requests) {
-          InferenceRequest::Release(std::move(request));
-        }
-
-        return;
+        FAIL_ALL_AND_RETURN_IF_ERROR(
+            requests, responses, status,
+            "error creating TensorFlow input tensor");
       }
 
       // Add the new TF tensor to the list of TF inputs.
@@ -843,24 +833,13 @@ BaseBackend::Context::Run(
         trtistf_model_.get(), *(input_tensors.release()),
         required_outputs.size(), output_names_cstr, &rtl);
     if (err != nullptr) {
+      auto status = Status(Status::Code::INTERNAL, err->msg_);
+      TRTISTF_ErrorDelete(err);
       // Something went wrong with the entire batch inference. For
       // every response that has not already been sent with an
       // error... send it now...
-      for (auto& response : responses) {
-        if (response != nullptr) {
-          LOG_STATUS_ERROR(
-              InferenceResponse::SendWithStatus(
-                  std::move(response),
-                  Status(Status::Code::INTERNAL, err->msg_)),
-              "error sending TensorFlow response");
-        }
-      }
-      for (auto& request : requests) {
-        InferenceRequest::Release(std::move(request));
-      }
-
-      TRTISTF_ErrorDelete(err);
-      return;
+      FAIL_ALL_AND_RETURN_IF_ERROR(
+          requests, responses, status, "error sending TensorFlow response");
     }
 
     output_tensors.reset(rtl);
