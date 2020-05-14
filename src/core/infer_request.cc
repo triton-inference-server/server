@@ -365,18 +365,9 @@ InferenceRequest::AddOverrideInput(
 }
 
 Status
-InferenceRequest::AddOriginalRequestedOutput(
-    const std::string& name, const uint32_t classification_cnt)
+InferenceRequest::AddOriginalRequestedOutput(const std::string& name)
 {
-  const auto& pr = original_requested_outputs_.emplace(
-      std::piecewise_construct, std::forward_as_tuple(name),
-      std::forward_as_tuple(name, classification_cnt));
-
-  if (!pr.second) {
-    return Status(
-        Status::Code::INVALID_ARG, "output '" + name + "' already requested");
-  }
-
+  original_requested_outputs_.insert(name);
   needs_normalization_ = true;
   return Status::Success;
 }
@@ -384,12 +375,7 @@ InferenceRequest::AddOriginalRequestedOutput(
 Status
 InferenceRequest::RemoveOriginalRequestedOutput(const std::string& name)
 {
-  if (original_requested_outputs_.erase(name) != 1) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "output '" + name + "' does not exist in request");
-  }
-
+  original_requested_outputs_.erase(name);
   needs_normalization_ = true;
   return Status::Success;
 }
@@ -446,16 +432,14 @@ InferenceRequest::Normalize()
   requested_outputs_.clear();
   if (original_requested_outputs_.size() == 0) {
     for (const auto& output : model_config.output()) {
-      requested_outputs_.emplace(
-          std::piecewise_construct, std::forward_as_tuple(output.name()),
-          std::forward_as_tuple(output.name(), 0));
+      requested_outputs_.insert(output.name());
     }
   } else {
     // Validate if the original requested output name exists in the
     // model configuration.
-    for (const auto& pr : original_requested_outputs_) {
+    for (const auto& output_name : original_requested_outputs_) {
       const ModelOutput* output_config;
-      RETURN_IF_ERROR(backend_raw_->GetOutput(pr.first, &output_config));
+      RETURN_IF_ERROR(backend_raw_->GetOutput(output_name, &output_config));
     }
   }
 
@@ -679,14 +663,6 @@ InferenceRequest::Input::DataBuffer(
   return Status::Success;
 }
 
-//
-// RequestedOutput
-//
-InferenceRequest::RequestedOutput::RequestedOutput(
-    const std::string& name, const uint32_t classification_cnt)
-    : name_(name), classification_cnt_(classification_cnt)
-{
-}
 
 std::ostream&
 operator<<(std::ostream& out, const InferenceRequest& request)
@@ -718,13 +694,13 @@ operator<<(std::ostream& out, const InferenceRequest& request)
   }
 
   out << "original requested outputs:" << std::endl;
-  for (const auto& itr : request.OriginalRequestedOutputs()) {
-    out << itr.second << std::endl;
+  for (const auto& name : request.OriginalRequestedOutputs()) {
+    out << name << std::endl;
   }
 
   out << "requested outputs:" << std::endl;
-  for (const auto& itr : request.ImmutableRequestedOutputs()) {
-    out << itr.second << std::endl;
+  for (const auto& name : request.ImmutableRequestedOutputs()) {
+    out << name << std::endl;
   }
 
   return out;
@@ -737,14 +713,6 @@ operator<<(std::ostream& out, const InferenceRequest::Input& input)
       << ", type: " << DataTypeToProtocolString(input.DType())
       << ", original shape: " << DimsListToString(input.OriginalShape())
       << ", shape: " << DimsListToString(input.Shape());
-  return out;
-}
-
-std::ostream&
-operator<<(std::ostream& out, const InferenceRequest::RequestedOutput& output)
-{
-  out << "requested output: " << output.Name()
-      << ", class count: " << output.ClassificationCount();
   return out;
 }
 

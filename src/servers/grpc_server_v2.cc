@@ -46,6 +46,7 @@
 #include "src/core/model_config.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/tritonserver.h"
+#include "src/servers/classification.h"
 #include "src/servers/common.h"
 
 #ifdef TRTIS_ENABLE_TRACING
@@ -201,21 +202,23 @@ struct AllocPayload {
   };
 
   using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
+  using ClassificationMap = std::unordered_map<std::string, uint32_t>;
 
-  explicit AllocPayload() : response_(nullptr), shm_map_(nullptr) {}
+  explicit AllocPayload() : response_(nullptr) {}
   ~AllocPayload()
   {
     // Don't delete 'response_'.. it is owned by the HandlerState
-    delete shm_map_;
   }
 
   ModelInferResponse* response_;
-  TensorShmMap* shm_map_;
+  TensorShmMap shm_map_;
+  ClassificationMap classification_map_;
 
   // Used to extend the lifetime of the serialized data in case
-  // non-raw contents were provided in the request. It actual lifetime
-  // is that of the request whereas AllocPayload's lifetime is that of
-  // a response... but it is convenient to keep it here.
+  // non-raw contents were provided in the request. Serialized data's
+  // actual lifetime is that of the request whereas AllocPayload's
+  // lifetime is that of a response... but it is convenient to keep it
+  // here.
   std::list<std::string> serialized_data_;
 };
 
@@ -1075,7 +1078,7 @@ CommonHandler::SetUpAllRequests()
           }
         }
         TRITONSERVER_MessageDelete(model_index_message);
-      };
+      }
     } else {
       err = TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNSUPPORTED,
@@ -1765,7 +1768,7 @@ InferResponseAlloc(
 {
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
   ModelInferResponse* response = payload->response_;
-  const AllocPayload::TensorShmMap* shm_map = payload->shm_map_;
+  const AllocPayload::TensorShmMap& shm_map = payload->shm_map_;
 
   *buffer = nullptr;
   *buffer_userp = nullptr;
@@ -1781,31 +1784,29 @@ InferResponseAlloc(
       output_tensor->mutable_contents()->mutable_raw_contents();
 
   if (byte_size > 0) {
-    if (shm_map != nullptr) {
-      const auto& pr = shm_map->find(tensor_name);
-      if (pr != shm_map->end()) {
-        // The output is in shared memory so check that shared memory
-        // size is at least large enough for the output.
-        if (byte_size > pr->second.byte_size_) {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INTERNAL,
-              std::string(
-                  "shared memory size specified with the request for output '" +
-                  std::string(tensor_name) + "' (" +
-                  std::to_string(pr->second.byte_size_) +
-                  " bytes) should be at least " + std::to_string(byte_size) +
-                  " bytes to hold the results")
-                  .c_str());
-        }
-
-        *buffer = const_cast<void*>(pr->second.base_);
-        *actual_memory_type = pr->second.memory_type_;
-        *actual_memory_type_id = pr->second.memory_type_id_;
-
-        LOG_VERBOSE(1) << "GRPC: using shared-memory for '" << tensor_name
-                       << "', size: " << byte_size << ", addr: " << *buffer;
-        return nullptr;  // Success
+    const auto& pr = shm_map.find(tensor_name);
+    if (pr != shm_map.end()) {
+      // The output is in shared memory so check that shared memory
+      // size is at least large enough for the output.
+      if (byte_size > pr->second.byte_size_) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INTERNAL,
+            std::string(
+                "shared memory size specified with the request for output '" +
+                std::string(tensor_name) + "' (" +
+                std::to_string(pr->second.byte_size_) +
+                " bytes) should be at least " + std::to_string(byte_size) +
+                " bytes to hold the results")
+                .c_str());
       }
+
+      *buffer = const_cast<void*>(pr->second.base_);
+      *actual_memory_type = pr->second.memory_type_;
+      *actual_memory_type_id = pr->second.memory_type_id_;
+
+      LOG_VERBOSE(1) << "GRPC: using shared-memory for '" << tensor_name
+                     << "', size: " << byte_size << ", addr: " << *buffer;
+      return nullptr;  // Success
     }
 
     // Not using shared memory so allocate a buffer. The buffer we
@@ -1934,6 +1935,40 @@ ParseSharedMemoryParams(
   return nullptr;
 }
 
+
+TRITONSERVER_Error*
+ParseClassificationParams(
+    const ModelInferRequest::InferRequestedOutputTensor& output,
+    bool* has_classification, uint32_t* classification_count)
+{
+  *has_classification = false;
+
+  const auto& class_it = output.parameters().find("classification");
+  if (class_it != output.parameters().end()) {
+    *has_classification = true;
+
+    const auto& param = class_it->second;
+    if (param.parameter_choice_case() !=
+        InferParameter::ParameterChoiceCase::kInt64Param) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          "invalid value type for 'classification' parameter, expected "
+          "int64_param");
+    }
+
+    const int64_t cnt = param.int64_param();
+    if (cnt <= 0) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          "invalid value for 'classification' parameter, expected >= 0");
+    }
+
+    *classification_count = cnt;
+  }
+
+  return nullptr;  // success
+}
+
 TRITONSERVER_Error*
 InferAllocatorPayload(
     const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
@@ -1942,10 +1977,8 @@ InferAllocatorPayload(
     ModelInferResponse* response, AllocPayload* alloc_payload)
 {
   alloc_payload->response_ = response;
-  if (alloc_payload->shm_map_ != nullptr) {
-    alloc_payload->shm_map_->clear();
-  }
-
+  alloc_payload->shm_map_.clear();
+  alloc_payload->classification_map_.clear();
   alloc_payload->serialized_data_ = std::move(serialized_data);
 
   // If any of the outputs use shared memory, then we must calculate
@@ -1957,10 +1990,21 @@ InferAllocatorPayload(
     int64_t offset;
     size_t byte_size;
     bool has_shared_memory;
-
     RETURN_IF_ERR(
         ParseSharedMemoryParams<ModelInferRequest::InferRequestedOutputTensor>(
             io, &has_shared_memory, &region_name, &offset, &byte_size));
+
+    bool has_classification;
+    uint32_t classification_count;
+    RETURN_IF_ERR(ParseClassificationParams(
+        io, &has_classification, &classification_count));
+
+    if (has_shared_memory && has_classification) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          "output can't set both 'shared_memory_region' and "
+          "'classification'");
+    }
 
     if (has_shared_memory) {
       void* base;
@@ -1969,14 +2013,12 @@ InferAllocatorPayload(
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, &base, &memory_type, &memory_type_id));
 
-      // if shm_map_ does not exist, then create an empty shm_map
-      if (alloc_payload->shm_map_ == nullptr) {
-        alloc_payload->shm_map_ = new AllocPayload::TensorShmMap;
-      }
-
-      alloc_payload->shm_map_->emplace(
+      alloc_payload->shm_map_.emplace(
           io.name(),
           AllocPayload::ShmInfo{base, byte_size, memory_type, memory_type_id});
+    } else if (has_classification) {
+      alloc_payload->classification_map_.emplace(
+          io.name(), classification_count);
     }
   }
 
@@ -2320,29 +2362,6 @@ SetInferenceRequestMetadata(
   for (const auto& output : request.outputs()) {
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddRequestedOutput(
         inference_request, output.name().c_str()));
-
-    const auto& class_it = output.parameters().find("classification");
-    if (class_it != output.parameters().end()) {
-      if (output.parameters().find("shared_memory_region") !=
-          output.parameters().end()) {
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            "Output can't set both 'shared_memory_region' and "
-            "'classification'");
-      }
-      const auto& infer_param = class_it->second;
-      if (infer_param.parameter_choice_case() !=
-          InferParameter::ParameterChoiceCase::kInt64Param) {
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            "invalid value type for 'classification' parameter, expected "
-            "int64_param.");
-      }
-      RETURN_IF_ERR(
-          TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
-              inference_request, output.name().c_str(),
-              infer_param.int64_param()));
-    }
   }
 
   return nullptr;  // Success
@@ -2385,8 +2404,9 @@ InferResponseCompleteCommon(
         TRITONSERVER_ERROR_INTERNAL, "response output count mismatch");
   }
 
-  for (uint32_t idx = 0; idx < output_count; ++idx) {
+  for (uint32_t output_idx = 0; output_idx < output_count; ++output_idx) {
     const char* cname;
+    uint32_t batch_size;
     TRITONSERVER_DataType datatype;
     const int64_t* shape;
     uint64_t dim_count;
@@ -2397,8 +2417,8 @@ InferResponseCompleteCommon(
     void* userp;
 
     RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutput(
-        iresponse, idx, &cname, &datatype, &shape, &dim_count, &base,
-        &byte_size, &memory_type, &memory_type_id, &userp));
+        iresponse, output_idx, &cname, &datatype, &shape, &dim_count,
+        &batch_size, &base, &byte_size, &memory_type, &memory_type_id, &userp));
 
     const std::string name(cname);
 
@@ -2419,46 +2439,69 @@ InferResponseCompleteCommon(
           "unable to find expected response output");
     }
 
-    output->set_datatype(TRITONSERVER_DataTypeString(datatype));
-    for (size_t idx = 0; idx < dim_count; idx++) {
-      output->add_shape(shape[idx]);
-    }
+    // If this output was requested as classification then remove the
+    // raw output from the response and instead return classification
+    // results as a string tensor
+    const auto itr = alloc_payload.classification_map_.find(name);
+    if (itr == alloc_payload.classification_map_.end()) {
+      // Not classification...
+      output->set_datatype(TRITONSERVER_DataTypeString(datatype));
+      for (size_t idx = 0; idx < dim_count; idx++) {
+        output->add_shape(shape[idx]);
+      }
+    } else {
+      // Classification
+      const uint32_t classification_count = itr->second;
 
-#if 0
-        // FIXMEV2, different handling if the output requested
-        // classification results
-        //
-        // Check if the output can be classification results
-        // (no raw_contents and not using shared memory)
-        if (output.contents().raw_contents().size() == 0) {
-          if ((alloc_payload.shm_map_ == nullptr) ||
-              (alloc_payload.shm_map_->find(output.name()) ==
-               alloc_payload.shm_map_->end())) {
-            size_t element_cnt = shape[0] * shape[1];
-            const char* base = nullptr;
-            size_t byte_size;
-            TRITONSERVER_MemoryType mem_type;
-            int64_t mem_id;
-            err = TRITONSERVER_InferenceResponseOutputData(
-                iresponse, output.name().c_str(), (const void**)&base,
-                &byte_size, &mem_type, &mem_id);
-            if (err != nullptr) {
-              break;
-            }
-            size_t offset = 0;
-            if (base != nullptr) {
-              for (size_t idx = 0; idx < element_cnt; idx++) {
-                size_t length =
-                    *(reinterpret_cast<const uint32_t*>(base + offset));
-                offset += sizeof(uint32_t);
-                output.mutable_contents()->add_byte_contents(
-                    base + offset, length);
-                offset += length;
-              }
-            }
+      // Determine the batch1 byte size of the tensor... needed when
+      // the response tensor batch-size > 1 so that we know how to
+      // stride though the tensor data.
+      size_t batch1_element_count = 1;
+      for (size_t idx = ((batch_size == 0) ? 0 : 1); idx < dim_count; idx++) {
+        batch1_element_count *= shape[idx];
+      }
+
+      const size_t batch1_byte_size =
+          batch1_element_count * TRITONSERVER_DataTypeByteSize(datatype);
+
+      // Create the classification contents
+      std::string serialized;
+
+      size_t class_offset = 0;
+      for (uint32_t bs = 0; bs < std::max((uint32_t)1, batch_size); ++bs) {
+        std::vector<std::string> class_strs;
+        RETURN_IF_ERR(TopkClassifications(
+            iresponse, output_idx,
+            reinterpret_cast<const char*>(base) + class_offset,
+            ((class_offset + batch1_byte_size) > byte_size) ? 0
+                                                            : batch1_byte_size,
+            datatype, classification_count, &class_strs));
+
+        // Serialize for binary representation...
+        for (const auto& str : class_strs) {
+          uint32_t len = str.size();
+          serialized.append(reinterpret_cast<const char*>(&len), sizeof(len));
+          if (len > 0) {
+            serialized.append(str);
           }
         }
-#endif
+
+        class_offset += batch1_byte_size;
+      }
+
+      // Update the output with new datatype, shape and contents.
+      output->set_datatype(
+          TRITONSERVER_DataTypeString(TRITONSERVER_TYPE_BYTES));
+
+      if (batch_size > 0) {
+        output->add_shape(batch_size);
+      }
+      output->add_shape(classification_count);
+
+      output->mutable_contents()->Clear();
+      *(output->mutable_contents()->mutable_raw_contents()) =
+          std::move(serialized);
+    }
   }
 
   // Make sure response doesn't exceed GRPC limits.
