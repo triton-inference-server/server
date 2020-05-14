@@ -139,6 +139,7 @@ class HttpInferRequest : public InferRequest {
 
  private:
   friend class InferenceServerHttpClient;
+  friend class InferResultHttp;
 
   // Pointer to easy handle that is processing the request
   CURL* easy_handle_;
@@ -250,8 +251,8 @@ HttpInferRequest::GetNextInput(uint8_t* buf, size_t size, size_t* input_bytes)
 class InferResultHttp : public InferResult {
  public:
   static Error Create(
-      InferResult** infer_result, std::unique_ptr<std::string> response,
-      size_t json_response_size);
+      InferResult** infer_result,
+      std::shared_ptr<HttpInferRequest> infer_request);
 
   Error RequestStatus() const override;
   Error ModelName(std::string* name) const override;
@@ -270,24 +271,22 @@ class InferResultHttp : public InferResult {
   std::string DebugString() const override;
 
  private:
-  InferResultHttp(
-      std::unique_ptr<std::string> response, size_t json_response_size);
+  InferResultHttp(std::shared_ptr<HttpInferRequest> infer_request);
 
   std::map<std::string, const rapidjson::Value*> output_name_to_result_map_;
   std::map<std::string, std::pair<const uint8_t*, const size_t>>
       output_name_to_buffer_map_;
 
   rapidjson::Document response_json_;
-  std::unique_ptr<std::string> response_;
+  std::shared_ptr<HttpInferRequest> infer_request_;
 };
 
 Error
 InferResultHttp::Create(
-    InferResult** infer_result, std::unique_ptr<std::string> response,
-    size_t json_response_size)
+    InferResult** infer_result, std::shared_ptr<HttpInferRequest> infer_request)
 {
-  *infer_result = reinterpret_cast<InferResult*>(
-      new InferResultHttp(std::move(response), json_response_size));
+  *infer_result =
+      reinterpret_cast<InferResult*>(new InferResultHttp(infer_request));
   return Error::Success;
 }
 
@@ -446,14 +445,16 @@ InferResultHttp::RequestStatus() const
 }
 
 InferResultHttp::InferResultHttp(
-    std::unique_ptr<std::string> response, size_t json_response_size)
-    : response_(std::move(response))
+    std::shared_ptr<HttpInferRequest> infer_request)
+    : infer_request_(infer_request)
 {
-  size_t offset = json_response_size;
-  if (json_response_size != 0) {
-    response_json_.Parse((char*)response_.get()->c_str(), json_response_size);
+  size_t offset = infer_request->response_json_size_;
+  if (offset != 0) {
+    response_json_.Parse(
+        (char*)infer_request->infer_response_buffer_.get()->c_str(), offset);
   } else {
-    response_json_.Parse((char*)response_.get()->c_str());
+    response_json_.Parse(
+        (char*)infer_request->infer_response_buffer_.get()->c_str());
   }
   const auto& itr = response_json_.FindMember("outputs");
   if (itr != response_json_.MemberEnd()) {
@@ -471,7 +472,10 @@ InferResultHttp::InferResultHttp(
           output_name_to_buffer_map_.emplace(
               output_name,
               std::pair<const uint8_t*, const size_t>(
-                  (uint8_t*)(response_.get()->c_str()) + offset, byte_size));
+                  (uint8_t*)(infer_request->infer_response_buffer_.get()
+                                 ->c_str()) +
+                      offset,
+                  byte_size));
           offset += byte_size;
         }
       }
@@ -507,8 +511,6 @@ InferenceServerHttpClient::Create(
     const std::string& server_url, bool verbose)
 {
   client->reset(new InferenceServerHttpClient(server_url, verbose));
-  client->get()->sync_request_.reset(
-      static_cast<InferRequest*>(new HttpInferRequest()));
   return Error::Success;
 }
 
@@ -912,8 +914,7 @@ InferenceServerHttpClient::Infer(
   }
   request_uri = request_uri + "/infer";
 
-  std::shared_ptr<HttpInferRequest> sync_request =
-      std::static_pointer_cast<HttpInferRequest>(sync_request_);
+  std::shared_ptr<HttpInferRequest> sync_request(new HttpInferRequest());
 
   sync_request->Timer().Reset();
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
@@ -942,9 +943,7 @@ InferenceServerHttpClient::Infer(
   // RECV_END will be set.
   sync_request->http_status_ = curl_easy_perform(sync_request->easy_handle_);
 
-  InferResultHttp::Create(
-      result, std::move(sync_request->infer_response_buffer_),
-      sync_request->response_json_size_);
+  InferResultHttp::Create(result, sync_request);
 
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
 
@@ -1377,9 +1376,7 @@ InferenceServerHttpClient::AsyncTransfer()
 
     for (auto& this_request : request_list) {
       InferResult* result;
-      InferResultHttp::Create(
-          &result, std::move(this_request->infer_response_buffer_),
-          this_request->response_json_size_);
+      InferResultHttp::Create(&result, this_request);
       this_request->callback_(result);
     }
   } while (!exiting_);
