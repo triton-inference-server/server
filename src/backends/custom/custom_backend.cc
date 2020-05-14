@@ -30,6 +30,7 @@
 #include "src/backends/custom/loader.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
+#include "src/core/metrics.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 
@@ -73,10 +74,11 @@ namespace nvidia { namespace inferenceserver {
 
 CustomBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size,
-    const bool enable_pinned_input, const bool enable_pinned_output)
+    const bool enable_pinned_input, const bool enable_pinned_output,
+    std::unique_ptr<MetricModelReporter>&& metric_reporter)
     : BackendContext(
           name, gpu_device, max_batch_size, enable_pinned_input,
-          enable_pinned_output),
+          enable_pinned_output, std::move(metric_reporter)),
       library_handle_(nullptr), library_context_handle_(nullptr),
       InitializeFn_(nullptr), FinalizeFn_(nullptr), ErrorStringFn_(nullptr),
       ExecuteFn_(nullptr)
@@ -209,8 +211,17 @@ CustomBackend::CreateExecutionContext(
   const bool pinned_output =
       Config().optimization().output_pinned_memory().enable();
 
-  contexts_.emplace_back(
-      new Context(instance_name, gpu_device, mbs, pinned_input, pinned_output));
+  std::unique_ptr<MetricModelReporter> metric_reporter;
+#ifdef TRTIS_ENABLE_METRICS
+  if (Metrics::Enabled()) {
+    metric_reporter.reset(new MetricModelReporter(
+        Name(), Version(), gpu_device, Config().metric_tags()));
+  }
+#endif  // TRTIS_ENABLE_METRICS
+
+  contexts_.emplace_back(new Context(
+      instance_name, gpu_device, mbs, pinned_input, pinned_output,
+      std::move(metric_reporter)));
   Context* context = static_cast<Context*>(contexts_.back().get());
 
   // 'mn_itr->second' is the path to the shared library file to use
@@ -536,8 +547,9 @@ CustomBackend::Context::Run(
   for (size_t i = 0; i < custom_payloads.size(); ++i) {
     auto& request = requests[i];
     request->ReportStatistics(
-        (custom_payloads[i].error_code == 0), compute_start_ns,
-        compute_input_end_ns, compute_output_start_ns, compute_end_ns);
+        metric_reporter_.get(), (custom_payloads[i].error_code == 0),
+        compute_start_ns, compute_input_end_ns, compute_output_start_ns,
+        compute_end_ns);
 
 #ifdef TRTIS_ENABLE_TRACING
     if (request->Trace() != nullptr) {
@@ -553,8 +565,8 @@ CustomBackend::Context::Run(
 
   // Also reporting batch stats
   base->MutableStatsAggregator()->UpdateInferBatchStats(
-      total_batch_size, compute_start_ns, compute_input_end_ns,
-      compute_output_start_ns, compute_end_ns);
+      metric_reporter_.get(), total_batch_size, compute_start_ns,
+      compute_input_end_ns, compute_output_start_ns, compute_end_ns);
 #endif  // TRTIS_ENABLE_STATS
 
   // Send the response for each custom payload and release the request

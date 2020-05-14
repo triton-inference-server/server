@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -32,6 +32,7 @@
 #include <vector>
 #include "src/core/backend.h"
 #include "src/core/backend_context.h"
+#include "src/core/metric_model_reporter.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
@@ -68,7 +69,8 @@ class LibTorchBackend : public InferenceBackend {
 
     Context(
         const std::string& name, const int gpu_device, const int max_batch_size,
-        const bool enable_pinned_input, const bool enable_pinned_output);
+        const bool enable_pinned_input, const bool enable_pinned_output,
+        std::unique_ptr<MetricModelReporter>&& metric_reporter);
     ~Context();
 
     DISALLOW_COPY_AND_ASSIGN(Context);

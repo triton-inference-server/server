@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -39,54 +39,69 @@ namespace nvidia { namespace inferenceserver {
 //
 class MetricModelReporter {
  public:
-  MetricModelReporter(
-      const std::string& model_name, int64_t model_version,
-      const MetricTagsMap& model_tags);
-
-  // Get the name of model for which metrics are being reported.
-  const std::string& ModelName() const { return model_name_; }
-
-  // Get the version of model for which metrics are being reported.
-  int64_t ModelVersion() const { return model_version_; }
-
-  // Get a metric for the backend specialized for the given GPU index
-  // (if -1 then return non-specialized version of the metric).
 #ifdef TRTIS_ENABLE_METRICS
-#ifdef TRTIS_ENABLE_STATS
-  prometheus::Counter& MetricInferenceSuccess(int gpu_device) const;
-  prometheus::Counter& MetricInferenceFailure(int gpu_device) const;
-  prometheus::Counter& MetricInferenceCount(int gpu_device) const;
-  prometheus::Counter& MetricInferenceExecutionCount(int gpu_device) const;
-  prometheus::Counter& MetricInferenceRequestDuration(int gpu_device) const;
-  prometheus::Counter& MetricInferenceComputeDuration(int gpu_device) const;
-  prometheus::Counter& MetricInferenceQueueDuration(int gpu_device) const;
-  prometheus::Histogram& MetricInferenceLoadRatio(int gpu_device) const;
-#endif  // TRTIS_ENABLE_STATS
-#endif  // TRTIS_ENABLE_METRICS
+  MetricModelReporter(
+      const std::string& model_name, const int64_t model_version,
+      const int device, const MetricTagsMap& model_tags);
+  ~MetricModelReporter();
+
+  // Get a metric for the backend specialized for the given model,
+  // version and GPU index.
+  prometheus::Counter& MetricInferenceSuccess() const
+  {
+    return *metric_inf_success_;
+  }
+  prometheus::Counter& MetricInferenceFailure() const
+  {
+    return *metric_inf_failure_;
+  }
+  prometheus::Counter& MetricInferenceCount() const
+  {
+    return *metric_inf_count_;
+  }
+  prometheus::Counter& MetricInferenceExecutionCount() const
+  {
+    return *metric_inf_exec_count_;
+  }
+  prometheus::Counter& MetricInferenceRequestDuration() const
+  {
+    return *metric_inf_request_duration_us_;
+  }
+  prometheus::Counter& MetricInferenceQueueDuration() const
+  {
+    return *metric_inf_queue_duration_us_;
+  }
+  prometheus::Counter& MetricInferenceComputeInputDuration() const
+  {
+    return *metric_inf_compute_input_duration_us_;
+  }
+  prometheus::Counter& MetricInferenceComputeInferDuration() const
+  {
+    return *metric_inf_compute_infer_duration_us_;
+  }
+  prometheus::Counter& MetricInferenceComputeOutputDuration() const
+  {
+    return *metric_inf_compute_output_duration_us_;
+  }
 
  private:
-  const std::string model_name_;
-  const int64_t model_version_;
-  const MetricTagsMap model_tags_;
-
-#ifdef TRTIS_ENABLE_METRICS
-#ifdef TRTIS_ENABLE_STATS
   void GetMetricLabels(
-      std::map<std::string, std::string>* labels, const int gpu_device) const;
-  prometheus::Counter& GetCounterMetric(
-      std::map<int, prometheus::Counter*>& metrics,
+      std::map<std::string, std::string>* labels, const std::string& model_name,
+      const int64_t model_version, const int device,
+      const MetricTagsMap& model_tags) const;
+  prometheus::Counter* CreateCounterMetric(
       prometheus::Family<prometheus::Counter>& family,
-      const int gpu_device) const;
+      const std::map<std::string, std::string>& labels);
 
-  mutable std::map<int, prometheus::Counter*> metric_inf_success_;
-  mutable std::map<int, prometheus::Counter*> metric_inf_failure_;
-  mutable std::map<int, prometheus::Counter*> metric_inf_count_;
-  mutable std::map<int, prometheus::Counter*> metric_inf_exec_count_;
-  mutable std::map<int, prometheus::Counter*> metric_inf_request_duration_us_;
-  mutable std::map<int, prometheus::Counter*> metric_inf_compute_duration_us_;
-  mutable std::map<int, prometheus::Counter*> metric_inf_queue_duration_us_;
-  mutable std::map<int, prometheus::Histogram*> metric_inf_load_ratio_;
-#endif  // TRTIS_ENABLE_STATS
+  prometheus::Counter* metric_inf_success_;
+  prometheus::Counter* metric_inf_failure_;
+  prometheus::Counter* metric_inf_count_;
+  prometheus::Counter* metric_inf_exec_count_;
+  prometheus::Counter* metric_inf_request_duration_us_;
+  prometheus::Counter* metric_inf_queue_duration_us_;
+  prometheus::Counter* metric_inf_compute_input_duration_us_;
+  prometheus::Counter* metric_inf_compute_infer_duration_us_;
+  prometheus::Counter* metric_inf_compute_output_duration_us_;
 #endif  // TRTIS_ENABLE_METRICS
 };
 

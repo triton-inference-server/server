@@ -54,3 +54,9 @@ target_include_directories(libtorch-backend-library PRIVATE ${TRTIS_PYTORCH_INCL
 if(${TRTIS_ENABLE_GPU})
   target_include_directories(libtorch-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRTIS_ENABLE_GPU
+if(${TRTIS_ENABLE_METRICS})
+  target_include_directories(
+    libtorch-backend-library
+    PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
+  )
+endif() # TRTIS_ENABLE_METRICS

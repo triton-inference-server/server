@@ -192,6 +192,15 @@ if(${TRTIS_ENABLE_GRPC} OR ${TRTIS_ENABLE_GRPC_V2})
   include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
 endif()
 
+#
+# Prometheus
+#
+if(${TRTIS_ENABLE_METRICS})
+  find_package(prometheus-cpp CONFIG REQUIRED)
+  message(STATUS "Using prometheus-cpp ${prometheus-cpp_VERSION}")
+endif() # TRTIS_ENABLE_METRICS
+
+
 add_subdirectory(../../src/core src/core)
 add_subdirectory(../../src/backends/caffe2 src/backends/caffe2)
 add_subdirectory(../../src/backends/custom src/backends/custom)
