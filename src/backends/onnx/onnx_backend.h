@@ -93,43 +93,49 @@ class OnnxBackend : public InferenceBackend {
         bool* have_control);
 
     // See BackendContext::Run()
-    Status Run(
-        const InferenceBackend* base,
-        std::vector<Scheduler::Payload>* payloads);
+    void Run(
+        InferenceBackend* base,
+        std::vector<std::unique_ptr<InferenceRequest>>&& requests) override;
 
-    // Set an input tensor from one or more payloads.
-    Status SetInputTensor(
-        const std::string& name, const DataType data_type,
-        const std::vector<int64_t>& dims, size_t total_batch_size,
-        std::vector<Scheduler::Payload>* payloads,
+    // Thin wrapper on ORT Run() function.
+    Status OrtRun(
+        const std::vector<const char*>& input_names,
+        const std::vector<const char*>& output_names);
+
+    // Set input tensors from one or more requests.
+    Status SetInputTensors(
+        size_t total_batch_size,
+        const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+        std::vector<std::unique_ptr<InferenceResponse>>* responses,
         std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
-        std::vector<InputInfo>* inputs, std::vector<const char*>* input_names,
-        bool* cuda_used);
+        std::vector<const char*>* input_names, bool* cuda_copy);
+
+    // Read output tensors to one or more requests.
+    Status ReadOutputTensors(
+        size_t total_batch_size, const std::vector<const char*>& output_names,
+        const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+        std::vector<std::unique_ptr<InferenceResponse>>* responses);
 
     // Helper function to modify 'input_buffer' into format needed for creating
     // Onnx String tensor and to set meta data 'string_data'
     void SetStringInputBuffer(
         const std::string& name, const std::vector<size_t>& expected_byte_sizes,
         const std::vector<size_t>& expected_element_cnts,
-        std::vector<Scheduler::Payload>* payloads, char* input_buffer,
-        std::vector<const char*>* string_data);
+        std::vector<std::unique_ptr<InferenceResponse>>* responses,
+        char* input_buffer, std::vector<const char*>* string_data);
 
     // Helper function to fill 'string_data' with 'cnt' number of empty string
     void FillStringData(std::vector<const char*>* string_data, size_t cnt);
 
-    // Read output tensors into one or more payloads accordingly.
-    Status ReadOutputTensors(
-        const InferenceBackend* base, const size_t total_batch_size,
-        const std::vector<const char*>& output_names,
-        std::vector<Scheduler::Payload>* payloads);
-
-    // Helper function to set output buffer of string data type to payloads.
+    // Helper function to set output buffer of string data type to responses.
     // Return true if cudaMemcpyAsync is called, and the caller should call
     // cudaStreamSynchronize before using the data. Otherwise, return false.
     bool SetStringOutputBuffer(
         const std::string& name, const size_t batch1_element_cnt,
-        const char* content, const std::vector<int64_t>& content_shape,
-        const size_t* offsets, std::vector<Scheduler::Payload>* payloads);
+        const char* content, const size_t* offsets,
+        std::vector<int64_t>* content_shape,
+        const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+        std::vector<std::unique_ptr<InferenceResponse>>* responses);
 
     // Release the Onnx Runtime resources allocated for the run, if any.
     void ReleaseOrtRunResources();

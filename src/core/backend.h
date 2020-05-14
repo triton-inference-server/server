@@ -35,6 +35,47 @@
 
 namespace nvidia { namespace inferenceserver {
 
+#ifdef TRTIS_ENABLE_STATS
+#define FAIL_ALL_AND_RETURN_IF_ERROR(REQUESTS, RESPONSES, S, LOG_MSG) \
+  do {                                                                \
+    const auto& status__ = (S);                                       \
+    if (!status__.IsOk()) {                                           \
+      for (auto& response : (RESPONSES)) {                            \
+        if (response != nullptr) {                                    \
+          LOG_STATUS_ERROR(                                           \
+              InferenceResponse::SendWithStatus(                      \
+                  std::move(response), status__),                     \
+              (LOG_MSG));                                             \
+        }                                                             \
+      }                                                               \
+      for (auto& request : (REQUESTS)) {                              \
+        request->ReportStatistics(false /* success */, 0, 0, 0, 0);   \
+        InferenceRequest::Release(std::move(request));                \
+      }                                                               \
+      return;                                                         \
+    }                                                                 \
+  } while (false)
+#else
+#define FAIL_ALL_AND_RETURN_IF_ERROR(REQUESTS, RESPONSES, S, LOG_MSG) \
+  do {                                                                \
+    const auto& status__ = (S);                                       \
+    if (!status__.IsOk()) {                                           \
+      for (auto& response : (RESPONSES)) {                            \
+        if (response != nullptr) {                                    \
+          LOG_STATUS_ERROR(                                           \
+              InferenceResponse::SendWithStatus(                      \
+                  std::move(response), status__),                     \
+              (LOG_MSG));                                             \
+        }                                                             \
+      }                                                               \
+      for (auto& request : (REQUESTS)) {                              \
+        InferenceRequest::Release(std::move(request));                \
+      }                                                               \
+      return;                                                         \
+    }                                                                 \
+  } while (false)
+#endif  // TRTIS_ENABLE_STATS
+
 class InferenceRequest;
 class MetricModelReporter;
 
