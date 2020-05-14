@@ -287,8 +287,6 @@ InferenceServerGrpcClient::Create(
     const std::string& server_url, bool verbose)
 {
   client->reset(new InferenceServerGrpcClient(server_url, verbose));
-  client->get()->sync_request_.reset(
-      static_cast<InferRequest*>(new GrpcInferRequest()));
   return Error::Success;
 }
 
@@ -784,8 +782,7 @@ InferenceServerGrpcClient::Infer(
 
   grpc::ClientContext context;
 
-  std::shared_ptr<GrpcInferRequest> sync_request =
-      std::static_pointer_cast<GrpcInferRequest>(sync_request_);
+  std::shared_ptr<GrpcInferRequest> sync_request(new GrpcInferRequest());
 
   sync_request->Timer().Reset();
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);

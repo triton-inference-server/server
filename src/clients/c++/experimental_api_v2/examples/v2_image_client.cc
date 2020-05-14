@@ -1018,6 +1018,8 @@ main(int argc, char** argv)
 
     result_filenames.emplace_back(std::move(input_filenames));
 
+    options.request_id_ = std::to_string(results.size());
+
     // Send request.
     if (!async) {
       nic::InferResult* result;
