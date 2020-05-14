@@ -264,7 +264,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 set +e
 
-for client in \
+for i in \
     SIMPLE_STREAM_INFER_CLIENT_PY \
     SIMPLE_SEQUENCE_INFER_CLIENT_PY \
     SIMPLE_STREAM_INFER_CLIENT \

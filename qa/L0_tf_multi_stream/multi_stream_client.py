@@ -112,8 +112,7 @@ if __name__ == '__main__':
     timeout = None
 
     while True:
-        try:
-          result, finish_time = finish_times.get()
+        result, finish_time = finish_times.get()
         
         if type(result) == InferenceServerException:
             print(result)
