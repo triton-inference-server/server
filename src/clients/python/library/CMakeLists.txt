@@ -26,47 +26,47 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_GRPC_V2})
-  if(NOT WIN32)
-    #
-    # libcshmv2.so
-    #
-    add_library(cshmv2 SHARED shared_memory/shared_memory.cc)
-    if(${TRTIS_ENABLE_GPU})
-      target_include_directories(cshmv2 PRIVATE ${CUDA_INCLUDE_DIRS})
-    endif() # TRTIS_ENABLE_GPU
-    target_link_libraries(cshmv2 rt)
+if(NOT WIN32)
+  #
+  # libcshmv2.so
+  #
+  add_library(cshmv2 SHARED shared_memory/shared_memory.cc)
+  if(${TRTIS_ENABLE_GPU})
+    target_include_directories(cshmv2 PRIVATE ${CUDA_INCLUDE_DIRS})
+  endif() # TRTIS_ENABLE_GPU
+  target_link_libraries(cshmv2 rt)
 
-    #
-    # libccudashmv2.so
-    #
-    if(${TRTIS_ENABLE_GPU})
-      add_library(ccudashmv2 SHARED
+  #
+  # libccudashmv2.so
+  #
+  if(${TRTIS_ENABLE_GPU})
+    add_library(
+        ccudashmv2 SHARED
         cuda_shared_memory/cuda_shared_memory.cc
-        ../../../c++/experimental_api_v2/library/cencode.c
-        ../../../c++/experimental_api_v2/library/cencode.h)
-      target_include_directories(ccudashmv2 PUBLIC ${CUDA_INCLUDE_DIRS})
-      target_link_libraries(ccudashmv2
+        ../../c++/library/cencode.c
+        ../../c++/library/cencode.h
+    )
+    target_include_directories(ccudashmv2 PUBLIC ${CUDA_INCLUDE_DIRS})
+    target_link_libraries(
+        ccudashmv2
         PRIVATE ${CUDA_LIBRARIES})
-    endif() # TRTIS_ENABLE_GPU
-  endif() # NOT WIN32
+  endif() # TRTIS_ENABLE_GPU
+endif() # NOT WIN32
 
-  configure_file(../../../../../VERSION VERSION COPYONLY)
-  configure_file(utils.py utils.py COPYONLY)
+configure_file(../../../../VERSION VERSION COPYONLY)
+configure_file(utils.py utils.py COPYONLY)
 
-  if(NOT WIN32)
-    configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
-    if(${TRTIS_ENABLE_GPU})
-      configure_file(cuda_shared_memory/__init__.py cuda_shared_memory/__init__.py COPYONLY)
-    endif() # TRTIS_ENABLE_GPU
-  endif() # NOT WIN32
-endif() # TRTIS_ENABLE_HTTP_V2 || TRTIS_ENABLE_GRPC_V2
-
+if(NOT WIN32)
+  configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
+  if(${TRTIS_ENABLE_GPU})
+    configure_file(cuda_shared_memory/__init__.py cuda_shared_memory/__init__.py COPYONLY)
+  endif() # TRTIS_ENABLE_GPU
+endif() # NOT WIN32
 
 #
 # HTTP wheel file
 #
-if(${TRTIS_ENABLE_HTTP_V2})
+if(${TRTIS_ENABLE_HTTP})
   set(http_wheel_stamp_file "http_stamp.whl")
   configure_file(httpclient.py httpclient.py COPYONLY)
   configure_file(http_setup.py http_setup.py COPYONLY)
@@ -92,18 +92,18 @@ if(${TRTIS_ENABLE_HTTP_V2})
     CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/http/tritonhttpclient-*.whl\")"
     CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
   )
-endif() # TRTIS_ENABLE_HTTP_V2
+endif() # TRTIS_ENABLE_HTTP
 
 
 #
 # gRPC wheel file
 #
-if(${TRTIS_ENABLE_GRPC_V2})
+if(${TRTIS_ENABLE_GRPC})
   set(grpc_wheel_stamp_file "grpc_stamp.whl")
-  
+
   configure_file(grpcclient.py grpcclient.py COPYONLY)
   configure_file(grpc_setup.py grpc_setup.py COPYONLY)
-  
+
   add_custom_command(
     OUTPUT "${grpc_wheel_stamp_file}"
     COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/grpc_build_wheel.sh"
@@ -116,7 +116,7 @@ if(${TRTIS_ENABLE_GRPC_V2})
       proto-py-library
       grpc-v2-py-library
   )
-  
+
   add_custom_target(
     client-wheel-grpc ALL
     DEPENDS
@@ -126,34 +126,33 @@ if(${TRTIS_ENABLE_GRPC_V2})
     client-wheel-grpc
     model-config-library grpc-v2-library proto-library
   )
-  
+
   file(
     GLOB generated-py
-    ${CMAKE_CURRENT_BINARY_DIR}/../../../core/*_pb2.py
-    ${CMAKE_CURRENT_BINARY_DIR}/../../../core/*_grpc.py
+    ${CMAKE_CURRENT_BINARY_DIR}/../../core/*_pb2.py
+    ${CMAKE_CURRENT_BINARY_DIR}/../../core/*_grpc.py
   )
-  
+
   install(
     FILES ${generated-py}
     DESTINATION python
   )
-  
+
   install(
     CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/grpc/tritongrpcclient-*.whl\")"
     CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
   )
-endif() # TRTIS_ENABLE_GRPC_V2
+endif() # TRTIS_ENABLE_GRPC
 
 #
 # triton client utils wheel file
 #
-if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_GRPC_V2})
-  if(NOT WIN32)
-    set(utils_wheel_stamp_file "utils_stamp.whl")
-    configure_file(utils_setup.py utils_setup.py COPYONLY)
+if(NOT WIN32)
+  set(utils_wheel_stamp_file "utils_stamp.whl")
+  configure_file(utils_setup.py utils_setup.py COPYONLY)
 
-    if(${TRTIS_ENABLE_GPU})
-      add_custom_command(
+  if(${TRTIS_ENABLE_GPU})
+    add_custom_command(
         OUTPUT "${utils_wheel_stamp_file}"
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/utils_build_wheel.sh"
         ARGS "${CMAKE_CURRENT_BINARY_DIR}/utils/"
@@ -162,9 +161,9 @@ if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_GRPC_V2})
           ${CMAKE_CURRENT_BINARY_DIR}/utils_setup.py
           cshmv2
           ccudashmv2
-      )
-    else()
-      add_custom_command(
+    )
+  else()
+    add_custom_command(
         OUTPUT "${utils_wheel_stamp_file}"
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/utils_build_wheel.sh"
         ARGS "${CMAKE_CURRENT_BINARY_DIR}/utils/"
@@ -172,20 +171,17 @@ if(${TRTIS_ENABLE_HTTP_V2} OR ${TRTIS_ENABLE_GRPC_V2})
           ${CMAKE_CURRENT_BINARY_DIR}/VERSION
           ${CMAKE_CURRENT_BINARY_DIR}/utils_setup.py
           cshmv2
-      )
+    )
+  endif()
 
-    endif()
-
-
-    add_custom_target(
+  add_custom_target(
       client-wheel-utils ALL
       DEPENDS
         "${utils_wheel_stamp_file}"
-    )
+  )
 
-    install(
+  install(
       CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/utils/tritonclientutils-*.whl\")"
       CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
-    )
-  endif() # NOT WIN32
-endif() # TRTIS_ENABLE_HTTP_V2 || TRTIS_ENABLE_GRPC_V2
+  )
+endif() # NOT WIN32

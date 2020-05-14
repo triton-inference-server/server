@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/clients/python/experimental_api_v2/library/shared_memory/shared_memory.h"
+#include "src/clients/python/library/shared_memory/shared_memory.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -32,7 +32,7 @@
 #include <unistd.h>
 #include <cstring>
 #include <iostream>
-#include "src/clients/python/experimental_api_v2/library/shared_memory/shared_memory_handle.h"
+#include "src/clients/python/library/shared_memory/shared_memory_handle.h"
 
 //==============================================================================
 // SharedMemoryControlContext

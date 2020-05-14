@@ -24,15 +24,15 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/clients/python/experimental_api_v2/library/cuda_shared_memory/cuda_shared_memory.h"
+#include "src/clients/python/library/cuda_shared_memory/cuda_shared_memory.h"
 
 extern "C" {
-#include <src/clients/c++/experimental_api_v2/library/cencode.h>
+#include <src/clients/c++/library/cencode.h>
 }
 #include <cuda_runtime_api.h>
 #include <cstring>
 #include <iostream>
-#include "src/clients/python/experimental_api_v2/library/shared_memory/shared_memory_handle.h"
+#include "src/clients/python/library/shared_memory/shared_memory_handle.h"
 
 //==============================================================================
 // SharedMemoryControlContext
