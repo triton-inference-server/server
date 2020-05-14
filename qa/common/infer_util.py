@@ -374,7 +374,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         tester.assertEqual(response_model_name, model_name)
 
         if model_version != "":
-            tester.assertEqual(response_model_version, model_version)
+            tester.assertEqual(str(response_model_version), model_version)
 
         tester.assertEqual(len(response_outputs), len(outputs))
 
@@ -427,7 +427,11 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 for b in range(batch_size):
                     # num_classes values must be returned and must
                     # match expected top values
-                    class_list = results.as_numpy(result_name)[b]
+                    if "nobatch" in pf:
+                      class_list = results.as_numpy(result_name)
+                    else:
+                      class_list = results.as_numpy(result_name)[b]
+
                     tester.assertEqual(len(class_list), num_classes)
                     if batch_size == 1:
                         expected0_flatten = output0_array.flatten()
@@ -446,8 +450,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                         else:
                             ctuple = "".join(chr(x)
                                          for x in class_label).split(':')
-                        cidx = int(ctuple[0])
-                        cval = float(ctuple[1])
+                        cval = float(ctuple[0])
+                        cidx = int(ctuple[1])
                         if result_name == OUTPUT0:
                             tester.assertEqual(cval, expected0_flatten[cidx])
                             tester.assertEqual(
