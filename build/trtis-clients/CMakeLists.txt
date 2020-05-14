@@ -48,33 +48,43 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
 
+if(${TRTIS_ENABLE_HTTP})
+  add_definitions(-DTRTIS_ENABLE_HTTP=1)
+endif() # TRTIS_ENABLE_HTTP
+
+if(${TRTIS_ENABLE_GRPC})
+  add_definitions(-DTRTIS_ENABLE_GRPC=1)
+endif() # TRTIS_ENABLE_GRPC
+
 if(NOT WIN32)
-#
-# CUDA
-#
-if(${TRTIS_ENABLE_GPU})
-  add_definitions(-DTRTIS_ENABLE_GPU=1)
-  find_package(CUDA REQUIRED)
-  message(STATUS "Using CUDA ${CUDA_VERSION}")
-  set(CUDA_NVCC_FLAGS -std=c++11)
-endif() # TRTIS_ENABLE_GPU
+  #
+  # CUDA
+  #
+  if(${TRTIS_ENABLE_GPU})
+    find_package(CUDA REQUIRED)
+    message(STATUS "Using CUDA ${CUDA_VERSION}")
+
+    add_definitions(-DTRTIS_ENABLE_GPU=1)
+    set(CUDA_NVCC_FLAGS -std=c++11)
+  endif() # TRTIS_ENABLE_GPU
 endif() # NOT WIN32
 
-#
-# Protobuf
-#
-set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
-find_package(Protobuf CONFIG REQUIRED)
-message(STATUS "Using protobuf ${Protobuf_VERSION}")
-include_directories(${Protobuf_INCLUDE_DIRS})
+if(${TRTIS_ENABLE_GRPC})
+  #
+  # Protobuf
+  #
+  set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
+  find_package(Protobuf CONFIG REQUIRED)
+  message(STATUS "Using protobuf ${Protobuf_VERSION}")
+  include_directories(${Protobuf_INCLUDE_DIRS})
 
-#
-# GRPC
-#
-set(TRTIS_ENABLE_GRPC ON)
-find_package(gRPC CONFIG REQUIRED)
-message(STATUS "Using gRPC ${gRPC_VERSION}")
-include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
+  #
+  # GRPC
+  #
+  find_package(gRPC CONFIG REQUIRED)
+  message(STATUS "Using gRPC ${gRPC_VERSION}")
+  include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
+endif() # TRTIS_ENABLE_GRPC
 
 add_subdirectory(../../src/core src/core)
 add_subdirectory(../../src/clients/c++ src/clients/c++)
