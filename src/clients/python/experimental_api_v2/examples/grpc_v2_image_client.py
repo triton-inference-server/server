@@ -29,6 +29,7 @@ import argparse
 import numpy as np
 from PIL import Image
 import os
+import sys
 
 import grpc
 from tritongrpcclient import grpc_service_v2_pb2
@@ -196,7 +197,7 @@ def postprocess(results, filenames, batch_size):
 
 
 def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
-                     input_filenames):
+                     result_filenames):
     request = grpc_service_v2_pb2.ModelInferRequest()
     request.model_name = FLAGS.model_name
     request.model_version = FLAGS.model_version
@@ -215,7 +216,8 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
 
     filenames.sort()
 
-    output = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor(
+    )
     output.name = output_name
     output.parameters['classification'].int64_param = FLAGS.classes
     request.outputs.extend([output])
@@ -237,23 +239,32 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
         image_data.append(preprocess(img, format, dtype, c, h, w,
                                      FLAGS.scaling))
 
-    # Send requests of FLAGS.batch_size images.
-    input_bytes = None
-    for idx in range(FLAGS.batch_size):
-        # wrap over if requested batch size exceeds number of provided images
-        img_idx = idx % len(filenames)
-        input_filenames.append(filenames[img_idx])
-        if input_bytes is None:
-            input_bytes = image_data[img_idx].tobytes()
-        else:
-            input_bytes += image_data[img_idx].tobytes()
+    # Send requests of FLAGS.batch_size images. If the number of
+    # images isn't an exact multiple of FLAGS.batch_size then just
+    # start over with the first images until the batch is filled.
+    image_idx = 0
+    last_request = False
+    while not last_request:
+        input_bytes = None
+        input_filenames = []
+        request.ClearField("inputs")
+        for idx in range(FLAGS.batch_size):
+            input_filenames.append(filenames[image_idx])
+            if input_bytes is None:
+                input_bytes = image_data[image_idx].tobytes()
+            else:
+                input_bytes += image_data[image_idx].tobytes()
+            
+            image_idx = (image_idx + 1) % len(image_data)
+            if image_idx == 0:
+                last_request = True
 
-    input_contents = grpc_service_v2_pb2.InferTensorContents()
-    input_contents.raw_contents = input_bytes
-    input.contents.CopyFrom(input_contents)
-    request.inputs.extend([input])
-
-    yield request
+        input_contents = grpc_service_v2_pb2.InferTensorContents()
+        input_contents.raw_contents = input_bytes
+        input.contents.CopyFrom(input_contents)
+        request.inputs.extend([input])
+        result_filenames.append(input_filenames)
+        yield request
 
 
 if __name__ == '__main__':
@@ -264,6 +275,18 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
+    parser.add_argument('-a',
+                        '--async',
+                        dest="async_set",
+                        action="store_true",
+                        required=False,
+                        default=False,
+                        help='Use asynchronous inference API')
+    parser.add_argument('--streaming',
+                        action="store_true",
+                        required=False,
+                        default=False,
+                        help='Use streaming inference API')
     parser.add_argument('-m',
                         '--model-name',
                         type=str,
@@ -331,14 +354,41 @@ if __name__ == '__main__':
     # start over with the first images until the batch is filled.
     requests = []
     responses = []
-    input_filenames = []
+    result_filenames = []
 
     # Send request
-    for request in requestGenerator(input_name, output_name, c, h, w, format,
-                                    dtype, FLAGS, input_filenames):
-        responses.append(grpc_stub.ModelInfer(request))
+    if FLAGS.streaming:
+        for response in grpc_stub.ModelStreamInfer(
+                requestGenerator(input_name, output_name, c, h, w, format,
+                                 dtype, FLAGS, result_filenames)):
+            responses.append(response)
+    else:
+        for request in requestGenerator(input_name, output_name, c, h, w,
+                                        format, dtype, FLAGS, result_filenames):
+            if not FLAGS.async_set:
+                responses.append(grpc_stub.ModelInfer(request))
+            else:
+                requests.append(grpc_stub.ModelInfer.future(request))
 
+    # For async, retrieve results according to the send order
+    if FLAGS.async_set:
+        for request in requests:
+            responses.append(request.result())
+
+    error_found = False
+    idx = 0
     for response in responses:
-        postprocess(response.outputs, input_filenames, FLAGS.batch_size)
+        if FLAGS.streaming:
+            if response.error_message != "":
+                error_found = True
+                print(response.error_message)
+            else:
+                postprocess(response.infer_response.outputs, result_filenames[idx], FLAGS.batch_size)
+        else:
+            postprocess(response.outputs, result_filenames[idx], FLAGS.batch_size)
+        idx += 1
+    
+    if error_found:
+        sys.exit(1)
 
     print("PASS")
