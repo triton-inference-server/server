@@ -63,10 +63,7 @@ COPY src/core src/core
 
 RUN cd build && \
     cmake -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install
-          -DTRTIS_ENABLE_GRPC_V2=ON \
-          -DTRTIS_ENABLE_HTTP_V2=ON \
-          . && \
+          -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install && \
     make -j16 trtis-clients
 RUN cd install && \
     export VERSION=`cat /workspace/VERSION` && \
