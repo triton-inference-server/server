@@ -134,14 +134,10 @@ NetDefBackend::CreateExecutionContexts(
       total_context_cnt,
       [](uint32_t runner_idx) -> Status { return Status::Success; },
       [this](
-          uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-          std::function<void(Status)> func) {
-        Run(runner_idx, payloads, func);
-      },
-      [this](
-          uint32_t runner_idx, const InferenceRequest::Input& input,
-          const Scheduler::Payload& payload,
-          std::vector<int64_t>* shape) -> Status { return Status::Success; }));
+          uint32_t runner_idx,
+          std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
+        Run(runner_idx, std::move(requests));
+      }));
 
   LOG_VERBOSE(1) << "netdef backend for " << Name() << std::endl << *this;
   return Status::Success;
@@ -353,251 +349,16 @@ NetDefBackend::Context::ValidateOutputs(
 }
 
 Status
-NetDefBackend::Context::SetFixedSizedInputTensor(
-    const std::string& name, const std::vector<int64_t>& shape,
-    const Caffe2Workspace::DataType dtype, const size_t batch1_byte_size,
-    const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-    InputInfo* input, bool* cuda_copy)
+NetDefBackend::Context::ReadOutputTensors(
+    const InferenceBackend* base, size_t total_batch_size,
+    const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+    std::vector<std::unique_ptr<InferenceResponse>>* responses)
 {
-  // Visit the payloads in order and copy the input tensors to
-  // 'buffer'.
-  std::vector<size_t> expected_byte_sizes;
-  for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_;
-    expected_byte_sizes.push_back(irequest->BatchSize() * batch1_byte_size);
-  }
-
-  *cuda_copy |= SetInputBuffer(name, expected_byte_sizes, payloads, input);
-
-  Caffe2Workspace::Error err = workspace_->SetInputTensor(
-      name, shape, dtype, static_cast<const char*>(input->input_buffer_),
-      total_byte_size);
-  if (!err.IsOk()) {
-    return Status(Status::Code::INTERNAL, err.Message());
-  }
-
-  return Status::Success;
-}
-
-Status
-NetDefBackend::Context::ReadFixedSizedOutputTensor(
-    const std::string& name, const Caffe2Workspace::DataType dtype,
-    const size_t dtype_byte_size, const size_t total_batch_size,
-    const DimsList& dims, std::vector<Scheduler::Payload>* payloads,
-    OutputInfo* output, bool* cuda_copy)
-{
-  // [TODO] use the following statement. Right now we always create
-  // netdef workspace with inputs / outputs on CPU node
-  // auto content_memory_type = (gpu_device_ == NO_GPU_DEVICE)
-  //                                ? TRITONSERVER_MEMORY_CPU
-  //                                : TRITONSERVER_MEMORY_GPU;
-  output->memory_type_ = TRITONSERVER_MEMORY_CPU;
-  output->memory_type_id_ = 0;
-  size_t byte_size = 0;
-  Caffe2Workspace::Error err = workspace_->GetOutputTensor(
-      name, dtype, &output->output_buffer_, &byte_size, &output->output_shape_);
-  if (!err.IsOk()) {
-    return Status(Status::Code::INTERNAL, err.Message());
-  }
-
-  // verify shape of output matches shape from model config
-  RETURN_IF_ERROR(CompareOutputDims(
-      name, output->output_shape_, dims,
-      max_batch_size_ != NO_BATCHING /* supports_batching */));
-
-  const size_t total_byte_size =
-      GetElementCount(output->output_shape_) * dtype_byte_size;
-  const size_t batch1_byte_size = total_byte_size / total_batch_size;
-
-  if (byte_size != total_byte_size) {
-    return Status(
-        Status::Code::INTERNAL,
-        "unexpected size for output '" + name + "', byte-size " +
-            std::to_string(byte_size) + " does not equal " +
-            std::to_string(total_batch_size) + " * " +
-            std::to_string(batch1_byte_size));
-  }
-
-  *cuda_copy |=
-      SetFixedSizeOutputBuffer(name, batch1_byte_size, output, payloads);
-  return Status::Success;
-}
-
-Status
-NetDefBackend::Context::SetInput(
-    const std::string& name, const DataType datatype,
-    const std::vector<int64_t>& dims, const size_t total_batch_size,
-    std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
-    std::vector<InputInfo>* inputs, bool* cuda_copy)
-{
-  // Get the shape of the input. Request normalize already checked
-  // that the request shape is valid so don't need to do it here.
-  std::vector<int64_t> shape;
-
-  // If model supports batching then prepend the batch dimension
-  // onto the input shape.
-  if (max_batch_size_ != NO_BATCHING) {
-    shape.push_back(total_batch_size);
-  }
-
-  size_t batch1_element_cnt = 1;
-  for (auto dim : dims) {
-    shape.push_back(dim);
-    batch1_element_cnt *= dim;
-  }
-
-  // Checked at initialization time to make sure that STRING is not
-  // being used for an input, so can just assume fixed-sized here.
-  const Caffe2Workspace::DataType dtype = ConvertDataType(datatype);
-  const size_t batch1_byte_size =
-      batch1_element_cnt * GetDataTypeByteSize(datatype);
-  const size_t total_byte_size = total_batch_size * batch1_byte_size;
-
-  // The entire input tensor must be delivered as a single
-  // contiguous chunk so create a buffer large enough to hold the
-  // entire dynamic batched input.
-  input_buffers->emplace_back(
-      new AllocatedMemory(total_byte_size, TRITONSERVER_MEMORY_CPU_PINNED, 0));
-  inputs->emplace_back();
-  auto& input = inputs->back();
-  input.input_buffer_ = input_buffers->back()->MutableBuffer(
-      &input.memory_type_, &input.memory_type_id_);
-
-  return SetFixedSizedInputTensor(
-      name, shape, dtype, batch1_byte_size, total_byte_size, payloads, &input,
-      cuda_copy);
-}
-
-Status
-NetDefBackend::Context::Run(
-    const InferenceBackend* base, std::vector<Scheduler::Payload>* payloads)
-{
-  LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
-                 << " request payloads";
-
-  const InferenceRequest* repr_input_request = nullptr;
-
-  // For each request in 'payloads' collect the total batch size for
-  // this inference execution. The batch-size, number of inputs, and
-  // size of each input has already been checked by each request
-  // normalizer so don't need to do that here.
-  size_t total_batch_size = 0;
-  for (auto& payload : *payloads) {
-    if (!payload.status_.IsOk()) {
-      return Status(
-          Status::Code::INTERNAL,
-          "unexpected payload with non-OK status given to runner for '" +
-              name_ + "'");
-    }
-
-    total_batch_size += payload.request_->BatchSize();
-
-    // All payloads must have equally-sized input tensors so use any
-    // payload as the representative for the input tensors.
-    repr_input_request = payload.request_.get();
-  }
-
-  // If there are no valid payloads then no need to run the
-  // inference. The payloads will have their error status set so can
-  // just return.
-  if (total_batch_size == 0) {
-    return Status::Success;
-  }
-
-  // total_batch_size can be 1 for models that don't support batching
-  // (i.e. max_batch_size_ == 0).
-  if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size_)) {
-    return Status(
-        Status::Code::INTERNAL,
-        "dynamic batch size " + std::to_string(total_batch_size) + " for '" +
-            name_ + "', max allowed is " + std::to_string(max_batch_size_));
-  }
-
-  // Hold reference to each buffer of input data to that it stays
-  // until the inference has completed.
-  std::vector<std::unique_ptr<AllocatedMemory>> input_buffers;
-  std::vector<InputInfo> inputs;
-
-  // Create a tensor for each input sized correctly for the total
-  // payload batch size. Concatenate input values from each payload
-  // into the corresponding tensor.
-
-  // Inputs from the request...
-  bool cuda_copy = false;
-  for (const auto& pr : repr_input_request->ImmutableInputs()) {
-    const InferenceRequest::Input* input = pr.second;
-    const std::string& name = input->Name();
-
-    RETURN_IF_ERROR(SetInput(
-        name, input->DType(), input->Shape(), total_batch_size, payloads,
-        &input_buffers, &inputs, &cuda_copy));
-  }
-
-#ifdef TRTIS_ENABLE_GPU
-  // Two pass synchronization, one to make sure indirect buffers are filled if
-  // any, the other to make sure the input buffer for execution is ready.
-  if (cuda_copy) {
-    cudaStreamSynchronize(stream_);
-  }
-  cuda_copy = false;
-  for (auto& input : inputs) {
-    for (auto& indirect_buffer : input.indirect_buffers_) {
-      bool cuda_used;
-      TRITONSERVER_MemoryType buffer_memory_type;
-      int64_t buffer_memory_id;
-      size_t buffer_byte_size;
-      auto buffer =
-          std::get<0>(indirect_buffer)
-              ->BufferAt(
-                  0, &buffer_byte_size, &buffer_memory_type, &buffer_memory_id);
-      auto status = CopyBuffer(
-          "indirect buffer", buffer_memory_type, buffer_memory_id,
-          input.memory_type_, input.memory_type_id_, buffer_byte_size, buffer,
-          input.input_buffer_ + std::get<1>(indirect_buffer), stream_,
-          &cuda_used);
-      if (!status.IsOk()) {
-        for (const auto& payload_idx : std::get<2>(indirect_buffer)) {
-          (*payloads)[payload_idx].status_ = status;
-        }
-      } else {
-        cuda_copy |= cuda_used;
-      }
-    }
-  }
-  if (cuda_copy) {
-    cudaStreamSynchronize(stream_);
-  }
-#endif  // TRTIS_ENABLE_GPU
-
-#ifdef TRTIS_ENABLE_STATS
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeInputEnd);
-    }
-  }
-#endif  // TRTIS_ENABLE_STATS
-
-  // Run...
-  Caffe2Workspace::Error err = workspace_->Run();
-  if (!err.IsOk()) {
-    return Status(Status::Code::INTERNAL, err.Message());
-  }
-
-#ifdef TRTIS_ENABLE_STATS
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeOutputStart);
-    }
-  }
-#endif  // TRTIS_ENABLE_STATS
-
-  std::vector<OutputInfo> outputs;
+  BackendResponder responder(
+      requests, responses, max_batch_size_, enable_pinned_output_, stream_);
   // Make sure each output is of the expected size and copy it into
   // the payload responses.
-  cuda_copy = false;
+  bool cuda_copy = false;
   for (const auto& output : base->Config().output()) {
     const std::string& name = output.name();
 
@@ -609,50 +370,246 @@ NetDefBackend::Context::Run(
     const Caffe2Workspace::DataType dtype =
         ConvertDataType(output_config->data_type());
 
-    const DimsList& output_dims = (output_config->has_reshape())
-                                      ? output_config->reshape().shape()
-                                      : output_config->dims();
+    const char* output_buffer = nullptr;
+    size_t byte_size = 0;
+    std::vector<int64_t> batchn_shape;
+    Caffe2Workspace::Error err = workspace_->GetOutputTensor(
+        name, dtype, &output_buffer, &byte_size, &batchn_shape);
+    if (!err.IsOk()) {
+      return Status(Status::Code::INTERNAL, err.Message());
+    }
 
-    outputs.emplace_back();
-    RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
-        name, dtype, GetDataTypeByteSize(output_config->data_type()),
-        total_batch_size, output_dims, payloads, &outputs.back(), &cuda_copy));
+    responder.ProcessTensor(
+        name, output_config->data_type(), batchn_shape, output_buffer,
+        TRITONSERVER_MEMORY_CPU, 0);
   }
+
+  // Finalize and wait for any pending buffer copies.
+  cuda_copy |= responder.Finalize();
+
 #ifdef TRTIS_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
-  cuda_copy = false;
-  for (auto& output : outputs) {
-    for (auto& indirect_buffer : output.indirect_buffers_) {
-      bool cuda_used;
-      TRITONSERVER_MemoryType src_memory_type;
-      int64_t src_memory_type_id;
-      // placeholder, copy byte size is determined by dst_byte_size
-      size_t src_byte_size;
-      auto src = indirect_buffer.first->BufferAt(
-          0, &src_byte_size, &src_memory_type, &src_memory_type_id);
-      TRITONSERVER_MemoryType dst_memory_type;
-      int64_t dst_memory_type_id;
-      for (auto& payload_output : indirect_buffer.second) {
-        char* dst = payload_output.second->MutableBuffer(
-            &dst_memory_type, &dst_memory_type_id);
-        auto dst_byte_size = payload_output.second->TotalByteSize();
-        (*payloads)[payload_output.first].status_ = CopyBuffer(
-            "indirect buffer", src_memory_type, src_memory_type_id,
-            dst_memory_type, dst_memory_type_id, dst_byte_size, src, dst,
-            stream_, &cuda_used);
-        cuda_copy |= cuda_used;
-        src += dst_byte_size;
-      }
+#endif  // TRTIS_ENABLE_GPU
+  return Status::Success;
+}
+
+Status
+NetDefBackend::Context::SetInputTensors(
+    size_t total_batch_size,
+    const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+    std::vector<std::unique_ptr<InferenceResponse>>* responses,
+    std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
+    bool* cuda_copy)
+{
+  BackendInputCollector collector(
+      requests, responses, enable_pinned_input_, stream_);
+  // All requests must have equally-sized input tensors so use any
+  // request as the representative for the input tensors.
+  for (const auto& pr : requests[0]->ImmutableInputs()) {
+    const auto& name = pr.first;
+    const auto& repr_input = pr.second;
+    const auto& batch1_shape = repr_input->Shape();
+
+    // The shape for the entire input patch, [total_batch_size, ...]
+    std::vector<int64_t> batchn_shape;
+    batchn_shape.reserve(batch1_shape.size() + 1);
+    if (max_batch_size_ != NO_BATCHING) {
+      batchn_shape.push_back(total_batch_size);
+    }
+    batchn_shape.insert(
+        batchn_shape.end(), batch1_shape.begin(), batch1_shape.end());
+    const DataType datatype = repr_input->DType();
+
+    // Checked at initialization time to make sure that STRING is not
+    // being used for an input, so can just assume fixed-sized here.
+    const Caffe2Workspace::DataType dtype = ConvertDataType(datatype);
+
+    // The entire input tensor must be delivered as a single
+    // contiguous chunk so create a buffer large enough to hold the
+    // entire dynamic batched input.
+    input_buffers->emplace_back(new AllocatedMemory(
+        GetByteSize(datatype, batchn_shape), TRITONSERVER_MEMORY_CPU_PINNED,
+        0));
+    TRITONSERVER_MemoryType mem_type;
+    auto input_buffer = input_buffers->back()->MutableBuffer(&mem_type);
+    auto total_byte_size = input_buffers->back()->TotalByteSize();
+
+    collector.ProcessTensor(
+        name, datatype, batch1_shape, input_buffer, total_byte_size, mem_type,
+        0);
+
+    Caffe2Workspace::Error err = workspace_->SetInputTensor(
+        name, batchn_shape, dtype, static_cast<const char*>(input_buffer),
+        total_byte_size);
+    if (!err.IsOk()) {
+      return Status(Status::Code::INTERNAL, err.Message());
     }
   }
+  // Finalize...
+  *cuda_copy |= collector.Finalize();
+  return Status::Success;
+}
+
+void
+NetDefBackend::Context::Run(
+    InferenceBackend* base,
+    std::vector<std::unique_ptr<InferenceRequest>>&& requests)
+{
+  LOG_VERBOSE(1) << "Running " << name_ << " with " << requests.size()
+                 << " request payloads";
+
+  INFER_STATS_DECL_TIMESTAMP(compute_start_ns);
+
+  // For each request in 'payloads' collect the total batch size for
+  // this inference execution. The batch-size, number of inputs, and
+  // size of each input has already been checked by each request
+  // normalizer so don't need to do that here.
+  size_t total_batch_size = 0;
+  for (auto& request : requests) {
+    // If we get a nullptr request then something is badly wrong. Fail
+    // and release all requests.
+    if (request == nullptr) {
+      InferenceRequest::RespondIfError(
+          requests,
+          Status(
+              Status::Code::INTERNAL,
+              "null request given to Caffe2 runner for '" + name_ + "'"),
+          true /* release_requests */);
+      return;
+    }
+
+    total_batch_size += std::max(1U, request->BatchSize());
+  }
+
+  // If there are no valid payloads then no need to run the
+  // inference. The payloads will have their error status set so can
+  // just return.
+  if (total_batch_size == 0) {
+    return;
+  }
+
+  // total_batch_size can be 1 for models that don't support batching
+  // (i.e. max_batch_size_ == 0).
+  if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size_)) {
+    InferenceRequest::RespondIfError(
+        requests,
+        Status(
+            Status::Code::INTERNAL,
+            "dynamic batch size " + std::to_string(total_batch_size) +
+                " for '" + name_ + "', max allowed is " +
+                std::to_string(max_batch_size_)),
+        true /* release_requests */);
+    return;
+  }
+
+  // At this point we are committed to running inference with all
+  // 'requests'. Create a response for each request. During input
+  // processing if there is an error with any request that error will
+  // be sent immediately with the corresponding response (and the
+  // response unique_ptr will then be nullptr). The request object
+  // itself will not be released until after all inferencing is done
+  // (below) as we may need to access the request object when
+  // determine how to process outputs (for example, even if we don't
+  // need the outputs for a request that has an error, we do need to
+  // know the size of those outputs associated with the request so we
+  // can skip them in the output tensors).
+  std::vector<std::unique_ptr<InferenceResponse>> responses;
+  responses.reserve(requests.size());
+
+  for (auto& request : requests) {
+    std::unique_ptr<InferenceResponse> response;
+    Status status = request->ResponseFactory().CreateResponse(&response);
+    if (!status.IsOk()) {
+      InferenceRequest::RespondIfError(request, status);
+      response.reset();
+    }
+
+    responses.emplace_back(std::move(response));
+  }
+
+  // Hold reference to each buffer of input data to that it stays
+  // until the inference has completed.
+  std::vector<std::unique_ptr<AllocatedMemory>> input_buffers;
+
+  // Create a tensor for each input sized correctly for the total
+  // payload batch size. Concatenate input values from each payload
+  // into the corresponding tensor.
+
+  // Inputs from the request...
+  bool cuda_copy = false;
+  FAIL_ALL_AND_RETURN_IF_ERROR(
+      requests, responses,
+      SetInputTensors(
+          total_batch_size, requests, &responses, &input_buffers, &cuda_copy),
+      "error sending Caffe2 response");
+
+#ifdef TRTIS_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
 #endif  // TRTIS_ENABLE_GPU
 
-  return Status::Success;
+  INFER_STATS_DECL_TIMESTAMP(compute_input_end_ns);
+
+  // Run...
+  Caffe2Workspace::Error err = workspace_->Run();
+  if (!err.IsOk()) {
+    auto status = Status(Status::Code::INTERNAL, err.Message());
+    FAIL_ALL_AND_RETURN_IF_ERROR(
+        requests, responses, status, "error sending Caffe2 response");
+  }
+
+  INFER_STATS_DECL_TIMESTAMP(compute_output_start_ns);
+
+  FAIL_ALL_AND_RETURN_IF_ERROR(
+      requests, responses,
+      ReadOutputTensors(base, total_batch_size, requests, &responses),
+      "error sending Caffe2 response");
+
+#ifdef TRTIS_ENABLE_STATS
+  INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
+
+  // Report stats and trace
+  for (size_t i = 0; i < requests.size(); ++i) {
+    auto& request = requests[i];
+    request->ReportStatistics(
+        (responses[i] != nullptr), compute_start_ns, compute_input_end_ns,
+        compute_output_start_ns, compute_end_ns);
+
+#ifdef TRTIS_ENABLE_TRACING
+    if (request->Trace() != nullptr) {
+      auto& trace = request->Trace();
+      trace->Report(TRITONSERVER_TRACE_COMPUTE_START, compute_start_ns);
+      trace->Report(TRITONSERVER_TRACE_COMPUTE_INPUT_END, compute_input_end_ns);
+      trace->Report(
+          TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
+      trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
+    }
+#endif  // TRTIS_ENABLE_TRACING
+  }
+
+  // Also reporting batch stats
+  base->MutableStatsAggregator()->UpdateInferBatchStats(
+      total_batch_size, compute_start_ns, compute_input_end_ns,
+      compute_output_start_ns, compute_end_ns);
+#endif  // TRTIS_ENABLE_STATS
+
+  // Send all the responses that haven't already been sent because of
+  // an earlier error.
+  for (auto& response : responses) {
+    if (response != nullptr) {
+      LOG_STATUS_ERROR(
+          InferenceResponse::Send(std::move(response)),
+          "failed to send TensorFlow backend response");
+    }
+  }
+
+  // Release all requests.
+  for (auto& request : requests) {
+    InferenceRequest::Release(std::move(request));
+  }
 }
 
 std::ostream&
