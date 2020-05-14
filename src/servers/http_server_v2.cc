@@ -44,6 +44,7 @@
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/server_status.pb.h"
+#include "src/servers/classification.h"
 #include "src/servers/common.h"
 
 #ifdef TRTIS_ENABLE_GPU
@@ -205,6 +206,60 @@ HTTPMetricsServerV2::Handle(evhtp_request_t* req)
 
 
 namespace {
+
+// Allocate an evbuffer of size 'byte_size'. Return the 'evb' and
+// the 'base' address of the buffer contents.
+TRITONSERVER_Error*
+AllocEVBuffer(const size_t byte_size, evbuffer** evb, void** base)
+{
+  evbuffer* evhttp_buffer = evbuffer_new();
+  if (evhttp_buffer == nullptr) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "failed to create evbuffer for output tensor");
+  }
+
+  // Reserve requested space in evbuffer...
+  struct evbuffer_iovec output_iovec;
+  if (evbuffer_reserve_space(evhttp_buffer, byte_size, &output_iovec, 1) != 1) {
+    evbuffer_free(evhttp_buffer);
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string(
+            "failed to reserve " + std::to_string(byte_size) +
+            " bytes in output tensor buffer")
+            .c_str());
+  }
+
+  if (output_iovec.iov_len < byte_size) {
+    evbuffer_free(evhttp_buffer);
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        std::string(
+            "reserved " + std::to_string(output_iovec.iov_len) +
+            " bytes in output tensor buffer, need " + std::to_string(byte_size))
+            .c_str());
+  }
+
+  output_iovec.iov_len = byte_size;
+  *base = output_iovec.iov_base;
+
+  // Immediately commit the buffer space. We are relying on evbuffer
+  // not to relocate this space. Because we request a contiguous
+  // chunk every time (above by allowing only a single entry in
+  // output_iovec), this seems to be a valid assumption.
+  if (evbuffer_commit_space(evhttp_buffer, &output_iovec, 1) != 0) {
+    *base = nullptr;
+    evbuffer_free(evhttp_buffer);
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "failed to commit output tensors to output buffer");
+  }
+
+  *evb = evhttp_buffer;
+
+  return nullptr;  // success
+}
 
 void
 JsonStringDataByteSize(const rapidjson::Value& tensor_data, size_t* byte_size)
@@ -591,7 +646,7 @@ CheckSharedMemoryData(
 
 bool
 CheckClassificationOutput(
-    const rapidjson::Value& request_output, uint64_t* num_classes)
+    const rapidjson::Value& request_output, uint32_t* num_classes)
 {
   bool use_classification = false;
   rapidjson::Value::ConstMemberIterator itr =
@@ -843,7 +898,11 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
       int64_t device_id_;
 
       // For non-shared memory
-      OutputInfo(Kind k) : kind_(k), evbuffer_(nullptr) {}
+      OutputInfo(Kind k, uint32_t class_cnt)
+          : kind_(k), class_cnt_(class_cnt), evbuffer_(nullptr)
+      {
+      }
+      uint32_t class_cnt_;
       evbuffer* evbuffer_;
     };
 
@@ -983,7 +1042,7 @@ HTTPAPIServerV2::InferResponseAlloc(
     // OutputInfo for it that uses default setting of JSON.
     auto pr = output_map.find(tensor_name);
     if (pr == output_map.end()) {
-      info = new AllocPayload::OutputInfo(AllocPayload::OutputInfo::JSON);
+      info = new AllocPayload::OutputInfo(AllocPayload::OutputInfo::JSON, 0);
     } else {
       // Take ownership of the OutputInfo object.
       info = pr->second;
@@ -992,7 +1051,7 @@ HTTPAPIServerV2::InferResponseAlloc(
 
     // If the output is in shared memory...
     if (info->kind_ == AllocPayload::OutputInfo::SHM) {
-      // ...then make sure shared memory size is at least as bug as
+      // ...then make sure shared memory size is at least as big as
       // the size of the output.
       if (byte_size > info->byte_size_) {
         delete info;
@@ -1030,54 +1089,11 @@ HTTPAPIServerV2::InferResponseAlloc(
       *actual_memory_type_id = 0;
     }
 
-    evbuffer* evhttp_buffer = evbuffer_new();
-    if (evhttp_buffer == nullptr) {
+    evbuffer* evhttp_buffer;
+    TRITONSERVER_Error* err = AllocEVBuffer(byte_size, &evhttp_buffer, buffer);
+    if (err != nullptr) {
       delete info;
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL,
-          "failed to create evbuffer for output tensor");
-    }
-
-    // Reserve requested space in evbuffer...
-    struct evbuffer_iovec output_iovec;
-    if (evbuffer_reserve_space(evhttp_buffer, byte_size, &output_iovec, 1) !=
-        1) {
-      delete info;
-      evbuffer_free(evhttp_buffer);
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL,
-          std::string(
-              "failed to reserve " + std::to_string(byte_size) +
-              " bytes in output tensor buffer")
-              .c_str());
-    }
-
-    if (output_iovec.iov_len < byte_size) {
-      delete info;
-      evbuffer_free(evhttp_buffer);
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL,
-          std::string(
-              "reserved " + std::to_string(output_iovec.iov_len) +
-              " bytes in output tensor buffer, need " +
-              std::to_string(byte_size))
-              .c_str());
-    }
-
-    output_iovec.iov_len = byte_size;
-    *buffer = output_iovec.iov_base;
-
-    // Immediately commit the buffer space. We are relying on evbuffer
-    // not to relocate this space. Because we request a contiguous
-    // chunk every time (above by allowing only a single entry in
-    // output_iovec), this seems to be a valid assumption.
-    if (evbuffer_commit_space(evhttp_buffer, &output_iovec, 1) != 0) {
-      *buffer = nullptr;
-      delete info;
-      evbuffer_free(evhttp_buffer);
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL,
-          "failed to commit output tensors to output buffer");
+      return err;
     }
 
     // Associate info with the evbuffer with this allocation.
@@ -1993,39 +2009,41 @@ HTTPAPIServerV2::EVBufferToInput(
       const char* output_name = name_itr->value.GetString();
       TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output_name);
 
-      uint64_t class_size = 0;
-      if (!CheckClassificationOutput(output, &class_size)) {
-        // Initialize System Memory for Output if it uses shared memory
-        uint64_t offset = 0, byte_size = 0;
-        const char* shm_region = nullptr;
-        if (CheckSharedMemoryData(output, &shm_region, &offset, &byte_size)) {
-          void* base;
-          TRITONSERVER_MemoryType memory_type;
-          int64_t memory_type_id;
-          RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
-              shm_region, offset, &base, &memory_type, &memory_type_id));
+      uint32_t class_size = 0;
+      const bool use_classification =
+          CheckClassificationOutput(output, &class_size);
 
-          infer_req->alloc_payload_.output_map_.emplace(
-              std::piecewise_construct, std::forward_as_tuple(output_name),
-              std::forward_as_tuple(new AllocPayload::OutputInfo(
-                  base, byte_size, memory_type, memory_type_id)));
-        } else {
-          infer_req->alloc_payload_.output_map_.emplace(
-              std::piecewise_construct, std::forward_as_tuple(output_name),
-              std::forward_as_tuple(new AllocPayload::OutputInfo(
-                  CheckBinaryOutputData(output)
-                      ? AllocPayload::OutputInfo::BINARY
-                      : AllocPayload::OutputInfo::JSON)));
-        }
+      uint64_t offset = 0, byte_size = 0;
+      const char* shm_region = nullptr;
+      const bool use_shm =
+          CheckSharedMemoryData(output, &shm_region, &offset, &byte_size);
+
+      // ValidateOutputParameter ensures that both shm and
+      // classification cannot be true.
+      if (use_shm) {
+        void* base;
+        TRITONSERVER_MemoryType memory_type;
+        int64_t memory_type_id;
+        RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
+            shm_region, offset, &base, &memory_type, &memory_type_id));
+
+        infer_req->alloc_payload_.output_map_.emplace(
+            std::piecewise_construct, std::forward_as_tuple(output_name),
+            std::forward_as_tuple(new AllocPayload::OutputInfo(
+                base, byte_size, memory_type, memory_type_id)));
       } else {
-        TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
-            irequest, output_name, class_size);
+        infer_req->alloc_payload_.output_map_.emplace(
+            std::piecewise_construct, std::forward_as_tuple(output_name),
+            std::forward_as_tuple(new AllocPayload::OutputInfo(
+                CheckBinaryOutputData(output) ? AllocPayload::OutputInfo::BINARY
+                                              : AllocPayload::OutputInfo::JSON,
+                use_classification ? class_size : 0)));
       }
     }
   }
 
   return nullptr;  // success
-}  // namespace inferenceserver
+}
 
 void
 HTTPAPIServerV2::HandleInfer(
@@ -2277,6 +2295,7 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     TRITONSERVER_DataType datatype;
     const int64_t* shape;
     uint64_t dim_count;
+    uint32_t batch_size;
     const void* base;
     size_t byte_size;
     TRITONSERVER_MemoryType memory_type;
@@ -2284,8 +2303,11 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     void* userp;
 
     RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutput(
-        response, idx, &cname, &datatype, &shape, &dim_count, &base, &byte_size,
-        &memory_type, &memory_type_id, &userp));
+        response, idx, &cname, &datatype, &shape, &dim_count, &batch_size,
+        &base, &byte_size, &memory_type, &memory_type_id, &userp));
+
+    // Handle data. SHM outputs will not have an info.
+    auto info = reinterpret_cast<AllocPayload::OutputInfo*>(userp);
 
     // FIXME I think this could be doing some copying of json, should
     // structure so that json is constructed in place without copying
@@ -2294,19 +2316,83 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
     rapidjson::Value name_val(cname, strlen(cname));
     output_metadata[idx].AddMember("name", name_val, allocator);
 
-    const char* datatype_str = TRITONSERVER_DataTypeString(datatype);
-    rapidjson::Value datatype_val(datatype_str, strlen(datatype_str));
-    output_metadata[idx].AddMember("datatype", datatype_val, allocator);
+    // If returning output as classification then need to set the
+    // datatype and shape based on classification requirements.
+    if ((info != nullptr) && (info->class_cnt_ > 0)) {
+      const char* datatype_str =
+          TRITONSERVER_DataTypeString(TRITONSERVER_TYPE_BYTES);
+      rapidjson::Value datatype_val(datatype_str, strlen(datatype_str));
+      output_metadata[idx].AddMember("datatype", datatype_val, allocator);
 
-    rapidjson::Value shape_array(rapidjson::kArrayType);
-    for (size_t j = 0; j < dim_count; j++) {
-      shape_array.PushBack(shape[j], allocator);
+      rapidjson::Value shape_array(rapidjson::kArrayType);
+      if (batch_size > 0) {
+        shape_array.PushBack(batch_size, allocator);
+      }
+      shape_array.PushBack(info->class_cnt_, allocator);
+      output_metadata[idx].AddMember("shape", shape_array, allocator);
+    } else {
+      const char* datatype_str = TRITONSERVER_DataTypeString(datatype);
+      rapidjson::Value datatype_val(datatype_str, strlen(datatype_str));
+      output_metadata[idx].AddMember("datatype", datatype_val, allocator);
+
+      rapidjson::Value shape_array(rapidjson::kArrayType);
+      for (size_t j = 0; j < dim_count; j++) {
+        shape_array.PushBack(shape[j], allocator);
+      }
+      output_metadata[idx].AddMember("shape", shape_array, allocator);
     }
-    output_metadata[idx].AddMember("shape", shape_array, allocator);
 
-    // Handle data. SHM outputs will not have an info.
-    auto info = reinterpret_cast<AllocPayload::OutputInfo*>(userp);
+    // For classification replace existing output with serialized
+    // classification output.
+    if ((info != nullptr) && (info->class_cnt_ > 0)) {
+      // Determine the batch1 byte size of the tensor... needed when
+      // the response tensor batch-size > 1 so that we know how to
+      // stride though the tensor data.
+      size_t batch1_element_count = 1;
+      for (size_t sidx = ((batch_size == 0) ? 0 : 1); sidx < dim_count;
+           sidx++) {
+        batch1_element_count *= shape[sidx];
+      }
 
+      const size_t batch1_byte_size =
+          batch1_element_count * TRITONSERVER_DataTypeByteSize(datatype);
+
+      // Create the classification contents
+      std::string serialized;
+
+      size_t class_offset = 0;
+      for (uint32_t bs = 0; bs < std::max((uint32_t)1, batch_size); ++bs) {
+        std::vector<std::string> class_strs;
+        RETURN_IF_ERR(TopkClassifications(
+            response, idx, reinterpret_cast<const char*>(base) + class_offset,
+            ((class_offset + batch1_byte_size) > byte_size) ? 0
+                                                            : batch1_byte_size,
+            datatype, info->class_cnt_, &class_strs));
+
+        // Serialize for binary representation...
+        for (const auto& str : class_strs) {
+          uint32_t len = str.size();
+          serialized.append(reinterpret_cast<const char*>(&len), sizeof(len));
+          if (len > 0) {
+            serialized.append(str);
+          }
+        }
+
+        class_offset += batch1_byte_size;
+      }
+
+      evbuffer_free(info->evbuffer_);
+      info->evbuffer_ = nullptr;
+
+      void* buffer;
+      byte_size = serialized.size();
+      RETURN_IF_ERR(AllocEVBuffer(byte_size, &info->evbuffer_, &buffer));
+      memcpy(buffer, serialized.c_str(), byte_size);
+      base = reinterpret_cast<const void*>(buffer);
+    }
+
+    // Add JSON data, or collect binary data. If 'info' is nullptr
+    // then using shared memory so don't need this step.
     if (info != nullptr) {
       if (info->kind_ == AllocPayload::OutputInfo::BINARY) {
         ordered_buffers.push_back(info->evbuffer_);
@@ -2375,10 +2461,10 @@ HTTPServerV2::CreateAPIServer(
   http_servers->clear();
   for (auto const& ep_map : port_map) {
     std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
-    LOG_INFO << "Starting HTTPV2Service at " << addr;
     http_servers->emplace_back(new HTTPAPIServerV2(
         server, trace_manager, shm_manager, ep_map.second, ep_map.first,
         thread_cnt));
+    LOG_INFO << "Started HTTPV2Service at " << addr;
   }
 
   return nullptr;

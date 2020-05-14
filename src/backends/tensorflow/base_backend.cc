@@ -799,8 +799,8 @@ BaseBackend::Context::Run(
     const auto& request = requests[idx];
     const auto& response = responses[idx];
     if (response != nullptr) {
-      for (const auto& pr : request->ImmutableRequestedOutputs()) {
-        required_outputs.insert(pr.first);
+      for (const auto& output_name : request->ImmutableRequestedOutputs()) {
+        required_outputs.insert(output_name);
       }
     }
   }
@@ -915,7 +915,9 @@ BaseBackend::Context::Run(
               (request->ImmutableRequestedOutputs().find(name) !=
                request->ImmutableRequestedOutputs().end())) {
             InferenceResponse::Output* response_output = nullptr;
-            response->AddOutput(name, datatype, batchn_shape, &response_output);
+            response->AddOutput(
+                name, datatype, batchn_shape, request->BatchSize(),
+                &response_output);
             cuda_copy |= SetStringOutputBuffer(
                 output_tensor, &response, response_output, tensor_element_cnt,
                 tensor_offset, stream_);

@@ -64,9 +64,11 @@ InferenceResponse::ActualModelVersion() const
 Status
 InferenceResponse::AddOutput(
     const std::string& name, const DataType datatype,
-    const std::vector<int64_t>& shape, InferenceResponse::Output** output)
+    const std::vector<int64_t>& shape, const uint32_t batch_size,
+    InferenceResponse::Output** output)
 {
-  outputs_.emplace_back(name, datatype, shape, allocator_, alloc_userp_);
+  outputs_.emplace_back(
+      name, datatype, shape, batch_size, allocator_, alloc_userp_);
 
   LOG_VERBOSE(1) << "add response output: " << outputs_.back();
 
@@ -80,15 +82,32 @@ InferenceResponse::AddOutput(
 Status
 InferenceResponse::AddOutput(
     const std::string& name, const DataType datatype,
-    std::vector<int64_t>&& shape, InferenceResponse::Output** output)
+    std::vector<int64_t>&& shape, const uint32_t batch_size,
+    InferenceResponse::Output** output)
 {
   outputs_.emplace_back(
-      name, datatype, std::move(shape), allocator_, alloc_userp_);
+      name, datatype, std::move(shape), batch_size, allocator_, alloc_userp_);
 
   LOG_VERBOSE(1) << "add response output: " << outputs_.back();
 
   if (output != nullptr) {
     *output = std::addressof(outputs_.back());
+  }
+
+  return Status::Success;
+}
+
+Status
+InferenceResponse::ClassificationLabel(
+    const InferenceResponse::Output& output, const uint32_t class_index,
+    const char** label) const
+{
+  const auto& label_provider = backend_->GetLabelProvider();
+  const std::string& l = label_provider->GetLabel(output.Name(), class_index);
+  if (l.empty()) {
+    *label = nullptr;
+  } else {
+    *label = l.c_str();
   }
 
   return Status::Success;

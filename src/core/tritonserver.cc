@@ -1225,22 +1225,6 @@ TRITONSERVER_InferenceRequestRemoveAllRequestedOutputs(
 }
 
 TRITONSERVER_Error*
-TRITONSERVER_InferenceRequestSetRequestedOutputClassificationCount(
-    TRITONSERVER_InferenceRequest* inference_request, const char* name,
-    uint32_t count)
-{
-  //  ni::InferenceRequest* lrequest =
-  //      reinterpret_cast<ni::InferenceRequest*>(inference_request);
-
-  // FIXMEV2 this entire function should be removed
-  //  ni::InferenceRequest::RequestedOutput* requested;
-  //  RETURN_IF_STATUS_ERROR(lrequest->MutableRequestedOutput(name,
-  //  &requested)); requested->SetClassificationCount(count);
-
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestSetReleaseCallback(
     TRITONSERVER_InferenceRequest* inference_request,
     TRITONSERVER_InferenceRequestReleaseFn_t request_release_fn,
@@ -1336,8 +1320,9 @@ TRITONSERVER_Error*
 TRITONSERVER_InferenceResponseOutput(
     TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
     const char** name, TRITONSERVER_DataType* datatype, const int64_t** shape,
-    uint64_t* dim_count, const void** base, size_t* byte_size,
-    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id, void** userp)
+    uint64_t* dim_count, uint32_t* batch_size, const void** base,
+    size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
+    int64_t* memory_type_id, void** userp)
 {
   ni::InferenceResponse* lresponse =
       reinterpret_cast<ni::InferenceResponse*>(inference_response);
@@ -1359,6 +1344,7 @@ TRITONSERVER_InferenceResponseOutput(
   const std::vector<int64_t>& oshape = output.Shape();
   *shape = &oshape[0];
   *dim_count = oshape.size();
+  *batch_size = output.BatchSize();
 
   RETURN_IF_STATUS_ERROR(
       output.DataBuffer(base, byte_size, memory_type, memory_type_id, userp));
@@ -1366,6 +1352,29 @@ TRITONSERVER_InferenceResponseOutput(
   return nullptr;  // Success
 }
 
+TRITONSERVER_Error*
+TRITONSERVER_InferenceResponseOutputClassificationLabel(
+    TRITONSERVER_InferenceResponse* inference_response, const uint32_t index,
+    const size_t class_index, const char** label)
+{
+  ni::InferenceResponse* lresponse =
+      reinterpret_cast<ni::InferenceResponse*>(inference_response);
+
+  const auto& outputs = lresponse->Outputs();
+  if (index >= outputs.size()) {
+    return TritonServerError::Create(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        "out of bounds index " + std::to_string(index) +
+            std::string(": response has ") + std::to_string(outputs.size()) +
+            " outputs");
+  }
+
+  const ni::InferenceResponse::Output& output = outputs[index];
+  RETURN_IF_STATUS_ERROR(
+      lresponse->ClassificationLabel(output, class_index, label));
+
+  return nullptr;  // Success
+}
 
 //
 // TRITONSERVER_Server
