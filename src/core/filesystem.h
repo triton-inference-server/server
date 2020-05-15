@@ -34,54 +34,30 @@
 
 namespace nvidia { namespace inferenceserver {
 
-struct TemporaryDirectory {
-  std::string model_path;
+// This class stores the paths of local temporary files needed for loading
+// models from Cloud repositories and performs necessary cleanup after the
+// models are loaded.
+class LocalizedDirectory {
+ public:
+  std::string true_path_;
+  std::string local_path_;
 
-  TemporaryDirectory(std::string path) : model_path(path) {}
-
-  ~TemporaryDirectory()
+  // Store both the true path and the temporary local path. For LocalFileSystem
+  // this will be the same.
+  LocalizedDirectory(std::string true_path, std::string local_path)
+      : true_path_(true_path), local_path_(local_path)
   {
-    // Only delete file/folder if it is a local copy created from a Cloud
-    // repository
-    if (model_path.rfind("/tmp/file", 0) == 0) {
-      if (IsPathDirectory(model_path.c_str())) {
-        DeleteFolderRecursive(model_path);
-      } else {
-        remove(model_path.c_str());
-      }
-    }
   }
 
-  bool IsPathDirectory(const char* path)
-  {
-    struct stat s_buf;
-    if (stat(path, &s_buf)) {
-      return 0;
-    }
+  // Only delete the file/folder if it is a local copy created from a Cloud
+  // repository i.e. local_path != true_path.
+  ~LocalizedDirectory();
 
-    return S_ISDIR(s_buf.st_mode);
-  }
-
-  void DeleteFolderRecursive(const std::string& path)
-  {
-    struct dirent* ep;
-    DIR* dp = opendir(path.c_str());
-
-    while ((ep = readdir(dp)) != NULL) {
-      if (strcmp(ep->d_name, ".") == 0 || strcmp(ep->d_name, "..") == 0) {
-        continue;
-      }
-      std::string tmp_path = path + "/" + std::string(ep->d_name);
-      if (IsPathDirectory(tmp_path.c_str())) {
-        DeleteFolderRecursive(tmp_path);
-      } else {
-        remove(tmp_path.c_str());
-      }
-    }
-
-    closedir(dp);
-    rmdir(path.c_str());
-  }
+ private:
+  bool IsPathDirectory(const char* path);
+  // Helper function used in destructor to cleanup local temporary
+  // files/folders.
+  void DeleteFolderRecursive(const std::string& path);
 };
 
 /// Is a path an absolute path?
@@ -156,8 +132,7 @@ Status ReadTextFile(const std::string& path, std::string* contents);
 /// \param local_path Returns the local path of the file.
 /// \return Error status
 Status LocalizeFileFolder(
-    const std::string& path,
-    const std::shared_ptr<TemporaryDirectory>& local_path);
+    const std::string& path, std::shared_ptr<LocalizedDirectory>* local_path);
 
 /// Write a string to a file.
 /// \param path The path of the file.

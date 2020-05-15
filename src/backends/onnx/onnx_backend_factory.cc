@@ -82,23 +82,19 @@ OnnxBackendFactory::CreateBackend(
   // or path to downloaded copy of the subdir.
   std::unordered_map<std::string, std::pair<bool, std::string>> models;
 
-  std::vector<std::shared_ptr<TemporaryDirectory>> local_onnx(
+  std::vector<std::shared_ptr<LocalizedDirectory>> local_onnx_path(
       onnx_files.size());
-  for (size_t s = 0; s < onnx_files.size(); s++) {
-    local_onnx[s] = std::make_shared<TemporaryDirectory>("");
-  }
 
   // Download the subdirs so that relative file references in the main
   // model file work correctly.
-  int i = 0;
   for (const auto& dirname : onnx_subdirs) {
     const auto onnx_path = JoinPath({path, dirname});
-    RETURN_IF_ERROR(LocalizeFileFolder(onnx_path, local_onnx[i]));
+    local_onnx_path.push_back(std::shared_ptr<LocalizedDirectory>(nullptr));
+    RETURN_IF_ERROR(LocalizeFileFolder(onnx_path, &local_onnx_path.back()));
     models.emplace(
         std::piecewise_construct, std::make_tuple(dirname),
-        std::make_tuple(
-            std::move(std::make_pair(false, local_onnx[i]->model_path))));
-    i++;
+        std::make_tuple(std::move(
+            std::make_pair(false, local_onnx_path.back()->local_path_))));
   }
 
   for (const auto& filename : onnx_files) {

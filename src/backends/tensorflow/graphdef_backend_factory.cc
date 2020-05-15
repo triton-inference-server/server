@@ -69,20 +69,16 @@ GraphDefBackendFactory::CreateBackend(
       GetDirectoryFiles(path, true /* skip_hidden_files */, &graphdef_files));
 
   std::unordered_map<std::string, std::string> models;
-  std::vector<std::shared_ptr<TemporaryDirectory>> local_graphdef(
-      graphdef_files.size());
-  for (size_t s = 0; s < graphdef_files.size(); s++) {
-    local_graphdef[s] = std::make_shared<TemporaryDirectory>("");
-  }
+  std::vector<std::shared_ptr<LocalizedDirectory>> local_graphdef_path;
 
-  int i = 0;
   for (const auto& filename : graphdef_files) {
     const auto graphdef_path = JoinPath({path, filename});
-    RETURN_IF_ERROR(LocalizeFileFolder(graphdef_path, local_graphdef[i]));
+    local_graphdef_path.push_back(std::shared_ptr<LocalizedDirectory>(nullptr));
+    RETURN_IF_ERROR(
+        LocalizeFileFolder(graphdef_path, &local_graphdef_path.back()));
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(local_graphdef[i]->model_path));
-    i++;
+        std::make_tuple(local_graphdef_path.back()->local_path_));
   }
 
   // Create the backend for the model and all the execution contexts

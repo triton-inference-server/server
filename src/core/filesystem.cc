@@ -55,6 +55,50 @@
 
 namespace nvidia { namespace inferenceserver {
 
+LocalizedDirectory::~LocalizedDirectory()
+{
+  if (true_path_ == local_path_) {
+    if (IsPathDirectory(local_path_.c_str())) {
+      DeleteFolderRecursive(local_path_);
+    } else {
+      remove(local_path_.c_str());
+    }
+  }
+}
+
+bool
+LocalizedDirectory::IsPathDirectory(const char* path)
+{
+  struct stat s_buf;
+  if (stat(path, &s_buf)) {
+    return 0;
+  }
+
+  return S_ISDIR(s_buf.st_mode);
+}
+
+void
+LocalizedDirectory::DeleteFolderRecursive(const std::string& path)
+{
+  struct dirent* ep;
+  DIR* dp = opendir(path.c_str());
+
+  while ((ep = readdir(dp)) != NULL) {
+    if (strcmp(ep->d_name, ".") == 0 || strcmp(ep->d_name, "..") == 0) {
+      continue;
+    }
+    std::string tmp_path = path + "/" + std::string(ep->d_name);
+    if (IsPathDirectory(tmp_path.c_str())) {
+      DeleteFolderRecursive(tmp_path);
+    } else {
+      remove(tmp_path.c_str());
+    }
+  }
+
+  closedir(dp);
+  rmdir(path.c_str());
+}
+
 namespace {
 
 class FileSystem {
@@ -73,7 +117,7 @@ class FileSystem {
       const std::string& path, std::string* contents) = 0;
   virtual Status LocalizeFileFolder(
       const std::string& path,
-      const std::shared_ptr<TemporaryDirectory>& local_path) = 0;
+      std::shared_ptr<LocalizedDirectory>* local_path) = 0;
   virtual Status WriteTextFile(
       const std::string& path, const std::string& contents) = 0;
 };
@@ -93,7 +137,7 @@ class LocalFileSystem : public FileSystem {
   Status ReadTextFile(const std::string& path, std::string* contents) override;
   Status LocalizeFileFolder(
       const std::string& path,
-      const std::shared_ptr<TemporaryDirectory>& local_path) override;
+      std::shared_ptr<LocalizedDirectory>* local_path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 };
@@ -216,12 +260,11 @@ LocalFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 
 Status
 LocalFileSystem::LocalizeFileFolder(
-    const std::string& path,
-    const std::shared_ptr<TemporaryDirectory>& local_path)
+    const std::string& path, std::shared_ptr<LocalizedDirectory>* local_path)
 {
   // For local file system we don't actually need to download the folder. We use
   // it in place.
-  local_path->model_path = path;
+  local_path->reset(new LocalizedDirectory(path, path));
   return Status::Success;
 }
 
@@ -276,7 +319,7 @@ class GCSFileSystem : public FileSystem {
   Status ReadTextFile(const std::string& path, std::string* contents) override;
   Status LocalizeFileFolder(
       const std::string& path,
-      const std::shared_ptr<TemporaryDirectory>& local_path) override;
+      std::shared_ptr<LocalizedDirectory>* local_path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -536,12 +579,11 @@ GCSFileSystem::ReadTextFile(const std::string& path, std::string* contents)
 
 Status
 GCSFileSystem::LocalizeFileFolder(
-    const std::string& path,
-    const std::shared_ptr<TemporaryDirectory>& local_path)
+    const std::string& path, std::shared_ptr<LocalizedDirectory>* local_path)
 {
   // For GCS we don't download the folder.
   // FIXME We will need to fix this in the future.
-  local_path->model_path = path;
+  local_path->reset(new LocalizedDirectory(path, path));
   return Status::Success;
 }
 
@@ -577,7 +619,7 @@ class S3FileSystem : public FileSystem {
   Status ReadTextFile(const std::string& path, std::string* contents) override;
   Status LocalizeFileFolder(
       const std::string& path,
-      const std::shared_ptr<TemporaryDirectory>& local_path) override;
+      std::shared_ptr<LocalizedDirectory>* local_path) override;
   Status WriteTextFile(
       const std::string& path, const std::string& contents) override;
 
@@ -897,8 +939,7 @@ S3FileSystem::ReadTextFile(const std::string& path, std::string* contents)
 
 Status
 S3FileSystem::LocalizeFileFolder(
-    const std::string& path,
-    const std::shared_ptr<TemporaryDirectory>& local_path)
+    const std::string& path, std::shared_ptr<LocalizedDirectory>* local_path)
 {
   bool exists;
   RETURN_IF_ERROR(FileExists(path, &exists));
@@ -929,13 +970,13 @@ S3FileSystem::LocalizeFileFolder(
               ", errno:" + strerror(errno));
     }
 
-    local_path->model_path = std::string(tmp_folder);
+    local_path->reset(new LocalizedDirectory(effective_path, tmp_folder));
     RETURN_IF_ERROR(GetDirectoryContents(effective_path, &contents));
 
     for (auto iter = contents.begin(); iter != contents.end(); ++iter) {
       bool is_subdir;
       std::string s3_fpath = JoinPath({effective_path, *iter});
-      std::string local_fpath = JoinPath({local_path->model_path, *iter});
+      std::string local_fpath = JoinPath({(*local_path)->local_path_, *iter});
       RETURN_IF_ERROR(IsDirectory(s3_fpath, &is_subdir));
       if (is_subdir) {
         // Create local mirror of sub-directories
@@ -977,7 +1018,7 @@ S3FileSystem::LocalizeFileFolder(
             get_object_outcome.GetResultWithOwnership().GetBody();
         std::string s3_removed_path = (*iter).substr(effective_path.size());
         std::string local_file_path =
-            JoinPath({local_path->model_path, s3_removed_path});
+            JoinPath({(*local_path)->local_path_, s3_removed_path});
         std::ofstream output_file(local_file_path.c_str(), std::ios::binary);
         output_file << retrieved_file.rdbuf();
         output_file.close();
@@ -994,7 +1035,7 @@ S3FileSystem::LocalizeFileFolder(
           "Failed to create local temp file: " + file_template);
     }
 
-    local_path->model_path = file_template;
+    local_path->reset(new LocalizedDirectory(effective_path, file_template));
     std::string bucket, object;
     RETURN_IF_ERROR(ParsePath(effective_path, &bucket, &object));
 
@@ -1008,7 +1049,7 @@ S3FileSystem::LocalizeFileFolder(
       auto& retrieved_file =
           get_object_outcome.GetResultWithOwnership().GetBody();
       std::ofstream output_file(
-          local_path->model_path.c_str(), std::ios::binary);
+          (*local_path)->local_path_.c_str(), std::ios::binary);
       output_file << retrieved_file.rdbuf();
       output_file.close();
     } else {
@@ -1242,8 +1283,7 @@ ReadTextProto(const std::string& path, google::protobuf::Message* msg)
 
 Status
 LocalizeFileFolder(
-    const std::string& path,
-    const std::shared_ptr<TemporaryDirectory>& local_path)
+    const std::string& path, std::shared_ptr<LocalizedDirectory>* local_path)
 {
   FileSystem* fs;
   RETURN_IF_ERROR(GetFileSystem(path, &fs));

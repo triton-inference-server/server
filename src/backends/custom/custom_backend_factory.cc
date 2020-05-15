@@ -66,20 +66,15 @@ CustomBackendFactory::CreateBackend(
       GetDirectoryFiles(path, true /* skip_hidden_files */, &custom_files));
 
   std::unordered_map<std::string, std::string> custom_paths;
-  std::vector<std::shared_ptr<TemporaryDirectory>> local_custom(
-      custom_files.size());
-  for (size_t s = 0; s < custom_files.size(); s++) {
-    local_custom[s] = std::make_shared<TemporaryDirectory>("");
-  }
+  std::vector<std::shared_ptr<LocalizedDirectory>> local_custom_path;
 
-  int i = 0;
   for (const auto& filename : custom_files) {
     const auto custom_path = JoinPath({path, filename});
-    RETURN_IF_ERROR(LocalizeFileFolder(custom_path, local_custom[i]));
+    local_custom_path.push_back(std::shared_ptr<LocalizedDirectory>(nullptr));
+    RETURN_IF_ERROR(LocalizeFileFolder(custom_path, &local_custom_path.back()));
     custom_paths.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(local_custom[i]->model_path));
-    i++;
+        std::make_tuple(local_custom_path.back()->local_path_));
   }
 
   // Create the vector of server parameter values, indexed by the

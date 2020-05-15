@@ -68,22 +68,17 @@ SavedModelBackendFactory::CreateBackend(
   RETURN_IF_ERROR(GetDirectorySubdirs(path, &savedmodel_subdirs));
 
   std::unordered_map<std::string, std::string> models;
-  std::vector<std::shared_ptr<TemporaryDirectory>> local_savedmodel(
-      savedmodel_subdirs.size());
-  for (size_t s = 0; s < savedmodel_subdirs.size(); s++) {
-    local_savedmodel[s] = std::make_shared<TemporaryDirectory>("");
-    std::cerr << "Test: " << local_savedmodel[s]->model_path;
-  }
+  std::vector<std::shared_ptr<LocalizedDirectory>> local_savedmodel_path;
 
-  int i = 0;
   for (const auto& filename : savedmodel_subdirs) {
     const auto savedmodel_path = JoinPath({path, filename});
-
-    RETURN_IF_ERROR(LocalizeFileFolder(savedmodel_path, local_savedmodel[i]));
+    local_savedmodel_path.push_back(
+        std::shared_ptr<LocalizedDirectory>(nullptr));
+    RETURN_IF_ERROR(
+        LocalizeFileFolder(savedmodel_path, &local_savedmodel_path.back()));
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(local_savedmodel[i]->model_path));
-    i++;
+        std::make_tuple(local_savedmodel_path.back()->local_path_));
   }
 
   // Create the backend for the model and all the execution contexts
