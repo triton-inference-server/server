@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servers/grpc_server_v2.h"
+#include "src/servers/grpc_server.h"
 
 #include <condition_variable>
 #include <cstdint>
@@ -44,7 +44,6 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
-#include "src/core/server_status.pb.h"
 #include "src/core/tritonserver.h"
 #include "src/servers/classification.h"
 #include "src/servers/common.h"
@@ -380,7 +379,7 @@ class HandlerState {
 template <
     typename ServiceType, typename ServerResponderType, typename RequestType,
     typename ResponseType>
-class Handler : public GRPCServerV2::HandlerBase {
+class Handler : public GRPCServer::HandlerBase {
  public:
   Handler(
       const std::string& name,
@@ -529,7 +528,7 @@ Handler<ServiceType, ServerResponderType, RequestType, ResponseType>::Stop()
 }
 
 template <typename ResponderType, typename RequestType, typename ResponseType>
-class CommonCallData : public GRPCServerV2::ICallData {
+class CommonCallData : public GRPCServer::ICallData {
  public:
   using StandardRegisterFunc = std::function<void(
       grpc::ServerContext*, RequestType*, ResponderType*, void*)>;
@@ -607,7 +606,7 @@ CommonCallData<ResponderType, RequestType, ResponseType>::Process(bool rpc_ok)
 //
 // CommonHandler
 //
-class CommonHandler : public GRPCServerV2::HandlerBase {
+class CommonHandler : public GRPCServer::HandlerBase {
  public:
   CommonHandler(
       const std::string& name,
@@ -664,8 +663,8 @@ CommonHandler::Start()
     bool ok;
 
     while (cq_->Next(&tag, &ok)) {
-      GRPCServerV2::ICallData* call_data =
-          static_cast<GRPCServerV2::ICallData*>(tag);
+      GRPCServer::ICallData* call_data =
+          static_cast<GRPCServer::ICallData*>(tag);
       if (!call_data->Process(ok)) {
         LOG_VERBOSE(1) << "Done for " << call_data->Name() << ", "
                        << call_data->Id();
@@ -3089,9 +3088,9 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 }  // namespace
 
 //
-// GRPCServerV2
+// GRPCServer
 //
-GRPCServerV2::GRPCServerV2(
+GRPCServer::GRPCServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
@@ -3102,27 +3101,27 @@ GRPCServerV2::GRPCServerV2(
 {
 }
 
-GRPCServerV2::~GRPCServerV2()
+GRPCServer::~GRPCServer()
 {
   Stop();
 }
 
 TRITONSERVER_Error*
-GRPCServerV2::Create(
+GRPCServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
-    int infer_allocation_pool_size, std::unique_ptr<GRPCServerV2>* grpc_server)
+    int infer_allocation_pool_size, std::unique_ptr<GRPCServer>* grpc_server)
 {
   const std::string addr = "0.0.0.0:" + std::to_string(port);
-  grpc_server->reset(new GRPCServerV2(
+  grpc_server->reset(new GRPCServer(
       server, trace_manager, shm_manager, addr, infer_allocation_pool_size));
 
   return nullptr;  // success
 }
 
 TRITONSERVER_Error*
-GRPCServerV2::Start()
+GRPCServer::Start()
 {
   if (running_) {
     return TRITONSERVER_ErrorNew(
@@ -3214,7 +3213,7 @@ GRPCServerV2::Start()
 }
 
 TRITONSERVER_Error*
-GRPCServerV2::Stop()
+GRPCServer::Stop()
 {
   if (!running_) {
     return TRITONSERVER_ErrorNew(

@@ -29,7 +29,6 @@
 #include "src/core/ensemble_scheduler.h"
 
 #include <mutex>
-#include "src/core/api.pb.h"
 #include "src/core/backend.h"
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"

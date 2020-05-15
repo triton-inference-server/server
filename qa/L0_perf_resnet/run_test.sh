@@ -30,7 +30,7 @@ DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH_SIZES:=1}
 INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
 REQUIRED_CONCURRENCY=${REQUIRED_CONCURRENCY:=0}
 
-PERF_CLIENT=../clients/perf_client_v2
+PERF_CLIENT=../clients/perf_client
 REPORTER=../common/reporter.py
 
 SERVER=/opt/tritonserver/bin/tritonserver

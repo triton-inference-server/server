@@ -35,7 +35,7 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-CLIENT=../clients/perf_client_v2
+CLIENT=../clients/perf_client
 # Only use libtorch as it accepts GPU I/O and it can handle variable shape
 BACKENDS=${BACKENDS:="libtorch"}
 

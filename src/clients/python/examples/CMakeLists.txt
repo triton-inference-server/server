@@ -29,15 +29,15 @@ cmake_minimum_required (VERSION 3.5)
 if(${TRTIS_ENABLE_HTTP})
   install(
     PROGRAMS
-      simple_http_v2_health_metadata.py
-      simple_http_v2_infer_client.py
-      simple_http_v2_string_infer_client.py
-      simple_http_v2_async_infer_client.py
-      simple_http_v2_sequence_sync_infer_client.py
-      simple_http_v2_cudashm_client.py
-      simple_http_v2_shm_client.py
-      simple_http_v2_shm_string_client.py
-      simple_http_v2_model_control.py
+      simple_http_health_metadata.py
+      simple_http_infer_client.py
+      simple_http_string_infer_client.py
+      simple_http_async_infer_client.py
+      simple_http_sequence_sync_infer_client.py
+      simple_http_cudashm_client.py
+      simple_http_shm_client.py
+      simple_http_shm_string_client.py
+      simple_http_model_control.py
     DESTINATION python
   )
 endif() # TRTIS_ENABLE_HTTP
@@ -45,21 +45,21 @@ endif() # TRTIS_ENABLE_HTTP
 if(${TRTIS_ENABLE_GRPC})
   install(
     PROGRAMS
-      grpc_v2_client.py
-      grpc_v2_explicit_byte_content_client.py
-      grpc_v2_explicit_int_content_client.py
-      grpc_v2_explicit_int8_content_client.py
-      grpc_v2_image_client.py
-      simple_grpc_v2_cudashm_client.py
-      simple_grpc_v2_health_metadata.py
-      simple_grpc_v2_async_infer_client.py
-      simple_grpc_v2_infer_client.py
-      simple_grpc_v2_sequence_stream_infer_client.py
-      simple_grpc_v2_sequence_sync_infer_client.py
-      simple_grpc_v2_string_infer_client.py
-      simple_grpc_v2_shm_client.py
-      simple_grpc_v2_shm_string_client.py
-      simple_grpc_v2_model_control.py
+      grpc_client.py
+      grpc_explicit_byte_content_client.py
+      grpc_explicit_int_content_client.py
+      grpc_explicit_int8_content_client.py
+      grpc_image_client.py
+      simple_grpc_cudashm_client.py
+      simple_grpc_health_metadata.py
+      simple_grpc_async_infer_client.py
+      simple_grpc_infer_client.py
+      simple_grpc_sequence_stream_infer_client.py
+      simple_grpc_sequence_sync_infer_client.py
+      simple_grpc_string_infer_client.py
+      simple_grpc_shm_client.py
+      simple_grpc_shm_string_client.py
+      simple_grpc_model_control.py
     DESTINATION python
   )
 endif() # TRTIS_ENABLE_GRPC
@@ -67,8 +67,8 @@ endif() # TRTIS_ENABLE_GRPC
 if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_GRPC})
   install(
     PROGRAMS
-      v2_image_client.py
-      v2_ensemble_image_client.py
+      image_client.py
+      ensemble_image_client.py
     DESTINATION python
   )
 endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_GRPC

@@ -38,7 +38,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./perf_client.log"
-PERF_CLIENT=../clients/perf_client_v2
+PERF_CLIENT=../clients/perf_client
 
 DATADIR=`pwd`/models
 TESTDATADIR=`pwd`/test_data

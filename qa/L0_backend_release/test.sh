@@ -35,8 +35,8 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-SIMPLE_CLIENT=../clients/simple_http_v2_infer_client
-SIMPLE_SEQ_CLIENT=../clients/simple_grpc_v2_sequence_stream_infer_client
+SIMPLE_CLIENT=../clients/simple_http_infer_client
+SIMPLE_SEQ_CLIENT=../clients/simple_grpc_sequence_stream_infer_client
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models"

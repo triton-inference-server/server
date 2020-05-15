@@ -48,7 +48,7 @@ class _utf8(object):
 
 
 import os
-_ccudashm_lib = "ccudashmv2" if os.name == 'nt' else 'libccudashmv2.so'
+_ccudashm_lib = "ccudashm" if os.name == 'nt' else 'libccudashm.so'
 _ccudashm_path = pkg_resources.resource_filename(
     'tritonclientutils.cuda_shared_memory', _ccudashm_lib)
 _ccudashm = cdll.LoadLibrary(_ccudashm_path)
@@ -137,10 +137,10 @@ def get_raw_handle(cuda_shm_handle):
     ----------
     cuda_shm_handle : c_void_p
         The handle for the cuda shared memory region.
-    
+
     Returns
     -------
-    bytes 
+    bytes
         The raw serialized cudaIPC handle of underlying cuda shared memory
         in base64 encoding
 

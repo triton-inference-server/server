@@ -35,7 +35,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class HTTPServerV2 {
+class HTTPServer {
  public:
   static TRITONSERVER_Error* CreateAPIServer(
       const std::shared_ptr<TRITONSERVER_Server>& server,
@@ -43,13 +43,13 @@ class HTTPServerV2 {
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
       const std::map<int32_t, std::vector<std::string>>& port_map,
       const int thread_cnt,
-      std::vector<std::unique_ptr<HTTPServerV2>>* http_servers);
+      std::vector<std::unique_ptr<HTTPServer>>* http_servers);
 
   static TRITONSERVER_Error* CreateMetricsServer(
       const std::shared_ptr<TRITONSERVER_Server>& server, int32_t port,
-      int thread_cnt, std::unique_ptr<HTTPServerV2>* metrics_server);
+      int thread_cnt, std::unique_ptr<HTTPServer>* metrics_server);
 
-  virtual ~HTTPServerV2() = default;
+  virtual ~HTTPServer() = default;
 
   virtual TRITONSERVER_Error* Start() = 0;
   virtual TRITONSERVER_Error* Stop() = 0;

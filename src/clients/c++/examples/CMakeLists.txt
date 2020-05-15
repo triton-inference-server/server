@@ -38,293 +38,293 @@ else()
   )
 
   #
-  # v2_image_client
+  # image_client
   #
   find_package(OpenCV REQUIRED)
-  add_executable(v2_image_client v2_image_client.cc)
-  target_include_directories(v2_image_client PRIVATE ${OpenCV_INCLUDE_DIRS})
+  add_executable(image_client image_client.cc)
+  target_include_directories(image_client PRIVATE ${OpenCV_INCLUDE_DIRS})
   target_link_libraries(
-    v2_image_client
+    image_client
     PRIVATE TRTIS::grpcclient_static
     PRIVATE TRTIS::httpclient_static
     PRIVATE ${OpenCV_LIBS}
   )
   install(
-    TARGETS v2_image_client
+    TARGETS image_client
     RUNTIME DESTINATION bin
   )
 
   #
-  # v2_ensemble_image_client
+  # ensemble_image_client
   #
-  add_executable(v2_ensemble_image_client v2_ensemble_image_client.cc)
+  add_executable(ensemble_image_client ensemble_image_client.cc)
   target_link_libraries(
-    v2_ensemble_image_client
+    ensemble_image_client
     PRIVATE TRTIS::grpcclient_static
     PRIVATE TRTIS::httpclient_static
   )
   install(
-    TARGETS v2_ensemble_image_client
+    TARGETS ensemble_image_client
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_grpc_v2_health_metadata
+  # simple_grpc_health_metadata
   #
-  add_executable(simple_grpc_v2_health_metadata simple_grpc_v2_health_metadata.cc)
+  add_executable(simple_grpc_health_metadata simple_grpc_health_metadata.cc)
   target_link_libraries(
-    simple_grpc_v2_health_metadata
+    simple_grpc_health_metadata
     PRIVATE TRTIS::grpcclient_static
   )
   install(
-    TARGETS simple_grpc_v2_health_metadata
+    TARGETS simple_grpc_health_metadata
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_grpc_v2_model_control
+  # simple_grpc_model_control
   #
-  add_executable(simple_grpc_v2_model_control simple_grpc_v2_model_control.cc)
+  add_executable(simple_grpc_model_control simple_grpc_model_control.cc)
   target_link_libraries(
-    simple_grpc_v2_model_control
+    simple_grpc_model_control
     PRIVATE TRTIS::grpcclient_static
   )
   install(
-    TARGETS simple_grpc_v2_model_control
+    TARGETS simple_grpc_model_control
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_grpc_v2_infer_client
+  # simple_grpc_infer_client
   #
-  add_executable(simple_grpc_v2_infer_client simple_grpc_v2_infer_client.cc)
+  add_executable(simple_grpc_infer_client simple_grpc_infer_client.cc)
   target_link_libraries(
-    simple_grpc_v2_infer_client
+    simple_grpc_infer_client
     PRIVATE TRTIS::grpcclient_static
   )
   install(
-    TARGETS simple_grpc_v2_infer_client
+    TARGETS simple_grpc_infer_client
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_grpc_v2_string_infer_client
+  # simple_grpc_string_infer_client
   #
-  add_executable(simple_grpc_v2_string_infer_client simple_grpc_v2_string_infer_client.cc)
+  add_executable(simple_grpc_string_infer_client simple_grpc_string_infer_client.cc)
   target_link_libraries(
-    simple_grpc_v2_string_infer_client
+    simple_grpc_string_infer_client
     PRIVATE TRTIS::grpcclient_static
   )
   install(
-    TARGETS simple_grpc_v2_string_infer_client
+    TARGETS simple_grpc_string_infer_client
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_grpc_v2_async_infer_client
+  # simple_grpc_async_infer_client
   #
-  add_executable(simple_grpc_v2_async_infer_client simple_grpc_v2_async_infer_client.cc)
+  add_executable(simple_grpc_async_infer_client simple_grpc_async_infer_client.cc)
   target_link_libraries(
-    simple_grpc_v2_async_infer_client
+    simple_grpc_async_infer_client
     PRIVATE TRTIS::grpcclient_static
   )
   install(
-    TARGETS simple_grpc_v2_async_infer_client
+    TARGETS simple_grpc_async_infer_client
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_grpc_v2_sequence_stream_infer_client
+  # simple_grpc_sequence_stream_infer_client
   #
-  add_executable(simple_grpc_v2_sequence_stream_infer_client simple_grpc_v2_sequence_stream_infer_client.cc)
+  add_executable(simple_grpc_sequence_stream_infer_client simple_grpc_sequence_stream_infer_client.cc)
   target_link_libraries(
-    simple_grpc_v2_sequence_stream_infer_client
+    simple_grpc_sequence_stream_infer_client
     PRIVATE TRTIS::grpcclient_static
   )
   install(
-    TARGETS simple_grpc_v2_sequence_stream_infer_client
+    TARGETS simple_grpc_sequence_stream_infer_client
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_grpc_v2_sequence_sync_infer_client
+  # simple_grpc_sequence_sync_infer_client
   #
-  add_executable(simple_grpc_v2_sequence_sync_infer_client simple_grpc_v2_sequence_sync_infer_client.cc)
+  add_executable(simple_grpc_sequence_sync_infer_client simple_grpc_sequence_sync_infer_client.cc)
   target_link_libraries(
-    simple_grpc_v2_sequence_sync_infer_client
+    simple_grpc_sequence_sync_infer_client
     PRIVATE TRTIS::grpcclient_static
   )
   install(
-    TARGETS simple_grpc_v2_sequence_sync_infer_client
+    TARGETS simple_grpc_sequence_sync_infer_client
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_grpc_v2_shm_client
+  # simple_grpc_shm_client
   #
   set(
     SIMPLE_GRPC_SHM_SRCS
-    simple_grpc_v2_shm_client.cc
+    simple_grpc_shm_client.cc
     shm_utils.cc
   )
   set(
     SIMPLE_GRPC_SHM_HDRS
     shm_utils.h
   )
-  add_executable(simple_grpc_v2_shm_client ${SIMPLE_GRPC_SHM_SRCS} ${SIMPLE_GRPC_SHM_HDRS})
+  add_executable(simple_grpc_shm_client ${SIMPLE_GRPC_SHM_SRCS} ${SIMPLE_GRPC_SHM_HDRS})
   target_link_libraries(
-    simple_grpc_v2_shm_client
+    simple_grpc_shm_client
     PRIVATE TRTIS::grpcclient_static
   )
   install(
-    TARGETS simple_grpc_v2_shm_client
+    TARGETS simple_grpc_shm_client
     RUNTIME DESTINATION bin
   )
 
   if(${TRTIS_ENABLE_GPU})
     #
-    # simple_grpc_v2_cudashm_client
+    # simple_grpc_cudashm_client
     #
     set(
       SIMPLE_GRPC_CUDA_SHM_SRCS
-      simple_grpc_v2_cudashm_client.cc
+      simple_grpc_cudashm_client.cc
     )
     set(
       SIMPLE_GRPC_CUDA_SHM_HDRS
     )
-    add_executable(simple_grpc_v2_cudashm_client ${SIMPLE_GRPC_CUDA_SHM_SRCS} ${SIMPLE_GRPC_CUDA_SHM_HDRS})
-    target_include_directories(simple_grpc_v2_cudashm_client PRIVATE ${CUDA_INCLUDE_DIRS})
+    add_executable(simple_grpc_cudashm_client ${SIMPLE_GRPC_CUDA_SHM_SRCS} ${SIMPLE_GRPC_CUDA_SHM_HDRS})
+    target_include_directories(simple_grpc_cudashm_client PRIVATE ${CUDA_INCLUDE_DIRS})
     target_link_libraries(
-      simple_grpc_v2_cudashm_client
+      simple_grpc_cudashm_client
       PRIVATE TRTIS::grpcclient_static
       PRIVATE ${CUDA_LIBRARIES}
     )
     install(
-      TARGETS simple_grpc_v2_cudashm_client
+      TARGETS simple_grpc_cudashm_client
       RUNTIME DESTINATION bin
     )
   endif() # TRTIS_ENABLE_GPU
 
   #
-  # simple_http_v2_health_metadata
+  # simple_http_health_metadata
   #
-  add_executable(simple_http_v2_health_metadata simple_http_v2_health_metadata.cc)
+  add_executable(simple_http_health_metadata simple_http_health_metadata.cc)
   target_link_libraries(
-    simple_http_v2_health_metadata
+    simple_http_health_metadata
     PRIVATE TRTIS::httpclient_static
   )
   install(
-    TARGETS simple_http_v2_health_metadata
+    TARGETS simple_http_health_metadata
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_http_v2_model_control
+  # simple_http_model_control
   #
-  add_executable(simple_http_v2_model_control simple_http_v2_model_control.cc)
+  add_executable(simple_http_model_control simple_http_model_control.cc)
   target_link_libraries(
-    simple_http_v2_model_control
+    simple_http_model_control
     PRIVATE TRTIS::httpclient_static
   )
   install(
-    TARGETS simple_http_v2_model_control
+    TARGETS simple_http_model_control
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_http_v2_infer_client
+  # simple_http_infer_client
   #
-  add_executable(simple_http_v2_infer_client simple_http_v2_infer_client.cc)
+  add_executable(simple_http_infer_client simple_http_infer_client.cc)
   target_link_libraries(
-    simple_http_v2_infer_client
+    simple_http_infer_client
     PRIVATE TRTIS::httpclient_static
   )
   install(
-    TARGETS simple_http_v2_infer_client
+    TARGETS simple_http_infer_client
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_http_v2_string_infer_client
+  # simple_http_string_infer_client
   #
-  add_executable(simple_http_v2_string_infer_client simple_http_v2_string_infer_client.cc)
+  add_executable(simple_http_string_infer_client simple_http_string_infer_client.cc)
   target_link_libraries(
-    simple_http_v2_string_infer_client
+    simple_http_string_infer_client
     PRIVATE TRTIS::httpclient_static
   )
   install(
-    TARGETS simple_http_v2_string_infer_client
+    TARGETS simple_http_string_infer_client
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_http_v2_async_infer_client
+  # simple_http_async_infer_client
   #
-  add_executable(simple_http_v2_async_infer_client simple_http_v2_async_infer_client.cc)
+  add_executable(simple_http_async_infer_client simple_http_async_infer_client.cc)
   target_link_libraries(
-    simple_http_v2_async_infer_client
+    simple_http_async_infer_client
     PRIVATE TRTIS::httpclient_static
   )
   install(
-    TARGETS simple_http_v2_async_infer_client
+    TARGETS simple_http_async_infer_client
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_http_v2_sequence_sync_infer_client
+  # simple_http_sequence_sync_infer_client
   #
-  add_executable(simple_http_v2_sequence_sync_infer_client simple_http_v2_sequence_sync_infer_client.cc)
+  add_executable(simple_http_sequence_sync_infer_client simple_http_sequence_sync_infer_client.cc)
   target_link_libraries(
-    simple_http_v2_sequence_sync_infer_client
+    simple_http_sequence_sync_infer_client
     PRIVATE TRTIS::httpclient_static
   )
   install(
-    TARGETS simple_http_v2_sequence_sync_infer_client
+    TARGETS simple_http_sequence_sync_infer_client
     RUNTIME DESTINATION bin
   )
 
   #
-  # simple_http_v2_shm_client
+  # simple_http_shm_client
   #
   set(
     SIMPLE_HTTP_SHM_SRCS
-    simple_http_v2_shm_client.cc
+    simple_http_shm_client.cc
     shm_utils.cc
   )
   set(
     SIMPLE_HTTP_SHM_HDRS
     shm_utils.h
   )
-  add_executable(simple_http_v2_shm_client ${SIMPLE_HTTP_SHM_SRCS} ${SIMPLE_HTTP_SHM_HDRS})
+  add_executable(simple_http_shm_client ${SIMPLE_HTTP_SHM_SRCS} ${SIMPLE_HTTP_SHM_HDRS})
   target_link_libraries(
-    simple_http_v2_shm_client
+    simple_http_shm_client
     PRIVATE TRTIS::httpclient_static
   )
   install(
-    TARGETS simple_http_v2_shm_client
+    TARGETS simple_http_shm_client
     RUNTIME DESTINATION bin
   )
 
   if(${TRTIS_ENABLE_GPU})
     #
-    # simple_http_v2_cudashm_client
+    # simple_http_cudashm_client
     #
     set(
       SIMPLE_HTTP_CUDA_SHM_SRCS
-      simple_http_v2_cudashm_client.cc
+      simple_http_cudashm_client.cc
     )
     set(
       SIMPLE_HTTP_CUDA_SHM_HDRS
     )
-    add_executable(simple_http_v2_cudashm_client ${SIMPLE_HTTP_CUDA_SHM_SRCS} ${SIMPLE_HTTP_CUDA_SHM_HDRS})
-    target_include_directories(simple_http_v2_cudashm_client PRIVATE ${CUDA_INCLUDE_DIRS})
+    add_executable(simple_http_cudashm_client ${SIMPLE_HTTP_CUDA_SHM_SRCS} ${SIMPLE_HTTP_CUDA_SHM_HDRS})
+    target_include_directories(simple_http_cudashm_client PRIVATE ${CUDA_INCLUDE_DIRS})
     target_link_libraries(
-      simple_http_v2_cudashm_client
+      simple_http_cudashm_client
       PRIVATE TRTIS::httpclient_static
       PRIVATE ${CUDA_LIBRARIES}
     )
     install(
-      TARGETS simple_http_v2_cudashm_client
+      TARGETS simple_http_cudashm_client
       RUNTIME DESTINATION bin
     )
   endif() # TRTIS_ENABLE_GPU

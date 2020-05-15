@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -29,19 +29,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
-constexpr char kInferRequestHTTPHeader[] = "NV-InferRequest";
-constexpr char kInferResponseHTTPHeader[] = "NV-InferResponse";
-constexpr char kStatusHTTPHeader[] = "NV-Status";
 constexpr char kInferHeaderContentLengthHTTPHeader[] =
     "Inference-Header-Content-Length";
-
-constexpr char kInferRESTEndpoint[] = "api/infer";
-constexpr char kStatusRESTEndpoint[] = "api/status";
-constexpr char kHealthRESTEndpoint[] = "api/health";
-constexpr char kModelControlRESTEndpoint[] = "api/modelcontrol";
-constexpr char kSharedMemoryControlRESTEndpoint[] = "api/sharedmemorycontrol";
-constexpr char kModelRepositoryRESTEndpoint[] = "api/repository";
-constexpr char kHttpV2RESTEndpoint[] = "v1/models";
 
 #ifdef TRTIS_ENABLE_TENSORFLOW
 constexpr char kTensorFlowGraphDefPlatform[] = "tensorflow_graphdef";

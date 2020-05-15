@@ -33,7 +33,7 @@
 #include "src/core/tritonserver.h"
 
 #ifdef TRTIS_ENABLE_GRPC
-#include "src/core/grpc_service_v2.grpc.pb.h"
+#include "src/core/grpc_service.grpc.pb.h"
 #endif
 
 #ifdef TRTIS_ENABLE_GPU
@@ -91,7 +91,7 @@ class SharedMemoryManager {
       const std::string& name, size_t offset, void** shm_mapped_addr,
       TRITONSERVER_MemoryType* memory_type, int64_t* device_id);
 
-  /// FIXMEV2 remove the Unregister/GetStatus that don't require mem type arg
+  /// FIXME remove the Unregister/GetStatus that don't require mem type arg
 
   /// Removes the named shared memory block from the manager. Any future
   /// attempt to get the details of this block will result in an array
