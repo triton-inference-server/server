@@ -76,7 +76,10 @@ RUN mkdir -p qa/common && \
     cp /opt/tritonserver/bin/memory_alloc qa/L0_io/. && \
     cp /workspace/builddir/trtis-test-utils/install/bin/memory_test qa/L0_memory/.
 
-RUN cp /workspace/builddir/trtis-test-utils/install/bin/caffe2plan qa/common/.
+# caffe2plan will not exist if the build was done without TensorRT enabled
+RUN if [ -f /workspace/builddir/trtis-test-utils/install/bin/caffe2plan ]; then \
+       cp /workspace/builddir/trtis-test-utils/install/bin/caffe2plan qa/common/.; \
+    fi
 
 RUN mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
     cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
