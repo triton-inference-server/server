@@ -96,7 +96,11 @@ function main() {
 
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"
-  VERSION=$VERSION python3 setup.py bdist_wheel
+  if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    VERSION=$VERSION python3 setup.py bdist_wheel
+  else
+    VERSION=$VERSION python setup.py bdist_wheel
+  fi
   mkdir -p "${DEST}"
   cp dist/* "${DEST}"
   popd
