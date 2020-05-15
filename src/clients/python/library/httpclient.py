@@ -1476,6 +1476,7 @@ class InferRequestedOutput:
         shared memory region.
         """
 
+        self._parameters['binary_data'] = self._binary
         self._parameters.pop('shared_memory_region', None)
         self._parameters.pop('shared_memory_byte_size', None)
         self._parameters.pop('shared_memory_offset', None)
