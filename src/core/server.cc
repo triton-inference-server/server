@@ -92,12 +92,12 @@ InferenceServer::InferenceServer()
   extensions_.push_back("model_configuration");
   extensions_.push_back("system_shared_memory");
   extensions_.push_back("cuda_shared_memory");
-#ifdef TRTIS_ENABLE_HTTP_V2
+#ifdef TRTIS_ENABLE_HTTP
   extensions_.push_back("binary_tensor_data");
-#endif
+#endif  // TRTIS_ENABLE_HTTP
 #ifdef TRTIS_ENABLE_STATS
   extensions_.push_back("statistics");
-#endif
+#endif  // TRTIS_ENABLE_STATS
 
   strict_model_config_ = true;
   strict_readiness_ = true;

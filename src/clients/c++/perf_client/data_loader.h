@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,14 +26,12 @@
 #pragma once
 
 #include <fstream>
+#include "src/clients/c++/perf_client/model_parser.h"
 #include "src/clients/c++/perf_client/perf_utils.h"
 
 class DataLoader {
  public:
-  DataLoader(
-      size_t batch_size,
-      const std::unordered_map<std::string, std::vector<int64_t>>&
-          default_input_shapes);
+  DataLoader(size_t batch_size);
 
   /// Returns the total number of data steps that can be supported by a
   /// non-sequence model.
@@ -53,25 +51,27 @@ class DataLoader {
     return 0;
   }
 
-  /// Reads the input data from the specified data directory
-  /// \param inputs The vector of inputs to the target model.
+
+  /// Reads the input data from the specified data directory.
+  /// \param inputs The pointer to the map holding the information about
+  /// input tensors of a model
   /// \param data_directory The path to the directory containing the data
   nic::Error ReadDataFromDir(
-      std::vector<std::shared_ptr<nic::InferContext::Input>> inputs,
+      std::shared_ptr<ModelTensorMap> inputs,
       const std::string& data_directory);
 
-  /// Reads the input data from the specified json file and append to the
-  /// stream buffers.
-  /// \param inputs The vector of inputs to the target model.
+  /// Reads the input data from the specified json file.
+  /// \param inputs The pointer to the map holding the information about
+  /// input tensors of a model
   /// \param json_file The json file containing the user-provided input
   /// data.
   /// Returns error object indicating status
   nic::Error ReadDataFromJSON(
-      std::vector<std::shared_ptr<nic::InferContext::Input>> inputs,
-      const std::string& json_file);
+      std::shared_ptr<ModelTensorMap> inputs, const std::string& json_file);
 
   /// Generates the input data to use with the inference requests
-  /// \param inputs The vector of inputs to the target model.
+  /// \param inputs The pointer to the map holding the information about
+  /// input tensors of a model
   /// \param zero_input Whether or not to use zero value for buffer
   /// initialization.
   /// \param string_length The length of the string to generate for
@@ -80,42 +80,41 @@ class DataLoader {
   /// string tensors
   /// Returns error object indicating status
   nic::Error GenerateData(
-      std::vector<std::shared_ptr<nic::InferContext::Input>> inputs,
-      const bool zero_input, const size_t string_length,
-      const std::string& string_data);
+      std::shared_ptr<ModelTensorMap> inputs, const bool zero_input,
+      const size_t string_length, const std::string& string_data);
 
   /// Helper function to access data for the specified input
-  /// \param input The target input
+  /// \param input The target model input tensor
   /// \param stream_id The data stream_id to use for retrieving input data.
   /// \param step_id The data step_id to use for retrieving input data.
   /// \param data Returns the pointer to the data for the requested input.
   /// \param batch1_size Returns the size of the input data in bytes.
   /// Returns error object indicating status
   nic::Error GetInputData(
-      std::shared_ptr<nic::InferContext::Input> input, const int stream_id,
-      const int step_id, const uint8_t** data_ptr, size_t* batch1_size);
+      const ModelTensor& input, const int stream_id, const int step_id,
+      const uint8_t** data_ptr, size_t* batch1_size);
 
   /// Helper function to get the shape values to the input
-  /// \param input The target input
+  /// \param input The target model input tensor
   /// \param stream_id The data stream_id to use for retrieving input shape.
   /// \param step_id The data step_id to use for retrieving input shape.
   /// \param shape returns the pointer to the vector containing the shape
   /// values.
   /// Returns error object indicating status
   nic::Error GetInputShape(
-      std::shared_ptr<nic::InferContext::Input> input, const int stream_id,
-      const int step_id, const std::vector<int64_t>** shape);
+      const ModelTensor& input, const int stream_id, const int step_id,
+      std::vector<int64_t>* shape);
 
  private:
   /// Helper function to read data for the specified input from json
   /// \param step the DOM for current step
-  /// \param inputs The inputs to the model
+  /// \param inputs The pointer to the map holding the information about
+  /// input tensors of a model
   /// \param stream_index the stream index the data should be exported to.
   /// \param step_index the step index the data should be exported to.
   /// Returns error object indicating status
   nic::Error ReadInputTensorData(
-      const rapidjson::Value& step,
-      std::vector<std::shared_ptr<nic::InferContext::Input>>& inputs,
+      const rapidjson::Value& step, std::shared_ptr<ModelTensorMap> inputs,
       int stream_index, int step_index);
 
 
@@ -132,9 +131,6 @@ class DataLoader {
   // User provided input data, it will be preferred over synthetic data
   std::unordered_map<std::string, std::vector<char>> input_data_;
   std::unordered_map<std::string, std::vector<int64_t>> input_shapes_;
-
-  // The default shapes to use if json doesn't provide shapes
-  std::unordered_map<std::string, std::vector<int64_t>> default_input_shapes_;
 
   // Placeholder for generated input data, which will be used for all inputs
   // except string

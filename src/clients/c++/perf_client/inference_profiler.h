@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,12 +27,10 @@
 
 #include <thread>
 #include "src/clients/c++/perf_client/concurrency_manager.h"
-#include "src/clients/c++/perf_client/context_factory.h"
 #include "src/clients/c++/perf_client/custom_load_manager.h"
+#include "src/clients/c++/perf_client/model_parser.h"
 #include "src/clients/c++/perf_client/request_rate_manager.h"
 
-using ModelInfo = std::pair<std::string, int64_t>;
-using ComposingModelMap = std::map<ModelInfo, std::set<ModelInfo>>;
 
 /// Constant parameters that determine the whether stopping criteria has met
 /// for the current phase of testing
@@ -48,8 +46,6 @@ struct LoadParams {
 /// Data structure to keep track of real-time load status and determine wether
 /// stopping criteria has met for the current phase of testing.
 struct LoadStatus {
-  // Record of the measurements in the current session
-  //
   // Stores the observations of infer_per_sec and latencies in a vector
   std::vector<double> infer_per_sec;
   std::vector<uint64_t> latencies;
@@ -59,16 +55,18 @@ struct LoadStatus {
   uint64_t avg_latency = 0;
 };
 
-
+/// Holds the server-side inference statisitcs of the target model and its
+/// composing models
 struct ServerSideStats {
   uint64_t request_count;
   uint64_t cumm_time_ns;
   uint64_t queue_time_ns;
   uint64_t compute_time_ns;
 
-  std::map<ModelInfo, ServerSideStats> composing_models_stat;
+  std::map<ModelIdentifier, ServerSideStats> composing_models_stat;
 };
 
+/// Holds the statistics recorded at the client side.
 struct ClientSideStats {
   // Request count and elapsed time measured by client
   uint64_t request_count;
@@ -90,14 +88,12 @@ struct ClientSideStats {
   double sequence_per_sec;
 };
 
+/// The entire statistics record.
 struct PerfStatus {
   uint32_t concurrency;
   double request_rate;
   size_t batch_size;
-
-  // Request count and elapsed time measured by server
   ServerSideStats server_stats;
-  // Measurements on the client side
   ClientSideStats client_stats;
 
   bool on_sequence_model;
@@ -144,14 +140,20 @@ class InferenceProfiler {
   /// average latency will be reported and used as stable criteria.
   /// \param latency_threshold_ms The threshold on the latency measurements in
   /// microseconds.
-  /// \param factory The ContextFactory object used to create InferContext.
-  /// \param manager Returns a new InferenceProfiler object.
+  /// \param parser The ModelParse object which holds all the details about the
+  /// model.
+  /// \param profile_client The TritonClientWrapper object used to communicate
+  /// with the server by profiler.
+  /// \param manager The LoadManager object that will produce load on the
+  /// server.
+  /// \param profiler Returns a new InferenceProfiler object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const bool verbose, const double stability_threshold,
       const uint64_t measurement_window_ms, const size_t max_trials,
       const int64_t percentile, const uint64_t latency_threshold_ms,
-      std::shared_ptr<ContextFactory>& factory,
+      std::shared_ptr<ModelParser>& parser,
+      std::unique_ptr<TritonClientWrapper> profile_client,
       std::unique_ptr<LoadManager> manager,
       std::unique_ptr<InferenceProfiler>* profiler);
 
@@ -174,10 +176,10 @@ class InferenceProfiler {
     nic::Error err;
     bool meets_threshold;
     if (search_mode == SearchMode::NONE) {
-      err = Profile(summary, &meets_threshold);
-      if (!err.IsOk()) {
-        return err;
-      }
+      //  err = Profile(summary, &meets_threshold);
+      //  if (!err.IsOk()) {
+      //    return err;
+      //  }
     } else if (search_mode == SearchMode::LINEAR) {
       T current_value = start;
       do {
@@ -221,26 +223,9 @@ class InferenceProfiler {
       const bool verbose, const double stability_threshold,
       const int32_t measurement_window_ms, const size_t max_trials,
       const bool extra_percentile, const size_t percentile,
-      const uint64_t latency_threshold_ms, const ProtocolType protocol,
-      const ContextFactory::ModelSchedulerType scheduler_type,
-      const std::string& model_name, const int64_t model_version,
-      std::unique_ptr<nic::ServerStatusContext> status_ctx,
+      const uint64_t latency_threshold_ms, std::shared_ptr<ModelParser>& parser,
+      std::unique_ptr<TritonClientWrapper> profile_client,
       std::unique_ptr<LoadManager> manager);
-
-  /// A helper function to construct the map of ensemble models to its composing
-  /// models.
-  /// \param model_name The ensemble model to be added into the map
-  /// \param model_version The version of the model to be added
-  /// \param server_status The server status response from TRTIS.
-  /// \return Error object indicating success or failure
-  nic::Error BuildComposingModelMap(
-      const std::string& model_name, const int64_t& model_version,
-      const ni::ServerStatus& server_status);
-
-  /// Constructs the composing_model_map_ which includes the details of ensemble
-  /// \param The server status response from TRTIS
-  /// \return Error object indicating success or failure
-  nic::Error BuildComposingModelMap(const ni::ServerStatus& server_status);
 
   /// Actively measure throughput in every 'measurement_window' msec until the
   /// throughput is stable. Once the throughput is stable, it adds the
@@ -291,19 +276,20 @@ class InferenceProfiler {
   /// \return Error object indicating success or failure.
   nic::Error Measure(PerfStatus& status_summary);
 
-  /// \param server_status Returns the status of the models provided by
+  /// Gets the server side statistics
+  /// \param model_status Returns the status of the models provided by
   /// the server. If the model being profiled is non-ensemble model,
   /// only its status will be returned. Otherwise, the status of the composing
   /// models will also be returned.
   /// \return Error object indicating success or failure.
   nic::Error GetServerSideStatus(
-      std::map<std::string, ni::ModelStatus>* model_status);
+      std::map<ModelIdentifier, ModelStatistics>* model_status);
 
   // A helper fuction for obtaining the status of the models provided by the
   // server.
   nic::Error GetServerSideStatus(
-      ni::ServerStatus& server_status, const ModelInfo model_info,
-      std::map<std::string, ni::ModelStatus>* model_status);
+      ModelStatistics& server_status, const ModelIdentifier model_identifier,
+      std::map<ModelIdentifier, ModelStatistics>* model_status);
 
   /// Sumarize the measurement with the provided statistics.
   /// \param timestamps The timestamps of the requests completed during the
@@ -316,27 +302,31 @@ class InferenceProfiler {
   /// \return Error object indicating success or failure.
   nic::Error Summarize(
       const TimestampVector& timestamps,
-      const std::map<std::string, ni::ModelStatus>& start_status,
-      const std::map<std::string, ni::ModelStatus>& end_status,
-      const nic::InferContext::Stat& start_stat,
-      const nic::InferContext::Stat& end_stat, PerfStatus& summary);
+      const std::map<ModelIdentifier, ModelStatistics>& start_status,
+      const std::map<ModelIdentifier, ModelStatistics>& end_status,
+      const nic::InferStat& start_stat, const nic::InferStat& end_stat,
+      PerfStatus& summary);
 
+  /// A helper function to get the start and end of a measurement window.
   /// \param timestamps The timestamps collected for the measurement.
-  /// \return the start and end timestamp of the measurement window.
-  std::pair<uint64_t, uint64_t> MeasurementTimestamp(
-      const TimestampVector& timestamps);
+  /// \param valid_range Returns the start and end timestamp of the measurement
+  /// window.
+  void MeasurementTimestamp(
+      const TimestampVector& timestamps,
+      std::pair<uint64_t, uint64_t>* valid_range);
 
   /// \param timestamps The timestamps collected for the measurement.
   /// \param valid_range The start and end timestamp of the measurement window.
   /// \param valid_sequence_count Returns the number of completed sequences
   /// during the measurement. A sequence is a set of correlated requests sent to
   /// sequence model.
-  /// \return the vector of request latencies where the requests are completed
-  /// within the measurement window.
-  std::vector<uint64_t> ValidLatencyMeasurement(
+  /// \param latencies Returns the vector of request latencies where the
+  /// requests are completed within the measurement window.
+  void ValidLatencyMeasurement(
       const TimestampVector& timestamps,
       const std::pair<uint64_t, uint64_t>& valid_range,
-      size_t& valid_sequence_count, size_t& delayed_request_count);
+      size_t& valid_sequence_count, size_t& delayed_request_count,
+      std::vector<uint64_t>* latencies);
 
   /// \param latencies The vector of request latencies collected.
   /// \param summary Returns the summary that the latency related fields are
@@ -345,8 +335,8 @@ class InferenceProfiler {
   nic::Error SummarizeLatency(
       const std::vector<uint64_t>& latencies, PerfStatus& summary);
 
-  /// \param start_stat The accumulated context status at the start.
-  /// \param end_stat The accumulated context status at the end.
+  /// \param start_stat The accumulated client statistics at the start.
+  /// \param end_stat The accumulated client statistics at the end.
   /// \param duration_ns The duration of the measurement in nsec.
   /// \param valid_request_count The number of completed requests recorded.
   /// \param valid_sequence_count The number of completed sequences recorded.
@@ -356,22 +346,37 @@ class InferenceProfiler {
   /// client are set.
   /// \return Error object indicating success or failure.
   nic::Error SummarizeClientStat(
-      const nic::InferContext::Stat& start_stat,
-      const nic::InferContext::Stat& end_stat, const uint64_t duration_ns,
-      const size_t valid_request_count, const size_t delayed_request_count,
-      const size_t valid_sequence_count, PerfStatus& summary);
+      const nic::InferStat& start_stat, const nic::InferStat& end_stat,
+      const uint64_t duration_ns, const size_t valid_request_count,
+      const size_t delayed_request_count, const size_t valid_sequence_count,
+      PerfStatus& summary);
 
-  /// \param model_name The name of the model to summarize the server side stats
-  /// \param model_version The version of the model
+  /// \param model_identifier A pair of model_name and model_version to identify
+  /// a specific model.
   /// \param start_status The model status at the start of the measurement.
   /// \param end_status The model status at the end of the measurement.
   /// \param server_stats Returns the summary that the fields recorded by server
   /// are set.
   /// \return Error object indicating success or failure.
-  nic::Error SummarizeServerModelStats(
-      const std::string& model_name, const int64_t model_version,
-      const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
+  nic::Error SummarizeServerStatsHelper(
+      const ModelIdentifier& model_identifier,
+      const std::map<ModelIdentifier, ModelStatistics>& start_status,
+      const std::map<ModelIdentifier, ModelStatistics>& end_status,
       ServerSideStats* server_stats);
+
+  /// \param model_identifier A pair of model_name and model_version to identify
+  /// a specific model.
+  /// \param start_status The model status at the start of the measurement.
+  /// \param end_status The model status at the end of the measurement.
+  /// \param server_stats Returns the summary that the fields recorded by server
+  /// are set.
+  /// \return Error object indicating success or failure.
+  nic::Error SummarizeServerStats(
+      const ModelIdentifier& model_identifier,
+      const std::map<ModelIdentifier, ModelStatistics>& start_status,
+      const std::map<ModelIdentifier, ModelStatistics>& end_status,
+      ServerSideStats* server_stats);
+
 
   /// \param start_status The model status at the start of the measurement.
   /// \param end_status The model status at the end of the measurement.
@@ -379,20 +384,8 @@ class InferenceProfiler {
   /// are set.
   /// \return Error object indicating success or failure.
   nic::Error SummarizeServerStats(
-      const ModelInfo model_info,
-      const std::map<std::string, ni::ModelStatus>& start_status,
-      const std::map<std::string, ni::ModelStatus>& end_status,
-      ServerSideStats* server_stats);
-
-
-  /// \param start_status The model status at the start of the measurement.
-  /// \param end_status The model status at the end of the measurement.
-  /// \param server_stats Returns the summary that the fields recorded by server
-  /// are set.
-  /// \return Error object indicating success or failure.
-  nic::Error SummarizeServerStats(
-      const std::map<std::string, ni::ModelStatus>& start_status,
-      const std::map<std::string, ni::ModelStatus>& end_status,
+      const std::map<ModelIdentifier, ModelStatistics>& start_status,
+      const std::map<ModelIdentifier, ModelStatistics>& end_status,
       ServerSideStats* server_stats);
 
   bool verbose_;
@@ -403,12 +396,11 @@ class InferenceProfiler {
   uint64_t latency_threshold_ms_;
 
   ProtocolType protocol_;
-  ContextFactory::ModelSchedulerType scheduler_type_;
   std::string model_name_;
   int64_t model_version_;
-  ComposingModelMap composing_models_map_;
 
-  std::unique_ptr<nic::ServerStatusContext> status_ctx_;
+  std::shared_ptr<ModelParser> parser_;
+  std::unique_ptr<TritonClientWrapper> profile_client_;
   std::unique_ptr<LoadManager> manager_;
   LoadParams load_parameters_;
 };

@@ -38,7 +38,6 @@ import unittest
 import numpy as np
 import test_util as tu
 import sequence_util as su
-from tensorrtserver.api import *
 
 _test_system_shared_memory = bool(int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 _test_cuda_shared_memory = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
