@@ -134,8 +134,8 @@ FROM ${TENSORFLOW_IMAGE} AS trtserver_tf
 ############################################################################
 FROM ${BASE_IMAGE} AS trtserver_build
 
-ARG TRTIS_VERSION=1.13.0dev
-ARG TRTIS_CONTAINER_VERSION=20.05dev
+ARG TRTIS_VERSION=1.14.0dev
+ARG TRTIS_CONTAINER_VERSION=20.06dev
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl4-openSSL-dev is needed for GCS
@@ -319,8 +319,8 @@ ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
 ############################################################################
 FROM ${BASE_IMAGE}
 
-ARG TRTIS_VERSION=1.13.0dev
-ARG TRTIS_CONTAINER_VERSION=20.05dev
+ARG TRTIS_VERSION=1.14.0dev
+ARG TRTIS_CONTAINER_VERSION=20.06dev
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
 ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
