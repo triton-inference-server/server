@@ -59,16 +59,6 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
     mkdir qa/L0_backend_release/simple_models && \
     cp -r docs/examples/model_repository/simple qa/L0_backend_release/simple_models/. && \
-    mkdir qa/L0_simple_callback_example/models && \
-    cp -r docs/examples/model_repository/simple qa/L0_simple_callback_example/models/. && \
-    mkdir qa/L0_simple_string_example/models && \
-    cp -r docs/examples/model_repository/simple_string qa/L0_simple_string_example/models/. && \
-    mkdir qa/L0_simple_shared_memory_example/models && \
-    cp -r docs/examples/model_repository/simple qa/L0_simple_shared_memory_example/models/. && \
-    cp -r docs/examples/model_repository/simple_string qa/L0_simple_shared_memory_example/models/. && \
-    mkdir qa/L0_simple_cuda_shared_memory_example/models && \
-    cp -r docs/examples/model_repository/simple qa/L0_simple_cuda_shared_memory_example/models/. && \
-    cp -r docs/examples/model_repository/simple_string qa/L0_simple_cuda_shared_memory_example/models/. && \
     mkdir qa/L0_shared_memory/models && \
     cp -r docs/examples/model_repository/simple qa/L0_shared_memory/models/. && \
     mkdir qa/L0_cuda_shared_memory/models && \
@@ -101,9 +91,12 @@ RUN mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
     mkdir -p qa/custom_models/custom_nobatch_float32_float32_float32/1 && \
     cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
         qa/custom_models/custom_nobatch_float32_float32_float32/1/. && \
-    mkdir -p qa/L0_simple_custom_example/models/simple/1 && \
+    mkdir -p qa/L0_grpc_v2/models/simple_custom/1 && \
     cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
-        qa/L0_simple_custom_example/models/simple/1/. && \
+        qa/L0_grpc_v2/models/simple_custom/1/. && \
+    mkdir -p qa/L0_http_v2/models/simple_custom/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+        qa/L0_http_v2/models/simple_custom/1/. && \
     mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
     cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
         qa/L0_simple_ensemble/models/simple/1/. && \
@@ -126,21 +119,21 @@ RUN mkdir -p qa/L0_custom_param/models/param/1 && \
     cp builddir/trtis-custom-backends/install/lib/libparam.so \
         qa/L0_custom_param/models/param/1/.
 
-RUN mkdir -p qa/L0_simple_sequence_example/models/simple_sequence/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libsequence.so \
-        qa/L0_simple_sequence_example/models/simple_sequence/1/. && \
-    mkdir -p qa/L0_simple_sequence_example/models_dyna/simple_sequence/1 && \
-    cp builddir/trtis-custom-backends/install/lib/libdyna_sequence.so \
-        qa/L0_simple_sequence_example/models_dyna/simple_sequence/1/. && \
-    mkdir -p qa/L0_backend_release/simple_seq_models/simple_sequence/1 && \
+RUN mkdir -p qa/L0_backend_release/simple_seq_models/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/L0_backend_release/simple_seq_models/simple_sequence/1/. && \
     mkdir -p qa/L0_grpc_v2/models/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/L0_grpc_v2/models/simple_sequence/1/. && \
+    mkdir -p qa/L0_grpc_v2/models_dyna/simple_sequence/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libdyna_sequence.so \
+        qa/L0_grpc_v2/models_dyna/simple_sequence/1/. && \
     mkdir -p qa/L0_http_v2/models/simple_sequence/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/L0_http_v2/models/simple_sequence/1/. && \
+    mkdir -p qa/L0_http_v2/models_dyna/simple_sequence/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libdyna_sequence.so \
+        qa/L0_http_v2/models_dyna/simple_sequence/1/. && \
     mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp builddir/trtis-custom-backends/install/lib/libsequence.so \
         qa/custom_models/custom_sequence_int32/1/. && \
@@ -161,11 +154,7 @@ RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_savedmodel_shape/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
-        qa/L0_simple_perf/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_perf_custom/. && \
-    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
-        qa/L0_simple_dbatch_perf/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_perf_nomodel/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \

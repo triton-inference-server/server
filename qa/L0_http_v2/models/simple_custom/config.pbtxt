@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,44 +24,32 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "simple_sequence"
+name: "simple_custom"
 platform: "custom"
 max_batch_size: 8
-default_model_filename: "libsequence.so"
-sequence_batching {
-  control_input [
-    {
-      name: "START"
-      control [
-        {
-          kind: CONTROL_SEQUENCE_START
-          int32_false_true: [ 0, 1 ]
-        }
-      ]
-    },
-    {
-      name: "READY"
-      control [
-        {
-          kind: CONTROL_SEQUENCE_READY
-          int32_false_true: [ 0, 1 ]
-        }
-      ]
-    }
-  ]
-}
+default_model_filename: "libaddsub.so"
 input [
   {
-    name: "INPUT"
+    name: "INPUT0"
     data_type: TYPE_INT32
-    dims: [ 1 ]
+    dims: [ 16 ]
+  },
+  {
+    name: "INPUT1"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
   }
 ]
 output [
   {
-    name: "OUTPUT"
+    name: "OUTPUT0"
     data_type: TYPE_INT32
-    dims: [ 1 ]
+    dims: [ 16 ]
+  },
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
   }
 ]
 instance_group [
