@@ -369,6 +369,14 @@ class InferRequestedOutput {
       const std::string& region_name, const size_t byte_size,
       const size_t offset = 0);
 
+  /// Clears the shared memory option set by the last call to
+  /// InferRequestedOutput::SetSharedMemory(). After call to this
+  /// function requested output will no longer be returned in a
+  /// shared memory region.
+  /// \return Error object indicating success or failure of the
+  /// request.
+  Error UnsetSharedMemory();
+
  private:
 #ifdef TRITON_INFERENCE_SERVER_CLIENT_CLASS
   friend TRITON_INFERENCE_SERVER_CLIENT_CLASS;

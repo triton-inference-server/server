@@ -1408,6 +1408,17 @@ class InferRequestedOutput:
         if offset != 0:
             self._output.parameters['shared_memory_offset'].int64_param = offset
 
+    def unset_shared_memory(self):
+        """Clears the shared memory option set by the last call to
+        InferRequestedOutput.set_shared_memory(). After call to this
+        function requested output will no longer be returned in a
+        shared memory region.
+        """
+
+        self._output.parameters.pop('shared_memory_region', None)
+        self._output.parameters.pop('shared_memory_byte_size', None)
+        self._output.parameters.pop('shared_memory_offset', None)
+
     def _get_tensor(self):
         """Retrieve the underlying InferRequestedOutputTensor message.
         Returns
