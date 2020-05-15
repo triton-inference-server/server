@@ -266,6 +266,10 @@ LibTorchBackend::CreateExecutionContext(
 
   RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
   RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
+  if (Config().has_sequence_batching()) {
+    RETURN_IF_ERROR(
+        context->ValidateControlInputs(Config().sequence_batching()));
+  }
   return Status::Success;
 }
 
@@ -274,7 +278,7 @@ LibTorchBackend::Context::ValidateInputs(
     const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
   std::string deliminator = "__";
-  int ip_index;
+  int ip_index = 0;
 
   for (const auto& io : ios) {
     const auto pr = ConvertDataTypeToTorchType(io.data_type());
@@ -292,6 +296,7 @@ LibTorchBackend::Context::ValidateInputs(
               "Input '" + name +
               "' does not follow naming convention i.e. <name>__<index>.");
         }
+        input_index_map_[name] = ip_index;
         ip_index = std::atoi(name.substr(start_pos + 2).c_str());
       }
       catch (std::exception& ex) {
@@ -300,13 +305,41 @@ LibTorchBackend::Context::ValidateInputs(
             "Input '" + name +
                 "' does not follow naming convention i.e. <name>__<index>.");
       }
-      input_index_map_[name] = ip_index;
     }
   }
 
   return Status::Success;
 }
 
+Status
+LibTorchBackend::Context::ValidateControlInputs(
+    const ModelSequenceBatching& batching)
+{
+  std::string deliminator = "__";
+  int ip_index = 0;
+
+  for (const auto& io : batching.control_input()) {
+    const std::string& name = io.name();
+    try {
+      int start_pos = name.find(deliminator);
+      if (start_pos == -1) {
+        throw std::invalid_argument(
+            "Input '" + name +
+            "' does not follow naming convention i.e. <name>__<index>.");
+      }
+      ip_index = std::atoi(name.substr(start_pos + 2).c_str());
+      input_index_map_[name] = ip_index;
+    }
+    catch (std::exception& ex) {
+      return Status(
+          Status::Code::INTERNAL,
+          "Input '" + name +
+              "' does not follow naming convention i.e. <name>__<index>.");
+    }
+  }
+
+  return Status::Success;
+}
 
 Status
 LibTorchBackend::Context::ValidateOutputs(
@@ -332,6 +365,7 @@ LibTorchBackend::Context::ValidateOutputs(
               "' does not follow naming convention i.e. <name>__<index>.");
         }
         op_index = std::atoi(name.substr(start_pos + 2).c_str());
+        output_index_map_[name] = op_index;
       }
       catch (std::exception& ex) {
         return Status(
@@ -339,7 +373,6 @@ LibTorchBackend::Context::ValidateOutputs(
             "Output '" + name +
                 "' does not follow naming convention i.e. <name>__<index>.");
       }
-      output_index_map_[name] = op_index;
     }
   }
 
@@ -374,32 +407,7 @@ LibTorchBackend::Context::SetInputTensors(
         batchn_shape.end(), batch1_shape.begin(), batch1_shape.end());
     const DataType datatype = repr_input->DType();
 
-    int ip_index = 0;
-    const auto& itr = input_index_map_.find(input_name);
-    if (itr != input_index_map_.end()) {
-      ip_index = itr->second;
-    } else {
-      static const std::string deliminator = "__";
-
-      LOG_VERBOSE(1) << "Processing override input: " << input_name;
-
-      try {
-        int start_pos = input_name.find(deliminator);
-        if (start_pos == -1) {
-          throw std::invalid_argument(
-              "Input '" + input_name +
-              "' does not follow naming convention i.e. <name>__<index>.");
-        }
-        ip_index = std::atoi(input_name.substr(start_pos + 2).c_str());
-        input_index_map_[input_name] = ip_index;
-      }
-      catch (std::exception& ex) {
-        return Status(
-            Status::Code::INVALID_ARG,
-            "Input '" + input_name +
-                "' does not follow naming convention i.e. <name>__<index>.");
-      }
-    }
+    int ip_index = input_index_map_[input_name];
 
     const auto torch_dtype = ConvertDataTypeToTorchType(datatype);
     if (!torch_dtype.first) {
@@ -633,13 +641,9 @@ LibTorchBackend::Context::Run(
   std::vector<torch::jit::IValue> inputs_(input_count);
   std::vector<torch::Tensor> outputs_;
 
-  // Collect the request inputs into contiguous input tensors.
-  // FIXME override inputs from controls should be known from the model
-  // configuration at load time and so they should be processed then to
-  // initialze input_index_map_. Since they are not we do it here for
-  // every request which is unnecessary perf overhead.
-
   bool cuda_copy = false;
+
+  // Collect the request inputs into contiguous input tensors.
   FAIL_ALL_AND_RETURN_IF_ERROR(
       requests, responses, metric_reporter_.get(),
       SetInputTensors(

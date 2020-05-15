@@ -80,6 +80,7 @@ class LibTorchBackend : public InferenceBackend {
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
     Status ValidateOutputs(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+    Status ValidateControlInputs(const ModelSequenceBatching& ios);
 
     // Set the meta data of an input from payloads.
     Status SetInputMetaData(
