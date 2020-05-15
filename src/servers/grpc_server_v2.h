@@ -33,16 +33,15 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class GRPCServerV2 {
+class GRPCServer {
  public:
   static TRITONSERVER_Error* Create(
       const std::shared_ptr<TRITONSERVER_Server>& server,
       nvidia::inferenceserver::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
-      int infer_allocation_pool_size,
-      std::unique_ptr<GRPCServerV2>* grpc_server);
+      int infer_allocation_pool_size, std::unique_ptr<GRPCServer>* grpc_server);
 
-  ~GRPCServerV2();
+  ~GRPCServer();
 
   TRITONSERVER_Error* Start();
   TRITONSERVER_Error* Stop();
@@ -62,7 +61,7 @@ class GRPCServerV2 {
   };
 
  private:
-  GRPCServerV2(
+  GRPCServer(
       const std::shared_ptr<TRITONSERVER_Server>& server,
       nvidia::inferenceserver::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,

@@ -60,14 +60,14 @@ extern "C" {
 namespace nvidia { namespace inferenceserver {
 
 // Generic HTTP server using evhtp
-class HTTPServerV2Impl : public HTTPServerV2 {
+class HTTPServerImpl : public HTTPServer {
  public:
-  explicit HTTPServerV2Impl(const int32_t port, const int thread_cnt)
+  explicit HTTPServerImpl(const int32_t port, const int thread_cnt)
       : port_(port), thread_cnt_(thread_cnt)
   {
   }
 
-  virtual ~HTTPServerV2Impl() { Stop(); }
+  virtual ~HTTPServerImpl() { Stop(); }
 
   static void Dispatch(evhtp_request_t* req, void* arg);
 
@@ -90,13 +90,13 @@ class HTTPServerV2Impl : public HTTPServerV2 {
 };
 
 TRITONSERVER_Error*
-HTTPServerV2Impl::Start()
+HTTPServerImpl::Start()
 {
   if (!worker_.joinable()) {
     evbase_ = event_base_new();
     htp_ = evhtp_new(evbase_, NULL);
     evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_NODELAY);
-    evhtp_set_gencb(htp_, HTTPServerV2Impl::Dispatch, this);
+    evhtp_set_gencb(htp_, HTTPServerImpl::Dispatch, this);
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
     evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024);
     // Set listening event for breaking event loop
@@ -108,11 +108,11 @@ HTTPServerV2Impl::Start()
   }
 
   return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_ALREADY_EXISTS, "HTTP V2 server is already running.");
+      TRITONSERVER_ERROR_ALREADY_EXISTS, "HTTP server is already running.");
 }
 
 TRITONSERVER_Error*
-HTTPServerV2Impl::Stop()
+HTTPServerImpl::Stop()
 {
   if (worker_.joinable()) {
     // Notify event loop to break via fd write
@@ -128,36 +128,36 @@ HTTPServerV2Impl::Stop()
   }
 
   return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNAVAILABLE, "HTTP V2 server is not running.");
+      TRITONSERVER_ERROR_UNAVAILABLE, "HTTP server is not running.");
 }
 
 void
-HTTPServerV2Impl::StopCallback(int sock, short events, void* arg)
+HTTPServerImpl::StopCallback(int sock, short events, void* arg)
 {
   struct event_base* base = (struct event_base*)arg;
   event_base_loopbreak(base);
 }
 
 void
-HTTPServerV2Impl::Dispatch(evhtp_request_t* req, void* arg)
+HTTPServerImpl::Dispatch(evhtp_request_t* req, void* arg)
 {
-  (static_cast<HTTPServerV2Impl*>(arg))->Handle(req);
+  (static_cast<HTTPServerImpl*>(arg))->Handle(req);
 }
 
 #ifdef TRTIS_ENABLE_METRICS
 
 // Handle HTTP requests to obtain prometheus metrics
-class HTTPMetricsServerV2 : public HTTPServerV2Impl {
+class HTTPMetricsServer : public HTTPServerImpl {
  public:
-  explicit HTTPMetricsServerV2(
+  explicit HTTPMetricsServer(
       const std::shared_ptr<TRITONSERVER_Server>& server, const int32_t port,
       const int thread_cnt)
-      : HTTPServerV2Impl(port, thread_cnt), server_(server),
+      : HTTPServerImpl(port, thread_cnt), server_(server),
         api_regex_(R"(/metrics/?)")
   {
   }
 
-  ~HTTPMetricsServerV2() = default;
+  ~HTTPMetricsServer() = default;
 
  private:
   void Handle(evhtp_request_t* req) override;
@@ -167,7 +167,7 @@ class HTTPMetricsServerV2 : public HTTPServerV2Impl {
 };
 
 void
-HTTPMetricsServerV2::Handle(evhtp_request_t* req)
+HTTPMetricsServer::Handle(evhtp_request_t* req)
 {
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
@@ -798,15 +798,15 @@ EVBufferToJson(
 }  // namespace
 
 // Handle HTTP requests to inference server APIs
-class HTTPAPIServerV2 : public HTTPServerV2Impl {
+class HTTPAPIServer : public HTTPServerImpl {
  public:
-  explicit HTTPAPIServerV2(
+  explicit HTTPAPIServer(
       const std::shared_ptr<TRITONSERVER_Server>& server,
       nvidia::inferenceserver::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const std::vector<std::string>& endpoints, const int32_t port,
       const int thread_cnt)
-      : HTTPServerV2Impl(port, thread_cnt), server_(server),
+      : HTTPServerImpl(port, thread_cnt), server_(server),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
         model_regex_(
@@ -859,7 +859,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
         "creating response allocator");
   }
 
-  ~HTTPAPIServerV2()
+  ~HTTPAPIServer()
   {
     if (server_metadata_err_ != nullptr) {
       TRITONSERVER_ErrorDelete(server_metadata_err_);
@@ -1017,7 +1017,7 @@ class HTTPAPIServerV2 : public HTTPServerV2Impl {
 };
 
 TRITONSERVER_Error*
-HTTPAPIServerV2::InferResponseAlloc(
+HTTPAPIServer::InferResponseAlloc(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
     int64_t preferred_memory_type_id, void* userp, void** buffer,
@@ -1110,7 +1110,7 @@ HTTPAPIServerV2::InferResponseAlloc(
 }
 
 TRITONSERVER_Error*
-HTTPAPIServerV2::InferResponseFree(
+HTTPAPIServer::InferResponseFree(
     TRITONSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
     size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
@@ -1127,9 +1127,9 @@ HTTPAPIServerV2::InferResponseFree(
 }
 
 void
-HTTPAPIServerV2::Handle(evhtp_request_t* req)
+HTTPAPIServer::Handle(evhtp_request_t* req)
 {
-  LOG_VERBOSE(1) << "HTTP V2 request: " << req->method << " "
+  LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
 
   if (std::string(req->uri->path->full) == "/v2/models/stats") {
@@ -1200,16 +1200,14 @@ HTTPAPIServerV2::Handle(evhtp_request_t* req)
     }
   }
 
-  LOG_VERBOSE(1) << "HTTP V2 error: " << req->method << " "
-                 << req->uri->path->full << " - "
-                 << static_cast<int>(EVHTP_RES_BADREQ);
+  LOG_VERBOSE(1) << "HTTP error: " << req->method << " " << req->uri->path->full
+                 << " - " << static_cast<int>(EVHTP_RES_BADREQ);
 
   evhtp_send_reply(req, EVHTP_RES_BADREQ);
 }
 
 void
-HTTPAPIServerV2::HandleServerHealth(
-    evhtp_request_t* req, const std::string& kind)
+HTTPAPIServer::HandleServerHealth(evhtp_request_t* req, const std::string& kind)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -1232,7 +1230,7 @@ HTTPAPIServerV2::HandleServerHealth(
 }
 
 void
-HTTPAPIServerV2::HandleRepositoryIndex(
+HTTPAPIServer::HandleRepositoryIndex(
     evhtp_request_t* req, const std::string& repository_name)
 {
   if (req->method != htp_method_GET) {
@@ -1265,7 +1263,7 @@ HTTPAPIServerV2::HandleRepositoryIndex(
 }
 
 void
-HTTPAPIServerV2::HandleRepositoryControl(
+HTTPAPIServer::HandleRepositoryControl(
     evhtp_request_t* req, const std::string& repository_name,
     const std::string& model_name, const std::string& action)
 {
@@ -1301,7 +1299,7 @@ HTTPAPIServerV2::HandleRepositoryControl(
 }
 
 void
-HTTPAPIServerV2::HandleModelReady(
+HTTPAPIServer::HandleModelReady(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
@@ -1332,7 +1330,7 @@ HTTPAPIServerV2::HandleModelReady(
 }
 
 void
-HTTPAPIServerV2::HandleModelMetadata(
+HTTPAPIServer::HandleModelMetadata(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
@@ -1381,7 +1379,7 @@ HTTPAPIServerV2::HandleModelMetadata(
 }
 
 void
-HTTPAPIServerV2::HandleModelConfig(
+HTTPAPIServer::HandleModelConfig(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
@@ -1430,7 +1428,7 @@ HTTPAPIServerV2::HandleModelConfig(
 }
 
 void
-HTTPAPIServerV2::HandleModelStats(
+HTTPAPIServer::HandleModelStats(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
@@ -1481,7 +1479,7 @@ HTTPAPIServerV2::HandleModelStats(
 }
 
 void
-HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
+HTTPAPIServer::HandleServerMetadata(evhtp_request_t* req)
 {
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -1503,7 +1501,7 @@ HTTPAPIServerV2::HandleServerMetadata(evhtp_request_t* req)
 }
 
 void
-HTTPAPIServerV2::HandleSystemSharedMemory(
+HTTPAPIServer::HandleSystemSharedMemory(
     evhtp_request_t* req, const std::string& region_name,
     const std::string& action)
 {
@@ -1601,7 +1599,7 @@ HTTPAPIServerV2::HandleSystemSharedMemory(
 }
 
 void
-HTTPAPIServerV2::HandleCudaSharedMemory(
+HTTPAPIServer::HandleCudaSharedMemory(
     evhtp_request_t* req, const std::string& region_name,
     const std::string& action)
 {
@@ -1735,7 +1733,7 @@ HTTPAPIServerV2::HandleCudaSharedMemory(
 }
 
 TRITONSERVER_Error*
-HTTPAPIServerV2::EVBufferToInput(
+HTTPAPIServer::EVBufferToInput(
     const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
     evbuffer* input_buffer, InferRequestClass* infer_req, size_t header_length)
 {
@@ -2046,7 +2044,7 @@ HTTPAPIServerV2::EVBufferToInput(
 }
 
 void
-HTTPAPIServerV2::HandleInfer(
+HTTPAPIServer::HandleInfer(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
@@ -2151,10 +2149,10 @@ HTTPAPIServerV2::HandleInfer(
 }
 
 void
-HTTPAPIServerV2::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
+HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
-  HTTPAPIServerV2::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServerV2::InferRequestClass*>(arg);
+  HTTPAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_OK);
@@ -2176,10 +2174,10 @@ HTTPAPIServerV2::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 }
 
 void
-HTTPAPIServerV2::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
+HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
-  HTTPAPIServerV2::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServerV2::InferRequestClass*>(arg);
+  HTTPAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_BADREQ);
@@ -2200,7 +2198,7 @@ HTTPAPIServerV2::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   delete infer_request;
 }
 
-HTTPAPIServerV2::InferRequestClass::InferRequestClass(
+HTTPAPIServer::InferRequestClass::InferRequestClass(
     evhtp_request_t* req, const char* server_id)
     : req_(req), server_id_(server_id)
 {
@@ -2210,7 +2208,7 @@ HTTPAPIServerV2::InferRequestClass::InferRequestClass(
 }
 
 void
-HTTPAPIServerV2::InferRequestClass::InferRequestComplete(
+HTTPAPIServer::InferRequestClass::InferRequestComplete(
     TRITONSERVER_InferenceRequest* request, void* userp)
 {
   // FIXME need to manage the lifetime of InferRequestClass so that we
@@ -2223,7 +2221,7 @@ HTTPAPIServerV2::InferRequestClass::InferRequestComplete(
 
 
 void
-HTTPAPIServerV2::InferRequestClass::InferResponseComplete(
+HTTPAPIServer::InferRequestClass::InferResponseComplete(
     TRITONSERVER_InferenceResponse* response, void* userp)
 {
   // FIXME can't use InferRequestClass object here since it's lifetime
@@ -2235,8 +2233,8 @@ HTTPAPIServerV2::InferRequestClass::InferResponseComplete(
   // But for now userp is the InferRequestClass object and the end of
   // its life is in the OK or BAD ReplyCallback.
 
-  HTTPAPIServerV2::InferRequestClass* infer_request =
-      reinterpret_cast<HTTPAPIServerV2::InferRequestClass*>(userp);
+  HTTPAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(userp);
 
   auto err = infer_request->FinalizeResponse(response);
   if (err == nullptr) {
@@ -2253,7 +2251,7 @@ HTTPAPIServerV2::InferRequestClass::InferResponseComplete(
 }
 
 TRITONSERVER_Error*
-HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
+HTTPAPIServer::InferRequestClass::FinalizeResponse(
     TRITONSERVER_InferenceResponse* response)
 {
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseError(response));
@@ -2445,35 +2443,35 @@ HTTPAPIServerV2::InferRequestClass::FinalizeResponse(
 }
 
 TRITONSERVER_Error*
-HTTPServerV2::CreateAPIServer(
+HTTPServer::CreateAPIServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     nvidia::inferenceserver::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
-    std::vector<std::unique_ptr<HTTPServerV2>>* http_servers)
+    std::vector<std::unique_ptr<HTTPServer>>* http_servers)
 {
   if (port_map.empty()) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
-        "HTTP V2 is enabled but none of the service endpoints have a valid "
-        "port assignment");
+        "HTTP is enabled but none of the service endpoints have a valid port "
+        "assignment");
   }
   http_servers->clear();
   for (auto const& ep_map : port_map) {
     std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
-    http_servers->emplace_back(new HTTPAPIServerV2(
+    http_servers->emplace_back(new HTTPAPIServer(
         server, trace_manager, shm_manager, ep_map.second, ep_map.first,
         thread_cnt));
-    LOG_INFO << "Started HTTPV2Service at " << addr;
+    LOG_INFO << "Started HTTPService at " << addr;
   }
 
   return nullptr;
 }
 
 TRITONSERVER_Error*
-HTTPServerV2::CreateMetricsServer(
+HTTPServer::CreateMetricsServer(
     const std::shared_ptr<TRITONSERVER_Server>& server, const int32_t port,
-    const int thread_cnt, std::unique_ptr<HTTPServerV2>* metrics_server)
+    const int thread_cnt, std::unique_ptr<HTTPServer>* metrics_server)
 {
   std::string addr = "0.0.0.0:" + std::to_string(port);
   LOG_INFO << "Starting Metrics Service at " << addr;
@@ -2484,7 +2482,7 @@ HTTPServerV2::CreateMetricsServer(
 #endif  // !TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_METRICS
-  metrics_server->reset(new HTTPMetricsServerV2(server, port, thread_cnt));
+  metrics_server->reset(new HTTPMetricsServer(server, port, thread_cnt));
   return nullptr;
 #endif  // TRTIS_ENABLE_METRICS
 }

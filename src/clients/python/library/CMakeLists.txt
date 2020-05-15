@@ -30,25 +30,25 @@ if(NOT WIN32)
   #
   # libcshmv2.so
   #
-  add_library(cshmv2 SHARED shared_memory/shared_memory.cc)
+  add_library(cshm SHARED shared_memory/shared_memory.cc)
   if(${TRTIS_ENABLE_GPU})
-    target_include_directories(cshmv2 PRIVATE ${CUDA_INCLUDE_DIRS})
+    target_include_directories(cshm PRIVATE ${CUDA_INCLUDE_DIRS})
   endif() # TRTIS_ENABLE_GPU
-  target_link_libraries(cshmv2 rt)
+  target_link_libraries(cshm rt)
 
   #
   # libccudashmv2.so
   #
   if(${TRTIS_ENABLE_GPU})
     add_library(
-        ccudashmv2 SHARED
+        ccudashm SHARED
         cuda_shared_memory/cuda_shared_memory.cc
         ../../c++/library/cencode.c
         ../../c++/library/cencode.h
     )
-    target_include_directories(ccudashmv2 PUBLIC ${CUDA_INCLUDE_DIRS})
+    target_include_directories(ccudashm PUBLIC ${CUDA_INCLUDE_DIRS})
     target_link_libraries(
-        ccudashmv2
+        ccudashm
         PRIVATE ${CUDA_LIBRARIES})
   endif() # TRTIS_ENABLE_GPU
 endif() # NOT WIN32
@@ -114,7 +114,7 @@ if(${TRTIS_ENABLE_GRPC})
       ${CMAKE_CURRENT_BINARY_DIR}/utils.py
       ${CMAKE_CURRENT_BINARY_DIR}/grpc_setup.py
       proto-py-library
-      grpc-v2-py-library
+      grpc-py-library
   )
 
   add_custom_target(
@@ -124,7 +124,7 @@ if(${TRTIS_ENABLE_GRPC})
   )
   add_dependencies(
     client-wheel-grpc
-    model-config-library grpc-v2-library proto-library
+    model-config-library grpc-library proto-library
   )
 
   file(
@@ -159,8 +159,8 @@ if(NOT WIN32)
         DEPENDS
           ${CMAKE_CURRENT_BINARY_DIR}/VERSION
           ${CMAKE_CURRENT_BINARY_DIR}/utils_setup.py
-          cshmv2
-          ccudashmv2
+          cshm
+          ccudashm
     )
   else()
     add_custom_command(
@@ -170,7 +170,7 @@ if(NOT WIN32)
         DEPENDS
           ${CMAKE_CURRENT_BINARY_DIR}/VERSION
           ${CMAKE_CURRENT_BINARY_DIR}/utils_setup.py
-          cshmv2
+          cshm
     )
   endif()
 

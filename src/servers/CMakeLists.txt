@@ -54,7 +54,7 @@ if(${TRTIS_ENABLE_GRPC})
 
   add_dependencies(grpc-endpoint-library proto-library)
   if(${TRTIS_ENABLE_GRPC})
-    add_dependencies(grpc-endpoint-library grpc-v2-library)
+    add_dependencies(grpc-endpoint-library grpc-library)
   endif() # TRTIS_ENABLE_GRPC
 
   set(
@@ -65,7 +65,7 @@ if(${TRTIS_ENABLE_GRPC})
   if(${TRTIS_ENABLE_GRPC})
     list(APPEND
       GRPC_ENDPOINT_OBJECTS
-      $<TARGET_OBJECTS:grpc-v2-library>
+      $<TARGET_OBJECTS:grpc-library>
       )
   endif() # TRTIS_ENABLE_GRPC
 

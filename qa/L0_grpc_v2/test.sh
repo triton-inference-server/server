@@ -54,7 +54,7 @@ SIMPLE_MODEL_CONTROL_PY=../clients/simple_grpc_v2_model_control.py
 EXPLICIT_BYTE_CONTENT_CLIENT_PY=../clients/grpc_v2_explicit_byte_content_client.py
 EXPLICIT_INT_CONTENT_CLIENT_PY=../clients/grpc_v2_explicit_int_content_client.py
 EXPLICIT_INT8_CONTENT_CLIENT_PY=../clients/grpc_v2_explicit_int8_content_client.py
-GRPC_V2_CLIENT_PY=../clients/grpc_v2_client.py
+GRPC_CLIENT_PY=../clients/grpc_v2_client.py
 GRPC_IMAGE_CLIENT_PY=../clients/grpc_v2_image_client.py
 
 SIMPLE_HEALTH_CLIENT=../clients/simple_grpc_v2_health_metadata
@@ -128,7 +128,7 @@ for i in \
         $EXPLICIT_BYTE_CONTENT_CLIENT_PY \
         $EXPLICIT_INT_CONTENT_CLIENT_PY \
         $EXPLICIT_INT8_CONTENT_CLIENT_PY \
-        $GRPC_V2_CLIENT_PY \
+        $GRPC_CLIENT_PY \
         $GRPC_IMAGE_CLIENT_PY \
         ; do
     BASE=$(basename -- $i)

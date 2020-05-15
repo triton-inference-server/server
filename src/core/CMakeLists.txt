@@ -46,13 +46,13 @@ add_library(
 add_custom_target(proto-py-library DEPENDS ${PROTO_PY})
 
 #
-# GRPC V1
+# GRPC
 #
-get_filename_component(grpc_service_proto_abspath "grpc_service.proto" ABSOLUTE)
+get_filename_component(grpc_service_proto_abspath "grpc_service_v2.proto" ABSOLUTE)
 get_filename_component(grpc_service_proto_dir "${grpc_service_proto_abspath}" PATH)
-set(GRPC_SRCS "grpc_service.grpc.pb.cc")
-set(GRPC_HDRS "grpc_service.grpc.pb.h")
-set(GRPC_PY "grpc_service.grpc.py")
+set(GRPC_SRCS "grpc_service_v2.grpc.pb.cc")
+set(GRPC_HDRS "grpc_service_v2.grpc.pb.h")
+set(GRPC_PY "grpc_service_v2.grpc.py")
 
 add_custom_command(
   OUTPUT "${GRPC_SRCS}" "${GRPC_HDRS}"
@@ -62,8 +62,8 @@ add_custom_command(
     --cpp_out "${CMAKE_CURRENT_BINARY_DIR}"
     -I "${grpc_service_proto_dir}"
     --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
-    "grpc_service.proto"
-  DEPENDS "grpc_service.proto" proto-library
+    "grpc_service_v2.proto"
+  DEPENDS "grpc_service_v2.proto" proto-library
 )
 
 find_program(PYTHON "python" REQUIRED)
@@ -74,8 +74,8 @@ add_custom_command(
     -m grpc_tools.protoc
     -I "${grpc_service_proto_dir}"
     --grpc_python_out "${CMAKE_CURRENT_BINARY_DIR}"
-    "grpc_service.proto"
-  DEPENDS "grpc_service.proto" proto-library
+    "grpc_service_v2.proto"
+  DEPENDS "grpc_service_v2.proto" proto-library
 )
 
 add_library(
@@ -84,46 +84,6 @@ add_library(
 )
 
 add_custom_target(grpc-py-library DEPENDS ${GRPC_PY})
-
-#
-# GRPC V2
-#
-get_filename_component(grpc_service_v2_proto_abspath "grpc_service_v2.proto" ABSOLUTE)
-get_filename_component(grpc_service_v2_proto_dir "${grpc_service_v2_proto_abspath}" PATH)
-set(GRPC_V2_SRCS "grpc_service_v2.grpc.pb.cc")
-set(GRPC_V2_HDRS "grpc_service_v2.grpc.pb.h")
-set(GRPC_V2_PY "grpc_service_v2.grpc.py")
-
-add_custom_command(
-  OUTPUT "${GRPC_V2_SRCS}" "${GRPC_V2_HDRS}"
-  COMMAND ${_PROTOBUF_PROTOC}
-  ARGS
-    --grpc_out "${CMAKE_CURRENT_BINARY_DIR}"
-    --cpp_out "${CMAKE_CURRENT_BINARY_DIR}"
-    -I "${grpc_service_v2_proto_dir}"
-    --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
-    "grpc_service_v2.proto"
-  DEPENDS "grpc_service_v2.proto" proto-library
-)
-
-find_program(PYTHON "python" REQUIRED)
-add_custom_command(
-  OUTPUT "${GRPC_V2_PY}"
-  COMMAND ${PYTHON}
-  ARGS
-    -m grpc_tools.protoc
-    -I "${grpc_service_v2_proto_dir}"
-    --grpc_python_out "${CMAKE_CURRENT_BINARY_DIR}"
-    "grpc_service_v2.proto"
-  DEPENDS "grpc_service_v2.proto" proto-library
-)
-
-add_library(
-  grpc-v2-library EXCLUDE_FROM_ALL OBJECT
-  ${GRPC_V2_SRCS} ${GRPC_V2_HDRS}
-)
-
-add_custom_target(grpc-v2-py-library DEPENDS ${GRPC_V2_PY})
 
 #
 # Model configuration utilities used by both clients and server.
