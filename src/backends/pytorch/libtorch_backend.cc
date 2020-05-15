@@ -30,6 +30,7 @@
 #include <exception>
 #include <memory>
 #include "src/core/constants.h"
+#include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/model_config_cuda.h"
@@ -174,14 +175,10 @@ LibTorchBackend::CreateExecutionContexts(
       total_context_cnt,
       [](uint32_t runner_idx) -> Status { return Status::Success; },
       [this](
-          uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-          std::function<void(Status)> func) {
-        Run(runner_idx, payloads, func);
-      },
-      [this](
-          uint32_t runner_idx, const InferenceRequest::Input& input,
-          const Scheduler::Payload& payload,
-          std::vector<int64_t>* shape) -> Status { return Status::Success; }));
+          uint32_t runner_idx,
+          std::vector<std::unique_ptr<InferenceRequest>>&& requests) {
+        Run(runner_idx, std::move(requests));
+      }));
 
   return Status::Success;
 }
@@ -357,71 +354,160 @@ LibTorchBackend::Context::ValidateOutputs(
 }
 
 Status
-LibTorchBackend::Context::SetInputTensor(
-    const InputMetaData& meta_data, torch::jit::IValue* tensor)
+LibTorchBackend::Context::SetInputTensors(
+    size_t total_batch_size,
+    const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+    std::vector<std::unique_ptr<InferenceResponse>>* responses,
+    std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
+    std::vector<torch::jit::IValue>* inputs, bool* cuda_copy)
 {
-  TRITONSERVER_MemoryType memory_type;
-  int64_t memory_type_id;
-  size_t total_byte_size = meta_data.input_buffer_->TotalByteSize();
-  char* buffer =
-      meta_data.input_buffer_->MutableBuffer(&memory_type, &memory_type_id);
+  BackendInputCollector collector(
+      requests, responses, enable_pinned_input_, stream_);
 
-  torch::TensorOptions options{meta_data.torch_type_};
-  auto updated_options = (memory_type == TRITONSERVER_MEMORY_GPU)
-                             ? options.device(torch::kCUDA, memory_type_id)
-                             : options.device(torch::kCPU);
-  torch::Tensor input_tensor =
-      torch::from_blob(buffer, meta_data.shape_, updated_options);
+  // All requests must have equally-sized input tensors so use any
+  // request as the representative for the input tensors.
+  for (const auto& pr : requests[0]->ImmutableInputs()) {
+    const std::string& input_name = pr.first;
+    const auto& repr_input = pr.second;
+    const auto& batch1_shape = repr_input->Shape();
 
-  if (input_tensor.nbytes() != total_byte_size) {
-    return Status(
-        Status::Code::INTERNAL,
-        "unexpected size " + std::to_string(total_byte_size) +
-            " for inference input '" + meta_data.name_ + "', expecting " +
-            std::to_string(input_tensor.nbytes()));
+    // The shape for the entire input patch, [total_batch_size, ...]
+    std::vector<int64_t> batchn_shape;
+    batchn_shape.reserve(batch1_shape.size() + 1);
+    if (max_batch_size_ != NO_BATCHING) {
+      batchn_shape.push_back(total_batch_size);
+    }
+    batchn_shape.insert(
+        batchn_shape.end(), batch1_shape.begin(), batch1_shape.end());
+    const DataType datatype = repr_input->DType();
+
+    int ip_index = 0;
+    const auto& itr = input_index_map_.find(input_name);
+    if (itr != input_index_map_.end()) {
+      ip_index = itr->second;
+    } else {
+      static const std::string deliminator = "__";
+
+      LOG_VERBOSE(1) << "Processing override input: " << input_name;
+
+      try {
+        int start_pos = input_name.find(deliminator);
+        if (start_pos == -1) {
+          throw std::invalid_argument(
+              "Input '" + input_name +
+              "' does not follow naming convention i.e. <name>__<index>.");
+        }
+        ip_index = std::atoi(input_name.substr(start_pos + 2).c_str());
+        input_index_map_[input_name] = ip_index;
+      }
+      catch (std::exception& ex) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "Input '" + input_name +
+                "' does not follow naming convention i.e. <name>__<index>.");
+      }
+    }
+
+    const auto torch_dtype = ConvertDataTypeToTorchType(datatype);
+    if (!torch_dtype.first) {
+      return Status(
+          Status::Code::INTERNAL, "Failed to convert DataType '" +
+                                      DataType_Name(datatype) +
+                                      "' to Torch datatype");
+    }
+
+    // Checked at initialization time to make sure that STRING is not
+    // being used for an input, so can just assume fixed-sized here.
+    size_t total_element_cnt = 1;
+    for (auto dim : batchn_shape) {
+      total_element_cnt *= dim;
+    }
+
+    const size_t total_byte_size =
+        total_element_cnt * GetDataTypeByteSize(datatype);
+
+    // The entire input tensor must be delivered as a single
+    // contiguous chunk so create a buffer large enough to hold the
+    // entire dynamic batched input.
+    input_buffers->emplace_back(new AllocatedMemory(
+        GetByteSize(datatype, batchn_shape),
+        (gpu_device_ == NO_GPU_DEVICE) ? TRITONSERVER_MEMORY_CPU_PINNED
+                                       : TRITONSERVER_MEMORY_GPU,
+        (gpu_device_ == NO_GPU_DEVICE) ? 0 : gpu_device_));
+
+    TRITONSERVER_MemoryType memory_type;
+    int64_t memory_type_id;
+    auto input_buffer =
+        input_buffers->back()->MutableBuffer(&memory_type, &memory_type_id);
+    torch::TensorOptions options{torch_dtype.second};
+    auto updated_options = (memory_type == TRITONSERVER_MEMORY_GPU)
+                               ? options.device(torch::kCUDA, memory_type_id)
+                               : options.device(torch::kCPU);
+
+    torch::Tensor input_tensor =
+        torch::from_blob(input_buffer, batchn_shape, updated_options);
+
+    if (input_tensor.nbytes() != total_byte_size) {
+      return Status(
+          Status::Code::INTERNAL,
+          "unexpected size " + std::to_string(total_byte_size) +
+              " for inference input '" + input_name + "', expecting " +
+              std::to_string(input_tensor.nbytes()));
+    }
+    (*inputs)[ip_index] = input_tensor;
   }
-  *tensor = input_tensor;
 
+  // Finalize...
+  *cuda_copy |= collector.Finalize();
   return Status::Success;
 }
 
 Status
-LibTorchBackend::Context::ReadFixedSizedOutputTensor(
-    std::vector<torch::Tensor>* outputs_, const std::string& name,
-    const int& op_index, const DataType dtype, const size_t dtype_byte_size,
-    const size_t total_batch_size, const DimsList& dims,
-    std::vector<Scheduler::Payload>* payloads, OutputInfo* output,
-    bool* cuda_copy)
+LibTorchBackend::Context::ReadOutputTensors(
+    const InferenceBackend* base, size_t total_batch_size,
+    const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+    std::vector<std::unique_ptr<InferenceResponse>>* responses,
+    std::vector<torch::Tensor>* outputs,
+    std::unordered_map<std::string, int>* output_index_map)
 {
-  size_t byte_size = 0;
-  RETURN_IF_ERROR(GetOutputTensor(
-      outputs_, op_index, name, dtype, &output->output_buffer_, &byte_size,
-      &output->output_shape_));
+  BackendResponder responder(
+      requests, responses, max_batch_size_, enable_pinned_output_, stream_);
+  // Make sure each output is of the expected size and copy it into
+  // the payload responses.
+  bool cuda_copy = false;
+  for (const auto& output : base->Config().output()) {
+    const std::string& name = output.name();
+    int op_index = (*output_index_map)[name];
 
-  // verify shape of output matches shape from model config
-  RETURN_IF_ERROR(CompareOutputDims(
-      name, output->output_shape_, dims,
-      max_batch_size_ != NO_BATCHING /* supports_batching */));
+    const ModelOutput* output_config;
+    RETURN_IF_ERROR(base->GetOutput(name, &output_config));
 
-  const size_t total_byte_size =
-      GetElementCount(output->output_shape_) * dtype_byte_size;
-  const size_t batch1_byte_size = total_byte_size / total_batch_size;
+    // Checked at initialization time to make sure that STRING is not
+    // being used for an output, so can just assume fixed-sized here.
+    const DataType dtype = output_config->data_type();
 
-  if (byte_size != total_byte_size) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "unexpected size for output '" + name + "', byte-size " +
-            std::to_string(byte_size) + " does not equal " +
-            std::to_string(total_batch_size) + " * " +
-            std::to_string(batch1_byte_size));
+    const char* output_buffer = nullptr;
+    size_t byte_size = 0;
+    std::vector<int64_t> batchn_shape;
+    RETURN_IF_ERROR(GetOutputTensor(
+        outputs, op_index, name, dtype, &output_buffer, &byte_size,
+        &batchn_shape));
+
+    responder.ProcessTensor(
+        name, output_config->data_type(), batchn_shape, output_buffer,
+        ((device_ == torch::kCUDA)) ? TRITONSERVER_MEMORY_GPU
+                                    : TRITONSERVER_MEMORY_CPU,
+        ((device_ == torch::kCUDA)) ? gpu_device_ : 0);
   }
 
-  output->memory_type_ = (device_ == torch::kCPU) ? TRITONSERVER_MEMORY_CPU
-                                                  : TRITONSERVER_MEMORY_GPU;
-  output->memory_type_id_ = (device_ == torch::kCPU) ? 0 : gpu_device_;
-  *cuda_copy |=
-      SetFixedSizeOutputBuffer(name, batch1_byte_size, output, payloads);
+  // Finalize and wait for any pending buffer copies.
+  cuda_copy |= responder.Finalize();
 
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
   return Status::Success;
 }
 
@@ -460,324 +546,226 @@ LibTorchBackend::Context::GetOutputTensor(
   return Status::Success;
 }
 
-Status
-LibTorchBackend::Context::SetInputMetaData(
-    const std::string& name, const DataType datatype,
-    const std::vector<int64_t>& dims, const size_t total_batch_size,
-    std::vector<Scheduler::Payload>* payloads, std::vector<InputInfo>* inputs,
-    InputMetaData* meta_data, bool* cuda_copy)
-{
-  meta_data->name_ = name;
-  // Get the shape of the input. The request normalizer has already
-  // checked that the request shape is valid so don't need to do it
-  // here.
-  meta_data->shape_.clear();
-
-  // If model supports batching then prepend the batch dimension
-  // onto the input shape.
-  if (max_batch_size_ != NO_BATCHING) {
-    meta_data->shape_.push_back(total_batch_size);
-  }
-
-  size_t batch1_element_cnt = 1;
-  for (auto dim : dims) {
-    meta_data->shape_.push_back(dim);
-    batch1_element_cnt *= dim;
-  }
-
-  const auto pr = ConvertDataTypeToTorchType(datatype);
-  if (!pr.first) {
-    return Status(
-        Status::Code::INTERNAL, "Failed to convert DataType '" +
-                                    DataType_Name(datatype) +
-                                    "' to Torch datatype");
-  }
-  meta_data->torch_type_ = pr.second;
-
-  // Checked at initialization time to make sure that STRING is not
-  // being used for an input, so can just assume fixed-sized here.
-  const size_t batch1_byte_size =
-      batch1_element_cnt * GetDataTypeByteSize(datatype);
-  const auto total_byte_size = total_batch_size * batch1_byte_size;
-
-  inputs->emplace_back();
-
-  return SetFixedSizedInputBuffer(
-      name, batch1_byte_size, total_byte_size, payloads, &inputs->back(),
-      meta_data, cuda_copy);
-}
-
-Status
-LibTorchBackend::Context::SetFixedSizedInputBuffer(
-    const std::string& name, const size_t batch1_byte_size,
-    const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-    InputInfo* input, InputMetaData* meta_data, bool* cuda_copy)
-{
-  // The entire input tensor must be delivered as a single
-  // contiguous chunk so create a buffer large enough to hold the
-  // entire dynamic batched input.
-  auto memory_type = (gpu_device_ == NO_GPU_DEVICE)
-                         ? TRITONSERVER_MEMORY_CPU_PINNED
-                         : TRITONSERVER_MEMORY_GPU;
-  int64_t memory_type_id = (gpu_device_ == NO_GPU_DEVICE) ? 0 : gpu_device_;
-  meta_data->input_buffer_.reset(
-      new AllocatedMemory(total_byte_size, memory_type, memory_type_id));
-  input->input_buffer_ = meta_data->input_buffer_->MutableBuffer(
-      &input->memory_type_, &input->memory_type_id_);
-
-  // Visit the payloads in order and copy the input tensors to 'buffer'.
-  std::vector<size_t> expected_byte_sizes;
-  for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_;
-    expected_byte_sizes.push_back(irequest->BatchSize() * batch1_byte_size);
-  }
-
-  *cuda_copy |= SetInputBuffer(name, expected_byte_sizes, payloads, input);
-
-  return Status::Success;
-}
-
-Status
+void
 LibTorchBackend::Context::Run(
-    const InferenceBackend* base, std::vector<Scheduler::Payload>* payloads)
+    InferenceBackend* base,
+    std::vector<std::unique_ptr<InferenceRequest>>&& requests)
 {
-  LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
-                 << " request payloads";
+  LOG_VERBOSE(1) << "Running " << name_ << " with " << requests.size()
+                 << " requests";
+
+  INFER_STATS_DECL_TIMESTAMP(compute_start_ns);
 
   const InferenceRequest* repr_input_request = nullptr;
 
-  // For each request in 'payloads' collect the total batch size for
-  // this inference execution. The batch-size, number of inputs, and
-  // size of each input has already been checked by each payloads
-  // request provider so don't need to do that here.
+  // For each request collect the total batch size for this inference
+  // execution. The batch-size, number of inputs, and size of each
+  // input has already been checked so don't need to do that here.
   size_t total_batch_size = 0;
-  for (auto& payload : *payloads) {
-    if (!payload.status_.IsOk()) {
-      return Status(
-          Status::Code::INTERNAL,
-          "unexpected payload with non-OK status given to runner for '" +
-              name_ + "'");
+  for (auto& request : requests) {
+    // If we get a nullptr request then something is badly wrong. Fail
+    // and release all requests.
+    if (request == nullptr) {
+      InferenceRequest::RespondIfError(
+          requests,
+          Status(
+              Status::Code::INTERNAL,
+              "null request given to LibTorch runner for '" + name_ + "'"),
+          true /* release_requests */);
+      return;
     }
 
-    total_batch_size += payload.request_->BatchSize();
+    total_batch_size += std::max(1U, request->BatchSize());
 
-    // All payloads must have equally-sized input tensors so use any
-    // payload as the representative for the input tensors.
-    repr_input_request = payload.request_.get();
+    // All requests must have equally-sized input tensors so use any
+    // request as the representative for the input tensors.
+    repr_input_request = request.get();
   }
 
-  // If there are no valid payloads then no need to run the
-  // inference. The payloads will have their error status set so can
-  // just return.
+  // If there are no valid requests then no need to run the
+  // inference. This should never happen unless called with an empty
+  // 'requests' for some reason.
   if (total_batch_size == 0) {
-    return Status::Success;
+    return;
   }
 
-  // total_batch_size can be 1 for models that don't support batching
-  // (i.e. max_batch_size_ == 0).
+  // Make sure the maximum batch size is not exceeded. The
+  // total_batch_size must be 1 for models that don't support batching
+  // (i.e. max_batch_size_ == 0). If max_batch_size is exceeded then
+  // scheduler has done something badly wrong so fail and release all
+  // requests.
   if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size_)) {
-    return Status(
-        Status::Code::INTERNAL,
-        "dynamic batch size " + std::to_string(total_batch_size) + " for '" +
-            name_ + "', max allowed is " + std::to_string(max_batch_size_));
+    InferenceRequest::RespondIfError(
+        requests,
+        Status(
+            Status::Code::INTERNAL,
+            "dynamic batch size " + std::to_string(total_batch_size) +
+                " for '" + name_ + "', max allowed is " +
+                std::to_string(max_batch_size_)),
+        true /* release_requests */);
+    return;
+  }
+
+  // At this point we are committed to running inference with all
+  // 'requests'. Create a response for each request. During input
+  // processing if there is an error with any request that error will
+  // be sent immediately with the corresponding response (and the
+  // response unique_ptr will then be nullptr). The request object
+  // itself will not be released until after all inferencing is done
+  // (below) as we may need to access the request object when
+  // determine how to process outputs (for example, even if we don't
+  // need the outputs for a request that has an error, we do need to
+  // know the size of those outputs associated with the request so we
+  // can skip them in the output tensors).
+  std::vector<std::unique_ptr<InferenceResponse>> responses;
+  responses.reserve(requests.size());
+
+  for (auto& request : requests) {
+    std::unique_ptr<InferenceResponse> response;
+    Status status = request->ResponseFactory().CreateResponse(&response);
+    if (!status.IsOk()) {
+      InferenceRequest::RespondIfError(request, status);
+      response.reset();
+    }
+
+    responses.emplace_back(std::move(response));
   }
 
   size_t input_count = repr_input_request->ImmutableInputs().size();
 
-  // Hold reference to each buffer of input data so that it stays
+  // Hold reference to each buffer of input data to that it stays
   // until the inference has completed.
-  std::vector<InputMetaData> input_meta_data(input_count);
+  std::vector<std::unique_ptr<AllocatedMemory>> input_buffers;
 
   // Store input and output tensors
   std::vector<torch::jit::IValue> inputs_(input_count);
   std::vector<torch::Tensor> outputs_;
-  std::vector<InputInfo> inputs;
 
-  // Collect input metadata. FIXME override inputs from controls
-  // should be known from the model configuration at load time and so
-  // they should be processed then to initialze
-  // input_index_map_. Since they are not we do it here for every
-  // request which is unnecessary perf overhead.
+  // Collect the request inputs into contiguous input tensors.
+  // FIXME override inputs from controls should be known from the model
+  // configuration at load time and so they should be processed then to
+  // initialze input_index_map_. Since they are not we do it here for
+  // every request which is unnecessary perf overhead.
+
   bool cuda_copy = false;
-  for (const auto& pr : repr_input_request->ImmutableInputs()) {
-    const InferenceRequest::Input* input = pr.second;
-    const std::string& name = input->Name();
-    int ip_index;
+  FAIL_ALL_AND_RETURN_IF_ERROR(
+      requests, responses, metric_reporter_.get(),
+      SetInputTensors(
+          total_batch_size, requests, &responses, &input_buffers, &inputs_,
+          &cuda_copy),
+      "error sending LibTorch response");
 
-    const auto& itr = input_index_map_.find(name);
-    if (itr != input_index_map_.end()) {
-      ip_index = itr->second;
-    } else {
-      static const std::string deliminator = "__";
-
-      LOG_VERBOSE(1) << "Processing override input: " << name;
-
-      try {
-        int start_pos = name.find(deliminator);
-        if (start_pos == -1) {
-          throw std::invalid_argument(
-              "Input '" + name +
-              "' does not follow naming convention i.e. <name>__<index>.");
-        }
-        ip_index = std::atoi(name.substr(start_pos + 2).c_str());
+  // Collect the names of requested outputs. Do not include outputs
+  // for requests that have already responded with an error.
+  std::set<std::string> required_outputs;
+  for (size_t idx = 0; idx < requests.size(); idx++) {
+    const auto& request = requests[idx];
+    const auto& response = responses[idx];
+    if (response != nullptr) {
+      for (const auto& output_name : request->ImmutableRequestedOutputs()) {
+        required_outputs.insert(output_name);
       }
-      catch (std::exception& ex) {
-        return Status(
-            Status::Code::INTERNAL,
-            "Input '" + name +
-                "' does not follow naming convention i.e. <name>__<index>.");
-      }
-
-      input_index_map_[name] = ip_index;
     }
-
-    RETURN_IF_ERROR(SetInputMetaData(
-        name, input->DType(), input->Shape(), total_batch_size, payloads,
-        &inputs, &(input_meta_data[ip_index]), &cuda_copy));
   }
 
-#ifdef TRITON_ENABLE_GPU
+  // Wait for any in-flight input tensor copies to complete.
+#ifdef TRTIS_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
-  cuda_copy = false;
-  for (auto& input : inputs) {
-    for (auto& indirect_buffer : input.indirect_buffers_) {
-      bool cuda_used;
-      TRITONSERVER_MemoryType buffer_memory_type;
-      int64_t buffer_memory_id;
-      size_t buffer_byte_size;
-      auto buffer =
-          std::get<0>(indirect_buffer)
-              ->BufferAt(
-                  0, &buffer_byte_size, &buffer_memory_type, &buffer_memory_id);
-      auto status = CopyBuffer(
-          "indirect buffer", buffer_memory_type, buffer_memory_id,
-          input.memory_type_, input.memory_type_id_, buffer_byte_size, buffer,
-          input.input_buffer_ + std::get<1>(indirect_buffer), stream_,
-          &cuda_used);
-      if (!status.IsOk()) {
-        for (const auto& payload_idx : std::get<2>(indirect_buffer)) {
-          (*payloads)[payload_idx].status_ = status;
-        }
-      } else {
-        cuda_copy |= cuda_used;
-      }
-    }
-  }
-  if (cuda_copy) {
-    cudaStreamSynchronize(stream_);
-  }
-#endif  // TRITON_ENABLE_GPU
+#endif
 
-  for (size_t i = 0; i < inputs_.size(); i++) {
-    SetInputTensor(input_meta_data[i], &(inputs_[i]));
-  }
-
-#ifdef TRITON_ENABLE_STATS
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeInputEnd);
-    }
-  }
-#endif  // TRITON_ENABLE_STATS
+  INFER_STATS_DECL_TIMESTAMP(compute_input_end_ns);
 
   // Run...
-  RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
-
-#ifdef TRITON_ENABLE_STATS
-  for (auto& payload : *payloads) {
-    if (payload.stats_ != nullptr) {
-      payload.stats_->CaptureTimestamp(
-          ModelInferStats::TimestampKind::kComputeOutputStart);
+  Status status = Execute(&inputs_, &outputs_);
+  if (!status.IsOk()) {
+    for (auto& response : responses) {
+      if (response != nullptr) {
+        LOG_STATUS_ERROR(
+            InferenceResponse::SendWithStatus(std::move(response), status),
+            "error running LibTorch model");
+      }
     }
   }
-#endif  // TRITON_ENABLE_STATS
 
-  // verify output indices are valid with number of outputs after execution
-  for (const auto& output : base->Config().output()) {
-    int op_index = output_index_map_[output.name()];
-    int max_index = outputs_.size() - 1;
+  INFER_STATS_DECL_TIMESTAMP(compute_output_start_ns);
+
+  // Verify output indices are valid with number of outputs after execution
+  int max_index = outputs_.size() - 1;
+  for (const auto& name : required_outputs) {
+    int op_index = output_index_map_[name];
     if ((op_index < 0) || (op_index > max_index)) {
-      return Status(
+      Status status = Status(
           Status::Code::INVALID_ARG,
-          "The output " + output.name() +
+          "The output " + name +
               " in the model configuration refers to an output index which "
               "doesn't exist. This model has " +
               std::to_string(max_index + 1) + " outputs");
+
+      FAIL_ALL_AND_RETURN_IF_ERROR(
+          requests, responses, metric_reporter_.get(), status,
+          "error creating LibTorch output tensor");
     }
   }
 
-  // Prepare set of Outputs requested for
-  std::set<std::string> required_outputs;
-  for (auto& payload : *payloads) {
-    const auto& irequest = payload.request_;
-    for (const auto& pr : irequest->RequestedOutputs()) {
-      required_outputs.insert(pr.first);
-    }
-  }
-
-  // Ensure outputs have the expected size and copy it to the payload responses.
-  std::vector<OutputInfo> outputs;
-  cuda_copy = false;
-  for (const auto& name : required_outputs) {
-    outputs.emplace_back();
-    int op_index = output_index_map_[name];
-    const ModelOutput* output_config;
-    RETURN_IF_ERROR(base->GetOutput(name, &output_config));
-
-    const DataType dtype = output_config->data_type();
-
-    // If a reshape is provided for the output then use that when
-    // validating that the model matches what is expected.
-    const DimsList& output_dims = (output_config->has_reshape())
-                                      ? output_config->reshape().shape()
-                                      : output_config->dims();
-
-    // Checked at initialization time to make sure that STRING is not
-    // being used for an output, so can just assume fixed-sized here.
-    RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
-        &outputs_, name, op_index, dtype,
-        GetDataTypeByteSize(output_config->data_type()), total_batch_size,
-        output_dims, payloads, &outputs.back(), &cuda_copy));
-  }
+  // Create the response tensors and copy the appropriate tensor data
+  // into each.
+  FAIL_ALL_AND_RETURN_IF_ERROR(
+      requests, responses, metric_reporter_.get(),
+      ReadOutputTensors(
+          base, total_batch_size, requests, &responses, &outputs_,
+          &output_index_map_),
+      "error sending LibTorch response");
 
 #ifdef TRITON_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
-  cuda_copy = false;
-  for (auto& output : outputs) {
-    for (auto& indirect_buffer : output.indirect_buffers_) {
-      bool cuda_used;
-      TRITONSERVER_MemoryType src_memory_type;
-      int64_t src_memory_type_id;
-      // placeholder, copy byte size is determined by dst_byte_size
-      size_t src_byte_size;
-      auto src = indirect_buffer.first->BufferAt(
-          0, &src_byte_size, &src_memory_type, &src_memory_type_id);
-      TRITONSERVER_MemoryType dst_memory_type;
-      int64_t dst_memory_type_id;
-      for (auto& payload_output : indirect_buffer.second) {
-        char* dst = payload_output.second->MutableBuffer(
-            &dst_memory_type, &dst_memory_type_id);
-        auto dst_byte_size = payload_output.second->TotalByteSize();
-        (*payloads)[payload_output.first].status_ = CopyBuffer(
-            "indirect buffer", src_memory_type, src_memory_type_id,
-            dst_memory_type, dst_memory_type_id, dst_byte_size, src, dst,
-            stream_, &cuda_used);
-        cuda_copy |= cuda_used;
-        src += dst_byte_size;
-      }
+#endif  // TRTIS_ENABLE_GPU
+
+#ifdef TRTIS_ENABLE_STATS
+  INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
+
+  // Report stats and trace
+  for (size_t i = 0; i < requests.size(); ++i) {
+    auto& request = requests[i];
+    request->ReportStatistics(
+        metric_reporter_.get(), (responses[i] != nullptr), compute_start_ns,
+        compute_input_end_ns, compute_output_start_ns, compute_end_ns);
+
+#ifdef TRTIS_ENABLE_TRACING
+    if (request->Trace() != nullptr) {
+      auto& trace = request->Trace();
+      trace->Report(TRITONSERVER_TRACE_COMPUTE_START, compute_start_ns);
+      trace->Report(TRITONSERVER_TRACE_COMPUTE_INPUT_END, compute_input_end_ns);
+      trace->Report(
+          TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
+      trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
+    }
+#endif  // TRTIS_ENABLE_TRACING
+  }
+
+  // Also reporting batch stats
+  base->MutableStatsAggregator()->UpdateInferBatchStats(
+      metric_reporter_.get(), total_batch_size, compute_start_ns,
+      compute_input_end_ns, compute_output_start_ns, compute_end_ns);
+#endif  // TRTIS_ENABLE_STATS
+
+  // Send all the responses that haven't already been sent because of
+  // an earlier error.
+  for (auto& response : responses) {
+    if (response != nullptr) {
+      LOG_STATUS_ERROR(
+          InferenceResponse::Send(std::move(response)),
+          "failed to send TensorFlow backend response");
     }
   }
-  if (cuda_copy) {
-    cudaStreamSynchronize(stream_);
-  }
-#endif  // TRITON_ENABLE_GPU
 
-  return Status::Success;
+  // Release all requests.
+  for (auto& request : requests) {
+    InferenceRequest::Release(std::move(request));
+  }
 }
 
 Status

@@ -84,29 +84,28 @@ class LibTorchBackend : public InferenceBackend {
     // Set the meta data of an input from payloads.
     Status SetInputMetaData(
         const std::string& name, const DataType datatype,
-        const std::vector<int64_t>& dims, const size_t total_batch_size,
-        std::vector<Scheduler::Payload>* payloads,
-        std::vector<InputInfo>* inputs, InputMetaData* meta_data,
-        bool* cuda_copy);
+        const std::vector<int64_t>& dims, InputMetaData* meta_data);
 
     // See BackendContext::Run()
-    Status Run(
-        const InferenceBackend* base,
-        std::vector<Scheduler::Payload>* payloads) override;
+    void Run(
+        InferenceBackend* base,
+        std::vector<std::unique_ptr<InferenceRequest>>&& requests) override;
 
     // Helper function to set an input buffer from one or more payloads.
-    Status SetFixedSizedInputBuffer(
-        const std::string& name, const size_t batch1_byte_size,
-        const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-        InputInfo* input, InputMetaData* meta_data, bool* cuda_copy);
+    Status SetInputTensors(
+        size_t total_batch_size,
+        const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+        std::vector<std::unique_ptr<InferenceResponse>>* responses,
+        std::vector<std::unique_ptr<AllocatedMemory>>* input_buffers,
+        std::vector<torch::jit::IValue>* inputs, bool* cuda_copy);
 
     // Read an output tensor into one or more payloads.
-    Status ReadFixedSizedOutputTensor(
-        std::vector<torch::Tensor>* outputs_, const std::string& name,
-        const int& op_index, const DataType dtype, const size_t dtype_byte_size,
-        const size_t total_batch_size, const DimsList& dims,
-        std::vector<Scheduler::Payload>* payloads, OutputInfo* output,
-        bool* cuda_copy);
+    Status ReadOutputTensors(
+        const InferenceBackend* base, size_t total_batch_size,
+        const std::vector<std::unique_ptr<InferenceRequest>>& requests,
+        std::vector<std::unique_ptr<InferenceResponse>>* responses,
+        std::vector<torch::Tensor>* outputs,
+        std::unordered_map<std::string, int>* output_index_map);
 
     // Set the input tensor given the meta data of the input.
     Status SetInputTensor(
