@@ -39,11 +39,9 @@
 #include "rapidjson/rapidjson.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
-#include "src/core/api.pb.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
-#include "src/core/server_status.pb.h"
 #include "src/servers/classification.h"
 #include "src/servers/common.h"
 

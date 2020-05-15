@@ -36,7 +36,6 @@
 #include <utility>
 #include <vector>
 
-#include "src/core/api.pb.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"

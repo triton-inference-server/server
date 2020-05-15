@@ -163,6 +163,7 @@ class InferenceRequest {
   const std::string& Id() const { return id_; }
   void SetId(const std::string& i) { id_ = i; }
 
+  // Flags for the request, union of TRITONSERVER_RequestFlag.
   uint32_t Flags() const { return flags_; }
   void SetFlags(uint32_t f) { flags_ = f; }
 

@@ -44,7 +44,6 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
-#include "src/core/server_status.pb.h"
 #include "src/core/tritonserver.h"
 #include "src/servers/classification.h"
 #include "src/servers/common.h"
