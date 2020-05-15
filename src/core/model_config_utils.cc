@@ -34,15 +34,15 @@
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
 namespace {
 
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#ifdef TRITON_ENABLE_ENSEMBLE
 
 struct EnsembleTensor {
   EnsembleTensor(bool isOutput) : ready(false), isOutput(isOutput) {}
@@ -248,7 +248,7 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
   return Status::Success;
 }
 
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE
 
 template <class ModelIO>
 Status
@@ -616,43 +616,43 @@ GetNormalizedModelConfig(
   // If 'default_model_filename' is not specified set it appropriately
   // based upon 'platform'.
   if (config->default_model_filename().empty()) {
-#ifdef TRTIS_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORFLOW
     if (config->platform() == kTensorFlowGraphDefPlatform) {
       config->set_default_model_filename(kTensorFlowGraphDefFilename);
     } else if (config->platform() == kTensorFlowSavedModelPlatform) {
       config->set_default_model_filename(kTensorFlowSavedModelFilename);
     } else
-#endif  // TRTIS_ENABLE_TENSORFLOW
-#ifdef TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORRT
         if (config->platform() == kTensorRTPlanPlatform) {
       config->set_default_model_filename(kTensorRTPlanFilename);
     } else
-#endif  // TRTIS_ENABLE_TENSORRT
-#ifdef TRTIS_ENABLE_CAFFE2
+#endif  // TRITON_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_CAFFE2
         if (config->platform() == kCaffe2NetDefPlatform) {
       config->set_default_model_filename(kCaffe2NetDefFilename);
     } else
-#endif  // TRTIS_ENABLE_CAFFE2
-#ifdef TRTIS_ENABLE_ONNXRUNTIME
+#endif  // TRITON_ENABLE_CAFFE2
+#ifdef TRITON_ENABLE_ONNXRUNTIME
         if (config->platform() == kOnnxRuntimeOnnxPlatform) {
       config->set_default_model_filename(kOnnxRuntimeOnnxFilename);
     } else
-#endif  // TRTIS_ENABLE_ONNXRUNTIME
-#ifdef TRTIS_ENABLE_PYTORCH
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_PYTORCH
         if (config->platform() == kPyTorchLibTorchPlatform) {
       config->set_default_model_filename(kPyTorchLibTorchFilename);
     } else
-#endif  // TRTIS_ENABLE_PYTORCH
-#ifdef TRTIS_ENABLE_CUSTOM
+#endif  // TRITON_ENABLE_PYTORCH
+#ifdef TRITON_ENABLE_CUSTOM
         if (config->platform() == kCustomPlatform) {
       config->set_default_model_filename(kCustomFilename);
     } else
-#endif  // TRTIS_ENABLE_CUSTOM
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_ENSEMBLE
         if (config->platform() == kEnsemblePlatform) {
       // No actual model file is needed to be loaded for ensemble.
     } else
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE
     {
       return Status(
           Status::Code::INTERNAL, "unexpected platform type " +
@@ -713,14 +713,14 @@ GetNormalizedModelConfig(
 
     // Creates a set of supported GPU device ids
     std::set<int> supported_gpus;
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
     // Get the total number of GPUs from the runtime library.
     Status status = GetSupportedGPUs(&supported_gpus, min_compute_capability);
     if (!status.IsOk()) {
       return status;
     }
 
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
     // Assign default name, kind and count to each instance group that
     // doesn't give those values explicitly. For KIND_GPU, set GPUs to
@@ -979,21 +979,21 @@ ValidateModelConfig(
   // If ensemble scheduling is specified, validate it.
   // Otherwise, must validate platform and instance_group
   if (config.has_ensemble_scheduling()) {
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#ifdef TRITON_ENABLE_ENSEMBLE
     RETURN_IF_ERROR(ValidateEnsembleSchedulingConfig(config));
 #else
     return Status(
         Status::Code::INVALID_ARG, "ensemble scheduling not supported");
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE
   } else {
-#ifdef TRTIS_ENABLE_ENSEMBLE
+#ifdef TRITON_ENABLE_ENSEMBLE
     if (config.platform() == kEnsemblePlatform) {
       return Status(
           Status::Code::INVALID_ARG,
           "ensemble scheduling must be set for ensemble " + config.name() +
               " whose platform is " + kEnsemblePlatform);
     }
-#endif  // TRTIS_ENABLE_ENSEMBLE
+#endif  // TRITON_ENABLE_ENSEMBLE
 
     if (config.instance_group().size() == 0) {
       return Status(
@@ -1004,13 +1004,13 @@ ValidateModelConfig(
     // Make sure KIND_GPU instance group specifies at least one GPU and
     // doesn't specify a non-existent GPU. Make sure non-KIND_GPU does
     // not specify any GPUs.
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
     std::set<int> supported_gpus;
     Status status = GetSupportedGPUs(&supported_gpus, min_compute_capability);
     if (!status.IsOk()) {
       return status;
     }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
     for (const auto& group : config.instance_group()) {
       // KIND_MODEL is supported only on TensorFlow.
@@ -1021,10 +1021,10 @@ ValidateModelConfig(
               "instance group " + group.name() + " of model " + config.name() +
                   " has kind KIND_MODEL but specifies one or more GPUs");
         }
-#ifdef TRTIS_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORFLOW
         if (!(config.platform() == kTensorFlowGraphDefPlatform ||
               config.platform() == kTensorFlowSavedModelPlatform))
-#endif  // TRTIS_ENABLE_TENSORFLOW
+#endif  // TRITON_ENABLE_TENSORFLOW
         {
           return Status(
               Status::Code::INVALID_ARG,
@@ -1034,7 +1034,7 @@ ValidateModelConfig(
                   "models");
         }
       } else if (group.kind() == ModelInstanceGroup::KIND_GPU) {
-#ifndef TRTIS_ENABLE_GPU
+#ifndef TRITON_ENABLE_GPU
         return Status(
             Status::Code::INVALID_ARG,
             "instance group " + group.name() + " of model " + config.name() +
@@ -1064,10 +1064,10 @@ ValidateModelConfig(
                     " specifies invalid or unsupported gpu id of " +
                     std::to_string(gid) +
                     ". The minimum required CUDA compute compatibility is " +
-                    std::to_string(TRTIS_MIN_COMPUTE_CAPABILITY));
+                    std::to_string(TRITON_MIN_COMPUTE_CAPABILITY));
           }
         }
-#endif  // !TRTIS_ENABLE_GPU
+#endif  // !TRITON_ENABLE_GPU
       } else if (group.kind() == ModelInstanceGroup::KIND_CPU) {
         if (group.gpus().size() > 0) {
           return Status(
@@ -1083,9 +1083,9 @@ ValidateModelConfig(
       }
 
       if (
-#ifdef TRTIS_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_TENSORRT
           (config.platform() != kTensorRTPlanPlatform) &&
-#endif  // TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORRT
           !group.profile().empty()) {
         return Status(
             Status::Code::INVALID_ARG,
@@ -1128,9 +1128,9 @@ ValidateModelInput(
   }
 
   if (
-#ifdef TRTIS_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_TENSORRT
       (platform != kTensorRTPlanPlatform) &&
-#endif  // TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORRT
       io.is_shape_tensor()) {
     return Status(
         Status::Code::INVALID_ARG,
@@ -1138,9 +1138,9 @@ ValidateModelInput(
   }
 
   if (
-#ifdef TRTIS_ENABLE_CUSTOM
+#ifdef TRITON_ENABLE_CUSTOM
       (platform != kCustomPlatform) &&
-#endif  // TRTIS_ENABLE_CUSTOM
+#endif  // TRITON_ENABLE_CUSTOM
       io.allow_ragged_batch()) {
     return Status(
         Status::Code::INVALID_ARG,
@@ -1177,9 +1177,9 @@ ValidateModelOutput(
   RETURN_IF_ERROR(ValidateIOShape(io, max_batch_size, "model output "));
 
   if (
-#ifdef TRTIS_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_TENSORRT
       (platform != kTensorRTPlanPlatform) &&
-#endif  // TRTIS_ENABLE_TENSORRT
+#endif  // TRITON_ENABLE_TENSORRT
       io.is_shape_tensor()) {
     return Status(
         Status::Code::INVALID_ARG,

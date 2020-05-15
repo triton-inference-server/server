@@ -134,8 +134,8 @@ FROM ${TENSORFLOW_IMAGE} AS tritonserver_tf
 ############################################################################
 FROM ${BASE_IMAGE} AS tritonserver_build
 
-ARG TRTIS_VERSION=1.14.0dev
-ARG TRTIS_CONTAINER_VERSION=20.06dev
+ARG TRITON_VERSION=1.14.0dev
+ARG TRITON_CONTAINER_VERSION=20.06dev
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl4-openSSL-dev is needed for GCS
@@ -275,26 +275,26 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
     rm -fr builddir && mkdir -p builddir && \
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
-                  -DTRTIS_ENABLE_GRPC=ON \
-                  -DTRTIS_ENABLE_HTTP=ON \
-                  -DTRTIS_ENABLE_METRICS=ON \
-                  -DTRTIS_ENABLE_METRICS_GPU=ON \
-                  -DTRTIS_ENABLE_STATS=ON \
-                  -DTRTIS_ENABLE_TRACING=ON \
-                  -DTRTIS_ENABLE_GCS=ON \
-                  -DTRTIS_ENABLE_S3=ON \
-                  -DTRTIS_ENABLE_CUSTOM=ON \
-                  -DTRTIS_ENABLE_TENSORFLOW=ON \
-                  -DTRTIS_ENABLE_TENSORRT=OFF \
-                  -DTRTIS_ENABLE_CAFFE2=ON \
-                  -DTRTIS_ENABLE_ONNXRUNTIME=ON \
-                  -DTRTIS_ENABLE_ONNXRUNTIME_TENSORRT=OFF \
-                  -DTRTIS_ENABLE_ONNXRUNTIME_OPENVINO=ON \
-                  -DTRTIS_ENABLE_PYTORCH=OFF \
-                  -DTRTIS_ENABLE_ENSEMBLE=OFF \
-                  -DTRTIS_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
-                  -DTRTIS_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch" \
-                  -DTRTIS_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/lib/tensorflow;/opt/tritonserver/lib/pytorch;/opt/tritonserver/lib/onnx" \
+                  -DTRITON_ENABLE_GRPC=ON \
+                  -DTRITON_ENABLE_HTTP=ON \
+                  -DTRITON_ENABLE_METRICS=ON \
+                  -DTRITON_ENABLE_METRICS_GPU=ON \
+                  -DTRITON_ENABLE_STATS=ON \
+                  -DTRITON_ENABLE_TRACING=ON \
+                  -DTRITON_ENABLE_GCS=ON \
+                  -DTRITON_ENABLE_S3=ON \
+                  -DTRITON_ENABLE_CUSTOM=ON \
+                  -DTRITON_ENABLE_TENSORFLOW=ON \
+                  -DTRITON_ENABLE_TENSORRT=OFF \
+                  -DTRITON_ENABLE_CAFFE2=ON \
+                  -DTRITON_ENABLE_ONNXRUNTIME=ON \
+                  -DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=OFF \
+                  -DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON \
+                  -DTRITON_ENABLE_PYTORCH=OFF \
+                  -DTRITON_ENABLE_ENSEMBLE=OFF \
+                  -DTRITON_ONNXRUNTIME_INCLUDE_PATHS="/opt/tritonserver/include/onnxruntime" \
+                  -DTRITON_PYTORCH_INCLUDE_PATHS="/opt/tritonserver/include/torch" \
+                  -DTRITON_EXTRA_LIB_PATHS="/opt/tritonserver/lib;/opt/tritonserver/lib/tensorflow;/opt/tritonserver/lib/pytorch;/opt/tritonserver/lib/onnx" \
                   ../build && \
             make -j16 trtis && \
             mkdir -p /opt/tritonserver/include && \
@@ -307,10 +307,10 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
     (cd /opt/tritonserver/lib/pytorch && chmod ugo-w+rx *) && \
     (cd /opt/tritonserver/lib/onnx && chmod ugo-w+rx *)
 
-ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
-ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
-ENV TRITON_SERVER_VERSION ${TRTIS_VERSION}
-ENV NVIDIA_TRITON_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
+ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
+ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 ENV PATH /opt/tritonserver/bin:${PATH}
 
 COPY nvidia_entrypoint.sh /opt/tritonserver
@@ -321,13 +321,13 @@ ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
 ############################################################################
 FROM ${BASE_IMAGE}
 
-ARG TRTIS_VERSION=1.14.0dev
-ARG TRTIS_CONTAINER_VERSION=20.06dev
+ARG TRITON_VERSION=1.14.0dev
+ARG TRITON_CONTAINER_VERSION=20.06dev
 
-ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
-ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
-ENV TRITON_SERVER_VERSION ${TRTIS_VERSION}
-ENV NVIDIA_TRITON_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
+ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
+ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 
 ENV PATH /opt/tritonserver/bin:${PATH}
@@ -344,10 +344,8 @@ ENV MKL_THREADING_LAYER GNU
 # Create a user that can be used to run the triton-server as
 # non-root. Make sure that this user to given ID 1000. All server
 # artifacts copied below are assign to this user.
-ENV TENSORRT_SERVER_USER=triton-server
 ENV TRITON_SERVER_USER=triton-server
-RUN userdel tensorrt-server > /dev/null 2>&1 || true && \
-    if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \
+RUN if ! id -u $TRITON_SERVER_USER > /dev/null 2>&1 ; then \
         useradd $TRITON_SERVER_USER; \
     fi && \
     [ `id -u $TRITON_SERVER_USER` -eq 1000 ] && \

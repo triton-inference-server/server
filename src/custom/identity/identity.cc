@@ -32,9 +32,9 @@
 #include "src/core/model_config.pb.h"
 #include "src/custom/sdk/custom_instance.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
@@ -60,7 +60,7 @@ class Context : public CustomInstance {
   // Validate the model configuration for the derived backend instance
   int Init();
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   // Version 2 interface may need to deal with data in GPU memory,
   // which requires CUDA support.
   int Execute(
@@ -71,7 +71,7 @@ class Context : public CustomInstance {
   int Execute(
       const uint32_t payload_cnt, CustomPayload* payloads,
       CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn) override;
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
  private:
   // Delay to introduce into execution, in milliseconds.
@@ -82,9 +82,9 @@ class Context : public CustomInstance {
     DataType datatype_;
   };
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   cudaStream_t stream_;
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   // Map from output name to information needed to copy input into
   // that output.
@@ -142,7 +142,7 @@ Context::Context(
       }
     }
   }
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   int device_cnt;
   auto cuerr = cudaGetDeviceCount(&device_cnt);
   // Do nothing if there is no CUDA device since all data transfer will be done
@@ -155,7 +155,7 @@ Context::Context(
       stream_ = nullptr;
     }
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 }
 
 int
@@ -206,7 +206,7 @@ Context::Init()
   return ErrorCodes::Success;
 }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 int
 Context::Execute(
     const uint32_t payload_cnt, CustomPayload* payloads,
@@ -452,7 +452,7 @@ Context::Execute(
 
   return ErrorCodes::Success;
 }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 
 }  // namespace identity
@@ -483,11 +483,11 @@ extern "C" {
 uint32_t
 CustomVersion()
 {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   return 2;
 #else
   return 1;
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 }
 
 }  // extern "C"

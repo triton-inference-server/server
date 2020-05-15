@@ -33,7 +33,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
 
 void
 InferenceStatsAggregator::UpdateFailure(
@@ -44,11 +44,11 @@ InferenceStatsAggregator::UpdateFailure(
   infer_stats_.failure_count_++;
   infer_stats_.failure_duration_ns_ += (request_end_ns - request_start_ns);
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   if (metric_reporter != nullptr) {
     metric_reporter->MetricInferenceFailure().Increment();
   }
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 }
 
 void
@@ -76,7 +76,7 @@ InferenceStatsAggregator::UpdateSuccess(
   infer_stats_.compute_infer_duration_ns_ += compute_infer_duration_ns;
   infer_stats_.compute_output_duration_ns_ += compute_output_duration_ns;
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   if (metric_reporter != nullptr) {
     metric_reporter->MetricInferenceSuccess().Increment();
     metric_reporter->MetricInferenceRequestDuration().Increment(
@@ -90,7 +90,7 @@ InferenceStatsAggregator::UpdateSuccess(
     metric_reporter->MetricInferenceComputeOutputDuration().Increment(
         compute_output_duration_ns / 1000);
   }
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 }
 
 void
@@ -121,14 +121,14 @@ InferenceStatsAggregator::UpdateInferBatchStats(
   it->second.compute_output_duration_ns_ +=
       (compute_end_ns - compute_output_start_ns);
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   if (metric_reporter != nullptr) {
     metric_reporter->MetricInferenceExecutionCount().Increment(1);
     metric_reporter->MetricInferenceCount().Increment(batch_size);
   }
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 }
 
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
 }}  // namespace nvidia::inferenceserver

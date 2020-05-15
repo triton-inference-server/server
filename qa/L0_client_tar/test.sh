@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,13 +28,13 @@
 CLIENT_LOG=client.log
 
 # Install the tar file
-rm -fr trtis_client
-mkdir trtis_client
-(cd trtis_client && tar xzvf /workspace/*.tar.gz)
+rm -fr triton_client
+mkdir triton_client
+(cd triton_client && tar xzvf /workspace/*.tar.gz)
 
 # Build
-cd trtis_client/build
-cmake -DCMAKE_BUILD_TYPE=Release -DTRTIS_CLIENT_CMAKE_DIR:PATH=`pwd`/../lib/cmake/TRTIS .
+cd triton_client/build
+cmake -DCMAKE_BUILD_TYPE=Release -DTRITON_CLIENT_CMAKE_DIR:PATH=`pwd`/../lib/cmake/TRITON .
 make -j16 trtis-clients
 
 # There is no server running but can still check to make sure that the

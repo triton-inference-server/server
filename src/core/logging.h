@@ -93,7 +93,7 @@ extern Logger gLogger_;
   nvidia::inferenceserver::gLogger_.SetVerboseLevel( \
       static_cast<uint32_t>(std::max(0, (L))))
 
-#ifdef TRTIS_ENABLE_LOGGING
+#ifdef TRITON_ENABLE_LOGGING
 
 #define LOG_INFO_IS_ON                         \
   nvidia::inferenceserver::gLogger_.IsEnabled( \
@@ -115,7 +115,7 @@ extern Logger gLogger_;
 #define LOG_ERROR_IS_ON false
 #define LOG_VERBOSE_IS_ON(L) false
 
-#endif  // TRTIS_ENABLE_LOGGING
+#endif  // TRITON_ENABLE_LOGGING
 
 #define LOG_INFO                                         \
   if (LOG_INFO_IS_ON)                                    \

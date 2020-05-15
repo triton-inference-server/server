@@ -36,25 +36,25 @@
 ## 2. Set CUDA_DEVICE to the ID of the CUDA device present on the
 ## system that you want to target for the generated models.
 ##
-## 3. Run this script to create a '/tmp/<TRTIS_VERSION>_xavier' directory
+## 3. Run this script to create a '/tmp/<TRITON_VERSION>_xavier' directory
 ## containing all the TensorRT models needed for CI testing.
 ##
 ## 4. Copy all non-TensorRT models from the dlcluster directory
-## '/mnt/dldata/inferenceserver/<TRTIS_VERSION>' to
-## '/mnt/dldata/inferenceserver/<TRTIS_VERSION>'_xavier.
+## '/mnt/dldata/inferenceserver/<TRITON_VERSION>' to
+## '/mnt/dldata/inferenceserver/<TRITON_VERSION>'_xavier.
 ##
-## 5. Copy the generated models from '/tmp/<TRTIS_VERSION>_xavier' to the
-## dlcluster directory '/mnt/dldata/inferenceserver/<TRTIS_VERSION>'_xavier.
+## 5. Copy the generated models from '/tmp/<TRITON_VERSION>_xavier' to the
+## dlcluster directory '/mnt/dldata/inferenceserver/<TRITON_VERSION>'_xavier.
 ##
-## 6. Remember to delete the '/tmp/<TRTIS_VERSION>_xavier' directory after.
+## 6. Remember to delete the '/tmp/<TRITON_VERSION>_xavier' directory after.
 ##
 ############################################################################
 
-TRTIS_VERSION=20.02
+TRITON_VERSION=20.02
 CUDA_DEVICE=0
 
 REPO_ARCH="xavier"
-TMP_DIR=/tmp/${TRTIS_VERSION}_${REPO_ARCH}
+TMP_DIR=/tmp/${TRITON_VERSION}_${REPO_ARCH}
 
 SRCDIR=/tmp/src
 DESTDIR=$TMP_DIR/models

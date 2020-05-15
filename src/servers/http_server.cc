@@ -45,15 +45,15 @@
 #include "src/servers/classification.h"
 #include "src/servers/common.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 extern "C" {
 #include <b64/cdecode.h>
 }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
 #include "src/servers/tracer.h"
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
 namespace nvidia { namespace inferenceserver {
 
@@ -142,7 +142,7 @@ HTTPServerImpl::Dispatch(evhtp_request_t* req, void* arg)
   (static_cast<HTTPServerImpl*>(arg))->Handle(req);
 }
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
 
 // Handle HTTP requests to obtain prometheus metrics
 class HTTPMetricsServer : public HTTPServerImpl {
@@ -200,7 +200,7 @@ HTTPMetricsServer::Handle(evhtp_request_t* req)
   evhtp_send_reply(req, res);
 }
 
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
 
 namespace {
@@ -925,10 +925,10 @@ class HTTPAPIServer : public HTTPServerImpl {
     TRITONSERVER_Error* FinalizeResponse(
         TRITONSERVER_InferenceResponse* response);
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
     TraceManager* trace_manager_;
     uint64_t trace_id_;
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
     AllocPayload alloc_payload_;
 
@@ -1439,7 +1439,7 @@ HTTPAPIServer::HandleModelStats(
       req->headers_out,
       evhtp_header_new("Content-Type", "application/json", 1, 1));
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   TRITONSERVER_Message* model_stats_message = nullptr;
 
   int64_t requested_model_version;
@@ -1631,7 +1631,7 @@ HTTPAPIServer::HandleCudaSharedMemory(
           TRITONSERVER_ERROR_INVALID_ARG,
           "'region name' is necessary to register cuda shared memory region");
     } else {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
       struct evbuffer_iovec* v = nullptr;
       int v_idx = 0;
       int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
@@ -1711,7 +1711,7 @@ HTTPAPIServer::HandleCudaSharedMemory(
               "failed to register CUDA shared memory region: '" + region_name +
               "', GPUs not supported")
               .c_str());
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
     }
   } else if (action == "unregister") {
     if (region_name.empty()) {
@@ -2063,7 +2063,7 @@ HTTPAPIServer::HandleInfer(
 
   // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* trace = nullptr;
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   uint64_t trace_id = 0;
   if ((err == nullptr) && (trace_manager_ != nullptr)) {
     trace = trace_manager_->SampleTrace();
@@ -2081,7 +2081,7 @@ HTTPAPIServer::HandleInfer(
           TIMESPEC_TO_NANOS(req->recv_end_ts));
     }
   }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   // Create the inference request object which provides all information needed
   // for an inference.
@@ -2095,10 +2095,10 @@ HTTPAPIServer::HandleInfer(
     connection_paused = true;
     std::unique_ptr<InferRequestClass> infer_request(
         new InferRequestClass(req, server_id_));
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
     infer_request->trace_manager_ = trace_manager_;
     infer_request->trace_id_ = trace_id;
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
     // Find Inference-Header-Content-Length in header. If missing set to 0
     size_t header_length = 0;
@@ -2156,7 +2156,7 @@ HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
   evhtp_send_reply(request, EVHTP_RES_OK);
   evhtp_request_resume(request);
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   if ((infer_request->trace_manager_ != nullptr) &&
       (infer_request->trace_id_ != 0)) {
     infer_request->trace_manager_->CaptureTimestamp(
@@ -2166,7 +2166,7 @@ HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
         infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_SEND_END",
         TIMESPEC_TO_NANOS(request->send_end_ts));
   }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   delete infer_request;
 }
@@ -2181,7 +2181,7 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   evhtp_send_reply(request, EVHTP_RES_BADREQ);
   evhtp_request_resume(request);
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   if ((infer_request->trace_manager_ != nullptr) &&
       (infer_request->trace_id_ != 0)) {
     infer_request->trace_manager_->CaptureTimestamp(
@@ -2191,7 +2191,7 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
         infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_SEND_END",
         TIMESPEC_TO_NANOS(request->send_end_ts));
   }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   delete infer_request;
 }
@@ -2474,15 +2474,15 @@ HTTPServer::CreateMetricsServer(
   std::string addr = "0.0.0.0:" + std::to_string(port);
   LOG_INFO << "Starting Metrics Service at " << addr;
 
-#ifndef TRTIS_ENABLE_METRICS
+#ifndef TRITON_ENABLE_METRICS
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNAVAILABLE, "Metrics support is disabled");
-#endif  // !TRTIS_ENABLE_METRICS
+#endif  // !TRITON_ENABLE_METRICS
 
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   metrics_server->reset(new HTTPMetricsServer(server, port, thread_cnt));
   return nullptr;
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 }
 
 }}  // namespace nvidia::inferenceserver

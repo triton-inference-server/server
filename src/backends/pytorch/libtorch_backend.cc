@@ -35,11 +35,11 @@
 #include "src/core/model_config_cuda.h"
 #include "src/core/model_config_utils.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <cuda_runtime_api.h>
 #include "src/core/cuda_utils.h"
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -64,9 +64,9 @@ LibTorchBackend::Context::Context(
 LibTorchBackend::Context::~Context()
 {
   torch_model_.reset();
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   c10::cuda::CUDACachingAllocator::emptyCache();
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   LOG_VERBOSE(1) << "~LibTorchBackend::Context ";
 }
 
@@ -198,7 +198,7 @@ LibTorchBackend::CreateExecutionContext(
   if (gpu_device == Context::NO_GPU_DEVICE) {
     cc_model_filename = Config().default_model_filename();
   } else {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
     cudaDeviceProp cuprops;
     cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
     if (cuerr != cudaSuccess) {
@@ -215,7 +215,7 @@ LibTorchBackend::CreateExecutionContext(
                             : cc_itr->second;
 #else
     return Status(Status::Code::INTERNAL, "GPU instances not supported");
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   }
 
   const auto& lp_itr = models.find(cc_model_filename);
@@ -242,12 +242,12 @@ LibTorchBackend::CreateExecutionContext(
       Config().optimization().output_pinned_memory().enable();
 
   std::unique_ptr<MetricModelReporter> metric_reporter;
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
     metric_reporter.reset(new MetricModelReporter(
         Name(), Version(), gpu_device, Config().metric_tags()));
   }
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
   contexts_.emplace_back(new Context(
       instance_name, gpu_device, mbs, pinned_input, pinned_output,
@@ -636,7 +636,7 @@ LibTorchBackend::Context::Run(
         &inputs, &(input_meta_data[ip_index]), &cuda_copy));
   }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
@@ -668,32 +668,32 @@ LibTorchBackend::Context::Run(
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   for (size_t i = 0; i < inputs_.size(); i++) {
     SetInputTensor(input_meta_data[i], &(inputs_[i]));
   }
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeInputEnd);
     }
   }
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
   // Run...
   RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
       payload.stats_->CaptureTimestamp(
           ModelInferStats::TimestampKind::kComputeOutputStart);
     }
   }
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
   // verify output indices are valid with number of outputs after execution
   for (const auto& output : base->Config().output()) {
@@ -743,7 +743,7 @@ LibTorchBackend::Context::Run(
         output_dims, payloads, &outputs.back(), &cuda_copy));
   }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
@@ -775,7 +775,7 @@ LibTorchBackend::Context::Run(
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   return Status::Success;
 }

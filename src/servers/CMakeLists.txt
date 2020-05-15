@@ -32,7 +32,7 @@ cmake_minimum_required (VERSION 3.5)
 set(GRPC_ENDPOINT_OBJECTS "")
 set(GRPC_ENDPOINT_LIBRARIES "")
 
-if(${TRTIS_ENABLE_GRPC})
+if(${TRITON_ENABLE_GRPC})
   list(APPEND
     GRPC_ENDPOINT_SRCS
     grpc_server.cc
@@ -48,26 +48,26 @@ if(${TRTIS_ENABLE_GRPC})
     ${GRPC_ENDPOINT_SRCS} ${GRPC_ENDPOINT_HDRS}
   )
 
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     target_include_directories(grpc-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
 
   add_dependencies(grpc-endpoint-library proto-library)
-  if(${TRTIS_ENABLE_GRPC})
+  if(${TRITON_ENABLE_GRPC})
     add_dependencies(grpc-endpoint-library grpc-library)
-  endif() # TRTIS_ENABLE_GRPC
+  endif() # TRITON_ENABLE_GRPC
 
   set(
     GRPC_ENDPOINT_OBJECTS
     $<TARGET_OBJECTS:grpc-endpoint-library>
     $<TARGET_OBJECTS:proto-library>
     )
-  if(${TRTIS_ENABLE_GRPC})
+  if(${TRITON_ENABLE_GRPC})
     list(APPEND
       GRPC_ENDPOINT_OBJECTS
       $<TARGET_OBJECTS:grpc-library>
       )
-  endif() # TRTIS_ENABLE_GRPC
+  endif() # TRITON_ENABLE_GRPC
 
   set(
     GRPC_ENDPOINT_LIBRARIES
@@ -75,7 +75,7 @@ if(${TRTIS_ENABLE_GRPC})
     PRIVATE gRPC::grpc
     PRIVATE protobuf::libprotobuf
     )
-endif() # TRTIS_ENABLE_GRPC
+endif() # TRITON_ENABLE_GRPC
 
 #
 # http endpoint
@@ -83,11 +83,11 @@ endif() # TRTIS_ENABLE_GRPC
 set(HTTP_ENDPOINT_OBJECTS "")
 set(HTTP_ENDPOINT_LIBRARIES "")
 
-if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
+if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
   find_package(libevhtp CONFIG REQUIRED)
   message(STATUS "Using libevhtp ${libevhtp_VERSION}")
 
-  if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
+  if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS})
     list(APPEND
       HTTP_ENDPOINT_SRCS
       http_server.cc
@@ -96,16 +96,16 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
       HTTP_ENDPOINT_HDRS
       http_server.h
       )
-  endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
+  endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS
 
   add_library(
     http-endpoint-library EXCLUDE_FROM_ALL OBJECT
     ${HTTP_ENDPOINT_SRCS} ${HTTP_ENDPOINT_HDRS}
   )
 
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     target_include_directories(http-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
 
   add_dependencies(http-endpoint-library proto-library)
   target_include_directories(
@@ -128,7 +128,7 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
     PRIVATE -lre2
     PRIVATE -lb64
   )
-endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
+endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS
 
 #
 # tracing
@@ -136,8 +136,8 @@ endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 set(TRACING_OBJECTS "")
 set(TRACING_LIBRARIES "")
 
-if(${TRTIS_ENABLE_TRACING})
-  message(STATUS "Using tracing ${TRTIS_TRACE_INSTALL_PATH}")
+if(${TRITON_ENABLE_TRACING})
+  message(STATUS "Using tracing ${TRITON_TRACE_INSTALL_PATH}")
 
   set(
     TRACING_SRCS
@@ -153,14 +153,14 @@ if(${TRTIS_ENABLE_TRACING})
     tracing-library EXCLUDE_FROM_ALL OBJECT
     ${TRACING_SRCS} ${TRACING_HDRS}
   )
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     target_include_directories(tracing-library PRIVATE ${CUDA_INCLUDE_DIRS})
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
   set(
     TRACING_OBJECTS
     $<TARGET_OBJECTS:tracing-library>
   )
-endif() # TRTIS_ENABLE_TRACING
+endif() # TRITON_ENABLE_TRACING
 
 #
 # tritonserver
@@ -192,9 +192,9 @@ add_executable(
   $<TARGET_OBJECTS:proto-library>
 )
 set_property(TARGET main PROPERTY OUTPUT_NAME tritonserver)
-if(${TRTIS_ENABLE_GPU})
+if(${TRITON_ENABLE_GPU})
   target_include_directories(main PRIVATE ${CUDA_INCLUDE_DIRS})
-endif() # TRTIS_ENABLE_GPU
+endif() # TRITON_ENABLE_GPU
 set_target_properties(
   main
   PROPERTIES
@@ -212,12 +212,12 @@ target_link_libraries(
   PRIVATE protobuf::libprotobuf
   PRIVATE tritonserver
 )
-if(${TRTIS_ENABLE_GPU})
+if(${TRITON_ENABLE_GPU})
 target_link_libraries(
   main
   PRIVATE ${CUDA_LIBRARIES}
 )
-endif() # TRTIS_ENABLE_GPU
+endif() # TRITON_ENABLE_GPU
 install(
   TARGETS main
   RUNTIME DESTINATION bin
@@ -254,7 +254,7 @@ target_link_libraries(
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
 )
-if(${TRTIS_ENABLE_GPU})
+if(${TRITON_ENABLE_GPU})
 target_include_directories(simple PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
   simple
@@ -262,7 +262,7 @@ target_link_libraries(
   PUBLIC -lnvidia-ml
   PRIVATE ${CUDA_LIBRARIES}
 )
-endif() # TRTIS_ENABLE_GPU
+endif() # TRITON_ENABLE_GPU
 install(
   TARGETS simple
   RUNTIME DESTINATION bin
@@ -271,7 +271,7 @@ install(
 #
 # memory_alloc
 #
-if(${TRTIS_ENABLE_GPU})
+if(${TRITON_ENABLE_GPU})
 set(
   MEMORY_ALLOC_SRCS
   memory_alloc.cc
@@ -308,37 +308,37 @@ install(
   TARGETS memory_alloc
   RUNTIME DESTINATION bin
 )
-endif() # TRTIS_ENABLE_GPU
+endif() # TRITON_ENABLE_GPU
 
 #
 # libtritonserver.so
 #
-if(${TRTIS_ENABLE_TENSORFLOW})
+if(${TRITON_ENABLE_TENSORFLOW})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:tensorflow-backend-library>)
-endif() # TRTIS_ENABLE_TENSORFLOW
-if(${TRTIS_ENABLE_TENSORRT})
+endif() # TRITON_ENABLE_TENSORFLOW
+if(${TRITON_ENABLE_TENSORRT})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:tensorrt-backend-library>)
-endif() # TRTIS_ENABLE_TENSORRT
-if(${TRTIS_ENABLE_CAFFE2})
+endif() # TRITON_ENABLE_TENSORRT
+if(${TRITON_ENABLE_CAFFE2})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:caffe2-backend-library>)
-endif() # TRTIS_ENABLE_CAFFE2
-if(${TRTIS_ENABLE_ONNXRUNTIME})
+endif() # TRITON_ENABLE_CAFFE2
+if(${TRITON_ENABLE_ONNXRUNTIME})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:onnxruntime-backend-library>)
-endif() # TRTIS_ENABLE_ONNXRUNTIME
-if(${TRTIS_ENABLE_PYTORCH})
+endif() # TRITON_ENABLE_ONNXRUNTIME
+if(${TRITON_ENABLE_PYTORCH})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:libtorch-backend-library>)
-endif() # TRTIS_ENABLE_PYTORCH
-if(${TRTIS_ENABLE_CUSTOM})
+endif() # TRITON_ENABLE_PYTORCH
+if(${TRITON_ENABLE_CUSTOM})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:custom-backend-library>)
-endif() # TRTIS_ENABLE_CUSTOM
-if(${TRTIS_ENABLE_ENSEMBLE})
+endif() # TRITON_ENABLE_CUSTOM
+if(${TRITON_ENABLE_ENSEMBLE})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:ensemble-backend-library>)
-endif() # TRTIS_ENABLE_ENSEMBLE
+endif() # TRITON_ENABLE_ENSEMBLE
 
 set(CUDA_OBJS "")
-if(${TRTIS_ENABLE_GPU})
+if(${TRITON_ENABLE_GPU})
   set(CUDA_OBJS $<TARGET_OBJECTS:model-config-cuda-library>)
-endif() # TRTIS_ENABLE_GPU
+endif() # TRITON_ENABLE_GPU
 
 configure_file(libtritonserver.ldscript libtritonserver.ldscript COPYONLY)
 
@@ -363,30 +363,30 @@ set_target_properties(
 target_link_libraries(
   tritonserver
   PRIVATE -ldl
-  PRIVATE ${TRTIS_EXTRA_LDFLAGS}
+  PRIVATE ${TRITON_EXTRA_LDFLAGS}
   PRIVATE protobuf::libprotobuf
 )
 
-if(${TRTIS_ENABLE_TENSORRT})
+if(${TRITON_ENABLE_TENSORRT})
   target_link_libraries(
     tritonserver
     PUBLIC -lnvinfer
     PUBLIC -lnvinfer_plugin
   )
-endif() # TRTIS_ENABLE_TENSORRT
+endif() # TRITON_ENABLE_TENSORRT
 
-if(${TRTIS_ENABLE_TENSORFLOW})
+if(${TRITON_ENABLE_TENSORFLOW})
   target_link_libraries(
     tritonserver
-    PUBLIC ${TRTIS_EXTRA_LDFLAGS}
+    PUBLIC ${TRITON_EXTRA_LDFLAGS}
     PUBLIC -ltensorflow_trtis
   )
-endif() # TRTIS_ENABLE_TENSORFLOW
+endif() # TRITON_ENABLE_TENSORFLOW
 
-if(${TRTIS_ENABLE_CAFFE2} OR ${TRTIS_ENABLE_PYTORCH})
+if(${TRITON_ENABLE_CAFFE2} OR ${TRITON_ENABLE_PYTORCH})
   target_link_libraries(
     tritonserver
-    PUBLIC ${TRTIS_EXTRA_LDFLAGS}
+    PUBLIC ${TRITON_EXTRA_LDFLAGS}
     PUBLIC -ltorch
     PUBLIC -ltorch_cpu
     PUBLIC -ltorch_cuda
@@ -402,43 +402,43 @@ if(${TRTIS_ENABLE_CAFFE2} OR ${TRTIS_ENABLE_PYTORCH})
     PUBLIC -lmkl_rt
     PUBLIC -lmkl_vml_def
   )
-endif() # TRTIS_ENABLE_CAFFE2 || TRTIS_ENABLE_PYTORCH
+endif() # TRITON_ENABLE_CAFFE2 || TRITON_ENABLE_PYTORCH
 
-if(${TRTIS_ENABLE_ONNXRUNTIME})
+if(${TRITON_ENABLE_ONNXRUNTIME})
   target_link_libraries(
     tritonserver
-    PUBLIC ${TRTIS_EXTRA_LDFLAGS}
+    PUBLIC ${TRITON_EXTRA_LDFLAGS}
     PUBLIC -lonnxruntime
   )
-endif() # TRTIS_ENABLE_ONNXRUNTIME
-if(${TRTIS_ENABLE_ONNXRUNTIME_OPENVINO})
+endif() # TRITON_ENABLE_ONNXRUNTIME
+if(${TRITON_ENABLE_ONNXRUNTIME_OPENVINO})
   target_link_libraries(
     tritonserver
-    PUBLIC ${TRTIS_EXTRA_LDFLAGS}
+    PUBLIC ${TRITON_EXTRA_LDFLAGS}
     PUBLIC -ltbb
     PUBLIC -linference_engine
   )
-endif() # TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
+endif() # TRITON_ENABLE_ONNXRUNTIME_OPENVINO
 
-if(${TRTIS_ENABLE_METRICS})
+if(${TRITON_ENABLE_METRICS})
   find_package(prometheus-cpp CONFIG REQUIRED)
   message(STATUS "Using prometheus-cpp ${prometheus-cpp_VERSION}")
   target_link_libraries(
     tritonserver
     PRIVATE prometheus-cpp::core
   )
-endif() # TRTIS_ENABLE_METRICS
+endif() # TRITON_ENABLE_METRICS
 
-if(${TRTIS_ENABLE_GCS})
+if(${TRITON_ENABLE_GCS})
   find_package(storage_client REQUIRED)
   message(STATUS "Using google-cloud-cpp ${storage_client_VERSION}")
   target_link_libraries(
     tritonserver
     PRIVATE storage_client
   )
-endif() # TRTIS_ENABLE_GCS
+endif() # TRITON_ENABLE_GCS
 
-if(${TRTIS_ENABLE_S3})
+if(${TRITON_ENABLE_S3})
   find_package(AWSSDK REQUIRED COMPONENTS s3)
   message(STATUS "Using aws-cpp-sdk-s3 ${AWSSDK_VERSION}")
   target_link_libraries(
@@ -446,9 +446,9 @@ if(${TRTIS_ENABLE_S3})
     PRIVATE aws-cpp-sdk-s3
     PRIVATE -lre2
   )
-endif() # TRTIS_ENABLE_S3
+endif() # TRITON_ENABLE_S3
 
-if(${TRTIS_ENABLE_GPU})
+if(${TRITON_ENABLE_GPU})
   target_link_libraries(
     tritonserver
     PUBLIC -L/usr/local/cuda/lib64/stubs
@@ -457,7 +457,7 @@ if(${TRTIS_ENABLE_GPU})
     PRIVATE -L${CNMEM_PATH}/lib
     PRIVATE -lcnmem
   )
-endif() # TRTIS_ENABLE_GPU
+endif() # TRITON_ENABLE_GPU
 
 install(
   TARGETS tritonserver

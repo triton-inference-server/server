@@ -48,28 +48,28 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
 
-if(${TRTIS_ENABLE_HTTP})
-  add_definitions(-DTRTIS_ENABLE_HTTP=1)
-endif() # TRTIS_ENABLE_HTTP
+if(${TRITON_ENABLE_HTTP})
+  add_definitions(-DTRITON_ENABLE_HTTP=1)
+endif() # TRITON_ENABLE_HTTP
 
-if(${TRTIS_ENABLE_GRPC})
-  add_definitions(-DTRTIS_ENABLE_GRPC=1)
-endif() # TRTIS_ENABLE_GRPC
+if(${TRITON_ENABLE_GRPC})
+  add_definitions(-DTRITON_ENABLE_GRPC=1)
+endif() # TRITON_ENABLE_GRPC
 
 if(NOT WIN32)
   #
   # CUDA
   #
-  if(${TRTIS_ENABLE_GPU})
+  if(${TRITON_ENABLE_GPU})
     find_package(CUDA REQUIRED)
     message(STATUS "Using CUDA ${CUDA_VERSION}")
 
-    add_definitions(-DTRTIS_ENABLE_GPU=1)
+    add_definitions(-DTRITON_ENABLE_GPU=1)
     set(CUDA_NVCC_FLAGS -std=c++11)
-  endif() # TRTIS_ENABLE_GPU
+  endif() # TRITON_ENABLE_GPU
 endif() # NOT WIN32
 
-if(${TRTIS_ENABLE_GRPC})
+if(${TRITON_ENABLE_GRPC})
   #
   # Protobuf
   #
@@ -84,7 +84,7 @@ if(${TRTIS_ENABLE_GRPC})
   find_package(gRPC CONFIG REQUIRED)
   message(STATUS "Using gRPC ${gRPC_VERSION}")
   include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
-endif() # TRTIS_ENABLE_GRPC
+endif() # TRITON_ENABLE_GRPC
 
 add_subdirectory(../../src/core src/core)
 add_subdirectory(../../src/clients/c++ src/clients/c++)

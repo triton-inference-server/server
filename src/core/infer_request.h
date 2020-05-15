@@ -183,14 +183,14 @@ class InferenceRequest {
   uint64_t TimeoutMicroseconds() const { return timeout_us_; }
   void SetTimeoutMicroseconds(uint64_t t) { timeout_us_ = t; }
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   const std::unique_ptr<InferenceTrace>& Trace() const { return trace_; }
   std::unique_ptr<InferenceTrace>* MutableTrace() { return &trace_; }
   void SetTrace(std::unique_ptr<InferenceTrace>&& trace)
   {
     trace_ = std::move(trace);
   }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   // The original inputs are the inputs added to the request before
   // the inference execution (that is before
@@ -380,7 +380,7 @@ class InferenceRequest {
     return queue_start_ns_;
   }
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   uint64_t RequestStartNs() const { return request_start_ns_; }
   uint64_t CaptureRequestStartNs()
   {
@@ -405,7 +405,7 @@ class InferenceRequest {
   {
     secondary_stats_aggregator_ = secondary_stats_aggregator;
   }
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
  private:
   DISALLOW_COPY_AND_ASSIGN(InferenceRequest);
@@ -467,15 +467,15 @@ class InferenceRequest {
   // when statistics are not being collected.
   uint64_t queue_start_ns_;
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   uint64_t request_start_ns_;
   InferenceStatsAggregator* secondary_stats_aggregator_ = nullptr;
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   // Inference trace associated with this request.
   std::unique_ptr<InferenceTrace> trace_;
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceRequest& request);

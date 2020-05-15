@@ -48,9 +48,9 @@
 #include "src/servers/classification.h"
 #include "src/servers/common.h"
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
 #include "src/servers/tracer.h"
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
 namespace nvidia { namespace inferenceserver {
 
@@ -271,12 +271,12 @@ class HandlerState {
         return nullptr;
       }
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
         state->trace_manager_->CaptureTimestamp(
             state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
       }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
       state->step_ = Steps::WRITTEN;
       responder_->Write(state->response_, state);
@@ -359,11 +359,11 @@ class HandlerState {
   std::shared_ptr<Context> context_;
   Steps step_;
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   TraceManager* trace_manager_;
   TRITONSERVER_InferenceTrace* trace_;
   uint64_t trace_id_;
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   RequestType request_;
   ResponseType response_;
@@ -716,7 +716,7 @@ CommonHandler::SetUpAllRequests()
                                       ModelStatisticsRequest& request,
                                       ModelStatisticsResponse* response,
                                       grpc::Status* status) {
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
     int64_t requested_model_version;
     auto err =
         GetModelVersionFromString(request.version(), &requested_model_version);
@@ -971,7 +971,7 @@ CommonHandler::SetUpAllRequests()
           CudaSharedMemoryRegisterRequest& request,
           CudaSharedMemoryRegisterResponse* response, grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
         err = shm_manager_->RegisterCUDASharedMemory(
             request.name(),
             reinterpret_cast<const cudaIpcMemHandle_t*>(
@@ -984,7 +984,7 @@ CommonHandler::SetUpAllRequests()
                 "failed to register CUDA shared memory region: '" +
                 request.name() + "', GPUs not supported")
                 .c_str());
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
         GrpcStatusUtil::Create(status, err);
         TRITONSERVER_ErrorDelete(err);
@@ -2564,7 +2564,7 @@ ModelInferHandler::StartNewRequest()
   auto context = std::make_shared<State::Context>();
   State* state = StateNew(context);
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   state->trace_manager_ = nullptr;
   state->trace_ = nullptr;
   state->trace_id_ = 0;
@@ -2578,7 +2578,7 @@ ModelInferHandler::StartNewRequest()
           "GRPC_WAITREAD_START");
     }
   }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   service_->RequestModelInfer(
       state->context_->ctx_.get(), &state->request_,
@@ -2614,12 +2614,12 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
 
   if (state->step_ == Steps::START) {
     TRITONSERVER_Error* err = nullptr;
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
     if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
       state->trace_manager_->CaptureTimestamp(
           state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_WAITREAD_END");
     }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
     // Start a new request to replace this one...
     if (!shutdown) {
@@ -2668,9 +2668,9 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
     }
     if (err == nullptr) {
       TRITONSERVER_InferenceTrace* trace = nullptr;
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
       trace = state->trace_;
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
       state->step_ = ISSUED;
       err = TRITONSERVER_ServerInferAsync(tritonserver_.get(), irequest, trace);
@@ -2692,23 +2692,23 @@ ModelInferHandler::Process(Handler::State* state, bool rpc_ok)
 
       response.Clear();
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
         state->trace_manager_->CaptureTimestamp(
             state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
       }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
       state->step_ = COMPLETE;
       state->context_->responder_->Finish(response, status, state);
     }
   } else if (state->step_ == Steps::COMPLETE) {
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
     if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
       state->trace_manager_->CaptureTimestamp(
           state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_END");
     }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
     state->step_ = Steps::FINISH;
     finished = true;
@@ -2743,12 +2743,12 @@ ModelInferHandler::InferResponseComplete(
       TRITONSERVER_InferenceResponseDelete(iresponse),
       "deleting GRPC inference response");
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
     state->trace_manager_->CaptureTimestamp(
         state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
   }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   state->step_ = COMPLETE;
   state->context_->responder_->Finish(response, status, state);
@@ -2801,7 +2801,7 @@ ModelStreamInferHandler::StartNewRequest()
   auto context = std::make_shared<State::Context>(NEXT_UNIQUE_ID);
   State* state = StateNew(context);
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
   state->trace_manager_ = nullptr;
   state->trace_ = nullptr;
   state->trace_id_ = 0;
@@ -2815,7 +2815,7 @@ ModelStreamInferHandler::StartNewRequest()
           "GRPC_WAITREAD_START");
     }
   }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
   service_->RequestModelStreamInfer(
       state->context_->ctx_.get(), state->context_->responder_.get(), cq_, cq_,
@@ -2857,12 +2857,12 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
   } else if (state->step_ == Steps::READ) {
     TRITONSERVER_Error* err = nullptr;
     const ModelInferRequest& request = state->request_;
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
     if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
       state->trace_manager_->CaptureTimestamp(
           state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_WAITREAD_END");
     }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
     // If done reading and no in-flight requests then can finish the
     // entire stream. Otherwise just finish this state.
@@ -2940,9 +2940,9 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     }
     if (err == nullptr) {
       TRITONSERVER_InferenceTrace* trace = nullptr;
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
       trace = state->trace_;
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
       state->step_ = ISSUED;
       err = TRITONSERVER_ServerInferAsync(tritonserver_.get(), irequest, trace);
@@ -2976,7 +2976,7 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // (i.e the next request in the stream).
     State* next_read_state = StateNew(context, Steps::READ);
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
     // Capture a timestamp for the time when we start waiting for this
     // next request to read.
     next_read_state->trace_manager_ = nullptr;
@@ -2993,18 +2993,18 @@ ModelStreamInferHandler::Process(Handler::State* state, bool rpc_ok)
             "GRPC_WAITREAD_START");
       }
     }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
     next_read_state->context_->responder_->Read(
         &next_read_state->request_, next_read_state);
 
   } else if (state->step_ == Steps::WRITTEN) {
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
     if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
       state->trace_manager_->CaptureTimestamp(
           state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_END");
     }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
 
     // If the write failed (for example, client closed the stream)
     // mark that the stream did not complete successfully but don't

@@ -30,7 +30,7 @@
 
 #include <algorithm>
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 
 #define RETURN_IF_CUDA_ERR(FUNC)                                               \
@@ -43,7 +43,7 @@
     }                                                                          \
   }
 
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 namespace {
 
@@ -59,7 +59,7 @@ TensorToRegionName(std::string name)
   return name;
 }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 nic::Error
 CreateCUDAIPCHandle(
     cudaIpcMemHandle_t* cuda_handle, void* input_d_ptr, int device_id = 0)
@@ -73,7 +73,7 @@ CreateCUDAIPCHandle(
   return nic::Error::Success;
 }
 
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
 
 }  // namespace
@@ -107,7 +107,7 @@ LoadManager::~LoadManager()
         }
       }
     } else if (shared_memory_type_ == SharedMemoryType::CUDA_SHARED_MEMORY) {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
       for (auto region : shared_memory_regions_) {
         cudaError_t cuda_err =
             cudaFree(shared_memory_regions_[region.first].first);
@@ -121,7 +121,7 @@ LoadManager::~LoadManager()
                     << std::endl;
         }
       }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
     }
   }
 }
@@ -272,7 +272,7 @@ LoadManager::InitSharedMemory()
       RETURN_IF_ERROR(client_->RegisterSystemSharedMemory(
           region_name, shm_key, alloc_size));
     } else {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
       cudaError_t cuda_err = cudaMalloc((void**)&output_shm_ptr, alloc_size);
       if (cuda_err != cudaSuccess) {
         return nic::Error(
@@ -288,7 +288,7 @@ LoadManager::InitSharedMemory()
       // Using GPU with device id 0
       RETURN_IF_ERROR(client_->RegisterCudaSharedMemory(
           region_name, cuda_handle, alloc_size));
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
     }
   }
 
@@ -385,11 +385,11 @@ LoadManager::InitSharedMemory()
             count++;
           }
 
-          // Register the region with TRTIS
+          // Register the region with triton
           RETURN_IF_ERROR(client_->RegisterSystemSharedMemory(
               region_name, shm_key, alloc_size));
         } else {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
           cudaError_t cuda_err = cudaMalloc((void**)&input_shm_ptr, alloc_size);
           if (cuda_err != cudaSuccess) {
             return nic::Error(
@@ -423,10 +423,10 @@ LoadManager::InitSharedMemory()
           RETURN_IF_ERROR(
               CreateCUDAIPCHandle(&cuda_handle, (void*)input_shm_ptr));
 
-          // Register the region with TRTIS
+          // Register the region with triton
           RETURN_IF_ERROR(client_->RegisterCudaSharedMemory(
               region_name, cuda_handle, alloc_size));
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
         }
       }
     }

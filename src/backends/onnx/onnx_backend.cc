@@ -37,18 +37,18 @@
 #include "src/core/model_config_cuda.h"
 #include "src/core/model_config_utils.h"
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
 #include <cuda_provider_factory.h>
 #include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
-#ifdef TRTIS_ENABLE_ONNXRUNTIME_TENSORRT
+#ifdef TRITON_ENABLE_ONNXRUNTIME_TENSORRT
 #include <tensorrt_provider_factory.h>
-#endif  // TRTIS_ENABLE_ONNXRUNTIME_TENSORRT
+#endif  // TRITON_ENABLE_ONNXRUNTIME_TENSORRT
 
-#ifdef TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
+#ifdef TRITON_ENABLE_ONNXRUNTIME_OPENVINO
 #include <openvino_provider_factory.h>
-#endif  // TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
+#endif  // TRITON_ENABLE_ONNXRUNTIME_OPENVINO
 
 namespace nvidia { namespace inferenceserver {
 
@@ -164,7 +164,7 @@ OnnxBackend::CreateExecutionContext(
   if (gpu_device == Context::NO_GPU_DEVICE) {
     cc_model_filename = Config().default_model_filename();
   } else {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
     cudaDeviceProp cuprops;
     cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
     if (cuerr != cudaSuccess) {
@@ -181,7 +181,7 @@ OnnxBackend::CreateExecutionContext(
                             : cc_itr->second;
 #else
     return Status(Status::Code::INTERNAL, "GPU instances not supported");
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   }
 
   const auto& op_itr = models.find(cc_model_filename);
@@ -208,12 +208,12 @@ OnnxBackend::CreateExecutionContext(
       Config().optimization().output_pinned_memory().enable();
 
   std::unique_ptr<MetricModelReporter> metric_reporter;
-#ifdef TRTIS_ENABLE_METRICS
+#ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
     metric_reporter.reset(new MetricModelReporter(
         Name(), Version(), gpu_device, Config().metric_tags()));
   }
-#endif  // TRTIS_ENABLE_METRICS
+#endif  // TRITON_ENABLE_METRICS
 
   contexts_.emplace_back(new Context(
       instance_name, gpu_device, mbs, pinned_input, pinned_output,
@@ -232,7 +232,7 @@ OnnxBackend::CreateExecutionContext(
 
   // Set execution execution_accelerators (execution providers in ONNX Runtime)
   if (gpu_device != Context::NO_GPU_DEVICE) {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
     if (Config().optimization().has_execution_accelerators()) {
       // Don't need to ensure uniqueness of the providers,
       // ONNX Runtime will check it.
@@ -241,14 +241,14 @@ OnnxBackend::CreateExecutionContext(
                .optimization()
                .execution_accelerators()
                .gpu_execution_accelerator()) {
-#ifdef TRTIS_ENABLE_ONNXRUNTIME_TENSORRT
+#ifdef TRITON_ENABLE_ONNXRUNTIME_TENSORRT
         if (execution_accelerator.name() == kTensorRTExecutionAccelerator) {
           RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_Tensorrt(
               session_options, gpu_device));
           LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
                          << instance_name << " on device " << gpu_device;
         } else
-#endif  // TRTIS_ENABLE_ONNXRUNTIME_TENSORRT
+#endif  // TRITON_ENABLE_ONNXRUNTIME_TENSORRT
         {
           return Status(
               Status::Code::INVALID_ARG, "unknown Execution Accelerator '" +
@@ -263,7 +263,7 @@ OnnxBackend::CreateExecutionContext(
                    << " on device " << gpu_device;
 #else
     return Status(Status::Code::INTERNAL, "GPU instances not supported");
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   }
 
   bool need_lock = false;
@@ -273,7 +273,7 @@ OnnxBackend::CreateExecutionContext(
                                                  .execution_accelerators()
                                                  .cpu_execution_accelerator()) {
       if (execution_accelerator.name() == kOpenVINOExecutionAccelerator) {
-#ifdef TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
+#ifdef TRITON_ENABLE_ONNXRUNTIME_OPENVINO
         need_lock = true;
         RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_OpenVINO(
             session_options, "CPU"));
@@ -283,7 +283,7 @@ OnnxBackend::CreateExecutionContext(
         return Status(
             Status::Code::INVALID_ARG,
             "OpenVINO Execution Accelerator is not enabled");
-#endif  // TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
+#endif  // TRITON_ENABLE_ONNXRUNTIME_OPENVINO
       } else {
         return Status(
             Status::Code::INVALID_ARG, "unknown Execution Accelerator '" +
@@ -657,7 +657,7 @@ OnnxBackend::Context::Run(
   }
 
   // Wait for any in-flight input tensor copies to complete.
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
@@ -677,7 +677,7 @@ OnnxBackend::Context::Run(
       ReadOutputTensors(total_batch_size, output_names, requests, &responses),
       "error sending ONNX response");
 
-#ifdef TRTIS_ENABLE_STATS
+#ifdef TRITON_ENABLE_STATS
   INFER_STATS_DECL_TIMESTAMP(compute_end_ns);
 
   // Report stats and trace
@@ -687,7 +687,7 @@ OnnxBackend::Context::Run(
         metric_reporter_.get(), (responses[i] != nullptr), compute_start_ns,
         compute_input_end_ns, compute_output_start_ns, compute_end_ns);
 
-#ifdef TRTIS_ENABLE_TRACING
+#ifdef TRITON_ENABLE_TRACING
     if (request->Trace() != nullptr) {
       auto& trace = request->Trace();
       trace->Report(TRITONSERVER_TRACE_COMPUTE_START, compute_start_ns);
@@ -696,14 +696,14 @@ OnnxBackend::Context::Run(
           TRITONSERVER_TRACE_COMPUTE_OUTPUT_START, compute_output_start_ns);
       trace->Report(TRITONSERVER_TRACE_COMPUTE_END, compute_end_ns);
     }
-#endif  // TRTIS_ENABLE_TRACING
+#endif  // TRITON_ENABLE_TRACING
   }
 
   // Also reporting batch stats
   base->MutableStatsAggregator()->UpdateInferBatchStats(
       metric_reporter_.get(), total_batch_size, compute_start_ns,
       compute_input_end_ns, compute_output_start_ns, compute_end_ns);
-#endif  // TRTIS_ENABLE_STATS
+#endif  // TRITON_ENABLE_STATS
 
   // Send all the responses that haven't already been sent because of
   // an earlier error.
@@ -854,12 +854,12 @@ OnnxBackend::Context::SetInputTensors(
         buffer_offset += expected_byte_sizes[ridx];
       }
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
       // Synchronize to ensure the buffer is ready to be modified
       if (string_cuda_copy) {
         cudaStreamSynchronize(stream_);
       }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
       std::vector<const char*> string_data;
       // Modify input buffer and set string expected by ORT
@@ -1041,11 +1041,11 @@ OnnxBackend::Context::ReadOutputTensors(
   // Finalize and wait for any pending buffer copies.
   cuda_copy |= responder.Finalize();
 
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (cuda_copy) {
     cudaStreamSynchronize(stream_);
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
   return Status::Success;
 }
 

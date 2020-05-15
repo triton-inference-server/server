@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,7 +41,6 @@ add_library(
   $<TARGET_OBJECTS:proto-library>
 )
 
-set(TRTIS_CUSTOMBACKEND "libcustombackend.a")
 add_custom_command(
   OUTPUT libcustombackend.a
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${Protobuf_LIBRARY} libcustombackendprotobuf.a
@@ -70,7 +69,7 @@ install(
   DESTINATION include/src/custom/sdk
 )
 
-# Install the TRTIS and protobuf headers needed to build a custom
+# Install the triton and protobuf headers needed to build a custom
 # backend
 install(
   FILES

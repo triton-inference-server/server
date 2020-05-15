@@ -65,14 +65,14 @@ BackendContext::BackendContext(
       enable_pinned_output_(enable_pinned_output),
       metric_reporter_(std::move(metric_reporter))
 {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   stream_ = nullptr;
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 }
 
 BackendContext::~BackendContext()
 {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (stream_ != nullptr) {
     cudaError_t err = cudaStreamDestroy(stream_);
     if (err != cudaSuccess) {
@@ -80,14 +80,14 @@ BackendContext::~BackendContext()
     }
     stream_ = nullptr;
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 }
 
 Status
 BackendContext::CreateCudaStream(
     const int cuda_stream_priority, cudaStream_t* stream)
 {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (gpu_device_ != NO_GPU_DEVICE) {
     // Make sure that correct device is set before creating stream and
     // then restore the device to what was set by the caller.
@@ -117,7 +117,7 @@ BackendContext::CreateCudaStream(
                                       ": " + cudaGetErrorString(cuerr));
     }
   }
-#endif  // TRTIS_ENABLE_GPU
+#endif  // TRITON_ENABLE_GPU
 
   return Status::Success;
 }
@@ -247,7 +247,7 @@ BackendResponder::ProcessTensor(
 bool
 BackendResponder::Finalize()
 {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (need_sync_) {
     cudaStreamSynchronize(stream_);
     need_sync_ = false;
@@ -574,7 +574,7 @@ BackendInputCollector::ProcessTensor(
 bool
 BackendInputCollector::Finalize()
 {
-#ifdef TRTIS_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
   if (need_sync_) {
     cudaStreamSynchronize(stream_);
     need_sync_ = false;
