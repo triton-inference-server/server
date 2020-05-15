@@ -685,6 +685,7 @@ main(int argc, char** argv)
   std::vector<std::shared_ptr<nic::InferContext::Request>> requests;
   size_t image_idx = 0;
   size_t done_cnt = 0;
+  size_t sent_cnt = 0;
   bool last_request = false;
   std::mutex mtx;
   std::condition_variable cv;
@@ -746,6 +747,7 @@ main(int argc, char** argv)
         exit(1);
       }
     }
+    sent_cnt++;
   }
 
   // For async, retrieve results according to the send order
@@ -754,7 +756,7 @@ main(int argc, char** argv)
     {
       std::unique_lock<std::mutex> lk(mtx);
       cv.wait(lk, [&]() {
-        if (done_cnt >= image_data.size()) {
+        if (done_cnt >= sent_cnt) {
           return true;
         } else {
           return false;
