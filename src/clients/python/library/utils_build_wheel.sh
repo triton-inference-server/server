@@ -47,14 +47,14 @@ function main() {
 
   if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
     mkdir -p ${WHLDIR}/tritonclientutils/shared_memory
-    cp libcshmv2.so \
+    cp libcshm.so \
       "${WHLDIR}/tritonclientutils/shared_memory/."
     cp shared_memory/__init__.py \
       "${WHLDIR}/tritonclientutils/shared_memory/."
 
-    if [ -f libccudashmv2.so ] && [ -f cuda_shared_memory/__init__.py ]; then
+    if [ -f libccudashm.so ] && [ -f cuda_shared_memory/__init__.py ]; then
       mkdir -p ${WHLDIR}/tritonclientutils/cuda_shared_memory
-      cp libccudashmv2.so \
+      cp libccudashm.so \
         "${WHLDIR}/tritonclientutils/cuda_shared_memory/."
       cp cuda_shared_memory/__init__.py \
         "${WHLDIR}/tritonclientutils/cuda_shared_memory/."

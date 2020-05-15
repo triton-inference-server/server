@@ -31,7 +31,7 @@
 
 #include "src/clients/c++/library/common.h"
 #include "src/core/constants.h"
-#include "src/core/grpc_service_v2.grpc.pb.h"
+#include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/model_config.pb.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {

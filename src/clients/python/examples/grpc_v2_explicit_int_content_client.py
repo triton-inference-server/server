@@ -29,8 +29,8 @@ import argparse
 import numpy as np
 
 import grpc
-from tritongrpcclient import grpc_service_v2_pb2
-from tritongrpcclient import grpc_service_v2_pb2_grpc
+from tritongrpcclient import grpc_service_pb2
+from tritongrpcclient import grpc_service_pb2_grpc
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -59,10 +59,10 @@ if __name__ == '__main__':
 
     # Create gRPC stub for communicating with the server
     channel = grpc.insecure_channel(FLAGS.url)
-    grpc_stub = grpc_service_v2_pb2_grpc.GRPCInferenceServiceStub(channel)
+    grpc_stub = grpc_service_pb2_grpc.GRPCInferenceServiceStub(channel)
 
     # Generate the request
-    request = grpc_service_v2_pb2.ModelInferRequest()
+    request = grpc_service_pb2.ModelInferRequest()
     request.model_name = model_name
     request.model_version = model_version
 
@@ -71,13 +71,13 @@ if __name__ == '__main__':
     input1_data = [1 for i in range(16)]
 
     # Populate the inputs in inference request
-    input0 = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
+    input0 = grpc_service_pb2.ModelInferRequest().InferInputTensor()
     input0.name = "INPUT0"
     input0.datatype = "INT32"
     input0.shape.extend([1, 16])
     input0.contents.int_contents[:] = input0_data
 
-    input1 = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
+    input1 = grpc_service_pb2.ModelInferRequest().InferInputTensor()
     input1.name = "INPUT1"
     input1.datatype = "INT32"
     input1.shape.extend([1, 16])
@@ -85,10 +85,10 @@ if __name__ == '__main__':
     request.inputs.extend([input0, input1])
 
     # Populate the outputs in the inference request
-    output0 = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output0 = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output0.name = "OUTPUT0"
 
-    output1 = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output1 = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output1.name = "OUTPUT1"
     request.outputs.extend([output0, output1])
 

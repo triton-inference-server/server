@@ -52,9 +52,9 @@ except ImportError:
     bdist_wheel = None
 
 if not os.name == 'nt':
-    platform_package_data = ['libcshmv2.so']
+    platform_package_data = ['libcshm.so']
     if bool(os.environ.get('CUDA_VERSION', 0)):
-        platform_package_data += ['libccudashmv2.so']
+        platform_package_data += ['libccudashm.so']
 
     setup(
         name='tritonclientutils',

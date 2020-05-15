@@ -39,35 +39,26 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
-SIMPLE_HEALTH_CLIENT_PY=../clients/simple_grpc_v2_health_metadata.py
-SIMPLE_INFER_CLIENT_PY=../clients/simple_grpc_v2_infer_client.py
-SIMPLE_ASYNC_INFER_CLIENT_PY=../clients/simple_grpc_v2_async_infer_client.py
-SIMPLE_STRING_INFER_CLIENT_PY=../clients/simple_grpc_v2_string_infer_client.py
-SIMPLE_STREAM_INFER_CLIENT_PY=../clients/simple_grpc_v2_sequence_stream_infer_client.py
-SIMPLE_SEQUENCE_INFER_CLIENT_PY=../clients/simple_grpc_v2_sequence_sync_infer_client.py
-SIMPLE_IMAGE_CLIENT_PY=../clients/v2_image_client.py
-SIMPLE_ENSEMBLE_IMAGE_CLIENT_PY=../clients/v2_ensemble_image_client.py
-SIMPLE_SHM_STRING_CLIENT_PY=../clients/simple_grpc_v2_shm_string_client.py
-SIMPLE_SHM_CLIENT_PY=../clients/simple_grpc_v2_shm_client.py
-SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_grpc_v2_cudashm_client.py
-SIMPLE_MODEL_CONTROL_PY=../clients/simple_grpc_v2_model_control.py
-EXPLICIT_BYTE_CONTENT_CLIENT_PY=../clients/grpc_v2_explicit_byte_content_client.py
-EXPLICIT_INT_CONTENT_CLIENT_PY=../clients/grpc_v2_explicit_int_content_client.py
-EXPLICIT_INT8_CONTENT_CLIENT_PY=../clients/grpc_v2_explicit_int8_content_client.py
-GRPC_CLIENT_PY=../clients/grpc_v2_client.py
-GRPC_IMAGE_CLIENT_PY=../clients/grpc_v2_image_client.py
+SIMPLE_HEALTH_CLIENT_PY=../clients/simple_http_health_metadata.py
+SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
+SIMPLE_ASYNC_INFER_CLIENT_PY=../clients/simple_http_async_infer_client.py
+SIMPLE_STRING_INFER_CLIENT_PY=../clients/simple_http_string_infer_client.py
+SIMPLE_IMAGE_CLIENT_PY=../clients/image_client.py
+SIMPLE_ENSEMBLE_IMAGE_CLIENT_PY=../clients/ensemble_image_client.py
+SIMPLE_SHM_STRING_CLIENT_PY=../clients/simple_http_shm_string_client.py
+SIMPLE_SHM_CLIENT_PY=../clients/simple_http_shm_client.py
+SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_http_cudashm_client.py
+SIMPLE_MODEL_CONTROL_PY=../clients/simple_http_model_control.py
+SIMPLE_SEQUENCE_INFER_CLIENT_PY=../clients/simple_http_sequence_sync_infer_client.py
 
-SIMPLE_HEALTH_CLIENT=../clients/simple_grpc_v2_health_metadata
-SIMPLE_INFER_CLIENT=../clients/simple_grpc_v2_infer_client
-SIMPLE_STRING_INFER_CLIENT=../clients/simple_grpc_v2_string_infer_client
-SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_grpc_v2_async_infer_client
-SIMPLE_MODEL_CONTROL=../clients/simple_grpc_v2_model_control
-SIMPLE_STREAM_INFER_CLIENT=../clients/simple_grpc_v2_sequence_stream_infer_client
-SIMPLE_SEQUENCE_INFER_CLIENT=../clients/simple_grpc_v2_sequence_sync_infer_client
-SIMPLE_SHM_CLIENT=../clients/simple_grpc_v2_shm_client
-SIMPLE_CUDASHM_CLIENT=../clients/simple_grpc_v2_cudashm_client
-SIMPLE_IMAGE_CLIENT=../clients/v2_image_client
-SIMPLE_ENSEMBLE_IMAGE_CLIENT=../clients/v2_ensemble_image_client
+SIMPLE_HEALTH_CLIENT=../clients/simple_http_health_metadata
+SIMPLE_INFER_CLIENT=../clients/simple_http_infer_client
+SIMPLE_STRING_INFER_CLIENT=../clients/simple_http_string_infer_client
+SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_http_async_infer_client
+SIMPLE_MODEL_CONTROL=../clients/simple_http_model_control
+SIMPLE_SEQUENCE_INFER_CLIENT=../clients/simple_http_sequence_sync_infer_client
+SIMPLE_SHM_CLIENT=../clients/simple_http_shm_client
+SIMPLE_CUDASHM_CLIENT=../clients/simple_http_cudashm_client
 
 rm -f *.log
 rm -f *.log.*
@@ -78,8 +69,8 @@ wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
      https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz
 (cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
 mv /tmp/inception_v3_2016_08_28_frozen.pb models/inception_graphdef/1/model.graphdef
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_int8_int32_int32 models/
-cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/resnet_v1_50_graphdef models/
+
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/savedmodel_zero_1_object models/
 
 # Create model repository layout for ensemble image classification
 cp -r ../L0_docs/docs/examples/ensemble_model_repository/image_preprocess_nchw_3x224x224_inception models/ && \
@@ -107,6 +98,7 @@ fi
 
 set +e
 
+# Test health
 python $SIMPLE_HEALTH_CLIENT_PY -v >> ${CLIENT_LOG}.health 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.health
@@ -117,50 +109,31 @@ IMAGE=../images/vulture.jpeg
 for i in \
         $SIMPLE_INFER_CLIENT_PY \
         $SIMPLE_ASYNC_INFER_CLIENT_PY \
-        $SIMPLE_STRING_INFER_CLIENT_PY \
         $SIMPLE_IMAGE_CLIENT_PY \
         $SIMPLE_ENSEMBLE_IMAGE_CLIENT_PY \
-        $SIMPLE_STREAM_INFER_CLIENT_PY \
-        $SIMPLE_SEQUENCE_INFER_CLIENT_PY \
         $SIMPLE_SHM_STRING_CLIENT_PY \
         $SIMPLE_SHM_CLIENT_PY \
         $SIMPLE_CUDASHM_CLIENT_PY \
-        $EXPLICIT_BYTE_CONTENT_CLIENT_PY \
-        $EXPLICIT_INT_CONTENT_CLIENT_PY \
-        $EXPLICIT_INT8_CONTENT_CLIENT_PY \
-        $GRPC_CLIENT_PY \
-        $GRPC_IMAGE_CLIENT_PY \
+        $SIMPLE_STRING_INFER_CLIENT_PY \
+        $SIMPLE_SEQUENCE_INFER_CLIENT_PY \
         ; do
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"
-    if [ $SUFFIX == "grpc_v2_image_client" ]; then
+    if [ $SUFFIX == "image_client" ]; then
+        python $i -m inception_graphdef -s INCEPTION -a -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.async.${SUFFIX}" 2>&1
+        if [ `grep -c VULTURE ${CLIENT_LOG}.async.${SUFFIX}` != "1" ]; then
+            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
+            cat $CLIENT_LOG.async.${SUFFIX}
+            RET=1
+        fi
         python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.${SUFFIX}
             RET=1
         fi
-    elif [ $SUFFIX == "v2_image_client" ]; then
-        python $i -m inception_graphdef -s INCEPTION -a -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.async.${SUFFIX}" 2>&1
-        if [ `grep -c VULTURE ${CLIENT_LOG}.async.${SUFFIX}` != "1" ]; then
-            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
-            cat $CLIENT_LOG.async.${SUFFIX}
-            RET=1
-        fi
-        python $i -m inception_graphdef -s INCEPTION -a --streaming -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.streaming.${SUFFIX}" 2>&1
-        if [ `grep -c VULTURE ${CLIENT_LOG}.streaming.${SUFFIX}` != "1" ]; then
-            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
-            cat $CLIENT_LOG.streaming.${SUFFIX}
-            RET=1
-        fi
-        python $i -m inception_graphdef -s INCEPTION -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
-        if [ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
-            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
-            cat $CLIENT_LOG.${SUFFIX}
-            RET=1
-        fi
-    elif [ $SUFFIX == "v2_ensemble_image_client" ]; then
-        python $i -c 1 -i grpc -u localhost:8001 ../images >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+    elif [ $SUFFIX == "ensemble_image_client" ]; then
+        python $i -c 1 ../images >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
         for result in "SPORTS CAR" "COFFEE MUG" "VULTURE"; do
             if [ `grep -c "$result" ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
                 echo -e "\n***\n*** Failed. Expected 1 $result result\n***"
@@ -172,11 +145,6 @@ for i in \
     fi
 
     if [ $? -ne 0 ]; then
-        cat "${CLIENT_LOG}.${SUFFIX}"
-        RET=1
-    fi
-
-    if [ $(cat "${CLIENT_LOG}.${SUFFIX}" | grep "PASS" | wc -l) -ne 1 ]; then
         cat "${CLIENT_LOG}.${SUFFIX}"
         RET=1
     fi
@@ -194,48 +162,17 @@ for i in \
    $SIMPLE_STRING_INFER_CLIENT \
    $SIMPLE_ASYNC_INFER_CLIENT \
    $SIMPLE_HEALTH_CLIENT \
-   $SIMPLE_STREAM_INFER_CLIENT \
-   $SIMPLE_SEQUENCE_INFER_CLIENT \
    $SIMPLE_SHM_CLIENT \
    $SIMPLE_CUDASHM_CLIENT \
-   $SIMPLE_IMAGE_CLIENT \
-   $SIMPLE_ENSEMBLE_IMAGE_CLIENT \
+   $SIMPLE_SEQUENCE_INFER_CLIENT \
    ; do
    BASE=$(basename -- $i)
    SUFFIX="${BASE%.*}"
-    if [ $SUFFIX == "v2_image_client" ]; then
-        $i -m inception_graphdef -s INCEPTION -a -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.async.${SUFFIX}" 2>&1
-        if [ `grep -c VULTURE ${CLIENT_LOG}.c++.async.${SUFFIX}` != "1" ]; then
-            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
-            cat $CLIENT_LOG.c++.${SUFFIX}
-            RET=1
-        fi
-        $i -m inception_graphdef -s INCEPTION -a --streaming -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.streaming.${SUFFIX}" 2>&1
-        if [ `grep -c VULTURE ${CLIENT_LOG}.c++.streaming.${SUFFIX}` != "1" ]; then
-            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
-            cat $CLIENT_LOG.c++.${SUFFIX}
-            RET=1
-        fi
-        $i -m inception_graphdef -s INCEPTION -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.${SUFFIX}" 2>&1
-        if [ `grep -c VULTURE ${CLIENT_LOG}.c++.${SUFFIX}` != "1" ]; then
-            echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
-            cat $CLIENT_LOG.c++.${SUFFIX}
-            RET=1
-        fi
-    elif [ $SUFFIX == "v2_ensemble_image_client" ]; then
-        $i -c 1 -i grpc -u localhost:8001 ../images >> "${CLIENT_LOG}.c++.${SUFFIX}" 2>&1
-        for result in "SPORTS CAR" "COFFEE MUG" "VULTURE"; do
-            if [ `grep -c "$result" ${CLIENT_LOG}.c++.${SUFFIX}` != "1" ]; then
-                echo -e "\n***\n*** Failed. Expected 1 $result result\n***"
-                RET=1
-            fi
-        done
-    else
-        $i -v -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
-        if [ $? -ne 0 ]; then
-            cat ${CLIENT_LOG}.c++.${SUFFIX}
-            RET=1
-        fi
+
+    $i -v -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.c++.${SUFFIX}
+        RET=1
     fi
 done
 
@@ -246,7 +183,9 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+
 set -e
+
 kill $SERVER_PID
 wait $SERVER_PID
 
@@ -259,6 +198,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
+
 # Test Model Control API
 python $SIMPLE_MODEL_CONTROL_PY -v >> ${CLIENT_LOG}.model_control 2>&1
 if [ $? -ne 0 ]; then
@@ -270,6 +210,7 @@ if [ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
 fi
+
 set -e
 
 kill $SERVER_PID
@@ -284,12 +225,14 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
+
 # Test Model Control API
 $SIMPLE_MODEL_CONTROL -v >> ${CLIENT_LOG}.c++.model_control 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.c++.model_control
     RET=1
 fi
+
 set -e
 
 kill $SERVER_PID
@@ -308,10 +251,8 @@ fi
 set +e
 
 for i in \
-    $SIMPLE_STREAM_INFER_CLIENT_PY \
-    $SIMPLE_SEQUENCE_INFER_CLIENT_PY \
-    $SIMPLE_STREAM_INFER_CLIENT \
-    $SIMPLE_SEQUENCE_INFER_CLIENT; do
+    $SIMPLE_SEQUENCE_INFER_CLIENT \
+    $SIMPLE_SEQUENCE_INFER_CLIENT_PY; do
 
     $i -v -d >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
@@ -323,6 +264,9 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+
+
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

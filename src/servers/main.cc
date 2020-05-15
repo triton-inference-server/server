@@ -54,11 +54,11 @@ static_assert(
 #endif  // TRTIS_ENABLE_GPU
 
 #if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
-#include "src/servers/http_server_v2.h"
+#include "src/servers/http_server.h"
 #endif  // TRTIS_ENABLE_HTTP|| TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_GRPC
-#include "src/servers/grpc_server_v2.h"
+#include "src/servers/grpc_server.h"
 #endif  // TRTIS_ENABLE_GRPC
 
 namespace {

@@ -34,29 +34,29 @@ from PIL import Image
 import unittest
 
 import grpc
-from tritongrpcclient import grpc_service_v2_pb2
-from tritongrpcclient import grpc_service_v2_pb2_grpc
+from tritongrpcclient import grpc_service_pb2
+from tritongrpcclient import grpc_service_pb2_grpc
 
 _trials = ("graphdef", "libtorch", "netdef", "onnx", "plan", "savedmodel")
 
 class OutputNameValidationTest(unittest.TestCase):
     def requestGenerator(self, model_name, output_name):
-        request = grpc_service_v2_pb2.ModelInferRequest()
+        request = grpc_service_pb2.ModelInferRequest()
         request.model_name = model_name
         request.id = "output name validation"
 
-        input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
+        input = grpc_service_pb2.ModelInferRequest().InferInputTensor()
         input.name = "INPUT0"
         input.datatype = "FP32"
         input.shape.extend([1])
 
-        input_contents = grpc_service_v2_pb2.InferTensorContents()
+        input_contents = grpc_service_pb2.InferTensorContents()
         input_contents.raw_contents = bytes(4 * 'a', 'utf-8')
         input.contents.CopyFrom(input_contents)
 
         request.inputs.extend([input])
 
-        output = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
+        output = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
         output.name = output_name
         request.outputs.extend([output])
 
@@ -64,7 +64,7 @@ class OutputNameValidationTest(unittest.TestCase):
 
     def test_grpc(self):
         channel = grpc.insecure_channel("localhost:8001")
-        grpc_stub = grpc_service_v2_pb2_grpc.GRPCInferenceServiceStub(channel)
+        grpc_stub = grpc_service_pb2_grpc.GRPCInferenceServiceStub(channel)
 
         # Send request with invalid output name
         for trial in _trials:

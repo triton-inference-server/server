@@ -35,12 +35,12 @@ set(GRPC_ENDPOINT_LIBRARIES "")
 if(${TRTIS_ENABLE_GRPC})
   list(APPEND
     GRPC_ENDPOINT_SRCS
-    grpc_server_v2.cc
+    grpc_server.cc
     )
 
   list(APPEND
     GRPC_ENDPOINT_HDRS
-    grpc_server_v2.h
+    grpc_server.h
     )
 
   add_library(
@@ -90,11 +90,11 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
   if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
     list(APPEND
       HTTP_ENDPOINT_SRCS
-      http_server_v2.cc
+      http_server.cc
       )
     list(APPEND
       HTTP_ENDPOINT_HDRS
-      http_server_v2.h
+      http_server.h
       )
   endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 
@@ -224,11 +224,11 @@ install(
 )
 
 #
-# simplev2
+# simple
 #
 set(
   SIMPLE_SRCS
-  simplev2.cc
+  simple.cc
 )
 
 set(
@@ -236,13 +236,13 @@ set(
 )
 
 add_executable(
-  simplev2
+  simple
   ${SIMPLE_SRCS}
   ${SIMPLE_HDRS}
   $<TARGET_OBJECTS:proto-library>
 )
 set_target_properties(
-  simplev2
+  simple
   PROPERTIES
     SKIP_BUILD_RPATH TRUE
     BUILD_WITH_INSTALL_RPATH TRUE
@@ -250,21 +250,21 @@ set_target_properties(
     INSTALL_RPATH ""
 )
 target_link_libraries(
-  simplev2
+  simple
   PRIVATE tritonserver
   PRIVATE protobuf::libprotobuf
 )
 if(${TRTIS_ENABLE_GPU})
-target_include_directories(simplev2 PRIVATE ${CUDA_INCLUDE_DIRS})
+target_include_directories(simple PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
-  simplev2
+  simple
   PUBLIC -L/usr/local/cuda/lib64/stubs
   PUBLIC -lnvidia-ml
   PRIVATE ${CUDA_LIBRARIES}
 )
 endif() # TRTIS_ENABLE_GPU
 install(
-  TARGETS simplev2
+  TARGETS simple
   RUNTIME DESTINATION bin
 )
 

@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servers/http_server_v2.h"
+#include "src/servers/http_server.h"
 
 #include <event2/buffer.h>
 #include <evhtp/evhtp.h>

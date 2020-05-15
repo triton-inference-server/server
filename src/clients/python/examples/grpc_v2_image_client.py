@@ -32,8 +32,8 @@ import os
 import sys
 
 import grpc
-from tritongrpcclient import grpc_service_v2_pb2
-from tritongrpcclient import grpc_service_v2_pb2_grpc
+from tritongrpcclient import grpc_service_pb2
+from tritongrpcclient import grpc_service_pb2_grpc
 import tritongrpcclient.model_config_pb2 as mc
 
 FLAGS = None
@@ -198,7 +198,7 @@ def postprocess(results, filenames, batch_size):
 
 def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
                      result_filenames):
-    request = grpc_service_v2_pb2.ModelInferRequest()
+    request = grpc_service_pb2.ModelInferRequest()
     request.model_name = FLAGS.model_name
     request.model_version = FLAGS.model_version
 
@@ -216,12 +216,12 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
 
     filenames.sort()
 
-    output = grpc_service_v2_pb2.ModelInferRequest().InferRequestedOutputTensor()
+    output = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
     output.name = output_name
     output.parameters['classification'].int64_param = FLAGS.classes
     request.outputs.extend([output])
 
-    input = grpc_service_v2_pb2.ModelInferRequest().InferInputTensor()
+    input = grpc_service_pb2.ModelInferRequest().InferInputTensor()
     input.name = input_name
     input.datatype = dtype
     if format == mc.ModelInput.FORMAT_NHWC:
@@ -253,12 +253,12 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS,
                 input_bytes = image_data[image_idx].tobytes()
             else:
                 input_bytes += image_data[image_idx].tobytes()
-            
+
             image_idx = (image_idx + 1) % len(image_data)
             if image_idx == 0:
                 last_request = True
 
-        input_contents = grpc_service_v2_pb2.InferTensorContents()
+        input_contents = grpc_service_pb2.InferTensorContents()
         input_contents.raw_contents = input_bytes
         input.contents.CopyFrom(input_contents)
         request.inputs.extend([input])
@@ -333,15 +333,15 @@ if __name__ == '__main__':
 
     # Create gRPC stub for communicating with the server
     channel = grpc.insecure_channel(FLAGS.url)
-    grpc_stub = grpc_service_v2_pb2_grpc.GRPCInferenceServiceStub(channel)
+    grpc_stub = grpc_service_pb2_grpc.GRPCInferenceServiceStub(channel)
 
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
-    metadata_request = grpc_service_v2_pb2.ModelMetadataRequest(
+    metadata_request = grpc_service_pb2.ModelMetadataRequest(
         name=FLAGS.model_name, version=FLAGS.model_version)
     metadata_response = grpc_stub.ModelMetadata(metadata_request)
 
-    config_request = grpc_service_v2_pb2.ModelConfigRequest(
+    config_request = grpc_service_pb2.ModelConfigRequest(
         name=FLAGS.model_name, version=FLAGS.model_version)
     config_response = grpc_stub.ModelConfig(config_request)
 
@@ -386,7 +386,7 @@ if __name__ == '__main__':
         else:
             postprocess(response.outputs, result_filenames[idx], FLAGS.batch_size)
         idx += 1
-    
+
     if error_found:
         sys.exit(1)
 

@@ -28,7 +28,7 @@ cmake_minimum_required (VERSION 3.5)
 
 if(NOT WIN32)
   #
-  # libcshmv2.so
+  # libcshm.so
   #
   add_library(cshm SHARED shared_memory/shared_memory.cc)
   if(${TRTIS_ENABLE_GPU})
@@ -37,7 +37,7 @@ if(NOT WIN32)
   target_link_libraries(cshm rt)
 
   #
-  # libccudashmv2.so
+  # libccudashm.so
   #
   if(${TRTIS_ENABLE_GPU})
     add_library(
