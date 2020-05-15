@@ -77,6 +77,7 @@ Usage(char** argv, const std::string& msg = std::string())
 
   std::cerr << "Usage: " << argv[0] << " [options]" << std::endl;
   std::cerr << "\t-v" << std::endl;
+  std::cerr << "\t-m <model name>" << std::endl;
   std::cerr << "\t-u <URL for inference service>" << std::endl;
   std::cerr << "\t-H <HTTP header>" << std::endl;
   std::cerr << std::endl;
@@ -93,15 +94,19 @@ int
 main(int argc, char** argv)
 {
   bool verbose = false;
+  bool use_custom_model = false;
   std::string url("localhost:8001");
   nic::Headers http_headers;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vu:H:")) != -1) {
+  while ((opt = getopt(argc, argv, "vcu:H:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
+        break;
+      case 'c':
+        use_custom_model = true;
         break;
       case 'u':
         url = optarg;
@@ -122,7 +127,7 @@ main(int argc, char** argv)
   // each and returns 2 output tensors of 16 integers each. One output
   // tensor is the element-wise sum of the inputs and one output is
   // the element-wise difference.
-  std::string model_name = "simple";
+  std::string model_name = use_custom_model ? "simple_custom" : "simple";
   std::string model_version = "";
 
   // Create a InferenceServerGrpcClient instance to communicate with the

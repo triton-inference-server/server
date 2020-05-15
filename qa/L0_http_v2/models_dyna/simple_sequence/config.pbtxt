@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,36 +24,79 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "simple"
+name: "simple_sequence"
 platform: "custom"
 max_batch_size: 8
-default_model_filename: "libaddsub.so"
+default_model_filename: "libdyna_sequence.so"
+sequence_batching {
+    max_sequence_idle_microseconds: 10000000
+    oldest {
+      max_candidate_sequences: 1024
+      max_queue_delay_microseconds: 10000
+    }
+
+  control_input [
+    {
+      name: "START"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_START
+          int32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "END"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_END
+          int32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "READY"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_READY
+          int32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "CORRID"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_CORRID
+          data_type: TYPE_UINT64
+        }
+      ]
+    }
+  ]
+}
 input [
   {
-    name: "INPUT0"
+    name: "INPUT"
     data_type: TYPE_INT32
-    dims: [ 16 ]
-  },
-  {
-    name: "INPUT1"
-    data_type: TYPE_INT32
-    dims: [ 16 ]
+    dims: [ 1 ]
   }
 ]
 output [
   {
-    name: "OUTPUT0"
+    name: "OUTPUT"
     data_type: TYPE_INT32
-    dims: [ 16 ]
-  },
+    dims: [ 1 ]
+  }
+]
+parameters [
   {
-    name: "OUTPUT1"
-    data_type: TYPE_INT32
-    dims: [ 16 ]
+    key: "execute_delay_ms"
+    value: { string_value: "3" }
   }
 ]
 instance_group [
   {
+    count: 2
     kind: KIND_CPU
   }
 ]

@@ -39,6 +39,12 @@ if __name__ == '__main__':
                         required=False,
                         default=False,
                         help='Enable verbose output')
+    parser.add_argument('-c',
+                        '--use_custom_model',
+                        action="store_true",
+                        required=False,
+                        default=False,
+                        help='Use custom model')
     parser.add_argument('-u',
                         '--url',
                         type=str,
@@ -54,7 +60,7 @@ if __name__ == '__main__':
         print("channel creation failed: " + str(e))
         sys.exit()
 
-    model_name = 'simple'
+    model_name = "simple_custom" if FLAGS.use_custom_model else "simple" 
 
     # Infer
     inputs = []

@@ -159,6 +159,6 @@ if __name__ == '__main__':
             # to the last request in a sequence.
             if FLAGS.dyna and (values[i] == 1):
                 seq0_expected += sequence_id0
-                seq1_expected += sequence_id0
+                seq1_expected += sequence_id1
 
     print("PASS: Sequence")
