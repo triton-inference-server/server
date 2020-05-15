@@ -459,8 +459,8 @@ SetStringInputTensor(
   // copy it there.
   auto buffer_memory_type = TRITONSERVER_MEMORY_CPU_PINNED;
   int64_t buffer_memory_type_id = 0;
-  const char* content;
-  size_t content_byte_size;
+  const char* content = nullptr;
+  size_t content_byte_size = 0;
 
   std::unique_ptr<AllocatedMemory> contiguous_buffer;
   Status status = GetContiguousInputContent(
