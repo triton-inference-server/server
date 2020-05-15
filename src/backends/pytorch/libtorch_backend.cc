@@ -487,9 +487,9 @@ LibTorchBackend::Context::ReadOutputTensors(
 
     responder.ProcessTensor(
         name, dtype, batchn_shape, output_buffer,
-        ((device_ == torch::kCUDA)) ? TRITONSERVER_MEMORY_GPU
-                                    : TRITONSERVER_MEMORY_CPU,
-        ((device_ == torch::kCUDA)) ? gpu_device_ : 0);
+        (device_ == torch::kCPU) ? TRITONSERVER_MEMORY_CPU
+                                 : TRITONSERVER_MEMORY_GPU,
+        (device_ == torch::kCPU) ? 0 : gpu_device_);
   }
 
   // Finalize and wait for any pending buffer copies.
